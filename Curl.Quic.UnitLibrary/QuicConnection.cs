@@ -12,7 +12,7 @@ namespace Curl.Quic;
 /// the channel; they change the <see cref="QuicClientConnectionState" />'s streams under one lock
 /// and wait for the loop to report that something arrived.
 /// </summary>
-public sealed class QuicConnection : IMultiplexedConnection
+public sealed class QuicConnection : IMultiplexedConnection, IDatagramCarryingConnection, IPeerBidirectionalStreamAccepting
 {
     private const int ReceiveBufferLength = (int)QuicTransportParameters.DefaultMaxUdpPayloadSize;
 
@@ -85,6 +85,34 @@ public sealed class QuicConnection : IMultiplexedConnection
     /// <inheritdoc />
     public ValueTask<IMultiplexedStream> AcceptUnidirectionalStreamAsync(CancellationToken cancellationToken) =>
         WaitForStreamAsync(streams => streams.AcceptUnidirectional(), cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask<IMultiplexedStream> AcceptBidirectionalStreamAsync(CancellationToken cancellationToken) =>
+        WaitForStreamAsync(streams => streams.AcceptBidirectional(), cancellationToken);
+
+    /// <inheritdoc />
+    public int MaxDatagramPayloadLength
+    {
+        get
+        {
+            lock (gate)
+            {
+                return state.MaxDatagramPayloadLength;
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public ValueTask SendDatagramAsync(ReadOnlyMemory<byte> datagram, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Change(() => state.SendDatagram(datagram));
+        return ValueTask.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public ValueTask<ReadOnlyMemory<byte>> ReceiveDatagramAsync(CancellationToken cancellationToken) =>
+        WaitForAsync(state.TakeReceivedDatagram, cancellationToken);
 
     /// <inheritdoc />
     public async ValueTask CloseAsync(long applicationErrorCode, CancellationToken cancellationToken)

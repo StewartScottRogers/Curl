@@ -75,6 +75,10 @@ the Schannel build ignores `--crlfile`. The hand-built path's other exit 35 text
 `TlsFailureMessages.SchannelHandBuiltHandshakeFailure` and `OpenSslHandBuiltHandshakeFailure`.
 Its tests run it against a server-side `SslStream` over `Fakes/InMemoryDuplexStream`, TLS 1.3
 excluded on macOS, and compare each failure with `SslStreamTlsProvider`'s.
+Per ADR-1052 (BL-4249) both providers implement `ITlsProvider.VerifyServerCertificateChain` through
+`ServerCertificateVerification.VerifyChain`, which reads the trust anchors and judges a chain with
+`HandBuiltCertificateVerifier` apart from any handshake, so an extension running its own handshake
+(DTLS) gets the handshake's exit 60, 77 or 90 and message; no stapled OCSP response is checked there.
 
 This is the one project allowed to construct a `Socket`, and only inside a transport
 type: `TcpDialer` (behind `ITcpDialer`) and `TcpConnectionListener` with its
@@ -580,7 +584,9 @@ cancels and disposes local UDP sockets without sending anything.
 the in-memory `Fakes/InMemoryDuplexStream` pair, with a self-signed certificate made in
 the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
 `TcpPendingConnectionTests` bind local TCP sockets without connecting to them
-(`TcpPendingConnection.HasConnectionWaiting`, which polls the listening socket, is pinned on one nothing connects to, BL-2638). The tests that
+(`TcpPendingConnection.HasConnectionWaiting`, which polls the listening socket, is pinned on one nothing connects to, BL-2638),
+except `TcpPendingConnectionTests`' one accept of a loopback peer that sends nothing, which sees the
+FIN when the accepted connection is disposed, so the accepted socket stays owned (AF-0458, ADR-1022). The tests that
 connect or send bytes are the loopback tests in `TcpDialerTests` (TCP and Unix socket), `UdpDatagramChannelTests`,
 `TcpConnectorTests.LocalEndPoint` (plain and over TLS) and the accepting test in `TcpConnectionListenerTests`, tagged
 `[TestCategory("Integration")]`, as is `DnsSocketOpenerTests`' TCP connect. Per ADR-0083 the members only those tests can reach,

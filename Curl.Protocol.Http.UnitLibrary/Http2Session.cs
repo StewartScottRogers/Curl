@@ -36,6 +36,16 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     internal const int StreamReceiveWindowSize = 10 * 1024 * 1024;
 
     /// <summary>
+    /// Gets the receive window a stream is grown to: <see cref="StreamReceiveWindowSize" />, or half
+    /// the <c>--limit-rate</c> when that is smaller (curl 8.18.0 sends 139265 = 204800 - 65535 for
+    /// <c>--limit-rate 400k</c>; CGR-281).
+    /// </summary>
+    /// <param name="receiveBytesPerSecond">The receive rate, or <see langword="null" /> for none.</param>
+    /// <returns>The window size in bytes.</returns>
+    internal static int StreamReceiveWindowSizeFor(long? receiveBytesPerSecond) =>
+        receiveBytesPerSecond is { } rate ? (int)Math.Min(StreamReceiveWindowSize, rate / 2) : StreamReceiveWindowSize;
+
+    /// <summary>
     /// How many times curl 8.18.0 sends the stream's WINDOW_UPDATE after HEADERS, each with
     /// the same increment: twice (measured, BL-817 Notes).
     /// </summary>
@@ -248,7 +258,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
             isPrefaceSent = true;
             isUpgradeSettingsDue = true;
             int streamId = Register(Frames.OpenUpgradedStream(), receiver);
-            await SendStreamWindowUpdatesAsync(streamId, cancellationToken).ConfigureAwait(false);
+            await SendStreamWindowUpdatesAsync(streamId, receiver.ReceiveBytesPerSecond, cancellationToken).ConfigureAwait(false);
             isUpgradedStreamOpened = true;
             return streamId;
         }
@@ -266,14 +276,15 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// 10420224 on the next (measured, BL-817 Notes). After an h2c upgrade the settings count as acknowledged once stream 1 is open, so later streams get 10420224 (CGR-277).
     /// </summary>
     /// <param name="streamId">The stream whose window grows.</param>
+    /// <param name="receiveBytesPerSecond">The transfer's <c>--limit-rate</c>, or <see langword="null" /> for none.</param>
     /// <param name="cancellationToken">Cancels the writes.</param>
     /// <returns>A task that completes when both frames are written.</returns>
-    internal async ValueTask GrowStreamReceiveWindowAsync(int streamId, CancellationToken cancellationToken)
+    internal async ValueTask GrowStreamReceiveWindowAsync(int streamId, long? receiveBytesPerSecond, CancellationToken cancellationToken)
     {
         await frameLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await SendStreamWindowUpdatesAsync(streamId, cancellationToken).ConfigureAwait(false);
+            await SendStreamWindowUpdatesAsync(streamId, receiveBytesPerSecond, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -281,12 +292,13 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         }
     }
 
-    private async ValueTask SendStreamWindowUpdatesAsync(int streamId, CancellationToken cancellationToken)
+    private async ValueTask SendStreamWindowUpdatesAsync(int streamId, long? receiveBytesPerSecond, CancellationToken cancellationToken)
     {
         int initialWindowSize = Frames.IsClientSettingsAcknowledged || isUpgradedStreamOpened ? Http2Connection.ClientInitialWindowSize : Http2Settings.DefaultInitialWindowSize;
-        for (int sent = 0; sent < StreamWindowUpdateCount; sent++)
+        int increment = StreamReceiveWindowSizeFor(receiveBytesPerSecond) - initialWindowSize;
+        for (int sent = 0; sent < StreamWindowUpdateCount && increment > 0; sent++)
         {
-            await Frames.IncreaseStreamReceiveWindowAsync(streamId, StreamReceiveWindowSize - initialWindowSize, cancellationToken).ConfigureAwait(false);
+            await Frames.IncreaseStreamReceiveWindowAsync(streamId, increment, cancellationToken).ConfigureAwait(false);
         }
     }
 

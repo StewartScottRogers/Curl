@@ -252,6 +252,20 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectMultiplexedAsync_ThroughAnHttpsProxy_MakesItsHandshakeAsTheProxys()
+    {
+        // The proxy's handshake is reported and verified as the proxy's (AF-0456).
+        var tls = new FakeTlsProvider { FailureToReturn = ConnectResult.Failed(CurlExitCode.SslConnectError, "handshake failed") };
+        var target = TunnelTarget() with { Proxy = TunnelHttpProxy with { Kind = ProxyKind.Https } };
+        Diagnostics.Arrange("proxy kind", ProxyKind.Https);
+
+        await ConnectMultiplexedAsync(TunnelConnector(_ => new FakeConnection(), tlsProvider: tls), target);
+
+        Diagnostics.Assert("isProxy of each handshake", "True", string.Join(",", tls.ReceivedIsProxy));
+        CollectionAssert.AreEqual(new[] { true }, tls.ReceivedIsProxy);
+    }
+
+    [TestMethod]
     public async Task ConnectMultiplexedAsync_WhenTheHttpsProxysHandshakeFails_FailsWithItsExitCode()
     {
         var tls = new SequencedTlsProvider(ConnectResult.Failed(CurlExitCode.SslConnectError, "handshake failed"));

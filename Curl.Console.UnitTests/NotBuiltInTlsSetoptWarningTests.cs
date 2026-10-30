@@ -7,8 +7,10 @@ namespace Curl.Console;
 /// <summary>
 /// Pins that <see cref="ToolEasyHandle.SetOptions(IEnumerable{EasySetopt}, Func{EasySetopt, CurlCode})" /> carries on
 /// past a <c>CURLE_NOT_BUILT_IN</c> answer to <c>CURLOPT_CAPATH</c>, <c>CURLOPT_PROXY_CAPATH</c>,
-/// <c>CURLOPT_TLS13_CIPHERS</c> and <c>CURLOPT_PROXY_TLS13_CIPHERS</c>, as curl 8.22.0's <c>config2setopts</c> does,
-/// and still stops at any other refusal (BL-4029, ADR-0975).
+/// <c>CURLOPT_TLS13_CIPHERS</c>, <c>CURLOPT_PROXY_TLS13_CIPHERS</c>, <c>CURLOPT_CRLFILE</c>,
+/// <c>CURLOPT_PROXY_CRLFILE</c>, <c>CURLOPT_SSL_EC_CURVES</c>, <c>CURLOPT_SSL_SIGNATURE_ALGORITHMS</c> and
+/// <c>CURLOPT_TCP_FASTOPEN</c>, as curl 8.22.0's <c>config2setopts</c> does, and still stops at any other refusal
+/// (BL-4029, ADR-0975, BL-4182, ADR-1036).
 /// </summary>
 [TestClass]
 public sealed class NotBuiltInTlsSetoptWarningTests
@@ -18,6 +20,11 @@ public sealed class NotBuiltInTlsSetoptWarningTests
     [DataRow(CurlOption.ProxyCapath)]
     [DataRow(CurlOption.Tls13Ciphers)]
     [DataRow(CurlOption.ProxyTls13Ciphers)]
+    [DataRow(CurlOption.Crlfile)]
+    [DataRow(CurlOption.ProxyCrlfile)]
+    [DataRow(CurlOption.SslEcCurves)]
+    [DataRow(CurlOption.SslSignatureAlgorithms)]
+    [DataRow(CurlOption.TcpFastopen)]
     public void SetOptions_NotBuiltInForAnIgnoredTlsOption_CarriesOnWithTheCallsAfterIt(CurlOption option)
     {
         List<CurlOption> made = [];

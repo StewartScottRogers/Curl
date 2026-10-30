@@ -40,6 +40,17 @@ public sealed class ManagedCurlEngine : ICurlEngine
     }
 
     /// <summary>
+    /// Creates the engine on the system clock and the real network, with no easy error text, its transfers reaching the
+    /// handlers <paramref name="extensionHandlers" /> builds after curl's own (ADR-0999): the factory <c>Curl.Api</c> and
+    /// <c>Curl.Mcp</c> pass in from <c>Curl.Extension.Composition</c>. The engine never references an extension.
+    /// </summary>
+    /// <param name="extensionHandlers">Builds the extensions' handlers over the transfer's transports; <see langword="null" /> for curl's alone.</param>
+    public ManagedCurlEngine(Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers)
+        : this(TimeProvider.System, null, extensionHandlers: extensionHandlers)
+    {
+    }
+
+    /// <summary>
     /// Creates the engine on <paramref name="timeProvider" />, building each transfer's dispatcher
     /// with <paramref name="createDispatcher" />, or <see cref="CreateDispatcher" />'s production one.
     /// </summary>
@@ -94,6 +105,10 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <c>stderr</c>: the conformance harness's case stderr (upstream tests 1506 and 1510, BL-2726); <see langword="null" />
     /// for the process's standard error.
     /// </param>
+    /// <param name="extensionHandlers">
+    /// Builds the handlers a host's extensions add after curl's own in the production dispatcher (ADR-0999);
+    /// <see langword="null" /> for curl's alone. Ignored when <paramref name="createDispatcher" /> is given.
+    /// </param>
     internal ManagedCurlEngine(
         TimeProvider timeProvider,
         Func<EasyOptions, ManagedEngineSharedState, ICookieStore?, ProtocolDispatcher>? createDispatcher,
@@ -105,11 +120,14 @@ public sealed class ManagedCurlEngine : ICurlEngine
         Stream? standardInput = null,
         bool stopsFirstFtpTransferBeforePwd = false,
         Func<string>? createFormBoundary = null,
-        Stream? standardError = null)
+        Stream? standardError = null,
+        Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers = null)
     {
         shared = new ManagedEngineSharedState(timeProvider, easyErrorText ?? (_ => string.Empty), readEnvironmentVariable, dialing, signingClock, webSocketRandomSource, FirstTransferFtpPwdStop.When(stopsFirstFtpTransferBeforePwd), createFormBoundary, readEnvironmentVariable is not null && EngineComposition.LearnsHstsOverHttp(honoursHstsHttpVariable: true, readEnvironmentVariable));
         handleHost = HandleHostOf(standardInput, readEnvironmentVariable, standardError);
-        this.createDispatcher = createDispatcher is null ? CreateDispatcher : (options, state, cookies, _, _, _) => createDispatcher(options, state, cookies);
+        this.createDispatcher = createDispatcher is null
+            ? (options, state, cookies, pushSink, rtspSession, webSocketPerformConnection) => CreateDispatcher(options, state, cookies, pushSink, rtspSession, webSocketPerformConnection, extensionHandlers)
+            : (options, state, cookies, _, _, _) => createDispatcher(options, state, cookies);
     }
 
     /// <summary>
@@ -214,8 +232,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <param name="pushSink">Where the HTTP handler offers HTTP/2 server pushes (<see cref="EngineHttp2PushSink" />, BL-2469), or <see langword="null" /> to refuse them.</param>
     /// <param name="rtspSession">The handle's RTSP state, whose settings and session the RTSP handler sends (BL-2704), or <see langword="null" /> for the curl tool's <c>OPTIONS *</c>.</param>
     /// <param name="webSocketPerformConnection">The handle's WebSocket perform connection, which <c>curl_ws_send</c> from a write callback writes to (BL-2710), or <see langword="null" /> for none.</param>
+    /// <param name="extensionHandlers">Builds the handlers a host's extensions add after curl's own (ADR-0999), or <see langword="null" /> for curl's alone.</param>
     /// <returns>The dispatcher.</returns>
-    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null, HandleRtspSession? rtspSession = null, WsPerformConnection? webSocketPerformConnection = null)
+    internal static ProtocolDispatcher CreateDispatcher(EasyOptions options, ManagedEngineSharedState shared, ICookieStore? cookieStore, IHttp2PushSink? pushSink = null, HandleRtspSession? rtspSession = null, WsPerformConnection? webSocketPerformConnection = null, Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers = null)
     {
         CurlTransports transports = CreateTransports(options, shared);
         IConnector connector = PrerequestConnector.Over(PoolOf(transports, transports.TcpConnector, options.Callbacks, shared), options.Callbacks.Prerequest);
@@ -240,7 +259,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
             http2PushSink: pushSink,
             webSocketRandomSource: shared.WebSocketRandomSource,
             ftpStopsBeforeEntryPath: shared.FtpPwdStop?.TryClaim() == true,
-            socketWait: shared.SocketWait));
+            socketWait: shared.SocketWait,
+            extensionHandlers: extensionHandlers));
     }
 
     /// <summary>

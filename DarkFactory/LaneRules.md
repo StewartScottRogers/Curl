@@ -60,6 +60,13 @@ Flat: every project is a directory immediately under the repository root. No `sr
 no `tests/`. `Documentation/` and `Tasks/` are shared projects; `data/` is never read or
 modified; never edit anything under `bin/`, `obj/` or `.vs/`.
 - Production library `Curl.<Area>.UnitLibrary`, protocols `Curl.Protocol.<Name>.UnitLibrary`.
+- Extensions (what Curl adds beyond upstream curl, ADR-0999): `Curl.Extension.<Name>.UnitLibrary`,
+  in `/Extensions/<Name>/` in `Curl.slnx` (one single-line `<Folder>` holding both projects, added directly
+  under the marker comment there; Composition references extensions by wildcard, ADR-1003), registered by one line in
+  `Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs`. It references only
+  `Curl.Protocol.Abstractions`, the shared layers and `Curl.Extension.Abstractions`; nothing but the
+  hosts and the extensions references it (the build enforces both). It never changes curl's
+  behaviour, and is tested against its specification, not against curl.
 - Tests: the same name with `.UnitTests`; Integration tests with `.IntegrationTests`.
 - Exceptions: `Curl.Console` (the executable), `Curl.Api` and `Libcurl` (programming
   interfaces), `Curl.Mcp` (MCP server host). `Curl.Api.UnitTests` tests `Curl.Api` and

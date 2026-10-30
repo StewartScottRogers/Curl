@@ -20,7 +20,7 @@ public sealed class CurlMcpHostTests
     [TestMethod]
     public void CreateRegistry_RegistersExactlyTheFiveToolsInTheGoldenOrder()
     {
-        McpServerRegistry registry = CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, Cap);
+        McpServerRegistry registry = CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, Cap, _ => null, _ => []);
 
         CollectionAssert.AreEqual(
             new[] { "parse_url", "transfer", "curl", "build_url", "version" },
@@ -30,7 +30,7 @@ public sealed class CurlMcpHostTests
     [TestMethod]
     public void CreateRegistry_RegistersEveryAiHelpResource()
     {
-        McpServerRegistry registry = CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, Cap);
+        McpServerRegistry registry = CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, Cap, _ => null, _ => []);
 
         CollectionAssert.AreEqual(
             McpAiHelpResourceCatalogue.Resources.Select(resource => resource.Uri).ToArray(),
@@ -40,7 +40,7 @@ public sealed class CurlMcpHostTests
     [TestMethod]
     public void CreateHandlers_AnswersTheToolResourceAndLoggingMethods()
     {
-        IEnumerable<IMcpMethodHandler> handlers = CurlMcpHost.CreateHandlers(McpConfinementRoot.NotConfigured, Cap, _ => { });
+        IEnumerable<IMcpMethodHandler> handlers = CurlMcpHost.CreateHandlers(McpConfinementRoot.NotConfigured, Cap, _ => null, _ => { });
 
         CollectionAssert.AreEquivalent(
             new[] { "tools/list", "tools/call", "resources/list", "resources/read", "logging/setLevel" },
@@ -96,5 +96,16 @@ public sealed class CurlMcpHostTests
         {
             Environment.SetEnvironmentVariable(McpResponseCap.VariableName, before);
         }
+    }
+
+    [TestMethod]
+    public void Build_OverTheProcessTwice_BuildsTwoSeparateHosts()
+    {
+        // The second call reuses the delegate the compiler cached for the environment reader on the first.
+        using McpStdioHost first = CurlMcpHost.Build();
+
+        using McpStdioHost second = CurlMcpHost.Build();
+
+        Assert.AreNotSame(first, second);
     }
 }

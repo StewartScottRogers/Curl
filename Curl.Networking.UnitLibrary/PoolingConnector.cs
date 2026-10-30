@@ -112,6 +112,11 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         new(innerConnector, _cache, _configuration, _connectTo) { WaitsForMultiplexing = WaitsForMultiplexing, PlainTcpMayMultiplex = PlainTcpMayMultiplex, MaximumConnectionLifetime = MaximumConnectionLifetime, FreshConnect = FreshConnect, ForbidReuse = ForbidReuse };
 
     /// <summary>
+    /// Gets what the inner connector's handshake for HTTP over TLS to an origin offers through ALPN (ADR-1066).
+    /// </summary>
+    public IReadOnlyList<string> HttpOverTlsApplicationProtocols => _innerConnector.HttpOverTlsApplicationProtocols;
+
+    /// <summary>
     /// Gets a value indicating whether this connector's transfers open a new connection although the pool holds an
     /// idle or shareable one with their key: curl's <c>CURLOPT_FRESH_CONNECT</c>. The connection it opens is pooled
     /// afterwards like any other, unless <see cref="ForbidReuse" /> is also set (BL-3326).

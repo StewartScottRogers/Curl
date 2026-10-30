@@ -65,5 +65,41 @@ public sealed class TcpDialerSocketCreatedTests
         ITcpDialer dialer = new FakeTcpDialer();
 
         Assert.AreSame(dialer, dialer.PublishingSocketsTo(_ => { }));
+        Assert.AreSame(dialer, dialer.HoldingFailedSocketsUntil(_ => ValueTask.CompletedTask));
+    }
+
+    [TestMethod]
+    public async Task CloseFailedSocketAsync_DialerHoldingFailedSockets_ClosesOnlyOnceTheHoldEnds()
+    {
+        TaskCompletionSource released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        List<nint> published = [];
+        var dialer = (TcpDialer)new TcpDialer().HoldingFailedSocketsUntil(_ => new ValueTask(released.Task)).PublishingSocketsTo(published.Add);
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        dialer.PrepareToConnect(socket);
+
+        ValueTask closing = dialer.CloseFailedSocketAsync(socket, CancellationToken.None);
+        bool openWhileHeld = socket.SafeHandle.IsClosed is false;
+        released.SetResult();
+        await closing;
+
+        Assert.IsTrue(openWhileHeld);
+        Assert.IsTrue(socket.SafeHandle.IsClosed);
+        Assert.HasCount(1, published);
+    }
+
+    [TestMethod]
+    public async Task CloseFailedSocketAsync_NoHold_ClosesAtOnce()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        await new TcpDialer().CloseFailedSocketAsync(socket, CancellationToken.None);
+
+        Assert.IsTrue(socket.SafeHandle.IsClosed);
+    }
+
+    [TestMethod]
+    public void HoldingFailedSocketsUntil_NullHook_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => new TcpDialer().HoldingFailedSocketsUntil(null!));
     }
 }

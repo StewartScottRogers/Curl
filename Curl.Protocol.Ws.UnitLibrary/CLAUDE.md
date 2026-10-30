@@ -19,8 +19,8 @@ runs the same upgrade as `ExecuteAsync` but stops after the `101`, returning a
 `WsUpgradeOutcome` with the open connection (the caller owns it) and the bytes after the head;
 `WsFrameEncoder.Encode(opcode, isFinal, ...)` writes any masked client frame;
 `WsFrameMetadataDecoder` decodes incrementally into `WsFrameRun`s (opcode, FIN, offset, bytes
-left) with the completed ping and the tool decoder's own violation messages. These types are the
-library's own (`WsOpcode` included): it must not reference `Curl.Api`.
+left) with the completed ping and the tool decoder's own violation messages. These types live in the shared
+`Curl.WebSocket.UnitLibrary` (ADR-1017), `WsOpcode` included: this library must not reference `Curl.Api`.
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnector`
 so the tests in the matching `.UnitTests` project can drive this code from a
@@ -36,7 +36,7 @@ URL's credentials and the `Authorization` value are never written.
 `--trace-config ws` (ADR-0370, BL-1164): `WsFrameTrace` writes curl 8.21.0's `[WS]` lines
 through the transfer's events when the handler's `TracesFrames` is set - the chunk size and
 upload reader after the `101`, each frame decoded and each run of payload passed on (from
-`WsFrameDecoder`), the pong sent (from `WsFrameReceiver`), the upload frame encoded and
+`WsFrameDecoder` through `WsFrameDecodeReporter`), the pong sent (from `WsFrameReceiver`), the upload frame encoded and
 `websocket established, callback mode`.
 
 `CURLWS_RAW_MODE` on a transfer that exchanges frames (BL-2494): with `WsProtocolHandler.RawMode`

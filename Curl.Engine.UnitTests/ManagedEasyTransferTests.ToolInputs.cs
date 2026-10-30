@@ -200,6 +200,18 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_NoToolInputsAndResumeFromZero_PassesNoResumeOffset()
+    {
+        RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
+        await using ManagedEasyTransfer easy = EasyOver(handler);
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://h/x" }, Transfer = new() { ResumeFrom = 0 } };
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.IsNull(handler.Contexts.Single().ResumeFrom);
+    }
+
+    [TestMethod]
     public async Task Duplicate_HandleWithToolInputs_DoesNotCopyThemAndResetClearsThem()
     {
         await using ManagedEasyTransfer easy = EasyOver(RecordingProtocolHandler.WritingPath("http"));

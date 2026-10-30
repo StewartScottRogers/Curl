@@ -5,8 +5,8 @@ namespace Curl.Protocol.Abstractions;
 /// <summary>
 /// Maps a host name that is not ASCII as IDNA (UTS #46, non-transitional, Unicode 15.1) does before
 /// it is converted to punycode, as libidn2 2.3.8 does for curl 8.22.0: every character the IDNA
-/// mapping table maps (including <c>disallowed_STD3_mapped</c>, as libidn2 does not apply the STD3
-/// rules) is replaced by its mapping, ignored characters are dropped, and the result is put in
+/// mapping table maps (including <c>disallowed_STD3_mapped</c>, refused only in a label that stays
+/// outside ASCII, ADR-1000) is replaced by its mapping, ignored characters are dropped, and the result is put in
 /// Normalization Form C (canonical decomposition, canonical reordering and composition, Hangul
 /// included). <c>ß</c> and final sigma (deviations) and disallowed characters stay as they are.
 /// Curl runs with invariant globalization, where <see cref="System.Globalization.IdnMapping" /> and
@@ -24,6 +24,8 @@ internal static class CurlUrlHostNameMapping
     public const string CharactersMappedToNothing =
         "­͏᠋᠌᠍᠎᠏​‌‍⁠"
         + "︀︁︂︃︄︅︆︇︈︉︊︋︌︍︎️﻿";
+
+    private const string ReplacementCharacterText = "�";
 
     private const int HangulSyllableBase = 0xAC00;
 
@@ -55,6 +57,7 @@ internal static class CurlUrlHostNameMapping
     public static string Map(string name)
     {
         var mapped = new StringBuilder(name.Length);
+        var mappingsOutsideStd3Rules = new List<int>();
         foreach (Rune character in name.EnumerateRunes())
         {
             if (character.IsBmp && CharactersMappedToNothing.Contains((char)character.Value))
@@ -64,6 +67,7 @@ internal static class CurlUrlHostNameMapping
 
             if (Mappings.TryGetValue(character.Value, out string? mapping))
             {
+                AddIfOutsideStd3Rules(mappingsOutsideStd3Rules, mapping, mapped.Length);
                 mapped.Append(mapping);
             }
             else
@@ -72,7 +76,46 @@ internal static class CurlUrlHostNameMapping
             }
         }
 
+        RefuseMappingsOutsideStd3RulesInLabelsNotAscii(mapped, mappingsOutsideStd3Rules);
+
         return Compose(Decompose(mapped.ToString()));
+    }
+
+    /// <summary>
+    /// Records that the mapping appended at <paramref name="index" /> holds an ASCII character other
+    /// than a letter, digit, hyphen or dot (U+2100 maps to <c>a/c</c>, U+FDFA to text with spaces).
+    /// </summary>
+    private static void AddIfOutsideStd3Rules(List<int> mappingsOutsideStd3Rules, string mapping, int index)
+    {
+        if (mapping.Any(character => character < 0x80 && !char.IsAsciiLetterOrDigit(character) && character is not ('-' or '.')))
+        {
+            mappingsOutsideStd3Rules.Add(index);
+        }
+    }
+
+    /// <summary>
+    /// Replaces the first character of each mapping outside the STD3 rules with U+FFFD, so the host is
+    /// refused, when the label it lands in holds a character outside ASCII once mapped: libidn2 2.3.8
+    /// passes a label that maps to ASCII as it is (<c>a℀b</c> is <c>aa/cb</c>, <c>a︐b</c> is
+    /// <c>a,b</c>), but refuses such a mapping in a label it converts to punycode (<c>a℀é</c>,
+    /// <c>aﹰb</c>, whose mapping is a space and an Arabic mark), while <c>a℀.é</c> is
+    /// <c>aa/c.xn--9ca</c> (BL-4076, BL-4079).
+    /// </summary>
+    private static void RefuseMappingsOutsideStd3RulesInLabelsNotAscii(StringBuilder mapped, List<int> mappingsOutsideStd3Rules)
+    {
+        string text = mapped.ToString();
+        foreach (int index in mappingsOutsideStd3Rules.Where(index => LabelAt(text, index).ContainsAnyInRange('\u0080', char.MaxValue)))
+        {
+            mapped[index] = ReplacementCharacterText[0];
+        }
+    }
+
+    private static ReadOnlySpan<char> LabelAt(string text, int index)
+    {
+        int start = text.LastIndexOf('.', index) + 1;
+        int end = text.IndexOf('.', index);
+
+        return text.AsSpan(start, (end < 0 ? text.Length : end) - start);
     }
 
     private static List<int> Decompose(string mapped)

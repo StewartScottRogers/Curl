@@ -12,6 +12,9 @@ using Curl.Core.Globbing;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
 using Curl.Engine;
+using Curl.Extension.Abstractions;
+using Curl.Extension.Abstractions.Arguments;
+using Curl.Extension.Composition;
 using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
@@ -293,6 +296,8 @@ namespace Curl.Console;
 /// harness turn it on to reach the hand-built ECH.
 /// </param>
 /// <param name="debugWriteOut">What <c>-w</c> prints in place of the clock, the measured values and the library version under curl's debug-build test variables; <see langword="null" />, the default, prints them as measured (ADR-0732, BL-2909).</param>
+/// <param name="extensionOptions">The extensions' long options the parser reads where curl has no option of that name (ADR-1006); <see langword="null" />, the default, reads every registered extension's (<see cref="ExtensionCommandLineOptions.For" />). None is read under <c>CURL_EXTENSIONS=0</c>. Tests pass their own to reach an option no extension registers yet.</param>
+/// <param name="argumentExpanders">The extensions' argument expanders, each replacing its option and value with curl arguments before the command line is parsed (ADR-1040); <see langword="null" />, the default, uses every registered one (<see cref="ExtensionArgumentExpanderCatalogue.Entries" />). None is used under <c>CURL_EXTENSIONS=0</c>. Tests pass their own to reach an expander no extension registers yet.</param>
 /// <param name="parsesAsWindowsBuild">Whether the command line is read as curl's Windows Schannel build reads it (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild" />); <see langword="null" />, the default, reads it as this process's platform's build does. Tests pass <see langword="false" /> to reach the HTTP/2 options and <c>--ssl-sessions</c> on any platform.</param>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
@@ -328,7 +333,9 @@ internal sealed class CurlCommandRunner(
     ICurlEngine? curlEngine = null,
     Func<Api.Options.EasyOptions, IReadOnlyList<EasySetopt>>? easySetoptsOf = null,
     DebugWriteOutStandIn? debugWriteOut = null,
-    bool parsesAsEchBuild = false)
+    bool parsesAsEchBuild = false,
+    IReadOnlyList<ExtensionOption>? extensionOptions = null,
+    IReadOnlyList<IArgumentExpander>? argumentExpanders = null)
 {
     /// <summary>
     /// The line curl 8.21.0's own write callback prints, with no <c>(23)</c>, when standard
@@ -831,8 +838,20 @@ internal sealed class CurlCommandRunner(
     /// <returns>The process exit code.</returns>
     internal async Task<int> RunAsync(IReadOnlyList<string> arguments)
     {
+        IReadOnlyList<string> expandedArguments;
+        try
+        {
+            expandedArguments = ExpandedArguments(arguments);
+        }
+        catch (ArgumentExpansionException failure)
+        {
+            // An extension could not turn its option into arguments: the run ends before any transfer (ADR-1040).
+            await WriteErrorLinesAsync(["curl: " + failure.Message]).ConfigureAwait(false);
+            return (int)failure.ExitCode;
+        }
+
         RecordingDataFileReader parseFileReader = new(DataFileReader);
-        CommandLineParseResult parsed = ParseCommandLine(arguments, parseFileReader);
+        CommandLineParseResult parsed = ParseCommandLine(expandedArguments, parseFileReader);
 
         return await ThenCleanUpAsync(RunWarnedAsync(parsed, parseFileReader.FilesTried), CloseRunOutputsAsync).ConfigureAwait(false);
     }
@@ -1367,7 +1386,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The run.</returns>
     private ParallelRun NewParallelRun(CommandLineOptions options)
     {
-        ParallelRun run = new(options.ParallelMax, options.ParallelMaxHost, options.ParallelImmediate)
+        ParallelRun run = new(options.ParallelMax, options.ParallelMaxHost, options.ParallelImmediate, timeProvider)
         {
             Transfers = new ParallelTransferMulti(engine.MultiInit()),
             ProgressMeter = writesProgressMeter && !options.Silent && !options.ProgressMeterOff
@@ -1518,7 +1537,56 @@ internal sealed class CurlCommandRunner(
             parsesAsWindowsBuild ?? OperatingSystem.IsWindows(),
             EnvironmentVariables,
             parsesAsQuicBuild,
-            parsesAsEchBuild);
+            parsesAsEchBuild,
+            actsAsCAresBuild: false,
+            ParsedExtensionOptions);
+
+    /// <summary>
+    /// Gives <paramref name="arguments" /> with each extension expander's option and value replaced by the
+    /// expander's arguments (ADR-1040): unchanged under <c>CURL_EXTENSIONS=0</c>, so the parser then refuses the
+    /// option as curl refuses an unknown one. The expanders read files through the runner's reader.
+    /// </summary>
+    /// <param name="arguments">The command-line arguments, without the program name.</param>
+    /// <returns>The arguments the parser reads.</returns>
+    /// <exception cref="ArgumentExpansionException">An expander could not expand its option's value.</exception>
+    private IReadOnlyList<string> ExpandedArguments(IReadOnlyList<string> arguments) =>
+        EnvironmentVariables(ExtensionProtocolHandlers.SwitchVariable) == "0"
+            ? arguments
+            : ArgumentExpansion.Expand(arguments, argumentExpanders ?? ExtensionArgumentExpanderCatalogue.Entries, new ArgumentExpansionContext(EnvironmentVariables, ReadExpansionFile));
+
+    /// <summary>Reads a file an argument expander names through the runner's reader.</summary>
+    /// <param name="path">The file's path.</param>
+    /// <returns>Every byte of the file, or <see langword="null" /> when it cannot be read.</returns>
+    private byte[]? ReadExpansionFile(string path) =>
+        DataFileReader.TryReadFile(path, out byte[] contents) ? contents : null;
+
+    /// <summary>
+    /// Gets the extension options the parser reads where curl has no option of that name (ADR-1006): none under
+    /// <c>CURL_EXTENSIONS=0</c>, so the parser refuses each as curl refuses an unknown option; otherwise the options
+    /// the runner was given, else every registered extension's.
+    /// </summary>
+    private IReadOnlyList<CommandLineExtensionOption> ParsedExtensionOptions =>
+        EnvironmentVariables(ExtensionProtocolHandlers.SwitchVariable) == "0"
+            ? []
+            : [.. (extensionOptions ?? ExtensionCommandLineOptions.For(EnvironmentVariables, IsCurlLongOption)).Select(ToCommandLineExtensionOption)];
+
+    /// <summary>
+    /// Reports whether a long name is one of curl's own options, created once with <see langword="new" /> so no
+    /// use of it carries the compiler's method-group cache.
+    /// </summary>
+    private static readonly Func<string, bool> IsCurlLongOption = new(CommandLineParser.IsCurlLongOption);
+
+    /// <summary>
+    /// Gives the parser's form of an extension's option (<see cref="ToParserOption" />), created once with
+    /// <see langword="new" /> so no use of it carries the compiler's method-group cache.
+    /// </summary>
+    private static readonly Func<ExtensionOption, CommandLineExtensionOption> ToCommandLineExtensionOption = new(ToParserOption);
+
+    /// <summary>Gives the parser's form of an extension's option: its long name, and whether it takes a value.</summary>
+    /// <param name="option">The extension's option.</param>
+    /// <returns>The option, taking a value when its argument is <see cref="ExtensionOptionArgument.Value" />.</returns>
+    private static CommandLineExtensionOption ToParserOption(ExtensionOption option) =>
+        new(option.Name, option.Argument == ExtensionOptionArgument.Value);
 
     /// <summary>
     /// Transfers every URL of one option group in order, each command-line URL once for every URL
@@ -1530,12 +1598,23 @@ internal sealed class CurlCommandRunner(
     /// <returns>
     /// The last transfer's exit code, and whether the run ended: a transfer <see cref="EndsTheRun" />
     /// names is the last, and the URLs after it are not transferred. A URL that is not a well-formed
-    /// glob also ends the run, with exit 3.
+    /// glob also ends the run, with exit 3, and a group whose extension options claim its connection twice
+    /// (<see cref="ExtensionOptionConflictException" />) ends it with exit 2 before anything is transferred.
     /// </returns>
     private async Task<(CurlExitCode ExitCode, bool RunEnded)> TransferAllAsync(CommandLineOptions options, CurlExitCode exitCode)
     {
         firstTransferIdOfGroup = transferPerformer.NextTransferId;
-        TransferDispatch dispatch = createTransferDispatch(options);
+        TransferDispatch dispatch;
+        try
+        {
+            dispatch = createTransferDispatch(options);
+        }
+        catch (ExtensionOptionConflictException conflict)
+        {
+            // Two extension options claim the group's connection: a command-line error, even under -s (ADR-1010).
+            await WriteErrorLinesAsync(["curl: " + conflict.Message, CommandLineRefusal.TryHelpLine]).ConfigureAwait(false);
+            return (CurlExitCode.FailedInit, true);
+        }
 
         return await ThenCleanUpAsync(TransferEachUrlAsync(dispatch, options, exitCode), () => EndGroupAsync(dispatch, options)).ConfigureAwait(false);
     }
@@ -4682,7 +4761,7 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Tells whether a transfer shows progress, the meter or the <c>-#</c> bar: only when this
-    /// runner writes it, never under <c>-s</c> or <c>--no-progress-meter</c>, not for a body
+    /// runner writes it, never under <c>-s</c> (except for a <c>-T .</c> upload, which curl 8.22.0 still draws it for, CGR-176) or <c>--no-progress-meter</c>, not for a body
     /// written to standard output when that is a terminal, and never under <c>-Z</c>, whose run draws
     /// one combined meter instead (<see cref="ParallelProgressMeter" />), as curl 8.21.0 does.
     /// </summary>
@@ -4692,9 +4771,18 @@ internal sealed class CurlCommandRunner(
     private bool ShowsProgress(CommandLineOptions options, bool toStandardOutput) =>
         writesProgressMeter
         && parallelRun is null
-        && !options.Silent
+        && !IsSilencedProgress(options)
         && !options.ProgressMeterOff
         && !(toStandardOutput && standardOutputIsTerminal);
+
+    /// <summary>
+    /// Tells whether <c>-s</c> silences progress: it does, except for a <c>-T .</c> upload of
+    /// standard input, which curl 8.22.0 still draws the meter for (CGR-176).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns><see langword="true" /> when <c>-s</c> silences progress.</returns>
+    private bool IsSilencedProgress(CommandLineOptions options) =>
+        options.Silent && !Running.UploadsFromStandardInputWithoutBlocking;
 
     /// <summary>
     /// Chooses how the <c>-i</c> and <c>-I</c> header lines of a transfer writing to standard
@@ -5695,8 +5783,19 @@ internal sealed class CurlCommandRunner(
         { ManualRequested: true } => CurlManual.Lines(),
         { HelpRequested: true, HelpSubject: var subject } when !CurlHelpText.IsOptionSubject(subject) =>
             CurlHelpText.Lines(subject, terminalColumns),
-        _ => TlsBuildInformation.Lines(EasyOptionsFromCommandLine.TlsOf(options), options.CaEmbedDumpRequested),
+        _ => ExtensionsOrBuildInformationLines(options),
     };
+
+    /// <summary>
+    /// The lines <see cref="InformationLines" /> gives for the rest: <see cref="ExtensionListing" />'s for
+    /// <c>--extensions</c>, Curl's own option (ADR-1008), otherwise <see cref="TlsBuildInformation" />'s.
+    /// </summary>
+    /// <param name="options">The parsed options.</param>
+    /// <returns>The lines, or <see langword="null" /> when no such option was given.</returns>
+    private IReadOnlyList<string>? ExtensionsOrBuildInformationLines(CommandLineOptions options) =>
+        options.ExtensionsRequested
+            ? ExtensionListing.Lines(EnvironmentVariables)
+            : TlsBuildInformation.Lines(EasyOptionsFromCommandLine.TlsOf(options), options.CaEmbedDumpRequested);
 
     /// <summary>
     /// Writes the page each <c>help</c> / <c>-h</c> line of a <c>-K</c> or default config file asked for,
@@ -5748,7 +5847,12 @@ internal sealed class CurlCommandRunner(
     /// <returns>A task that completes when the output is flushed.</returns>
     private async Task WriteAiHelpAsync(string? subject)
     {
-        if (CurlAiHelpText.TryGetMarkdown(subject, out string markdown))
+        if (CurlAiHelpText.IsExtensionsSubject(subject))
+        {
+            await standardOutput.WriteAsync(Encoding.UTF8.GetBytes(ExtensionListing.Markdown(EnvironmentVariables))).ConfigureAwait(false);
+            await standardOutput.FlushAsync().ConfigureAwait(false);
+        }
+        else if (CurlAiHelpText.TryGetMarkdown(subject, out string markdown))
         {
             await standardOutput.WriteAsync(Encoding.UTF8.GetBytes(markdown)).ConfigureAwait(false);
             await standardOutput.FlushAsync().ConfigureAwait(false);

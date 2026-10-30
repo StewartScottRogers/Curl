@@ -96,6 +96,19 @@ function Get-TurnCapArgument {
     return ''
 }
 
+function Get-TurnCapNote {
+    # The prompt's {TURNCAP}: the run is told its turn cap as well as its deadline, so it can
+    # hand back what is left before the cap stops it (AF-0482); empty with no turn cap.
+    param([int]$MaxTurns)
+    if ($MaxTurns -le 0) { return '' }
+    $handBack = [Math]::Max(1, $MaxTurns - 15)
+    return "`r`n   The run is also stopped after $MaxTurns turns (each reply that calls tools is one), and" +
+        "`r`n   its task is then split as too big for one run. By turn $handBack, if the task is not" +
+        "`r`n   finished, hand back what is left the same way (AF-0482: BL-3563's third run had its" +
+        "`r`n   fix passing when the cap stopped it mid quality run, and a split and a fourth claim" +
+        "`r`n   followed)."
+}
+
 function Test-TurnCapReached {
     # Whether the last run stopped because it reached the -MaxRunTurns turn cap: the task
     # is too big for one run and wants splitting (BL-3001).
@@ -119,6 +132,7 @@ function Invoke-TaskRun {
     $deadline = (Get-Date).AddMinutes($Minutes)
     $Text = $Text.Replace('{ID}', $Id).Replace('{LANE}', "$Lane").Replace('{BRANCH}', $Branch)
     $Text = $Text.Replace('{DEADLINE}', $deadline.ToString('HH:mm')).Replace('{MINUTES}', "$Minutes")
+    $Text = $Text.Replace('{TURNCAP}', (Get-TurnCapNote $MaxRunTurns))
     $raw = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.jsonl"
     $err = Join-Path $LogDir "$Id-$Stamp$LaneTag$Suffix.err.txt"
     $script:RunResult = $null
@@ -144,7 +158,7 @@ function Invoke-TaskRun {
     $runModel = $script:ModelChoice.Model
     if (-not (Test-Path $raw)) { Add-Content -Path $raw -Value ([pscustomobject][ordered]@{ type = 'factory'; model = $runModel; why = $script:ModelChoice.Why } | ConvertTo-Json -Compress) -Encoding UTF8 }
     $context = Get-LaneContextArguments $Root $LogDir
-    $psi = New-ClaudeRunStartInfo "/d /c claude -p --model $runModel --dangerously-skip-permissions --output-format stream-json --verbose $context$budget$turns --disallowedTools $denied 2>`"$err`""
+    $psi = New-ClaudeRunStartInfo "claude -p --model $runModel --dangerously-skip-permissions --output-format stream-json --verbose $context$budget$turns --disallowedTools $denied 2>`"$err`""
     # No claude.ai connectors and no auto memory either: the operator's memory is not a lane's.
     $psi.EnvironmentVariables['ENABLE_CLAUDEAI_MCP_SERVERS'] = 'false'
     $psi.EnvironmentVariables['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] = '1'
@@ -165,7 +179,7 @@ function Invoke-TaskRun {
             if ($evt) { try { Write-Event $Id $evt } catch { Write-Trace $Id 'trace' "could not trace an event: $(Get-Short $_.Exception.Message)" 'DarkYellow' } }
             $pending = $p.StandardOutput.ReadLineAsync()
         } elseif ((Get-Date) -gt $deadline) {
-            & taskkill /T /F /PID $p.Id 2>&1 | Out-Null
+            Stop-FactoryProcessTree -ProcessId $p.Id
             $timedOut = $true
             # A killed run sends no result event, so its end is traced here: without it the
             # lane log's last line for the run is whatever step it was in (AF-0034).
@@ -204,6 +218,10 @@ if ($TestLaneFlags) {
         & $check 'claude.ai connectors are off' 'True' "$($settings.disableClaudeAiConnectors)"
         & $check 'turn cap 80' ' --max-turns 80' (Get-TurnCapArgument 80)
         & $check '-MaxRunTurns 0 is no turn cap' '' (Get-TurnCapArgument 0)
+        & $check 'the prompt names the turn cap' 'True' "$((Get-TurnCapNote 80).Contains('stopped after 80 turns') -and (Get-TurnCapNote 80).Contains('By turn 65'))"
+        & $check '-MaxRunTurns 0 adds no turn-cap note' '' (Get-TurnCapNote 0)
+        & $check 'both task prompts carry the turn-cap note' 'True' "$($Prompt.Contains('(AF-0094).{TURNCAP}') -and $LanePrompt.Contains('(AF-0094).{TURNCAP}'))"
+        & $check 'the run fills in the turn-cap note' 'True' "$((Get-Command Invoke-TaskRun).Definition.Contains('{TURNCAP}'))"
         $launch = (Get-Command Invoke-TaskRun).Definition
         & $check 'the run is launched with the context, cost cap and turn cap' 'True' "$($launch.Contains('--verbose $context$budget$turns --disallowedTools'))"
         $script:RunResult = [pscustomobject]@{ type = 'result'; subtype = 'error_max_turns'; is_error = $true }

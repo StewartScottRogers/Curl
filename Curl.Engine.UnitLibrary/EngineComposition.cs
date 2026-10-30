@@ -15,7 +15,6 @@ using Curl.Protocol.Pop3;
 using Curl.Protocol.Rtsp;
 using Curl.Protocol.Smtp;
 using Curl.Protocol.Ssh;
-using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
 using Curl.Protocol.Ws;
@@ -119,6 +118,13 @@ internal static partial class EngineComposition
     /// <param name="ftpStopsBeforeEntryPath">Whether the FTP handler's new control connections stop before <c>PWD</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />, BL-2636).</param>
     /// <param name="socketWait">The wait of a transfer driven by <c>curl_multi_socket_action</c>, which holds the HTTP handler's expect-100 deadline (<see cref="ContinueWaitBeginsOf" />, BL-3864); <see langword="null" /> outside socket-action mode.</param>
     /// <param name="digestRandomBytes">Where Digest and DIGEST-MD5 draw their client nonce's bytes from (ADR-0751, BL-2834); <see langword="null" /> for <see cref="System.Security.Cryptography.RandomNumberGenerator" />.</param>
+    /// <param name="extensionHandlers">Builds the handlers a host's extensions add beyond upstream curl's, over the same transports, put after curl's (ADR-0999); <see langword="null" /> for curl's alone. The engine never references an extension.</param>
+    /// <param name="extensionTransferHooks">Puts each handler's transfers through the hooks of the extensions a host's options activated (ADR-1007); <see langword="null" /> runs no hook. The engine never references an extension.</param>
+    /// <param name="extensionConnector">Gives the connector of the extension a host's options activated in place of <paramref name="connector" /> (ADR-1010), as <c>--unix-socket</c> replaces curl's; <see langword="null" /> keeps <paramref name="connector" />.</param>
+    /// <param name="extensionDatagramConnector">Gives that extension's datagram connector in place of <paramref name="datagramConnector" /> (ADR-1010); <see langword="null" /> keeps <paramref name="datagramConnector" />.</param>
+    /// <param name="extensionResolver">Gives the resolver of the extension a host's options activated in place of <paramref name="dnsResolver" /> (ADR-1012), as <c>--doh-url</c> replaces curl's; <see langword="null" /> keeps <paramref name="dnsResolver" />.</param>
+    /// <param name="extensionCertificateConnector">Puts the connector, after <paramref name="extensionConnector" />, through the certificate checks of the extensions a hosts options activated (ADR-1016), which can only refuse a chain curl accepted; <see langword="null" /> checks nothing more.</param>
+    /// <param name="extensionTlsProvider">Puts <paramref name="tlsProvider" /> through those checks for in-place upgrades (ADR-1016); <see langword="null" /> keeps <paramref name="tlsProvider" />.</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -149,8 +155,19 @@ internal static partial class EngineComposition
         IWebSocketRandomSource? webSocketRandomSource = null,
         bool ftpStopsBeforeEntryPath = false,
         Func<int, byte[]>? digestRandomBytes = null,
-        TransferSocketWait? socketWait = null)
+        TransferSocketWait? socketWait = null,
+        Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers = null,
+        Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null,
+        Func<IConnector, IConnector>? extensionConnector = null,
+        Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector = null,
+        Func<IDnsResolver, IDnsResolver>? extensionResolver = null,
+        Func<IConnector, IConnector>? extensionCertificateConnector = null,
+        Func<ITlsProvider, ITlsProvider>? extensionTlsProvider = null)
     {
+        dnsResolver = ThroughExtension(dnsResolver, extensionResolver);
+        connector = ThroughExtension(ThroughExtension(connector, extensionConnector), extensionCertificateConnector);
+        tlsProvider = ThroughExtension(tlsProvider, extensionTlsProvider);
+        datagramConnector = ThroughExtension(datagramConnector, extensionDatagramConnector);
         Func<RtspRequestSettings?> rtspSettingsOf = rtspRequestSettings ?? (() => null);
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
@@ -184,100 +201,9 @@ internal static partial class EngineComposition
             new LazyProtocolHandler(["ftp", "ftps"], () => new RoutingFtpProtocolHandler(
                 http,
                 CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver, tracesFtp, ftpListener, ftpWildcardHooks, ftpStopsBeforeEntryPath))),
+            .. ExtensionHandlersOver(new ProtocolHandlerServices(recordingConnector, recordingDatagramConnector, tlsProvider, dnsResolver), extensionHandlers),
         ];
 
-        return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(handler, recorder))];
+        return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(ThroughTransferHooks(handler, extensionTransferHooks), recorder))];
     }
-
-    /// <summary>
-    /// Gives what the HTTP handler tells as a request starts waiting for <c>100 Continue</c>: the start of
-    /// <paramref name="socketWait" />'s expect-100 deadline (<see cref="TransferSocketWait.BeginExpectContinueWait" />, BL-3864).
-    /// </summary>
-    /// <param name="socketWait">The socket-action transfer's wait, or <see langword="null" /> outside socket-action mode.</param>
-    /// <returns>The begin hook, or <see langword="null" /> without a wait.</returns>
-    internal static Action<TimeSpan>? ContinueWaitBeginsOf(TransferSocketWait? socketWait) =>
-        socketWait is null ? null : socketWait.BeginExpectContinueWait;
-
-    /// <summary>
-    /// Gives what the HTTP handler tells as a request's wait for <c>100 Continue</c> ends: the end of
-    /// <paramref name="socketWait" />'s expect-100 deadline (<see cref="TransferSocketWait.EndExpectContinueWait" />, BL-3864).
-    /// </summary>
-    /// <param name="socketWait">The socket-action transfer's wait, or <see langword="null" /> outside socket-action mode.</param>
-    /// <returns>The end hook, or <see langword="null" /> without a wait.</returns>
-    internal static Action? ContinueWaitEndsOf(TransferSocketWait? socketWait) =>
-        socketWait is null ? null : socketWait.EndExpectContinueWait;
-
-    /// <summary>
-    /// Gives the LDAP library the platform's curl is built with: WinLDAP on Windows, OpenLDAP elsewhere.
-    /// </summary>
-    /// <param name="runsOnWindows">Whether the run is on Windows.</param>
-    /// <returns>The dialect.</returns>
-    internal static LdapDialect LdapDialectFor(bool runsOnWindows) =>
-        runsOnWindows ? LdapDialect.WinLdap : LdapDialect.OpenLdap;
-
-    /// <summary>
-    /// Gives the SSH algorithms the platform's curl offers: the Schannel build's on Windows, the
-    /// OpenSSL build's elsewhere.
-    /// </summary>
-    /// <param name="runsOnWindows">Whether the run is on Windows.</param>
-    /// <returns>The algorithm preferences.</returns>
-    internal static SshAlgorithmPreferences SshAlgorithmPreferencesFor(bool runsOnWindows) =>
-        runsOnWindows ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference;
-
-    /// <summary>
-    /// Creates the FTP handler for <c>ftp</c> and <c>ftps</c> (ADR-0102): the control connection
-    /// through <paramref name="connector" />, passive data
-    /// connections through <paramref name="dataConnector" />, active ones (<c>-P</c>) on a
-    /// <see cref="TcpConnectionListener" />, a <c>-P</c> interface name looked up with
-    /// <see cref="SystemNetworkInterfaceLookup" /> (ADR-0110) and a <c>-P</c> host name
-    /// resolved with <paramref name="dnsResolver" /> (ADR-0108), and TLS from
-    /// <paramref name="tlsProvider" />.
-    /// </summary>
-    /// <param name="connector">Supplies the control connection.</param>
-    /// <param name="dataConnector">Supplies the passive data connection.</param>
-    /// <param name="tlsProvider">Upgrades a connection after an accepted <c>AUTH</c> or <c>PROT P</c>.</param>
-    /// <param name="dnsResolver">Resolves a host name given to <c>-P</c>.</param>
-    /// <param name="tracesFtp">Whether it writes the <c>--trace-config ftp</c> lines (<see cref="TracesFtp" />, BL-1162).</param>
-    /// <param name="listener">Listens for active-mode data connections; a <see cref="TcpConnectionListener" /> when not given.</param>
-    /// <param name="wildcardHooks">The wildcard hooks (ADR-0615, ADR-0619); <see langword="null" /> fetches a wildcard URL as a plain path.</param>
-    /// <returns>The handler.</returns>
-    /// <param name="stopsBeforeEntryPath">Whether a new control connection stops before <c>PWD</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />, the debug build's <c>CURL_FTP_PWD_STOP</c>, BL-2636).</param>
-    internal static FtpProtocolHandler CreateFtpProtocolHandler(IConnector connector, IConnector dataConnector, ITlsProvider tlsProvider, IDnsResolver dnsResolver, bool tracesFtp = false, IConnectionListener? listener = null, IFtpWildcardHooks? wildcardHooks = null, bool stopsBeforeEntryPath = false) =>
-        new(connector, dataConnector, listener ?? new TcpConnectionListener(), tlsProvider, dnsResolver, new SystemNetworkInterfaceLookup()) { TracesStateMachine = tracesFtp, WildcardHooks = wildcardHooks, StopsBeforeEntryPath = stopsBeforeEntryPath };
-
-    /// <summary>
-    /// The connector FTP's passive data connections go through: the option group's pooling
-    /// connector over its TCP connector's <see cref="TcpConnector.ForFtpDataConnections" />, so
-    /// they share the pool's numbering and the connector's DNS cache and <c>--resolve</c>, but
-    /// take only a matching <c>--connect-to</c> host, keeping the reply's port, as curl 8.21.0 does
-    /// (upstream test713, BL-1976), and only <c>-m</c> or the system's own connect timeout ends
-    /// one, as curl 8.21.0 does not hold it to <c>--connect-timeout</c> (measured, ADR-0286, BL-797).
-    /// </summary>
-    /// <param name="transports">The option group's connectors.</param>
-    /// <returns>The connector.</returns>
-    internal static IConnector FtpDataConnectorOf(CurlTransports transports) =>
-        transports.PoolingConnector.Over(transports.TcpConnector.ForFtpDataConnections());
-
-    /// <summary>
-    /// The datagram connector TFTP opens its channel through: over a
-    /// <see cref="PoolingConnector" />, one that numbers each open in that pool's sequence, as
-    /// curl 8.21.0 numbers a TFTP transfer's connection with the connections before it
-    /// (BL-969); over any other connector, <paramref name="datagramConnector" /> itself.
-    /// </summary>
-    /// <param name="connector">The connector the TCP protocols connect through.</param>
-    /// <param name="datagramConnector">Opens the channels.</param>
-    /// <returns>The datagram connector.</returns>
-    internal static IDatagramConnector NumberedDatagramsOf(IConnector connector, IDatagramConnector datagramConnector) =>
-        connector is PoolingConnector pool ? pool.NumberingDatagrams(datagramConnector) : datagramConnector;
-
-    /// <summary>
-    /// The count the <c>file://</c> handler numbers its transfers in: over a
-    /// <see cref="PoolingConnector" />, that pool's, as curl 8.21.0 numbers a <c>file://</c>
-    /// transfer with every connection the run opens (BL-977); over any other connector, a count
-    /// of its own from <c>0</c>.
-    /// </summary>
-    /// <param name="connector">The connector the TCP protocols connect through.</param>
-    /// <returns>The count.</returns>
-    internal static IConnectionNumbers ConnectionNumbersOf(IConnector connector) =>
-        connector is PoolingConnector pool ? pool.ConnectionNumbers : new ConnectionNumberSequence();
 }

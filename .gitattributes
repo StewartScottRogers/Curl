@@ -10,6 +10,10 @@
 # lanes add to it at once: a merge or rebase keeps both sides' lines (ADR-0689).
 Curl.Conformance.UnitTests/PassingUpstreamCases.txt merge=union
 
+# Extension projects are added to Curl.slnx as one order-free line each under one marker comment; two
+# branches adding a line at once keep both (ADR-1003).
+Curl.slnx merge=union
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #
@@ -78,3 +82,12 @@ Documentation/Planning/Decisions/README.md merge=union
 # Extended curltest cases carry file and expected-output parts whose bytes the runner compares,
 # so a checkout must not turn their line feeds into CRLF on Windows.
 Curl.Conformance.UnitTests/CurlTestCases/Extended/**/*.curltest text eol=lf
+Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs merge=union
+Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs merge=union
+Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs merge=union
+Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs merge=union
+Curl.Extension.Composition.UnitLibrary/ExtensionConnectionHookCatalogue.cs merge=union
+Curl.Extension.Composition.UnitLibrary/ExtensionSchemeHookCatalogue.cs merge=union
+Curl.Extension.Composition.UnitLibrary/ExtensionResolverHookCatalogue.cs merge=union
+Curl.Extension.Composition.UnitLibrary/ExtensionCertificateCheckHookCatalogue.cs merge=union
+Curl.Extension.Composition.UnitLibrary/ExtensionArgumentExpanderCatalogue.cs merge=union

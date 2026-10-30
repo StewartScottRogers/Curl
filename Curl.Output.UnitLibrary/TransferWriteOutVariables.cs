@@ -29,7 +29,9 @@ namespace Curl.Output;
 /// <c>conn_id</c>, <c>xfer_id</c>, <c>json</c>, <c>header_json</c>, and
 /// <c>url.&lt;part&gt;</c> and <c>urle.&lt;part&gt;</c> for the parts <c>scheme</c>,
 /// <c>user</c>, <c>password</c>, <c>options</c>, <c>host</c>, <c>port</c>, <c>path</c>,
-/// <c>query</c>, <c>fragment</c> and <c>zoneid</c>. Any other name is reported unknown.
+/// <c>query</c>, <c>fragment</c> and <c>zoneid</c>. Any other name prints the value an extension's
+/// transfer hook gave it in <see cref="TransferReport.ExtensionWriteOutValues"/> (ADR-1130), and is
+/// reported unknown when none did.
 /// </para>
 /// <para>
 /// From the <see cref="TransferInfo"/> (ADR-0506, BL-2319): the response and <c>CONNECT</c> codes,
@@ -339,7 +341,7 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
         {
             "json" => FormatJson(),
             "header_json" => WriteOutTemplateRenderer.MarkHeaderBytes(WriteOutJson.FormatHeaders(report.ResponseHeaders, HeaderValueWhitespace)),
-            _ => VariableFormatters.TryGetValue(name, out Func<TransferWriteOutVariables, WriteOutValue>? format) ? format(this).Text : null,
+            _ => VariableFormatters.TryGetValue(name, out Func<TransferWriteOutVariables, WriteOutValue>? format) ? format(this).Text : report.ExtensionWriteOutValues.GetValueOrDefault(name),
         };
         return text is not null;
     }

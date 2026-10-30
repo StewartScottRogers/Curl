@@ -19,6 +19,43 @@ internal static class EasyTlsOptionSetters
     /// <summary>The whole-string <c>CURLOPT_ECH</c> values that set the mode; the <c>ecl:</c> and <c>pn:</c> forms are matched by prefix.</summary>
     private static readonly HashSet<string> EncryptedClientHelloModes = new(StringComparer.Ordinal) { "false", "grease", "true", "hard" };
 
+    /// <summary>
+    /// Whether this platform's curl takes <c>CURLOPT_TLS13_CIPHERS</c> and <c>CURLOPT_PROXY_TLS13_CIPHERS</c>: a Schannel
+    /// build (Windows) has no TLS 1.3 cipher suite selection and answers <see cref="CurlCode.NotBuiltIn"/> (ADR-0991).
+    /// </summary>
+    internal static bool Tls13CiphersIsBuiltIn { get; set; } = !OperatingSystem.IsWindows();
+
+    /// <summary>
+    /// Whether this platform's curl takes <c>CURLOPT_PROXY_CAPATH</c>: a Schannel build (Windows) answers
+    /// <see cref="CurlCode.NotBuiltIn"/> for it while taking <c>CURLOPT_CAPATH</c> (ADR-0991).
+    /// </summary>
+    internal static bool ProxyCaPathIsBuiltIn { get; set; } = !OperatingSystem.IsWindows();
+
+    /// <summary>Whether this platform's TLS backend has <c>SSLSUPP_CRLFILE</c> for <c>CURLOPT_CRLFILE</c> and its <c>PROXY_</c> twin: Schannel (Windows) lacks it (ADR-0995).</summary>
+    internal static bool RevocationListFileIsBuiltIn { get; set; } = !OperatingSystem.IsWindows();
+
+    /// <summary>Whether this platform's TLS backend has <c>SSLSUPP_ISSUERCERT</c> and <c>_BLOB</c> for <c>CURLOPT_ISSUERCERT</c>, its blob and their <c>PROXY_</c> twins: Schannel (Windows) lacks them (ADR-0995).</summary>
+    internal static bool IssuerCertificateIsBuiltIn { get; set; } = !OperatingSystem.IsWindows();
+
+    /// <summary>Whether this platform's TLS backend has <c>SSLSUPP_SSL_EC_CURVES</c> for <c>CURLOPT_SSL_EC_CURVES</c>: Schannel (Windows) lacks it (ADR-0995).</summary>
+    internal static bool EllipticCurvesIsBuiltIn { get; set; } = !OperatingSystem.IsWindows();
+
+    /// <summary>Whether this platform's TLS backend has <c>SSLSUPP_SIGNATURE_ALGORITHMS</c> for <c>CURLOPT_SSL_SIGNATURE_ALGORITHMS</c>: Schannel (Windows) lacks it (ADR-0995).</summary>
+    internal static bool SignatureAlgorithmsIsBuiltIn { get; set; } = !OperatingSystem.IsWindows();
+
+    /// <summary>Whether this platform's TLS backend has <c>cert_status_request</c> for <c>CURLOPT_SSL_VERIFYSTATUS</c> and <c>CURLOPT_DOH_SSL_VERIFYSTATUS</c>: on everywhere, Curl checking stapled OCSP responses itself where Schannel would not (ADR-0995).</summary>
+    internal static bool CertificateStatusIsBuiltIn { get; set; } = true;
+
+    /// <summary>Whether this build has <c>USE_ECH</c> for <c>CURLOPT_ECH</c>: on everywhere, Curl doing ECH itself where the platform's curl would not (ADR-0995).</summary>
+    internal static bool EncryptedClientHelloIsBuiltIn { get; set; } = true;
+
+    /// <summary>
+    /// Whether this platform's TLS backend has OpenSSL's engine and provider entry points: off (Schannel, Windows) an engine
+    /// name and <c>CURLOPT_SSLENGINE_DEFAULT</c> answer <see cref="CurlCode.NotBuiltIn"/>; on, Curl having no engine or
+    /// provider to load, a name answers <see cref="CurlCode.SslEngineNotFound"/> and the default <see cref="CurlCode.Ok"/> (ADR-0995).
+    /// </summary>
+    internal static bool OpenSslEngineIsBuiltIn { get; set; } = !OperatingSystem.IsWindows();
+
     /// <summary>Adds the TLS rows to <paramref name="setters"/>.</summary>
     /// <param name="setters">The rows to add to.</param>
     internal static void AddTo(Dictionary<CurlOption, EasyOptionSetter> setters)
@@ -44,12 +81,12 @@ internal static class EasyTlsOptionSetters
         setters[CurlOption.Cainfo] = new(peer.SetCertificateAuthorityFile);
         setters[CurlOption.CainfoBlob] = new(peer.SetCertificateAuthorityBlob);
         setters[CurlOption.Capath] = new(peer.SetCertificateAuthorityPath);
-        setters[CurlOption.Crlfile] = new(peer.SetRevocationListFile);
-        setters[CurlOption.Issuercert] = new(peer.SetIssuerCertificate);
-        setters[CurlOption.IssuercertBlob] = new(peer.SetIssuerCertificateBlob);
+        setters[CurlOption.Crlfile] = new(SetOriginRevocationListFile);
+        setters[CurlOption.Issuercert] = new(SetOriginIssuerCertificate);
+        setters[CurlOption.IssuercertBlob] = new(SetOriginIssuerCertificateBlob);
         setters[CurlOption.Pinnedpublickey] = new(peer.SetPinnedPublicKey);
         setters[CurlOption.SslCipherList] = new(peer.SetCipherList);
-        setters[CurlOption.Tls13Ciphers] = new(peer.SetTls13Ciphers);
+        setters[CurlOption.Tls13Ciphers] = new(SetOriginTls13Ciphers);
         setters[CurlOption.SslOptions] = new(peer.SetSslOptions);
     }
 
@@ -68,13 +105,13 @@ internal static class EasyTlsOptionSetters
         setters[CurlOption.ProxySslVerifyhost] = new(peer.SetVerifyHost);
         setters[CurlOption.ProxyCainfo] = new(peer.SetCertificateAuthorityFile);
         setters[CurlOption.ProxyCainfoBlob] = new(peer.SetCertificateAuthorityBlob);
-        setters[CurlOption.ProxyCapath] = new(peer.SetCertificateAuthorityPath);
-        setters[CurlOption.ProxyCrlfile] = new(peer.SetRevocationListFile);
-        setters[CurlOption.ProxyIssuercert] = new(peer.SetIssuerCertificate);
-        setters[CurlOption.ProxyIssuercertBlob] = new(peer.SetIssuerCertificateBlob);
+        setters[CurlOption.ProxyCapath] = new(SetProxyCertificateAuthorityPath);
+        setters[CurlOption.ProxyCrlfile] = new(SetProxyRevocationListFile);
+        setters[CurlOption.ProxyIssuercert] = new(SetProxyIssuerCertificate);
+        setters[CurlOption.ProxyIssuercertBlob] = new(SetProxyIssuerCertificateBlob);
         setters[CurlOption.ProxyPinnedpublickey] = new(peer.SetPinnedPublicKey);
         setters[CurlOption.ProxySslCipherList] = new(peer.SetCipherList);
-        setters[CurlOption.ProxyTls13Ciphers] = new(peer.SetTls13Ciphers);
+        setters[CurlOption.ProxyTls13Ciphers] = new(SetProxyTls13Ciphers);
         setters[CurlOption.ProxySslOptions] = new(peer.SetSslOptions);
     }
 
@@ -99,17 +136,61 @@ internal static class EasyTlsOptionSetters
         setters[CurlOption.RandomFile] = new(IgnoreDeprecated);
     }
 
+    /// <summary><c>CURLOPT_TLS13_CIPHERS</c>: the origin's TLS 1.3 cipher suites, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="Tls13CiphersIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetOriginTls13Ciphers(ref EasyOptions o, object? v) => Tls13CiphersIsBuiltIn ? Origin.SetTls13Ciphers(ref o, v) : CurlCode.NotBuiltIn;
+
+    /// <summary><c>CURLOPT_PROXY_TLS13_CIPHERS</c>: the proxy's TLS 1.3 cipher suites, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="Tls13CiphersIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetProxyTls13Ciphers(ref EasyOptions o, object? v) => Tls13CiphersIsBuiltIn ? Proxy.SetTls13Ciphers(ref o, v) : CurlCode.NotBuiltIn;
+
+    /// <summary><c>CURLOPT_PROXY_CAPATH</c>: the proxy's CA directory, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="ProxyCaPathIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetProxyCertificateAuthorityPath(ref EasyOptions o, object? v) =>
+        ProxyCaPathIsBuiltIn ? Proxy.SetCertificateAuthorityPath(ref o, v) : CurlCode.NotBuiltIn;
+
+    /// <summary><c>CURLOPT_CRLFILE</c>: the origin's CRL file, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="RevocationListFileIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetOriginRevocationListFile(ref EasyOptions o, object? v) =>
+        RevocationListFileIsBuiltIn ? Origin.SetRevocationListFile(ref o, v) : CurlCode.NotBuiltIn;
+
+    /// <summary><c>CURLOPT_PROXY_CRLFILE</c>: the proxy's CRL file, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="RevocationListFileIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetProxyRevocationListFile(ref EasyOptions o, object? v) =>
+        RevocationListFileIsBuiltIn ? Proxy.SetRevocationListFile(ref o, v) : CurlCode.NotBuiltIn;
+
+    /// <summary><c>CURLOPT_ISSUERCERT</c>: the origin's issuer certificate, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="IssuerCertificateIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetOriginIssuerCertificate(ref EasyOptions o, object? v) =>
+        IssuerCertificateIsBuiltIn ? Origin.SetIssuerCertificate(ref o, v) : CurlCode.NotBuiltIn;
+
+    /// <summary><c>CURLOPT_PROXY_ISSUERCERT</c>: the proxy's issuer certificate, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="IssuerCertificateIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetProxyIssuerCertificate(ref EasyOptions o, object? v) =>
+        IssuerCertificateIsBuiltIn ? Proxy.SetIssuerCertificate(ref o, v) : CurlCode.NotBuiltIn;
+
+    /// <summary><c>CURLOPT_ISSUERCERT_BLOB</c>: the origin's issuer certificate bytes, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="IssuerCertificateIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetOriginIssuerCertificateBlob(ref EasyOptions o, object? v) =>
+        IssuerCertificateIsBuiltIn ? Origin.SetIssuerCertificateBlob(ref o, v) : CurlCode.NotBuiltIn;
+
+    /// <summary><c>CURLOPT_PROXY_ISSUERCERT_BLOB</c>: the proxy's issuer certificate bytes, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="IssuerCertificateIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetProxyIssuerCertificateBlob(ref EasyOptions o, object? v) =>
+        IssuerCertificateIsBuiltIn ? Proxy.SetIssuerCertificateBlob(ref o, v) : CurlCode.NotBuiltIn;
+
     /// <summary>
-    /// <c>CURLOPT_SSLENGINE</c>: Curl has no crypto engines, so a name is <see cref="CurlCode.NotBuiltIn"/>,
-    /// as libcurl's engine-less <c>Curl_ssl_set_engine</c> answers; <see langword="null"/> or empty clears it.
+    /// <c>CURLOPT_SSLENGINE</c>: <see langword="null"/> or empty clears it; a name is <see cref="CurlCode.SslEngineNotFound"/>
+    /// where <see cref="OpenSslEngineIsBuiltIn"/> is on, Curl having no engine or provider to load, and
+    /// <see cref="CurlCode.NotBuiltIn"/> where it is off, as Schannel's absent <c>set_engine</c> answers.
     /// </summary>
-    private static CurlCode SetEngine(ref EasyOptions o, object? v) =>
-        string.IsNullOrEmpty((string?)v) ? Tls(ref o, t => t with { Engine = null }) : CurlCode.NotBuiltIn;
+    private static CurlCode SetEngine(ref EasyOptions o, object? v)
+    {
+        if (string.IsNullOrEmpty((string?)v))
+        {
+            return Tls(ref o, t => t with { Engine = null });
+        }
 
-    /// <summary><c>CURLOPT_SSLENGINE_DEFAULT</c>: <see cref="CurlCode.NotBuiltIn"/>, as libcurl's engine-less <c>Curl_ssl_set_engine_default</c> answers.</summary>
-    private static CurlCode SetEngineDefault(ref EasyOptions o, object? v) => CurlCode.NotBuiltIn;
+        return OpenSslEngineIsBuiltIn ? CurlCode.SslEngineNotFound : CurlCode.NotBuiltIn;
+    }
 
-    private static CurlCode SetVerifyStatus(ref EasyOptions o, object? v) => Tls(ref o, t => t with { VerifyStatus = IsOn(v) });
+    /// <summary><c>CURLOPT_SSLENGINE_DEFAULT</c>: <see cref="CurlCode.Ok"/> with no engine set where <see cref="OpenSslEngineIsBuiltIn"/> is on, else <see cref="CurlCode.NotBuiltIn"/>.</summary>
+    private static CurlCode SetEngineDefault(ref EasyOptions o, object? v) => OpenSslEngineIsBuiltIn ? CurlCode.Ok : CurlCode.NotBuiltIn;
+
+    /// <summary><c>CURLOPT_SSL_VERIFYSTATUS</c>: on for non-zero, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="CertificateStatusIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetVerifyStatus(ref EasyOptions o, object? v) =>
+        CertificateStatusIsBuiltIn ? Tls(ref o, t => t with { VerifyStatus = IsOn(v) }) : CurlCode.NotBuiltIn;
 
     /// <summary><c>CURLOPT_CA_CACHE_TIMEOUT</c>: below -1 is <see cref="CurlCode.BadFunctionArgument"/>, -1 is forever, and above <see cref="int.MaxValue"/> becomes it.</summary>
     private static CurlCode SetCertificateAuthorityCacheTimeout(ref EasyOptions o, object? v)
@@ -126,9 +207,13 @@ internal static class EasyTlsOptionSetters
 
     private static CurlCode SetGatherCertificateInfo(ref EasyOptions o, object? v) => Tls(ref o, t => t with { GatherCertificateInfo = IsOn(v) });
 
-    private static CurlCode SetEllipticCurves(ref EasyOptions o, object? v) => Tls(ref o, t => t with { EllipticCurves = (string?)v });
+    /// <summary><c>CURLOPT_SSL_EC_CURVES</c>: the curves, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="EllipticCurvesIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetEllipticCurves(ref EasyOptions o, object? v) =>
+        EllipticCurvesIsBuiltIn ? Tls(ref o, t => t with { EllipticCurves = (string?)v }) : CurlCode.NotBuiltIn;
 
-    private static CurlCode SetSignatureAlgorithms(ref EasyOptions o, object? v) => Tls(ref o, t => t with { SignatureAlgorithms = (string?)v });
+    /// <summary><c>CURLOPT_SSL_SIGNATURE_ALGORITHMS</c>: the algorithms, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="SignatureAlgorithmsIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetSignatureAlgorithms(ref EasyOptions o, object? v) =>
+        SignatureAlgorithmsIsBuiltIn ? Tls(ref o, t => t with { SignatureAlgorithms = (string?)v }) : CurlCode.NotBuiltIn;
 
     private static CurlCode SetSessionIdCache(ref EasyOptions o, object? v) => Tls(ref o, t => t with { SessionIdCache = IsOn(v) });
 
@@ -138,10 +223,16 @@ internal static class EasyTlsOptionSetters
     /// <summary>
     /// <c>CURLOPT_ECH</c>: <see langword="null"/> turns ECH off; <c>false</c>, <c>grease</c>, <c>true</c> and
     /// <c>hard</c> set the mode; <c>ecl:</c> and <c>pn:</c> with something after them set the config list and the
-    /// public name beside the mode (ADR-0514); anything else changes nothing, as libcurl does.
+    /// public name beside the mode (ADR-0514); anything else changes nothing, as libcurl does. Every value is
+    /// <see cref="CurlCode.NotBuiltIn"/> where <see cref="EncryptedClientHelloIsBuiltIn"/> is off.
     /// </summary>
     private static CurlCode SetEncryptedClientHello(ref EasyOptions o, object? v)
     {
+        if (!EncryptedClientHelloIsBuiltIn)
+        {
+            return CurlCode.NotBuiltIn;
+        }
+
         var text = (string?)v;
         return Tls(ref o, t => EncryptedClientHelloOf(t, text));
     }
@@ -176,7 +267,9 @@ internal static class EasyTlsOptionSetters
     /// <summary><c>CURLOPT_DOH_SSL_VERIFYHOST</c>: on when either of the two low bits is set, as for <c>CURLOPT_SSL_VERIFYHOST</c>.</summary>
     private static CurlCode SetDohVerifyHost(ref EasyOptions o, object? v) => Tls(ref o, t => t with { DohVerifyHost = IsVerifyHostOn(v) });
 
-    private static CurlCode SetDohVerifyStatus(ref EasyOptions o, object? v) => Tls(ref o, t => t with { DohVerifyStatus = IsOn(v) });
+    /// <summary><c>CURLOPT_DOH_SSL_VERIFYSTATUS</c>: on for non-zero, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="CertificateStatusIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetDohVerifyStatus(ref EasyOptions o, object? v) =>
+        CertificateStatusIsBuiltIn ? Tls(ref o, t => t with { DohVerifyStatus = IsOn(v) }) : CurlCode.NotBuiltIn;
 
     /// <summary>
     /// <c>CURLOPT_SSL_ENABLE_NPN</c>, <c>CURLOPT_EGDSOCKET</c> and <c>CURLOPT_RANDOM_FILE</c>: deprecated, and ignored

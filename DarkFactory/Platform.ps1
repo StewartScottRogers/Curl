@@ -58,6 +58,27 @@ function Get-FactoryProcessTable {
     return @($table)
 }
 
+function Get-FactoryNullDevice {
+    # The null device a shell command line redirects into: nul for cmd.exe, /dev/null for sh.
+    if (Test-FactoryOnWindows) { return 'nul' }
+    return '/dev/null'
+}
+
+function Set-FactoryShellCommand {
+    # Points $StartInfo at the platform's shell running $CommandLine, so a command line with
+    # redirections (claude -p ... 2>"err.txt") runs the same way everywhere (BL-3933):
+    # cmd.exe /d /c on Windows, sh -c elsewhere.
+    param([System.Diagnostics.ProcessStartInfo]$StartInfo, [string]$CommandLine)
+    if (Test-FactoryOnWindows) {
+        $StartInfo.FileName = $env:ComSpec
+        $StartInfo.Arguments = "/d /c $CommandLine"
+        return
+    }
+    $StartInfo.FileName = '/bin/sh'
+    $StartInfo.ArgumentList.Add('-c')
+    $StartInfo.ArgumentList.Add($CommandLine)
+}
+
 if ($TestPlatform) {
     # Proves the helpers answer as the current OS requires.
     $script:platformFailed = 0
@@ -83,6 +104,14 @@ if ($TestPlatform) {
         $parentRow = @(Get-FactoryProcessTable | Where-Object ProcessId -eq $parent.Id)
         & $check 'parent process in the process table' ($me.Count -eq 1 -and $me[0].ParentProcessId -eq $parent.Id -and $parentRow.Count -eq 1) "parent $($parent.Id)"
     }
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    Set-FactoryShellCommand $psi "echo shell-ok 2>$(Get-FactoryNullDevice)"
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $shell = [System.Diagnostics.Process]::Start($psi)
+    $said = $shell.StandardOutput.ReadToEnd().Trim()
+    $shell.WaitForExit()
+    & $check 'a shell command line runs, redirection and all' ($said -eq 'shell-ok' -and $shell.ExitCode -eq 0) "said '$said', exit $($shell.ExitCode)"
     exit $(if ($script:platformFailed) { 1 } else { 0 })
 }
 

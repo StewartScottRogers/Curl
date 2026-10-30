@@ -13,6 +13,8 @@ Run /task-run {ID}.
 Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRules.md):
 0. No Python, not even a one-liner: PowerShell for scripts and checks, the Edit tool
    for edits, and Record-CurlExchange.ps1 to measure real curl (extend it if needed).
+   To run Curl itself, pass -Curl Curl.Console\bin\Debug\net10.0\curl.exe after
+   dotnet build Curl.Console; bin\ cannot be listed, so do not look for it (AF-0483).
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
 2. Design and behaviour decisions are yours: Stewart has delegated them (the lane rules,
@@ -113,7 +115,7 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    the deadline, file what is left as a task with the board script, add its ID to the
    task's `depends-on`, record what you measured under Notes, and move it to Backlog
    before then with a -Reason naming that task: the next lane then starts on the work
-   that is left, not on measuring the task again (AF-0094).
+   that is left, not on measuring the task again (AF-0094).{TURNCAP}
    Before committing a change to a library's production code, run Measure-CodeQuality.ps1
    for that library once and fix any method past the complexity gate, so the push does not
    turn the CI quality job red (AF-0213: BL-2177 pushed four methods past the gate with no
@@ -196,6 +198,8 @@ claim step, do not move it to Doing again, and do not take any other task.
 Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRules.md):
 0. No Python, not even a one-liner: PowerShell for scripts and checks, the Edit tool
    for edits, and Record-CurlExchange.ps1 to measure real curl (extend it if needed).
+   To run Curl itself, pass -Curl Curl.Console\bin\Debug\net10.0\curl.exe after
+   dotnet build Curl.Console; bin\ cannot be listed, so do not look for it (AF-0483).
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
 2. Design and behaviour decisions are yours: Stewart has delegated them (the lane rules,
@@ -312,7 +316,7 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    the deadline, file what is left as a task with the board script, add its ID to the
    task's `depends-on`, record what you measured under Notes, and move it to Backlog
    before then with a -Reason naming that task: the next lane then starts on the work
-   that is left, not on measuring the task again (AF-0094).
+   that is left, not on measuring the task again (AF-0094).{TURNCAP}
    Before committing a change to a library's production code, run Measure-CodeQuality.ps1
    for that library once and fix any method past the complexity gate, so the push does not
    turn the CI quality job red (AF-0213: BL-2177 pushed four methods past the gate with no

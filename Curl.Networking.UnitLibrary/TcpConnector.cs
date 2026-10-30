@@ -767,16 +767,16 @@ public sealed partial class TcpConnector(
                 ? await ConnectThroughProxyAsync(target, destination, proxy, started, limited.Token).ConfigureAwait(false)
                 : await ConnectDirectlyAsync(target, destination, started, limited.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
+        catch (CanceledWhileResolvingException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
         {
-            var message = $"Connection timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
+            // Only a resolve cancelled once the limit has passed is curl's "Resolving timed out" (CGR-284); a cancellation before the limit escapes.
+            var message = $"Resolving timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
             target.Events.ReportInfo(message);
             return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
         }
-        catch (CanceledWhileResolvingException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
         {
-            // curl names the phase the --max-time limit ended: a resolve still running says "Resolving" (CGR-284).
-            var message = $"Resolving timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
+            var message = $"Connection timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
             target.Events.ReportInfo(message);
             return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
         }

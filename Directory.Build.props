@@ -151,4 +151,40 @@
            Text="%(_TestPlacementSource.PlacementKey) has %(_TestPlacementSource.TestMethodAttributes) test methods but only %(_TestPlacementSource.IntegrationAttributes) [TestCategory(&quot;Integration&quot;)] attributes. Every test in a *.IntegrationTests project carries the Integration category (ADR-0421)." />
   </Target>
 
+  <!--
+    Extensions - what Curl adds beyond upstream curl - stay apart from curl's own code (ADR-0999).
+    Three rules, checked on every project's ProjectReference items:
+    1. Only the hosts (Curl.Console, Curl.Api, Curl.Mcp and their test projects) and the extensions
+       themselves reference a Curl.Extension.* project; the engine, the core and every protocol never do.
+    2. An extension library references no Curl.Protocol.* project but Curl.Protocol.Abstractions,
+       as protocols reference no other protocol.
+    3. An extension library references no other extension but Curl.Extension.Abstractions; only
+       Curl.Extension.Composition, which lists them all, references the extensions.
+  -->
+  <!-- Ahead of the SDK's IncludeTransitiveProjectReferences, so only a project's own references are checked.
+       BeforeBuild alone is too late under Rebuild (dotnet build's no-incremental switch): its Clean runs that
+       target first, so by BeforeBuild ProjectReference holds the transitive references too (BL-4294). -->
+  <Target Name="VerifyExtensionIsolation" BeforeTargets="IncludeTransitiveProjectReferences;BeforeBuild">
+    <PropertyGroup>
+      <_IsExtensionProject>$(MSBuildProjectName.StartsWith('Curl.Extension.'))</_IsExtensionProject>
+      <_IsExtensionTestProject>false</_IsExtensionTestProject>
+      <_IsExtensionTestProject Condition="'$(_IsExtensionProject)' == 'True' And ($(MSBuildProjectName.EndsWith('.UnitTests')) Or $(MSBuildProjectName.EndsWith('.IntegrationTests')))">true</_IsExtensionTestProject>
+      <_IsExtensionHost>false</_IsExtensionHost>
+      <_IsExtensionHost Condition="'$(MSBuildProjectName)' == 'Curl.Console' Or '$(MSBuildProjectName)' == 'Curl.Console.UnitTests' Or '$(MSBuildProjectName)' == 'Curl.Console.IntegrationTests' Or '$(MSBuildProjectName)' == 'Curl.Api' Or '$(MSBuildProjectName)' == 'Curl.Api.UnitTests' Or '$(MSBuildProjectName)' == 'Curl.Mcp' Or '$(MSBuildProjectName)' == 'Curl.Mcp.UnitTests'">true</_IsExtensionHost>
+      <_IsExtensionLibrary>false</_IsExtensionLibrary>
+      <_IsExtensionLibrary Condition="'$(_IsExtensionProject)' == 'True' And '$(_IsExtensionTestProject)' != 'true' And '$(MSBuildProjectName)' != 'Curl.Extension.Composition.UnitLibrary' And '$(MSBuildProjectName)' != 'Curl.Extension.Abstractions.UnitLibrary'">true</_IsExtensionLibrary>
+    </PropertyGroup>
+    <ItemGroup>
+      <_ExtensionReference Include="@(ProjectReference)" Condition="$([System.String]::Copy('%(Filename)').StartsWith('Curl.Extension.'))" />
+      <_ExtensionToExtensionReference Include="@(_ExtensionReference)" Condition="'%(Filename)' != 'Curl.Extension.Abstractions.UnitLibrary'" />
+      <_ExtensionToProtocolReference Include="@(ProjectReference)" Condition="$([System.String]::Copy('%(Filename)').StartsWith('Curl.Protocol.')) And '%(Filename)' != 'Curl.Protocol.Abstractions.UnitLibrary'" />
+    </ItemGroup>
+    <Error Condition="'$(_IsExtensionProject)' != 'True' And '$(_IsExtensionHost)' != 'true' And '@(_ExtensionReference)' != ''"
+           Text="$(MSBuildProjectName) references @(_ExtensionReference->'%(Filename)'), but only the hosts (Curl.Console, Curl.Api, Curl.Mcp) and the extensions reference an extension (ADR-0999). Pass the extension in from a host instead." />
+    <Error Condition="'$(_IsExtensionLibrary)' == 'true' And '@(_ExtensionToProtocolReference)' != ''"
+           Text="$(MSBuildProjectName) references @(_ExtensionToProtocolReference->'%(Filename)'), but an extension references no curl protocol library, only Curl.Protocol.Abstractions and the shared layers (ADR-0999)." />
+    <Error Condition="'$(_IsExtensionLibrary)' == 'true' And '@(_ExtensionToExtensionReference)' != ''"
+           Text="$(MSBuildProjectName) references @(_ExtensionToExtensionReference->'%(Filename)'), but an extension references no other extension, only Curl.Extension.Abstractions (ADR-0999)." />
+  </Target>
+
 </Project>

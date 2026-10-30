@@ -15,7 +15,7 @@ public sealed class QuicConnectionTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task OpenBidirectionalStreamAsync_RequestAndResponse_CarriesBothWays()
     {
         Diagnostics.Arrange("request", "GET");
@@ -23,10 +23,10 @@ public sealed class QuicConnectionTests
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
         await using (connection)
         {
-            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(CancellationToken.None);
+            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken);
             using (Diagnostics.Phase("data transfer"))
             {
-                await stream.WriteAsync("GET"u8.ToArray(), endStream: true, CancellationToken.None);
+                await stream.WriteAsync("GET"u8.ToArray(), endStream: true, TestContext.CancellationToken);
                 await channel.WaitUntilSentAsync(() => channel.Sent<QuicStreamFrame>().Any(frame => frame.IsFin));
                 Task<string> responseTask = ReadToEndAsync(stream);
                 channel.FromServer(new QuicStreamFrame(0, 2, "ok"u8.ToArray(), true));
@@ -53,7 +53,7 @@ public sealed class QuicConnectionTests
             Assert.AreEqual(QuicTestChannel.ServerAddress, connection.RemoteEndPoint);
             Diagnostics.Assert("local end point", QuicTestLiveChannel.ClientAddress, connection.LocalEndPoint);
             Assert.AreEqual(QuicTestLiveChannel.ClientAddress, connection.LocalEndPoint);
-            int endRead = await stream.ReadAsync(Memory<byte>.Empty, CancellationToken.None);
+            int endRead = await stream.ReadAsync(Memory<byte>.Empty, TestContext.CancellationToken);
             Diagnostics.Assert("read after end", 0, endRead);
             Assert.AreEqual(0, endRead);
             await stream.DisposeAsync();
@@ -61,7 +61,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task PeerIdleTimeout_ServerDeclaresOne_IsItsMaxIdleTimeout()
     {
         Diagnostics.Arrange("server MaxIdleTimeout (ms)", 180000);
@@ -75,7 +75,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task PeerIdleTimeout_ServerDeclaresNone_IsNull()
     {
         Diagnostics.Arrange("server MaxIdleTimeout (ms)", 0);
@@ -89,14 +89,14 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task AcceptUnidirectionalStreamAsync_ServerStream_IsAcceptedAndRead()
     {
         Diagnostics.Arrange("server stream", "3 carrying 'control' with fin; a spoofed 'spoofed' frame from another address");
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
         await using (connection)
         {
-            Task<IMultiplexedStream> accept = connection.AcceptUnidirectionalStreamAsync(CancellationToken.None).AsTask();
+            Task<IMultiplexedStream> accept = connection.AcceptUnidirectionalStreamAsync(TestContext.CancellationToken).AsTask();
             IMultiplexedStream stream;
             using (Diagnostics.Phase("data transfer"))
             {
@@ -116,16 +116,43 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task AcceptBidirectionalStreamAsync_ServerStream_IsAcceptedReadAndWritten()
+    {
+        Diagnostics.Arrange("server stream", "1 carrying 'signal' with fin; the client answers 'ok'");
+        (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
+        await using (connection)
+        {
+            IPeerBidirectionalStreamAccepting accepting = connection;
+            Task<IMultiplexedStream> accept = accepting.AcceptBidirectionalStreamAsync(TestContext.CancellationToken).AsTask();
+            IMultiplexedStream stream;
+            using (Diagnostics.Phase("data transfer"))
+            {
+                channel.FromServer(new QuicStreamFrame(1, 0, "signal"u8.ToArray(), true));
+                stream = await accept;
+                await stream.WriteAsync("ok"u8.ToArray(), endStream: true, TestContext.CancellationToken);
+                await channel.WaitUntilSentAsync(() => channel.Sent<QuicStreamFrame>().Any(frame => frame.StreamId == 1 && frame.IsFin));
+            }
+
+            string text = await ReadToEndAsync(stream);
+            string answer = Encoding.ASCII.GetString(channel.Sent<QuicStreamFrame>().Single(frame => frame.StreamId == 1).Data.Span);
+            Diagnostics.Act("(stream id, text read, answer sent)", (stream.StreamId, text, answer));
+            Diagnostics.Assert("(stream id, text read, answer sent)", (1L, "signal", "ok"), (stream.StreamId, text, answer));
+            Assert.AreEqual((1L, "signal", "ok"), (stream.StreamId, text, answer));
+        }
+    }
+
+    [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task ReadAsync_ServerResetsTheStream_ThrowsWithItsCode()
     {
         Diagnostics.Arrange("RESET_STREAM error code", 0x10c);
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
         await using (connection)
         {
-            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(CancellationToken.None);
-            await stream.WriteAsync("x"u8.ToArray(), endStream: false, CancellationToken.None);
-            Task<int> read = stream.ReadAsync(new byte[10], CancellationToken.None).AsTask();
+            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken);
+            await stream.WriteAsync("x"u8.ToArray(), endStream: false, TestContext.CancellationToken);
+            Task<int> read = stream.ReadAsync(new byte[10], TestContext.CancellationToken).AsTask();
             channel.FromServer(new QuicResetStreamFrame(0, 0x10c, 0));
 
             MultiplexedStreamResetException error = await Assert.ThrowsExactlyAsync<MultiplexedStreamResetException>(() => read);
@@ -136,7 +163,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task WriteAsync_AfterStopSending_ThrowsAndTheStreamIsReset()
     {
         Diagnostics.Arrange("bytes written", 3);
@@ -144,13 +171,13 @@ public sealed class QuicConnectionTests
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
         await using (connection)
         {
-            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(CancellationToken.None);
-            await stream.WriteAsync("abc"u8.ToArray(), endStream: false, CancellationToken.None);
+            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken);
+            await stream.WriteAsync("abc"u8.ToArray(), endStream: false, TestContext.CancellationToken);
             await channel.WaitUntilSentAsync(() => channel.Sent<QuicStreamFrame>().Count == 1);
             channel.FromServer(new QuicStopSendingFrame(0, 0x10b));
             await channel.WaitUntilSentAsync(() => channel.Sent<QuicResetStreamFrame>().Count == 1);
 
-            MultiplexedStreamResetException error = await Assert.ThrowsExactlyAsync<MultiplexedStreamResetException>(() => stream.WriteAsync("d"u8.ToArray(), false, CancellationToken.None).AsTask());
+            MultiplexedStreamResetException error = await Assert.ThrowsExactlyAsync<MultiplexedStreamResetException>(() => stream.WriteAsync("d"u8.ToArray(), false, TestContext.CancellationToken).AsTask());
             QuicResetStreamFrame reset = channel.Sent<QuicResetStreamFrame>().Single();
             Diagnostics.Act("exception", error.GetType().Name + ": " + error.Message);
             Diagnostics.Act("RESET_STREAM sent", reset);
@@ -162,14 +189,14 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task Abort_SendsResetStreamAndStopSending()
     {
         Diagnostics.Arrange("abort error code", 0x10c);
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
         await using (connection)
         {
-            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(CancellationToken.None);
+            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken);
 
             stream.Abort(0x10c);
             await channel.WaitUntilSentAsync(() => channel.Sent<QuicStopSendingFrame>().Count == 1);
@@ -186,7 +213,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task OpenUnidirectionalStreamAsync_NoStreamAllowed_WaitsForMaxStreamsAndSendsStreamsBlocked()
     {
         Diagnostics.Arrange("server InitialMaxStreamsUni", 0);
@@ -194,7 +221,7 @@ public sealed class QuicConnectionTests
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync(parameters => GenerousServerLimits(parameters) with { InitialMaxStreamsUni = 0 });
         await using (connection)
         {
-            Task<IMultiplexedStream> open = connection.OpenUnidirectionalStreamAsync(CancellationToken.None).AsTask();
+            Task<IMultiplexedStream> open = connection.OpenUnidirectionalStreamAsync(TestContext.CancellationToken).AsTask();
             await channel.WaitUntilSentAsync(() => channel.Sent<QuicStreamsBlockedFrame>().Count == 1);
             Diagnostics.Act("open completed before MAX_STREAMS", open.IsCompleted);
             Diagnostics.Assert("open completed before MAX_STREAMS", false, open.IsCompleted);
@@ -213,15 +240,15 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task ReadAsync_ServerBreaksFlowControl_FailsTheConnectionWithRecvError()
     {
         Diagnostics.Arrange("bytes delivered on stream 0", 101);
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
         await using (connection)
         {
-            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(CancellationToken.None);
-            Task<int> read = stream.ReadAsync(new byte[10], CancellationToken.None).AsTask();
+            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken);
+            Task<int> read = stream.ReadAsync(new byte[10], TestContext.CancellationToken).AsTask();
 
             channel.FromServer(new QuicStreamFrame(0, 0, Bytes(101), false));
 
@@ -234,7 +261,7 @@ public sealed class QuicConnectionTests
             Diagnostics.Act("CONNECTION_CLOSE error code", closeCode);
             Diagnostics.Assert("CONNECTION_CLOSE error code", (ulong)QuicTransportErrorCode.FlowControlError, closeCode);
             Assert.AreEqual((ulong)QuicTransportErrorCode.FlowControlError, closeCode);
-            MultiplexedConnectionFailedException writeError = await Assert.ThrowsExactlyAsync<MultiplexedConnectionFailedException>(() => stream.WriteAsync("x"u8.ToArray(), false, CancellationToken.None).AsTask());
+            MultiplexedConnectionFailedException writeError = await Assert.ThrowsExactlyAsync<MultiplexedConnectionFailedException>(() => stream.WriteAsync("x"u8.ToArray(), false, TestContext.CancellationToken).AsTask());
             Diagnostics.Act("write after failure exception", writeError.GetType().Name + ": " + writeError.Message);
             Diagnostics.Assert("write after failure exit code", CurlExitCode.RecvError, writeError.ExitCode);
         }
@@ -244,14 +271,14 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task AcceptUnidirectionalStreamAsync_ReceiveFails_FailsWithRecvError()
     {
         Diagnostics.Arrange("socket error code", 10054);
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
         await using (connection)
         {
-            Task<IMultiplexedStream> accept = connection.AcceptUnidirectionalStreamAsync(CancellationToken.None).AsTask();
+            Task<IMultiplexedStream> accept = connection.AcceptUnidirectionalStreamAsync(TestContext.CancellationToken).AsTask();
 
             channel.FailNextReceive(new SocketException(10054));
 
@@ -266,14 +293,14 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task AcceptUnidirectionalStreamAsync_ServerClosesTheConnection_FailsWithRecvErrorAndSendsNoClose()
     {
         Diagnostics.Arrange("server CONNECTION_CLOSE error code", (ulong)QuicTransportErrorCode.InternalError);
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
         await using (connection)
         {
-            Task<IMultiplexedStream> accept = connection.AcceptUnidirectionalStreamAsync(CancellationToken.None).AsTask();
+            Task<IMultiplexedStream> accept = connection.AcceptUnidirectionalStreamAsync(TestContext.CancellationToken).AsTask();
 
             channel.FromServer(new QuicConnectionCloseFrame((ulong)QuicTransportErrorCode.InternalError, 0, ReadOnlyMemory<byte>.Empty));
 
@@ -290,14 +317,14 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task Loop_ServerGoesSilent_SendsKeepAlivesThenFailsWithTheIdleTimeout()
     {
         Diagnostics.Arrange("server MaxIdleTimeout (ms)", 400);
         (QuicConnection connection, QuicTestLiveChannel channel, ManualTimerTimeProvider clock) = await ConnectAsync(parameters => GenerousServerLimits(parameters) with { MaxIdleTimeout = 400 });
         await using (connection)
         {
-            Task<IMultiplexedStream> accept = connection.AcceptUnidirectionalStreamAsync(CancellationToken.None).AsTask();
+            Task<IMultiplexedStream> accept = connection.AcceptUnidirectionalStreamAsync(TestContext.CancellationToken).AsTask();
             channel.Silence();
 
             using (Diagnostics.Phase("idle timers"))
@@ -322,21 +349,21 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task Loop_StreamChangeWhileTheReceiveWaits_WakesTheLoopToSendIt()
     {
         Diagnostics.Arrange("payload", "woken (5 bytes, fin) written while the loop's receive waits on a silenced channel");
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
         await using (connection)
         {
-            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(CancellationToken.None);
+            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken);
             channel.Silence();
             await channel.WaitUntilReceiveWaitsAsync();
 
             using (Diagnostics.Phase("data transfer"))
             {
                 // No datagram and no timer can end that receive now; only the wake this write raises does.
-                await stream.WriteAsync("woken"u8.ToArray(), endStream: true, CancellationToken.None);
+                await stream.WriteAsync("woken"u8.ToArray(), endStream: true, TestContext.CancellationToken);
                 await channel.WaitUntilSentAsync(() => channel.Sent<QuicStreamFrame>().Count == 1);
             }
 
@@ -349,19 +376,19 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task Loop_UnacknowledgedStreamData_IsProbedWhenTheLossDetectionTimerFires()
     {
         Diagnostics.Arrange("payload", "lost (4 bytes, fin) on a silenced channel");
         (QuicConnection connection, QuicTestLiveChannel channel, ManualTimerTimeProvider clock) = await ConnectAsync();
         await using (connection)
         {
-            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(CancellationToken.None);
+            IMultiplexedStream stream = await connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken);
             channel.Silence();
 
             using (Diagnostics.Phase("data transfer"))
             {
-                await stream.WriteAsync("lost"u8.ToArray(), endStream: true, CancellationToken.None);
+                await stream.WriteAsync("lost"u8.ToArray(), endStream: true, TestContext.CancellationToken);
                 await channel.WaitUntilSentAsync(() => channel.Sent<QuicStreamFrame>().Count == 1);
 
                 await RunTimersUntilAsync(clock, () => channel.Sent<QuicStreamFrame>().Count >= 2);
@@ -375,16 +402,16 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task CloseAsync_SendsTheApplicationCloseOnceAndRefusesFurtherUse()
     {
         Diagnostics.Arrange("application error code", 0x100);
         (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
 
-        await connection.CloseAsync(0x100, CancellationToken.None);
+        await connection.CloseAsync(0x100, TestContext.CancellationToken);
         List<QuicConnectionCloseFrame> closes = channel.Sent<QuicConnectionCloseFrame>();
-        ObjectDisposedException openError = await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => connection.OpenBidirectionalStreamAsync(CancellationToken.None).AsTask());
-        ObjectDisposedException closeError = await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => connection.CloseAsync(0, CancellationToken.None).AsTask());
+        ObjectDisposedException openError = await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => connection.OpenBidirectionalStreamAsync(TestContext.CancellationToken).AsTask());
+        ObjectDisposedException closeError = await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => connection.CloseAsync(0, TestContext.CancellationToken).AsTask());
         await connection.DisposeAsync();
 
         Diagnostics.Act("open after close", openError.GetType().Name);
@@ -397,7 +424,7 @@ public sealed class QuicConnectionTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task DisposeAsync_OpenConnection_ClosesWithApplicationErrorZero()
     {
         Diagnostics.Arrange("connection", "open, never used");
@@ -456,7 +483,7 @@ public sealed class QuicConnectionTests
         object? handshakeFailure;
         using (Diagnostics.Phase("handshake"))
         {
-            handshakeFailure = await new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
+            handshakeFailure = await new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, TestContext.CancellationToken);
         }
 
         Diagnostics.Act("handshake failure", handshakeFailure?.ToString() ?? "none");
@@ -498,12 +525,12 @@ public sealed class QuicConnectionTests
         }
     }
 
-    private static async Task<string> ReadToEndAsync(IMultiplexedStream stream)
+    private async Task<string> ReadToEndAsync(IMultiplexedStream stream)
     {
         StringBuilder text = new();
         byte[] buffer = new byte[1];
         int read;
-        while ((read = await stream.ReadAsync(buffer, CancellationToken.None)) > 0)
+        while ((read = await stream.ReadAsync(buffer, TestContext.CancellationToken)) > 0)
         {
             text.Append(Encoding.ASCII.GetString(buffer, 0, read));
         }

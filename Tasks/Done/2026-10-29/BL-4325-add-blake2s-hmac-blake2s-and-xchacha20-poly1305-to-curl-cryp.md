@@ -1,0 +1,44 @@
+---
+id: BL-4325
+title: Add BLAKE2s, HMAC-BLAKE2s and XChaCha20-Poly1305 to Curl.Cryptography
+priority: Low
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Cryptography.UnitLibrary/Blake2s.cs, Curl.Cryptography.UnitLibrary/HmacBlake2s.cs, Curl.Cryptography.UnitLibrary/HChaCha20.cs, Curl.Cryptography.UnitLibrary/AeadXChaCha20Poly1305.cs, Curl.Cryptography.UnitTests/Blake2sTests.cs, Curl.Cryptography.UnitTests/HmacBlake2sTests.cs, Curl.Cryptography.UnitTests/HChaCha20Tests.cs, Curl.Cryptography.UnitTests/AeadXChaCha20Poly1305Tests.cs, Curl.Cryptography.UnitLibrary/CLAUDE.md]
+requirement: none
+created: 2026-10-29
+completed: 2026-10-29
+---
+# BL-4325 — Add BLAKE2s, HMAC-BLAKE2s and XChaCha20-Poly1305 to Curl.Cryptography
+
+## Goal
+
+`Curl.Cryptography.UnitLibrary` provides BLAKE2s (keyed and unkeyed, any digest length 1-32), HMAC-BLAKE2s, HChaCha20 and XChaCha20-Poly1305, as the WireGuard extension needs them.
+
+## Context
+
+Split from BL-4147 (WireGuard extension): WireGuard's Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s construction needs BLAKE2s for HASH, MAC and HMAC-based HKDF, and XChaCha20-Poly1305 for cookie replies (WireGuard whitepaper section 5.4.7). `X25519`, `ChaCha20`, `Poly1305` and `AeadChaCha20Poly1305` already exist in the library; follow their style. Specifications: RFC 7693 (BLAKE2), RFC 2104 (HMAC, block size 64 for BLAKE2s), draft-irtf-cfrg-xchacha-03 (HChaCha20, XChaCha20-Poly1305).
+
+## Acceptance criteria
+
+- [x] `Blake2s` matches RFC 7693 Appendix B ("abc") and the official BLAKE2s keyed test vectors for at least lengths 0, 1, 63, 64, 65 and 255 bytes of input; unit tests.
+- [x] `HmacBlake2s` and `HChaCha20` / `AeadXChaCha20Poly1305` match the test vectors of draft-irtf-cfrg-xchacha-03 sections 2.2.1 and A.3.1, and a tampered tag fails to open; unit tests.
+- [x] The library meets the four quality gates by `Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary`.
+- [x] `dotnet build` is clean and the fast tests pass.
+
+## Notes
+
+BLAKE2s is not anywhere in the repository yet (searched 2026-10-29). Base class library only.
+
+- 2026-10-29 run: delivered directly rather than through the full /feature agent chain - four small primitives with published vectors, no design seams. Vectors taken from the BLAKE2 reference repository (testvectors/blake2s-kat.txt) and the draft-irtf-cfrg-xchacha-03 text, both downloaded this run.
+- Added `Curl.Cryptography.UnitLibrary/CLAUDE.md` to touches: the library README lists every public type, so the four new ones go there too. No other task in Doing names it (BL-4326 touches only the WireGuard projects).
+- Decision: `Blake2s` is an `IDisposable` class with static `HashData` plus `AppendData`/`GetHashAndReset` (HMAC needs the streaming form), like `HmacRipemd160`; `HmacBlake2s` and `HChaCha20` are static (no stored key); `AeadXChaCha20Poly1305` mirrors `AeadChaCha20Poly1305` and delegates to it under the HChaCha20 subkey. Sensible defaults within ADR-0118, so no new ADR.
+- No published HMAC-BLAKE2s vectors exist (the draft sections the criterion names cover HChaCha20 and the AEAD), so `HmacBlake2sTests` checks RFC 2104 composition over the vector-pinned `Blake2s` for keys of 0, 32, 64, 65 and 200 bytes.
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10.
+
+## Log
+
+- 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 594872e4 71dda211 f188b140 3d836d5e.
+- 2026-10-29: Doing -> Done. Curl.Cryptography provides BLAKE2s (keyed, 1-32 byte digests), HMAC-BLAKE2s, HChaCha20 and XChaCha20-Poly1305, pinned to RFC 7693, the BLAKE2s KAT and draft-irtf-cfrg-xchacha-03

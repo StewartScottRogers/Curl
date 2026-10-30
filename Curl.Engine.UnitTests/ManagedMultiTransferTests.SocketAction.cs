@@ -14,10 +14,8 @@ namespace Curl.Engine;
 /// <summary>The multi handle's socket-action API and its socket and timer callbacks (BL-2426).</summary>
 public sealed partial class ManagedMultiTransferTests
 {
-    private static readonly CurlSocket FirstSocket = new(ManagedMultiTransfer.FirstTransferSocket);
-
     [TestMethod]
-    public async Task SocketActionAsync_TransferDrivenOnlyBySocketActions_CallsTheCallbacksInLibcurlsOrder()
+    public async Task SocketActionAsync_TransferWithNoSocketDrivenByTimeoutActions_CallsOnlyTheTimerCallback()
     {
         List<string> calls = [];
         await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
@@ -26,26 +24,24 @@ public sealed partial class ManagedMultiTransferTests
 
         CurlMultiCode added = multi.Add(transfer);
         (CurlMultiCode Code, int RunningTransfers) started = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
-        CurlMultiCode assigned = multi.Assign(FirstSocket, "state");
-        (CurlMultiCode Code, int RunningTransfers) stillRunning = await multi.SocketActionAsync(FirstSocket, CurlSocketSelect.In, CancellationToken.None);
+        (CurlMultiCode Code, int RunningTransfers) stillRunning = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
         transfer.Finish(CurlCode.Ok);
-        (CurlMultiCode Code, int RunningTransfers) finished = await multi.SocketActionAsync(FirstSocket, CurlSocketSelect.In, CancellationToken.None);
+        (CurlMultiCode Code, int RunningTransfers) finished = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
         Assert.AreEqual(CurlMultiCode.Ok, added);
         Assert.AreEqual((CurlMultiCode.Ok, 1), started);
-        Assert.AreEqual(CurlMultiCode.Ok, assigned);
         Assert.AreEqual((CurlMultiCode.Ok, 1), stillRunning);
         Assert.AreEqual((CurlMultiCode.Ok, 0), finished);
         Assert.AreEqual(1, transfer.PerformCount);
         CollectionAssert.AreEqual(
-            new[] { "timer 0", $"socket {FirstSocket.Handle} In null", "timer 10", $"socket {FirstSocket.Handle} Remove state", "timer -1" },
+            new[] { "timer 0", "timer 0", "timer 0", "timer -1" },
             calls);
         Assert.IsTrue(multi.TryReadInfo(out CurlMultiMessage? message, out _));
         Assert.AreEqual(new CurlMultiMessage(CurlMultiMessageType.Done, transfer, CurlCode.Ok), message);
     }
 
     [TestMethod]
-    public async Task SocketActionAsync_TwoTransfers_GivesEachItsOwnSocket()
+    public async Task SocketActionAsync_TwoTransfersWithNoSocket_TellTheSocketCallbackOfNone()
     {
         List<string> calls = [];
         await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
@@ -56,7 +52,7 @@ public sealed partial class ManagedMultiTransferTests
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
         CollectionAssert.AreEqual(
-            new[] { "timer 0", "timer 0", $"socket {FirstSocket.Handle} In null", $"socket {FirstSocket.Handle + 1} In null", "timer 10" },
+            new[] { "timer 0", "timer 0", "timer 0" },
             calls);
     }
 
@@ -70,10 +66,10 @@ public sealed partial class ManagedMultiTransferTests
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
         calls.Clear();
 
-        await multi.SocketActionAsync(FirstSocket, CurlSocketSelect.In, CancellationToken.None);
+        await multi.SocketActionAsync(WrappedSocket, CurlSocketSelect.In, CancellationToken.None);
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
-        CollectionAssert.AreEqual(new[] { "timer 10" }, calls);
+        CollectionAssert.AreEqual(new[] { "timer 0" }, calls);
     }
 
     [TestMethod]
@@ -95,7 +91,7 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
-    public async Task SocketActionAsync_TransferTimeoutSoonerThanTheCheckInterval_IsTheTimer()
+    public async Task SocketActionAsync_RunningTransferWithATimeoutAndNoSocket_MakesTheTimerZero()
     {
         List<string> calls = [];
         await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
@@ -104,11 +100,11 @@ public sealed partial class ManagedMultiTransferTests
 
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
-        Assert.AreEqual("timer 4", calls[^1]);
+        Assert.AreEqual("timer 0", calls[^1]);
     }
 
     [TestMethod]
-    public async Task SocketActionAsync_TransferFinishedBeforeItsFirstAction_IsGivenASocketThenRemovedOnTheNextAction()
+    public async Task SocketActionAsync_TransferFinishedBeforeItsFirstAction_TellsTheSocketCallbackOfNoneAndEndsTheTimer()
     {
         List<string> calls = [];
         await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
@@ -121,8 +117,7 @@ public sealed partial class ManagedMultiTransferTests
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
         Assert.AreEqual((CurlMultiCode.Ok, 1), result);
-        string socket = $"socket {ManagedMultiTransfer.FirstTransferSocket}";
-        CollectionAssert.AreEqual(new[] { "timer 0", $"{socket} In null", "timer 0", $"{socket} Remove null", "timer -1" }, calls);
+        CollectionAssert.AreEqual(new[] { "timer 0", "timer 0", "timer -1" }, calls);
     }
 
     [TestMethod]
@@ -148,26 +143,42 @@ public sealed partial class ManagedMultiTransferTests
     public async Task Remove_TransferWithASocket_TellsTheSocketCallbackToRemoveIt()
     {
         List<string> calls = [];
-        await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
+        TimerManualTimeProvider time = new();
+        await using ManagedCurlEngine engine = new(time, null);
+        await using ManagedMultiTransfer multi = NewMulti(time);
         multi.Options = new MultiOptions { Socket = RecordingOptions(calls).Socket };
-        ControlledEasyTransfer transfer = new();
+        multi.SocketWaitSettleLimit = TimeSpan.FromSeconds(30);
+        await using WrappingEasyTransfer transfer = ReadableWaitingTransfer(engine);
         multi.Add(transfer);
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
-        multi.Assign(FirstSocket, 7);
+        multi.Assign(WrappedSocket, 7);
 
         CurlMultiCode removed = multi.Remove(transfer);
 
         Assert.AreEqual(CurlMultiCode.Ok, removed);
-        CollectionAssert.AreEqual(new[] { $"socket {FirstSocket.Handle} In null", $"socket {FirstSocket.Handle} Remove 7" }, calls);
-        Assert.AreEqual(CurlMultiCode.BadSocket, multi.Assign(FirstSocket, null));
+        CollectionAssert.AreEqual(new[] { $"socket {WrappedSocket.Handle} In null", $"socket {WrappedSocket.Handle} Remove 7" }, calls);
+        Assert.AreEqual(CurlMultiCode.BadSocket, multi.Assign(WrappedSocket, null));
     }
+
+    /// <summary>A wrapped managed transfer that takes <see cref="WrappedSocket" /> and waits until it is readable.</summary>
+    internal static WrappingEasyTransfer ReadableWaitingTransfer(ManagedCurlEngine engine) =>
+        new((ManagedEasyTransfer)engine.CreateEasy(), async (wait, token) =>
+        {
+            wait.TakeSocket(WrappedSocket.Handle);
+            await wait.WaitUntilReadableAsync(token);
+            return CurlCode.Ok;
+        });
 
     [TestMethod]
     public async Task Remove_SocketCallbackClearedSinceTheSocketWasGiven_RemovesTheTransfer()
     {
-        await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
-        multi.Options = new MultiOptions { Socket = (_, _, _, _) => 0 };
-        ControlledEasyTransfer transfer = new();
+        TimerManualTimeProvider time = new();
+        await using ManagedCurlEngine engine = new(time, null);
+        await using ManagedMultiTransfer multi = NewMulti(time);
+        List<CurlSocket> told = [];
+        multi.Options = new MultiOptions { Socket = (_, socket, _, _) => { told.Add(socket); return 0; } };
+        multi.SocketWaitSettleLimit = TimeSpan.FromSeconds(30);
+        await using WrappingEasyTransfer transfer = ReadableWaitingTransfer(engine);
         multi.Add(transfer);
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
         multi.Options = new MultiOptions();
@@ -175,7 +186,8 @@ public sealed partial class ManagedMultiTransferTests
         CurlMultiCode removed = multi.Remove(transfer);
 
         Assert.AreEqual(CurlMultiCode.Ok, removed);
-        Assert.IsTrue(transfer.PerformToken.IsCancellationRequested);
+        CollectionAssert.AreEqual(new[] { WrappedSocket }, told);
+        Assert.AreEqual(CurlMultiCode.BadSocket, multi.Assign(WrappedSocket, null));
     }
 
     [TestMethod]
@@ -185,7 +197,7 @@ public sealed partial class ManagedMultiTransferTests
         multi.Add(new ControlledEasyTransfer());
         await multi.PerformAsync(CancellationToken.None);
 
-        Assert.AreEqual(CurlMultiCode.BadSocket, multi.Assign(FirstSocket, "state"));
+        Assert.AreEqual(CurlMultiCode.BadSocket, multi.Assign(WrappedSocket, "state"));
     }
 
     [TestMethod]
@@ -195,7 +207,7 @@ public sealed partial class ManagedMultiTransferTests
         await multi.DisposeAsync();
 
         Assert.AreEqual((CurlMultiCode.BadHandle, 0), await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None));
-        Assert.AreEqual(CurlMultiCode.BadHandle, multi.Assign(FirstSocket, null));
+        Assert.AreEqual(CurlMultiCode.BadHandle, multi.Assign(WrappedSocket, null));
     }
 
     [TestMethod]
@@ -267,7 +279,7 @@ public sealed partial class ManagedMultiTransferTests
         Assert.AreSame(transfer, ((IEasyTransfer)transfer).PerformingTransfer);
     }
 
-    private static readonly CurlSocket WrappedSocket = new(0x1234);
+    internal static readonly CurlSocket WrappedSocket = new(0x1234);
 
     private static MultiOptions RecordingOptions(List<string> calls) => new()
     {
@@ -287,7 +299,7 @@ public sealed partial class ManagedMultiTransferTests
     /// A handle that is not a <see cref="ManagedEasyTransfer" /> but wraps one, as Curl.Api's store-bound handle does:
     /// its perform runs <c>perform</c> on the socket wait the multi handle gave the wrapped transfer.
     /// </summary>
-    private sealed class WrappingEasyTransfer(ManagedEasyTransfer inner, Func<TransferSocketWait, CancellationToken, Task<CurlCode>> perform) : IEasyTransfer
+    internal sealed class WrappingEasyTransfer(ManagedEasyTransfer inner, Func<TransferSocketWait, CancellationToken, Task<CurlCode>> perform) : IEasyTransfer
     {
         public EasyOptions Options
         {

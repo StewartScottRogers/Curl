@@ -10,7 +10,8 @@ provider with one explicit line, never by scanning an assembly, so the host stay
 compatible: the `Tools/` classes `ParseUrlMcpTool`, `TransferMcpTool`, `CurlCommandMcpTool`,
 `BuildUrlMcpTool` and `VersionMcpTool` (in the order `tools/list` answers), each forwarding to one
 `Curl.Mcp.UnitLibrary` call over a production `ManagedCurlEngine` the host creates once, as `Libcurl`
-does, and `AiHelpMcpResourceProvider` for the `--ai-help` resources (ADR-0589).
+does, and `AiHelpMcpResourceProvider` for the `--ai-help` resources (ADR-0589). That engine's transfers reach
+Curl's extensions through `Curl.Extension.Composition.UnitLibrary` unless `CURL_EXTENSIONS` is `0` (ADR-1071).
 `LoggingSetLevelMcpHandler` advertises the `logging` capability the SDK host advertised. The runner
 adapter over `Curl.Console` is `InProcessCurlCommandRunner`. Tool logic - checking, capping, turning
 a result into an error - lives in `Curl.Mcp.UnitLibrary`, never here; a branch added here is a sign

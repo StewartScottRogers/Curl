@@ -254,6 +254,7 @@ public sealed partial class SshProtocolHandlerTests
             QuoteCommands = quotes ?? [],
             ListOnly = listOnly,
             NoBody = noBody,
+            TimeProvider = new UnlimitedShutDownClock(),
         };
         ArrangeTransfer(context);
         Diagnostics.Arrange("no body", noBody);
@@ -263,5 +264,23 @@ public sealed partial class SshProtocolHandlerTests
 
         ActTransfer(result, context, setup.Server);
         return string.Join(" | ", events.Transcript);
+    }
+
+    // The system clock with timers that never fire, so the handler's few-second limit on the
+    // session's close cannot pass on a busy runner before the close it bounds is done (BL-4071).
+    private sealed class UnlimitedShutDownClock : TimeProvider
+    {
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period) => new StoppedTimer();
+    }
+
+    private sealed class StoppedTimer : ITimer
+    {
+        public bool Change(TimeSpan dueTime, TimeSpan period) => true;
+
+        public void Dispose()
+        {
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

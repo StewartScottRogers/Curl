@@ -324,9 +324,9 @@ public sealed partial class CurlCompositionTests
         string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => Unwrapped(handler).GetType().Name).Order()];
         Diagnostics.Act("connecting handlers", string.Join(", ", connectingHandlers));
         Diagnostics.Act("connector count", connectors.Length);
-        Diagnostics.Assert("connecting handler count", 14, connectingHandlers.Length);
+        Diagnostics.Assert("connecting handler count", 30, connectingHandlers.Length);
         CollectionAssert.AreEqual(
-            new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "ImapProtocolHandler", "LdapProtocolHandler", "MqttProtocolHandler", "Pop3ProtocolHandler", "RoutingFtpProtocolHandler", "RtspProtocolHandler", "SmtpProtocolHandler", "SshProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler", "WsProtocolHandler" },
+            new[] { "Amqp0ProtocolHandler", "Amqp1ProtocolHandler", "AzureStorageProtocolHandler", "DictProtocolHandler", "GcsProtocolHandler", "GopherProtocolHandler", "GrpcProtocolHandler", "HttpProtocolHandler", "ImapProtocolHandler", "KafkaProtocolHandler", "LdapProtocolHandler", "McpProtocolHandler", "Mqtt5SchemeHandler", "MqttProtocolHandler", "NatsProtocolHandler", "OciRegistryProtocolHandler", "Pop3ProtocolHandler", "RedisProtocolHandler", "RoutingFtpProtocolHandler", "RtspProtocolHandler", "S3ProtocolHandler", "SignalRProtocolHandler", "SmtpProtocolHandler", "SocketIoProtocolHandler", "SshProtocolHandler", "StompProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler", "WsProtocolHandler", "XmppProtocolHandler" },
             connectingHandlers);
         Assert.IsTrue(connectors.All(connector => ReferenceEquals(connector, transports.PoolingConnector)));
         Assert.AreSame(transports.PoolingConnector, dispatch.ConnectionPool);

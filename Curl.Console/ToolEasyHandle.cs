@@ -16,8 +16,19 @@ namespace Curl.Console;
 /// <param name="Hooks">The engine transfer the handle wraps.</param>
 internal sealed record ToolEasyHandle(CurlEasy Easy, IToolEasyTransfer Hooks) : IAsyncDisposable
 {
-    // The calls whose CURLE_NOT_BUILT_IN curl's config2setopts ignores and carries on past (ADR-0975).
-    private static readonly HashSet<CurlOption> IgnoredWhenNotBuiltIn = [CurlOption.Capath, CurlOption.ProxyCapath, CurlOption.Tls13Ciphers, CurlOption.ProxyTls13Ciphers];
+    // The calls whose CURLE_NOT_BUILT_IN curl's config2setopts ignores and carries on past (ADR-0975, ADR-1036).
+    private static readonly HashSet<CurlOption> IgnoredWhenNotBuiltIn =
+    [
+        CurlOption.Capath,
+        CurlOption.ProxyCapath,
+        CurlOption.Tls13Ciphers,
+        CurlOption.ProxyTls13Ciphers,
+        CurlOption.Crlfile,
+        CurlOption.ProxyCrlfile,
+        CurlOption.SslEcCurves,
+        CurlOption.SslSignatureAlgorithms,
+        CurlOption.TcpFastopen,
+    ];
 
     /// <summary>
     /// Makes <paramref name="setopts" />' <c>curl_easy_setopt</c> calls on the handle, as
@@ -33,7 +44,10 @@ internal sealed record ToolEasyHandle(CurlEasy Easy, IToolEasyTransfer Hooks) : 
     /// (BL-2491, ADR-0631) - except a <c>CURLE_NOT_BUILT_IN</c> answer to <c>CURLOPT_CAPATH</c>,
     /// <c>CURLOPT_PROXY_CAPATH</c>, <c>CURLOPT_TLS13_CIPHERS</c> or <c>CURLOPT_PROXY_TLS13_CIPHERS</c>, which curl
     /// ignores and carries on past. Its warning is one of the run's lines before each transfer
-    /// (<see cref="CurlComposition.WarningLinesBeforeEachTransfer" />), so it is not written here (ADR-0975).
+    /// (<see cref="CurlComposition.WarningLinesBeforeEachTransfer" />), so it is not written here (ADR-0975). curl
+    /// also carries on, silently, past a <c>CURLE_NOT_BUILT_IN</c> answer to <c>CURLOPT_CRLFILE</c>,
+    /// <c>CURLOPT_PROXY_CRLFILE</c>, <c>CURLOPT_SSL_EC_CURVES</c>, <c>CURLOPT_SSL_SIGNATURE_ALGORITHMS</c> or
+    /// <c>CURLOPT_TCP_FASTOPEN</c>, so this does too (ADR-1036).
     /// </summary>
     /// <param name="setopts">The calls to make.</param>
     /// <param name="setOption">Makes one call and answers its code.</param>

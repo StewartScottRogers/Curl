@@ -62,9 +62,9 @@ internal sealed partial class ManagedEasyTransfer
         IReadOnlyList<CallbackReadStream> callbackReads = inputs.Upload is CallbackReadStream upload ? [.. mimeReads, upload] : mimeReads;
         EngineToolTransferProgress? toolProgress = ToolProgress;
         using CancellationTokenSource abort = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, AbortTokenOf(toolProgress));
-        CallbackTransferProgress? callbackProgress = CallbackProgressUnlessToolGave(toolProgress, options, abort);
+        CallbackTransferProgress? callbackProgress = CallbackProgressUnlessToolGave(toolProgress, options, abort, () => options.Behaviour.StandardError ?? Host.StandardError.Value, shared.TimeProvider);
         pauseGate.TickWhilePaused(CallbackTransferProgress.PausedTickOf(callbackProgress), shared.TimeProvider);
-        TransferResult? result = await FollowUnlessAbortedAsync(
+        TransferResult? result = await FollowFinishingMeterAsync(
             follower,
             state,
             CreateContext(
@@ -84,6 +84,38 @@ internal sealed partial class ManagedEasyTransfer
         KeepHandleStateOf(recorder, negotiateFailure, abortedHead is null ? result : abortedHead.ReportOn(result), url);
         long connectionId = toolEvents is null ? ConnectionIdOf(result, state) : ToolConnectionIdOf(result, state, toolEvents);
         return FinishPerformed(LastResult, options, transferUrl, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
+    }
+
+    /// <summary>
+    /// Performs the attempt as <see cref="FollowUnlessAbortedAsync" /> does, then ends the built-in progress meter
+    /// <paramref name="progress" /> drew (<see cref="CallbackTransferProgress.FinishMeter" />), even when the attempt
+    /// throws, so the meter's clock always stops (BL-4057, ADR-0993).
+    /// </summary>
+    /// <param name="follower">Performs the attempt, following redirects.</param>
+    /// <param name="state">The running transfer, which keeps the attempt's watchdogs.</param>
+    /// <param name="context">The attempt's context.</param>
+    /// <param name="redirectPolicy">The redirect policy.</param>
+    /// <param name="progress">The progress callback's sink, or <see langword="null" /> for none.</param>
+    /// <param name="reads">The read callbacks' streams the transfer reads.</param>
+    /// <returns>The attempt's result, or <see langword="null" /> when a callback aborted it.</returns>
+    private static async Task<TransferResult?> FollowFinishingMeterAsync(
+        RedirectFollower follower,
+        EngineTransferState state,
+        TransferContext context,
+        RedirectPolicy redirectPolicy,
+        CallbackTransferProgress? progress,
+        IReadOnlyList<CallbackReadStream> reads)
+    {
+        TransferResult? result = null;
+        try
+        {
+            result = await FollowUnlessAbortedAsync(follower, state, context, redirectPolicy, progress, reads).ConfigureAwait(false);
+            return result;
+        }
+        finally
+        {
+            progress?.FinishMeter(result?.IsSuccess == true);
+        }
     }
 
     /// <summary>
@@ -193,9 +225,11 @@ internal sealed partial class ManagedEasyTransfer
     /// <param name="toolProgress">The runner's progress, or <see langword="null" /> for a handle's own.</param>
     /// <param name="options">The handle's options.</param>
     /// <param name="abort">Cancelled when the callback aborts.</param>
+    /// <param name="standardError">The handle's standard error, for the built-in meter.</param>
+    /// <param name="timeProvider">The clock the built-in meter draws on.</param>
     /// <returns>The sink, or <see langword="null" /> for none.</returns>
-    private static CallbackTransferProgress? CallbackProgressUnlessToolGave(EngineToolTransferProgress? toolProgress, EasyOptions options, CancellationTokenSource abort) =>
-        toolProgress is null ? CallbackTransferProgress.Of(options.Behaviour.NoProgress, options.Callbacks, abort) : null;
+    private static CallbackTransferProgress? CallbackProgressUnlessToolGave(EngineToolTransferProgress? toolProgress, EasyOptions options, CancellationTokenSource abort, Func<Stream> standardError, TimeProvider timeProvider) =>
+        toolProgress is null ? CallbackTransferProgress.Of(options.Behaviour.NoProgress, options.Callbacks, abort, standardError, timeProvider) : null;
 
     /// <summary>
     /// The progress the context reports to, after starting the attempt's <c>-Y</c>/<c>-y</c> watchdog on

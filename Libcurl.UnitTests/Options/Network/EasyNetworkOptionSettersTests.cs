@@ -17,10 +17,6 @@ public sealed class EasyNetworkOptionSettersTests
         (CurlOption.Interface, static n => n.Interface),
         (CurlOption.UnixSocketPath, static n => n.UnixSocketPath),
         (CurlOption.AbstractUnixSocket, static n => n.AbstractUnixSocket),
-        (CurlOption.DnsServers, static n => n.DnsServers),
-        (CurlOption.DnsInterface, static n => n.DnsInterface),
-        (CurlOption.DnsLocalIp4, static n => n.DnsLocalIPv4),
-        (CurlOption.DnsLocalIp6, static n => n.DnsLocalIPv6),
         (CurlOption.DohUrl, static n => n.DohUrl),
     ];
 
@@ -29,7 +25,6 @@ public sealed class EasyNetworkOptionSettersTests
         (CurlOption.PathAsIs, static n => n.PathAsIs),
         (CurlOption.DnsShuffleAddresses, static n => n.DnsShuffleAddresses),
         (CurlOption.TcpNodelay, static n => n.TcpNoDelay),
-        (CurlOption.TcpFastopen, static n => n.TcpFastOpen),
         (CurlOption.TcpKeepalive, static n => n.TcpKeepAlive),
         (CurlOption.FreshConnect, static n => n.FreshConnect),
         (CurlOption.ForbidReuse, static n => n.ForbidReuse),

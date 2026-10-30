@@ -12,6 +12,13 @@ using Curl.Cookies;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Engine;
+using Curl.Extension.Abstractions;
+using Curl.Extension.Abstractions.Certificates;
+using Curl.Extension.Abstractions.Connection;
+using Curl.Extension.Abstractions.Resolution;
+using Curl.Extension.Abstractions.Scheme;
+using Curl.Extension.Abstractions.Transfer;
+using Curl.Extension.Composition;
 using Curl.Kerberos;
 using Curl.Networking;
 using Curl.Ntlm;
@@ -53,11 +60,17 @@ internal static class CurlComposition
     private static readonly Func<CurlExitCode, string> EasyErrorText = new(CurlEasyErrorText.Of);
 
     /// <summary>
+    /// <see cref="Environment.GetEnvironmentVariable(string)" /> as one delegate made once, so no call site
+    /// re-checks a compiler-cached method-group delegate, whose two sides coverage counted by test order (BL-4083).
+    /// </summary>
+    private static readonly Func<string, string?> ProcessEnvironmentVariable = new(Environment.GetEnvironmentVariable);
+
+    /// <summary>
     /// Creates the runner that parses a command line and performs its transfers against
     /// the real disk, the real network and the given standard streams, wrapping warnings at
     /// the width <see cref="TerminalColumns.Resolve()" /> gives. The network
     /// transports are built for each option group by
-    /// <see cref="CreateTransports(EngineToolOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?, EngineTraceComponents?)" /> once the
+    /// <see cref="CreateTransports(EngineToolOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?, EngineTraceComponents?, Func{long}?)" /> once the
     /// command line is parsed, because their TLS settings come from it, over one
     /// <see cref="ConnectionCache" /> the runner closes when the run ends, so a later group reuses
     /// an earlier group's connection when their settings match (ADR-0285, BL-754).
@@ -85,8 +98,9 @@ internal static class CurlComposition
         TlsSessionCache tlsSessions = new(TimeProvider.System);
         DnsCache runDnsCache = new();
         LateBoundDiagnosticLog runLog = new();
+        TransferPerformer performer = new(TimeProvider.System, EasyErrorText);
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options)), cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)))),
+            SharingRunCookies((options, cookies) => CreateNetworkTransferDispatch(options, cookies, ExtensionResolverHooksOf(options), runConnections, tlsSessions, runLog, runDnsCache, performer)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -107,9 +121,46 @@ internal static class CurlComposition
             tlsSessions: tlsSessions,
             extendedAttributeWriter: NativeExtendedAttributeWriter.ForCurrentPlatform(),
             lateBoundDiagnosticLog: runLog,
-            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
+            transferPerformer: performer,
             curlEngine: new ManagedCurlEngine(TimeProvider.System, null, EasyErrorText));
     }
+
+    /// <summary>
+    /// Builds one option group's dispatch for the executable: its transports over the real network, the TCP and UDP
+    /// connectors looking names up through <paramref name="resolverHooks" /> as the handlers do (ADR-1012).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
+    /// <param name="resolverHooks">The resolver hook the group's extension options activated, or <see cref="ResolverHooks.None" />.</param>
+    /// <param name="runConnections">The run's connection cache.</param>
+    /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache.</param>
+    /// <param name="runLog">The run's diagnostic log.</param>
+    /// <param name="runDnsCache">The run's DNS cache.</param>
+    /// <param name="performer">Takes the run's next <c>%{conn_id}</c> for each DoH connection.</param>
+    /// <returns>The dispatch.</returns>
+    private static TransferDispatch CreateNetworkTransferDispatch(CommandLineOptions options, CookieEngine? cookies, ResolverHooks resolverHooks, ConnectionCache runConnections, TlsSessionCache tlsSessions, IDiagnosticLog runLog, DnsCache runDnsCache, TransferPerformer performer)
+    {
+        ConnectionHooks connectionHooks = ExtensionConnectionHooksOf(options);
+        CurlTransports transports = CreateNetworkTransports(options, resolverHooks, connectionHooks, runConnections, tlsSessions, runLog, runDnsCache, performer);
+        return CreateTransferDispatch(transports, cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), ExtensionHandlerHooksOf(options, transports.PoolingConnector, new TcpConnectionListener()), connectionHooks, resolverHooks, ExtensionCertificateCheckHooksOf(options));
+    }
+
+    /// <summary>
+    /// Builds one option group's transports over the real network: the TCP and UDP connectors look names up through
+    /// <paramref name="resolverHooks" /> (ADR-1012), and QUIC opens its channels through the datagram connector
+    /// <paramref name="connectionHooks" />' hook supplies, when it supplies one (BL-4318).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="resolverHooks">The resolver hook the group's extension options activated, or <see cref="ResolverHooks.None" />.</param>
+    /// <param name="connectionHooks">The connection hook the group's extension options activated, or <see cref="ConnectionHooks.None" />.</param>
+    /// <param name="runConnections">The run's connection cache.</param>
+    /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache.</param>
+    /// <param name="runLog">The run's diagnostic log.</param>
+    /// <param name="runDnsCache">The run's DNS cache.</param>
+    /// <param name="performer">Takes the run's next <c>%{conn_id}</c> for each DoH connection.</param>
+    /// <returns>The transports.</returns>
+    internal static CurlTransports CreateNetworkTransports(CommandLineOptions options, ResolverHooks resolverHooks, ConnectionHooks connectionHooks, ConnectionCache runConnections, TlsSessionCache tlsSessions, IDiagnosticLog runLog, DnsCache runDnsCache, TransferPerformer performer) =>
+        CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options), resolverHooks.ResolverOver, takeDohConnectionId: performer.TakeConnectionId, extensionDatagramConnector: ExtensionDatagramConnectorOf(connectionHooks));
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given
@@ -156,6 +207,11 @@ internal static class CurlComposition
     /// Whether the runner reads the command line as a curl built with ECH does, accepting <c>--ech</c>; off by default, as
     /// every reference build refuses it (ADR-0918). Tests and the conformance harness turn it on to reach the hand-built ECH.
     /// </param>
+    /// <param name="extensionOptions">The extensions' long options the parser reads (ADR-1006); <see langword="null" /> for every registered extension's. Tests pass their own.</param>
+    /// <param name="extensionTransferHookActivators">The extensions' transfer hook activators (ADR-1007); <see langword="null" /> for <see cref="ExtensionTransferHookCatalogue.Entries" />. Tests pass their own.</param>
+    /// <param name="extensionConnectionHookActivators">The extensions' connection hook activators (ADR-1010); <see langword="null" /> for <see cref="ExtensionConnectionHookCatalogue.Entries" />. Tests pass their own.</param>
+    /// <param name="extensionCertificateCheckHookActivators">The extensions' certificate check hook activators (ADR-1016); <see langword="null" /> for <see cref="ExtensionCertificateCheckHookCatalogue.Entries" />. Tests pass their own.</param>
+    /// <param name="extensionSchemeHookActivators">The extensions' scheme hook activators (ADR-1048); <see langword="null" /> for <see cref="ExtensionSchemeHookCatalogue.Entries" />. Tests pass their own.</param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -171,11 +227,18 @@ internal static class CurlComposition
         bool writesProgressMeter = false,
         IWriteOutFileOpener? writeOutFileOpener = null,
         bool parsesAsQuicBuild = false,
-        bool parsesAsEchBuild = false)
+        bool parsesAsEchBuild = false,
+        IReadOnlyList<ExtensionOption>? extensionOptions = null,
+        IReadOnlyList<Func<ExtensionOptionValues, ITransferHook?>>? extensionTransferHookActivators = null,
+        IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>>? extensionConnectionHookActivators = null,
+        IReadOnlyList<Func<ExtensionOptionValues, ICertificateCheckHook?>>? extensionCertificateCheckHookActivators = null,
+        IReadOnlyList<Func<ExtensionOptionValues, ISchemeHook?>>? extensionSchemeHookActivators = null)
     {
         LateBoundDiagnosticLog runLog = new();
+        IReadOnlyList<Func<ExtensionOptionValues, ITransferHook?>> activators = extensionTransferHookActivators ?? ExtensionTransferHookCatalogue.Entries;
+        IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>> connectionActivators = extensionConnectionHookActivators ?? ExtensionConnectionHookCatalogue.Entries;
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(GroupConnectorOf(options, connector, runConnections), datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.Of(EasyOptionsFromCommandLine.TlsOf(options), options.UseAlpn, options.SslSessionsFile), TimeProvider.System), cookies, proxySelector, securityContexts, options, signingClock, runLog)),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(GroupConnectorOf(options, connector, runConnections), datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.Of(EasyOptionsFromCommandLine.TlsOf(options), options.UseAlpn, options.SslSessionsFile), TimeProvider.System), cookies, proxySelector, securityContexts, options, signingClock, runLog, activators, connectionActivators, extensionCertificateCheckHookActivators ?? ExtensionCertificateCheckHookCatalogue.Entries, extensionSchemeHookActivators ?? ExtensionSchemeHookCatalogue.Entries)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -191,7 +254,8 @@ internal static class CurlComposition
             parsesAsWindowsBuild: parsesAsWindowsBuild,
             parsesAsQuicBuild: parsesAsQuicBuild,
             parsesAsEchBuild: parsesAsEchBuild,
-            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText));
+            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
+            extensionOptions: extensionOptions);
     }
 
     /// <summary>
@@ -297,6 +361,8 @@ internal static class CurlComposition
     /// <see cref="System.Security.Cryptography.RandomNumberGenerator" />. The conformance harness passes the debug build's
     /// forced <c>CURL_ENTROPY</c> sequence (ADR-0751, BL-2834).
     /// </param>
+    /// <param name="extensionOptions">The extensions' long options the parser reads (ADR-1006); <see langword="null" /> for every registered extension's. Tests pass their own.</param>
+    /// <param name="extensionResolverHookActivators">The extensions' resolver hook activators (ADR-1012); <see langword="null" /> for <see cref="ExtensionResolverHookCatalogue.Entries" />. Tests pass their own.</param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -326,14 +392,17 @@ internal static class CurlComposition
         EngineFeatureMask featureMask = EngineFeatureMask.None,
         bool standardOutputIsTerminal = false,
         Func<int, byte[]>? digestRandomBytes = null,
-        bool parsesAsEchBuild = false)
+        bool parsesAsEchBuild = false,
+        IReadOnlyList<ExtensionOption>? extensionOptions = null,
+        IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>>? extensionResolverHookActivators = null)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
         Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
         string? dnsServer = honoursDnsServerVariable ? environment(DnsServerVariableName) : null;
+        IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>> resolverActivators = extensionResolverHookActivators ?? ExtensionResolverHookCatalogue.Entries;
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector)), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes)),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, ExtensionResolverHooksOf(options, resolverActivators).ResolverOver(DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector))), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes)),
             RunFileSystemOf(fileSystem),
             new PhysicalFileSystem(),
             standardOutput,
@@ -358,7 +427,8 @@ internal static class CurlComposition
             parsesAsEchBuild: parsesAsEchBuild,
             transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
             extendedAttributeWriter: extendedAttributeWriter,
-            debugWriteOut: DebugWriteOutStandIn.OfHonoured(honoursDebugWriteOutVariables, environment));
+            debugWriteOut: DebugWriteOutStandIn.OfHonoured(honoursDebugWriteOutVariables, environment),
+            extensionOptions: extensionOptions);
     }
 
     /// <summary>The HSTS clock a <c>CURL_TIME</c> fixes (<see cref="HstsClockOf" />) when the seam is on; <see langword="null" />, for the real clock, when it is off.</summary>
@@ -391,7 +461,7 @@ internal static class CurlComposition
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?, bool)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?, bool, IReadOnlyList{ExtensionOption}?, IReadOnlyList{Func{ExtensionOptionValues, IResolverHook?}}?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
@@ -430,6 +500,8 @@ internal static class CurlComposition
         EngineFeatureMask featureMask,
         Func<int, byte[]>? digestRandomBytes)
     {
+        ConnectionHooks connectionHooks = ExtensionConnectionHooksOf(options);
+        CertificateCheckHooks certificateCheckHooks = ExtensionCertificateCheckHooksOf(options);
         EasyNetworkOptions network = EasyOptionsFromCommandLine.NetworkOf(options);
         EasyTlsOptions tls = EasyOptionsFromCommandLine.TlsOf(options);
         EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
@@ -448,7 +520,7 @@ internal static class CurlComposition
         ISecurityContextFactory securityContexts = givenSecurityContexts ?? CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
         proxyContexts.Bind(securityContexts);
         return new(
-            new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, securityContexts, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.Of(authentication), signingClock: signingClock, ftpDataConnector: poolingConnector.Over(tcpConnector.ForFtpDataConnections()), diagnosticLog: diagnosticLog, ftpListener: ftpListener, webSocketRandomSource: webSocketRandomSource, digestRandomBytes: digestRandomBytes)),
+            new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, securityContexts, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.Of(authentication), signingClock: signingClock, ftpDataConnector: poolingConnector.Over(tcpConnector.ForFtpDataConnections()), diagnosticLog: diagnosticLog, ftpListener: ftpListener, webSocketRandomSource: webSocketRandomSource, digestRandomBytes: digestRandomBytes, extensionHandlers: ExtensionProtocolHandlers.For(readEnvironmentVariable), extensionTransferHooks: ExtensionHandlerHooksOf(options, poolingConnector, ftpListener ?? new TcpConnectionListener()), extensionConnector: ExtensionConnectorOf(connectionHooks, tlsProvider), extensionDatagramConnector: ExtensionDatagramConnectorOf(connectionHooks), extensionCertificateConnector: ExtensionCertificateConnectorOf(certificateCheckHooks), extensionTlsProvider: ExtensionTlsProviderOf(certificateCheckHooks))),
             ProxyDisabledLinesOf(featureMask, proxy),
             cookies,
             new ProxySelector(readEnvironmentVariable),
@@ -549,9 +621,13 @@ internal static class CurlComposition
     /// <param name="transports">The run's connectors.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
     /// <param name="negotiateOptions">The service names and delegation the HTTP handler's Negotiate answers with; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
+    /// <param name="extensionTransferHooks">Puts each handler through the transfer hooks the option group's extension options activated (<see cref="ExtensionTransferHooksOf(CommandLineOptions, IConnector, IConnectionListener)" />), or <see langword="null" /> for none.</param>
+    /// <param name="extensionConnectionHooks">The connection hook the option group's extension options activated (<see cref="ExtensionConnectionHooksOf(CommandLineOptions)" />), or <see langword="null" /> for none.</param>
+    /// <param name="extensionResolverHooks">The resolver hook the option group's extension options activated (<see cref="ExtensionResolverHooksOf(CommandLineOptions)" />), or <see langword="null" /> for none; it answers the handlers' look-ups, and the connectors' when <paramref name="transports" /> were built with its <see cref="ResolverHooks.ResolverOver" /> as their look-up wrapper.</param>
+    /// <param name="extensionCertificateCheckHooks">The certificate checks the option group's extension options activated (<see cref="ExtensionCertificateCheckHooksOf(CommandLineOptions)" />), or <see langword="null" /> for none; they run on every chain curl accepted, and the first refusal fails the transfer with exit 60.</param>
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
-    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
-        CreateTransferDispatch(transports, OperatingSystem.IsWindows(), cookies, negotiateOptions);
+    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null, Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null, ConnectionHooks? extensionConnectionHooks = null, ResolverHooks? extensionResolverHooks = null, CertificateCheckHooks? extensionCertificateCheckHooks = null) =>
+        CreateTransferDispatch(transports, OperatingSystem.IsWindows(), cookies, negotiateOptions, extensionTransferHooks, extensionConnectionHooks, extensionResolverHooks, extensionCertificateCheckHooks);
 
     /// <summary>
     /// Returns the lines curl 8.21.0 prints to standard error before each URL's transfer, unless
@@ -586,27 +662,247 @@ internal static class CurlComposition
         return lines;
     }
 
+    /// <summary>
+    /// Gives the extension options one option group gave, as its extensions' transfer hooks read them
+    /// (ADR-1006, ADR-1007): each option's value, or the empty string for a flag.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The group's extension option values, holding none when it gave none.</returns>
+    internal static ExtensionOptionValues ExtensionOptionValuesOf(CommandLineOptions options) =>
+        new(options.ExtensionOptionValues);
+
+    /// <summary>
+    /// Gives what the engine puts each of an option group's protocol handlers through (ADR-1007): the transfer hooks
+    /// <see cref="ExtensionTransferHookCatalogue.Entries" /> activate for the group's extension options.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="connector">The group's connector, lent to the hooks to make their own requests (ADR-1039).</param>
+    /// <param name="listener">The loopback listener lent to the hooks (ADR-1039).</param>
+    /// <returns><see cref="TransferHooks.Around" /> of the activated hooks, or <see langword="null" /> when the group activated none.</returns>
+    internal static Func<IProtocolHandler, IProtocolHandler>? ExtensionTransferHooksOf(CommandLineOptions options, IConnector connector, IConnectionListener listener) =>
+        ExtensionTransferHooksOf(options, ExtensionTransferHookCatalogue.Entries, connector, listener);
+
+    /// <summary>
+    /// Gives what the engine puts each of an option group's protocol handlers through: the transfer hooks
+    /// <paramref name="activators" /> activate for the group's extension options (ADR-1007).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>
+    /// <param name="connector">The group's connector, lent to the hooks to make their own requests (ADR-1039).</param>
+    /// <param name="listener">The loopback listener lent to the hooks (ADR-1039).</param>
+    /// <returns><see cref="TransferHooks.Around" /> of the activated hooks, or <see langword="null" /> when the group activated none, so the engine runs no hook.</returns>
+    internal static Func<IProtocolHandler, IProtocolHandler>? ExtensionTransferHooksOf(CommandLineOptions options, IEnumerable<Func<ExtensionOptionValues, ITransferHook?>> activators, IConnector connector, IConnectionListener listener)
+    {
+        TransferHooks hooks = TransferHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators, new TransferHookServices(connector, listener));
+        return hooks.Hooks.Count == 0 ? null : hooks.Around;
+    }
+
+    /// <summary>
+    /// Gives what the engine puts each of an option group's protocol handlers through: the scheme hook
+    /// <see cref="ExtensionSchemeHookCatalogue.Entries" /> activate for the group's extension options (ADR-1048),
+    /// inside the transfer hooks <see cref="ExtensionTransferHookCatalogue.Entries" /> activate (ADR-1007).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="connector">The group's connector, lent to the hooks (ADR-1039).</param>
+    /// <param name="listener">The loopback listener lent to the hooks (ADR-1039).</param>
+    /// <returns>The hooks around a handler, or <see langword="null" /> when the group activated none.</returns>
+    /// <exception cref="ExtensionOptionConflictException">Two of the group's extension options each serve a curl scheme.</exception>
+    internal static Func<IProtocolHandler, IProtocolHandler>? ExtensionHandlerHooksOf(CommandLineOptions options, IConnector connector, IConnectionListener listener) =>
+        HandlerHooksOver(ExtensionTransferHooksOf(options, connector, listener), ExtensionSchemeHooksOf(options, ExtensionSchemeHookCatalogue.Entries, new TransferHookServices(connector, listener)));
+
+    /// <summary>
+    /// Gives what the engine puts each of an option group's protocol handlers through: the scheme hook
+    /// <paramref name="schemeActivators" /> activate for the group's extension options (ADR-1048), inside the
+    /// transfer hooks <paramref name="transferActivators" /> activate (ADR-1007).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="transferActivators">One per extension: its transfer hook when its option was given, otherwise <see langword="null" />.</param>
+    /// <param name="schemeActivators">One per extension: its scheme hook when its option was given, otherwise <see langword="null" />.</param>
+    /// <param name="connector">The group's connector, lent to the hooks (ADR-1039).</param>
+    /// <param name="listener">The loopback listener lent to the hooks (ADR-1039).</param>
+    /// <returns>The hooks around a handler, or <see langword="null" /> when the group activated none.</returns>
+    /// <exception cref="ExtensionOptionConflictException">Two of the group's extension options each serve a curl scheme.</exception>
+    internal static Func<IProtocolHandler, IProtocolHandler>? ExtensionHandlerHooksOf(CommandLineOptions options, IEnumerable<Func<ExtensionOptionValues, ITransferHook?>> transferActivators, IEnumerable<Func<ExtensionOptionValues, ISchemeHook?>> schemeActivators, IConnector connector, IConnectionListener listener) =>
+        HandlerHooksOver(ExtensionTransferHooksOf(options, transferActivators, connector, listener), ExtensionSchemeHooksOf(options, schemeActivators, new TransferHookServices(connector, listener)));
+
+    /// <summary>
+    /// Gives the scheme hook <paramref name="activators" /> activate for an option group's extension options
+    /// (ADR-1048), turning two hooks into the command-line error the runner reports with exit 2.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>
+    /// <param name="services">The group's connector and loopback listener, lent to the hook's handler.</param>
+    /// <returns>The activated hook, or <see cref="SchemeHooks.None" />.</returns>
+    /// <exception cref="ExtensionOptionConflictException">Two of the group's extension options each serve a curl scheme; the message names both.</exception>
+    internal static SchemeHooks ExtensionSchemeHooksOf(CommandLineOptions options, IEnumerable<Func<ExtensionOptionValues, ISchemeHook?>> activators, TransferHookServices services)
+    {
+        try
+        {
+            return SchemeHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators, services);
+        }
+        catch (ArgumentException conflict)
+        {
+            throw OptionConflictOf(conflict);
+        }
+    }
+
+    /// <summary>Puts a handler through <paramref name="schemeHooks" /> first and then <paramref name="transferHooks" />, so the transfer hooks see an extension's transfers too.</summary>
+    /// <param name="transferHooks">The activated transfer hooks, or <see langword="null" /> for none.</param>
+    /// <param name="schemeHooks">The activated scheme hook, or <see cref="SchemeHooks.None" />.</param>
+    /// <returns>Both around a handler, or <paramref name="transferHooks" /> alone when no scheme hook was activated.</returns>
+    private static Func<IProtocolHandler, IProtocolHandler>? HandlerHooksOver(Func<IProtocolHandler, IProtocolHandler>? transferHooks, SchemeHooks schemeHooks)
+    {
+        if (schemeHooks.Hook is null)
+        {
+            return transferHooks;
+        }
+
+        return transferHooks is null ? schemeHooks.Over : handler => transferHooks(schemeHooks.Over(handler));
+    }
+
+    /// <summary>
+    /// Gives the connection hook <see cref="ExtensionConnectionHookCatalogue.Entries" /> activate for an option
+    /// group's extension options (ADR-1010).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The activated hook, or <see cref="ConnectionHooks.None" />.</returns>
+    /// <exception cref="ExtensionOptionConflictException">Two of the group's extension options each claim the connection.</exception>
+    internal static ConnectionHooks ExtensionConnectionHooksOf(CommandLineOptions options) =>
+        ExtensionConnectionHooksOf(options, ExtensionConnectionHookCatalogue.Entries);
+
+    /// <summary>
+    /// Gives the connection hook <paramref name="activators" /> activate for an option group's extension options
+    /// (ADR-1010), turning two hooks into the command-line error the runner reports with exit 2.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>
+    /// <returns>The activated hook, or <see cref="ConnectionHooks.None" />.</returns>
+    /// <exception cref="ExtensionOptionConflictException">Two of the group's extension options each claim the connection; the message names both.</exception>
+    internal static ConnectionHooks ExtensionConnectionHooksOf(CommandLineOptions options, IEnumerable<Func<ExtensionOptionValues, IConnectionHook?>> activators)
+    {
+        try
+        {
+            return ConnectionHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators);
+        }
+        catch (ArgumentException conflict)
+        {
+            throw OptionConflictOf(conflict);
+        }
+    }
+
+    /// <summary>
+    /// Gives the resolver hook <see cref="ExtensionResolverHookCatalogue.Entries" /> activate for an option
+    /// group's extension options (ADR-1012).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The activated hook, or <see cref="ResolverHooks.None" />.</returns>
+    /// <exception cref="ExtensionOptionConflictException">Two of the group's extension options, or one and <c>--doh-url</c>, each claim the resolver.</exception>
+    internal static ResolverHooks ExtensionResolverHooksOf(CommandLineOptions options) =>
+        ExtensionResolverHooksOf(options, ExtensionResolverHookCatalogue.Entries);
+
+    /// <summary>
+    /// Gives the resolver hook <paramref name="activators" /> activate for an option group's extension options,
+    /// checked against the group's <c>--doh-url</c> (ADR-1012).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>
+    /// <returns>The activated hook, or <see cref="ResolverHooks.None" />.</returns>
+    /// <exception cref="ExtensionOptionConflictException">Two of the group's extension options, or one and <c>--doh-url</c>, each claim the resolver; the message names both.</exception>
+    internal static ResolverHooks ExtensionResolverHooksOf(CommandLineOptions options, IEnumerable<Func<ExtensionOptionValues, IResolverHook?>> activators)
+    {
+        try
+        {
+            return ResolverHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators, options.DohUrl is not null);
+        }
+        catch (ArgumentException conflict)
+        {
+            throw OptionConflictOf(conflict);
+        }
+    }
+
+    /// <summary>Gives the engine's <c>extensionResolver</c> for an option group's resolver hook.</summary>
+    /// <param name="hooks">The group's resolver hook, or <see langword="null" /> for none.</param>
+    /// <returns><see cref="ResolverHooks.ResolverOver" />, or <see langword="null" /> without a hook, so the engine keeps curl's resolver.</returns>
+    internal static Func<IDnsResolver, IDnsResolver>? ExtensionResolverOf(ResolverHooks? hooks) =>
+        hooks is { Hook: not null } ? hooks.ResolverOver : null;
+
+    // An extension hook conflict as curl's command-line error. ArgumentException.Message ends with
+    // " (Parameter 'values')", which curl's line does not carry.
+    private static ExtensionOptionConflictException OptionConflictOf(ArgumentException conflict) =>
+        new(conflict.Message.Replace($" (Parameter '{conflict.ParamName}')", string.Empty, StringComparison.Ordinal));
+
+    /// <summary>Gives the engine's <c>extensionConnector</c> for an option group's connection hook.</summary>
+    /// <param name="hooks">The group's connection hook, or <see langword="null" /> for none.</param>
+    /// <param name="tlsProvider">The group's TLS provider, handed to the hook so one that supplies only the byte stream layers curl's TLS over it (ADR-1055).</param>
+    /// <returns><see cref="ConnectionHooks.ConnectorOver(IConnector, ITlsProvider)" /> over <paramref name="tlsProvider" />, or <see langword="null" /> without a hook, so the engine keeps curl's connector.</returns>
+    internal static Func<IConnector, IConnector>? ExtensionConnectorOf(ConnectionHooks? hooks, ITlsProvider tlsProvider) =>
+        hooks is { Hook: not null } ? curlConnector => hooks.ConnectorOver(curlConnector, tlsProvider) : null;
+
+    /// <summary>Gives the engine's <c>extensionDatagramConnector</c> for an option group's connection hook.</summary>
+    /// <param name="hooks">The group's connection hook, or <see langword="null" /> for none.</param>
+    /// <returns><see cref="ConnectionHooks.DatagramConnectorOver" />, or <see langword="null" /> without a hook, so the engine keeps curl's datagram connector.</returns>
+    internal static Func<IDatagramConnector, IDatagramConnector>? ExtensionDatagramConnectorOf(ConnectionHooks? hooks) =>
+        hooks is { Hook: not null } ? hooks.DatagramConnectorOver : null;
+
+    /// <summary>
+    /// Gives the certificate checks <see cref="ExtensionCertificateCheckHookCatalogue.Entries" /> activate for an
+    /// option group's extension options (ADR-1016).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The activated checks, or none.</returns>
+    internal static CertificateCheckHooks ExtensionCertificateCheckHooksOf(CommandLineOptions options) =>
+        ExtensionCertificateCheckHooksOf(options, ExtensionCertificateCheckHookCatalogue.Entries);
+
+    /// <summary>
+    /// Gives the certificate checks <paramref name="activators" /> activate for an option group's extension options
+    /// (ADR-1016). Every activated check runs, so two of them are no conflict.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="activators">One per extension: its check when its option was given, otherwise <see langword="null" />.</param>
+    /// <returns>The activated checks, or none.</returns>
+    internal static CertificateCheckHooks ExtensionCertificateCheckHooksOf(CommandLineOptions options, IEnumerable<Func<ExtensionOptionValues, ICertificateCheckHook?>> activators) =>
+        CertificateCheckHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators);
+
+    /// <summary>Gives the engine's <c>extensionCertificateConnector</c> for an option group's certificate checks.</summary>
+    /// <param name="hooks">The group's certificate checks, or <see langword="null" /> for none.</param>
+    /// <returns><see cref="CertificateCheckHooks.ConnectorOver" />, or <see langword="null" /> without a check, so the engine keeps curl's connector.</returns>
+    internal static Func<IConnector, IConnector>? ExtensionCertificateConnectorOf(CertificateCheckHooks? hooks) =>
+        hooks is { Hooks.Count: > 0 } ? hooks.ConnectorOver : null;
+
+    /// <summary>Gives the engine's <c>extensionTlsProvider</c> for an option group's certificate checks.</summary>
+    /// <param name="hooks">The group's certificate checks, or <see langword="null" /> for none.</param>
+    /// <returns><see cref="CertificateCheckHooks.TlsProviderOver" />, or <see langword="null" /> without a check, so the engine keeps curl's TLS provider.</returns>
+    internal static Func<ITlsProvider, ITlsProvider>? ExtensionTlsProviderOf(CertificateCheckHooks? hooks) =>
+        hooks is { Hooks.Count: > 0 } ? hooks.TlsProviderOver : null;
+
     // The tool's warning for an option curl's Schannel build ignores.
     private static string SchannelIgnoredOptionWarning(string option) =>
         $"Warning: ignoring {option}, not supported by libcurl with Schannel";
 
     /// <summary>
-    /// Creates what one run transfers through as <see cref="CreateTransferDispatch(CurlTransports, CookieEngine?, NegotiateOptions?)" />
+    /// Creates what one run transfers through as <see cref="CreateTransferDispatch(CurlTransports, CookieEngine?, NegotiateOptions?, Func{IProtocolHandler, IProtocolHandler}?, ConnectionHooks?, ResolverHooks?, CertificateCheckHooks?)" />
     /// does, warning as the named curl build does.
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
     /// <param name="matchesSchannelBuild">Whether the run warns as curl's Schannel build does.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
     /// <param name="negotiateOptions">The service names and delegation the HTTP handler's Negotiate answers with; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
+    /// <param name="extensionTransferHooks">Puts each handler through the transfer hooks the option group's extension options activated, or <see langword="null" /> for none.</param>
+    /// <param name="extensionConnectionHooks">The connection hook the option group's extension options activated, or <see langword="null" /> for none.</param>
+    /// <param name="extensionResolverHooks">The resolver hook the option group's extension options activated, or <see langword="null" /> for none.</param>
+    /// <param name="extensionCertificateCheckHooks">The certificate checks the option group's extension options activated, or <see langword="null" /> for none.</param>
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
-    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
-        new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs, tracesSsh: transports.TracesSsh, tracesHttp2: transports.TracesHttp2, tracesHttp3: transports.TracesHttp3, tracesRead: transports.TracesRead)),
+    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null, Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null, ConnectionHooks? extensionConnectionHooks = null, ResolverHooks? extensionResolverHooks = null, CertificateCheckHooks? extensionCertificateCheckHooks = null)
+    {
+        Func<string, string?> readEnvironmentVariable = ProcessEnvironmentVariable;
+        return new(
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs, tracesSsh: transports.TracesSsh, tracesHttp2: transports.TracesHttp2, tracesHttp3: transports.TracesHttp3, tracesRead: transports.TracesRead, extensionHandlers: ExtensionProtocolHandlers.For(readEnvironmentVariable), extensionTransferHooks: extensionTransferHooks, extensionConnector: ExtensionConnectorOf(extensionConnectionHooks, transports.TlsProvider), extensionDatagramConnector: ExtensionDatagramConnectorOf(extensionConnectionHooks), extensionResolver: ExtensionResolverOf(extensionResolverHooks), extensionCertificateConnector: ExtensionCertificateConnectorOf(extensionCertificateCheckHooks), extensionTlsProvider: ExtensionTlsProviderOf(extensionCertificateCheckHooks))),
             WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild),
             cookies,
-            new ProxySelector(Environment.GetEnvironmentVariable),
+            new ProxySelector(readEnvironmentVariable),
             transports.PoolingConnector,
             transports.TcpConnector.LoadResolveEntries);
+    }
 
     /// <summary>
     /// Creates what one run transfers through over the given connectors instead of the real
@@ -627,6 +923,10 @@ internal static class CurlComposition
     /// <param name="signingClock">The clock <c>--aws-sigv4</c> signs with; <see cref="TimeProvider.System" /> when <see langword="null" />.</param>
     /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
     /// <param name="diagnosticLog">The run's diagnostic log, bound by the runner once the command line is read (BL-923).</param>
+    /// <param name="extensionTransferHookActivators">The extensions' transfer hook activators the group's extension options are checked against.</param>
+    /// <param name="extensionConnectionHookActivators">The extensions' connection hook activators the group's extension options are checked against.</param>
+    /// <param name="extensionCertificateCheckHookActivators">The extensions' certificate check hook activators the group's extension options are checked against.</param>
+    /// <param name="extensionSchemeHookActivators">The extensions' scheme hook activators the group's extension options are checked against.</param>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -636,10 +936,18 @@ internal static class CurlComposition
         ISecurityContextFactory? securityContexts,
         CommandLineOptions options,
         TimeProvider? signingClock,
-        IDiagnosticLog diagnosticLog) =>
-        new(
-            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, options.ProxyAuthSchemes, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), signingClock, diagnosticLog: diagnosticLog)),
+        IDiagnosticLog diagnosticLog,
+        IEnumerable<Func<ExtensionOptionValues, ITransferHook?>> extensionTransferHookActivators,
+        IEnumerable<Func<ExtensionOptionValues, IConnectionHook?>> extensionConnectionHookActivators,
+        IEnumerable<Func<ExtensionOptionValues, ICertificateCheckHook?>> extensionCertificateCheckHookActivators,
+        IEnumerable<Func<ExtensionOptionValues, ISchemeHook?>> extensionSchemeHookActivators)
+    {
+        ConnectionHooks connectionHooks = ExtensionConnectionHooksOf(options, extensionConnectionHookActivators);
+        CertificateCheckHooks certificateCheckHooks = ExtensionCertificateCheckHooksOf(options, extensionCertificateCheckHookActivators);
+        return new(
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, options.ProxyAuthSchemes, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), signingClock, diagnosticLog: diagnosticLog, extensionTransferHooks: ExtensionHandlerHooksOf(options, extensionTransferHookActivators, extensionSchemeHookActivators, connector, new TcpConnectionListener()), extensionConnector: ExtensionConnectorOf(connectionHooks, tlsProvider), extensionDatagramConnector: ExtensionDatagramConnectorOf(connectionHooks), extensionCertificateConnector: ExtensionCertificateConnectorOf(certificateCheckHooks), extensionTlsProvider: ExtensionTlsProviderOf(certificateCheckHooks))),
             [],
             cookies,
             proxySelector);
+    }
 }

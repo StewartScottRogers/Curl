@@ -30,6 +30,35 @@ public sealed class QuicTransportParametersTests
     }
 
     [TestMethod]
+    public void Encode_MaxDatagramFrameSize_WritesParameter0x20BeforeVersionInformation()
+    {
+        // RFC 9221 section 3: max_datagram_frame_size is parameter 0x20, a variable-length integer; 65535 takes four bytes.
+        const string expectedHex = "0f0104" + "20048000ffff" + "11080000000100000001";
+        QuicTransportParameters parameters = new() { InitialSourceConnectionId = [4], MaxDatagramFrameSize = 65535, VersionInformation = QuicVersionInformation.Version1Only };
+        Diagnostics.Arrange("max_datagram_frame_size", parameters.MaxDatagramFrameSize);
+
+        byte[] encoded = parameters.Encode();
+        QuicTransportParameters decoded = QuicTransportParameters.Decode(encoded);
+
+        Diagnostics.Diff("encoded hex", expectedHex, HexOf(encoded));
+        Assert.AreEqual(expectedHex, HexOf(encoded));
+        Diagnostics.Assert("decoded max_datagram_frame_size", 65535UL, decoded.MaxDatagramFrameSize);
+        Assert.AreEqual(65535UL, decoded.MaxDatagramFrameSize);
+    }
+
+    [TestMethod]
+    public void Decode_NoMaxDatagramFrameSize_IsZeroAndCurlsDefaultsDoNotSendIt()
+    {
+        Diagnostics.Arrange("curl's client defaults", "max_datagram_frame_size not set");
+
+        QuicTransportParameters decoded = QuicTransportParameters.Decode(QuicTransportParameters.CurlClientDefaults.Encode());
+
+        Diagnostics.Assert("max_datagram_frame_size", 0UL, decoded.MaxDatagramFrameSize);
+        Assert.AreEqual(0UL, decoded.MaxDatagramFrameSize);
+        Assert.AreEqual(0UL, QuicTransportParameters.CurlClientDefaults.MaxDatagramFrameSize);
+    }
+
+    [TestMethod]
     public void Decode_EveryParameter_RoundTrips()
     {
         QuicTransportParameters parameters = new()

@@ -12,7 +12,8 @@ namespace Curl.Console;
 /// <param name="maxRunning">The <c>--parallel-max</c> limit.</param>
 /// <param name="maxPerHost">The <c>--parallel-max-host</c> limit; zero for none.</param>
 /// <param name="parallelImmediate">Whether <c>--parallel-immediate</c> was given.</param>
-internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelImmediate)
+/// <param name="timeProvider">The clock the <c>--fail-early</c> abort delay runs on; <see cref="TimeProvider.System" /> when not given.</param>
+internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelImmediate, TimeProvider? timeProvider = null)
 {
     /// <summary>
     /// The message of a transfer <c>--fail-early</c> aborted because another failed, with exit
@@ -25,6 +26,9 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
 
     /// <summary>Cancelled by the first failure under <c>--fail-early</c>, aborting every running transfer.</summary>
     private readonly CancellationTokenSource abort = new();
+
+    /// <summary>The abort delay's timer on the run's clock, started by the first failure that ends a <c>--fail-early</c> run.</summary>
+    private ITimer? abortTimer;
 
     /// <summary>Cancelled at once by the first failure under <c>--fail-early</c>, so no waiting transfer starts.</summary>
     private readonly CancellationTokenSource stopStarts = new();
@@ -201,13 +205,27 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
 
         if (failEarly)
         {
-            stopStarts.Cancel();
-            abort.CancelAfter(AbortDelay);
+            FailEarly();
         }
         else
         {
             HasEnded = true;
         }
+    }
+
+    /// <summary>
+    /// Stops further starts at once and starts the <see cref="AbortDelay" /> on the runs clock, on the first
+    /// failure that ends a <c>--fail-early</c> run only, so a later failure does not move the abort.
+    /// </summary>
+    private void FailEarly()
+    {
+        if (HasFailedEarly)
+        {
+            return;
+        }
+
+        stopStarts.Cancel();
+        abortTimer = (timeProvider ?? TimeProvider.System).CreateTimer(_ => abort.Cancel(), null, AbortDelay, Timeout.InfiniteTimeSpan);
     }
 
     /// <summary>
@@ -271,6 +289,7 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
         }
 
         await CloseDispatchesAsync().ConfigureAwait(false);
+        abortTimer?.Dispose();
         abort.Dispose();
     }
 

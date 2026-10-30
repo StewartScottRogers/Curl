@@ -1,4 +1,6 @@
 using Curl.Engine;
+using Curl.Extension.Composition;
+using Curl.Protocol.Abstractions;
 using Curl.Mcp.Protocol.Model;
 using Curl.Mcp.Protocol.Resources;
 using Curl.Mcp.Protocol.Server;
@@ -45,7 +47,7 @@ internal static class CurlMcpHost
         McpStandardErrorLog log = new(error, TimeProvider.System);
         return new(
             ServerInfo,
-            (root, cap) => CreateHandlers(root, cap, log.WriteLine),
+            (root, cap) => CreateHandlers(root, cap, readEnvironmentVariable, log.WriteLine),
             input,
             output,
             log,
@@ -60,11 +62,12 @@ internal static class CurlMcpHost
     /// </summary>
     /// <param name="root">The folder every file the <c>curl</c> tool touches must lie in.</param>
     /// <param name="cap">The most bytes a tool returns.</param>
+    /// <param name="readEnvironmentVariable">Reads <c>CURL_EXTENSIONS</c>, which turns Curl's extensions off at <c>0</c>.</param>
     /// <param name="logFailure">Receives one line for each exception a tool throws.</param>
     /// <returns>The five handlers.</returns>
-    internal static IEnumerable<IMcpMethodHandler> CreateHandlers(McpConfinementRoot root, McpResponseCap cap, Action<string> logFailure)
+    internal static IEnumerable<IMcpMethodHandler> CreateHandlers(McpConfinementRoot root, McpResponseCap cap, Func<string, string?> readEnvironmentVariable, Action<string> logFailure)
     {
-        McpServerRegistry registry = CreateRegistry(root, cap);
+        McpServerRegistry registry = CreateRegistry(root, cap, readEnvironmentVariable, ExtensionProtocolHandlers.Create);
         return [new ToolsListHandler(registry), new ToolsCallHandler(registry, logFailure), new ResourcesListHandler(registry), new ResourcesReadHandler(registry), new LoggingSetLevelMcpHandler()];
     }
 
@@ -74,14 +77,23 @@ internal static class CurlMcpHost
     /// <see cref="ManagedCurlEngine" /> that lives as long as the process, as <c>Libcurl</c>'s does, the
     /// <c>version</c> tool over that same engine, the <c>parse_url</c> and <c>build_url</c> tools over that engine's
     /// URL handles, and the <c>--ai-help</c> resources through <see cref="AiHelpMcpResourceProvider" /> (ADR-0589).
+    /// The engine's transfers reach the handlers <paramref name="extensionHandlers" /> builds, as the <c>curl</c>
+    /// tool's reach Curl's extensions, unless <paramref name="readEnvironmentVariable" /> sets
+    /// <c>CURL_EXTENSIONS</c> to <c>0</c> (ADR-0999, ADR-1071, BL-4098).
     /// </summary>
     /// <param name="root">The folder every file the <c>curl</c> tool touches must lie in.</param>
     /// <param name="cap">The most bytes a tool returns.</param>
+    /// <param name="readEnvironmentVariable">Reads <c>CURL_EXTENSIONS</c>.</param>
+    /// <param name="extensionHandlers">Builds the extensions' handlers.</param>
     /// <returns>The registry of the five tools and the resources.</returns>
-    internal static McpServerRegistry CreateRegistry(McpConfinementRoot root, McpResponseCap cap)
+    internal static McpServerRegistry CreateRegistry(
+        McpConfinementRoot root,
+        McpResponseCap cap,
+        Func<string, string?> readEnvironmentVariable,
+        Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>> extensionHandlers)
     {
         // One engine for the process, shared by the transfer, version and URL tools.
-        ManagedCurlEngine engine = new();
+        ManagedCurlEngine engine = new(ExtensionProtocolHandlers.For(readEnvironmentVariable) is null ? null : extensionHandlers);
         McpUrlTool urlTool = new(engine.CreateUrl);
         McpServerRegistry registry = new();
         // tools/list answers in registration order; this is the order the SDK host listed them in (the golden tools-list).

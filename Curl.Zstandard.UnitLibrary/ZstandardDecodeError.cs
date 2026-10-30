@@ -17,7 +17,7 @@ public enum ZstandardDecodeError
     /// <summary>The frame header sets its reserved bit (libzstd <c>frameParameter_unsupported</c>).</summary>
     FrameParameterUnsupported,
 
-    /// <summary>The frame's window is larger than <c>2^maxWindowLog</c> (libzstd <c>frameParameter_windowTooLarge</c>).</summary>
+    /// <summary>The frame's window is larger than the decoder's largest window, <c>2^maxWindowLog</c> or <c>maxWindowSize</c> (libzstd <c>frameParameter_windowTooLarge</c>).</summary>
     FrameParameterWindowTooLarge,
 
     /// <summary>The frame names a <c>Dictionary_ID</c> other than 0, and no dictionary is loaded (libzstd <c>dictionary_wrong</c>).</summary>

@@ -149,6 +149,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     internal TlsClientOptions Options => _options;
 
     /// <inheritdoc />
+    public ServerCertificateChainVerdict VerifyServerCertificateChain(IReadOnlyList<ReadOnlyMemory<byte>> certificates, string targetHost) =>
+        _verification.VerifyChain(certificates, targetHost);
+
+    /// <inheritdoc />
     public ITlsProvider WithSystemStoreOnlyTrust() =>
         new HandBuiltTlsProvider(
             ISystemStoreTrustTlsProvider.SystemStoreOnly(_options),
@@ -219,6 +223,24 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ITransferEvents events,
         CancellationToken cancellationToken) =>
         AuthenticateAsClientAsync(plaintext, targetHost, events, isProxy: false, [], cancellationToken);
+
+    /// <summary>
+    /// Performs the origin's client handshake, offering <paramref name="applicationProtocols" /> through ALPN, as
+    /// the six-argument overload does with <c>isProxy</c> <see langword="false" /> (ADR-1066).
+    /// </summary>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the trust and the completed handshake are reported.</param>
+    /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>The same result <see cref="ITlsProvider.AuthenticateAsClientAsync(IConnection, string, CancellationToken)" /> describes.</returns>
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        IReadOnlyList<string> applicationProtocols,
+        CancellationToken cancellationToken) =>
+        AuthenticateAsClientAsync(plaintext, targetHost, events, isProxy: false, applicationProtocols, cancellationToken);
 
     /// <summary>
     /// Performs the client handshake, offering <paramref name="applicationProtocols" /> through

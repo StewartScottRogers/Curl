@@ -136,6 +136,69 @@ public sealed class HpkeContextTests
         Assert.AreEqual(expected, Convert.ToHexStringLower(exportedValue));
     }
 
+    // RFC 9180 Appendix A.2.1.2, the two exports with a non-empty exporter context.
+    [TestMethod]
+    [DataRow("00", "8c1df14732580e5501b00f82b10a1647b40713191b7c1240ac80e2b68808ba69")]
+    [DataRow("54657374436f6e74657874", "5acb09211139c43b3090489a9da433e8a30ee7188ba8b0a9a1ccf0c229283e53")]
+    public void Export_Rfc9180A212ExporterContext_GivesThePublishedValue(string exporterContext, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        using HpkeContext recipient = HpkeBaseModeVectors.SetUpRecipient(HpkeBaseModeVectors.X25519ChaCha20Poly1305);
+        byte[] exportedValue = new byte[32];
+        diagnostics.Arrange("vector source", "RFC 9180 appendix A.2.1.2");
+        diagnostics.Bytes("exporter context", Convert.FromHexString(exporterContext));
+
+        recipient.Export(Convert.FromHexString(exporterContext), exportedValue);
+        diagnostics.Act("exported value", Convert.ToHexStringLower(exportedValue));
+
+        diagnostics.Diff("exported value", Convert.FromHexString(expected), exportedValue);
+        Assert.AreEqual(expected, Convert.ToHexStringLower(exportedValue));
+    }
+
+    // RFC 9180 Appendix A.1.1.1 and A.2.1.1, the encryptions after sequence number 1: the
+    // sender seals the published ciphertext and the recipient, having opened every earlier
+    // one, opens it back to the plaintext.
+    [TestMethod]
+    [DataRow(HpkeAead.Aes128Gcm, 2, "436f756e742d32", "498dfcabd92e8acedc281e85af1cb4e3e31c7dc394a1ca20e173cb72516491588d96a19ad4a683518973dcc180")]
+    [DataRow(HpkeAead.Aes128Gcm, 4, "436f756e742d34", "583bd32bc67a5994bb8ceaca813d369bca7b2a42408cddef5e22f880b631215a09fc0012bc69fccaa251c0246d")]
+    [DataRow(HpkeAead.Aes128Gcm, 255, "436f756e742d323535", "7175db9717964058640a3a11fb9007941a5d1757fda1a6935c805c21af32505bf106deefec4a49ac38d71c9e0a")]
+    [DataRow(HpkeAead.Aes128Gcm, 256, "436f756e742d323536", "957f9800542b0b8891badb026d79cc54597cb2d225b54c00c5238c25d05c30e3fbeda97d2e0e1aba483a2df9f2")]
+    [DataRow(HpkeAead.ChaCha20Poly1305, 2, "436f756e742d32", "71146bd6795ccc9c49ce25dda112a48f202ad220559502cef1f34271e0cb4b02b4f10ecac6f48c32f878fae86b")]
+    [DataRow(HpkeAead.ChaCha20Poly1305, 4, "436f756e742d34", "63357a2aa291f5a4e5f27db6baa2af8cf77427c7c1a909e0b37214dd47db122bb153495ff0b02e9e54a50dbe16")]
+    [DataRow(HpkeAead.ChaCha20Poly1305, 255, "436f756e742d323535", "18ab939d63ddec9f6ac2b60d61d36a7375d2070c9b683861110757062c52b8880a5f6b3936da9cd6c23ef2a95c")]
+    [DataRow(HpkeAead.ChaCha20Poly1305, 256, "436f756e742d323536", "7a4a13e9ef23978e2c520fd4d2e757514ae160cd0cd05e556ef692370ca53076214c0c40d4c728d6ed9e727a5b")]
+    public void SealAndTryOpen_X25519LaterSequenceNumber_GiveAndOpenThePublishedCiphertext(HpkeAead aead, int sequenceNumber, string associatedData, string expectedCiphertext)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        HpkeBaseModeVector vector = aead == HpkeAead.Aes128Gcm
+            ? HpkeBaseModeVectors.X25519Aes128Gcm
+            : HpkeBaseModeVectors.X25519ChaCha20Poly1305;
+        using HpkeContext sender = HpkeBaseModeVectors.SetUpSender(vector);
+        using HpkeContext recipient = HpkeBaseModeVectors.SetUpRecipient(vector);
+        byte[] plaintext = Convert.FromHexString(HpkeBaseModeVectors.Plaintext);
+        byte[] ciphertext = new byte[plaintext.Length + HpkeContext.TagSize];
+        byte[] opened = new byte[plaintext.Length];
+        diagnostics.Arrange("vector source", $"{vector.Source}, sequence number {sequenceNumber}");
+        using (diagnostics.Phase("seal and open the earlier sequence numbers"))
+        {
+            for (int earlier = 0; earlier < sequenceNumber; earlier++)
+            {
+                sender.Seal([], plaintext, ciphertext);
+                Assert.IsTrue(recipient.TryOpen([], ciphertext, opened));
+            }
+        }
+
+        sender.Seal(Convert.FromHexString(associatedData), plaintext, ciphertext);
+        bool openedPublished = recipient.TryOpen(Convert.FromHexString(associatedData), Convert.FromHexString(expectedCiphertext), opened);
+        diagnostics.Act("opened", openedPublished);
+
+        diagnostics.Diff("ciphertext", Convert.FromHexString(expectedCiphertext), ciphertext);
+        diagnostics.Diff("plaintext", plaintext, opened);
+        Assert.AreEqual(expectedCiphertext, Convert.ToHexStringLower(ciphertext));
+        Assert.IsTrue(openedPublished);
+        CollectionAssert.AreEqual(plaintext, opened);
+    }
+
     // RFC 9180 Appendix A.1.1.1, sequence numbers 255 and 256: the nonce's XOR reaches its second-lowest byte.
     [TestMethod]
     public void Seal_SequenceNumbers255And256_GiveThePublishedCiphertexts()

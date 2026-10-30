@@ -16,6 +16,17 @@ public static class CurlAiHelpText
 {
     private const string AllSubject = "all";
 
+    /// <summary>
+    /// The subject whose Markdown the console builds from Curl's extensions (ADR-1008); the index lists it
+    /// beside the categories, and <see cref="IsExtensionsSubject"/> recognises it in any case.
+    /// </summary>
+    public const string ExtensionsSubject = "extensions";
+
+    /// <summary>Reports whether <paramref name="subject"/> asks for the extensions' Markdown, in any case.</summary>
+    /// <param name="subject">The <c>--ai-help</c> subject, <see langword="null"/> for none.</param>
+    /// <returns><see langword="true"/> for <c>extensions</c> in any case.</returns>
+    public static bool IsExtensionsSubject(string? subject) => string.Equals(subject, ExtensionsSubject, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>The line an option's section carries when curl's Windows Schannel build refuses it (ADR-0397).</summary>
     private const string SchannelBuildRefusalLine =
         "- On Windows: refused with exit 2 (`the installed libcurl version does not support this`), as curl's Schannel build refuses it; accepted on Linux and macOS.";
@@ -34,11 +45,12 @@ public static class CurlAiHelpText
 
     /// <summary>
     /// The rows <c>--ai-help</c> documents that curl's <c>--help</c> does not: Curl's own diagnostic-log
-    /// options. <c>--ai-help</c> itself is in <see cref="CurlHelpTable"/>, so <c>--help</c> names it (BL-2985).
+    /// options and <c>--extensions</c>, which <c>--help</c> leaves out so curl's help pages stay byte for byte (ADR-1008). <c>--ai-help</c> itself is in <see cref="CurlHelpTable"/>, so <c>--help</c> names it (BL-2985).
     /// </summary>
     private static readonly CurlHelpEntry[] CurlOnlyEntries =
     [
         new("    --log-level <level>", "Curl's own diagnostic log, not curl's -v: none (the default), error, warning, info or verbose, to standard error or the --log-file", CurlHelpCategories.Curl),
+        new("    --extensions", "List Curl's own extensions beyond upstream curl, one per line: each one's schemes and options (ADR-1008); `--ai-help extensions` documents them", CurlHelpCategories.Curl),
         new("    --log-file <file>", "Write Curl's own diagnostic log, not curl's -v, to this file instead of standard error; at info level unless --log-level says otherwise", CurlHelpCategories.Curl),
     ];
 
@@ -144,6 +156,7 @@ public static class CurlAiHelpText
             string.Empty,
         ];
         lines.AddRange(CurlHelpText.Categories.Select(category => $"- `{category.Name}`: {category.Description}. Run `curl --ai-help {category.Name}`"));
+        lines.Add($"- `{ExtensionsSubject}`: Curl's own extensions beyond upstream curl, which `curl --extensions` lists. Run `curl --ai-help {ExtensionsSubject}`");
         lines.AddRange([string.Empty, "## Most-used options", string.Empty]);
         lines.AddRange(MostUsedLongNames.Select(name => MostUsedLine(Entries.First(entry => LongName(entry) == name))));
         lines.AddRange(

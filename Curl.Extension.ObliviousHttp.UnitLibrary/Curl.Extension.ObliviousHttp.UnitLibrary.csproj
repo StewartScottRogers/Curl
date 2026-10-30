@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Cryptography.UnitLibrary\Curl.Cryptography.UnitLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Extension.ObliviousHttp.UnitTests" />
+  </ItemGroup>
+
+</Project>

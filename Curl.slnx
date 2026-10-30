@@ -258,9 +258,21 @@
     <Project Path="Curl.Http3.UnitLibrary/Curl.Http3.UnitLibrary.csproj" />
     <Project Path="Curl.Http3.UnitTests/Curl.Http3.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/Wire/HttpDatagram/">
+    <Project Path="Curl.HttpDatagram.UnitLibrary/Curl.HttpDatagram.UnitLibrary.csproj" />
+    <Project Path="Curl.HttpDatagram.UnitTests/Curl.HttpDatagram.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Wire/Protobuf/">
+    <Project Path="Curl.Protobuf.UnitLibrary/Curl.Protobuf.UnitLibrary.csproj" />
+    <Project Path="Curl.Protobuf.UnitTests/Curl.Protobuf.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Wire/Quic/">
     <Project Path="Curl.Quic.UnitLibrary/Curl.Quic.UnitLibrary.csproj" />
     <Project Path="Curl.Quic.UnitTests/Curl.Quic.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Wire/WebSocket/">
+    <Project Path="Curl.WebSocket.UnitLibrary/Curl.WebSocket.UnitLibrary.csproj" />
+    <Project Path="Curl.WebSocket.UnitTests/Curl.WebSocket.UnitTests.csproj" />
   </Folder>
   <Folder Name="/Wire/Zstandard/">
     <Project Path="Curl.Zstandard.UnitLibrary/Curl.Zstandard.UnitLibrary.csproj" />
@@ -292,6 +304,77 @@
     <Project Path="Curl.Tls.UnitLibrary/Curl.Tls.UnitLibrary.csproj" />
     <Project Path="Curl.Tls.UnitTests/Curl.Tls.UnitTests.csproj" />
   </Folder>
+
+  <!-- Extensions: what Curl adds beyond upstream curl, kept apart from curl's own protocols (ADR-0999). -->
+  <Folder Name="/Extensions/" />
+  <Folder Name="/Extensions/Abstractions/">
+    <Project Path="Curl.Extension.Abstractions.UnitLibrary/Curl.Extension.Abstractions.UnitLibrary.csproj" />
+    <Project Path="Curl.Extension.Abstractions.UnitTests/Curl.Extension.Abstractions.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Extensions/Composition/">
+    <Project Path="Curl.Extension.Composition.UnitLibrary/Curl.Extension.Composition.UnitLibrary.csproj" />
+    <Project Path="Curl.Extension.Composition.UnitTests/Curl.Extension.Composition.UnitTests.csproj" />
+  </Folder>
+  <!-- A new extension adds ONE line directly below this comment: a single-line <Folder Name="/Extensions/<Name>/"> holding its UnitLibrary and UnitTests <Project/> elements. One line, so merge=union keeps two branches' lines whole (ADR-1003). -->
+  <Folder Name="/Extensions/OsCredentialStore/"><Project Path="Curl.Extension.OsCredentialStore.UnitLibrary/Curl.Extension.OsCredentialStore.UnitLibrary.csproj" /><Project Path="Curl.Extension.OsCredentialStore.UnitTests/Curl.Extension.OsCredentialStore.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Dpop/"><Project Path="Curl.Extension.Dpop.UnitLibrary/Curl.Extension.Dpop.UnitLibrary.csproj" /><Project Path="Curl.Extension.Dpop.UnitTests/Curl.Extension.Dpop.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/GrpcWeb/"><Project Path="Curl.Extension.GrpcWeb.UnitLibrary/Curl.Extension.GrpcWeb.UnitLibrary.csproj" /><Project Path="Curl.Extension.GrpcWeb.UnitTests/Curl.Extension.GrpcWeb.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Grpc/"><Project Path="Curl.Extension.Grpc.UnitLibrary/Curl.Extension.Grpc.UnitLibrary.csproj" /><Project Path="Curl.Extension.Grpc.UnitTests/Curl.Extension.Grpc.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/CodeGeneration/"><Project Path="Curl.Extension.CodeGeneration.UnitLibrary/Curl.Extension.CodeGeneration.UnitLibrary.csproj" /><Project Path="Curl.Extension.CodeGeneration.UnitTests/Curl.Extension.CodeGeneration.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/ConnectRpc/"><Project Path="Curl.Extension.ConnectRpc.UnitLibrary/Curl.Extension.ConnectRpc.UnitLibrary.csproj" /><Project Path="Curl.Extension.ConnectRpc.UnitTests/Curl.Extension.ConnectRpc.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/PluginProtocol/"><Project Path="Curl.Extension.PluginProtocol.UnitLibrary/Curl.Extension.PluginProtocol.UnitLibrary.csproj" /><Project Path="Curl.Extension.PluginProtocol.UnitTests/Curl.Extension.PluginProtocol.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Dane/"><Project Path="Curl.Extension.Dane.UnitLibrary/Curl.Extension.Dane.UnitLibrary.csproj" /><Project Path="Curl.Extension.Dane.UnitTests/Curl.Extension.Dane.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/DnsQuery/"><Project Path="Curl.Extension.DnsQuery.UnitLibrary/Curl.Extension.DnsQuery.UnitLibrary.csproj" /><Project Path="Curl.Extension.DnsQuery.UnitTests/Curl.Extension.DnsQuery.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/MlDsaCertificates/"><Project Path="Curl.Extension.MlDsaCertificates.UnitLibrary/Curl.Extension.MlDsaCertificates.UnitLibrary.csproj" /><Project Path="Curl.Extension.MlDsaCertificates.UnitTests/Curl.Extension.MlDsaCertificates.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/ObliviousDoh/"><Project Path="Curl.Extension.ObliviousDoh.UnitLibrary/Curl.Extension.ObliviousDoh.UnitLibrary.csproj" /><Project Path="Curl.Extension.ObliviousDoh.UnitTests/Curl.Extension.ObliviousDoh.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/CertificateTransparency/"><Project Path="Curl.Extension.CertificateTransparency.UnitLibrary/Curl.Extension.CertificateTransparency.UnitLibrary.csproj" /><Project Path="Curl.Extension.CertificateTransparency.UnitTests/Curl.Extension.CertificateTransparency.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/OpenTelemetry/"><Project Path="Curl.Extension.OpenTelemetry.UnitLibrary/Curl.Extension.OpenTelemetry.UnitLibrary.csproj" /><Project Path="Curl.Extension.OpenTelemetry.UnitTests/Curl.Extension.OpenTelemetry.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Har/"><Project Path="Curl.Extension.Har.UnitLibrary/Curl.Extension.Har.UnitLibrary.csproj" /><Project Path="Curl.Extension.Har.UnitTests/Curl.Extension.Har.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Masque/"><Project Path="Curl.Extension.Masque.UnitLibrary/Curl.Extension.Masque.UnitLibrary.csproj" /><Project Path="Curl.Extension.Masque.UnitTests/Curl.Extension.Masque.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/WireGuard/"><Project Path="Curl.Extension.WireGuard.UnitLibrary/Curl.Extension.WireGuard.UnitLibrary.csproj" /><Project Path="Curl.Extension.WireGuard.UnitTests/Curl.Extension.WireGuard.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/RecordReplay/"><Project Path="Curl.Extension.RecordReplay.UnitLibrary/Curl.Extension.RecordReplay.UnitLibrary.csproj" /><Project Path="Curl.Extension.RecordReplay.UnitTests/Curl.Extension.RecordReplay.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/VirtualMachineSocket/"><Project Path="Curl.Extension.VirtualMachineSocket.UnitLibrary/Curl.Extension.VirtualMachineSocket.UnitLibrary.csproj" /><Project Path="Curl.Extension.VirtualMachineSocket.UnitTests/Curl.Extension.VirtualMachineSocket.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/ClientHints/"><Project Path="Curl.Extension.ClientHints.UnitLibrary/Curl.Extension.ClientHints.UnitLibrary.csproj" /><Project Path="Curl.Extension.ClientHints.UnitTests/Curl.Extension.ClientHints.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/ObliviousHttp/"><Project Path="Curl.Extension.ObliviousHttp.UnitLibrary/Curl.Extension.ObliviousHttp.UnitLibrary.csproj" /><Project Path="Curl.Extension.ObliviousHttp.UnitTests/Curl.Extension.ObliviousHttp.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/RateLimit/"><Project Path="Curl.Extension.RateLimit.UnitLibrary/Curl.Extension.RateLimit.UnitLibrary.csproj" /><Project Path="Curl.Extension.RateLimit.UnitTests/Curl.Extension.RateLimit.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/PrivacyPass/"><Project Path="Curl.Extension.PrivacyPass.UnitLibrary/Curl.Extension.PrivacyPass.UnitLibrary.csproj" /><Project Path="Curl.Extension.PrivacyPass.UnitTests/Curl.Extension.PrivacyPass.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/WebDavTools/"><Project Path="Curl.Extension.WebDavTools.UnitLibrary/Curl.Extension.WebDavTools.UnitLibrary.csproj" /><Project Path="Curl.Extension.WebDavTools.UnitTests/Curl.Extension.WebDavTools.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/ContentDigest/"><Project Path="Curl.Extension.ContentDigest.UnitLibrary/Curl.Extension.ContentDigest.UnitLibrary.csproj" /><Project Path="Curl.Extension.ContentDigest.UnitTests/Curl.Extension.ContentDigest.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/ResumableUpload/"><Project Path="Curl.Extension.ResumableUpload.UnitLibrary/Curl.Extension.ResumableUpload.UnitLibrary.csproj" /><Project Path="Curl.Extension.ResumableUpload.UnitTests/Curl.Extension.ResumableUpload.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Checksum/"><Project Path="Curl.Extension.Checksum.UnitLibrary/Curl.Extension.Checksum.UnitLibrary.csproj" /><Project Path="Curl.Extension.Checksum.UnitTests/Curl.Extension.Checksum.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/CompressionDictionary/"><Project Path="Curl.Extension.CompressionDictionary.UnitLibrary/Curl.Extension.CompressionDictionary.UnitLibrary.csproj" /><Project Path="Curl.Extension.CompressionDictionary.UnitTests/Curl.Extension.CompressionDictionary.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Sigstore/"><Project Path="Curl.Extension.Sigstore.UnitLibrary/Curl.Extension.Sigstore.UnitLibrary.csproj" /><Project Path="Curl.Extension.Sigstore.UnitTests/Curl.Extension.Sigstore.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/GoogleCloudStorage/"><Project Path="Curl.Extension.GoogleCloudStorage.UnitLibrary/Curl.Extension.GoogleCloudStorage.UnitLibrary.csproj" /><Project Path="Curl.Extension.GoogleCloudStorage.UnitTests/Curl.Extension.GoogleCloudStorage.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/WebSocketSubprotocols/"><Project Path="Curl.Extension.WebSocketSubprotocols.UnitLibrary/Curl.Extension.WebSocketSubprotocols.UnitLibrary.csproj" /><Project Path="Curl.Extension.WebSocketSubprotocols.UnitTests/Curl.Extension.WebSocketSubprotocols.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/AzureStorage/"><Project Path="Curl.Extension.AzureStorage.UnitLibrary/Curl.Extension.AzureStorage.UnitLibrary.csproj" /><Project Path="Curl.Extension.AzureStorage.UnitTests/Curl.Extension.AzureStorage.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/DeltaDownload/"><Project Path="Curl.Extension.DeltaDownload.UnitLibrary/Curl.Extension.DeltaDownload.UnitLibrary.csproj" /><Project Path="Curl.Extension.DeltaDownload.UnitTests/Curl.Extension.DeltaDownload.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/SegmentedDownload/"><Project Path="Curl.Extension.SegmentedDownload.UnitLibrary/Curl.Extension.SegmentedDownload.UnitLibrary.csproj" /><Project Path="Curl.Extension.SegmentedDownload.UnitTests/Curl.Extension.SegmentedDownload.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/WebSocketExtendedConnect/"><Project Path="Curl.Extension.WebSocketExtendedConnect.UnitLibrary/Curl.Extension.WebSocketExtendedConnect.UnitLibrary.csproj" /><Project Path="Curl.Extension.WebSocketExtendedConnect.UnitTests/Curl.Extension.WebSocketExtendedConnect.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/OciRegistry/"><Project Path="Curl.Extension.OciRegistry.UnitLibrary/Curl.Extension.OciRegistry.UnitLibrary.csproj" /><Project Path="Curl.Extension.OciRegistry.UnitTests/Curl.Extension.OciRegistry.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/WebTransport/"><Project Path="Curl.Extension.WebTransport.UnitLibrary/Curl.Extension.WebTransport.UnitLibrary.csproj" /><Project Path="Curl.Extension.WebTransport.UnitTests/Curl.Extension.WebTransport.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Xmpp/"><Project Path="Curl.Extension.Xmpp.UnitLibrary/Curl.Extension.Xmpp.UnitLibrary.csproj" /><Project Path="Curl.Extension.Xmpp.UnitTests/Curl.Extension.Xmpp.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/HttpFile/"><Project Path="Curl.Extension.HttpFile.UnitLibrary/Curl.Extension.HttpFile.UnitLibrary.csproj" /><Project Path="Curl.Extension.HttpFile.UnitTests/Curl.Extension.HttpFile.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Redis/"><Project Path="Curl.Extension.Redis.UnitLibrary/Curl.Extension.Redis.UnitLibrary.csproj" /><Project Path="Curl.Extension.Redis.UnitTests/Curl.Extension.Redis.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/OpenApi/"><Project Path="Curl.Extension.OpenApi.UnitLibrary/Curl.Extension.OpenApi.UnitLibrary.csproj" /><Project Path="Curl.Extension.OpenApi.UnitTests/Curl.Extension.OpenApi.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Stomp/"><Project Path="Curl.Extension.Stomp.UnitLibrary/Curl.Extension.Stomp.UnitLibrary.csproj" /><Project Path="Curl.Extension.Stomp.UnitTests/Curl.Extension.Stomp.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Nats/"><Project Path="Curl.Extension.Nats.UnitLibrary/Curl.Extension.Nats.UnitLibrary.csproj" /><Project Path="Curl.Extension.Nats.UnitTests/Curl.Extension.Nats.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Kafka/"><Project Path="Curl.Extension.Kafka.UnitLibrary/Curl.Extension.Kafka.UnitLibrary.csproj" /><Project Path="Curl.Extension.Kafka.UnitTests/Curl.Extension.Kafka.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Amqp1/"><Project Path="Curl.Extension.Amqp1.UnitLibrary/Curl.Extension.Amqp1.UnitLibrary.csproj" /><Project Path="Curl.Extension.Amqp1.UnitTests/Curl.Extension.Amqp1.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Amqp0/"><Project Path="Curl.Extension.Amqp0.UnitLibrary/Curl.Extension.Amqp0.UnitLibrary.csproj" /><Project Path="Curl.Extension.Amqp0.UnitTests/Curl.Extension.Amqp0.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/WebSocketRepl/"><Project Path="Curl.Extension.WebSocketRepl.UnitLibrary/Curl.Extension.WebSocketRepl.UnitLibrary.csproj" /><Project Path="Curl.Extension.WebSocketRepl.UnitTests/Curl.Extension.WebSocketRepl.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Coap/"><Project Path="Curl.Extension.Coap.UnitLibrary/Curl.Extension.Coap.UnitLibrary.csproj" /><Project Path="Curl.Extension.Coap.UnitTests/Curl.Extension.Coap.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/Mqtt5/"><Project Path="Curl.Extension.Mqtt5.UnitLibrary/Curl.Extension.Mqtt5.UnitLibrary.csproj" /><Project Path="Curl.Extension.Mqtt5.UnitTests/Curl.Extension.Mqtt5.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/SignalR/"><Project Path="Curl.Extension.SignalR.UnitLibrary/Curl.Extension.SignalR.UnitLibrary.csproj" /><Project Path="Curl.Extension.SignalR.UnitTests/Curl.Extension.SignalR.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/SocketIo/"><Project Path="Curl.Extension.SocketIo.UnitLibrary/Curl.Extension.SocketIo.UnitLibrary.csproj" /><Project Path="Curl.Extension.SocketIo.UnitTests/Curl.Extension.SocketIo.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/OAuth2/"><Project Path="Curl.Extension.OAuth2.UnitLibrary/Curl.Extension.OAuth2.UnitLibrary.csproj" /><Project Path="Curl.Extension.OAuth2.UnitTests/Curl.Extension.OAuth2.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/GraphQl/"><Project Path="Curl.Extension.GraphQl.UnitLibrary/Curl.Extension.GraphQl.UnitLibrary.csproj" /><Project Path="Curl.Extension.GraphQl.UnitTests/Curl.Extension.GraphQl.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/JsonRpc/"><Project Path="Curl.Extension.JsonRpc.UnitLibrary/Curl.Extension.JsonRpc.UnitLibrary.csproj" /><Project Path="Curl.Extension.JsonRpc.UnitTests/Curl.Extension.JsonRpc.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/HttpCache/"><Project Path="Curl.Extension.HttpCache.UnitLibrary/Curl.Extension.HttpCache.UnitLibrary.csproj" /><Project Path="Curl.Extension.HttpCache.UnitTests/Curl.Extension.HttpCache.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/ServerSentEvents/"><Project Path="Curl.Extension.ServerSentEvents.UnitLibrary/Curl.Extension.ServerSentEvents.UnitLibrary.csproj" /><Project Path="Curl.Extension.ServerSentEvents.UnitTests/Curl.Extension.ServerSentEvents.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/S3/"><Project Path="Curl.Extension.S3.UnitLibrary/Curl.Extension.S3.UnitLibrary.csproj" /><Project Path="Curl.Extension.S3.UnitTests/Curl.Extension.S3.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/NamedPipe/"><Project Path="Curl.Extension.NamedPipe.UnitLibrary/Curl.Extension.NamedPipe.UnitLibrary.csproj" /><Project Path="Curl.Extension.NamedPipe.UnitTests/Curl.Extension.NamedPipe.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/EncryptedDns/"><Project Path="Curl.Extension.EncryptedDns.UnitLibrary/Curl.Extension.EncryptedDns.UnitLibrary.csproj" /><Project Path="Curl.Extension.EncryptedDns.UnitTests/Curl.Extension.EncryptedDns.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/McpClient/"><Project Path="Curl.Extension.McpClient.IntegrationTests/Curl.Extension.McpClient.IntegrationTests.csproj" /><Project Path="Curl.Extension.McpClient.UnitLibrary/Curl.Extension.McpClient.UnitLibrary.csproj" /><Project Path="Curl.Extension.McpClient.UnitTests/Curl.Extension.McpClient.UnitTests.csproj" /></Folder>
 
   <!-- The shared projects sit together in /Shared/ (ADR-0731). -->
   <Folder Name="/Shared/">

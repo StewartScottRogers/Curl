@@ -1,0 +1,35 @@
+# Runs a real one-task dark factory shift on Linux (BL-3933): DarkFactory/ShiftProof.ps1 makes a
+# local bare origin holding a scratch board with one task, puts a stand-in claude first on PATH,
+# runs RunDarkFactory.ps1, and fails unless the task ends in Done with the stand-in's change
+# pushed to that origin. Nothing is pushed to GitHub and no Claude tokens are spent. Lives apart
+# from ci.yml, a guard file that changes only through the audit branch.
+name: dark-factory-unix-shift
+
+on:
+  push:
+    branches: [work/dark-factory]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  one-task-shift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Configure git identity
+        run: |
+          git config --global user.name "dark-factory-ci"
+          git config --global user.email "dark-factory-ci@example.invalid"
+      - name: One-task shift against a local bare origin
+        run: ./DarkFactory/ShiftProof.ps1 -WorkDir "$env:RUNNER_TEMP/shift-proof"

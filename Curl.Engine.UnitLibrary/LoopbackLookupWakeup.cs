@@ -12,7 +12,9 @@ namespace Curl.Engine;
 internal sealed class LoopbackLookupWakeup : IDisposable
 {
     private readonly Socket listener;
+    private readonly object gate = new();
     private Socket? caller;
+    private bool disposed;
 
     private LoopbackLookupWakeup(Socket listener) => this.listener = listener;
 
@@ -29,22 +31,32 @@ internal sealed class LoopbackLookupWakeup : IDisposable
         return new LoopbackLookupWakeup(listener);
     }
 
-    /// <summary>Makes <see cref="Handle" /> readable by connecting to it, once; a later call does nothing.</summary>
+    /// <summary>
+    /// Makes <see cref="Handle" /> readable by connecting to it, once; a later call, or a call after <see cref="Dispose" />,
+    /// does nothing.
+    /// </summary>
     internal void Signal()
     {
-        if (caller is not null)
+        lock (gate)
         {
-            return;
-        }
+            if (disposed || caller is not null)
+            {
+                return;
+            }
 
-        caller = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        caller.Connect(listener.LocalEndPoint!);
+            caller = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            caller.Connect(listener.LocalEndPoint!);
+        }
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        caller?.Dispose();
-        listener.Dispose();
+        lock (gate)
+        {
+            disposed = true;
+            caller?.Dispose();
+            listener.Dispose();
+        }
     }
 }

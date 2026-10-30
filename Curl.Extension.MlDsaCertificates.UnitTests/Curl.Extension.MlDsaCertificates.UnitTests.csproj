@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <Using Include="Curl.Protocol.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Extension.MlDsaCertificates.UnitLibrary\Curl.Extension.MlDsaCertificates.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Extension.Composition.UnitLibrary\Curl.Extension.Composition.UnitLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

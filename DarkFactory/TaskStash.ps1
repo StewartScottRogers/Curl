@@ -197,7 +197,7 @@ function Get-TaskSplitArguments {
     param([string[]]$Deny, [string]$Context, [string]$ErrPath)
     $denied = ($Deny | ForEach-Object { "`"Bash($_`:*)`" `"PowerShell($_`:*)`"" }) -join ' '
     $budget = ([double]$TaskSplitBudgetUsd).ToString([System.Globalization.CultureInfo]::InvariantCulture)
-    return "/d /c claude -p --model sonnet --dangerously-skip-permissions --output-format stream-json --verbose $Context --max-budget-usd $budget --max-turns $TaskSplitMaxTurns --disallowedTools $denied 2>`"$ErrPath`""
+    return "claude -p --model sonnet --dangerously-skip-permissions --output-format stream-json --verbose $Context --max-budget-usd $budget --max-turns $TaskSplitMaxTurns --disallowedTools $denied 2>`"$ErrPath`""
 }
 
 function Invoke-TaskSplitRun {
@@ -221,7 +221,7 @@ function Invoke-TaskSplitRun {
             Add-Content -Path $raw -Value $pending.Result -Encoding UTF8
             $pending = $p.StandardOutput.ReadLineAsync()
         } elseif ((Get-Date) -gt $deadline) {
-            & taskkill /T /F /PID $p.Id 2>&1 | Out-Null
+            Stop-FactoryProcessTree -ProcessId $p.Id
             $p.WaitForExit()
             return @{ ExitCode = -1 }
         }

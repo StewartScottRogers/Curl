@@ -150,4 +150,18 @@ public interface ITcpDialer
     /// <param name="socketCreated">Called with each socket's handle as the socket is created.</param>
     /// <returns>The dialer to dial through.</returns>
     ITcpDialer PublishingSocketsTo(Action<nint> socketCreated) => this;
+
+    /// <summary>
+    /// Gives a dialer that dials as this one does and, when a TCP socket it created fails to connect, awaits
+    /// <paramref name="released" /> before closing it, so a transfer driven by <c>curl_multi_socket_action</c> keeps
+    /// the socket it told the application of open until the application's action reads the failure, as libcurl does
+    /// (CGR-034 C_65).
+    /// </summary>
+    /// <remarks>
+    /// This default is the dialer itself and holds nothing, for a dialer that creates no real socket.
+    /// <see cref="TcpDialer" /> holds each one.
+    /// </remarks>
+    /// <param name="released">Called with the dial's cancellation token; the socket closes when its task completes.</param>
+    /// <returns>The dialer to dial through.</returns>
+    ITcpDialer HoldingFailedSocketsUntil(Func<CancellationToken, ValueTask> released) => this;
 }

@@ -102,6 +102,12 @@
     <ProjectReference Include="..\Curl.Protocol.Ws.UnitLibrary\Curl.Protocol.Ws.UnitLibrary.csproj" />
     <!-- Libcurl's CurlEasyErrorText is curl_easy_strerror's table, which the tool prints too (BL-2450). -->
     <ProjectReference Include="..\Libcurl\Libcurl.csproj" />
+    <!-- The extensions' handlers, which the tool passes to the engine (ADR-0999). -->
+    <ProjectReference Include="..\Curl.Extension.Composition.UnitLibrary\Curl.Extension.Composition.UnitLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Curl.WebSocket" />
   </ItemGroup>
 
 </Project>

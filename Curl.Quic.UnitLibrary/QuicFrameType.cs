@@ -78,4 +78,10 @@ public enum QuicFrameType : ulong
 
     /// <summary>HANDSHAKE_DONE (section 19.20).</summary>
     HandshakeDone = 0x1e,
+
+    /// <summary>DATAGRAM running to the end of the packet (RFC 9221 section 4).</summary>
+    Datagram = 0x30,
+
+    /// <summary>DATAGRAM with a Length field (RFC 9221 section 4).</summary>
+    DatagramWithLength = 0x31,
 }

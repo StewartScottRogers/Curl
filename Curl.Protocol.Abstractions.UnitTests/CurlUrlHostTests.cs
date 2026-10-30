@@ -4,6 +4,30 @@ namespace Curl.Protocol.Abstractions.UnitTests;
 public sealed class CurlUrlHostTests
 {
     [TestMethod]
+    [DataRow(true, "xn--ab-pia8903akua.test")]
+    [DataRow(false, "aa/cb.test")]
+    public void ReadingHostAs_ChosenRule_DecidesHowTheHostIsRead_AndDisposeRestoresTheDefault(bool hostAsWindows1252, string expectedIdnHost)
+    {
+        string defaultIdnHost = ConvertAccountOfHost();
+
+        string chosenIdnHost;
+        using (CurlUrlHost.ReadingHostAs(hostAsWindows1252))
+        {
+            chosenIdnHost = ConvertAccountOfHost();
+        }
+
+        Assert.AreEqual(expectedIdnHost, chosenIdnHost);
+        Assert.AreEqual(defaultIdnHost, ConvertAccountOfHost());
+    }
+
+    private static string ConvertAccountOfHost()
+    {
+        CurlUrlHost.TryNormalize("a℀b.test", refuseUnconvertibleName: false, out _, out string idnHost, out _, out _);
+
+        return idnHost;
+    }
+
+    [TestMethod]
     [DataRow("[::1")]
     [DataRow("[")]
     public void TryNormalize_BracketNotClosed_IsBadIPv6(string host)

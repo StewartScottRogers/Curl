@@ -89,7 +89,8 @@
     CLAUDE.md still loads when the run works there. Each run is also capped at
     -MaxRunTurns turns (default 80, 0 for none); a run that reaches it stops, and its task
     goes back to Backlog as too big for one run, to be split in the first turns of its next
-    claim. -TestLaneFlags proves the flags.
+    claim. The task and lane prompts name the cap and ask the run to hand back what is left
+    15 turns before it (AF-0482). -TestLaneFlags proves the flags.
 
     THE MODEL PER TASK
 

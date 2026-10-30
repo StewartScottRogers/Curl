@@ -34,6 +34,7 @@ public sealed class ProtocolIsolationTests
             [Http2] = [Abstractions],
             ["Curl.Quic.UnitLibrary"] = [Tls, Cryptography, Abstractions],
             ["Curl.Http3.UnitLibrary"] = [Http2, Abstractions],
+            ["Curl.WebSocket.UnitLibrary"] = [],
         };
 
     [TestMethod]
@@ -106,6 +107,7 @@ public sealed class ProtocolIsolationTests
     [DataRow("Curl.Quic.UnitLibrary")]
     [DataRow("Curl.Http3.UnitLibrary")]
     [DataRow("Curl.Zstandard.UnitLibrary")]
+    [DataRow("Curl.WebSocket.UnitLibrary")]
     public void ForbiddenProtocolReferences_AllowedLibrary_IsNotForbidden(string referenced)
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
