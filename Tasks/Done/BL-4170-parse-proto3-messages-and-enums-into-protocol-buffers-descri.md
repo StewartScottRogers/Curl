@@ -8,7 +8,7 @@ depends-on: [BL-4164]
 touches: [Curl.Protobuf.UnitLibrary/Descriptors, Curl.Protobuf.UnitTests/Descriptors]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4170 — Parse proto3 messages and enums into Protocol Buffers descriptors in Curl.Protobuf
 
@@ -22,10 +22,10 @@ First of three parts split from BL-4165 (itself split from BL-4099) because the 
 
 ## Acceptance criteria
 
-- [ ] Proto3 text's messages (nested), enums, fields (every scalar type, `repeated`, `optional`, `oneof`, `map<,>`), `reserved`, `syntax`, `package` and `option` are read into descriptors, with a unit test for each construct.
-- [ ] Malformed `.proto` text fails with a typed error naming line and column, never an exception escaping; unit tests.
-- [ ] `Curl.Protobuf.UnitLibrary` meets the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Proto3 text's messages (nested), enums, fields (every scalar type, `repeated`, `optional`, `oneof`, `map<,>`), `reserved`, `syntax`, `package` and `option` are read into descriptors, with a unit test for each construct.
+- [x] Malformed `.proto` text fails with a typed error naming line and column, never an exception escaping; unit tests.
+- [x] `Curl.Protobuf.UnitLibrary` meets the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -94,6 +94,18 @@ First of three parts split from BL-4165 (itself split from BL-4099) because the 
   error, tokenizer escapes, comments, numbers and errors among them) to 100% line and branch
   coverage, one Measure-CodeQuality.ps1 run for the library, the fast tests, commit.
 
+- 2026-10-29, lane 11, third claim: wrote the unit tests under `Curl.Protobuf.UnitTests/Descriptors`
+  (`ProtoParserTests` one per construct, `ProtoParserErrorTests` one data row per syntax and token
+  error with line and column, `ProtoTokenizerTests`, `ProtoIntegerLiteralTests`,
+  `ProtoNumberLiteralTests`). The first quality run failed four methods on complexity
+  (`IsNumberCharacter` 18, `ReadUnquotedTokenKind` 16, `ReadEscape` 12, `ExpectInteger` 12) and
+  the `GeneratedRegex` source's own members on coverage, which no test of ours can reach. So the
+  two regexes became the hand-written `ProtoNumberLiteral` (`IsInteger`, `IsFloat`, same grammar),
+  and the four methods were split (`ReadIdentifier`, `StartsNumber`, `IsExponentSign`,
+  `SignedValue`). The second `Measure-CodeQuality.ps1 -Library Curl.Protobuf.UnitLibrary` run: 100%
+  line, 100% branch, highest CRAP 10, no failing member. The tests are platform-neutral (strings
+  only, no files, paths or OS text), which covers CI on Linux and macOS. `dotnet build` is clean and the fast tests pass.
+
 ## Log
 
 - 2026-10-29: Created.
@@ -104,3 +116,4 @@ First of three parts split from BL-4165 (itself split from BL-4099) because the 
 - 2026-10-29: Backlog -> Blocked. Stewart: dark factory cost cap: its runs of the last day already cost 1.39 of its 3.13 US dollar cost cap, so it was not run again; split the task; the automatic split failed: the push of the split was refused
 - 2026-10-29: Blocked -> Backlog. Cost cap window passed: its runs of the last 24 hours now leave 1 US dollar or more of its cost cap, so the cost cap allows a fresh run
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 690e3591 ee2341fd 7ae6d7ff 3d836d5e.
+- 2026-10-29: Doing -> Done. Proto3 text is read into file, message, field and enum descriptors, malformed text fails with a typed line and column error
