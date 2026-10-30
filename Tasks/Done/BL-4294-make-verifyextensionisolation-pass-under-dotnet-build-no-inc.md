@@ -8,7 +8,7 @@ depends-on: []
 touches: [Directory.Build.props]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4294 — Make VerifyExtensionIsolation pass under dotnet build --no-incremental
 
@@ -29,7 +29,7 @@ Likely fix: check only the project's own references, not transitive ones, e.g. b
 - [x] `dotnet build --no-incremental` of the solution exits 0 on Windows.
 - [x] A scratch project outside the hosts and extensions that references an extension directly still fails the build with the ADR-0999 message, under both `dotnet build` and `dotnet build --no-incremental` (checked by hand and recorded in the Log; the scratch project is not committed).
 - [x] An extension library referencing another extension, or a `Curl.Protocol.*` library, still fails the build under both.
-- [ ] CI is green on Windows, Linux and macOS.
+- [x] CI is green on Windows, Linux and macOS.
 
 ## Notes
 
@@ -38,3 +38,5 @@ Likely fix: check only the project's own references, not transitive ones, e.g. b
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 49975296 2e3569be 9239b4d0 fd900c2c.
 - 2026-10-29: Fix b0e3fdc4d: VerifyExtensionIsolation now runs BeforeTargets="IncludeTransitiveProjectReferences;BeforeBuild" (Rebuild's Clean ran that SDK target before BeforeBuild). Whole-solution `dotnet build --no-incremental`: 0 warnings, 0 errors (was 3 errors). Fast tests: 74 assemblies passed, exit 0. Scratch projects (deleted, not committed), each under `dotnet build` and `--no-incremental`: Curl.ScratchProbe.UnitLibrary -> Curl.Extension.Coap gives "only the hosts ... reference an extension (ADR-0999)"; Curl.Extension.ScratchProbe.UnitLibrary -> Curl.Protocol.Http gives "an extension references no curl protocol library"; -> Curl.Extension.Mqtt5 alone gives "an extension references no other extension". All four runs per rule failed as required.
+- 2026-10-29: CI run 40980505280 on work/dark-factory at 0af3afe15 (contains b0e3fdc4d) passed on Windows, Linux and macOS.
+- 2026-10-29: Doing -> Done. Rebuild passes; isolation rules still enforced; CI green on all three
