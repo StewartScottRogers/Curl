@@ -45,3 +45,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: cd391c17 c5786e7e dc0f73b9 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Split before any code: waits on BL-4318 (QUIC dials through an extension's datagram connector), BL-4319 (MASQUE wire format) and BL-4317 (MASQUE tunnel client flow)
+- 2026-10-30: Backlog -> Doing. Criteria at claim: cd391c17 c5786e7e dc0f73b9 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
