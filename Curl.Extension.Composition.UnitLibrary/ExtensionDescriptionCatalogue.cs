@@ -16,6 +16,7 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.VirtualMachineSocket.VirtualMachineSocketExtension.Description,
         GraphQl.GraphQlOptions.Description,
         Curl.Extension.JsonRpc.JsonRpcExtension.Description,
+        ConnectRpc.ConnectRpcExtension.Description,
         Curl.Extension.WebSocketSubprotocols.WebSocketSubprotocolsExtension.Description,
         HttpFile.HttpFileOptions.Description,
         OpenApi.OpenApiOptions.Description,
