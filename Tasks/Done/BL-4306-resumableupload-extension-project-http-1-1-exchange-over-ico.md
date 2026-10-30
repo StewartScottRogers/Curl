@@ -32,7 +32,7 @@ Specifications: draft-ietf-httpbis-resumable-upload (latest; header fields `Uplo
 
 ## Notes
 
-- Plan: copied the Azure Storage extension's HTTP/1.1 client into `Http/` under ResumableUpload names, added `BodyOffset` (seeks the body stream) and kept interim 1xx responses (not 101) in `InterimResponses` so the draft's 104 and its Location reach BL-4307; one static type per header field in `Fields/`, `Ietf*` (RFC 9651 Structured Fields) and `Tus*` (decimal digits, comma lists), with `ResumableUploadMediaTypes` for the media types and status 104. Decision recorded in ADR-1092.
+- Plan: copied the Azure Storage extension's HTTP/1.1 client into `Http/` under ResumableUpload names, added `BodyOffset` (seeks the body stream) and kept interim 1xx responses (not 101) in `InterimResponses` so the draft's 104 and its Location reach BL-4307; one static type per header field in `Fields/`, `Ietf*` (RFC 9651 Structured Fields) and `Tus*` (decimal digits, comma lists), with `ResumableUploadMediaTypes` for the media types and status 104. Decision recorded in ADR-1095.
 - Choice: Structured Field item parameters are skipped unchecked (the draft defines none); `Upload-Limit` ignores unknown keys and refuses a member without `=` for a known key.
 - Measured: Measure-CodeQuality.ps1 for the library: 100% line, 100% branch, max complexity 10, no failing member. Fast tests green across the solution, build 0 warnings, dotnet format clean; the tests use no paths, OS text or certificates, so they are platform-neutral for CI on Linux and macOS.
 

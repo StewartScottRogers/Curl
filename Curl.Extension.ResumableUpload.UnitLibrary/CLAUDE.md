@@ -9,6 +9,6 @@ option, its registration in `ExtensionCatalogue.cs` and its description (BL-4129
   (RFC 9112), its body optionally from `BodyOffset`, and returns a `ResumableUploadHttpResponse` whose
   body is framed by `Content-Length`, chunked or the close, with the interim 1xx responses before it.
   Every failure is a `ResumableUploadHttpException` naming a `ResumableUploadHttpFailure`. It is a copy
-  of the Azure Storage extension's client (ADR-1092).
+  of the Azure Storage extension's client (ADR-1095).
 - `Fields/` holds one type per header field: `Ietf*Field` for draft-ietf-httpbis-resumable-upload's
   Structured Fields and `Tus*Field` for tus 1.0's, each with `Name`, `Format` and `TryParse`.
