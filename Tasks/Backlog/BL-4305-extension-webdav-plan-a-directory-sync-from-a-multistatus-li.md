@@ -1,16 +1,16 @@
 ---
-id: BL-4301
+id: BL-4305
 title: Extension WebDAV: plan a directory sync from a Multistatus listing and a local folder
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4300]
+depends-on: [BL-4304]
 touches: [Curl.Extension.WebDavTools.UnitLibrary/Sync, Curl.Extension.WebDavTools.UnitTests/Sync]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4301 — Extension WebDAV: plan a directory sync from a Multistatus listing and a local folder
+# BL-4305 — Extension WebDAV: plan a directory sync from a Multistatus listing and a local folder
 
 ## Goal
 
@@ -18,7 +18,7 @@ Given a Depth 1 Multistatus listing of a remote collection and a local folder, a
 
 ## Context
 
-Split from BL-4131 for size. Builds on BL-4300's Multistatus entries. A file is current when the local file exists with the same length and a last-write time no older than `getlastmodified` (RFC 4918 15.7, 15.4); otherwise it is downloaded and its last-write time set to `getlastmodified`. Collections (15.9 resourcetype) are listed recursively; the entry for the requested collection itself is skipped. Hrefs that leave the collection, contain `..` or a path separator in a segment, or name an invalid file name are refused (no path traversal). Local deletion is out of scope (sync never deletes). Use injected file-system access (an interface in this library) so unit tests use a temporary directory or an in-memory fake.
+Split from BL-4131 for size. Builds on BL-4304's Multistatus entries. A file is current when the local file exists with the same length and a last-write time no older than `getlastmodified` (RFC 4918 15.7, 15.4); otherwise it is downloaded and its last-write time set to `getlastmodified`. Collections (15.9 resourcetype) are listed recursively; the entry for the requested collection itself is skipped. Hrefs that leave the collection, contain `..` or a path separator in a segment, or name an invalid file name are refused (no path traversal). Local deletion is out of scope (sync never deletes). Use injected file-system access (an interface in this library) so unit tests use a temporary directory or an in-memory fake.
 
 ## Acceptance criteria
 

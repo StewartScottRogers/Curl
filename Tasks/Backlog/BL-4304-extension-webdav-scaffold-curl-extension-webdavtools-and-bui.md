@@ -1,5 +1,5 @@
 ---
-id: BL-4300
+id: BL-4304
 title: Extension WebDAV: scaffold Curl.Extension.WebDavTools and build PROPFIND and read 207 Multistatus
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4300 — Extension WebDAV: scaffold Curl.Extension.WebDavTools and build PROPFIND and read 207 Multistatus
+# BL-4304 — Extension WebDAV: scaffold Curl.Extension.WebDavTools and build PROPFIND and read 207 Multistatus
 
 ## Goal
 

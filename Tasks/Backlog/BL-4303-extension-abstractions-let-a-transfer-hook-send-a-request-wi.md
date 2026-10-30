@@ -1,5 +1,5 @@
 ---
-id: BL-4299
+id: BL-4303
 title: Extension abstractions: let a transfer hook send a request with another URL, method and body
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4299 — Extension abstractions: let a transfer hook send a request with another URL, method and body
+# BL-4303 — Extension abstractions: let a transfer hook send a request with another URL, method and body
 
 ## Goal
 
