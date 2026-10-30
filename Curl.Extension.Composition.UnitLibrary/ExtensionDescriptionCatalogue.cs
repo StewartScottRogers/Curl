@@ -34,5 +34,6 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.WebSocketRepl.WebSocketReplExtension.Description,
         SignalR.SignalRExtension.Description,
         Mqtt5.Mqtt5Extension.Description,
+        Amqp1.Client.Amqp1Extension.Description,
     ];
 }

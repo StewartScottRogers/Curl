@@ -16,8 +16,9 @@ including `Curl.Extension.Amqp0.UnitLibrary` (AMQP 0-9-1, which owns `amqp://` a
   (`Amqp1Section`, `Amqp1SectionType`); `Amqp1SaslInitialResponse` the PLAIN and ANONYMOUS initial responses.
 - Every fault in the encoding, a frame or a header, read or about to be written, raises
   `Amqp1MalformedEncodingException`.
-- `Client/` (BL-4257, the client flow) is still to come. No option, handler or
-  registration yet: BL-4118 adds them.
+- `Client/`: the send/receive client of `amqp1://` and `amqp1s://` (ADR-1062). `Amqp1ProtocolHandler` serves the
+  schemes, `Amqp1ClientFlow` runs the exchange after `Amqp1SaslNegotiation`, and `Amqp1Extension` holds the
+  description and handler factory registered in `Curl.Extension.Composition` (ADR-1082). No options of its own.
 
 References only `Curl.Extension.Abstractions` (and through it `Curl.Protocol.Abstractions`). Held to the four
 quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.Amqp1.UnitTests`.

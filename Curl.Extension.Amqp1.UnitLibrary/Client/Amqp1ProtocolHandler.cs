@@ -18,10 +18,13 @@ public sealed class Amqp1ProtocolHandler : IProtocolHandler
 
     private readonly IConnector connector;
 
-    /// <summary>Creates the handler over <paramref name="connector"/>.</summary>
+    /// <summary>
+    /// Creates the handler over <paramref name="connector"/>. Unchecked, like every extension handler, because the
+    /// catalogue builds each handler before any transfer needs its connector.
+    /// </summary>
     public Amqp1ProtocolHandler(IConnector connector)
     {
-        this.connector = connector ?? throw new ArgumentNullException(nameof(connector));
+        this.connector = connector;
     }
 
     /// <summary>The schemes served: <c>amqp1</c> and <c>amqp1s</c>.</summary>

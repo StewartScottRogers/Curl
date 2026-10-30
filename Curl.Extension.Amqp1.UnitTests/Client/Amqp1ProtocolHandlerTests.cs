@@ -122,12 +122,6 @@ public sealed class Amqp1ProtocolHandlerTests
     }
 
     [TestMethod]
-    public void Constructor_NullConnector_Throws()
-    {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new Amqp1ProtocolHandler(null!));
-    }
-
-    [TestMethod]
     public void SupportedSchemes_AreAmqp1AndAmqp1s()
     {
         CollectionAssert.AreEqual(new[] { "amqp1", "amqp1s" }, new Amqp1ProtocolHandler(new ScriptedAmqp1Connector(ConnectResult.Refused("x"))).SupportedSchemes.ToArray());

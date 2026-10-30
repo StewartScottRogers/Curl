@@ -24,5 +24,6 @@ internal static class ExtensionCatalogue
         Redis.Client.RedisExtension.CreateHandler,
         SignalR.SignalRExtension.CreateHandler,
         Mqtt5.Mqtt5Extension.CreateHandler,
+        Amqp1.Client.Amqp1Extension.CreateHandler,
     ];
 }
