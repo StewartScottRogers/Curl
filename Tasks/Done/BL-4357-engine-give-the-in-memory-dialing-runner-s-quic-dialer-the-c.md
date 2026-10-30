@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EngineComposition.Transports.cs, Curl.Engine.UnitTests/EngineCompositionTests.QuicThroughExtension.cs]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-30
 ---
 # BL-4357 — Engine: give the in-memory dialing runner's QUIC dialer the connection hook's datagram connector
 
@@ -39,3 +39,4 @@ BL-4355 (WireGuard UDP inside the tunnel) needs this for its unit test that runs
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: d37048a4 fb9a909b 607dbf6e 3d836d5e.
+- 2026-10-30: Doing -> Done. Dialing QUIC dialer now opens through the hook's datagram connector; tests added, gates hold
