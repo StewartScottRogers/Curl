@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.PrivacyPass.UnitLibrary/Tokens, Curl.Extension.PrivacyPass.UnitTests/Tokens]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4321 — Extension: Privacy Pass VOPRF(P-384, SHA-384) client for token type 1
 
@@ -28,13 +28,20 @@ Split from BL-4315 (ADR-1110's "Not yet done"), which keeps only the wiring of t
 
 ## Acceptance criteria
 
-- [ ] `Tokens/` holds the P-384 group, hash-to-curve and VOPRF client, and their unit tests in `Curl.Extension.PrivacyPass.UnitTests/Tokens` pass the RFC 9497 Appendix A P384-SHA384 VOPRF vectors and the RFC 9380 `P384_XMD:SHA-384_SSWU_RO_` vectors.
-- [ ] `PrivacyPassIssuance` issues a type `0x0001` token for a challenge of that type, rejects a response whose proof does not verify (exit 8), and still issues type `0x0002` tokens as before.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Extension.PrivacyPass.UnitLibrary` reports every member inside the gates; `dotnet build` is clean and the fast tests are green.
+- [x] `Tokens/` holds the P-384 group, hash-to-curve and VOPRF client, and their unit tests in `Curl.Extension.PrivacyPass.UnitTests/Tokens` pass the RFC 9497 Appendix A P384-SHA384 VOPRF vectors and the RFC 9380 `P384_XMD:SHA-384_SSWU_RO_` vectors.
+- [x] `PrivacyPassIssuance` issues a type `0x0001` token for a challenge of that type, rejects a response whose proof does not verify (exit 8), and still issues type `0x0002` tokens as before.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Extension.PrivacyPass.UnitLibrary` reports every member inside the gates; `dotnet build` is clean and the fast tests are green.
 
 ## Notes
+
+- Plan: `P384Group` (Jacobian arithmetic, SEC1 compressed encoding), `P384HashToCurve` (expand_message_xmd, hash_to_field, SSWU Z = -12) and `VoprfP384Sha384` (Blind, VerifyProof, Finalize) in `Tokens/`; `PrivacyPassIssuance` runs VOPRF for type `0x0001` and Blind RSA otherwise. Decisions recorded in ADR-1115.
+- RFC 9380's P-384 vectors are in Appendix J.2.1 (the Context's J.3.1 is a slip); the msg "" and "abc" vectors pin u, Q0, Q1 and P. RFC 9497 A.4.2 vectors 1 and 2 pin the blinded element and output, vector 3 the batch proof, and the test issuer reproduces vector 1's proof from its ProofRandomScalar.
+- Curve constants are copied from the BCL's explicit nistP384 parameters (`ExportExplicitParameters` is not on every platform); a test checks d·G = Q against a BCL key. The tests are platform-neutral, which covers CI on Linux and macOS.
+- Measure-CodeQuality: 100% line and branch, 0 failing members (`P384Group.Decode` split after measuring complexity 12). Full build clean, fast tests green in all 93 test projects.
+- `TestIssuer.cs` has a pre-existing import-ordering format finding, left as it was.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 2188fe39 d5b139e5 1b75edd2.
+- 2026-10-29: Doing -> Done. Privacy Pass token type 0x0001 issues by a hand-built VOPRF(P-384, SHA-384) client passing the RFC 9497 and RFC 9380 vectors
