@@ -6,7 +6,7 @@ The WireGuard extension (ADR-0999), tested against wg(8) and wg-quick(8), not ag
 library or another extension. It is not yet registered in any Composition catalogue and has no `--wireguard` option
 (BL-4147 wires both).
 
-- `Configuration/` reads a wg-quick configuration file (ADR-1115): `WireGuardConfigurationParser.Parse` gives a
+- `Configuration/` reads a wg-quick configuration file (ADR-1117): `WireGuardConfigurationParser.Parse` gives a
   `WireGuardConfiguration` holding the `WireGuardInterface` (`PrivateKey`, `Address` as `WireGuardCidr`s, `DNS`,
   `ListenPort`, `MTU`) and its `WireGuardPeer`s (`PublicKey`, `PresharedKey`, `Endpoint` as a `WireGuardEndpoint`,
   `AllowedIPs`, `PersistentKeepalive`). Keys are 32 bytes of base64; wg-quick's host-side keys (`Table`, `FwMark`,

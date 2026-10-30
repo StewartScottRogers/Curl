@@ -1,4 +1,4 @@
-# ADR-1115 — The WireGuard configuration parser ignores wg-quick's host-side keys and names the line of every error
+# ADR-1117 — The WireGuard configuration parser ignores wg-quick's host-side keys and names the line of every error
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

@@ -4,7 +4,7 @@ namespace Curl.Extension.WireGuard.Configuration;
 /// Collects an <c>[Interface]</c> section. wg-quick's host-side keys (<c>Table</c>, <c>FwMark</c>,
 /// <c>SaveConfig</c> and the <c>PreUp</c>, <c>PostUp</c>, <c>PreDown</c> and <c>PostDown</c> hooks) configure the
 /// operating system's routing and run commands, which a user-space tunnel has no use for, so they are accepted and
-/// ignored (ADR-1115).
+/// ignored (ADR-1117).
 /// </summary>
 /// <param name="headerLineNumber">The line of the <c>[Interface]</c> header, named when the section has no <c>PrivateKey</c>.</param>
 internal sealed class WireGuardInterfaceSectionBuilder(int headerLineNumber) : IWireGuardSectionBuilder
