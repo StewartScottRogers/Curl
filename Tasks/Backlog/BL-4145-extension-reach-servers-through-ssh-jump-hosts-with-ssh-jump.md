@@ -4,7 +4,7 @@ title: Extension: Reach servers through SSH jump hosts with --ssh-jump
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4095, BL-4328, BL-4329, BL-4330]
+depends-on: [BL-4091, BL-4093, BL-4095, BL-4365, BL-4329, BL-4330]
 touches: [Curl.Extension.SshJump.UnitLibrary, Curl.Extension.SshJump.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29

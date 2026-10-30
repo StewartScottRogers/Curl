@@ -4,7 +4,7 @@ title: Move the SSH connection layer into Curl.Ssh.UnitLibrary and add direct-tc
 priority: Low
 assignee: Claude
 pipeline: direct
-depends-on: [BL-4328, BL-4329]
+depends-on: [BL-4365, BL-4329]
 touches: [Curl.Ssh.UnitLibrary/Connection, Curl.Ssh.UnitLibrary/SshSessionConnection.cs, Curl.Ssh.UnitTests/Connection, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-29

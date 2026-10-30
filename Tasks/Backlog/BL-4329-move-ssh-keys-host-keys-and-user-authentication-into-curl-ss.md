@@ -4,7 +4,7 @@ title: Move SSH keys, host keys and user authentication into Curl.Ssh.UnitLibrar
 priority: Low
 assignee: Claude
 pipeline: direct
-depends-on: [BL-4328]
+depends-on: [BL-4365]
 touches: [Curl.Ssh.UnitLibrary/Keys, Curl.Ssh.UnitLibrary/HostKeys, Curl.Ssh.UnitLibrary/Authentication, Curl.Ssh.UnitTests/Keys, Curl.Ssh.UnitTests/HostKeys, Curl.Ssh.UnitTests/Authentication, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-29

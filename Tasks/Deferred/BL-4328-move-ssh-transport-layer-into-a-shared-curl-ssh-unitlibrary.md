@@ -43,3 +43,4 @@ Extensions may reference shared layers but no `Curl.Protocol.*` library (ADR-099
 - 2026-10-29: Doing -> Backlog. Needs Curl.Console/CurlComposition.cs, held by BL-4320 in Doing; depends-on BL-4320
 - 2026-10-29: Backlog -> Doing. Criteria at claim: acac56da ea52861d e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-4328-20261029-184521-L7.jsonl
+- 2026-10-30: Backlog -> Deferred. Over its cost cap; split into BL-4362, BL-4363, BL-4364, BL-4365
