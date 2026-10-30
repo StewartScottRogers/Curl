@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 429822e8 6472bf92 b9114855 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-30: Doing -> Backlog. Out of time: code and 26 passing tests written (in stash); quality-gate measurement, fast tests and commit remain
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 429822e8 6472bf92 b9114855 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
