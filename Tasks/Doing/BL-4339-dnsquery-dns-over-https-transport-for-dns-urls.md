@@ -36,3 +36,4 @@ Builds on BL-4337's `Transport/DnsQueryTransportSelection.cs` (depends on BL-433
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: f908be11 f3bbf5c9 478f867b 3d836d5e.
