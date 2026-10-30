@@ -1,16 +1,16 @@
 ---
-id: BL-4317
+id: BL-4330
 title: Move the SSH connection layer into Curl.Ssh.UnitLibrary and add direct-tcpip channels
 priority: Low
 assignee: Claude
 pipeline: direct
-depends-on: [BL-4315, BL-4316]
+depends-on: [BL-4328, BL-4329]
 touches: [Curl.Ssh.UnitLibrary/Connection, Curl.Ssh.UnitLibrary/SshSessionConnection.cs, Curl.Ssh.UnitTests/Connection, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4317 — Move the SSH connection layer into Curl.Ssh.UnitLibrary and add direct-tcpip channels
+# BL-4330 — Move the SSH connection layer into Curl.Ssh.UnitLibrary and add direct-tcpip channels
 
 ## Goal
 

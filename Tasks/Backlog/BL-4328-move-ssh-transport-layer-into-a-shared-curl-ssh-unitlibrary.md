@@ -1,5 +1,5 @@
 ---
-id: BL-4315
+id: BL-4328
 title: Move SSH transport layer into a shared Curl.Ssh.UnitLibrary
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4315 — Move SSH transport layer into a shared Curl.Ssh.UnitLibrary
+# BL-4328 — Move SSH transport layer into a shared Curl.Ssh.UnitLibrary
 
 ## Goal
 

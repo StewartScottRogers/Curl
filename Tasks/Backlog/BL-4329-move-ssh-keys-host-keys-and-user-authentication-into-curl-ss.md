@@ -1,16 +1,16 @@
 ---
-id: BL-4316
+id: BL-4329
 title: Move SSH keys, host keys and user authentication into Curl.Ssh.UnitLibrary
 priority: Low
 assignee: Claude
 pipeline: direct
-depends-on: [BL-4315]
+depends-on: [BL-4328]
 touches: [Curl.Ssh.UnitLibrary/Keys, Curl.Ssh.UnitLibrary/HostKeys, Curl.Ssh.UnitLibrary/Authentication, Curl.Ssh.UnitTests/Keys, Curl.Ssh.UnitTests/HostKeys, Curl.Ssh.UnitTests/Authentication, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4316 — Move SSH keys, host keys and user authentication into Curl.Ssh.UnitLibrary
+# BL-4329 — Move SSH keys, host keys and user authentication into Curl.Ssh.UnitLibrary
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Second of three moves that give BL-4145's `--ssh-jump` extension an SSH client it may reference (ADR-0999). About 4,200 lines move with their tests (same folder names in `Curl.Protocol.Ssh.UnitTests`) into `Curl.Ssh.UnitTests`; namespaces become `Curl.Ssh.<Folder>`. Builds on BL-4315's project.
+Second of three moves that give BL-4145's `--ssh-jump` extension an SSH client it may reference (ADR-0999). About 4,200 lines move with their tests (same folder names in `Curl.Protocol.Ssh.UnitTests`) into `Curl.Ssh.UnitTests`; namespaces become `Curl.Ssh.<Folder>`. Builds on BL-4328's project.
 
 ## Acceptance criteria
 
