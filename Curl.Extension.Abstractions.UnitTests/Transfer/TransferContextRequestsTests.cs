@@ -19,6 +19,31 @@ public sealed class TransferContextRequestsTests
     }
 
     [TestMethod]
+    public void WithRequest_Body_IsSentAsTheHttpBodyAndPostData()
+    {
+        TransferContext own = new() { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), Http = new HttpRequestOptions() };
+
+        ITransferContext given = own.WithRequest(CurlUrl.Parse("http://example.com/dav/"), "PROPFIND", new byte[] { 2, 3 });
+
+        BytesBody body = (BytesBody)given.Http!.Body!;
+        CollectionAssert.AreEqual(new byte[] { 2, 3 }, body.Content.ToArray());
+        Assert.AreEqual("application/x-www-form-urlencoded", body.ContentType);
+        CollectionAssert.AreEqual(new byte[] { 2, 3 }, given.PostData!.Value.ToArray());
+        Assert.IsNull(own.Http.Body);
+    }
+
+    [TestMethod]
+    public void WithRequest_NoBody_KeepsTheHttpBodyItHas()
+    {
+        BytesBody ownBody = new(new byte[] { 9 }, "text/plain");
+        TransferContext own = new() { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), Http = new HttpRequestOptions { Body = ownBody } };
+
+        ITransferContext given = own.WithRequest(CurlUrl.Parse("http://example.com/other"), "GET", null);
+
+        Assert.AreSame(ownBody, given.Http!.Body);
+    }
+
+    [TestMethod]
     public void WithRequest_NoMethodOrBody_KeepsItsOwn()
     {
         TransferContext own = new() { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), PostData = new byte[] { 1 }, Http = new HttpRequestOptions { CustomMethod = "PUT" } };

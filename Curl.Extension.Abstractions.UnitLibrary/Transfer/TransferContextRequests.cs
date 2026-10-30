@@ -12,12 +12,17 @@ public static class TransferContextRequests
     /// <param name="url">The URL to send the request to.</param>
     /// <param name="method">The HTTP method, as <c>-X</c> gives it; <see langword="null" /> keeps the transfer's own. A transfer that is not HTTP has none to set.</param>
     /// <param name="body">The request body, as <c>--data-binary</c> gives it; <see langword="null" /> keeps the transfer's own.</param>
-    /// <returns>The same transfer with the URL, method and body replaced and every other member its own.</returns>
+    /// <returns>The same transfer with the URL, method and body replaced the HTTP body set to <paramref name="body" /> when given, and every other member its own.</returns>
     public static ITransferContext WithRequest(this ITransferContext context, CurlUrl url, string? method, ReadOnlyMemory<byte>? body)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(url);
         HttpRequestOptions? http = method is null || context.Http is null ? context.Http : context.Http with { CustomMethod = method };
+        if (body is { } bytes && http is not null)
+        {
+            http = http with { Body = new BytesBody(bytes, "application/x-www-form-urlencoded") };
+        }
+
         return new RetargetedTransferContext(context, url, http, body ?? context.PostData);
     }
 }

@@ -22,12 +22,14 @@ Found in BL-4131 (ADR-1149) by running `curl -v --webdav-list` against a loopbac
 
 ## Acceptance criteria
 
-- [ ] `WithRequest` with a non-null body gives a context whose `Http.Body` is a `BytesBody` of those bytes (content type `application/x-www-form-urlencoded`, as `--data-binary` sends; a `Content-Type` request header the hook adds still replaces it on the wire) and whose `PostData` is the same bytes; a null body keeps the transfer's own `Http.Body` and `PostData`.
-- [ ] A unit test in `Curl.Extension.Abstractions.UnitTests/Transfer/TransferContextRequestsTests.cs` checks both cases.
-- [ ] `Curl.Extension.Abstractions.UnitLibrary` meets the four quality gates by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `WithRequest` with a non-null body gives a context whose `Http.Body` is a `BytesBody` of those bytes (content type `application/x-www-form-urlencoded`, as `--data-binary` sends; a `Content-Type` request header the hook adds still replaces it on the wire) and whose `PostData` is the same bytes; a null body keeps the transfer's own `Http.Body` and `PostData`.
+- [x] A unit test in `Curl.Extension.Abstractions.UnitTests/Transfer/TransferContextRequestsTests.cs` checks both cases.
+- [x] `Curl.Extension.Abstractions.UnitLibrary` meets the four quality gates by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measure-CodeQuality.ps1 for the library: every member of my change passes. One member, CertificateCheckHooks.CheckedAsync (line 95, branch 91.67, Cx 12, from f34115c66), fails the gates; filed as BL-4357.
 
 ## Log
 
