@@ -8,7 +8,7 @@ depends-on: [BL-4091, BL-4093, BL-4094]
 touches: [Curl.Extension.SegmentedDownload.UnitLibrary, Curl.Extension.SegmentedDownload.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4128 — Extension: Download one file in parallel ranges with --segments
 
@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 2e9fbc2e 7ecafeca 93027b72 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Done. curl --segments <n> downloads a plain HTTP GET as n parallel byte ranges joined in order (RFC 9110 range requests)
