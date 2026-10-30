@@ -1,6 +1,6 @@
 # Curl.Extension.OpenTelemetry.UnitLibrary
 
-The OpenTelemetry tracing extension (ADR-0999, ADR-1122), tested against W3C Trace Context Level 1 and the OTLP
+The OpenTelemetry tracing extension (ADR-0999, ADR-1134), tested against W3C Trace Context Level 1 and the OTLP
 specification. Namespace `Curl.Extension.OpenTelemetry`. It references only `Curl.Extension.Abstractions.UnitLibrary`
 and the shared layers it brings.
 

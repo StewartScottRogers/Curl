@@ -5,7 +5,7 @@ using Curl.Extension.OpenTelemetry.TraceContext;
 namespace Curl.Extension.OpenTelemetry;
 
 /// <summary>
-/// The <c>--otel-endpoint</c> transfer hook (ADR-1122). Every HTTP transfer gets a client span: the hook sends its
+/// The <c>--otel-endpoint</c> transfer hook (ADR-1134). Every HTTP transfer gets a client span: the hook sends its
 /// <c>traceparent</c> (W3C Trace Context Level 1, §3.2), times the transfer on its <see cref="ITransferContext.TimeProvider" />,
 /// and exports the span to the OTLP/HTTP JSON traces endpoint. A <c>traceparent</c> <c>-H</c> already gave is left to it,
 /// and the span takes its trace-id and parent-id when it is valid. A failed export is a warning and never changes the

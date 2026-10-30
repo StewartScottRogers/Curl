@@ -1,4 +1,4 @@
-# ADR-1122 — --otel-endpoint sends a traceparent and exports each HTTP transfer's span as OTLP/HTTP JSON
+# ADR-1134 — --otel-endpoint sends a traceparent and exports each HTTP transfer's span as OTLP/HTTP JSON
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

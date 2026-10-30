@@ -6,7 +6,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.OpenTelemetry;
 
 /// <summary>
-/// The <c>--otel-endpoint</c> extension (ADR-1122): OpenTelemetry tracing of HTTP transfers. It sends a W3C Trace Context
+/// The <c>--otel-endpoint</c> extension (ADR-1134): OpenTelemetry tracing of HTTP transfers. It sends a W3C Trace Context
 /// <c>traceparent</c> with each HTTP request and exports the transfer's client span over OTLP/HTTP in JSON.
 /// <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
 /// </summary>

@@ -1178,4 +1178,4 @@ Each option and the specific reason it lost.
 | [1131](ADR-1131-dane-dnssec-verifies-rfc-8624-algorithms-and-treats-the-rest-as-insecure.md) | The Dane extension's DNSSEC verifier supports RFC 8624's algorithms and treats the rest as insecure (BL-4335) | Accepted | 2026-10-29 |
 | [1132](ADR-1132-grpc-web-sends-one-framed-message-and-checks-grpc-status.md) | --grpc-web sends one framed message and checks grpc-status (BL-4103) | Accepted | 2026-10-29 |
 | [1133](ADR-1133-grpc-extension-wire-format-follows-protocol-http2-md.md) | The gRPC extension's wire format follows grpc.io's PROTOCOL-HTTP2.md (BL-4340) | Accepted | 2026-10-29 |
-| [1122](ADR-1122-otel-endpoint-sends-traceparent-and-exports-each-http-transfer-span-as-otlp-json.md) | --otel-endpoint sends a traceparent and exports each HTTP transfer's span as OTLP/HTTP JSON (BL-4156) | Accepted | 2026-10-29 |
+| [1134](ADR-1134-otel-endpoint-sends-traceparent-and-exports-each-http-transfer-span-as-otlp-json.md) | --otel-endpoint sends a traceparent and exports each HTTP transfer's span as OTLP/HTTP JSON (BL-4156) | Accepted | 2026-10-29 |
