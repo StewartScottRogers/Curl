@@ -47,6 +47,14 @@ public sealed class OciTokenRequestBuilderTests
     }
 
     [TestMethod]
+    public void Build_AbsoluteRealmThatIsNotHttp_ReturnsNull()
+    {
+        var request = OciTokenRequestBuilder.Build(new OciBearerChallenge("file:///token", null, null), null);
+
+        Assert.IsNull(request);
+    }
+
+    [TestMethod]
     public void Build_NullChallenge_Throws()
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => OciTokenRequestBuilder.Build(null!, null));

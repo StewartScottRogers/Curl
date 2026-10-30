@@ -13,11 +13,11 @@ public static class OciTokenRequestBuilder
     /// <summary>Builds the request.</summary>
     /// <param name="challenge">The registry's challenge.</param>
     /// <param name="userAndPassword"><c>-u</c>'s <c>user:password</c>, or <see langword="null"/> for an anonymous token.</param>
-    /// <returns>The request, or <see langword="null"/> when the realm is not an absolute URL.</returns>
+    /// <returns>The request, or <see langword="null"/> when the realm is not an absolute <c>http</c> or <c>https</c> URL (a bare path such as <c>/token</c> parses as an absolute <c>file</c> URL on Linux and macOS).</returns>
     public static OciHttpRequest? Build(OciBearerChallenge challenge, string? userAndPassword)
     {
         ArgumentNullException.ThrowIfNull(challenge);
-        if (!Uri.TryCreate(challenge.Realm, UriKind.Absolute, out var realm))
+        if (!Uri.TryCreate(challenge.Realm, UriKind.Absolute, out var realm) || realm.Scheme is not ("http" or "https"))
         {
             return null;
         }
