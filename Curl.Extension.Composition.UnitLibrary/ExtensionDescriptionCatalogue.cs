@@ -13,6 +13,7 @@ internal static class ExtensionDescriptionCatalogue
     internal static IReadOnlyList<ExtensionDescription> Entries { get; } =
     [
         Curl.Extension.NamedPipe.NamedPipeExtension.Description,
+        Curl.Extension.VirtualMachineSocket.VirtualMachineSocketExtension.Description,
         GraphQl.GraphQlOptions.Description,
         Curl.Extension.JsonRpc.JsonRpcExtension.Description,
         Curl.Extension.WebSocketSubprotocols.WebSocketSubprotocolsExtension.Description,

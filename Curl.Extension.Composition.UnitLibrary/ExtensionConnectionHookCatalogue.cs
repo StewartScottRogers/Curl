@@ -17,5 +17,6 @@ public static class ExtensionConnectionHookCatalogue
     public static IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>> Entries { get; } =
     [
         Curl.Extension.NamedPipe.NamedPipeExtension.Activate,
+        Curl.Extension.VirtualMachineSocket.VirtualMachineSocketExtension.Activate,
     ];
 }
