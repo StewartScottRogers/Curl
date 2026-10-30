@@ -1,6 +1,6 @@
 # Curl.Extension.Har.UnitLibrary
 
-The `--har <file>` extension (ADR-0999, ADR-1127), tested against HAR 1.2 (W3C draft). Namespace
+The `--har <file>` extension (ADR-0999, ADR-1146), tested against HAR 1.2 (W3C draft). Namespace
 `Curl.Extension.Har`. It references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers it brings.
 
 - `HarExtension` gives the `--har` option, its description and its hook activator, which

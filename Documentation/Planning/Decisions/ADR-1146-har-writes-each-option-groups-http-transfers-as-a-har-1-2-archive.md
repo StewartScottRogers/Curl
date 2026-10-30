@@ -1,4 +1,4 @@
-# ADR-1127 — --har writes each option group's HTTP transfers as a HAR 1.2 archive
+# ADR-1146 — --har writes each option group's HTTP transfers as a HAR 1.2 archive
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

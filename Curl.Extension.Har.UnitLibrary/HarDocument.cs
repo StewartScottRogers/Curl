@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace Curl.Extension.Har;
 
 /// <summary>
-/// Writes an HTTP Archive, HAR 1.2 (W3C draft, ADR-1127): the <c>log</c> object with its <c>creator</c> and one
+/// Writes an HTTP Archive, HAR 1.2 (W3C draft, ADR-1146): the <c>log</c> object with its <c>creator</c> and one
 /// entry per transfer, each with the <c>request</c>, <c>response</c>, <c>cache</c> and <c>timings</c> objects
 /// the specification requires. A response the server never sent is written with status 0.
 /// </summary>

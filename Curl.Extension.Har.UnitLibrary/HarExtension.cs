@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.Har;
 
 /// <summary>
-/// The <c>--har &lt;file&gt;</c> extension (ADR-1127): writes the option group's HTTP transfers to a file as an
+/// The <c>--har &lt;file&gt;</c> extension (ADR-1146): writes the option group's HTTP transfers to a file as an
 /// HTTP Archive, HAR 1.2. <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
 /// </summary>
 public static class HarExtension

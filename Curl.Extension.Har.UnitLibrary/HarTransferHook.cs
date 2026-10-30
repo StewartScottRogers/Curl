@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.Har;
 
 /// <summary>
-/// The <c>--har &lt;file&gt;</c> transfer hook (ADR-1127). It copies each HTTP transfer's response body on its
+/// The <c>--har &lt;file&gt;</c> transfer hook (ADR-1146). It copies each HTTP transfer's response body on its
 /// way to curl's output, and when the transfer ends adds an entry to the archive (HAR 1.2, "entries") and
 /// writes the whole archive to the file again, so the file always holds every transfer of the option group so
 /// far. A transfer that is not HTTP passes through unrecorded. A file that cannot be written fails the
