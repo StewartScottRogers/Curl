@@ -1,6 +1,6 @@
 # Curl.Extension.Grpc.UnitLibrary
 
-The gRPC extension (ADR-0999, ADR-1130): calling a gRPC method over HTTP/2 as grpc.io's
+The gRPC extension (ADR-0999, ADR-1133): calling a gRPC method over HTTP/2 as grpc.io's
 PROTOCOL-HTTP2.md specifies. It sits in `/Extensions/Grpc/` in `Curl.slnx` and references only
 `Curl.Protocol.Abstractions.UnitLibrary` and `Curl.Extension.Abstractions.UnitLibrary`; the client
 flow may add the shared `Curl.Http2.UnitLibrary` and `Curl.Protobuf.UnitLibrary`. It never

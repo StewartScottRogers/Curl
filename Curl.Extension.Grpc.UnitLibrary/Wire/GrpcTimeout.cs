@@ -23,7 +23,7 @@ internal static class GrpcTimeout
 
     /// <summary>
     /// Formats <paramref name="timeout" /> in the finest unit whose value fits in 8 digits, rounding
-    /// up so the server never sees a shorter deadline than the client asked for (ADR-1130). A timeout
+    /// up so the server never sees a shorter deadline than the client asked for (ADR-1133). A timeout
     /// past 99999999 hours is written as that maximum.
     /// </summary>
     /// <param name="timeout">The time the call may take; never negative.</param>

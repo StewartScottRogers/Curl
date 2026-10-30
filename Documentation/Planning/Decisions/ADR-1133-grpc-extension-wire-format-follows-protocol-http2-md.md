@@ -1,4 +1,4 @@
-# ADR-1130: The gRPC extension's wire format follows grpc.io's PROTOCOL-HTTP2.md
+# ADR-1133: The gRPC extension's wire format follows grpc.io's PROTOCOL-HTTP2.md
 
 - Status: Accepted
 - Date: 2026-10-29

@@ -32,7 +32,7 @@ First of three parts of BL-4102 (split for size; then BL-4341 client flow, BL-43
 
 ## Notes
 
-- Delivered directly rather than through the full `/feature` subagent stages: a self-contained wire layer in a new library, and the run's cost cap would not hold five subagents. Decisions in ADR-1130 (1129 was taken on the shared branch).
+- Delivered directly rather than through the full `/feature` subagent stages: a self-contained wire layer in a new library, and the run's cost cap would not hold five subagents. Decisions in ADR-1133 (1129 was taken on the shared branch).
 - `Wire/`: `GrpcRequestHeaders` + `GrpcRequestTarget` + `GrpcTimeout` (finest unit within 8 digits, rounded up); `LengthPrefixedMessage` (frame) and `LengthPrefixedMessageReader` (split reads, several per read, truncation/bad flag/over-long as `GrpcWireException`, 4 MiB default limit); `GrpcResponseHeaders` (Trailers-Only, HTTP status mapping per http-grpc-status-mapping.md, content-type check, trailers), `GrpcStatus`/`GrpcStatusCode` (statuscodes.md names), `GrpcStatusMessage` (lenient percent-decoding).
 - The library references only Protocol.Abstractions and Extension.Abstractions so far; BL-4341 adds Http2/Protobuf when it needs them. Header lists are `KeyValuePair<string, string>`.
 - Measure-CodeQuality.ps1 -Library Curl.Extension.Grpc.UnitLibrary: 100% line, 100% branch, max complexity 8, 0 failing members. 80 tests in Curl.Extension.Grpc.UnitTests; full build clean, fast tests green. All tests are pure in-memory, platform-neutral, so CI on Linux and macOS is covered.

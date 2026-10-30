@@ -9,7 +9,7 @@ namespace Curl.Extension.Grpc.Wire;
 /// </summary>
 internal sealed class LengthPrefixedMessageReader
 {
-    /// <summary>The longest message read by default, 4 MiB, the limit gRPC's own clients receive (ADR-1130).</summary>
+    /// <summary>The longest message read by default, 4 MiB, the limit gRPC's own clients receive (ADR-1133).</summary>
     public const int DefaultMaximumMessageLength = 4 * 1024 * 1024;
 
     private readonly int maximumMessageLength;
