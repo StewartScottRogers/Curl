@@ -1,4 +1,4 @@
-# ADR-1131 — Certificate checks get the port the checking connector opened the connection to
+# ADR-1141 — Certificate checks get the port the checking connector opened the connection to
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

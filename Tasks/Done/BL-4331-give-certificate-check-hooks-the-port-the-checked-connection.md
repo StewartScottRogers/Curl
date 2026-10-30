@@ -31,7 +31,7 @@ DANE (BL-4151) looks up TLSA records at `_<port>._tcp.<host>` (RFC 6698 section 
 
 - Filed by BL-4151's run on 2026-10-29: the DANE check needs the port and the hook does not carry it.
 - 2026-10-30 (lane 3): two extensions now implement the hook (Certificate Transparency BL-4152, ML-DSA certificates), so their hook and test files were added to touches; no task in Doing on origin/work/dark-factory names them. They take the new parameter and ignore it.
-- Decision (ADR-1131): the hook takes int? port. The connector path passes ConnectTarget.Port; CertificateCheckHooks keeps each connection the checking connector returned in a ConditionalWeakTable with its target, and the TLS provider path passes that target's port for the plaintext connection, or null when the checking connector did not open it. The plaintext RemoteEndPoint was rejected: through a proxy tunnel it is the proxy's port.
+- Decision (ADR-1141): the hook takes int? port. The connector path passes ConnectTarget.Port; CertificateCheckHooks keeps each connection the checking connector returned in a ConditionalWeakTable with its target, and the TLS provider path passes that target's port for the plaintext connection, or null when the checking connector did not open it. The plaintext RemoteEndPoint was rejected: through a proxy tunnel it is the proxy's port.
 - Pipeline feature run directly: the change is one signature and one lookup in one library, so no architect stage was needed.
 - Verified: dotnet build clean (0 warnings); fast tests green in all 100 test projects; Measure-CodeQuality.ps1 for Abstractions, CertificateTransparency and MlDsaCertificates: 0 failing members.
 
@@ -39,4 +39,4 @@ DANE (BL-4151) looks up TLSA records at `_<port>._tcp.<host>` (RFC 6698 section 
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: aa0b566e c0b425b0 e7c4212f 3d836d5e.
-- 2026-10-30: Doing -> Done. Certificate check hooks get the port: ConnectTarget.Port on connect, the checking connector's remembered port (or null) on STARTTLS (ADR-1131)
+- 2026-10-30: Doing -> Done. Certificate check hooks get the port: ConnectTarget.Port on connect, the checking connector's remembered port (or null) on STARTTLS (ADR-1141)

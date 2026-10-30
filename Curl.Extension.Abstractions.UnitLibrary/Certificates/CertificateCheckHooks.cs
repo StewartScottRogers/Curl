@@ -41,7 +41,7 @@ public sealed class CertificateCheckHooks
 
     /// <summary>
     /// Keeps the port of each connection the checking connector opened, so an in-place upgrade of it is
-    /// checked with that port (ADR-1131). Weak, so a connection's entry goes with the connection.
+    /// checked with that port (ADR-1141). Weak, so a connection's entry goes with the connection.
     /// </summary>
     private readonly ConditionalWeakTable<IConnection, ConnectTarget> _targetsOfConnections = new();
 

@@ -4,7 +4,7 @@ namespace Curl.Extension.Abstractions.Certificates;
 /// Opens connections through curl's connector and puts the chain of each TLS connection it opened through
 /// the activated certificate checks (ADR-1016). A QUIC connection's chain is not reported to it, so a
 /// multiplexed connect passes through unchecked. Each connection it opened keeps its target's port, so an in-place
-/// upgrade of it later is checked with that port (ADR-1131).
+/// upgrade of it later is checked with that port (ADR-1141).
 /// </summary>
 /// <param name="inner">curl's connector.</param>
 /// <param name="hooks">The activated checks.</param>
