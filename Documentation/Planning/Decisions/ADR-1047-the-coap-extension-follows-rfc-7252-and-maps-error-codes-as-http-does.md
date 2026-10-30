@@ -14,9 +14,18 @@ match, so these choices follow the nearest curl behaviour, HTTP's.
 
 ## Decision
 
-- **Scheme and version.** The extension serves `coap` alone, UDP port 5683 by default, and follows RFC 7252
-  (CoAP version 1). `coaps` (DTLS 1.2, RFC 7252 section 9) comes with BL-4252, block-wise transfer of large
-  bodies (RFC 7959) with BL-4247, and observing a resource (RFC 7641) with BL-4248.
+- **Scheme and version.** The extension serves `coap`, UDP port 5683 by default, and `coaps`, port 5684 by
+  default, and follows RFC 7252 (CoAP version 1); block-wise transfer of large bodies (RFC 7959) is ADR-1057
+  and observing a resource (RFC 7641) ADR-1064.
+- **coaps** (RFC 7252 section 9.1, BL-4252). `coaps://` runs the same requests, block-wise transfers and
+  observations as `coap://` over DTLS 1.2 (RFC 6347) in certificate mode (section 9.1.3.3): the handshake of
+  ADR-1078, whose server chain curl's TLS provider verifies under curl's trust settings, so an untrusted
+  certificate fails with exit 60 and `-k` accepts it, as for `https://`; each CoAP message is then one protected
+  application data record. Decided by Claude under Stewart's delegation. Left out: DTLS 1.0 and 1.3 (RFC 7252
+  names DTLS 1.2, and every CoAP stack in use speaks it), PreSharedKey and RawPublicKey modes (section 9.1.3.1
+  and 9.1.3.2: curl has no option to give a pre-shared key identity or a raw public key to pin, and inventing
+  one would add options curl does not have; certificate mode needs none), and session resumption (each curl
+  run makes one association).
 - **Request.** One confirmable request: GET, or POST when `-d` (or an empty `-d ''`) is given, or the method
   `-X` names: `GET`, `POST`, `PUT` or `DELETE`, exactly as written. Any other `-X` fails with exit 2
   (`CURLE_FAILED_INIT`) before any datagram is sent: RFC 7252 defines no other method. The `-d` data is the
@@ -45,7 +54,6 @@ match, so these choices follow the nearest curl behaviour, HTTP's.
 
 ## Consequences
 
-`curl coap://host/path` works as a plain GET client and lists in `curl --extensions` and
-`curl --ai-help extensions`. Options and payloads larger than one datagram need BL-4247; `coaps://` needs
-BL-4252; `Observe` needs BL-4248. With `CURL_EXTENSIONS=0` the scheme is unknown and fails as curl fails one
-(exit 1, `Protocol "coap" not supported`).
+`curl coap://host/path` and `curl coaps://host/path` work as a CoAP client and list in `curl --extensions` and
+`curl --ai-help extensions`. With `CURL_EXTENSIONS=0` either scheme is unknown and fails as curl fails one
+(exit 1, `Protocol "coap" not supported` or `Protocol "coaps" not supported`).

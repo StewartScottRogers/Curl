@@ -11,9 +11,9 @@ public sealed class CoapExtensionTests
     private static readonly ProtocolHandlerServices Services = new(null!, new ScriptedDatagramConnector(DatagramOpenResult.Failed(CurlExitCode.CouldntConnect, "x")), null!, null!);
 
     [TestMethod]
-    public void Description_NamesTheCoapScheme()
+    public void Description_NamesTheCoapAndCoapsSchemes()
     {
-        CollectionAssert.AreEqual(new[] { "coap" }, CoapExtension.Description.Schemes.ToArray());
+        CollectionAssert.AreEqual(new[] { "coap", "coaps" }, CoapExtension.Description.Schemes.ToArray());
         Assert.AreEqual("coap", CoapExtension.Description.Name);
     }
 
@@ -37,14 +37,16 @@ public sealed class CoapExtensionTests
     }
 
     [TestMethod]
-    public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme()
+    [DataRow("coap")]
+    [DataRow("coaps")]
+    public async Task Dispatch_WithCurlExtensions0_FailsAsCurlFailsAnUnsupportedScheme(string scheme)
     {
         Assert.IsNull(ExtensionProtocolHandlers.For(name => name == "CURL_EXTENSIONS" ? "0" : null));
         ProtocolDispatcher dispatcher = new([]);
 
-        TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse("coap://example.com/"), Output = new MemoryStream() });
+        TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse($"{scheme}://example.com/"), Output = new MemoryStream() });
 
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
-        Assert.AreEqual("Protocol \"coap\" not supported", result.ErrorMessage);
+        Assert.AreEqual($"Protocol \"{scheme}\" not supported", result.ErrorMessage);
     }
 }

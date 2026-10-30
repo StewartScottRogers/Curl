@@ -11,6 +11,12 @@ internal static class CoapRequest
     /// <summary>The default port of the <c>coap</c> scheme (RFC 7252 section 6.1).</summary>
     public const int DefaultPort = 5683;
 
+    /// <summary>The default port of the <c>coaps</c> scheme (RFC 7252 section 6.2).</summary>
+    public const int SecureDefaultPort = 5684;
+
+    /// <summary>The scheme of CoAP over DTLS (RFC 7252 section 6.2).</summary>
+    public const string SecureScheme = "coaps";
+
     private static readonly Dictionary<string, CoapCode> Methods = new(StringComparer.Ordinal)
     {
         ["GET"] = CoapCode.Get,
@@ -19,10 +25,15 @@ internal static class CoapRequest
         ["DELETE"] = CoapCode.Delete,
     };
 
-    /// <summary>Gives the UDP port a URL names: its port, else 5683.</summary>
+    /// <summary>Gives the UDP port a URL names: its port, else 5684 for <c>coaps</c> and 5683 for <c>coap</c>.</summary>
     /// <param name="url">The URL.</param>
     /// <returns>The port.</returns>
-    public static int PortOf(CurlUrl url) => url.Port >= 0 ? url.Port : DefaultPort;
+    public static int PortOf(CurlUrl url) => url.Port >= 0 ? url.Port : IsSecure(url) ? SecureDefaultPort : DefaultPort;
+
+    /// <summary>Tells whether a URL is <c>coaps</c>, CoAP over DTLS.</summary>
+    /// <param name="url">The URL.</param>
+    /// <returns><see langword="true" /> for a <c>coaps</c> URL.</returns>
+    public static bool IsSecure(CurlUrl url) => string.Equals(url.Scheme, SecureScheme, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Gives the request method: <c>-X</c>'s method when given, else POST with <c>-d</c>, else GET.

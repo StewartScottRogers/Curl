@@ -9,8 +9,8 @@ registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDes
 `Client/` (namespace `Curl.Extension.Coap.Client`, ADR-1047) makes requests over UDP:
 
 - `CoapExtension` is the description `curl --extensions` lists and the handler factory, over
-  `ProtocolHandlerServices.DatagramConnector`.
-- `CoapProtocolHandler` sends a confirmable request (block-wise through `Blockwise/` when the payload or response needs it) to port 5683 (or the URL's port) and writes the
+  `ProtocolHandlerServices.DatagramConnector` and `ProtocolHandlerServices.TlsProvider`, for `coap` and `coaps`.
+- `CoapProtocolHandler` sends a confirmable request (block-wise through `Blockwise/` when the payload or response needs it) to port 5683, 5684 for `coaps` (or the URL's port), over `Secure/` for `coaps`, and writes the
   response payload. A 4.xx or 5.xx response ends with exit 0, or exit 22 under `-f` and
   `--fail-with-body`; `-i` writes `CoAP/1.0 c.dd` before the payload.
 - `CoapRequest` gives the method (GET, POST with `-d`, PUT with `-T`, or `-X` GET, POST, PUT or DELETE; any other is
@@ -20,10 +20,15 @@ registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDes
   by token (sections 5.2 and 5.3), acknowledges a confirmable separate response, and fails with exit 56
   on a Reset.
 
+`Secure/` (namespace `Curl.Extension.Coap.Secure`, ADR-1047) secures `coaps://` (RFC 7252 section 9.1):
+`DtlsDatagramChannel` runs the `Dtls/Handshake` client handshake over the UDP channel (which the handler disposes,
+whether or not the handshake succeeds) and then carries each CoAP datagram as one protected application data record, so `CoapExchange`,
+`Blockwise/` and `Observe/` run over it unchanged.
+
 `Observe/` (namespace `Curl.Extension.Coap.Observe`, ADR-1064) observes a resource (RFC 7641):
 
 - `CoapObserveTransferHook` declares `--coap-observe`, registered in `ExtensionOptionCatalogue.cs` and
-  `ExtensionTransferHookCatalogue.cs`, and hands a `coap://` transfer on as a `CoapObserveContext`, which
+  `ExtensionTransferHookCatalogue.cs`, and hands a `coap://` or `coaps://` transfer on as a `CoapObserveContext`, which
   forwards the transfer's own context and tells `CoapProtocolHandler` to observe.
 - `CoapObservation` adds Observe 0 to the GET; when the answer is a 2.xx with Observe, writes it and each later
   notification (payload, then a newline; under `-i` a `CoAP/1.0 c.dd` line first), drops one
@@ -102,6 +107,6 @@ resends them on a timer that starts at 1 second and doubles up to 60 seconds on 
   handshake fragments, dropping what does not parse.
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.Coap.UnitTests/Blockwise`, `Curl.Extension.Coap.UnitTests/Observe`,
-`Curl.Extension.Coap.UnitTests/Wire`, `Curl.Extension.Coap.UnitTests/Client`, `Curl.Extension.Coap.UnitTests/Dtls/Wire`,
+`Curl.Extension.Coap.UnitTests/Wire`, `Curl.Extension.Coap.UnitTests/Client`, `Curl.Extension.Coap.UnitTests/Secure`, `Curl.Extension.Coap.UnitTests/Dtls/Wire`,
 `Curl.Extension.Coap.UnitTests/Dtls/Record`, `Curl.Extension.Coap.UnitTests/Dtls/Retransmission` and
 `Curl.Extension.Coap.UnitTests/Dtls/Handshake` (which runs the client against `Dtls/TestServer`).

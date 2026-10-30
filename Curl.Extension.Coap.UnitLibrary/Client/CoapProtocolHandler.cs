@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Extension.Coap.Blockwise;
 using Curl.Extension.Coap.Observe;
+using Curl.Extension.Coap.Secure;
 using Curl.Extension.Coap.Wire;
 using Curl.Protocol.Abstractions;
 
@@ -13,10 +14,12 @@ namespace Curl.Extension.Coap.Client;
 /// does, or with exit 22 under <c>-f</c> or <c>--fail-with-body</c>. <c>-i</c> writes the response code
 /// as a header line before the payload, and <c>-v</c> reports it. Under <c>--coap-observe</c> the request
 /// registers an observation and the handler writes each notification (RFC 7641, ADR-1064).
+/// <c>coaps://</c> runs the same requests over DTLS 1.2 to port 5684 (RFC 7252 section 9.1, ADR-1042).
 /// </summary>
 /// <param name="connector">Opens the datagram channel to the server.</param>
 /// <param name="randomBytes">Gives the given number of random bytes, for the Message ID, the token and the timeout's random factor.</param>
-internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int, byte[]> randomBytes) : IProtocolHandler
+/// <param name="tlsProvider">Verifies a <c>coaps://</c> server's certificate chain under curl's trust settings.</param>
+internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int, byte[]> randomBytes, ITlsProvider tlsProvider) : IProtocolHandler
 {
     /// <summary>ACK_TIMEOUT (RFC 7252 section 4.8).</summary>
     public static readonly TimeSpan AcknowledgementTimeout = TimeSpan.FromSeconds(2);
@@ -24,7 +27,7 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
     private const int TokenLength = 4;
 
     /// <inheritdoc />
-    public IReadOnlyCollection<string> SupportedSchemes { get; } = ["coap"];
+    public IReadOnlyCollection<string> SupportedSchemes { get; } = ["coap", CoapRequest.SecureScheme];
 
     /// <inheritdoc />
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
@@ -53,26 +56,44 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
     {
         CoapMessage request = await RequestOfAsync(context).ConfigureAwait(false);
         DatagramOpenResult open = await connector.OpenAsync(context.Url.IdnHost, CoapRequest.PortOf(context.Url), context.CancellationToken).ConfigureAwait(false);
-        if (open.Channel is not { } channel)
+        if (open.Channel is not { } transport)
         {
             return new TransferResult(open.ExitCode, 0, open.ErrorMessage);
         }
 
-        await using (channel.ConfigureAwait(false))
+        await using (transport.ConfigureAwait(false))
         {
-            context.Progress.ReportTransferStarted();
-            var exchange = new CoapExchange(channel, context.TimeProvider);
-            TimeSpan initialTimeout = InitialTimeoutOf(randomBytes(1)[0]);
-            if (context is CoapObserveContext)
-            {
-                CoapMessage registration = CoapObservation.RegistrationOf(request);
-                return await ObserveAsync(context, channel, registration, exchange.RunAsync(registration, initialTimeout, context.CancellationToken)).ConfigureAwait(false);
-            }
-
-            CoapMessage response = await new CoapBlockwiseTransfer((message, stop) => exchange.RunAsync(message, initialTimeout, stop))
-                .RunAsync(request, context.CancellationToken).ConfigureAwait(false);
-            return await WriteResponseAsync(context, response).ConfigureAwait(false);
+            return CoapRequest.IsSecure(context.Url)
+                ? await SecureExchangeAsync(context, transport, request).ConfigureAwait(false)
+                : await ExchangeAsync(context, transport, request).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>Runs the DTLS 1.2 handshake over <paramref name="transport" /> and the exchange over the secured channel (RFC 7252 section 9.1).</summary>
+    private async ValueTask<TransferResult> SecureExchangeAsync(ITransferContext context, IDatagramChannel transport, CoapMessage request)
+    {
+        DtlsDatagramChannel secured = await DtlsDatagramChannel.OpenAsync(transport, tlsProvider, context.Url.IdnHost, context.TimeProvider, context.CancellationToken).ConfigureAwait(false);
+        await using (secured.ConfigureAwait(false))
+        {
+            return await ExchangeAsync(context, secured, request).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Sends <paramref name="request" /> over <paramref name="channel" />, block-wise or as an observation, and writes the response.</summary>
+    private async ValueTask<TransferResult> ExchangeAsync(ITransferContext context, IDatagramChannel channel, CoapMessage request)
+    {
+        context.Progress.ReportTransferStarted();
+        var exchange = new CoapExchange(channel, context.TimeProvider);
+        TimeSpan initialTimeout = InitialTimeoutOf(randomBytes(1)[0]);
+        if (context is CoapObserveContext)
+        {
+            CoapMessage registration = CoapObservation.RegistrationOf(request);
+            return await ObserveAsync(context, channel, registration, exchange.RunAsync(registration, initialTimeout, context.CancellationToken)).ConfigureAwait(false);
+        }
+
+        CoapMessage response = await new CoapBlockwiseTransfer((message, stop) => exchange.RunAsync(message, initialTimeout, stop))
+            .RunAsync(request, context.CancellationToken).ConfigureAwait(false);
+        return await WriteResponseAsync(context, response).ConfigureAwait(false);
     }
 
     /// <summary>

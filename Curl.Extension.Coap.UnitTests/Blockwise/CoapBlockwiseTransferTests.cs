@@ -208,7 +208,7 @@ public sealed class CoapBlockwiseTransferTests
     }
 
     private static CoapProtocolHandler Handler(ScriptedDatagramChannel channel) =>
-        new(new ScriptedDatagramConnector(DatagramOpenResult.Opened(channel)), length => new byte[length]);
+        new(new ScriptedDatagramConnector(DatagramOpenResult.Opened(channel)), length => new byte[length], null!);
 
     private static TransferContext Context(string url, Stream output, string? method = null, byte[]? data = null, byte[]? upload = null) => new()
     {

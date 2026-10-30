@@ -295,8 +295,8 @@ public sealed class CoapProtocolHandlerTests
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await Handler(new ScriptedDatagramChannel((_, _) => [])).ExecuteAsync(null!));
 
     [TestMethod]
-    public void SupportedSchemes_IsCoap() =>
-        CollectionAssert.AreEqual(new[] { "coap" }, Handler(new ScriptedDatagramChannel((_, _) => [])).SupportedSchemes.ToArray());
+    public void SupportedSchemes_AreCoapAndCoaps() =>
+        CollectionAssert.AreEqual(new[] { "coap", "coaps" }, Handler(new ScriptedDatagramChannel((_, _) => [])).SupportedSchemes.ToArray());
 
     [TestMethod]
     [DataRow((byte)0, 2000.0)]
@@ -316,7 +316,7 @@ public sealed class CoapProtocolHandlerTests
         Handler(new ScriptedDatagramConnector(DatagramOpenResult.Opened(channel)));
 
     private static CoapProtocolHandler Handler(ScriptedDatagramConnector connector) =>
-        new(connector, length => new byte[length]);
+        new(connector, length => new byte[length], null!);
 
     private static TransferContext Context(string url, Stream output, string? method = null, byte[]? data = null, ImmediateTimeProvider? clock = null) => new()
     {

@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Coap.Observe;
 
-/// <summary>Checks the <c>--coap-observe</c> option: activated only when given, and marking only <c>coap://</c> transfers.</summary>
+/// <summary>Checks the <c>--coap-observe</c> option: activated only when given, and marking only <c>coap://</c> and <c>coaps://</c> transfers.</summary>
 [TestClass]
 public sealed class CoapObserveTransferHookTests
 {
@@ -26,8 +26,9 @@ public sealed class CoapObserveTransferHookTests
     [TestMethod]
     [DataRow("coap://h/r", true)]
     [DataRow("COAP://h/r", true)]
+    [DataRow("coaps://h/r", true)]
     [DataRow("http://h/r", false)]
-    public async Task ExecuteAsync_ATransfer_MarksItOnlyWhenItIsCoap(string url, bool marked)
+    public async Task ExecuteAsync_ATransfer_MarksItOnlyWhenItIsCoapOrCoaps(string url, bool marked)
     {
         ITransferHook hook = CoapObserveTransferHook.ActivatedBy(new ExtensionOptionValues(new Dictionary<string, string> { ["coap-observe"] = "" }))!;
         var context = new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream() };

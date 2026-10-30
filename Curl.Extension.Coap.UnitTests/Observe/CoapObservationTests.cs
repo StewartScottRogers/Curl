@@ -249,7 +249,7 @@ public sealed class CoapObservationTests
         new((count, sent) => count == 1 ? repliesToRegistration(sent) : []);
 
     private static CoapProtocolHandler Handler(ScriptedDatagramChannel channel) =>
-        new(new ScriptedDatagramConnector(DatagramOpenResult.Opened(channel)), length => new byte[length]);
+        new(new ScriptedDatagramConnector(DatagramOpenResult.Opened(channel)), length => new byte[length], null!);
 
     private static CoapObserveContext Observed(Stream output, TimeProvider? clock = null) =>
         new(new TransferContext { Url = CurlUrl.Parse("coap://h/r"), Output = output, TimeProvider = clock ?? new SteppingTimeProvider(TimeSpan.Zero) });

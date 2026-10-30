@@ -105,6 +105,9 @@ internal sealed class DtlsTestServer : IDisposable
     /// <summary>Gets the application data the server has decrypted, in arrival order.</summary>
     public List<byte[]> ReceivedApplicationData { get; } = [];
 
+    /// <summary>Gets or sets the plaintext the server answers each application data record with; by default it echoes the record.</summary>
+    public Func<byte[], byte[]> AnswerApplicationData { get; set; } = plaintext => plaintext;
+
     /// <summary>Makes the server send nothing the next time it would send <paramref name="flight" />; it still remembers the flight for a retransmission.</summary>
     public void DropNextFlight(DtlsServerFlight flight) => flightsToDrop.Add(flight);
 
@@ -267,7 +270,7 @@ internal sealed class DtlsTestServer : IDisposable
         if (header.ContentType == TlsContentType.ApplicationData)
         {
             ReceivedApplicationData.Add(plaintext);
-            return [protector.Protect(TlsContentType.ApplicationData, plaintext)];
+            return [protector.Protect(TlsContentType.ApplicationData, AnswerApplicationData(plaintext))];
         }
 
         return header.ContentType == TlsContentType.Handshake ? ReceiveClientFinished(plaintext) : [];
