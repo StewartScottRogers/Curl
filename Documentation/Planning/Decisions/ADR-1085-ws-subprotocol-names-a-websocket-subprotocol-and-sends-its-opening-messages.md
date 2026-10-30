@@ -1,4 +1,4 @@
-# ADR-1082: --ws-subprotocol names a WebSocket subprotocol and sends its opening messages
+# ADR-1085: --ws-subprotocol names a WebSocket subprotocol and sends its opening messages
 
 - Status: Accepted
 - Date: 2026-10-29

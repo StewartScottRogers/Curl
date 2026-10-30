@@ -1,6 +1,6 @@
 # Curl.Extension.WebSocketSubprotocols.UnitLibrary
 
-The `--ws-subprotocol` extension (ADR-0999, ADR-1082): speaks graphql-transport-ws, WAMP (basic profile, JSON) or
+The `--ws-subprotocol` extension (ADR-0999, ADR-1085): speaks graphql-transport-ws, WAMP (basic profile, JSON) or
 STOMP 1.2 over curl's WebSocket. Namespace `Curl.Extension.WebSocketSubprotocols`. Tested against those
 specifications, not against curl.
 

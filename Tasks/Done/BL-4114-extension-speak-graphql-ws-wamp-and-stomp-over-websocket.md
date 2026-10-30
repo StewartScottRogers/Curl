@@ -54,7 +54,7 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29 (lane 1, resumed): the first criterion's "registered by one line in `ExtensionCatalogue.cs`" is met
   by the transfer hook extension's registration instead: one line each in the option, description and transfer
   hook catalogues, as `--jsonrpc` does (ADR-1028); `--ws-subprotocol` adds no URL scheme, so
-  `ExtensionCatalogue.cs` (protocol handler factories) has nothing to register (ADR-1082). The build's isolation
+  `ExtensionCatalogue.cs` (protocol handler factories) has nothing to register (ADR-1085). The build's isolation
   check passes.
 - Quality: `Measure-CodeQuality.ps1` for `Curl.Extension.WebSocketSubprotocols.UnitLibrary` (100% line and branch,
   highest complexity 10, 0 failing) and `Curl.Extension.Composition.UnitLibrary` (100/100, 0 failing).

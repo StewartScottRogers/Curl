@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.WebSocketSubprotocols;
 
 /// <summary>
-/// The <c>--ws-subprotocol</c> extension (ADR-1082): names a WebSocket subprotocol for a ws or wss transfer and
+/// The <c>--ws-subprotocol</c> extension (ADR-1085): names a WebSocket subprotocol for a ws or wss transfer and
 /// sends that subprotocol's opening messages (graphql-transport-ws, WAMP basic profile, STOMP 1.2), one text frame
 /// each. <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
 /// </summary>

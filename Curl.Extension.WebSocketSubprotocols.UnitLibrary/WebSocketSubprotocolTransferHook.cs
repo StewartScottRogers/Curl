@@ -5,7 +5,7 @@ using Curl.WebSocket;
 namespace Curl.Extension.WebSocketSubprotocols;
 
 /// <summary>
-/// What <c>--ws-subprotocol</c> does to a ws or wss transfer (ADR-1082): asks for the subprotocol with
+/// What <c>--ws-subprotocol</c> does to a ws or wss transfer (ADR-1085): asks for the subprotocol with
 /// <c>Sec-WebSocket-Protocol</c> (RFC 6455 §4.1) and uploads its opening messages in place of any <c>-d</c> or
 /// <c>-T</c> upload, one text frame each (<see cref="WsMessageUploadStream" />). The messages go out once the
 /// upgrade is accepted, without waiting for the server's answer to the first. Any other transfer runs unchanged;
