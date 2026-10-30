@@ -54,6 +54,22 @@ public sealed class ExtensionCommandLineOptionsTests
     }
 
     [TestMethod]
+    [DataRow(null)]
+    [DataRow("")]
+    [DataRow("--cache-dir")]
+    [DataRow("-x")]
+    [DataRow("cache=dir")]
+    public void Checked_AnOptionNameTheParserCouldNeverMatch_FailsNamingTheOption(string? name)
+    {
+        ExtensionOption unmatchable = new(name!, ExtensionOptionArgument.Value, "Unmatchable");
+
+        InvalidOperationException failure = Assert.ThrowsExactly<InvalidOperationException>(
+            () => ExtensionCommandLineOptions.Checked([unmatchable], _ => false));
+
+        StringAssert.Contains(failure.Message, $"\"{name}\" (\"Unmatchable\")");
+    }
+
+    [TestMethod]
     public void Checked_TwoOptionsOfOneName_FailsNamingBoth()
     {
         ExtensionOption otherCacheDirectory = new("cache-dir", ExtensionOptionArgument.Value, "Cache in <dir> too");
