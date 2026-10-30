@@ -32,3 +32,4 @@ BL-4147 (ADR-1159) gives each connection one transport session; `WireGuardTransp
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: b22b485f 0cba0a1a 8d6b4c2f 3d836d5e.
