@@ -4,8 +4,8 @@ title: Extension: Send requests through an Oblivious HTTP relay
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094, BL-4100]
-touches: [Curl.Extension.ObliviousHttp.UnitLibrary, Curl.Extension.ObliviousHttp.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4100, BL-4303, BL-4308, BL-4309, BL-4310]
+touches: [Curl.Extension.ObliviousHttp.UnitLibrary, Curl.Extension.ObliviousHttp.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,12 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 5, first pass before any code): split for size. The wire format is three tasks: BL-4308 (project scaffold and HPKE base mode, RFC 9180, using the shared `Curl.Cryptography.X25519`), BL-4309 (Binary HTTP, RFC 9292) and BL-4310 (key configurations and encapsulation, RFC 9458 sections 3 and 4, RFC 9540 section 3). What is left here is the client flow: a transfer hook that encodes the user's request, POSTs it as `message/ohttp-req` to the relay, decapsulates the `message/ohttp-res` answer and writes the inner response; the options naming the relay and the key config (a file, or fetched from the gateway per RFC 9540); the catalogue lines, description, `--ai-help`, ADR and the `CURL_EXTENSIONS=0` tests.
+- The POST to the relay needs a hook context with another URL, method and body, which BL-4303 (in Doing) adds as `TransferContextRequests.WithRequest`; so this task waits on it rather than writing its own `ITransferContext`.
+- Touches gained `ExtensionOptionCatalogue.cs`, `ExtensionDescriptionCatalogue.cs` and `ExtensionTransferHookCatalogue.cs`: an option-driven transfer hook registers there (as HttpCache and OAuth2 do), not in `ExtensionCatalogue.cs`. All three are shared list files, so they overlap no task.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 0ccaeafb c14da2cb 82b195bf e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Split for size into BL-4308, BL-4309 and BL-4310 (HPKE, Binary HTTP, encapsulation); also waits on BL-4303 for the relay POST context
