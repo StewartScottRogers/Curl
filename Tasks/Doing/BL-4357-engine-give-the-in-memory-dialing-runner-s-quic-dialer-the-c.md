@@ -24,14 +24,16 @@ BL-4355 (WireGuard UDP inside the tunnel) needs this for its unit test that runs
 
 ## Acceptance criteria
 
-- [ ] With an `EngineDialing` and a connection hook whose datagram connector differs from curl's, the QUIC dialer opens its channel through the hook's connector, checked by a unit test in `EngineCompositionTests.QuicThroughExtension.cs`.
-- [ ] Without a hook, or with a hook that keeps curl's connector, the QUIC dialer still opens through `dialing.DatagramConnector` (unit test).
-- [ ] The four quality gates hold by Measure-CodeQuality.ps1 for Curl.Engine.UnitLibrary.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] With an `EngineDialing` and a connection hook whose datagram connector differs from curl's, the QUIC dialer opens its channel through the hook's connector, checked by a unit test in `EngineCompositionTests.QuicThroughExtension.cs`.
+- [x] Without a hook, or with a hook that keeps curl's connector, the QUIC dialer still opens through `dialing.DatagramConnector` (unit test).
+- [x] The four quality gates hold by Measure-CodeQuality.ps1 for Curl.Engine.UnitLibrary.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 - Filed by BL-4355's run of 2026-10-30, which found the dialing branch skips the hook.
+- The dialing runner in Curl.Console/CurlComposition.cs already hands the hook's connector to its handlers; only EngineDialing (ManagedCurlEngine) skipped it, so Console needed no change.
+- Gates: Measure-CodeQuality.ps1 for Curl.Engine.UnitLibrary reports 0 failing members; Linux and macOS: tests are platform-neutral (in-memory).
 
 ## Log
 
