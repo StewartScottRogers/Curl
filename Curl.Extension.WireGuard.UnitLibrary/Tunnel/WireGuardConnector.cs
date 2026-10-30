@@ -3,7 +3,6 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using Curl.Extension.WireGuard.Configuration;
 using Curl.Extension.WireGuard.IpStack;
-using Curl.Extension.WireGuard.Noise;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.WireGuard.Tunnel;
@@ -215,20 +214,19 @@ internal sealed class WireGuardConnector(
 
     private async ValueTask<ConnectResult> ConnectOverAsync(IWireGuardUdpChannel udp, WireGuardPeer peer, IPAddress source, IPEndPoint destination, ConnectTarget target, CancellationToken cancellationToken)
     {
-        WireGuardHandshakeInitiator initiator = WireGuardHandshakeInitiator.ForPeer(configuration.Interface, peer, timeProvider, random);
-        WireGuardTransportSession session = await WireGuardTunnelHandshake.ConnectAsync(initiator, udp, timeProvider, cancellationToken).ConfigureAwait(false);
+        WireGuardPacketTunnel tunnel = await WireGuardPacketTunnel.OpenAsync(configuration.Interface, peer, udp, timeProvider, random, cancellationToken).ConfigureAwait(false);
         Stream stream;
         try
         {
-            stream = await UserSpaceTcpClient.ConnectAsync(new WireGuardPacketTunnel(udp, session), source, destination, MaximumSegmentSizeFor(destination.Address), timeProvider, cancellationToken).ConfigureAwait(false);
+            stream = await UserSpaceTcpClient.ConnectAsync(tunnel, source, destination, MaximumSegmentSizeFor(destination.Address), timeProvider, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
-            session.Dispose();
+            tunnel.Dispose();
             throw;
         }
 
-        WireGuardConnection connection = new(stream, udp, session, destination);
+        WireGuardConnection connection = new(stream, udp, tunnel, destination);
         return target.UseTls
             ? await tlsProvider!.AuthenticateAsClientAsync(connection, TlsServerNameOf(target), target.Events, ApplicationProtocolsFor(target), cancellationToken).ConfigureAwait(false)
             : ConnectResult.Connected(connection);

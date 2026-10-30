@@ -43,11 +43,18 @@ WireGuard support, so the choices follow the WireGuard whitepaper (Donenfeld, re
 
 ## Not yet built, with why
 
-- Rekeying an established session (section 6.2) and keepalives (section 6.5): a session lives one connection,
-  and `WireGuardTransportSession` already refuses to seal past Reject-After-Time, which ends the connection with
-  an error rather than send under expired keys. Long transfers past 180 s need rekeying, which BL-4356 adds.
-- `ListenPort` and wg-quick's host-side keys are read but not used: an initiator on an
-  ephemeral port needs neither. `PersistentKeepalive` is BL-4356's, with the keepalives.
+- `ListenPort` and wg-quick's host-side keys are read but not used: an initiator on an ephemeral port needs neither.
+- Rekeying and keepalives are built (BL-4356, decided by Claude under Stewart's delegation): `WireGuardPacketTunnel`
+  rekeys as the initiator of section 6.2 - a send once the session `NeedsRekey` also sends a new initiation, again
+  after each Rekey-Timeout without a response; the response moves sending to its session, and the previous one
+  still opens what the peer sealed under it until the next rekey replaces it. It sends section 6.5's passive
+  keepalive Keepalive-Timeout (10 s) after a packet arrived with nothing sent since, and a keepalive after every
+  `PersistentKeepalive` seconds without traffic. Left out, with why: the receive-side trigger (an initiation once a
+  received session is 165 s old) - a transfer through the tunnel always sends, TCP's acknowledgements at least, so
+  the send trigger fires first; giving up a rekey after Rekey-Attempt-Time - Reject-After-Time ends the session 60 s
+  after the first rekey initiation anyway; and acting as a responder, since the far end never initiates to an
+  ephemeral port. A keepalive that cannot be sent (keys past Reject-After-Time, socket closed) is dropped: nothing
+  waits on it, and the next send reports the failure.
 
 ## Consequences
 

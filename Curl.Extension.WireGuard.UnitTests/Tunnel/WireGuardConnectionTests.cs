@@ -10,10 +10,10 @@ public sealed class WireGuardConnectionTests
     [TestMethod]
     public async Task ReadWriteFlushAndDispose_OverTheStream_PassThroughAndCloseEverything()
     {
-        var (peer, session) = await WireGuardPacketTunnelTests.HandshakeAsync();
+        var (peer, tunnel, _) = await WireGuardPacketTunnelTests.OpenTunnelAsync();
         MemoryStream stream = new();
         IPEndPoint remote = new(IPAddress.Parse("10.0.0.1"), 80);
-        WireGuardConnection connection = new(stream, peer, session, remote);
+        WireGuardConnection connection = new(stream, peer, tunnel, remote);
 
         await connection.WriteAsync(new byte[] { 1, 2 }, CancellationToken.None);
         await connection.FlushAsync(CancellationToken.None);

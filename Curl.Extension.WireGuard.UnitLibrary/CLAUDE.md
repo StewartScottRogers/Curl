@@ -14,13 +14,14 @@ library or another extension.
   cryptokey routing picks the peer and source address, `IWireGuardUdpOpener` (`SystemWireGuardUdpOpener` in
   production) opens the UDP socket, `WireGuardTunnelHandshake` retries initiations every Rekey-Timeout for
   Rekey-Attempt-Time, `WireGuardPacketTunnel` is the `IIpPacketChannel` sealing and opening transport data, and
-  `WireGuardConnection` is the `IConnection` that owns the TCP stream, socket and keys. A host name is resolved
+  `WireGuardConnection` is the `IConnection` that owns the TCP stream, socket and tunnel. A host name is resolved
   first by DNS over TCP through its own tunnel to the first `DNS` address (ADR-1161), `WireGuardDnsMessage` building
   the query and reading the answer; without one it is exit 6. UDP and QUIC are carried too (ADR-1163):
   `WireGuardDatagramConnector` opens each `IDatagramChannel` in its own tunnel, a `UserSpaceUdpChannel` whose
-  `WireGuardTunnelLifetime` closes the socket and keys, resolving a host name through
+  `WireGuardTunnelLifetime` closes the socket and the tunnel, resolving a host name through
   `WireGuardConnector.ResolveThroughTunnelAsync`; `WireGuardConnector.ConnectMultiplexedAsync` hands QUIC to curl's
-  connector, whose QUIC dialer opens its UDP through that datagram connector. No rekeying (BL-4356). Its tests drive
+  connector, whose QUIC dialer opens its UDP through that datagram connector. `WireGuardPacketTunnel` also rekeys the session after Rekey-After-Time and sends section 6.5's passive and
+  `PersistentKeepalive` keepalives (BL-4356). Its tests drive
   it against `TunnelTestPeer`, a responder and TCP server written from the whitepaper.
 
 - `Configuration/` reads a wg-quick configuration file (ADR-1117): `WireGuardConfigurationParser.Parse` gives a

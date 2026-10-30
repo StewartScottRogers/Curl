@@ -4,7 +4,6 @@ using System.Security.Cryptography;
 using Curl.Extension.WireGuard.Configuration;
 using Curl.Extension.WireGuard.IpStack;
 using Curl.Extension.WireGuard.IpStack.Udp;
-using Curl.Extension.WireGuard.Noise;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.WireGuard.Tunnel;
@@ -64,9 +63,9 @@ internal sealed class WireGuardDatagramConnector(
         Exception failure;
         try
         {
-            WireGuardTransportSession session = await WireGuardTunnelHandshake.ConnectAsync(WireGuardHandshakeInitiator.ForPeer(configuration.Interface, peer, timeProvider, random), udp, timeProvider, cancellationToken).ConfigureAwait(false);
+            WireGuardPacketTunnel tunnel = await WireGuardPacketTunnel.OpenAsync(configuration.Interface, peer, udp, timeProvider, random, cancellationToken).ConfigureAwait(false);
             IPEndPoint local = new(source, EphemeralPort());
-            return DatagramOpenResult.Opened(new UserSpaceUdpChannel(new WireGuardPacketTunnel(udp, session), local, server, new WireGuardTunnelLifetime(udp, session)));
+            return DatagramOpenResult.Opened(new UserSpaceUdpChannel(tunnel, local, server, new WireGuardTunnelLifetime(udp, tunnel)));
         }
         catch (Exception exception)
         {
