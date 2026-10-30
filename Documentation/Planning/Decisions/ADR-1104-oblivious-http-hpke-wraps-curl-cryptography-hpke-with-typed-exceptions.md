@@ -1,4 +1,4 @@
-# ADR-1095 — Oblivious HTTP's HPKE wraps Curl.Cryptography's Hpke with typed exceptions
+# ADR-1104 — Oblivious HTTP's HPKE wraps Curl.Cryptography's Hpke with typed exceptions
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

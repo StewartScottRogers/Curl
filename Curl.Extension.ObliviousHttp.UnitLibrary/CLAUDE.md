@@ -1,6 +1,6 @@
 # Curl.Extension.ObliviousHttp.UnitLibrary
 
-The Oblivious HTTP extension (ADR-0999, ADR-1095), tested against RFC 9458 and RFC 9180. Namespace
+The Oblivious HTTP extension (ADR-0999, ADR-1104), tested against RFC 9458 and RFC 9180. Namespace
 `Curl.Extension.ObliviousHttp`. It references only `Curl.Cryptography.UnitLibrary`, a shared layer, and is not yet
 registered in any Composition catalogue (BL-4137 does that).
 
