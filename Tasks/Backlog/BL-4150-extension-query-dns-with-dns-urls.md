@@ -4,7 +4,7 @@ title: Extension: Query DNS with dns:// URLs
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4092, BL-4328, BL-4329, BL-4330, BL-4331]
+depends-on: [BL-4091, BL-4093, BL-4092, BL-4336, BL-4337, BL-4338, BL-4339]
 touches: [Curl.Extension.DnsQuery.UnitLibrary, Curl.Extension.DnsQuery.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
@@ -35,10 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
-- 2026-10-29 (lane 12): Split for size before any code, as the Notes above ask: five transports, a full RFC 1035 codec for every record type and two output formats are more than one run. BL-4328 (projects, wire codec, text and JSON rendering), BL-4329 (dns:// scheme over UDP and TCP, registration, `CURL_EXTENSIONS=0`, ADR), BL-4330 (DoT and DoQ), BL-4331 (DoH; after BL-4330 since both add to the transport selection file). Prerequisites checked: `ProtocolHandlerServices` gives the connector, datagram connector, TLS provider and resolver; registration follows `CoapExtension` (`ExtensionCatalogue.cs` plus `ExtensionDescriptionCatalogue.cs`, both shared list files); `Curl.Quic.UnitLibrary` and `Curl.Networking.UnitLibrary` are shared layers an extension may reference (EncryptedDns does); DoH needs its own minimal HTTP/1.1 client since an extension cannot reference `Curl.Protocol.Http`. No upstream cases, so no case runner work. Once those are Done this task needs only its criteria checked against their work.
+- 2026-10-29 (lane 12): Split for size before any code, as the Notes above ask: five transports, a full RFC 1035 codec for every record type and two output formats are more than one run. BL-4336 (projects, wire codec, text and JSON rendering), BL-4337 (dns:// scheme over UDP and TCP, registration, `CURL_EXTENSIONS=0`, ADR), BL-4338 (DoT and DoQ), BL-4339 (DoH; after BL-4338 since both add to the transport selection file). Prerequisites checked: `ProtocolHandlerServices` gives the connector, datagram connector, TLS provider and resolver; registration follows `CoapExtension` (`ExtensionCatalogue.cs` plus `ExtensionDescriptionCatalogue.cs`, both shared list files); `Curl.Quic.UnitLibrary` and `Curl.Networking.UnitLibrary` are shared layers an extension may reference (EncryptedDns does); DoH needs its own minimal HTTP/1.1 client since an extension cannot reference `Curl.Protocol.Http`. No upstream cases, so no case runner work. Once those are Done this task needs only its criteria checked against their work.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: e386bf2a 576087e8 01612e53 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
-- 2026-10-29: Doing -> Backlog. Split for size into BL-4328, BL-4329, BL-4330, BL-4331; waits on them
+- 2026-10-29: Doing -> Backlog. Split for size into BL-4336, BL-4337, BL-4338, BL-4339; waits on them

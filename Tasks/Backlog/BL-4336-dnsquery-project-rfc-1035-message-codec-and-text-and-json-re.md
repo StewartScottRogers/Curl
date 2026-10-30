@@ -1,5 +1,5 @@
 ---
-id: BL-4328
+id: BL-4336
 title: DnsQuery: project, RFC 1035 message codec and text and JSON rendering
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4328 — DnsQuery: project, RFC 1035 message codec and text and JSON rendering
+# BL-4336 — DnsQuery: project, RFC 1035 message codec and text and JSON rendering
 
 ## Goal
 
@@ -32,7 +32,7 @@ Create the projects with the `new-project` skill (ADR-1003: one single-line `<Fo
 
 ## Notes
 
-Not registered in `ExtensionCatalogue.cs` yet: BL-4329 adds the scheme and registration.
+Not registered in `ExtensionCatalogue.cs` yet: BL-4337 adds the scheme and registration.
 
 ## Log
 
