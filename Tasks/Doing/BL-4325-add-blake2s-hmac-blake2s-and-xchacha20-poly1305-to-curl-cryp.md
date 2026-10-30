@@ -34,3 +34,4 @@ BLAKE2s is not anywhere in the repository yet (searched 2026-10-29). Base class 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 594872e4 71dda211 f188b140 3d836d5e.
