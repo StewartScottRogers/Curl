@@ -4,7 +4,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.ClientHints;
 
 /// <summary>
-/// The <c>--client-hints</c> transfer hook (ADR-1100). It adds the WICG User-Agent Client Hints spec's low-entropy
+/// The <c>--client-hints</c> transfer hook (ADR-1102). It adds the WICG User-Agent Client Hints spec's low-entropy
 /// hints (§3.1 "low-entropy hint table"), each a Structured Field (RFC 8941) as §3.3 defines them: <c>Sec-CH-UA</c>
 /// (§3.3.1, a List of brands with a GREASE brand, §3.2 "grease"), <c>Sec-CH-UA-Mobile</c> (§3.3.6, a Boolean) and
 /// <c>Sec-CH-UA-Platform</c> (§3.3.8, a String). They are sent only to a potentially trustworthy URL (§2, secure

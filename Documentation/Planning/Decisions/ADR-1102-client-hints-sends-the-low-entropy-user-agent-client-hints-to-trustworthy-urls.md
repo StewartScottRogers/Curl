@@ -1,4 +1,4 @@
-# ADR-1100 — --client-hints sends the low-entropy User-Agent Client Hints to trustworthy URLs
+# ADR-1102 — --client-hints sends the low-entropy User-Agent Client Hints to trustworthy URLs
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

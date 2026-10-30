@@ -6,7 +6,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.ClientHints;
 
 /// <summary>
-/// The <c>--client-hints</c> extension (ADR-1100): User-Agent Client Hints (RFC 8942, WICG User-Agent Client Hints).
+/// The <c>--client-hints</c> extension (ADR-1102): User-Agent Client Hints (RFC 8942, WICG User-Agent Client Hints).
 /// It sends the low-entropy <c>Sec-CH-UA</c>, <c>Sec-CH-UA-Mobile</c> and <c>Sec-CH-UA-Platform</c> fields with every
 /// HTTP request to a potentially trustworthy URL. <c>Curl.Extension.Composition</c> registers its option, description
 /// and transfer hook.

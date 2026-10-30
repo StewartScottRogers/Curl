@@ -1146,4 +1146,4 @@ Each option and the specific reason it lost.
 | [1099](ADR-1099-gs-urls-download-upload-and-list-over-the-xml-api-with-a-bearer-token-or-hmac-key.md) | gs:// URLs download, upload and list over the XML API with a bearer token or HMAC key (BL-4125) | Accepted | 2026-10-29 |
 | [1100](ADR-1100-compression-dictionary-wire-format-and-store.md) | The compression dictionary extension's wire format and store (BL-4302) | Accepted | 2026-10-29 |
 | [1101](ADR-1101-sigstore-bundle-verifies-a-download-before-it-is-written.md) | --sigstore-bundle verifies a download against a Sigstore bundle before it is written (BL-4136) | Accepted | 2026-10-29 |
-| [1100](ADR-1100-client-hints-sends-the-low-entropy-user-agent-client-hints-to-trustworthy-urls.md) | --client-hints sends the low-entropy User-Agent Client Hints to trustworthy URLs (BL-4141) | Accepted | 2026-10-29 |
+| [1102](ADR-1102-client-hints-sends-the-low-entropy-user-agent-client-hints-to-trustworthy-urls.md) | --client-hints sends the low-entropy User-Agent Client Hints to trustworthy URLs (BL-4141) | Accepted | 2026-10-29 |

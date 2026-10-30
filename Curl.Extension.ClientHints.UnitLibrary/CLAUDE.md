@@ -1,6 +1,6 @@
 # Curl.Extension.ClientHints.UnitLibrary
 
-The User-Agent Client Hints extension (ADR-0999, ADR-1100), tested against RFC 8942 and the WICG User-Agent
+The User-Agent Client Hints extension (ADR-0999, ADR-1102), tested against RFC 8942 and the WICG User-Agent
 Client Hints spec. Namespace `Curl.Extension.ClientHints`. It references only `Curl.Extension.Abstractions.UnitLibrary`
 and the shared layers it brings.
 
