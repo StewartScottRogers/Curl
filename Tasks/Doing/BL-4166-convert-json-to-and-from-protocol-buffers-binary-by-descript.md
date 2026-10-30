@@ -32,3 +32,4 @@ Third of three parts split from BL-4099. Builds on BL-4164's wire codec and BL-4
 ## Log
 
 - 2026-10-29: Created (split from BL-4099).
+- 2026-10-29: Backlog -> Doing. Criteria at claim: de6465f3 a3ed0077 7ae6d7ff 3d836d5e.
