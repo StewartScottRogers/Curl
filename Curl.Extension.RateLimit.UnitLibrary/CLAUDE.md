@@ -1,6 +1,6 @@
 # Curl.Extension.RateLimit.UnitLibrary
 
-The RateLimit header fields extension (ADR-0999, ADR-1100), tested against draft-ietf-httpapi-ratelimit-headers-11.
+The RateLimit header fields extension (ADR-0999, ADR-1106), tested against draft-ietf-httpapi-ratelimit-headers-11.
 Namespace `Curl.Extension.RateLimit`. It references only `Curl.Extension.Abstractions.UnitLibrary` and the shared
 layers it brings.
 

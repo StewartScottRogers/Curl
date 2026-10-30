@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.RateLimit;
 
 /// <summary>
-/// The <c>--ratelimit-pace</c> extension (ADR-1100): RateLimit header fields (draft-ietf-httpapi-ratelimit-headers-11).
+/// The <c>--ratelimit-pace</c> extension (ADR-1106): RateLimit header fields (draft-ietf-httpapi-ratelimit-headers-11).
 /// It reads each HTTP response's <c>RateLimit</c> and <c>RateLimit-Policy</c> fields and, when the server says a quota
 /// is used up, holds every later transfer to that origin in the option group (<c>--retry</c> attempts and <c>-Z</c>
 /// parallel transfers alike) until the quota resets. <c>Curl.Extension.Composition</c> registers its option,

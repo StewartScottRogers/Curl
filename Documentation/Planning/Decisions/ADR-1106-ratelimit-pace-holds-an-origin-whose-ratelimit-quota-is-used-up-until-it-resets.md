@@ -1,4 +1,4 @@
-# ADR-1100 — --ratelimit-pace holds an origin whose RateLimit quota is used up until it resets
+# ADR-1106 — --ratelimit-pace holds an origin whose RateLimit quota is used up until it resets
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

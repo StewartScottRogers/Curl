@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.RateLimit;
 
 /// <summary>
-/// The <c>--ratelimit-pace</c> transfer hook (ADR-1100), one per option group and shared by its transfers. After
+/// The <c>--ratelimit-pace</c> transfer hook (ADR-1106), one per option group and shared by its transfers. After
 /// each HTTP response it reads the <c>RateLimit</c> field (draft-ietf-httpapi-ratelimit-headers-11 §4): a member whose
 /// remaining quota <c>r</c> is 0 (§4.1.1) holds the origin for its reset <c>t</c> seconds (§4.1.2), or, with no
 /// <c>t</c>, for the window <c>w</c> of the <c>RateLimit-Policy</c> member of the same name (§3.1.3); the longest hold
