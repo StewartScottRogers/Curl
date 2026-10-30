@@ -5,7 +5,7 @@ namespace Curl.Extension.DnsQuery.Client;
 
 /// <summary>
 /// Gives a <c>dns://</c> transfer to the DNS query handler as a <see cref="DnsQueryContext" /> carrying the transport and
-/// output format <c>--dns-transport</c> and <c>--dns-json</c> chose (ADR-1126). Every other transfer passes through unchanged.
+/// output format <c>--dns-transport</c> and <c>--dns-json</c> chose (ADR-1140). Every other transfer passes through unchanged.
 /// </summary>
 /// <param name="transport">The transport's name.</param>
 /// <param name="json">Whether to write JSON.</param>

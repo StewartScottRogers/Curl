@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.DnsQuery.Transport;
 
 /// <summary>
-/// The transports <c>--dns-transport</c> names (ADR-1126), and the transport each name gives. Each transport adds its
+/// The transports <c>--dns-transport</c> names (ADR-1140), and the transport each name gives. Each transport adds its
 /// name to <see cref="Names" /> and its case to <see cref="TransportOf" />, and nothing else here.
 /// </summary>
 internal static class DnsQueryTransportSelection

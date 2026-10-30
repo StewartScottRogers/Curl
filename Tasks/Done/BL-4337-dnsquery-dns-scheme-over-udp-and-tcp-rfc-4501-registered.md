@@ -38,7 +38,7 @@ Builds on BL-4336's `Wire/` and `Rendering/`. Parse the URL as RFC 4501 section 
   through a transfer hook, as `--coap-observe` does; the library's csproj, for the `Curl.Networking` reference
   (`SystemDnsServers`, the system's first DNS server for a URL with no server); the test csproj, for the Composition
   and Core references the registration and `CURL_EXTENSIONS=0` tests need.
-- Decisions in ADR-1126: options `--dns-transport udp|tcp` (default udp, exit 2 for another name) and `--dns-json`;
+- Decisions in ADR-1140: options `--dns-transport udp|tcp` (default udp, exit 2 for another name) and `--dns-json`;
   `?type=`/`?class=` separated by `;` (RFC 4501) or `&`; UDP 3 tries of 5 s (dig's defaults) then exit 28, TCP retry
   when TC is set; exit 8 for an undecodable answer or a wrong message ID, 56 for a TCP close mid-answer; any RCODE
   is written with exit 0, as dig does. EDNS(0), DNSSEC and AXFR left out.

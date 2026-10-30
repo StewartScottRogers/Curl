@@ -9,7 +9,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.DnsQuery.Client;
 
 /// <summary>
-/// Serves <c>dns://[server[:port]]/name[?type=T;class=C]</c> (RFC 4501, ADR-1126): encodes one recursive query
+/// Serves <c>dns://[server[:port]]/name[?type=T;class=C]</c> (RFC 4501, ADR-1140): encodes one recursive query
 /// (RFC 1035 section 4.1), sends it over the transport <c>--dns-transport</c> names (UDP by default), decodes the answer
 /// and writes it as dig-like text, or as one line of JSON under <c>--dns-json</c>. A URL naming no server queries the
 /// system's first DNS server. Any response code, NXDOMAIN included, is written and ends with exit 0, as dig does.

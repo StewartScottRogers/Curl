@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.DnsQuery.Client;
 
-/// <summary>Carries one DNS query to a server and its answer back (ADR-1126).</summary>
+/// <summary>Carries one DNS query to a server and its answer back (ADR-1140).</summary>
 internal interface IDnsQueryTransport
 {
     /// <summary>Sends <paramref name="query" /> to the server and gives its answer.</summary>

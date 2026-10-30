@@ -1185,4 +1185,4 @@ Each option and the specific reason it lost.
 | [1137](ADR-1137-dane-tlsa-lookup-walks-ds-from-the-root-and-leaves-out-what-it-cannot-prove.md) | The Dane extension's TLSA lookup walks DS from the root itself and leaves out what it cannot prove (BL-4332) | Accepted | 2026-10-29 |
 | [1138](ADR-1138-code-generation-extension-writes-httpclient-csharp-and-invoke-restmethod-powershell.md) | The code generation extension writes HttpClient C# with `--csharp` and Invoke-RestMethod PowerShell with `--powershell` (BL-4158) | Accepted | 2026-10-29 |
 | [1139](ADR-1139-connect-rpc-sends-connect-unary-and-streaming-calls-with-json.md) | --connect-rpc sends Connect unary and streaming calls with JSON (BL-4104) | Accepted | 2026-10-29 |
-| [1126](ADR-1126-dns-query-serves-dns-urls-over-udp-and-tcp.md) | The DNS query extension serves dns: URLs over UDP and TCP, chosen by --dns-transport and --dns-json (BL-4337) | Accepted | 2026-10-29 |
+| [1140](ADR-1140-dns-query-serves-dns-urls-over-udp-and-tcp.md) | The DNS query extension serves dns: URLs over UDP and TCP, chosen by --dns-transport and --dns-json (BL-4337) | Accepted | 2026-10-29 |

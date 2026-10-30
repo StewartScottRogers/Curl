@@ -8,7 +8,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.DnsQuery.Client;
 
-/// <summary>The <c>dns://</c> extension's description, options, transfer hook and handler factory (ADR-1126).</summary>
+/// <summary>The <c>dns://</c> extension's description, options, transfer hook and handler factory (ADR-1140).</summary>
 public static class DnsQueryExtension
 {
     /// <summary>Gets <c>--dns-transport</c>, which names the transport a <c>dns://</c> query goes over.</summary>

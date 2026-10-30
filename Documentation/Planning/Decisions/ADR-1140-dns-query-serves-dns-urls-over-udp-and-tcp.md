@@ -1,4 +1,4 @@
-# ADR-1126: The DNS query extension serves dns: URLs over UDP and TCP, chosen by --dns-transport and --dns-json
+# ADR-1140: The DNS query extension serves dns: URLs over UDP and TCP, chosen by --dns-transport and --dns-json
 
 - Status: Accepted
 - Date: 2026-10-29

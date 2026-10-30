@@ -4,7 +4,7 @@ using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 namespace Curl.Extension.DnsQuery.Client;
 
 /// <summary>
-/// A <c>dns://</c> transfer given <c>--dns-transport</c> or <c>--dns-json</c> (ADR-1126): the transfer's own context
+/// A <c>dns://</c> transfer given <c>--dns-transport</c> or <c>--dns-json</c> (ADR-1140): the transfer's own context
 /// with the transport and output format those options chose, which the DNS query handler reads.
 /// </summary>
 /// <param name="inner">The transfer's own context.</param>
