@@ -25,6 +25,7 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.SegmentedDownload.SegmentedDownloadExtension.HookFor,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.HookFor,
         Curl.Extension.Checksum.ChecksumExtension.HookFor,
+        Curl.Extension.Sigstore.SigstoreExtension.HookFor,
         OAuth2.Options.OAuth2Options.ActivatedBy,
         Curl.Extension.WebSocketRepl.WebSocketReplExtension.HookFor,
         Curl.Extension.ContentDigest.ContentDigestExtension.HookFor,
