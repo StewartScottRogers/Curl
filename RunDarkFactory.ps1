@@ -130,6 +130,10 @@
       -LimitWarnSeconds    before the reset: the new session is about to start
       on resuming          the new session has started, and which task it resumed
 
+    Stopping a lane stops its process tree and the MSBuild worker nodes found under it, and a
+    lane's runs build with node reuse off (MSBUILDDISABLENODEREUSE=1), so none is left behind;
+    a node is never stopped by name, so Visual Studio's and other checkouts' are untouched (BL-4348).
+
     Lanes survive being stopped. Each lane records its process and the task it holds in
     <repo>.logs\lanes-<stamp>\; the coordinator restarts a lane whose process has died (five tries
     each) and the lane resumes its task from the work in its worktree, first integrating
@@ -385,7 +389,9 @@
     wall time is recorded but decides nothing (BL-812). The cap is the largest passing k (at
     least 1), found at the first failing step, 16, or -ProbeMaxLanes. The result goes to
     <repo>.lanes\machine-lanes.json (marked incomplete when -ProbeMaxLanes cut it short)
-    and the probe folder is deleted. Run it only when no shift is building.
+    and the probe folder is deleted. Its builds run with MSBuild node reuse off, and any worker
+    node still found under a build when its step ends is stopped, so no step leaves nodes that
+    hold memory for the next (BL-4348). Run it only when no shift is building.
 
     AUDIT CADENCE (BL-1022)
 
