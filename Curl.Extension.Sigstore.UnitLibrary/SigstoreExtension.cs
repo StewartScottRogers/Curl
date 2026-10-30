@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.Sigstore;
 
 /// <summary>
-/// The <c>--sigstore-bundle</c> extension (ADR-1093): writes a downloaded file only once a Sigstore bundle shows it was
+/// The <c>--sigstore-bundle</c> extension (ADR-1101): writes a downloaded file only once a Sigstore bundle shows it was
 /// signed by the expected identity, as <c>cosign verify-blob</c> checks it. <c>Curl.Extension.Composition</c>
 /// registers its options, description and transfer hook.
 /// </summary>

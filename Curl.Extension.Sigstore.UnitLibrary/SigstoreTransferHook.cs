@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.Sigstore;
 
 /// <summary>
-/// The <c>--sigstore-bundle</c> transfer hook (ADR-1093). It runs curl's transfer with the body held back, the headers
+/// The <c>--sigstore-bundle</c> transfer hook (ADR-1101). It runs curl's transfer with the body held back, the headers
 /// written as they arrive, and writes the body only when <see cref="SigstoreVerification" /> passes it. A body that fails
 /// is not written and the transfer fails with exit code 60; a transfer that fails itself is returned as it is.
 /// </summary>

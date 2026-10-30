@@ -1,4 +1,4 @@
-# ADR-1093 — `--sigstore-bundle` verifies a download against a Sigstore bundle before it is written
+# ADR-1101 — `--sigstore-bundle` verifies a download against a Sigstore bundle before it is written
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
