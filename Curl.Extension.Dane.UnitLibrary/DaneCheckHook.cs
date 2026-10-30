@@ -8,7 +8,7 @@ namespace Curl.Extension.Dane;
 
 /// <summary>
 /// Refuses a chain curl accepted when the server's TLSA records, validated with DNSSEC, say it must not stand
-/// (ADR-1155, RFC 6698 section 4.1): when they are bogus, when no usable answer came, or when they are secure and have
+/// (ADR-1156, RFC 6698 section 4.1): when they are bogus, when no usable answer came, or when they are secure and have
 /// usable records none of which matches the chain. A proved-insecure zone, a proved absence of TLSA records, a set
 /// with no usable records and a server named by an IP address leave the chain to curl's own verification.
 /// </summary>

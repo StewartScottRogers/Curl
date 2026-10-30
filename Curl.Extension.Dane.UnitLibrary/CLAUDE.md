@@ -1,6 +1,6 @@
 # Curl.Extension.Dane.UnitLibrary
 
-The `--dane <resolver>` extension (ADR-0999, ADR-1123, ADR-1155): DNSSEC validation and DANE TLSA certificate
+The `--dane <resolver>` extension (ADR-0999, ADR-1123, ADR-1156): DNSSEC validation and DANE TLSA certificate
 matching, built up by BL-4151's split: BL-4333 the wire codec, BL-4334, BL-4335 and BL-4332 their own folders, and
 BL-4151 the option, the hook and the catalogue lines. Namespaces `Curl.Extension.Dane` and one per folder. Tested
 against RFC 1035, RFC 4034, RFC 4035, RFC 5155, RFC 6698, RFC 7671 and RFC 6891, not against curl. It references `Curl.Protocol.Abstractions`, `Curl.Extension.Abstractions`,

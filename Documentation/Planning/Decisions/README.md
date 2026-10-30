@@ -1202,4 +1202,4 @@ Each option and the specific reason it lost.
 | [1154](ADR-1154-compression-dictionary-stores-and-advertises-rfc-9842-dictionaries-in-a-transfer-hook.md) | --compression-dictionary stores and advertises RFC 9842 dictionaries in a transfer hook (BL-4132) | Accepted | 2026-10-30 |
 | [1155](ADR-1155-a-task-is-claimed-at-most-twice.md) | A task is claimed at most twice: splits defer, and a second requeue splits (AF-0465 to AF-0474) | Accepted | 2026-10-30 |
 | [1153](ADR-1153-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md) | The Dane extension checks TLSA records validated from the root with --dane (BL-4151) | Accepted | 2026-10-30 |
-| [1155](ADR-1155-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md) | The Dane extension checks TLSA records validated from the root with --dane (BL-4151) | Accepted | 2026-10-30 |
+| [1156](ADR-1156-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md) | The Dane extension checks TLSA records validated from the root with --dane (BL-4151) | Accepted | 2026-10-30 |
