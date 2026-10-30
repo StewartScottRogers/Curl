@@ -33,3 +33,4 @@ Split from BL-4147. Specification: WireGuard whitepaper (Donenfeld, revision e2d
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 5fa32082 944a49cc efff73f2 bef89300 3d836d5e.
