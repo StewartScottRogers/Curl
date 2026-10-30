@@ -1169,3 +1169,4 @@ Each option and the specific reason it lost.
 | [1122](ADR-1122-masque-client-flow-opens-datagram-channels-through-curls-connector.md) | The MASQUE client flow opens datagram channels through curl's connector (BL-4317) | Accepted | 2026-10-29 |
 | [1123](ADR-1123-dane-wire-codec-sends-edns0-do-and-decodes-without-throwing.md) | The Dane extension's wire codec sends EDNS0 with DO and decodes without throwing (BL-4333) | Accepted | 2026-10-29 |
 | [1124](ADR-1124-dns-query-presents-records-as-named-fields-in-text-and-json.md) | The DNS query extension presents records as named fields, in dig-like text and in JSON (BL-4336) | Accepted | 2026-10-29 |
+| [1115](ADR-1115-privacy-pass-token-type-1-builds-p384-voprf-by-hand-on-biginteger.md) | Privacy Pass token type 1 builds the P-384 VOPRF by hand on BigInteger (BL-4321) | Accepted | 2026-10-29 |
