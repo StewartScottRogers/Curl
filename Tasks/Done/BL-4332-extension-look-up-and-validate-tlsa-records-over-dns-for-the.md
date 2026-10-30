@@ -31,6 +31,18 @@ Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4333'
 ## Notes
 
 - Filed by BL-4151's run on 2026-10-29 when it split that task for size. Document the folder in XML comments; BL-4151 adds it to the library's CLAUDE.md.
+- Plan as built (ADR-1132): `DnssecQueryTransport` (UDP with DO+CD, TCP retry on TC with a length prefix, one
+  `TimeProvider` timeout, null on any failure); `TlsaLookup` walks DS top down from the trust anchors (a constructor
+  parameter, `RootTrustAnchors.DelegationSigners` in production) through every ancestor, anchors each zone's DNSKEY
+  RRset by DS, then judges the TLSA RRset, a CNAME (up to eight) or the NSEC/NSEC3 denial (`DenialOfExistence`,
+  `Nsec3Hash`, `LookupNames` for canonical order). Results: Secure, Insecure, Bogus, Absent, Failed.
+- Default taken: an unproved NODATA for DS keeps the name in the parent's zone (safe, since a hidden delegation's
+  signatures then fail as Bogus); only a proved NS-without-DS gives Insecure. Insecure results carry no records.
+- Tests generate a signed ". > test. > example.test." tree with Ed25519 keys and a test trust anchor, encode the
+  replies to wire bytes and replay them through `FakeDnsServer` (fake `IDatagramConnector` and `IConnector`), with
+  `ManualTimeProvider` firing the timeout. Nothing depends on the platform (no paths, OS errors or certificates).
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Extension.Dane.UnitLibrary` 100% line, 100% branch, 0 failing
+  members, worst CRAP 10. `dotnet build` clean; fast tests green (Dane.UnitTests 162 passed).
 
 ## Log
 
