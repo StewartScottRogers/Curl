@@ -54,6 +54,7 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.Har.HarExtension.Description,
         Curl.Extension.ClientHints.ClientHintsExtension.Description,
         Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.Description,
+        Curl.Extension.Dane.DaneExtension.Description,
         Curl.Extension.OpenTelemetry.OpenTelemetryExtension.Description,
         Curl.Extension.CodeGeneration.CodeGenerationExtension.Description,
         Curl.Extension.RateLimit.RateLimitExtension.Description,

@@ -60,6 +60,7 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.Har.HarExtension.Option,
         Curl.Extension.ClientHints.ClientHintsExtension.Option,
         Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.Option,
+        Curl.Extension.Dane.DaneExtension.Option,
         Curl.Extension.OpenTelemetry.OpenTelemetryExtension.Option,
         Curl.Extension.CodeGeneration.CodeGenerationExtension.CSharpOption,
         Curl.Extension.CodeGeneration.CodeGenerationExtension.PowerShellOption,

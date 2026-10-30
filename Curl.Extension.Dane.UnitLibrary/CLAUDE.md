@@ -1,9 +1,9 @@
 # Curl.Extension.Dane.UnitLibrary
 
-DNSSEC validation and DANE TLSA certificate matching (ADR-0999, ADR-1123), built up by BL-4151's split: BL-4333 the
-wire codec, BL-4334, BL-4335 and BL-4332 their own folders, and BL-4151 the option, the hook and the catalogue line.
-Namespace `Curl.Extension.Dane.Wire` so far. Tested against RFC 1035, RFC 4034, RFC 4035, RFC 5155, RFC 6698 and
-RFC 6891, not against curl. It references `Curl.Protocol.Abstractions`, `Curl.Extension.Abstractions`,
+The `--dane <resolver>` extension (ADR-0999, ADR-1123, ADR-1153): DNSSEC validation and DANE TLSA certificate
+matching, built up by BL-4151's split: BL-4333 the wire codec, BL-4334, BL-4335 and BL-4332 their own folders, and
+BL-4151 the option, the hook and the catalogue lines. Namespaces `Curl.Extension.Dane` and one per folder. Tested
+against RFC 1035, RFC 4034, RFC 4035, RFC 5155, RFC 6698, RFC 7671 and RFC 6891, not against curl. It references `Curl.Protocol.Abstractions`, `Curl.Extension.Abstractions`,
 `Curl.Networking` and `Curl.Cryptography`, and no other extension: `Curl.Extension.EncryptedDns`'s A/AAAA codec is
 that extension's own, so this one is separate.
 
@@ -26,3 +26,11 @@ that extension's own, so this one is separate.
     `NsecRecordData` (section 4.1) and `Nsec3RecordData` (RFC 5155 section 3.2), the type bit maps read into
     ascending type lists. RRSIG signer names and NSEC next names must not be compressed (RFC 4034 sections 3.1.7
     and 4.1.1). Any other type has null `Data`.
+- Root: the option and its hook.
+  - `DaneExtension` gives the `--dane` option, the `dane` description and `HookFor`, which `Curl.Extension.Composition`
+    registers in its option, description and certificate check hook catalogues; `LookupThrough` builds the networked
+    `TlsaLookup` (system resolver for the resolver's own name, UDP then TCP, five seconds a query, root trust anchors).
+  - `DaneResolverAddress.Parse` reads the `--dane` value: `host`, `host:port`, a bare IPv6 address or `[IPv6]:port`.
+  - `DaneCheckHook` refuses a chain curl accepted (exit 60) when the TLSA RRset is bogus, gets no usable answer, or
+    is secure with usable records none of which matches; an insecure zone, a proved absence, no usable records or a
+    server named by an IP address let it stand. An unknown port or a resolver value that is not an address refuses.

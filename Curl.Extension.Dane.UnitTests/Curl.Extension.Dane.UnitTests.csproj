@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Extension.Dane.UnitLibrary\Curl.Extension.Dane.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Extension.Composition.UnitLibrary\Curl.Extension.Composition.UnitLibrary.csproj" />
   </ItemGroup>
 
 </Project>

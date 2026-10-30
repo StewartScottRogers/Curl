@@ -18,5 +18,6 @@ public static class ExtensionCertificateCheckHookCatalogue
     [
         Curl.Extension.MlDsaCertificates.MlDsaCertificatesExtension.HookFor,
         Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.HookFor,
+        Curl.Extension.Dane.DaneExtension.HookFor,
     ];
 }
