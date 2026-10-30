@@ -25,5 +25,6 @@ internal static class ExtensionCatalogue
         SignalR.SignalRExtension.CreateHandler,
         Mqtt5.Mqtt5Extension.CreateHandler,
         Amqp1.Client.Amqp1Extension.CreateHandler,
+        WebTransport.WebTransportExtension.CreateHandler,
     ];
 }

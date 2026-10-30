@@ -22,6 +22,7 @@ internal static class ExtensionDescriptionCatalogue
         Coap.Client.CoapExtension.Description,
         Stomp.Client.StompExtension.Description,
         Nats.NatsExtension.Description,
+        WebTransport.WebTransportExtension.Description,
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.Description,
         Xmpp.Client.XmppExtension.Description,
         Curl.Extension.HttpCache.HttpCacheExtension.Description,
