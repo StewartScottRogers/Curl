@@ -32,3 +32,4 @@ Split from BL-4126 for size. Specification: Azure Blob Storage REST API ("List B
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 0b595677 a051d31c 3180db99 3d836d5e.
