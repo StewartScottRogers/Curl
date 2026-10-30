@@ -32,13 +32,13 @@ Third of three parts split from BL-4099. Builds on BL-4164's wire codec and BL-4
 - Built on BL-4169's `DynamicMessage` (the descriptor resolved to a `DynamicMessageType`), so `Json/` reads
   JSON into a dynamic message and writes one out; the binary side is `DynamicMessageEncoder`/`Decoder`.
   `ProtobufJsonConverter` (JSON to binary and back), `ProtobufJsonParser`, `ProtobufJsonFormatter`,
-  `ProtobufJsonNames`, internal `ProtobufJsonScalars`, and the typed `ProtobufJsonError`. Decisions in ADR-1115.
+  `ProtobufJsonNames`, internal `ProtobufJsonScalars`, and the typed `ProtobufJsonError`. Decisions in ADR-1120.
 - Delivered directly rather than through the `/feature` subagent stages: one library, one folder, and
   the design follows the dynamic message model already in place; the lane's cost rules favour doing it inline.
 - `JsonDocument` reports invalid UTF-8 and lone escaped surrogates only when a string is read, as an
   `InvalidOperationException`; the parser maps it to `MalformedJson`.
 - `json_name`'s option value is held quoted by the descriptor parser; `ProtobufJsonNames` strips the quotes.
-- Well-known types' special JSON forms and rejecting a oneof given twice are left out (ADR-1115); no task
+- Well-known types' special JSON forms and rejecting a oneof given twice are left out (ADR-1120); no task
   filed, since no extension uses them yet.
 - `Measure-CodeQuality.ps1 -Library Curl.Protobuf.UnitLibrary`: 100% line, 100% branch, highest complexity 10,
   0 failing members. 327 tests in `Curl.Protobuf.UnitTests` pass; the fast run is green.

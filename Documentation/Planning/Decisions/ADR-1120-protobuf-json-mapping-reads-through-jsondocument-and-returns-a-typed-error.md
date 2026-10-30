@@ -1,4 +1,4 @@
-# ADR-1115 — The Protocol Buffers JSON mapping reads through JsonDocument and returns a typed error
+# ADR-1120 — The Protocol Buffers JSON mapping reads through JsonDocument and returns a typed error
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
