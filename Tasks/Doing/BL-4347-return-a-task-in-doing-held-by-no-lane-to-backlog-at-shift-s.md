@@ -36,3 +36,4 @@ Also find out why a lane could hold a fresh claim at shift end (the runner check
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 701ecc44 c223562e 97acddf8 06eff321.
