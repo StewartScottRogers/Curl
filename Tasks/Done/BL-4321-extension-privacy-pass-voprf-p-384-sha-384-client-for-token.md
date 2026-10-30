@@ -34,7 +34,7 @@ Split from BL-4315 (ADR-1110's "Not yet done"), which keeps only the wiring of t
 
 ## Notes
 
-- Plan: `P384Group` (Jacobian arithmetic, SEC1 compressed encoding), `P384HashToCurve` (expand_message_xmd, hash_to_field, SSWU Z = -12) and `VoprfP384Sha384` (Blind, VerifyProof, Finalize) in `Tokens/`; `PrivacyPassIssuance` runs VOPRF for type `0x0001` and Blind RSA otherwise. Decisions recorded in ADR-1115.
+- Plan: `P384Group` (Jacobian arithmetic, SEC1 compressed encoding), `P384HashToCurve` (expand_message_xmd, hash_to_field, SSWU Z = -12) and `VoprfP384Sha384` (Blind, VerifyProof, Finalize) in `Tokens/`; `PrivacyPassIssuance` runs VOPRF for type `0x0001` and Blind RSA otherwise. Decisions recorded in ADR-1125.
 - RFC 9380's P-384 vectors are in Appendix J.2.1 (the Context's J.3.1 is a slip); the msg "" and "abc" vectors pin u, Q0, Q1 and P. RFC 9497 A.4.2 vectors 1 and 2 pin the blinded element and output, vector 3 the batch proof, and the test issuer reproduces vector 1's proof from its ProofRandomScalar.
 - Curve constants are copied from the BCL's explicit nistP384 parameters (`ExportExplicitParameters` is not on every platform); a test checks d·G = Q against a BCL key. The tests are platform-neutral, which covers CI on Linux and macOS.
 - Measure-CodeQuality: 100% line and branch, 0 failing members (`P384Group.Decode` split after measuring complexity 12). Full build clean, fast tests green in all 93 test projects.

@@ -1,4 +1,4 @@
-# ADR-1115: Privacy Pass token type 1 builds the P-384 VOPRF by hand on BigInteger
+# ADR-1125: Privacy Pass token type 1 builds the P-384 VOPRF by hand on BigInteger
 
 - Status: Accepted
 - Date: 2026-10-29
