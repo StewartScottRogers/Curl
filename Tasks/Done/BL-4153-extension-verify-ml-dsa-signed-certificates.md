@@ -35,8 +35,8 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
-- Option `--mldsa-verify` (no argument), a certificate check hook (ADR-1016), recorded in ADR-1121. It has no URL scheme, so like `--ratelimit-pace` (ADR-1106) it adds no line to `ExtensionCatalogue.cs`; it is registered in the option, description and certificate check hook catalogues instead (shared list files, added to touches for that).
-- Default taken: the server's certificate must be ML-DSA signed, and every ML-DSA link must have its issuer in the chain sent (or be a last self-issued certificate), since the hook sees only the server's chain; anchors in `--cacert` are left out (ADR-1121).
+- Option `--mldsa-verify` (no argument), a certificate check hook (ADR-1016), recorded in ADR-1126. It has no URL scheme, so like `--ratelimit-pace` (ADR-1106) it adds no line to `ExtensionCatalogue.cs`; it is registered in the option, description and certificate check hook catalogues instead (shared list files, added to touches for that).
+- Default taken: the server's certificate must be ML-DSA signed, and every ML-DSA link must have its issuer in the chain sent (or be a last self-issued certificate), since the hook sees only the server's chain; anchors in `--cacert` are left out (ADR-1126).
 - ML-DSA verification reuses `Curl.Cryptography.MlDsa.VerifyData` (a shared layer, as ObliviousHttp already references it); certificates are read with `System.Formats.Asn1`.
 - `CURL_EXTENSIONS=0` and the listing are covered by `MlDsaCertificatesExtensionTests`: the option is absent from the command-line options, so curl's unknown-option exit 2 applies; without the option no hook activates, so every transfer is unchanged.
 - Measure-CodeQuality.ps1 -Library Curl.Extension.MlDsaCertificates.UnitLibrary: 100% line, 100% branch, max complexity 10, 0 failing members.

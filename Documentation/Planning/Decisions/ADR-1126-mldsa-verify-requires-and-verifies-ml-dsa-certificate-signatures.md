@@ -1,4 +1,4 @@
-# ADR-1121 — --mldsa-verify requires and verifies ML-DSA certificate signatures
+# ADR-1126 — --mldsa-verify requires and verifies ML-DSA certificate signatures
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

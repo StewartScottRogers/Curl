@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Description;
 namespace Curl.Extension.MlDsaCertificates;
 
 /// <summary>
-/// The <c>--mldsa-verify</c> extension (ADR-1121): ML-DSA signed certificates (FIPS 204, RFC 9881). After curl's own
+/// The <c>--mldsa-verify</c> extension (ADR-1126): ML-DSA signed certificates (FIPS 204, RFC 9881). After curl's own
 /// verification accepted a server's chain, it requires the server's certificate to be signed with ML-DSA and verifies
 /// every ML-DSA signature in the chain against its issuer's ML-DSA key. <c>Curl.Extension.Composition</c> registers
 /// its option, description and certificate check hook.

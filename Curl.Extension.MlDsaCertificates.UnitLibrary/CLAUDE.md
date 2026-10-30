@@ -1,6 +1,6 @@
 # Curl.Extension.MlDsaCertificates.UnitLibrary
 
-The ML-DSA signed certificates extension (ADR-0999, ADR-1121), tested against FIPS 204 and RFC 9881.
+The ML-DSA signed certificates extension (ADR-0999, ADR-1126), tested against FIPS 204 and RFC 9881.
 Namespace `Curl.Extension.MlDsaCertificates`. It references only `Curl.Extension.Abstractions.UnitLibrary`,
 `Curl.Cryptography.UnitLibrary` and the shared layers they bring.
 

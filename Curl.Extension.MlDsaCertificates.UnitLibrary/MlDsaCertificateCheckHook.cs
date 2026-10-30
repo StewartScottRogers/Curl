@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Certificates;
 namespace Curl.Extension.MlDsaCertificates;
 
 /// <summary>
-/// The <c>--mldsa-verify</c> check (ADR-1121) on a chain curl accepted: the server's certificate must be signed with
+/// The <c>--mldsa-verify</c> check (ADR-1126) on a chain curl accepted: the server's certificate must be signed with
 /// ML-DSA, and every certificate signed with ML-DSA must name the next certificate the server sent as its issuer (or,
 /// at the end of the chain, be self-issued), whose key is an ML-DSA key of the same parameter set (RFC 9881 section 4)
 /// under which the signature verifies over the DER <c>tbsCertificate</c> with an empty context (RFC 9881 section 3,
