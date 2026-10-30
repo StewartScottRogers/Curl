@@ -1,5 +1,4 @@
 using Curl.Protocol.Ssh.Fakes;
-using Curl.Protocol.Ssh.Negotiation;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Authentication;

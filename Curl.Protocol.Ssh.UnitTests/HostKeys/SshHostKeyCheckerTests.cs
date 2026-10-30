@@ -1,6 +1,4 @@
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Authentication;
-using Curl.Protocol.Ssh.Negotiation;
 using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.HostKeys;

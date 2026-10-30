@@ -1208,3 +1208,4 @@ Each option and the specific reason it lost.
 | [1159](ADR-1159-wireguard-extension-tunnels-each-connection-through-a-user-space-wireguard-peer.md) | The WireGuard extension tunnels each connection through a user-space WireGuard peer (BL-4147) | Accepted | 2026-10-30 |
 | [1160](ADR-1160-a-hung-shift-coordinator-is-replaced-by-a-lane-without-stopping-the-lanes.md) | A hung shift coordinator is replaced by a lane, without stopping the lanes (BL-4353) | Accepted | 2026-10-30 |
 | [1161](ADR-1161-wireguard-extension-resolves-host-names-by-dns-over-tcp-through-the-tunnel.md) | The WireGuard extension resolves host names by DNS over TCP through the tunnel (BL-4354) | Accepted | 2026-10-30 |
+| [1162](ADR-1162-ssh-unit-tests-import-each-moving-namespace-once-in-a-global-using-file.md) | The SSH unit tests import each moving namespace once, in a global using file of its own (BL-4367) | Accepted | 2026-10-30 |

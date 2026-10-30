@@ -1,5 +1,3 @@
-using Curl.Protocol.Ssh.Negotiation;
-
 namespace Curl.Protocol.Ssh.Fakes;
 
 /// <summary>

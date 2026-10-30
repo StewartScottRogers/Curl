@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using Curl.Cryptography;
-using Curl.Protocol.Ssh.KeyExchange;
 
 namespace Curl.Protocol.Ssh.Fakes;
 

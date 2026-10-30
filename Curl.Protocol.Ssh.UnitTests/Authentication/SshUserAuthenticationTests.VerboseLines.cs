@@ -1,7 +1,5 @@
 using System.Text;
 using Curl.Protocol.Ssh.Fakes;
-using Curl.Protocol.Ssh.Negotiation;
-using Curl.Protocol.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Authentication;
 

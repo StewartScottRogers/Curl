@@ -1,5 +1,4 @@
 using Curl.Cryptography;
-using Curl.Protocol.Ssh.Keys;
 using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.PacketProtection;

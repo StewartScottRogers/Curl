@@ -1,5 +1,3 @@
-using Curl.Protocol.Ssh.Authentication;
-
 namespace Curl.Protocol.Ssh.Fakes;
 
 /// <summary>

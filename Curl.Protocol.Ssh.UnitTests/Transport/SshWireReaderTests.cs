@@ -1,4 +1,3 @@
-using Curl.Protocol.Ssh.Authentication;
 using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Transport;

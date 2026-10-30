@@ -1,5 +1,4 @@
 using System.Text;
-using Curl.Protocol.Ssh.Connection;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Fakes;

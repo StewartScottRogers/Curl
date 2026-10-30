@@ -1,6 +1,3 @@
-using Curl.Protocol.Ssh.PacketProtection;
-using Curl.Protocol.Ssh.Transport;
-
 namespace Curl.Protocol.Ssh.Fakes;
 
 /// <summary>

@@ -1,4 +1,3 @@
-using Curl.Protocol.Ssh.Compression;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Testing;
 

@@ -1,4 +1,3 @@
-using Curl.Protocol.Ssh.Authentication;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Fakes;

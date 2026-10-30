@@ -1,10 +1,7 @@
 using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
-using Curl.Protocol.Ssh.KeyExchange;
-using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Ssh.Scp;
 
 namespace Curl.Protocol.Ssh;

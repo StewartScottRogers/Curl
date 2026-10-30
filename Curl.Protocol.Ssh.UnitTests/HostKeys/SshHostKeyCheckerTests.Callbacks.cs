@@ -1,5 +1,4 @@
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Testing;
 

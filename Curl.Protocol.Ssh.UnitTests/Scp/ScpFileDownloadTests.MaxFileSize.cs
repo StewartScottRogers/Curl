@@ -1,6 +1,5 @@
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
-using Curl.Protocol.Ssh.Keys;
 using Curl.Protocol.Ssh.Sftp;
 using Curl.Testing;
 

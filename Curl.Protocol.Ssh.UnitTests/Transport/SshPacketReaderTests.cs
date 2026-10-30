@@ -1,9 +1,6 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
-using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
-using Curl.Protocol.Ssh.KeyExchange;
-using Curl.Protocol.Ssh.PacketProtection;
 using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Transport;

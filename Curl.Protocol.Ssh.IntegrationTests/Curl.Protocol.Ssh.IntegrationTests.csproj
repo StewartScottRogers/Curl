@@ -15,8 +15,11 @@
   <!--
     The unit tests' fakes the Pageant test uses, linked rather than referenced: a
     ProjectReference to Curl.Protocol.Ssh.UnitTests would bring a second TestDiagnostics.
+    The fakes take their SSH namespaces from the unit tests' one-per-namespace global
+    using files, so those are linked too.
   -->
   <ItemGroup>
+    <Compile Include="..\Curl.Protocol.Ssh.UnitTests\GlobalUsings\*.cs" LinkBase="GlobalUsings" />
     <Compile Include="..\Curl.Protocol.Ssh.UnitTests\Fakes\InMemorySshAgent.cs" Link="Fakes\InMemorySshAgent.cs" />
     <Compile Include="..\Curl.Protocol.Ssh.UnitTests\Fakes\SshTestEncoding.cs" Link="Fakes\SshTestEncoding.cs" />
     <Compile Include="..\Curl.Protocol.Ssh.UnitTests\Fakes\TestUserKeys.cs" Link="Fakes\TestUserKeys.cs" />

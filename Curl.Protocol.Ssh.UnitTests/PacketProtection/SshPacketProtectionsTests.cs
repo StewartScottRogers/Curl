@@ -1,9 +1,6 @@
 using System.Security.Cryptography;
 using Curl.Cryptography;
 using Curl.Protocol.Ssh.Fakes;
-using Curl.Protocol.Ssh.KeyExchange;
-using Curl.Protocol.Ssh.Keys;
-using Curl.Protocol.Ssh.Transport;
 using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.PacketProtection;

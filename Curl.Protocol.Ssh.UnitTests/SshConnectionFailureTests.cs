@@ -1,5 +1,3 @@
-using Curl.Protocol.Ssh.PacketProtection;
-using Curl.Protocol.Ssh.Transport;
 using Curl.Testing;
 
 namespace Curl.Protocol.Ssh;

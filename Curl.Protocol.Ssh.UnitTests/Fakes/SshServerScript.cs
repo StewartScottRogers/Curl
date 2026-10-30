@@ -1,8 +1,5 @@
 using System.Buffers.Binary;
 using System.Text;
-using Curl.Protocol.Ssh.Negotiation;
-using Curl.Protocol.Ssh.PacketProtection;
-using Curl.Protocol.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Fakes;
 
