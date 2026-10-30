@@ -17,7 +17,14 @@ registered in any Composition catalogue (BL-4137 does that).
   are Latin-1 strings. `QuicVariableLengthInteger` writes RFC 9000 section 16 integers and `BinaryHttpReader` reads
   them, here rather than taken from a protocol library. An invalid message throws `BinaryHttpFormatException`, a
   `FormatException`.
+- `Encapsulation/` is RFC 9458 sections 3 and 4 (ADR-1111): `KeyConfiguration.Parse` reads one key configuration,
+  `KeyConfigurationList.Parse` an `application/ohttp-keys` list (leaving out configurations whose KEM is not
+  supported) and `SelectFirstSupported` gives the first configuration and KDF and AEAD pair this library implements as
+  a `KeyConfigurationChoice`. `ObliviousRequest.Encapsulate` builds the `message/ohttp-req` body and keeps the HPKE
+  context whose `DecapsulateResponse` opens the `message/ohttp-res` body. Bad bytes throw
+  `MalformedKeyConfigurationException`, nothing usable `UnsupportedKeyConfigurationException`, a response that is
+  short or does not authenticate `EncapsulatedResponseException`. `ObliviousHttpMediaTypes` names the media types.
 
-Tested against the specifications, not against curl, with RFC 9180 Appendix A.1.1 and A.2.1 and the RFC 9292
-section 5 examples. Held to the four quality
+Tested against the specifications, not against curl, with RFC 9180 Appendix A.1.1 and A.2.1, the RFC 9292
+section 5 examples and RFC 9458 Appendix A. Held to the four quality
 gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.ObliviousHttp.UnitTests`.
