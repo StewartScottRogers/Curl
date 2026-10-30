@@ -1,4 +1,4 @@
-# ADR-1149: --compression-dictionary stores and advertises RFC 9842 dictionaries in a transfer hook (BL-4132)
+# ADR-1154: --compression-dictionary stores and advertises RFC 9842 dictionaries in a transfer hook (BL-4132)
 
 - Status: Accepted
 - Date: 2026-10-30

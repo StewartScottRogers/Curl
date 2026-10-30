@@ -1,7 +1,7 @@
 # Curl.Extension.CompressionDictionary.UnitLibrary
 
 The Compression Dictionary Transport extension, `--compression-dictionary <dir>` (RFC 9842; ADR-0999, ADR-1100,
-ADR-1149). Namespace `Curl.Extension.CompressionDictionary`. It references only
+ADR-1154). Namespace `Curl.Extension.CompressionDictionary`. It references only
 `Curl.Extension.Abstractions.UnitLibrary` and the shared layers it brings, and `Curl.Zstandard.UnitLibrary` for
 `dcz` (ADR-1107).
 

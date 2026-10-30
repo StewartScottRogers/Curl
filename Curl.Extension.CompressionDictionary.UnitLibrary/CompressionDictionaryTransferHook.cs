@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.CompressionDictionary;
 
 /// <summary>
-/// The <c>--compression-dictionary</c> transfer hook (ADR-1149), a client of RFC 9842. On an HTTP or HTTPS
+/// The <c>--compression-dictionary</c> transfer hook (ADR-1154), a client of RFC 9842. On an HTTP or HTTPS
 /// transfer it looks up the dictionary whose <c>match</c> fits the request URL best (§2.2.2) and, when curl's
 /// handler is not decoding content itself, sends <c>Available-Dictionary</c> (§2.2), <c>Dictionary-ID</c> (§2.3)
 /// and <c>Accept-Encoding: dcb, dcz</c> (§6.1). A <c>dcb</c> or <c>dcz</c> response compressed against it is decoded

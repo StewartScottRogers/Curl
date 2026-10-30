@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.CompressionDictionary;
 
 /// <summary>
-/// The <c>--compression-dictionary</c> extension (ADR-1149): Compression Dictionary Transport (RFC 9842). It stores
+/// The <c>--compression-dictionary</c> extension (ADR-1154): Compression Dictionary Transport (RFC 9842). It stores
 /// responses that carry <c>Use-As-Dictionary</c> in a directory, advertises the best matching one with
 /// <c>Available-Dictionary</c> and the <c>dcb</c> and <c>dcz</c> content codings, and decodes a response compressed
 /// against it. <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
