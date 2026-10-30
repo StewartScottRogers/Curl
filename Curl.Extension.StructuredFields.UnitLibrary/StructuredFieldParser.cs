@@ -179,6 +179,11 @@ internal sealed class StructuredFieldParser
     {
         '"' => ReadString(),
         ':' => ReadByteSequence(),
+        _ => ReadMarkedBareItem(),
+    };
+
+    private BareItem ReadMarkedBareItem() => First switch
+    {
         '?' => ReadBoolean(),
         '@' => ReadDate(),
         '%' => ReadDisplayString(),
@@ -187,24 +192,27 @@ internal sealed class StructuredFieldParser
 
     private BareItem ReadNumber()
     {
-        var negative = Consumes('-');
+        var sign = Consumes('-') ? "-" : string.Empty;
         if (!char.IsAsciiDigit(First))
         {
             throw new FormatException("a number has no digits");
         }
 
         var integerPart = ReadWhile(IsDigit);
-        if (!Consumes('.'))
-        {
-            return integerPart.Length > MaximumIntegerDigits
-                ? throw new FormatException("an integer has more than 15 digits")
-                : new BareItem(BareItemType.Integer, long.Parse((negative ? "-" : string.Empty) + integerPart, CultureInfo.InvariantCulture));
-        }
+        return Consumes('.') ? ReadDecimalFraction(sign, integerPart) : Integer(sign, integerPart);
+    }
 
+    private static BareItem Integer(string sign, string integerPart) =>
+        integerPart.Length > MaximumIntegerDigits
+            ? throw new FormatException("an integer has more than 15 digits")
+            : new BareItem(BareItemType.Integer, long.Parse(sign + integerPart, CultureInfo.InvariantCulture));
+
+    private BareItem ReadDecimalFraction(string sign, string integerPart)
+    {
         var fraction = ReadWhile(IsDigit);
         return integerPart.Length > MaximumIntegerPartDigits || fraction.Length is 0 or > MaximumFractionDigits
             ? throw new FormatException("a decimal has more than 12 integer digits or not 1 to 3 fraction digits")
-            : new BareItem(BareItemType.Decimal, decimal.Parse((negative ? "-" : string.Empty) + integerPart + "." + fraction, CultureInfo.InvariantCulture));
+            : new BareItem(BareItemType.Decimal, decimal.Parse(sign + integerPart + "." + fraction, CultureInfo.InvariantCulture));
     }
 
     private BareItem ReadString()
