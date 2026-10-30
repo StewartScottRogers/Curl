@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.OciRegistry.Client;
 
-/// <summary>The <c>oci://</c> extension's description and handler factory (ADR-1090).</summary>
+/// <summary>The <c>oci://</c> extension's description and handler factory (ADR-1093).</summary>
 public static class OciRegistryExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

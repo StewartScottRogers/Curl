@@ -1137,3 +1137,4 @@ Each option and the specific reason it lost.
 | [1091](ADR-1091-amqp0-registers-amqp-and-amqps-and-follows-amqp-0-9-1-with-rabbitmqs-errata.md) | The amqp0 extension registers amqp and amqps and follows AMQP 0-9-1 with RabbitMQ's errata (BL-4117) | Accepted | 2026-10-29 |
 | [1092](ADR-1092-zsync-fetches-only-the-blocks-a-seed-file-lacks-following-zsync-0-6.md) | --zsync fetches only the blocks a seed file lacks, following zsync 0.6 (BL-4130) | Accepted | 2026-10-29 |
 | [1090](ADR-1090-oci-pulls-manifests-by-tag-and-blobs-by-digest-over-https-with-the-registry-bearer-token.md) | OCI pulls manifests by tag and blobs by digest over HTTPS with the registry Bearer token (BL-4292) | Accepted | 2026-10-29 |
+| [1093](ADR-1093-oci-pulls-manifests-by-tag-and-blobs-by-digest-over-https-with-the-registry-bearer-token.md) | OCI pulls manifests by tag and blobs by digest over HTTPS with the registry Bearer token (BL-4292) | Accepted | 2026-10-29 |

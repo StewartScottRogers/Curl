@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.OciRegistry.Client;
 
 /// <summary>
-/// Serves <c>oci://registry[:port]/name[:tag]</c> and <c>oci://registry[:port]/name@digest</c> (ADR-1090): pulls the
+/// Serves <c>oci://registry[:port]/name[:tag]</c> and <c>oci://registry[:port]/name@digest</c> (ADR-1093): pulls the
 /// manifest or blob the path names (<see cref="OciPullReference"/>) from the registry over HTTPS, port 443 by default,
 /// through <see cref="OciPullFlow"/>, and writes its body to the output.
 /// </summary>

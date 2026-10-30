@@ -33,7 +33,7 @@ Split from BL-4127 (extension 26 of 63; ADR-0999). OCI Distribution Specificatio
 ## Notes
 
 - Added `ExtensionDescriptionCatalogue.cs` (the `--extensions` listing needs the description line), the test csproj (Composition and Core references for the registration and `CURL_EXTENSIONS=0` tests) and `CurlCompositionTests.cs` (its list of connecting handlers names every TCP handler) to `touches`; no task in Doing on `origin/work/dark-factory` names them.
-- Decisions in ADR-1090: `oci://registry[:port]/name[:tag]` pulls a manifest (tag `latest` by default), `name@digest` a blob; HTTPS only on 443; one Bearer token retry with `-u` as Basic to the realm; redirects followed without the token up to 50 (curl's default); `UNAUTHORIZED`/`DENIED`/401/403 exit 67, other errors exit 22 with curl's `-f` message plus the first `errors[].code`.
+- Decisions in ADR-1093: `oci://registry[:port]/name[:tag]` pulls a manifest (tag `latest` by default), `name@digest` a blob; HTTPS only on 443; one Bearer token retry with `-u` as Basic to the realm; redirects followed without the token up to 50 (curl's default); `UNAUTHORIZED`/`DENIED`/401/403 exit 67, other errors exit 22 with curl's `-f` message plus the first `errors[].code`.
 - Name, tag and digest grammar is checked by hand rather than `[GeneratedRegex]`: the generated matcher counts against the coverage and complexity gates of the library.
 - `Measure-CodeQuality.ps1 -Library Curl.Extension.OciRegistry.UnitLibrary`: 100% line, 100% branch, max complexity 10, no failing member. Fast tests green on Windows; tests use no paths, files or OS error text, so they are platform-neutral (CI criterion met by that).
 

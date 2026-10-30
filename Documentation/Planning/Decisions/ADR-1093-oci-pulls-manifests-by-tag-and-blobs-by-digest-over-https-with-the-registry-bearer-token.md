@@ -1,4 +1,4 @@
-# ADR-1090: OCI pulls manifests by tag and blobs by digest over HTTPS with the registry Bearer token
+# ADR-1093: OCI pulls manifests by tag and blobs by digest over HTTPS with the registry Bearer token
 
 - Status: Accepted
 - Date: 2026-10-29
