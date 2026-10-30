@@ -39,9 +39,12 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - The POST to the relay needs a hook context with another URL, method and body, which BL-4303 (in Doing) adds as `TransferContextRequests.WithRequest`; so this task waits on it rather than writing its own `ITransferContext`.
 - Touches gained `ExtensionOptionCatalogue.cs`, `ExtensionDescriptionCatalogue.cs` and `ExtensionTransferHookCatalogue.cs`: an option-driven transfer hook registers there (as HttpCache and OAuth2 do), not in `ExtensionCatalogue.cs`. All three are shared list files, so they overlap no task.
 
+- 2026-10-30 (lane 6): client flow written, left uncommitted for the stash: ObliviousHttpExtension (--ohttp-relay, --ohttp-keys file|url, default the target's /.well-known/ohttp-gateway), Relay/ (hook, InnerRequest, HookRequest, KeyConfigurationSource, InnerResponseOutput), catalogue lines in the option, description and hook catalogues, ADR-1149, CLAUDE.md, and 30-odd tests in Curl.Extension.ObliviousHttp.UnitTests (142 pass, a fake relay and gateway written from RFC 9458 sections 4.3, 4.4 and 5). The extension adds no scheme, so it has no ExtensionCatalogue.cs line: a hook registers in ExtensionTransferHookCatalogue.cs, as HttpCache does. Left to do: Measure-CodeQuality.ps1 -Library Curl.Extension.ObliviousHttp.UnitLibrary (measure it alone: with Composition added, the run took 100 minutes and stopped with dotnet test exit 1 although every test project in its log printed Passed), then dotnet build and the fast tests, then tick and finish. BL-4349 files the follow-up: the relay POST still carries the transfer's own -H, -A, -b and --user.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 0ccaeafb c14da2cb 82b195bf e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Split for size into BL-4311, BL-4309 and BL-4310 (HPKE, Binary HTTP, encapsulation); also waits on BL-4303 for the relay POST context
 - 2026-10-30: Backlog -> Doing. Criteria at claim: 0ccaeafb c14da2cb 82b195bf e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-30: Doing -> Backlog. Out of time: code and tests written (uncommitted, stashed); the quality run and full verification remain, see Notes
