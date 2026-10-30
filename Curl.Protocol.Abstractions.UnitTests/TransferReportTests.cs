@@ -47,6 +47,21 @@ public sealed class TransferReportTests
         Assert.AreEqual(0L, report.SslVerifyResult);
         Assert.AreEqual(0L, report.ProxySslVerifyResult);
         Assert.AreEqual(CurlProxyCode.Ok, report.ProxyError);
+        Assert.IsEmpty(report.ExtensionWriteOutValues);
+    }
+
+    [TestMethod]
+    public void New_WithExtensionWriteOutValues_CarriesThem()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        var values = new Dictionary<string, string> { ["sf_list"] = "a, b" };
+        diagnostics.Arrange("ExtensionWriteOutValues", "sf_list=a, b");
+
+        var report = new TransferReport { ExtensionWriteOutValues = values };
+
+        diagnostics.Act("same dictionary", ReferenceEquals(values, report.ExtensionWriteOutValues));
+        diagnostics.Assert("same dictionary", true, ReferenceEquals(values, report.ExtensionWriteOutValues));
+        Assert.AreSame(values, report.ExtensionWriteOutValues);
     }
 
     [TestMethod]

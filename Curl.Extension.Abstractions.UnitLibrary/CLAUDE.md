@@ -19,7 +19,11 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   `context.WithOutputs(...)` (`TransferContextOutputs`) to capture curl's response and write a different
   one (a stored response for a 304), or with `context.WithRequest(url, method, body)`
   (`TransferContextRequests`) to send a request of its own (a WebDAV `PROPFIND`) through curl's HTTP stack; a
-  null method or body keeps the transfer's own. By default it calls `next` unchanged.
+  null method or body keeps the transfer's own. By default it calls `next` unchanged. A hook adds `-w`
+  variables by returning a `TransferResult` whose `Report` carries `ExtensionWriteOutValues` (name to
+  text, `result with { Report = result.Report with { ExtensionWriteOutValues = ... } }`): `%{name}` prints
+  the value only for a name curl has no variable of, so a curl variable is never shadowed, and a name
+  given no value stays unknown (ADR-1115).
 - `Connection/IConnectionHook` supplies the connector (and optionally the datagram connector) a
   transfer runs over in place of curl's, given curl's so it can reach a first hop through it.
   `ConnectionHooks.ActivatedBy` keeps the one hook whose option was given and throws an

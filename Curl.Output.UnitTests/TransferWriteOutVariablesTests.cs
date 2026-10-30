@@ -367,6 +367,80 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void TryGetVariableText_NameAnExtensionGaveAValue_PrintsThatValue()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var values = new Dictionary<string, string> { ["sf_dictionary"] = "a=1, b=?0", ["empty"] = string.Empty };
+        diagnostics.Arrange("extension values", string.Join(';', values));
+        TransferWriteOutVariables variables = WithReport(new TransferReport { ExtensionWriteOutValues = values });
+
+        var given = Get(variables, "sf_dictionary");
+        var empty = Get(variables, "empty");
+
+        diagnostics.Act("sf_dictionary", given);
+        diagnostics.Act("empty", empty);
+        diagnostics.Assert("sf_dictionary", "a=1, b=?0", given);
+        Assert.AreEqual("a=1, b=?0", given);
+        Assert.AreEqual(string.Empty, empty);
+    }
+
+    [TestMethod]
+    [DataRow("http_code", "200")]
+    [DataRow("size_download", "7")]
+    [DataRow("url", LoopbackUrl)]
+    [DataRow("exitcode", "0")]
+    [DataRow("url.host", "127.0.0.1")]
+    public void TryGetVariableText_ExtensionValueUnderACurlName_PrintsCurlsValue(string name, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("name", name);
+        var report = new TransferReport
+        {
+            ResponseCode = 200,
+            DownloadSize = 7,
+            ExtensionWriteOutValues = new Dictionary<string, string> { [name] = "shadowed" },
+        };
+        TransferWriteOutVariables variables = WithReport(report);
+
+        var text = Get(variables, name);
+
+        diagnostics.Act("text", text);
+        diagnostics.Assert("text", expected, text);
+        Assert.AreEqual(expected, text);
+    }
+
+    [TestMethod]
+    [DataRow("json")]
+    [DataRow("header_json")]
+    public void TryGetVariableText_ExtensionValueUnderAJsonName_PrintsCurlsJson(string name)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("name", name);
+        TransferWriteOutVariables variables = WithReport(new TransferReport { ExtensionWriteOutValues = new Dictionary<string, string> { [name] = "shadowed" } });
+
+        var text = Get(variables, name);
+
+        diagnostics.Act("text", text);
+        diagnostics.Assert("starts with", "{", text);
+        Assert.StartsWith("{", text);
+    }
+
+    [TestMethod]
+    public void TryGetVariableText_UnknownNameNoExtensionGave_IsNotKnown()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        TransferWriteOutVariables variables = WithReport(new TransferReport { ExtensionWriteOutValues = new Dictionary<string, string> { ["sf_list"] = "a" } });
+        diagnostics.Arrange("extension values", "sf_list=a");
+
+        var known = variables.TryGetVariableText("sf_dictionary", out string? text);
+
+        diagnostics.Act("known", known);
+        diagnostics.Assert("known", false, known);
+        Assert.IsFalse(known);
+        Assert.IsNull(text);
+    }
+
+    [TestMethod]
     public void FindFirstHeaderValue_DuplicatesAndPadding_FirstValueTrimmedCaseInsensitively()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
