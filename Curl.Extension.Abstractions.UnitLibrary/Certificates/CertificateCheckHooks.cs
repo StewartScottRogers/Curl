@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Curl.Extension.Abstractions.Certificates;
 
 /// <summary>
@@ -37,13 +39,41 @@ public sealed class CertificateCheckHooks
     public ITlsProvider TlsProviderOver(ITlsProvider curlTlsProvider) =>
         Hooks.Count == 0 ? curlTlsProvider : new CertificateCheckingTlsProvider(curlTlsProvider, this);
 
+    /// <summary>
+    /// Keeps the port of each connection the checking connector opened, so an in-place upgrade of it is
+    /// checked with that port (ADR-1131). Weak, so a connection's entry goes with the connection.
+    /// </summary>
+    private readonly ConditionalWeakTable<IConnection, ConnectTarget> _targetsOfConnections = new();
+
+    /// <summary>Remembers the port of a connect the checking connector made, then runs every check on its chain.</summary>
+    /// <param name="result">The connect's result.</param>
+    /// <param name="target">The host and port the connect was made to.</param>
+    /// <param name="cancellationToken">Cancels the checks.</param>
+    /// <returns>What <see cref="CheckedAsync" /> returns for <paramref name="result" />.</returns>
+    internal ValueTask<ConnectResult> CheckedConnectAsync(ConnectResult result, ConnectTarget target, CancellationToken cancellationToken)
+    {
+        if (result.Connection is { } connection)
+        {
+            _targetsOfConnections.AddOrUpdate(connection, target);
+        }
+
+        return CheckedAsync(result, target.Host, target.Port, handshook: false, cancellationToken);
+    }
+
+    /// <summary>Gives the port the checking connector opened <paramref name="connection" /> to.</summary>
+    /// <param name="connection">The plaintext connection an in-place upgrade secures.</param>
+    /// <returns>The port, or <see langword="null" /> when the checking connector did not open it.</returns>
+    internal int? PortOf(IConnection connection) =>
+        _targetsOfConnections.TryGetValue(connection, out ConnectTarget? target) ? target.Port : null;
+
     /// <summary>Runs every check on the chain of a connect curl accepted.</summary>
     /// <param name="result">The connect's result.</param>
     /// <param name="host">The host name the chain was verified against.</param>
+    /// <param name="port">The port the connection was made to, or <see langword="null" /> when it is unknown.</param>
     /// <param name="handshook">Whether the connect was a TLS handshake even when it reported no certificate.</param>
     /// <param name="cancellationToken">Cancels the checks.</param>
     /// <returns><paramref name="result" /> when it failed, was reused, had no TLS or every check let it stand; otherwise exit 60 with the refusal, after its connection is disposed.</returns>
-    internal async ValueTask<ConnectResult> CheckedAsync(ConnectResult result, string host, bool handshook, CancellationToken cancellationToken)
+    internal async ValueTask<ConnectResult> CheckedAsync(ConnectResult result, string host, int? port, bool handshook, CancellationToken cancellationToken)
     {
         if (result.Connection is not { } connection || result.IsReused || (!handshook && result.PeerCertificates.Count == 0))
         {
@@ -52,7 +82,7 @@ public sealed class CertificateCheckHooks
 
         foreach (ICertificateCheckHook hook in Hooks)
         {
-            if (await hook.RefusalOfAsync(result.PeerCertificates, host, cancellationToken).ConfigureAwait(false) is { } refusal)
+            if (await hook.RefusalOfAsync(result.PeerCertificates, host, port, cancellationToken).ConfigureAwait(false) is { } refusal)
             {
                 await connection.DisposeAsync().ConfigureAwait(false);
                 return ConnectResult.Failed(CurlExitCode.PeerFailedVerification, refusal);

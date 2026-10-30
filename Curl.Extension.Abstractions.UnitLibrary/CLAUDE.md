@@ -40,7 +40,9 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   every hook whose option was given, run in order until one refuses; a host passes `ConnectorOver` and
   `TlsProviderOver` to the engine's `extensionCertificateConnector` and `extensionTlsProvider` (ADR-1016).
   A chain curl refused, a reused connection and a connection without TLS pass through unchecked, so a
-  check can only add a refusal.
+  check can only add a refusal. A check is given the host and the port the connection was made to: the connect's
+  target port, or for an in-place upgrade (STARTTLS) the port the checking connector opened the plaintext connection
+  to, or `null` when it did not open it (ADR-1131).
 - `Arguments/IArgumentExpander` turns one extension option's value into curl command-line arguments (URLs, `-X`,
   `-H`, `--data-binary`, `--next`), so an extension can supply whole requests. `ArgumentExpansion.Expand` replaces
   each expander's `--name value` or `--name=value` in the top-level arguments with them (not after a bare `--`, not in

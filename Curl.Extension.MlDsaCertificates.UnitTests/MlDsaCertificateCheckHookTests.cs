@@ -19,7 +19,7 @@ public sealed class MlDsaCertificateCheckHookTests
         TestCertificate leaf = new() { SignatureOid = oid, KeyOid = oid, PublicKey = TestCertificate.PublicKeyOf(root) };
         TestCertificate self = new() { Subject = "issuer", SignatureOid = oid, KeyOid = oid, PublicKey = TestCertificate.PublicKeyOf(root) };
 
-        string? refusal = await new MlDsaCertificateCheckHook().RefusalOfAsync([leaf.SignedBy(root), self.SignedBy(root)], "example.com", CancellationToken.None);
+        string? refusal = await new MlDsaCertificateCheckHook().RefusalOfAsync([leaf.SignedBy(root), self.SignedBy(root)], "example.com", 443, CancellationToken.None);
 
         Assert.IsNull(refusal);
     }

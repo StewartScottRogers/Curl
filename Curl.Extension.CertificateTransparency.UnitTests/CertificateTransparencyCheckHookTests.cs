@@ -14,7 +14,7 @@ public sealed class CertificateTransparencyCheckHookTests
         string? readPath = null;
         var hook = new CertificateTransparencyCheckHook("logs.json", (path, _) => { readPath = path; return Task.FromResult(logList); }, new FixedTimeProvider(CertificateTransparencyChain.Logged.AddDays(1)));
 
-        var refusal = await hook.RefusalOfAsync([leaf, chain.IssuerDer], "example.com", CancellationToken.None);
+        var refusal = await hook.RefusalOfAsync([leaf, chain.IssuerDer], "example.com", 443, CancellationToken.None);
 
         Assert.IsNull(refusal);
         Assert.AreEqual("logs.json", readPath);
@@ -29,7 +29,7 @@ public sealed class CertificateTransparencyCheckHookTests
         var logList = CertificateTransparencyChain.LogListOf(chain.LogKey.ExportSubjectPublicKeyInfo());
         var hook = new CertificateTransparencyCheckHook("logs.json", (_, _) => Task.FromResult(logList), new FixedTimeProvider(CertificateTransparencyChain.Logged.AddSeconds(-1)));
 
-        var refusal = await hook.RefusalOfAsync([leaf, chain.IssuerDer], "example.com", CancellationToken.None);
+        var refusal = await hook.RefusalOfAsync([leaf, chain.IssuerDer], "example.com", 443, CancellationToken.None);
 
         Assert.AreEqual(SignedCertificateTimestampVerifier.NoValidTimestamp, refusal);
     }
@@ -39,7 +39,7 @@ public sealed class CertificateTransparencyCheckHookTests
     {
         var hook = new CertificateTransparencyCheckHook("missing.json", (_, _) => throw new FileNotFoundException("gone"), TimeProvider.System);
 
-        var refusal = await hook.RefusalOfAsync([], "example.com", CancellationToken.None);
+        var refusal = await hook.RefusalOfAsync([], "example.com", 443, CancellationToken.None);
 
         Assert.AreEqual("Certificate Transparency: the log list missing.json could not be read: gone", refusal);
     }
@@ -49,7 +49,7 @@ public sealed class CertificateTransparencyCheckHookTests
     {
         var hook = new CertificateTransparencyCheckHook("locked.json", (_, _) => throw new UnauthorizedAccessException("denied"), TimeProvider.System);
 
-        var refusal = await hook.RefusalOfAsync([], "example.com", CancellationToken.None);
+        var refusal = await hook.RefusalOfAsync([], "example.com", 443, CancellationToken.None);
 
         Assert.AreEqual("Certificate Transparency: the log list locked.json could not be read: denied", refusal);
     }
@@ -61,7 +61,7 @@ public sealed class CertificateTransparencyCheckHookTests
     {
         var hook = new CertificateTransparencyCheckHook("bad.json", (_, _) => Task.FromResult(Encoding.UTF8.GetBytes(json)), TimeProvider.System);
 
-        var refusal = await hook.RefusalOfAsync([], "example.com", CancellationToken.None);
+        var refusal = await hook.RefusalOfAsync([], "example.com", 443, CancellationToken.None);
 
         StringAssert.StartsWith(refusal, "Certificate Transparency: the log list bad.json could not be read: ");
     }

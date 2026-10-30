@@ -17,7 +17,7 @@ internal sealed class MlDsaCertificateCheckHook : ICertificateCheckHook
     public ExtensionOption Option => MlDsaCertificatesExtension.Option;
 
     /// <inheritdoc />
-    public ValueTask<string?> RefusalOfAsync(IReadOnlyList<ReadOnlyMemory<byte>> peerCertificates, string host, CancellationToken cancellationToken) =>
+    public ValueTask<string?> RefusalOfAsync(IReadOnlyList<ReadOnlyMemory<byte>> peerCertificates, string host, int? port, CancellationToken cancellationToken) =>
         ValueTask.FromResult(RefusalOf(peerCertificates));
 
     /// <summary>Checks a chain, the server's own certificate first.</summary>

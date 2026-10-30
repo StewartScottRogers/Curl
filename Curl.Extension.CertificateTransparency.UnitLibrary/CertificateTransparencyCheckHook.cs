@@ -17,7 +17,7 @@ internal sealed class CertificateTransparencyCheckHook(string logListPath, Func<
     public ExtensionOption Option => CertificateTransparencyExtension.Option;
 
     /// <inheritdoc />
-    public async ValueTask<string?> RefusalOfAsync(IReadOnlyList<ReadOnlyMemory<byte>> peerCertificates, string host, CancellationToken cancellationToken)
+    public async ValueTask<string?> RefusalOfAsync(IReadOnlyList<ReadOnlyMemory<byte>> peerCertificates, string host, int? port, CancellationToken cancellationToken)
     {
         IReadOnlyDictionary<string, byte[]> keysByLogId;
         try

@@ -19,7 +19,7 @@ public sealed class CertificateTransparencyExtensionTests
             var leaf = chain.LeafWith(CertificateTransparencyChain.ListOf(chain.EcdsaTimestamp(CertificateTransparencyChain.Logged)));
             var hook = CertificateTransparencyExtension.HookFor(Given(logList))!;
 
-            var refusal = await hook.RefusalOfAsync([leaf, chain.IssuerDer], "example.com", CancellationToken.None);
+            var refusal = await hook.RefusalOfAsync([leaf, chain.IssuerDer], "example.com", 443, CancellationToken.None);
 
             Assert.IsInstanceOfType<CertificateTransparencyCheckHook>(hook);
             Assert.IsNull(refusal);

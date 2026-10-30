@@ -53,6 +53,7 @@ public sealed class CertificateCheckHooksTests
         Assert.IsTrue(connection.IsDisposed);
         Assert.AreSame(Chain, dane.GivenChain);
         Assert.AreEqual("example.com", dane.GivenHost);
+        Assert.AreEqual(Target.Port, dane.GivenPort);
     }
 
     [TestMethod]
@@ -156,6 +157,20 @@ public sealed class CertificateCheckHooksTests
         Assert.IsTrue(connection.IsDisposed);
         Assert.IsEmpty(dane.GivenChain!);
         Assert.AreEqual("mail.example.com", dane.GivenHost);
+        Assert.IsNull(dane.GivenPort);
+    }
+
+    [TestMethod]
+    public async Task TlsProviderOver_UpgradingAConnectionTheCheckingConnectorOpened_GivesTheCheckThatConnectsPort()
+    {
+        TrackedConnection plaintext = new();
+        ExampleHook dane = new(Dane, null);
+        CertificateCheckHooks hooks = HooksOf(dane);
+        await hooks.ConnectorOver(new FixedConnector(ConnectResult.Connected(plaintext))).ConnectAsync(new ConnectTarget("mail.example.com", 587, UseTls: false), CancellationToken.None);
+
+        await hooks.TlsProviderOver(new FixedTlsProvider(ConnectResult.Connected(new TrackedConnection(), null, peerCertificates: Chain))).AuthenticateAsClientAsync(plaintext, "mail.example.com", NoTransferEvents.Instance, CancellationToken.None);
+
+        Assert.AreEqual(587, dane.GivenPort);
     }
 
     [TestMethod]
@@ -206,13 +221,16 @@ public sealed class CertificateCheckHooksTests
 
         public string? GivenHost { get; private set; }
 
+        public int? GivenPort { get; private set; }
+
         public static Func<ExtensionOptionValues, ICertificateCheckHook?> ActivatedBy(ExtensionOption option, ExampleHook hook) =>
             values => values.IsGiven(option) ? hook : null;
 
-        public ValueTask<string?> RefusalOfAsync(IReadOnlyList<ReadOnlyMemory<byte>> peerCertificates, string host, CancellationToken cancellationToken)
+        public ValueTask<string?> RefusalOfAsync(IReadOnlyList<ReadOnlyMemory<byte>> peerCertificates, string host, int? port, CancellationToken cancellationToken)
         {
             GivenChain = peerCertificates;
             GivenHost = host;
+            GivenPort = port;
             return ValueTask.FromResult(refusal);
         }
     }

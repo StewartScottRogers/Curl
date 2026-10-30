@@ -105,7 +105,7 @@ public sealed class ExtensionCertificateCheckHookTests
     {
         public ExtensionOption Option => option;
 
-        public ValueTask<string?> RefusalOfAsync(IReadOnlyList<ReadOnlyMemory<byte>> peerCertificates, string host, CancellationToken cancellationToken)
+        public ValueTask<string?> RefusalOfAsync(IReadOnlyList<ReadOnlyMemory<byte>> peerCertificates, string host, int? port, CancellationToken cancellationToken)
         {
             checkedHosts.Add(host);
             return ValueTask.FromResult(refusal);
