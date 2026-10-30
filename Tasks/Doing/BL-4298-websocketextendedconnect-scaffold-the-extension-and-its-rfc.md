@@ -36,3 +36,4 @@ First part of BL-4112 (extension 11 of 63; rules in ADR-0999 and CLAUDE.md "Exte
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 5d7725a0 b32aef03 f6c38288 e35aff77 3d836d5e.
