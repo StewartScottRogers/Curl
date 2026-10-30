@@ -1193,3 +1193,4 @@ Each option and the specific reason it lost.
 | [1145](ADR-1145-dpop-signs-a-proof-per-http-request-with-a-pem-key.md) | --dpop signs a DPoP proof for every HTTP request with a PEM key (BL-4162) | Accepted | 2026-10-30 |
 | [1146](ADR-1146-har-writes-each-option-groups-http-transfers-as-a-har-1-2-archive.md) | --har writes each option group's HTTP transfers as a HAR 1.2 archive (BL-4155) | Accepted | 2026-10-29 |
 | [1147](ADR-1147-grpc-extension-calls-a-method-over-http2-with-a-grpc-proto-file.md) | The gRPC extension calls a method over HTTP/2 with a --grpc-proto file (BL-4341) | Accepted | 2026-10-29 |
+| [1145](ADR-1145-dns-query-adds-dns-over-https-as-dns-transport-https.md) | The DNS query extension adds DNS over HTTPS as --dns-transport https (BL-4339) | Accepted | 2026-10-30 |

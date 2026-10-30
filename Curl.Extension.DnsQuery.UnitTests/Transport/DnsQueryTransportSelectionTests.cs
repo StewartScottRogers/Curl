@@ -17,8 +17,8 @@ public sealed class DnsQueryTransportSelectionTests
     private static readonly ProtocolHandlerServices Services = new(Server, Server, new HandshakingTlsProvider(), null!);
 
     [TestMethod]
-    public void Names_AreUdpTcpTlsThenQuic() =>
-        CollectionAssert.AreEqual(new[] { "udp", "tcp", "tls", "quic" }, DnsQueryTransportSelection.Names.ToArray());
+    public void Names_AreUdpTcpTlsQuicThenHttps() =>
+        CollectionAssert.AreEqual(new[] { "udp", "tcp", "tls", "quic", "https" }, DnsQueryTransportSelection.Names.ToArray());
 
     [TestMethod]
     [DataRow("udp")]
@@ -60,6 +60,6 @@ public sealed class DnsQueryTransportSelectionTests
         DnsQueryException failure = Assert.ThrowsExactly<DnsQueryException>(() => DnsQueryTransportSelection.TransportOf("sctp", Services));
 
         Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
-        Assert.AreEqual("--dns-transport sctp names no transport; give one of udp, tcp, tls, quic", failure.Message);
+        Assert.AreEqual("--dns-transport sctp names no transport; give one of udp, tcp, tls, quic, https", failure.Message);
     }
 }

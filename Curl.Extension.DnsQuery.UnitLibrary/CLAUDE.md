@@ -1,6 +1,6 @@
 # Curl.Extension.DnsQuery.UnitLibrary
 
-The DNS query extension (ADR-0999, ADR-1124, ADR-1140, ADR-1143). Namespaces `Curl.Extension.DnsQuery.Wire`,
+The DNS query extension (ADR-0999, ADR-1124, ADR-1140, ADR-1143, ADR-1145). Namespaces `Curl.Extension.DnsQuery.Wire`,
 `Curl.Extension.DnsQuery.Rendering`, `Curl.Extension.DnsQuery.Client` and `Curl.Extension.DnsQuery.Transport`. It
 references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers `Curl.Networking.UnitLibrary` (for
 `SystemDnsServers`) and `Curl.Quic.UnitLibrary` (the DNS-over-QUIC client); never a `Curl.Protocol.*` library or another extension (not even `Curl.Extension.EncryptedDns`).
@@ -19,11 +19,14 @@ references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers 
   options to `DnsQueryProtocolHandler` as a `DnsQueryContext`; `DnsQueryRequest` reads the URL (no server: the
   system's first DNS server); failures are `DnsQueryException`s carrying the exit code.
 - `Transport/` holds `DnsQueryTransportSelection` (each `--dns-transport` name and its `IDnsQueryTransport`, which
-  also gives the port a URL naming none is queried on; DoH adds its name there), `Udp/DnsUdpTransport` (3 tries of 5
+  also gives the port a URL naming none is queried on), `Udp/DnsUdpTransport` (3 tries of 5
   seconds, TCP retry when TC is set), `Tcp/DnsTcpTransport` (two-octet length prefix), `Tls/DnsTlsTransport` (DNS
-  over TLS, RFC 7858: port 853, the TLS provider's handshake, then TCP's framing) and `Quic/DnsQuicTransport` (DNS
+  over TLS, RFC 7858: port 853, the TLS provider's handshake, then TCP's framing), `Quic/DnsQuicTransport` (DNS
   over QUIC, RFC 9250: port 853, ALPN `doq`, one stream with Message ID 0 and FIN, the certificate judged by the TLS
-  provider through `Quic/DnsQuicCertificateVerifier`).
+  provider through `Quic/DnsQuicCertificateVerifier`) and `Https/DnsHttpsTransport` (DNS over HTTPS, RFC 8484: port 443,
+  the TLS provider's handshake, then `DohRequest`'s HTTP/1.1 POST to `/dns-query` and `DohResponseReader`'s read of the
+  200 `application/dns-message` body, chunked, by `Content-Length` or to the connection's end; `DohResponseHead` parses
+  the status line and headers).
 
 Registered in `ExtensionCatalogue.cs`, `ExtensionDescriptionCatalogue.cs`, `ExtensionOptionCatalogue.cs` and
 `ExtensionTransferHookCatalogue.cs`. Held to the four quality gates in the root `CLAUDE.md`.

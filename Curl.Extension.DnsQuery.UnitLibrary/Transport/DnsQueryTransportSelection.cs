@@ -1,4 +1,5 @@
 using Curl.Extension.DnsQuery.Client;
+using Curl.Extension.DnsQuery.Transport.Https;
 using Curl.Extension.DnsQuery.Transport.Quic;
 using Curl.Extension.DnsQuery.Transport.Tcp;
 using Curl.Extension.DnsQuery.Transport.Tls;
@@ -25,8 +26,11 @@ internal static class DnsQueryTransportSelection
     /// <summary>DNS over QUIC (RFC 9250), port 853 by default.</summary>
     public const string Quic = "quic";
 
+    /// <summary>DNS over HTTPS (RFC 8484), a POST to /dns-query on port 443 by default.</summary>
+    public const string Https = "https";
+
     /// <summary>Gets every transport's name, in the order <c>--dns-transport</c>'s help lists them.</summary>
-    public static IReadOnlyList<string> Names { get; } = [Udp, Tcp, Tls, Quic];
+    public static IReadOnlyList<string> Names { get; } = [Udp, Tcp, Tls, Quic, Https];
 
     /// <summary>Gives the transport a name names, over curl's connection services.</summary>
     /// <param name="name">The name, in either case.</param>
@@ -40,6 +44,7 @@ internal static class DnsQueryTransportSelection
             Tcp => new DnsTcpTransport(services.Connector),
             Tls => new DnsTlsTransport(services.Connector, services.TlsProvider),
             Quic => new DnsQuicTransport(services.DatagramConnector, services.TlsProvider),
+            Https => new DnsHttpsTransport(services.Connector, services.TlsProvider),
             _ => throw new DnsQueryException(CurlExitCode.FailedInit, $"--dns-transport {name} names no transport; give one of {string.Join(", ", Names)}"),
         };
 }
