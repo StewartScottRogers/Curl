@@ -41,3 +41,4 @@ Extensions may reference shared layers but no `Curl.Protocol.*` library (ADR-099
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: acac56da ea52861d e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Needs Curl.Console/CurlComposition.cs, held by BL-4320 in Doing; depends-on BL-4320
+- 2026-10-29: Backlog -> Doing. Criteria at claim: acac56da ea52861d e35aff77 3d836d5e.
