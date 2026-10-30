@@ -1,4 +1,4 @@
-# ADR-1149 — --structured-fields shows known RFC 9651 fields in -v and -w
+# ADR-1152 — --structured-fields shows known RFC 9651 fields in -v and -w
 
 - **Status:** Accepted
 - **Date:** 2026-10-30

@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.StructuredFields;
 
 /// <summary>
-/// The <c>--structured-fields</c> extension (ADR-1149): shows the response's known Structured Field values (RFC 9651)
+/// The <c>--structured-fields</c> extension (ADR-1152): shows the response's known Structured Field values (RFC 9651)
 /// readably in <c>-v</c> output and as <c>-w</c> variables. <c>Curl.Extension.Composition</c> registers its option,
 /// description and transfer hook.
 /// </summary>

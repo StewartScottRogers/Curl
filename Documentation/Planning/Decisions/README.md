@@ -1197,4 +1197,4 @@ Each option and the specific reason it lost.
 | [1149](ADR-1149-grpc-extension-describes-the-method-by-server-reflection-v1.md) | The gRPC extension describes the method by server reflection v1 without --grpc-proto (BL-4342) | Accepted | 2026-10-30 |
 | [1150](ADR-1150-quic-migrate-moves-a-quic-transfer-to-a-new-local-address-after-path-loss.md) | --quic-migrate moves a QUIC transfer to a new local address after path loss (BL-4146) | Accepted | 2026-10-30 |
 | [1151](ADR-1151-resumable-upload-is-a-flag-that-takes-over-http-uploads.md) | --resumable-upload is a flag that takes over an HTTP -T upload (BL-4129) | Accepted | 2026-10-30 |
-| [1149](ADR-1149-structured-fields-shows-known-rfc-9651-fields-in-verbose-and-write-out.md) | --structured-fields shows known RFC 9651 fields in -v and -w (BL-4140) | Accepted | 2026-10-30 |
+| [1152](ADR-1152-structured-fields-shows-known-rfc-9651-fields-in-verbose-and-write-out.md) | --structured-fields shows known RFC 9651 fields in -v and -w (BL-4140) | Accepted | 2026-10-30 |

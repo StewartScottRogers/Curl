@@ -3,7 +3,7 @@ namespace Curl.Extension.StructuredFields;
 /// <summary>
 /// The response fields whose specifications define them as Structured Fields, each with the top-level type its
 /// specification gives (the "Structured Type" column of IANA's HTTP Field Name Registry, RFC 9110 §16.3.1), and
-/// the readable line for one such field's value (ADR-1149).
+/// the readable line for one such field's value (ADR-1152).
 /// </summary>
 internal static class KnownStructuredFields
 {

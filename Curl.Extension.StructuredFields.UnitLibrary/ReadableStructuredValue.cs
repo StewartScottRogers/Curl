@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Curl.Extension.StructuredFields;
 
 /// <summary>
-/// Writes a parsed Structured Field value as one readable line that names every type (ADR-1149): a List as
+/// Writes a parsed Structured Field value as one readable line that names every type (ADR-1152): a List as
 /// <c>List of 2: Token a; Integer 1 [q=Decimal 0.5]</c>, a Dictionary as <c>Dictionary of 1: u=Integer 3</c>, an Item
 /// as its bare item and parameters, an Inner List as <c>Inner List (Token a, Token b)</c>.
 /// </summary>

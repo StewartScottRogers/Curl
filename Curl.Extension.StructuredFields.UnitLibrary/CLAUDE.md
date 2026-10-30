@@ -1,6 +1,6 @@
 # Curl.Extension.StructuredFields.UnitLibrary
 
-The Structured Field Values extension (ADR-0999, ADR-1149), tested against RFC 9651. Namespace
+The Structured Field Values extension (ADR-0999, ADR-1152), tested against RFC 9651. Namespace
 `Curl.Extension.StructuredFields`. It references only `Curl.Extension.Abstractions.UnitLibrary` and the shared
 layers it brings.
 

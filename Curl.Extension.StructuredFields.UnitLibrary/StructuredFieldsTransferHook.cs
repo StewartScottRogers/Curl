@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.StructuredFields;
 
 /// <summary>
-/// The <c>--structured-fields</c> transfer hook (ADR-1149). After the transfer it parses every known Structured
+/// The <c>--structured-fields</c> transfer hook (ADR-1152). After the transfer it parses every known Structured
 /// Field in the response (<see cref="KnownStructuredFields" />, RFC 9651 §4.2), reports each as the <c>-v</c> line
 /// <c>* Structured field &lt;name&gt;: &lt;readable value&gt;</c>, and gives <c>-w</c> the variables
 /// <c>structured_fields</c> (every field, one <c>&lt;name&gt;: &lt;readable value&gt;</c> line each) and
