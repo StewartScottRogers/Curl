@@ -26,7 +26,7 @@ command line, the URL form and the exit codes to the client.
   option (the protocols a transfer may use), and an extension never changes curl's behaviour.
   Imports are read from the file's own directory. A file that is missing or does not parse is exit
   26 (curl's read error, as for a missing `-d @file`); a service or method the files do not declare
-  is exit 2. Without `--grpc-proto` the call fails with exit 2 until server reflection (BL-4342).
+  is exit 2. Without `--grpc-proto` the method is described by server reflection (ADR-1149, BL-4342).
 - **Request.** `-d` is the request message as proto3 JSON, encoded by the method's input type; no
   `-d`, or an empty one, sends the empty message, and JSON that is not of the type is exit 2. One
   uncompressed Length-Prefixed-Message ends the stream, sent as the flow-control windows allow.
