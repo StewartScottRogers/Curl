@@ -8,7 +8,7 @@ depends-on: [BL-4107]
 touches: [Curl.Extension.OpenApi.UnitLibrary/OpenApiYaml.cs, Curl.Extension.OpenApi.UnitLibrary/CLAUDE.md, Documentation/Planning/Decisions/ADR-1083-openapi-expands-an-operation-of-an-openapi-description-into-curl-arguments.md, Curl.Extension.OpenApi.UnitLibrary/OpenApiDocument.cs, Curl.Extension.OpenApi.UnitTests/OpenApiYamlTests.cs, Curl.Extension.OpenApi.UnitTests/OpenApiDocumentTests.cs, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4287 — Extension: read YAML OpenAPI descriptions with --openapi
 
@@ -38,3 +38,4 @@ BL-4107 added `Curl.Extension.OpenApi.UnitLibrary` (ADR-1083), which reads JSON 
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: f2752b60 6fb3b176 6543a87b 3d836d5e.
+- 2026-10-29: Doing -> Done. OpenApiYaml reads YAML descriptions; a YAML description gives the same curl arguments as its JSON twin; quality gates met.
