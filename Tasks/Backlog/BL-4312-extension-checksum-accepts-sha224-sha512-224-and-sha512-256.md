@@ -1,5 +1,5 @@
 ---
-id: BL-4308
+id: BL-4312
 title: Extension: --checksum accepts sha224, sha512-224 and sha512-256 with hand-built SHA-2 cores
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4308 — Extension: --checksum accepts sha224, sha512-224 and sha512-256 with hand-built SHA-2 cores
+# BL-4312 — Extension: --checksum accepts sha224, sha512-224 and sha512-256 with hand-built SHA-2 cores
 
 ## Goal
 

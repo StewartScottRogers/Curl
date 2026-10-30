@@ -40,5 +40,5 @@ hook's `ExecuteAsync` (ADR-1019) can see every body byte by running curl's handl
 ## Left out, with why
 
 - SHA-224, SHA-512/224 and SHA-512/256 (FIPS 180-4 §6.3, §6.7): the base class library has no primitive for them,
-  so they need hand-built SHA-256 and SHA-512 cores; BL-4308 adds them.
+  so they need hand-built SHA-256 and SHA-512 cores; BL-4312 adds them.
 - MD5 and SHA-3: not in FIPS 180-4, the specification the task names.
