@@ -1,4 +1,4 @@
-# ADR-1116: The MASQUE client flow opens datagram channels through curl's connector
+# ADR-1122: The MASQUE client flow opens datagram channels through curl's connector
 
 - Status: Accepted
 - Date: 2026-10-29

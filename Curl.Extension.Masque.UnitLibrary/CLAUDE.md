@@ -9,7 +9,7 @@ library or another extension, so it does not reuse `Curl.Networking`'s own CONNE
 request for `-x` (ADR-0250).
 
 Namespace `Curl.Extension.Masque`, with `Wire` and `Tunnel` below it. `Wire/` is the wire
-format; it works on bytes and owns no stream or socket. `Tunnel/` is the client flow (ADR-1116),
+format; it works on bytes and owns no stream or socket. `Tunnel/` is the client flow (ADR-1122),
 and the option (BL-4144) builds on it.
 
 - `MasqueUriTemplate` expands a proxy's URI template with `target_host`/`target_port`
