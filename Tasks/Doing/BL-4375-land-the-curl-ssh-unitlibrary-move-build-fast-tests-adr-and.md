@@ -36,3 +36,4 @@ Split from BL-4362 (over its cost cap). The stash holds all the work, already ve
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: e09ab28e 38fdd9b6 10174c6c 3d836d5e.
