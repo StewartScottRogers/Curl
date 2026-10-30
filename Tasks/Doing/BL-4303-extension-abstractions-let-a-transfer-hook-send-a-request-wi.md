@@ -32,3 +32,4 @@ Found by BL-4131 (WebDAV list and sync): `TransferContextRequestHeaders.WithRequ
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: a694e611 f50b5c0a 3180db99 3d836d5e.
