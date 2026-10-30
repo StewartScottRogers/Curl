@@ -40,3 +40,4 @@ Filed by BL-4132's first run when it split the task for size.
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: a8588390 6e8ab020 cfa7398a aac4ca86 35b0b836 c1e84cec 3180db99 3d836d5e.
