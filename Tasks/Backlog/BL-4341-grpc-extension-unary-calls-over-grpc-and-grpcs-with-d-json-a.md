@@ -37,3 +37,4 @@ Second of three parts of BL-4102, on BL-4340's `Wire/`. Specification: grpc.io P
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 12ee8bbf 90d861e8 73389f94 62009cc1 2881ec96 e35aff77 3d836d5e.
+- 2026-10-30: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-4341-20261029-184521-L1.jsonl
