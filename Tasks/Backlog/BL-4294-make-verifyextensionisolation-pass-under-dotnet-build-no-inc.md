@@ -1,5 +1,5 @@
 ---
-id: BL-4267
+id: BL-4294
 title: Make VerifyExtensionIsolation pass under dotnet build --no-incremental
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4267 — Make VerifyExtensionIsolation pass under dotnet build --no-incremental
+# BL-4294 — Make VerifyExtensionIsolation pass under dotnet build --no-incremental
 
 ## Goal
 
