@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.Checksum;
 
 /// <summary>
-/// The <c>--checksum &lt;alg&gt;:&lt;hex&gt;</c> extension (ADR-1092): hashes the response body as it is written
+/// The <c>--checksum &lt;alg&gt;:&lt;hex&gt;</c> extension (ADR-1096): hashes the response body as it is written
 /// with a FIPS 180-4 secure hash and fails the transfer with exit 61 when the digest differs from the one given.
 /// <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
 /// </summary>

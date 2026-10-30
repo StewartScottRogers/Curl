@@ -5,7 +5,7 @@ namespace Curl.Extension.Checksum;
 /// <summary>
 /// The hook <c>--checksum</c> gives when its value is not <c>&lt;alg&gt;:&lt;hex&gt;</c> with a known algorithm and
 /// a digest of its length: it refuses every transfer with exit 2, as curl refuses an option value it cannot read,
-/// without contacting the server (ADR-1092).
+/// without contacting the server (ADR-1096).
 /// </summary>
 internal sealed class InvalidChecksumTransferHook : ITransferHook
 {

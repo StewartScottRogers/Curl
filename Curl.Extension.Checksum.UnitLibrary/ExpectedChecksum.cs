@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 
 namespace Curl.Extension.Checksum;
 
-/// <summary>The digest <c>--checksum</c> expects: a FIPS 180-4 hash algorithm and its digest bytes (ADR-1092).</summary>
+/// <summary>The digest <c>--checksum</c> expects: a FIPS 180-4 hash algorithm and its digest bytes (ADR-1096).</summary>
 /// <param name="AlgorithmName">The algorithm as the value named it, in lower case, such as <c>sha256</c>.</param>
 /// <param name="Algorithm">The hash algorithm.</param>
 /// <param name="Digest">The expected digest.</param>

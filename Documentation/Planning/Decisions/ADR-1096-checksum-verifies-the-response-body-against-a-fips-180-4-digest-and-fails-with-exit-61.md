@@ -1,4 +1,4 @@
-# ADR-1092 — `--checksum` verifies the response body against a FIPS 180-4 digest and fails with exit 61
+# ADR-1096 — `--checksum` verifies the response body against a FIPS 180-4 digest and fails with exit 61
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

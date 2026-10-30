@@ -4,7 +4,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.Checksum;
 
 /// <summary>
-/// The hook <c>--checksum</c> gives (ADR-1092): it hashes the response body on its way to curl's output and, when
+/// The hook <c>--checksum</c> gives (ADR-1096): it hashes the response body on its way to curl's output and, when
 /// the transfer otherwise succeeded, fails it with exit 61 (<see cref="CurlExitCode.BadContentEncoding" />) unless
 /// the digest is the one expected. The body is written as it arrives, as curl leaves a failed transfer's output.
 /// </summary>

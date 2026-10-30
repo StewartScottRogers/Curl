@@ -1,6 +1,6 @@
 # Curl.Extension.Checksum.UnitLibrary
 
-The `--checksum <alg>:<hex>` extension (ADR-0999, ADR-1092). Namespace `Curl.Extension.Checksum`.
+The `--checksum <alg>:<hex>` extension (ADR-0999, ADR-1096). Namespace `Curl.Extension.Checksum`.
 It references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers it brings.
 
 - `ChecksumExtension` gives the `--checksum` option, its description and its hook activator, which
