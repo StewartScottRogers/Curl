@@ -4,7 +4,7 @@ title: Extension: Migrate QUIC connections and use multipath QUIC
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4095, BL-4315]
+depends-on: [BL-4091, BL-4093, BL-4095, BL-4320]
 touches: [Curl.Extension.QuicMigration.UnitLibrary, Curl.Extension.QuicMigration.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionConnectionHookCatalogue.cs]
 requirement: none
 created: 2026-10-29
@@ -36,10 +36,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
 - 2026-10-29 (lane 6, first claim): Design: a flag `--quic-migrate`, a connection hook (like `--npipe`'s, ADR-1021) that keeps curl's stream connector and wraps curl's datagram connector in `MigratingDatagramConnector`; each channel is a `MigratingDatagramChannel` that passes every datagram through unchanged and, once a 1-RTT (short header, RFC 9000 section 17.3.1) packet went each way (section 9: no migration before the handshake is confirmed), answers a send or receive failing with a local path loss socket error (`AddressNotAvailable`, `NetworkDown`, `NetworkUnreachable`, `NetworkReset`, `HostUnreachable`) by opening a fresh channel to the same server through curl's connector, disposing the old one (one path at a time, draft-ietf-quic-multipath section 2 without negotiation) and carrying on; the server validates the new path (section 9.3). Planned ADR: ADR-1109, recording that a new connection ID (section 9.5), PATH_CHALLENGE probing and multipath need a seam into the QUIC stack (to be filed as a follow-up task). Registration: like `--npipe`, an option extension registers in `ExtensionOptionCatalogue`, `ExtensionDescriptionCatalogue` and `ExtensionConnectionHookCatalogue` (all shared list files), not in `ExtensionCatalogue`, which holds protocol handler factories only; those three added to `touches`.
-- 2026-10-29: Requeued for BL-4315. In production `EngineComposition.DialersOf` builds HTTP/3's `QuicDialer` over its own `UdpChannelOpener`, so a connection hook's `DatagramConnectorOver` never sees a QUIC datagram (only the dialing harness opens QUIC through a datagram connector). The library, its catalogue lines and the slnx line are written (uncommitted, in the stash); tests, the ADR, the build and the quality run are still to do.
+- 2026-10-29: Requeued for BL-4320. In production `EngineComposition.DialersOf` builds HTTP/3's `QuicDialer` over its own `UdpChannelOpener`, so a connection hook's `DatagramConnectorOver` never sees a QUIC datagram (only the dialing harness opens QUIC through a datagram connector). The library, its catalogue lines and the slnx line are written (uncommitted, in the stash); tests, the ADR, the build and the quality run are still to do.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 3bb4418d d00a2947 dae9b5ab e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
-- 2026-10-29: Doing -> Backlog. Waits on BL-4315: HTTP/3's QUIC dialer opens its own UDP sockets, so the extension's datagram connector never sees a QUIC datagram
+- 2026-10-29: Doing -> Backlog. Waits on BL-4320: HTTP/3's QUIC dialer opens its own UDP sockets, so the extension's datagram connector never sees a QUIC datagram

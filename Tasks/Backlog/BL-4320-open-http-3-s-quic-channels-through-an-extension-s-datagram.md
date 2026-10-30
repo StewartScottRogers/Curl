@@ -1,5 +1,5 @@
 ---
-id: BL-4315
+id: BL-4320
 title: Open HTTP/3's QUIC channels through an extension's datagram connector
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4315 — Open HTTP/3's QUIC channels through an extension's datagram connector
+# BL-4320 — Open HTTP/3's QUIC channels through an extension's datagram connector
 
 ## Goal
 
