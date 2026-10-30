@@ -1,5 +1,5 @@
 ---
-id: BL-4317
+id: BL-4321
 title: Extension: Privacy Pass VOPRF(P-384, SHA-384) client for token type 1
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4317 — Extension: Privacy Pass VOPRF(P-384, SHA-384) client for token type 1
+# BL-4321 — Extension: Privacy Pass VOPRF(P-384, SHA-384) client for token type 1
 
 ## Goal
 
