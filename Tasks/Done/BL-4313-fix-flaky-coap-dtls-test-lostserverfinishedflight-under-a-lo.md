@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Coap.UnitTests]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4313 — Fix flaky CoAP DTLS test LostServerFinishedFlight under a loaded full run
 
@@ -22,12 +22,15 @@ Found by BL-4136 on 2026-10-29: it failed once in a full `dotnet test --filter "
 
 ## Acceptance criteria
 
-- [ ] The test waits for the events it needs (a fake TimeProvider or a signalled flight) instead of wall-clock timing.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The test waits for the events it needs (a fake TimeProvider or a signalled flight) instead of wall-clock timing.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: ImmediateTimeProvider fired every retransmission timer at once, racing the client reading the server reply. Added StarvedChannelTimeProvider (fires only when the test channel has nothing left to hand the client) and used it in the lost-flight tests; no wall-clock timing.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 00ae00f6 3d836d5e.
+- 2026-10-29: Doing -> Done. Lost-flight DTLS tests retransmit only once the channel is starved, no wall-clock race

@@ -72,7 +72,7 @@ public sealed class DtlsClientHandshakeTests
         server.DropNextFlight(DtlsServerFlight.ServerHello);
         DtlsTestServerChannel channel = new(server);
 
-        using DtlsClientSession session = await RunAsync(channel, insecure: true, new ImmediateTimeProvider());
+        using DtlsClientSession session = await RunAsync(channel, insecure: true, new StarvedChannelTimeProvider(channel));
 
         Assert.IsTrue(server.HandshakeComplete);
         Assert.IsGreaterThanOrEqualTo(2, channel.Sent.Count(datagram => IsHandshake(datagram, HandshakeType.ClientHello, 1)));
@@ -85,7 +85,7 @@ public sealed class DtlsClientHandshakeTests
         server.DropNextFlight(DtlsServerFlight.Finished);
         DtlsTestServerChannel channel = new(server);
 
-        using DtlsClientSession session = await RunAsync(channel, insecure: true, new ImmediateTimeProvider());
+        using DtlsClientSession session = await RunAsync(channel, insecure: true, new StarvedChannelTimeProvider(channel));
 
         Assert.IsTrue(server.HandshakeComplete);
         Assert.IsGreaterThanOrEqualTo(2, channel.Sent.Count(datagram => IsHandshake(datagram, HandshakeType.ClientKeyExchange, 2)));

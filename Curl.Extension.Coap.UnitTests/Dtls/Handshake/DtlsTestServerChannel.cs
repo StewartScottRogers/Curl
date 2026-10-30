@@ -15,6 +15,31 @@ internal sealed class DtlsTestServerChannel(DtlsTestServer server) : IDatagramCh
 {
     private readonly Channel<byte[]> inbox = Channel.CreateUnbounded<byte[]>();
 
+    private readonly object starvedGate = new();
+    private TaskCompletionSource starved = NewStarved();
+
+    /// <summary>Completes once the client waits to receive with no datagram left in the inbox.</summary>
+    public async Task WaitUntilStarvedAsync()
+    {
+        while (true)
+        {
+            Task wait;
+            lock (starvedGate)
+            {
+                wait = starved.Task;
+            }
+
+            await wait;
+            lock (starvedGate)
+            {
+                if (ReferenceEquals(wait, starved.Task))
+                {
+                    return;
+                }
+            }
+        }
+    }
+
     /// <inheritdoc />
     public EndPoint ServerEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 5684);
 
@@ -30,6 +55,14 @@ internal sealed class DtlsTestServerChannel(DtlsTestServer server) : IDatagramCh
     /// <summary>Hands <paramref name="datagram" /> to the client as if the server sent it.</summary>
     public void Deliver(byte[] datagram)
     {
+        lock (starvedGate)
+        {
+            if (starved.Task.IsCompleted)
+            {
+                starved = NewStarved();
+            }
+        }
+
         Delivered.Enqueue(datagram);
         inbox.Writer.TryWrite(datagram);
     }
@@ -53,10 +86,20 @@ internal sealed class DtlsTestServerChannel(DtlsTestServer server) : IDatagramCh
     /// <inheritdoc />
     public async ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        lock (starvedGate)
+        {
+            if (inbox.Reader.Count == 0)
+            {
+                starved.TrySetResult();
+            }
+        }
+
         byte[] datagram = await inbox.Reader.ReadAsync(cancellationToken);
         datagram.CopyTo(buffer);
         return new DatagramReceived(datagram.Length, ServerEndPoint);
     }
+
+    private static TaskCompletionSource NewStarved() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <inheritdoc />
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
