@@ -1,4 +1,4 @@
-# ADR-1106: Dynamic Protocol Buffers messages hold boxed values by field and decode to the wire codec's errors
+# ADR-1112: Dynamic Protocol Buffers messages hold boxed values by field and decode to the wire codec's errors
 
 - Status: Accepted
 - Date: 2026-10-29

@@ -29,7 +29,7 @@ Third of three parts split from BL-4165. Code under `DynamicMessages/` in the li
 
 ## Notes
 
-- Plan: `DynamicTypeCatalogue` resolves a set of files' named types (innermost scope out) into `DynamicMessageType`/`DynamicField`; `DynamicMessage` holds boxed values by field number plus unknown fields; `DynamicMessageEncoder` and `DynamicMessageDecoder` go through `ProtobufWriter`/`ProtobufReader`. Decisions in ADR-1106.
+- Plan: `DynamicTypeCatalogue` resolves a set of files' named types (innermost scope out) into `DynamicMessageType`/`DynamicField`; `DynamicMessage` holds boxed values by field number plus unknown fields; `DynamicMessageEncoder` and `DynamicMessageDecoder` go through `ProtobufWriter`/`ProtobufReader`. Decisions in ADR-1112.
 - Touches widened to `Wire/ProtobufDecodeError.cs` (new `InvalidUtf8`: proto3 rejects a non-UTF-8 string, and the task asks for the wire codec's typed error), `Wire/ProtobufReader.cs` (public `TryReadFieldValue`, so a field found unknown after its tag is kept and nested messages keep the reader's depth limit) and the library's `CLAUDE.md` (documents `DynamicMessages/`). No task in Doing on origin/work/dark-factory names them (BL-4168 holds `Descriptors/` only).
 - Default taken: a field with the wrong wire type for its descriptor is kept as an unknown field, as protoc's C++ runtime does; map entries always write key and value.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Protobuf.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10. `dotnet build Curl.slnx` 0 warnings; fast tests 90 assemblies passed, 198 in Curl.Protobuf.UnitTests. Tests are pure byte vectors, platform-neutral.

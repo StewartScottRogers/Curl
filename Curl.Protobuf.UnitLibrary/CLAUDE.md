@@ -15,7 +15,7 @@ Namespace `Curl.Protobuf.Wire` (folder `Wire/`): the wire format codec (BL-4164)
 - `ProtobufZigZag`: the ZigZag mapping.
 
 Namespace `Curl.Protobuf.DynamicMessages` (folder `DynamicMessages/`): messages of a type
-known only at run time (BL-4169, ADR-1106).
+known only at run time (BL-4169, ADR-1112).
 
 - `DynamicTypeCatalogue`: resolves the named types of a set of `ProtoFileDescriptor`s into
   `DynamicMessageType`s and their `DynamicField`s; a map field's entries are messages.
