@@ -34,3 +34,4 @@ Configuration format (wg(8) "CONFIGURATION FILE FORMAT" and wg-quick(8)): `[Inte
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: c10598a7 ec1e0714 bef89300 3d836d5e.
