@@ -29,7 +29,7 @@ Needed by BL-4144 (MASQUE: QUIC and HTTP/3 through a CONNECT-UDP or CONNECT-IP p
 
 ## Notes
 
-- Plan (ADR-1115): `CreateTransports` takes an optional `extensionDatagramConnector`; on the real network
+- Plan (ADR-1118): `CreateTransports` takes an optional `extensionDatagramConnector`; on the real network
   `NetworkDialersOf` builds the QUIC dialer over `DatagramConnectorUdpChannelOpener` when the hook's connector is not
   curl's own (`QuicDatagramConnectorOf`), else the socket `QuicDialer` as before. `CurlTransports.UdpDatagramConnector`
   stays curl's so the dispatch still hands it to the hook for TFTP; the hook's `DatagramConnectorOver` is so called

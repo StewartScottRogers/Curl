@@ -1,4 +1,4 @@
-# ADR-1115 — QUIC dials through an extension connection hook's datagram connector
+# ADR-1118 — QUIC dials through an extension connection hook's datagram connector
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
