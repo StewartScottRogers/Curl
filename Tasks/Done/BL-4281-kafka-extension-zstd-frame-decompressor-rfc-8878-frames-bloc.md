@@ -8,7 +8,7 @@ depends-on: [BL-4280]
 touches: [Curl.Extension.Kafka.UnitLibrary/Wire/Compression/Zstd/ZstdFrameDecompressor.cs, Curl.Extension.Kafka.UnitLibrary/Wire/Compression/Zstd/ZstdLiterals.cs, Curl.Extension.Kafka.UnitLibrary/Wire/Compression/Zstd/ZstdSequences.cs, Curl.Extension.Kafka.UnitTests/Wire/Compression/Zstd/ZstdFrameDecompressorTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4281 — Kafka extension: zstd frame decompressor (RFC 8878 frames, blocks, literals, sequences)
 
@@ -22,13 +22,17 @@ Split from BL-4277 (which wires the decoders into Curl.Extension.Kafka.UnitLibra
 
 ## Acceptance criteria
 
-- [ ] ZstdFrameDecompressor decompresses frames with raw, RLE and compressed blocks covering every literals and sequences mode, checked by unit tests against hand-assembled vectors.
-- [ ] A wrong magic number, a dictionary ID other than 0, truncated input and an offset before the start of the output throw FormatException naming zstd.
-- [ ] The library meets the four quality gates and the fast tests pass.
+- [x] ZstdFrameDecompressor decompresses frames with raw, RLE and compressed blocks covering every literals and sequences mode, checked by unit tests against hand-assembled vectors.
+- [x] A wrong magic number, a dictionary ID other than 0, truncated input and an offset before the start of the output throw FormatException naming zstd.
+- [x] The library meets the four quality gates and the fast tests pass.
 
 ## Notes
+
+- The content checksum is skipped, not verified (Kafka's batch CRC covers the compressed bytes); the window size is not enforced; a dictionary ID other than 0 is refused. Decided by Claude under Stewart's delegation.
+- Quality run of Curl.Extension.Kafka.UnitLibrary: 0 failing members, 214 tests green.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b8e6bd36 8adc22a9 dc514177.
+- 2026-10-29: Doing -> Done. ZstdFrameDecompressor decompresses zstd frames (raw, RLE, compressed blocks, all literals and sequences modes) with gates met
