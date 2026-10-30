@@ -35,3 +35,4 @@ completed:
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: fbecace0.
 - 2026-10-29: Doing -> Backlog. Waits for BL-4316 (holds Curl.Extension.PrivacyPass.UnitLibrary/Options, where PrivacyPassTransferHook picks the token type) and BL-4321 (the P-384 VOPRF client split out of this task)
+- 2026-10-30: Backlog -> Doing. Criteria at claim: fbecace0.
