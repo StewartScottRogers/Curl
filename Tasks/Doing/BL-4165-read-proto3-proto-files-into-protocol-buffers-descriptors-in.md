@@ -37,3 +37,4 @@ Second of three parts split from BL-4099. Builds on BL-4164's wire codec. Code g
 - 2026-10-29: Created (split from BL-4099).
 - 2026-10-29: Backlog -> Doing. Criteria at claim: db2edfd5 ef33a4ad 05c7963a 7ae6d7ff 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Split for size into BL-4170, BL-4168 and BL-4169; waits on them
+- 2026-10-29: Backlog -> Doing. Criteria at claim: db2edfd5 ef33a4ad 05c7963a 7ae6d7ff 3d836d5e.
