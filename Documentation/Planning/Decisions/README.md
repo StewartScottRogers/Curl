@@ -1171,3 +1171,4 @@ Each option and the specific reason it lost.
 | [1124](ADR-1124-dns-query-presents-records-as-named-fields-in-text-and-json.md) | The DNS query extension presents records as named fields, in dig-like text and in JSON (BL-4336) | Accepted | 2026-10-29 |
 | [1125](ADR-1125-privacy-pass-token-type-1-builds-p384-voprf-by-hand-on-biginteger.md) | Privacy Pass token type 1 builds the P-384 VOPRF by hand on BigInteger (BL-4321) | Accepted | 2026-10-29 |
 | [1126](ADR-1126-mldsa-verify-requires-and-verifies-ml-dsa-certificate-signatures.md) | --mldsa-verify requires and verifies ML-DSA certificate signatures (BL-4153) | Accepted | 2026-10-29 |
+| [1117](ADR-1117-oblivious-doh-extension-follows-rfc-9230-with-proxy-and-target-options.md) | The Oblivious DoH extension follows RFC 9230, named by `--odoh-proxy` and `--odoh-target` (BL-4149) | Accepted | 2026-10-29 |
