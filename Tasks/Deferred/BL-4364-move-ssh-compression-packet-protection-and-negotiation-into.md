@@ -4,7 +4,7 @@ title: Move SSH compression, packet protection and negotiation into Curl.Ssh.Uni
 priority: Low
 assignee: Claude
 pipeline: direct
-depends-on: [BL-4320, BL-4362]
+depends-on: [BL-4320, BL-4375, BL-4376]
 touches: [Curl.Ssh.UnitLibrary, Curl.Ssh.UnitTests, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests/Compression, Curl.Protocol.Ssh.UnitTests/PacketProtection, Curl.Protocol.Ssh.UnitTests/Negotiation, Curl.Protocol.Ssh.UnitTests/GlobalUsings/Curl.Protocol.Ssh.Compression.cs, Curl.Protocol.Ssh.UnitTests/GlobalUsings/Curl.Protocol.Ssh.PacketProtection.cs, Curl.Protocol.Ssh.UnitTests/GlobalUsings/Curl.Protocol.Ssh.Negotiation.cs, Curl.Protocol.Ssh.UnitTests/Fakes, Curl.Conformance.SshServer.UnitLibrary, Curl.Conformance.SshServer.UnitTests, Curl.Console/CurlComposition.cs, Curl.Engine.UnitLibrary/EngineComposition.PlatformBuilds.cs, Curl.Engine.UnitTests/EngineCompositionPlatformLibraryTests.cs]
 requirement: none
 created: 2026-10-30

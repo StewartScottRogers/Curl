@@ -44,3 +44,4 @@ Part 1 of BL-4328 (SSH transport layer into a shared library so extensions such 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: e09ab28e 112a1330 10174c6c e35aff77 3d836d5e.
 - 2026-10-30: Doing -> Backlog. Criterion 2 reworded: SshWireDecoders stays in Curl.Protocol.Ssh (the audit fuzzer's entry point, ADR-1162); the whole move is done and verified in the stash, so the next claim builds, runs the fast tests and finishes
+- 2026-10-30: Backlog -> Deferred. Split into BL-4375 and BL-4376 (over its cost cap)

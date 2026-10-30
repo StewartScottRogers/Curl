@@ -4,7 +4,7 @@ title: Move SSH key exchange, transport and host key verifiers into Curl.Ssh.Uni
 priority: Low
 assignee: Claude
 pipeline: direct
-depends-on: [BL-4320, BL-4362, BL-4363, BL-4364]
+depends-on: [BL-4320, BL-4375, BL-4376, BL-4363, BL-4364]
 touches: [Curl.Ssh.UnitLibrary, Curl.Ssh.UnitTests, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests/Transport, Curl.Protocol.Ssh.UnitTests/KeyExchange, Curl.Protocol.Ssh.UnitTests/HostKeys, Curl.Protocol.Ssh.UnitTests/GlobalUsings/Curl.Protocol.Ssh.Transport.cs, Curl.Protocol.Ssh.UnitTests/GlobalUsings/Curl.Protocol.Ssh.KeyExchange.cs, Curl.Protocol.Ssh.UnitTests/GlobalUsings/Curl.Protocol.Ssh.HostKeys.cs, Curl.Protocol.Ssh.UnitTests/Fakes, Curl.slnx, Curl.Conformance.SshServer.UnitLibrary, Curl.Conformance.SshServer.UnitTests, Curl.Console/CurlComposition.cs, Curl.Engine.UnitLibrary/EngineComposition.PlatformBuilds.cs, Curl.Engine.UnitTests/EngineCompositionPlatformLibraryTests.cs]
 requirement: none
 created: 2026-10-30
