@@ -1195,3 +1195,4 @@ Each option and the specific reason it lost.
 | [1147](ADR-1147-grpc-extension-calls-a-method-over-http2-with-a-grpc-proto-file.md) | The gRPC extension calls a method over HTTP/2 with a --grpc-proto file (BL-4341) | Accepted | 2026-10-29 |
 | [1148](ADR-1148-dns-query-adds-dns-over-https-as-dns-transport-https.md) | The DNS query extension adds DNS over HTTPS as --dns-transport https (BL-4339) | Accepted | 2026-10-30 |
 | [1149](ADR-1149-grpc-extension-describes-the-method-by-server-reflection-v1.md) | The gRPC extension describes the method by server reflection v1 without --grpc-proto (BL-4342) | Accepted | 2026-10-30 |
+| [1149](ADR-1149-quic-migrate-moves-a-quic-transfer-to-a-new-local-address-after-path-loss.md) | --quic-migrate moves a QUIC transfer to a new local address after path loss (BL-4146) | Accepted | 2026-10-30 |
