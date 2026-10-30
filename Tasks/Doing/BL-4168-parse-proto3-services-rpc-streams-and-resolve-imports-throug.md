@@ -32,3 +32,4 @@ Second of three parts split from BL-4165. Extends BL-4170's parser under `Descri
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 564d89be 99c0bb5f 7ae6d7ff 3d836d5e.
