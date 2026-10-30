@@ -1,4 +1,4 @@
-# ADR-1149 — `--webdav-list` and `--webdav-sync` list and sync a WebDAV collection through curl's HTTP stack
+# ADR-1164 — `--webdav-list` and `--webdav-sync` list and sync a WebDAV collection through curl's HTTP stack
 
 - **Status:** Accepted
 - **Date:** 2026-10-30

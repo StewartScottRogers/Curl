@@ -1,6 +1,6 @@
 # Curl.Extension.WebDavTools.UnitLibrary
 
-The WebDAV tools extension (ADR-0999, ADR-1149): `--webdav-list` lists a WebDAV collection from a
+The WebDAV tools extension (ADR-0999, ADR-1164): `--webdav-list` lists a WebDAV collection from a
 `PROPFIND`, and `--webdav-sync <dir>` downloads a collection tree into a local folder. Namespace
 `Curl.Extension.WebDavTools`. It references only `Curl.Extension.Abstractions.UnitLibrary`.
 

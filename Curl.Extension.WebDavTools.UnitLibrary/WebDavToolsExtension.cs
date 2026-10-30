@@ -7,7 +7,7 @@ using Curl.Extension.WebDavTools.Transfer;
 namespace Curl.Extension.WebDavTools;
 
 /// <summary>
-/// The WebDAV tools extension (ADR-1149): <c>--webdav-list</c> lists a collection from a <c>PROPFIND</c> (RFC 4918
+/// The WebDAV tools extension (ADR-1164): <c>--webdav-list</c> lists a collection from a <c>PROPFIND</c> (RFC 4918
 /// section 9.1) and <c>--webdav-sync &lt;dir&gt;</c> downloads a collection and every collection below it into a local
 /// folder. <c>Curl.Extension.Composition</c> registers its options, description and transfer hook.
 /// </summary>

@@ -5,7 +5,7 @@ using Curl.Extension.WebDavTools.Sync;
 namespace Curl.Extension.WebDavTools.Transfer;
 
 /// <summary>
-/// The <c>--webdav-sync &lt;dir&gt;</c> transfer hook (ADR-1149): lists the transfer's URL with a <c>Depth: 1</c>
+/// The <c>--webdav-sync &lt;dir&gt;</c> transfer hook (ADR-1164): lists the transfer's URL with a <c>Depth: 1</c>
 /// <c>PROPFIND</c>, plans it with <see cref="WebDavSyncPlanner" />, downloads each file that is not current with a
 /// <c>GET</c> into a <c>.webdav-part</c> file renamed over the local copy once the response is a 2xx, sets its last-write
 /// time to <c>getlastmodified</c> (RFC 4918 section 15.7), and syncs each sub-collection into its own folder the same

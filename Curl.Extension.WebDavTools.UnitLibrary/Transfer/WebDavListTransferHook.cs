@@ -6,7 +6,7 @@ using Curl.Extension.WebDavTools.Multistatus;
 namespace Curl.Extension.WebDavTools.Transfer;
 
 /// <summary>
-/// The <c>--webdav-list</c> transfer hook (ADR-1149): sends a <c>Depth: 1</c> <c>PROPFIND</c> for the transfer's URL in
+/// The <c>--webdav-list</c> transfer hook (ADR-1164): sends a <c>Depth: 1</c> <c>PROPFIND</c> for the transfer's URL in
 /// place of its own request and writes one line per <c>response</c> of the <c>207 Multistatus</c> body, in body order:
 /// <c>collection</c> or <c>file</c>, the length, the last-modified date (RFC 1123), and the percent-decoded href,
 /// separated by tabs, with <c>-</c> for a property the server did not report.
