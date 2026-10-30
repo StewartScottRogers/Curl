@@ -1130,3 +1130,4 @@ Each option and the specific reason it lost.
 | [1087](ADR-1087-segments-downloads-a-plain-http-get-as-parallel-byte-ranges-in-a-transfer-hook.md) | `--segments <n>` downloads a plain HTTP GET as parallel byte ranges (RFC 9110 §14), in a transfer hook (BL-4128) | Accepted | 2026-10-29 |
 | [1082](ADR-1082-amqp1-serves-amqp1-and-amqp1s-from-oasis-amqp-1-0.md) | AMQP 1.0 serves amqp1 and amqp1s, following OASIS AMQP Version 1.0 (BL-4118) | Accepted | 2026-10-29 |
 | [1088](ADR-1088-amqp1-serves-amqp1-and-amqp1s-from-oasis-amqp-1-0.md) | AMQP 1.0 serves amqp1 and amqp1s, following OASIS AMQP Version 1.0 (BL-4118) | Accepted | 2026-10-29 |
+| [1077](ADR-1077-webtransport-opens-one-session-over-http-3-and-carries-the-data-by-the-wt-query-field.md) | WebTransport opens one session over HTTP/3 and carries the data by the wt query field (BL-4113) | Accepted | 2026-10-29 |
