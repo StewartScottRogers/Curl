@@ -16,6 +16,14 @@ registration arrive in BL-4125.
   signer's inputs.
 - `Signing/GcsBearerAuthorization` builds `Authorization: Bearer <token>` from an OAuth 2.0
   access token.
+- `Xml/GcsListBucketResultParser` reads the XML API "List objects" `ListBucketResult` body into a
+  `GcsObjectListing`: prefix, delimiter, the `Contents` entries (`GcsListedObject`: key, size,
+  last write, ETag), common prefixes, truncation and the continuation value
+  (`NextContinuationToken`, else `NextMarker`).
+- `Xml/GcsErrorResponseParser` reads the "XML API error responses" `Error` body into a
+  `GcsErrorResponse` (`Code`, `Message`, `Details`).
+- Both match elements by local name and return a `GcsXmlParseResult`, never an exception, with the
+  reason when a body is not well-formed or lacks a required element (`Xml/GcsXmlBody`).
 
 Tested against the specification, not against curl. Held to the four quality gates in the root
 `CLAUDE.md`. Its tests are in `Curl.Extension.GoogleCloudStorage.UnitTests`.
