@@ -1,4 +1,4 @@
-# ADR-1153: The Dane extension checks TLSA records validated from the root with --dane
+# ADR-1155: The Dane extension checks TLSA records validated from the root with --dane
 
 - Status: Accepted
 - Date: 2026-10-30

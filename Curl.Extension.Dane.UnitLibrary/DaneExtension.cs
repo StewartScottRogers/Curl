@@ -9,7 +9,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Dane;
 
 /// <summary>
-/// The <c>--dane &lt;resolver&gt;</c> extension (ADR-1153): DNSSEC (RFC 4033-4035) and DANE TLSA (RFC 6698, RFC 7671).
+/// The <c>--dane &lt;resolver&gt;</c> extension (ADR-1155): DNSSEC (RFC 4033-4035) and DANE TLSA (RFC 6698, RFC 7671).
 /// After curl verified a server's chain, it looks up <c>_&lt;port&gt;._tcp.&lt;host&gt;</c>'s TLSA records through the
 /// named recursive resolver, validates them itself from the root trust anchors down, and refuses the connection with
 /// exit 60 when they are bogus, cannot be fetched, or are secure and none matches the chain.
