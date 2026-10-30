@@ -8,7 +8,7 @@ namespace Curl.Extension.Mqtt5;
 /// Serves all three MQTT 5 schemes as one handler, so the extension registers with one line (ADR-0999): each transfer
 /// goes to a <see cref="Mqtt5WebSocketProtocolHandler"/> when its URL's scheme is <c>mqtt5+ws</c> and to a
 /// <see cref="Mqtt5ProtocolHandler"/> for <c>mqtt5</c> and <c>mqtt5s</c>, made over <paramref name="connector"/> for
-/// that transfer (ADR-1082).
+/// that transfer (ADR-1085).
 /// </summary>
 /// <param name="connector">Opens the connection to the broker.</param>
 public sealed class Mqtt5SchemeHandler(IConnector connector) : IProtocolHandler

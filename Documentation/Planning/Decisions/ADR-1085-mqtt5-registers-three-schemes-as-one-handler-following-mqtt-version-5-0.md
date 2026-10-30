@@ -1,4 +1,4 @@
-# ADR-1082: MQTT 5 registers three schemes as one handler, following OASIS MQTT Version 5.0
+# ADR-1085: MQTT 5 registers three schemes as one handler, following OASIS MQTT Version 5.0
 
 - Status: Accepted
 - Date: 2026-10-29
