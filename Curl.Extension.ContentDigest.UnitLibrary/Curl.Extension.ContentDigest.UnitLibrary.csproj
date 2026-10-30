@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <Using Include="Curl.Protocol.Abstractions" />
+    <Using Include="Curl.Protocol.Abstractions.HttpRequestOptions" Alias="HttpRequestOptions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Extension.Abstractions.UnitLibrary\Curl.Extension.Abstractions.UnitLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Extension.ContentDigest.UnitTests" />
+  </ItemGroup>
+
+</Project>

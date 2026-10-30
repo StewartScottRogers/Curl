@@ -26,5 +26,6 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.HookFor,
         OAuth2.Options.OAuth2Options.ActivatedBy,
         Curl.Extension.WebSocketRepl.WebSocketReplExtension.HookFor,
+        Curl.Extension.ContentDigest.ContentDigestExtension.HookFor,
     ];
 }

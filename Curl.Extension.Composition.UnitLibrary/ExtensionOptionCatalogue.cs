@@ -43,5 +43,6 @@ internal static class ExtensionOptionCatalogue
         OpenApi.OpenApiOptions.Specification,
         OpenApi.OpenApiOptions.Operation,
         OpenApi.OpenApiOptions.Server,
+        Curl.Extension.ContentDigest.ContentDigestExtension.Option,
     ];
 }

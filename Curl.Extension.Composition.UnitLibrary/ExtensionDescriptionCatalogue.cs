@@ -40,5 +40,6 @@ internal static class ExtensionDescriptionCatalogue
         S3.Client.S3Extension.Description,
         Amqp0.Client.Amqp0Extension.Description,
         OciRegistry.Client.OciRegistryExtension.Description,
+        Curl.Extension.ContentDigest.ContentDigestExtension.Description,
     ];
 }
