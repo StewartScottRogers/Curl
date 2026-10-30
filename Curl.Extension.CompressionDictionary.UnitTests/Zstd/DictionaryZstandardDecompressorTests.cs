@@ -15,7 +15,7 @@ namespace Curl.Extension.CompressionDictionary.UnitTests.Zstd;
 public sealed class DictionaryZstandardDecompressorTests
 {
     // libzstd ZSTD_compress_usingDict(level 3) of Content against Dictionary.
-    private const string UsingDictionaryFrame =
+    internal const string UsingDictionaryFrame =
         "28B52FFD60E105050400B4033030207761732065646974656420666F722076657273696F6E2074776F7265736F7572" +
         "63653132303336373839313031313132363738393230323118001672330514A07810A102942D4065017A0B501E44E6" +
         "D1385341018A15A07810A102942D4065017A0B283FB7227BA8331A14A0A800650B9038291FAFC5E770E10101";
@@ -32,11 +32,11 @@ public sealed class DictionaryZstandardDecompressorTests
         "5BAEE7E7BEE937764F7BDACAD76B37977CA7E4DB88DDB9339D4A1BA810B0DBA9CF3207809736C301101A2230E2FFFF19" +
         "137C360E0D9D4E5BEB7AC2F51A0B6A9A6E971B1273EE7B0140699928FA24B5CBCF195DD752613A79AE";
 
-    private static readonly byte[] Dictionary = Encoding.ASCII.GetBytes(string.Concat(Enumerable.Range(0, 24).Select(
+    internal static readonly byte[] Dictionary = Encoding.ASCII.GetBytes(string.Concat(Enumerable.Range(0, 24).Select(
         line => $"Line {line:D2} of the shared dictionary: the quick brown fox jumps over the lazy dog.\n")));
 
     // Every fifth line differs from the dictionary; the rest are matches that reach back into it.
-    private static readonly byte[] Content = Encoding.ASCII.GetBytes(string.Concat(Enumerable.Range(0, 24).Select(
+    internal static readonly byte[] Content = Encoding.ASCII.GetBytes(string.Concat(Enumerable.Range(0, 24).Select(
         line => line % 5 == 0
             ? $"Line {line:D2} was edited for version two of the resource.\n"
             : $"Line {line:D2} of the shared dictionary: the quick brown fox jumps over the lazy dog.\n")));

@@ -45,5 +45,6 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.HookFor,
         Curl.Extension.Dpop.DpopExtension.HookFor,
         Grpc.Client.GrpcExtension.HookFor,
+        Curl.Extension.CompressionDictionary.CompressionDictionaryExtension.HookFor,
     ];
 }
