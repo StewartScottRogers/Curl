@@ -17,6 +17,15 @@ registration and the ADR arrive in BL-4131.
   with a `WebDavMultistatusFailureKind` (not well-formed, a document type declaration, a root that is
   not `DAV:multistatus`, a missing required element, a status that is not an HTTP status line).
   Document type declarations are prohibited, so no external entity is ever resolved.
+- `Sync/WebDavSyncPlanner` plans the sync of one collection listed with `Depth: 1` into a local folder
+  as a `Sync/WebDavSyncPlan`: sub-collections (RFC 4918 section 15.9) to list next, files to download
+  (each `WebDavSyncItem` carries the `getlastmodified` the download sets as its last-write time), and
+  files already current (same length, section 15.4, and a last-write time no older than
+  `getlastmodified`, section 15.7). The entry for the listed collection itself is skipped. An href
+  outside the collection, a `.` or `..` name or one holding `/` or `\`, and an empty name or one holding
+  a character Windows forbids in a file name are refused (`WebDavSyncRefusalKind`) on every platform,
+  so nothing is written outside the folder. It reads the disk through `Sync/IWebDavLocalFileSystem`
+  (`Sync/WebDavDiskFileSystem` in production) and never deletes a local file.
 
 Tested against the specification, not against curl. Held to the four quality gates in the root
 `CLAUDE.md`. Its tests are in `Curl.Extension.WebDavTools.UnitTests`.
