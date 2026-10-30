@@ -29,7 +29,7 @@ Found in BL-4131 (ADR-1149) by running `curl -v --webdav-list` against a loopbac
 
 ## Notes
 
-- Measure-CodeQuality.ps1 for the library: every member of my change passes. One member, CertificateCheckHooks.CheckedAsync (line 95, branch 91.67, Cx 12, from f34115c66), fails the gates; filed as BL-4357.
+- Measure-CodeQuality.ps1 for the library: every member of my change passes. One member, CertificateCheckHooks.CheckedAsync (line 95, branch 91.67, Cx 12, from f34115c66), fails the gates; filed as BL-4358.
 
 ## Log
 

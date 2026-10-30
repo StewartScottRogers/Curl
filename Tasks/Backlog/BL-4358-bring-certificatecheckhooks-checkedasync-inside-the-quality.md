@@ -1,5 +1,5 @@
 ---
-id: BL-4357
+id: BL-4358
 title: Bring CertificateCheckHooks.CheckedAsync inside the quality gates
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-30
 completed:
 ---
-# BL-4357 — Bring CertificateCheckHooks.CheckedAsync inside the quality gates
+# BL-4358 — Bring CertificateCheckHooks.CheckedAsync inside the quality gates
 
 ## Goal
 
