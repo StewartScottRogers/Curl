@@ -33,7 +33,7 @@ Suggested flow (record any change under Notes for BL-4129's ADR): the hook imple
 
 ## Notes
 
-- Plan and decisions in ADR-1097 (for BL-4129's option ADR). Code in `Curl.Extension.ResumableUpload.UnitLibrary/Transfer/`; the library now references `Curl.Extension.Abstractions` (its csproj is inside this task's touches).
+- Plan and decisions in ADR-1103 (for BL-4129's option ADR). Code in `Curl.Extension.ResumableUpload.UnitLibrary/Transfer/`; the library now references `Curl.Extension.Abstractions` (its csproj is inside this task's touches).
 - For BL-4129: `HookFor` constructs `new ResumableUploadTransferHook(maxResumptions)` (public; default `DefaultMaxResumptions` = 3, chosen as a small fixed bound).
 - Changes to the suggested flow: tus is chosen by a 2xx `OPTIONS` whose `Tus-Version` names 1.0.0 and whose `Tus-Extension` names `creation`; `Tus-Resumable` is not required there, because tus 1.0 exempts OPTIONS from it. The IETF upload resource is the creation's 2xx `Location` only (a 104's is not read). IETF interop version 6, matching the field type's documentation (draft -05).
 - Non-seekable upload streams (and seekable ones already read part way) are buffered whole in memory, because both protocols announce `Upload-Length` at creation and a resumption re-sends from any offset.

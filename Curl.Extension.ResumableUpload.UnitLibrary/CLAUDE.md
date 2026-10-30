@@ -7,7 +7,7 @@ another extension. The option, its registration in `ExtensionCatalogue.cs` and i
 arrive in a later task.
 
 - `Transfer/ResumableUploadTransferHook` uploads an http or https transfer's `-T` body in place of curl's
-  handler (ADR-1097): `OPTIONS` picks `TusUploadProtocol` or `IetfUploadProtocol`, `ResumableUploadFlow`
+  handler (ADR-1103): `OPTIONS` picks `TusUploadProtocol` or `IetfUploadProtocol`, `ResumableUploadFlow`
   creates the upload, appends, and after a broken connection retrieves the offset and appends from it,
   `ResumableUploadSession` sends the requests through curl's connector, and `ResumableUploadOutcome` makes
   the last response the transfer's. Its constructor takes how many resumptions to allow.

@@ -1,4 +1,4 @@
-# ADR-1097: The resumable upload picks tus by OPTIONS and resumes from the server's offset
+# ADR-1103: The resumable upload picks tus by OPTIONS and resumes from the server's offset
 
 - Status: Accepted
 - Date: 2026-10-29
