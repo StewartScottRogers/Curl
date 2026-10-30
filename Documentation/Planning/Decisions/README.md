@@ -1139,3 +1139,4 @@ Each option and the specific reason it lost.
 | [1090](ADR-1090-oci-pulls-manifests-by-tag-and-blobs-by-digest-over-https-with-the-registry-bearer-token.md) | OCI pulls manifests by tag and blobs by digest over HTTPS with the registry Bearer token (BL-4292) | Accepted | 2026-10-29 |
 | [1093](ADR-1093-oci-pulls-manifests-by-tag-and-blobs-by-digest-over-https-with-the-registry-bearer-token.md) | OCI pulls manifests by tag and blobs by digest over HTTPS with the registry Bearer token (BL-4292) | Accepted | 2026-10-29 |
 | [1094](ADR-1094-content-digest-sends-and-checks-rfc-9530-digest-fields.md) | --content-digest sends and checks RFC 9530 digest fields (BL-4134) | Accepted | 2026-10-29 |
+| [1092](ADR-1092-resumable-upload-wire-format-is-a-copied-http-1-1-client-and-one-type-per-field.md) | The resumable upload wire format is a copied HTTP/1.1 client and one type per header field (BL-4306) | Accepted | 2026-10-29 |
