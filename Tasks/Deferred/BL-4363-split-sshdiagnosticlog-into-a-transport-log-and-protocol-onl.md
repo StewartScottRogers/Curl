@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: [BL-4320]
-touches: [Curl.Protocol.Ssh.UnitLibrary/SshDiagnosticLog.cs, Curl.Protocol.Ssh.UnitTests/SshDiagnosticLogTests.cs, Curl.Protocol.Ssh.UnitTests/SshProtocolHandlerTests.DiagnosticLog.cs, Curl.Protocol.Ssh.UnitTests/Fakes/RecordingDiagnosticLog.cs]
+touches: [Curl.Protocol.Ssh.UnitLibrary/SshDiagnosticLog.cs, Curl.Protocol.Ssh.UnitLibrary/SshDiagnosticLog.Authentication.cs, Curl.Protocol.Ssh.UnitLibrary/SshDiagnosticLog.Channel.cs, Curl.Protocol.Ssh.UnitLibrary/SshDiagnosticLog.HostKeys.cs, Curl.Protocol.Ssh.UnitLibrary/SshDiagnosticLog.Transfer.cs, Curl.Protocol.Ssh.UnitLibrary/SshDiagnosticLog.Transport.cs, Curl.Protocol.Ssh.UnitTests/SshDiagnosticLogTests.cs, Curl.Protocol.Ssh.UnitTests/SshProtocolHandlerTests.DiagnosticLog.cs, Curl.Protocol.Ssh.UnitTests/Fakes/RecordingDiagnosticLog.cs]
 requirement: none
 created: 2026-10-30
 completed:
