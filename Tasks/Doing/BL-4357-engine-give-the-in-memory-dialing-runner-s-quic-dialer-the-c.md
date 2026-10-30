@@ -36,3 +36,4 @@ BL-4355 (WireGuard UDP inside the tunnel) needs this for its unit test that runs
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: d37048a4 fb9a909b 607dbf6e 3d836d5e.
