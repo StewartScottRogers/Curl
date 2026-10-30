@@ -1165,3 +1165,4 @@ Each option and the specific reason it lost.
 | [1118](ADR-1118-quic-dials-through-an-extension-connection-hooks-datagram-connector.md) | QUIC dials through an extension connection hook's datagram connector (BL-4318) | Accepted | 2026-10-29 |
 | [1119](ADR-1119-privacy-pass-discovers-the-issuer-request-url-from-the-issuer-directory.md) | --privacy-pass discovers the issuer request URL from the issuer directory (BL-4316) | Accepted | 2026-10-29 |
 | [1120](ADR-1120-protobuf-json-mapping-reads-through-jsondocument-and-returns-a-typed-error.md) | The Protocol Buffers JSON mapping reads through JsonDocument and returns a typed error (BL-4166) | Accepted | 2026-10-29 |
+| [1118](ADR-1118-wireguard-user-space-tcp-client-keeps-only-what-one-client-connection-needs.md) | The WireGuard extension's user-space TCP client keeps only what one client connection needs (BL-4324) | Accepted | 2026-10-29 |
