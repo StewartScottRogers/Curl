@@ -33,3 +33,4 @@ Start by finding what the coordinator was doing: the heartbeat loop in `DarkFact
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 3b8207b9 93aa094b 0d992756.
