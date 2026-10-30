@@ -33,3 +33,4 @@ Split from BL-4127 (extension 26 of 63; ADR-0999, CLAUDE.md "Extensions"). Speci
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 8f785ad2 499bd58d 00a80bd4 3180db99 3d836d5e.
