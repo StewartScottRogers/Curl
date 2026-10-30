@@ -900,7 +900,8 @@ if ($TestCiWatch) {
     & $check 'build error: regression at once' 'regression error CS1002 in X.cs run 9 from sha9 on Linux' `
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f 'error CS1002 in X.cs' @('Linux') 'build')))))
     & $check 'flaky title' 'Fix flaky CI test A that failed once on Linux' (Get-CiTaskTitle ([pscustomobject]@{ Key = 'A'; Kind = 'test'; Verdict = 'flaky'; Platforms = @('Linux') }))
-    & $check 'CI fix title is claimable past the usage stop' 'True True False' ("$(Test-CiFixTitle 'Fix CI failure A on Linux') $(Test-CiFixTitle 'Fix flaky CI test A') $(Test-CiFixTitle 'Add --foo option')")
+    & $check 'CI fix title is claimable past the usage stop' 'True True True False' ("$(Test-CiFixTitle 'Fix CI failure A on Linux') $(Test-CiFixTitle 'Fix flaky CI test A') $(Test-CiFixTitle 'Fix CI build CS1002 on macOS') $(Test-CiFixTitle 'Add --foo option')")
+    & $check 'a CI fix task file is told by its name' 'True True True False' ("$(Test-CiFixFileName 'BL-4052-fix-ci-failure-a.md') $(Test-CiFixFileName 'BL-4083-fix-flaky-ci-test-b.md') $(Test-CiFixFileName 'BL-9-fix-ci-build-c.md') $(Test-CiFixFileName 'BL-4093-add-extensions.md')")
     & $check 'touches' 'Curl.Protocol.Ssh.UnitTests,Curl.Protocol.Ssh.UnitLibrary' ((Get-CiTouches -Project 'Curl.Protocol.Ssh.UnitTests' -Repo $Root) -join ',')
     & $check 'integration touches' 'Curl.Networking.IntegrationTests,Curl.Networking.UnitLibrary' ((Get-CiTouches -Project 'Curl.Networking.IntegrationTests' -Repo $Root) -join ',')
     & $check 'console integration touches' 'Curl.Console.IntegrationTests,Curl.Console' ((Get-CiTouches -Project 'Curl.Console.IntegrationTests' -Repo $Root) -join ',')

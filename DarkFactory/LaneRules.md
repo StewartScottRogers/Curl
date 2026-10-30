@@ -125,6 +125,14 @@ work, the rest included, as tasks of their own and goes to `Deferred`, never bac
 `Backlog` to wait on its own subtasks; and the shift splits a task a run sends back to
 `Backlog` a second time rather than offer it a third claim.
 
+A CI fix (a task titled "Fix CI failure ...", "Fix CI build ..." or "Fix flaky CI test
+...") goes before all other work, because a red CI blocks the shift-end merge and hides the
+next failure (ADR-1158). The lane may have claimed it while another task in Doing holds a
+file it needs: change that file anyway, widening `touches` if needed; never send a CI fix
+back to Backlog to wait for a task in Doing to finish, since the other lane rebases over
+the fix. Only a change you cannot make yourself (another task's code that must land first)
+is a reason to wait, and then say which under Notes.
+
 ## Git
 Commit by logical unit with Conventional Commits once the build is clean and the fast
 tests are green. The lane prompt says what a lane may do beyond that (it never pushes,

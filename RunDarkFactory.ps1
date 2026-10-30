@@ -246,7 +246,13 @@
     task names the test, or when a finished task names it and the failing run predates that
     task's last commit. The task is committed in a detached worktree,
     <repo>.lanes\ci-watch, and pushed straight to the shift's branch, so lanes claim it on
-    their next claim; each filing is traced "ci filed: ..." and whispered through
+    their next claim. A CI fix goes first (ADR-1158): a claim takes the oldest ready CI-fix
+    task before anything task-board.ps1 next offers, even when its touches overlap a task in
+    Doing (that lane rebases over the fix); a lane's requeue of one keeps no other lane of
+    the shift from it; when it has waited 2 minutes with every lane busy, the coordinator
+    adds a lane for it (traced "BL-### lanes lane <n> added for this CI fix: ..."), up to 16,
+    which the next lane step retires once idle; and a lane integrating one waits for the
+    integrate lock ahead of the others. Each filing is traced "ci filed: ..." and whispered through
     .claude\hooks\whisper-milestone.ps1. Each run it examines is traced "ci run <id> ...":
     green, or each failure and whether it was filed, covered by a task, or is waiting for a
     run to confirm it - once per run, and again when that changes. The watch also runs while
@@ -277,7 +283,8 @@
     branch factory/lane-<n>), all feeding the branch this checkout is on:
 
       claim      A lane takes the next task the board offers - one whose `touches` do
-                 not overlap any task in Doing - moves it to Doing, commits and pushes
+                 not overlap any task in Doing, or a ready CI fix before it, whatever it
+                 overlaps (ADR-1158) - moves it to Doing, commits and pushes
                  that move. The push is the lock: if another lane got there first, the
                  push is refused, traced as "race", and the lane picks again. Only
                  a pushed claim is traced as "claim".

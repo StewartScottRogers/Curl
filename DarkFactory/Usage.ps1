@@ -51,10 +51,16 @@ function Get-UsageReading {
 }
 
 function Test-CiFixTitle {
-    # Whether a task title is one the coordinator files for a red CI: "Fix CI failure ..." or
-    # "Fix flaky CI test ...".
+    # Whether a task title is one the coordinator files for a red CI: "Fix CI failure ...",
+    # "Fix CI build ..." or "Fix flaky CI test ..." (Get-CiTaskTitle).
     param([string]$Title)
-    return [bool]($Title -match '^(Fix CI failure|Fix flaky CI test)\b')
+    return [bool]($Title -match '^(Fix CI failure|Fix CI build|Fix flaky CI test)\b')
+}
+
+function Test-CiFixFileName {
+    # The same for a task file name, whose slug starts with the title: BL-4083-fix-flaky-ci-test-...
+    param([string]$Name)
+    return [bool]($Name -match '^BL-\d+-fix-(ci-failure|ci-build|flaky-ci-test)-')
 }
 
 function Get-UsageStop {

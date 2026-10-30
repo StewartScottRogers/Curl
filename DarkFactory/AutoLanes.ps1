@@ -281,6 +281,25 @@ function Test-LanesFinished {
     return (@($Active | Where-Object { $Finished -notcontains $_ }).Count -eq 0)
 }
 
+function Get-CiFixLaneDecision {
+    # Whether the coordinator adds a lane for a CI fix (ADR-1158): a claimable CI-fix task
+    # waits in Backlog on origin (-Waiting: ID -> minutes since the coordinator first saw it
+    # there) for -GraceMinutes or more, no lane is free to claim it (-FreeLanes: lanes holding
+    # no task), and no lane was added for it lately (-Served). A free lane's next claim takes
+    # it within a minute (Get-ReadyCiFixTaskId); with every lane busy, BL-4052 and BL-4299
+    # waited 21 and 41 minutes for one. The lane is one above the pace and the machine cap,
+    # never above -Max; the next lane step retires it once it is idle. Id is the CI fix or '',
+    # Why the trace text.
+    param([hashtable]$Waiting, [int]$FreeLanes, [string[]]$Served = @(), [int]$Active, [int]$Max = 16, [double]$GraceMinutes = 2)
+    $due = @($Waiting.Keys | Where-Object { $Served -notcontains $_ -and $Waiting[$_] -ge $GraceMinutes } |
+        Sort-Object { [int]("$_" -replace '^BL-', '') })
+    if (-not $due.Count) { return [pscustomobject]@{ Id = ''; Why = 'no CI fix has waited for a lane' } }
+    if ($FreeLanes -gt 0) { return [pscustomobject]@{ Id = ''; Why = "a free lane claims $($due[0])" } }
+    if ($Active -ge $Max) { return [pscustomobject]@{ Id = ''; Why = "all $Max lanes are active" } }
+    $minutes = [math]::Floor([double]$Waiting[$due[0]])
+    return [pscustomobject]@{ Id = $due[0]; Why = "waiting $minutes min in Backlog with all $Active lanes busy" }
+}
+
 if ($TestAutoLanes) {
     # Recorded readings on one arbitrary date D, each case checked against its expected log line.
     $D = [datetime]'2026-01-05'
@@ -419,6 +438,12 @@ if ($TestAutoLanes) {
         ,@('fixed start 9 capacity 2 adopted 6', '6 (lane 6 adopted from the previous shift)', "$((Get-FixedStartCount -Requested 9 -Capacity 2 -Adopted 6) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('lanes-finished 1,3 of 1,2', 'False', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 2)")
         ,@('lanes-finished 1,3 of 1,3', 'True', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 3)")
+        ,@('ci-fix lane for the oldest CI fix past the grace with every lane busy', 'BL-4052: waiting 21 min in Backlog with all 8 lanes busy', "$((Get-CiFixLaneDecision -Waiting @{ 'BL-4299' = 40.5; 'BL-4052' = 21.2 } -FreeLanes 0 -Active 8) | ForEach-Object { "$($_.Id): $($_.Why)" })")
+        ,@('ci-fix lane not while a lane is free', ': a free lane claims BL-4052', "$((Get-CiFixLaneDecision -Waiting @{ 'BL-4052' = 5 } -FreeLanes 1 -Active 8) | ForEach-Object { "$($_.Id): $($_.Why)" })")
+        ,@('ci-fix lane not within the grace', ': no CI fix has waited for a lane', "$((Get-CiFixLaneDecision -Waiting @{ 'BL-4052' = 1.5 } -FreeLanes 0 -Active 8) | ForEach-Object { "$($_.Id): $($_.Why)" })")
+        ,@('ci-fix lane not twice for one fix; the next one gets it', 'BL-4299', "$((Get-CiFixLaneDecision -Waiting @{ 'BL-4299' = 3; 'BL-4052' = 21 } -FreeLanes 0 -Served 'BL-4052' -Active 9).Id)")
+        ,@('ci-fix lane not above 16', ': all 16 lanes are active', "$((Get-CiFixLaneDecision -Waiting @{ 'BL-4052' = 9 } -FreeLanes 0 -Active 16) | ForEach-Object { "$($_.Id): $($_.Why)" })")
+        ,@('ci-fix lane with nothing waiting', '', "$((Get-CiFixLaneDecision -Waiting @{} -FreeLanes 0 -Active 4).Id)")
         ,@('start saved 2', '3 (last shift saved 2, raised to 3 by -MinStartLanes)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start saved 5', '5 (last shift saved 5)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 5 }) 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start first shift', '3 (first auto shift)', "$((Get-AutoStartCount $null 16 16 3 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")

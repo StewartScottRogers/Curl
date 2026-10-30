@@ -199,6 +199,11 @@ failed jobs of the one still running, ADR-0811)
 Linux and macOS", or "Fix flaky CI test <test> ..." for one that failed once between
 passing runs - with the run, platforms, first failing commit, error message and the test's
 project and library as `touches`. A test a live task already names is not filed again.
+A CI fix goes first (ADR-1158): a lane's claim takes a ready one before anything `next`
+offers, even over a task in Doing that holds its files, and its run never sends it back to
+wait for that task; a lane's requeue of one keeps no other lane from it; with every lane
+busy for 2 minutes the coordinator adds a lane for it; and its integration waits for the
+integrate lock ahead of ordinary work.
 
 Every session, lanes included, whispers milestones to Stewart through the PostToolUse hook
 `.claude/hooks/whisper-milestone.ps1`: a task moved to Done, a CI failure filed, a commit

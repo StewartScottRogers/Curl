@@ -17,13 +17,41 @@ function Invoke-Git {
     return $true
 }
 
+function Get-LockPriorityPath {
+    # The marker a lane waiting with -Priority keeps beside the lock: integrate.priority-L<n>.
+    param([int]$ForLane = $Lane)
+    return (Join-Path $LanesDir "integrate.priority-L$ForLane")
+}
+
+function Test-LockPriorityWaiting {
+    # Whether another lane waits for the lock with -Priority: its marker was rewritten in the
+    # last minute. A marker a dead lane left goes stale and holds nobody back.
+    $mine = Split-Path (Get-LockPriorityPath) -Leaf
+    return [bool](@(Get-ChildItem $LanesDir -Filter 'integrate.priority-L*' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ne $mine -and $_.LastWriteTime -gt (Get-Date).AddMinutes(-1) }).Count)
+}
+
 function Enter-Lock {
     # Claims and integrations take turns across every lane. Holding the file open with no
     # sharing is the lock; the operating system releases it if the lane dies.
+    # -Priority (a lane integrating a CI fix) goes before every lane that waits without it:
+    # while its marker is fresh they do not try the lock, so it is next once the holder lets
+    # go. BL-4308's fix waited 27 minutes behind eight ordinary integrations while CI stayed
+    # red (2026-10-29, ADR-1158).
+    param([switch]$Priority)
     New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
-    while ($true) {
-        try { return [IO.File]::Open($LockFile, 'OpenOrCreate', 'ReadWrite', 'None') }
-        catch { Write-HeartbeatIfDue; Start-Sleep -Seconds 3 }
+    $marker = Get-LockPriorityPath
+    try {
+        while ($true) {
+            if ($Priority) { Set-Content -Path $marker -Value (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') -Encoding ASCII }
+            if ($Priority -or -not (Test-LockPriorityWaiting)) {
+                try { return [IO.File]::Open($LockFile, 'OpenOrCreate', 'ReadWrite', 'None') }
+                catch { }
+            }
+            Write-HeartbeatIfDue; Start-Sleep -Seconds 3
+        }
+    } finally {
+        if ($Priority) { Remove-Item -LiteralPath $marker -ErrorAction SilentlyContinue }
     }
 }
 
@@ -306,6 +334,46 @@ function Complete-ClaimSplit {
     } finally { $lock.Dispose() }
 }
 
+# ---------------------------------------------------------------------------- CI fixes first
+
+# A red CI on the shift branch is fixed before any other work (ADR-1158). Measured on
+# 2026-10-29/30, the red spells over 30 minutes were mostly a CI-fix task that sat ready
+# while lanes took other work: BL-4083 was shut out for 86 minutes by its shift's requeued
+# list after one run sent it back behind BL-4082 (Done a minute later), then waited 116
+# minutes as #6 in next's order behind High feature tasks with more tasks waiting on them;
+# BL-4052 and BL-4299 waited 21 and 41 minutes for a lane to come free.
+
+function Get-ClaimSkip {
+    # The IDs a lane's claim passes over: the tasks this lane already ran this shift
+    # (-Attempted), and those any lane of the shift sent back to Backlog (-ShiftRequeued) but
+    # a CI fix, which the next lane claims at once: what sent it back (a task holding a file
+    # it needs, a dependency) is gone within minutes, and the red CI is not.
+    param([string[]]$Attempted = @(), [string[]]$ShiftRequeued = @())
+    $requeued = @($ShiftRequeued | Where-Object { $_ -and $Attempted -notcontains $_ -and -not (Test-CiFixTitle (Get-TaskTitle $_)) })
+    return @(@($Attempted) + $requeued | Where-Object { $_ } | Select-Object -Unique)
+}
+
+function Get-ReadyCiFixTaskId {
+    # The CI-fix task (Test-CiFixFileName) in Backlog a claim takes before anything next
+    # offers, the oldest first, or '' when none may be claimed now: none is in -Skip, each of
+    # its depends-on is Done (in Tasks\Done or archived under it), and it is neither
+    # interactive only nor over its cost cap (Get-TaskNotClaimableWhy). Its touches may
+    # overlap a task in Doing: that lane rebases over the fix (ADR-1158).
+    param([string[]]$Skip = @())
+    $files = @(Get-ChildItem (Join-Path $Root 'Tasks\Backlog') -Filter 'BL-*.md' -ErrorAction SilentlyContinue |
+        Where-Object { Test-CiFixFileName $_.Name } | Sort-Object { [int](($_.Name -replace '^BL-(\d+).*$', '$1')) })
+    foreach ($file in $files) {
+        $id = Get-TaskIdFromFileName $file.Name
+        if ($Skip -contains $id) { continue }
+        $text = [IO.File]::ReadAllText($file.FullName)
+        $depends = if ($text -match '(?m)^depends-on:[ \t]*\[(.*)\]') { @($Matches[1] -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }) } else { @() }
+        if (@($depends | Where-Object { (Get-TaskState $_) -in 'Backlog', 'Doing', 'Blocked', 'Deferred' }).Count) { continue }
+        if ((Test-InteractiveOnlyTask $file.FullName) -or (Get-TaskNotClaimableWhy $id)) { continue }
+        return $id
+    }
+    return ''
+}
+
 function Invoke-Claim {
     # Returns @{ Id = 'BL-###' } on success, or @{ Wait = $true } when every ready task
     # overlaps work in progress (or nothing is ready but a lane-eligible task in Doing may
@@ -314,6 +382,7 @@ function Invoke-Claim {
     # interactive only, in Backlog or in Doing (AF-0435); Why then names it.
     param([string[]]$Skip, [switch]$CiFixOnly)
     $splitDue = @()
+    $ciFixRefused = @()
     $lock = Enter-Lock
     # Every task next offers is checked against its cost cap while this lane holds the lock
     # every claim and integration waits on, and each check read the 40 newest run logs again
@@ -337,7 +406,12 @@ function Invoke-Claim {
             # Only bare task IDs go to -Skip: anything else garbles the argument list.
             $skipNow = @($Skip | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^BL-\d+$' })
             $unready = @()
-            do {
+            # A ready CI fix comes before anything next offers, whatever its priority order or
+            # an overlap with Doing would say (ADR-1158); one the board refused this claim is not tried again.
+            $id = Get-ReadyCiFixTaskId -Skip (@($skipNow) + @($ciFixRefused))
+            $overCap = $false; $unreadyWhy = ''
+            if ($id) { $next = '' }
+            else { do {
                 $boardArgs = @('next')
                 if ($skipNow.Count) { $boardArgs += @('-Skip', ($skipNow -join ',')) }
                 $next = (Invoke-Board $boardArgs) -join "`n"
@@ -367,7 +441,7 @@ function Invoke-Claim {
                     $skipNow += $candidate
                     $unready += $candidate
                 }
-            } while ($overCap -or $unreadyWhy)
+            } while ($overCap -or $unreadyWhy) }
             if (-not $id) {
                 # Nothing is ready: wait only while a lane-eligible task is in Doing, since its
                 # end may make more ready. An interactive-only one in Doing is a session's, which
@@ -402,6 +476,7 @@ function Invoke-Claim {
                 # The board refuses an ID that names two live tasks, and no claim can win
                 # until they are renumbered (BL-2014); any other refusal is reported as it is.
                 if ($sharedId -and (Invoke-RenumberDuplicates $id)) { continue }
+                if (Test-CiFixTitle (Get-TaskTitle $id)) { $ciFixRefused += $id }
                 $refusal = Get-Short $moved 100
                 Write-Trace $id 'refused' "the board would not move it to Doing: $refusal" 'DarkYellow'
                 continue
@@ -674,6 +749,19 @@ if ($TestTaskReadiness) {
         git -C $repo commit -q -m 'a lane runs BL-008' 2>&1 | Out-Null
         git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
         $laneRunning = Invoke-Claim -Skip @()
+        # ADR-1158: a High feature task BL-010 that next offers first; a CI fix BL-012 whose
+        # touches overlap BL-008 in Doing; an older CI fix BL-011 that waits on BL-008; and
+        # BL-013, a CI fix this lane already ran.
+        Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-010-feature.md') -Encoding UTF8 -Value (((& $taskText 'Add a feature' '[Curl.Cli.UnitLibrary/New.cs]') -replace 'BL-001', 'BL-010') -replace 'priority: Normal', 'priority: High')
+        Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-011-fix-ci-failure-waits.md') -Encoding UTF8 -Value ((((& $taskText 'Fix CI failure Waits_OnLinux on Linux' '[Curl.Cli.UnitTests/W.cs]' 'feature') -replace 'BL-001', 'BL-011') -replace 'depends-on: \[\]', 'depends-on: [BL-008]') -replace 'priority: Normal', 'priority: High')
+        Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-012-fix-ci-failure-overlaps.md') -Encoding UTF8 -Value (((& $taskText 'Fix CI failure Overlaps_OnMac on macOS' '[Curl.Cli.UnitLibrary/Qux.cs]' 'feature') -replace 'BL-001', 'BL-012') -replace 'priority: Normal', 'priority: High')
+        Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-013-fix-flaky-ci-test-ran.md') -Encoding UTF8 -Value (((& $taskText 'Fix flaky CI test Ran_Once that failed once on Linux' '[Curl.Cli.UnitTests/R.cs]' 'feature') -replace 'BL-001', 'BL-013') -replace 'priority: Normal', 'priority: High')
+        git -C $repo add -A 2>&1 | Out-Null
+        git -C $repo commit -q -m 'a feature and three CI fixes' 2>&1 | Out-Null
+        git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
+        $nextFirst = Get-NextTaskId ((Invoke-Board @('next', '-Skip', 'BL-013')) -join "`n")
+        $ciFirst = Invoke-Claim -Skip @('BL-013')
+        $ciSkip = (Get-ClaimSkip -Attempted @('BL-002') -ShiftRequeued @('BL-010', 'BL-013', 'BL-002')) -join ','
         $traced = @(Get-Content $TraceFile -ErrorAction SilentlyContinue | Where-Object { $_ -match 'BL-001 unready' })
         $idleTraced = @(Get-Content $TraceFile -ErrorAction SilentlyContinue | Where-Object { $_ -match ' idle +nothing a lane can claim' })
         $cases = @(
@@ -690,6 +778,9 @@ if ($TestTaskReadiness) {
             ,@('the end names the interactive tasks in Doing and in Backlog, and is traced once as idle, not wait', 'True True 1', "$($interactiveOnly.Why -match 'in Doing with an interactive session: BL-006, BL-007') $($interactiveOnly.Why -match 'Backlog is interactive only, waiting on Stewart or an interactive session: BL-005') $($idleTraced.Count)")
             ,@('a lane-eligible task in Doing beside them keeps the lane waiting', 'wait No task is ready.', $(if ($laneRunning.Wait) { "wait $($laneRunning.Why)" } elseif ($laneRunning.None) { 'none' } else { "claimed $($laneRunning.Id)" }))
             ,@('the end notice is empty when no interactive work is named', "''", "'$(Get-NothingReadyEndNotice)'")
+            ,@('next would offer the High feature task first', 'BL-010', "$nextFirst")
+            ,@('a claim takes the ready CI fix first, over its overlap with Doing, past one waiting on Doing and one this lane ran (ADR-1158)', 'BL-012 Doing', "$($ciFirst.Id) $(Get-TaskState 'BL-012')")
+            ,@('the shift requeued list keeps a lane off a requeued task but not a requeued CI fix (ADR-1158)', 'BL-002,BL-010', $ciSkip)
             ,@('a task is interactive only when it says lane: no or touches an audit path or guard file, and not otherwise', 'lane-no guard-file guard-folder audit-folder', $(
                 $kinds = [ordered]@{ 'lane-no' = @('touches: [x]', 'lane: no'); 'guard-file' = @('touches: [Curl.Cli.UnitLibrary, .claude/settings.json]'); 'guard-folder' = @('touches: [.claude]')
                     'audit-folder' = @('touches: ["Audit\Tools"]'); 'lane-task' = @('touches: [DarkFactory/Claim.ps1, .claude/hooks/whisper-milestone.ps1]'); 'no-touches' = @() }

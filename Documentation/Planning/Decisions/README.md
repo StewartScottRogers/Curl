@@ -1204,3 +1204,4 @@ Each option and the specific reason it lost.
 | [1153](ADR-1153-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md) | The Dane extension checks TLSA records validated from the root with --dane (BL-4151) | Accepted | 2026-10-30 |
 | [1156](ADR-1156-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md) | The Dane extension checks TLSA records validated from the root with --dane (BL-4151) | Accepted | 2026-10-30 |
 | [1157](ADR-1157-oblivious-http-extension-sends-requests-through-a-relay.md) | The Oblivious HTTP extension sends requests through a relay with --ohttp-relay and --ohttp-keys (BL-4137) | Accepted | 2026-10-30 |
+| [1158](ADR-1158-a-ci-fix-goes-first-claim-lane-and-integrate-lock.md) | A CI fix goes first: claimed before other work, given a lane, and integrated ahead (AF-0475 to AF-0481) | Accepted | 2026-10-30 |

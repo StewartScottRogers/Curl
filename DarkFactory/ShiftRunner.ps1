@@ -79,7 +79,7 @@ while ($true) {
         $low = Get-UsageStop
         $ciFixOnly = $false
         if ($low) {
-            $ciFixWaiting = [bool](Get-ChildItem (Join-Path $Root 'Tasks\Backlog') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Select-String -Pattern '^title: .*(Fix CI failure|Fix flaky CI test)' -List)
+            $ciFixWaiting = [bool](Get-ChildItem (Join-Path $Root 'Tasks\Backlog') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Where-Object { Test-CiFixFileName $_.Name })
             if (-not ($Lane -and $ciFixWaiting)) { $stopWhy = "tokens low: $low"; break }
             $ciFixOnly = $true
         }
@@ -92,7 +92,7 @@ while ($true) {
         Set-HeartbeatTask ''
         Set-OwnTabLabel 'empty'
         Write-Heartbeat 'claim'
-        $claim = Invoke-Claim -Skip (@($attempted.Keys) + @(Get-ShiftRequeued) | Select-Object -Unique) -CiFixOnly:$ciFixOnly
+        $claim = Invoke-Claim -Skip (Get-ClaimSkip -Attempted @($attempted.Keys) -ShiftRequeued @(Get-ShiftRequeued)) -CiFixOnly:$ciFixOnly
         if ($claim.None) { $stopWhy = $(if ($ciFixOnly) { "tokens low: $low" } else { 'nothing ready' }); break }
         if ($claim.Wait) {
             if ($claim.Why -match '^No task is ready') {

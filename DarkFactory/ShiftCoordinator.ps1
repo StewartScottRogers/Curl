@@ -350,6 +350,44 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         foreach ($i in 1..($current - $step.Lanes)) { if ($null -eq (Request-LaneRetire)) { break } }
     }
 
+    $script:CiFixSeen = @{}
+    $script:CiFixLaneAdded = @{}
+    function Invoke-CiFixLaneStep {
+        # Once a minute: a CI fix that waits in Backlog on origin with every lane busy gets a
+        # lane of its own (Get-CiFixLaneDecision, ADR-1158), whose first claim takes it, since a
+        # claim takes a ready CI fix before anything else (Get-ReadyCiFixTaskId). One whose
+        # depends-on names a live task waits for it instead. Not past the shift's time or
+        # while it waits for tokens.
+        if ((Get-Date) -gt $shiftEnd -or (Test-WaitingForSession)) { return }
+        git -C $Root fetch -q origin $branch 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { return }
+        $live = @{}
+        foreach ($path in @(git -C $Root ls-tree -r --name-only "origin/$branch" -- Tasks/Backlog Tasks/Doing Tasks/Blocked Tasks/Deferred 2>$null)) {
+            $name = Split-Path "$path" -Leaf
+            if ($name -match '^(BL-\d+)-') { $live[$Matches[1]] = "$path" }
+        }
+        $now = Get-Date
+        $waiting = @{}
+        foreach ($id in @($live.Keys | Where-Object { $live[$_] -like 'Tasks/Backlog/*' -and (Test-CiFixFileName (Split-Path $live[$_] -Leaf)) })) {
+            $text = (git -C $Root show "origin/${branch}:$($live[$id])" 2>$null) -join "`n"
+            $depends = if ($text -match '(?m)^depends-on:[ \t]*\[(.*)\]') { @($Matches[1] -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }) } else { @() }
+            if (@($depends | Where-Object { $live.ContainsKey($_) }).Count) { continue }
+            if (-not $script:CiFixSeen.ContainsKey($id)) { $script:CiFixSeen[$id] = $now }
+            $waiting[$id] = ($now - $script:CiFixSeen[$id]).TotalMinutes
+        }
+        foreach ($id in @($script:CiFixSeen.Keys)) { if (-not $waiting.ContainsKey($id)) { $script:CiFixSeen.Remove($id) } }
+        $served = @($script:CiFixLaneAdded.Keys | Where-Object { $script:CiFixLaneAdded[$_] -gt $now.AddMinutes(-10) })
+        $free = @($activeLanes | Where-Object {
+                -not (Test-Path (Get-LaneStatePath $_ 'retire')) -and -not (Test-Path (Join-Path $summaries "lane-$_.txt")) -and
+                (Test-LaneAlive $_) -and -not (Get-LaneState $_ 'task') }).Count
+        $decision = Get-CiFixLaneDecision -Waiting $waiting -FreeLanes $free -Served $served -Active $activeLanes.Count
+        if (-not $decision.Id) { return }
+        $script:CiFixLaneAdded[$decision.Id] = $now
+        $n = Add-Lane
+        if ($null -eq $n) { Write-Trace $decision.Id 'lanes' "no lane to add for this CI fix ($($decision.Why))" 'Yellow'; return }
+        Write-Trace $decision.Id 'lanes' "lane $n added for this CI fix: $($decision.Why)" 'Yellow'
+    }
+
     # The lane count a fixed shift asked for; capacity steps never go above it.
     $requestedLanes = if ($AutoLanes) { $LaneCount } else { [math]::Max([int]$Lanes, $LaneCount) }
     foreach ($n in 1..$LaneCount) {
@@ -367,6 +405,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $nextAutoStep = (Get-Date).AddMinutes(15)
     $nextRampCheck = (Get-Date).AddMinutes(2)
     $nextCapacityStep = (Get-Date).AddMinutes(5)
+    $nextCiFixLaneCheck = (Get-Date).AddMinutes(1)
     while ((Get-Date) -lt $giveUp) {
         # The coordinator announces the usage limit for every lane, and lanes waiting for a
         # new session add that wait to their shift, so the coordinator waits longer too.
@@ -428,6 +467,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if (-not $AutoLanes -and $requestedLanes -gt 1 -and (Get-Date) -ge $nextCapacityStep -and -not (Test-WaitingForSession)) {
             Invoke-CapacityLaneStep
             $nextCapacityStep = (Get-Date).AddMinutes(5)
+        }
+        # A CI fix with every lane busy gets a lane of its own (ADR-1158).
+        if ((Get-Date) -ge $nextCiFixLaneCheck) {
+            $nextCiFixLaneCheck = (Get-Date).AddMinutes(1)
+            Invoke-CiFixLaneStep
         }
         # The coordinator is the board branch's one writer for a lane shift.
         Publish-BoardStatusIfDue -Branch $branch
