@@ -1,4 +1,4 @@
-# ADR-1089 — A WebSocket over HTTP/3 waits for SETTINGS and maps FIN and reset as RFC 9220 says
+# ADR-1098 — A WebSocket over HTTP/3 waits for SETTINGS and maps FIN and reset as RFC 9220 says
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

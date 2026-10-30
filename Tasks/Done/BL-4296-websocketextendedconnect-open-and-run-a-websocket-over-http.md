@@ -31,7 +31,7 @@ Third part of BL-4112. Uses the wire layer from BL-4298, the HTTP/3 client sessi
 ## Notes
 
 - Split from BL-4112 (the dark factory's cost cap).
-- Built as `Http3/Http3ExtendedConnectClient` (opens), `Http3ExtendedConnectWebSocket` (frames, FIN, reset) and `Http3ExtendedConnectException`; design recorded in ADR-1089 (decided by Claude under Stewart's delegation). Tests run over an in-memory `IMultiplexedConnection` with recorded HTTP/3 bytes, no network.
+- Built as `Http3/Http3ExtendedConnectClient` (opens), `Http3ExtendedConnectWebSocket` (frames, FIN, reset) and `Http3ExtendedConnectException`; design recorded in ADR-1098 (decided by Claude under Stewart's delegation). Tests run over an in-memory `IMultiplexedConnection` with recorded HTTP/3 bytes, no network.
 - `Measure-CodeQuality.ps1 -Library Curl.Extension.WebSocketExtendedConnect.UnitLibrary`: 0 failing members. An `await` inside a `catch` left a compiler branch uncovered, so a failed opening is awaited with `SuppressThrowing` and the session disposed before rethrowing.
 - Platform-neutral: no paths, OS errors or certificates; fast tests green on Windows.
 
