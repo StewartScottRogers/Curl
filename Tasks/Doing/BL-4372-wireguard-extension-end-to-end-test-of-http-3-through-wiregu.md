@@ -34,3 +34,4 @@ BL-4371 carries UDP inside the tunnel and BL-4357 made the in-memory dialing run
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 6291ef19 62dbae4c 3d836d5e.
