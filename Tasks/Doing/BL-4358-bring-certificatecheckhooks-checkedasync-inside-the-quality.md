@@ -29,3 +29,4 @@ completed:
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: fbecace0.
