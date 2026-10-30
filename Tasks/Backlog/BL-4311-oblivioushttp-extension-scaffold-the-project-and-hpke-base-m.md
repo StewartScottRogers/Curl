@@ -1,5 +1,5 @@
 ---
-id: BL-4308
+id: BL-4311
 title: ObliviousHttp extension: scaffold the project and HPKE base mode (RFC 9180)
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4308 — ObliviousHttp extension: scaffold the project and HPKE base mode (RFC 9180)
+# BL-4311 — ObliviousHttp extension: scaffold the project and HPKE base mode (RFC 9180)
 
 ## Goal
 

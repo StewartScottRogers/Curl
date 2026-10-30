@@ -4,7 +4,7 @@ title: ObliviousHttp extension: key configurations and request and response enca
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4308]
+depends-on: [BL-4311]
 touches: [Curl.Extension.ObliviousHttp.UnitLibrary/Encapsulation, Curl.Extension.ObliviousHttp.UnitTests/Encapsulation]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4137 (Oblivious HTTP relay extension) for size; builds on BL-4308's HPKE in `Hpke/`. Code goes in `Encapsulation/`. Key configuration: one `key_config` (RFC 9458 section 3.1) and the `application/ohttp-keys` list of length-prefixed configurations (section 3.2, as RFC 9540 section 3 serves it), choosing the first configuration whose KEM, KDF and AEAD the library supports. Request encapsulation per section 4.3 (header of key id, kem, kdf, aead; HPKE info "message/bhttp request"), response decapsulation per section 4.4 (export secret "message/bhttp response", response_nonce, HKDF-derived AEAD key and nonce). Media types `message/ohttp-req` and `message/ohttp-res` as constants here.
+Split from BL-4137 (Oblivious HTTP relay extension) for size; builds on BL-4311's HPKE in `Hpke/`. Code goes in `Encapsulation/`. Key configuration: one `key_config` (RFC 9458 section 3.1) and the `application/ohttp-keys` list of length-prefixed configurations (section 3.2, as RFC 9540 section 3 serves it), choosing the first configuration whose KEM, KDF and AEAD the library supports. Request encapsulation per section 4.3 (header of key id, kem, kdf, aead; HPKE info "message/bhttp request"), response decapsulation per section 4.4 (export secret "message/bhttp response", response_nonce, HKDF-derived AEAD key and nonce). Media types `message/ohttp-req` and `message/ohttp-res` as constants here.
 
 ## Acceptance criteria
 

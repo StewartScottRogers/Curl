@@ -4,7 +4,7 @@ title: ObliviousHttp extension: Binary HTTP known-length request encoding and re
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4308]
+depends-on: [BL-4311]
 touches: [Curl.Extension.ObliviousHttp.UnitLibrary/BinaryHttp, Curl.Extension.ObliviousHttp.UnitTests/BinaryHttp]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4137 (Oblivious HTTP relay extension) for size; the project is created by BL-4308. Code goes in `BinaryHttp/`. Request: framing indicator 0, control data (method, scheme, authority, path), header section, content, empty trailer section (RFC 9292 sections 3.2 to 3.6), with QUIC variable-length integers (RFC 9000 section 16) written here, not taken from a protocol library. Response: framing indicators 1 and 3, informational responses (1xx) before the final one, header and trailer sections, and padding (section 3.8). Malformed input gives a typed exception.
+Split from BL-4137 (Oblivious HTTP relay extension) for size; the project is created by BL-4311. Code goes in `BinaryHttp/`. Request: framing indicator 0, control data (method, scheme, authority, path), header section, content, empty trailer section (RFC 9292 sections 3.2 to 3.6), with QUIC variable-length integers (RFC 9000 section 16) written here, not taken from a protocol library. Response: framing indicators 1 and 3, informational responses (1xx) before the final one, header and trailer sections, and padding (section 3.8). Malformed input gives a typed exception.
 
 ## Acceptance criteria
 
