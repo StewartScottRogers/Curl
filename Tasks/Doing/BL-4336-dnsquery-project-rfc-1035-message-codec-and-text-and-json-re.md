@@ -37,3 +37,4 @@ Not registered in `ExtensionCatalogue.cs` yet: BL-4337 adds the scheme and regis
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 1eb1b74c cc8db1cc e2b1bc3f f4f7f560 3d836d5e.
