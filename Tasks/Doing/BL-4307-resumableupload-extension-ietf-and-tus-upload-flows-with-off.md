@@ -36,3 +36,4 @@ Suggested flow (record any change under Notes for BL-4129's ADR): the hook imple
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 557ffc32 c1a1811d af3a68c0 edfd5ba3 3180db99 3d836d5e.
