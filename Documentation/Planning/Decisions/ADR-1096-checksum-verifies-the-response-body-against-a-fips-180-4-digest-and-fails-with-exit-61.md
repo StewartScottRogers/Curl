@@ -20,12 +20,12 @@ hook's `ExecuteAsync` (ADR-1019) can see every body byte by running curl's handl
   `ExtensionCatalogue.cs` gets no line. Its option, description and hook activator are one line each in
   `ExtensionOptionCatalogue`, `ExtensionDescriptionCatalogue` and `ExtensionTransferHookCatalogue`. With
   `CURL_EXTENSIONS=0` the option is not registered, so curl refuses it as an unknown option (exit 2).
-- **Algorithms.** `sha1` (FIPS 180-4 §6.1), `sha256` (§6.2), `sha384` (§6.5) and `sha512` (§6.4), named in either
+- **Algorithms.** `sha1` (FIPS 180-4 §6.1), `sha224` (§6.3), `sha256` (§6.2), `sha384` (§6.5), `sha512` (§6.4), `sha512-224` and `sha512-256` (§6.7), named in either
   case, with exactly the digest's number of hexadecimal digits in either case. Hashing uses the base class
-  library's `IncrementalHash`.
+  library's `IncrementalHash`, except SHA-224 and SHA-512/t, whose hand-built cores BL-4312 added (constants computed from the primes as §4.2 and §5.3 define them).
 - **A value it cannot read** (no colon, another algorithm, wrong length, a non-hexadecimal digit) refuses the
   transfer with exit 2 (`FailedInit`, as curl refuses an option value it cannot read) and the message
-  `--checksum expects <alg>:<hex>: sha1, sha256, sha384 or sha512 and a digest of its length`, without
+  `--checksum expects <alg>:<hex>: sha1, sha224, sha256, sha384, sha512, sha512-224 or sha512-256 and a digest of its length`, without
   contacting the server.
 - **What is hashed.** The response body as curl writes it to its output (after `--compressed` decoding, and after
   the other hooks' body streams), not the headers. Each transfer of the option group is hashed on its own, so the
@@ -39,6 +39,7 @@ hook's `ExecuteAsync` (ADR-1019) can see every body byte by running curl's handl
 
 ## Left out, with why
 
-- SHA-224, SHA-512/224 and SHA-512/256 (FIPS 180-4 §6.3, §6.7): the base class library has no primitive for them,
-  so they need hand-built SHA-256 and SHA-512 cores; BL-4312 adds them.
+- SHA-224, SHA-512/224 and SHA-512/256 (FIPS 180-4 §6.3, §6.7) were left out at first, as the base class library has no
+  primitive for them; BL-4312 added them as `sha224`, `sha512-224` and `sha512-256` over hand-built SHA-256 and
+  SHA-512 cores, so nothing of FIPS 180-4's SHA-1 and SHA-2 families is left out.
 - MD5 and SHA-3: not in FIPS 180-4, the specification the task names.

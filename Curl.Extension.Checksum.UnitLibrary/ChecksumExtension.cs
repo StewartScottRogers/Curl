@@ -15,7 +15,7 @@ public static class ChecksumExtension
     public static ExtensionOption Option { get; } = new(
         "checksum",
         ExtensionOptionArgument.Value,
-        "Fail with exit 61 unless the body's <alg>:<hex> digest matches (sha1, sha256, sha384, sha512)");
+        "Fail with exit 61 unless the body's <alg>:<hex> digest matches (sha1, sha224, sha256, sha384, sha512, sha512-224, sha512-256)");
 
     /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(

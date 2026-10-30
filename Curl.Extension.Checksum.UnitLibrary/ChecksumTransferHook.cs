@@ -16,7 +16,7 @@ internal sealed class ChecksumTransferHook(ExpectedChecksum expected) : ITransfe
 
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
-        using var hash = IncrementalHash.CreateHash(Expected.Algorithm);
+        using var hash = Expected.CreateHash();
         await using var hashing = new HashingStream(context.Output, hash);
         var result = await next(context.WithOutputs(hashing, context.HeaderOutput, context.DumpHeaderOutput)).ConfigureAwait(false);
         var digest = hash.GetHashAndReset();

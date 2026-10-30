@@ -8,7 +8,7 @@ public sealed class HashingStreamTests
     [TestMethod]
     public void IsWriteOnly()
     {
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        using var hash = new BclChecksumHash(HashAlgorithmName.SHA256);
         using var stream = new HashingStream(Stream.Null, hash);
 
         Assert.IsFalse(stream.CanRead);
@@ -25,7 +25,7 @@ public sealed class HashingStreamTests
     [TestMethod]
     public async Task Write_PassesEveryByteOnAndHashesIt()
     {
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        using var hash = new BclChecksumHash(HashAlgorithmName.SHA256);
         var output = new MemoryStream();
         await using (var stream = new HashingStream(output, hash))
         {

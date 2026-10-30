@@ -10,7 +10,7 @@ namespace Curl.Extension.Checksum;
 internal sealed class InvalidChecksumTransferHook : ITransferHook
 {
     /// <summary>The message the refused transfer reports.</summary>
-    public const string Message = "--checksum expects <alg>:<hex>: sha1, sha256, sha384 or sha512 and a digest of its length";
+    public const string Message = "--checksum expects <alg>:<hex>: sha1, sha224, sha256, sha384, sha512, sha512-224 or sha512-256 and a digest of its length";
 
     public ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next) =>
         ValueTask.FromResult(TransferResult.Failure(CurlExitCode.FailedInit, Message));

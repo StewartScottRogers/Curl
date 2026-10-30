@@ -8,7 +8,7 @@ namespace Curl.Extension.Checksum;
 /// </summary>
 /// <param name="output">Where the bytes go next.</param>
 /// <param name="hash">The hash the bytes are added to.</param>
-internal sealed class HashingStream(Stream output, IncrementalHash hash) : Stream
+internal sealed class HashingStream(Stream output, IChecksumHash hash) : Stream
 {
     public override bool CanRead => false;
 
