@@ -1168,4 +1168,4 @@ Each option and the specific reason it lost.
 | [1121](ADR-1121-wireguard-user-space-tcp-client-keeps-only-what-one-client-connection-needs.md) | The WireGuard extension's user-space TCP client keeps only what one client connection needs (BL-4324) | Accepted | 2026-10-29 |
 | [1122](ADR-1122-masque-client-flow-opens-datagram-channels-through-curls-connector.md) | The MASQUE client flow opens datagram channels through curl's connector (BL-4317) | Accepted | 2026-10-29 |
 | [1123](ADR-1123-dane-wire-codec-sends-edns0-do-and-decodes-without-throwing.md) | The Dane extension's wire codec sends EDNS0 with DO and decodes without throwing (BL-4333) | Accepted | 2026-10-29 |
-| [1120](ADR-1120-dns-query-presents-records-as-named-fields-in-text-and-json.md) | The DNS query extension presents records as named fields, in dig-like text and in JSON (BL-4336) | Accepted | 2026-10-29 |
+| [1124](ADR-1124-dns-query-presents-records-as-named-fields-in-text-and-json.md) | The DNS query extension presents records as named fields, in dig-like text and in JSON (BL-4336) | Accepted | 2026-10-29 |

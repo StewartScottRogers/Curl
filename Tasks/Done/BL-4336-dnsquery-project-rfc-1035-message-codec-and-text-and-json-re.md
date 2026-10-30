@@ -33,7 +33,7 @@ Create the projects with the `new-project` skill (ADR-1003: one single-line `<Fo
 ## Notes
 
 Not registered in `ExtensionCatalogue.cs` yet: BL-4337 adds the scheme and registration.
-- Plan (done in-session, no subagents, to stay inside the run's cost): `Wire/` holds `DnsQueryEncoder`, `DnsMessageDecoder`, `DnsMessageReader` (ref struct; a compression pointer must point before the labels that hold it, so loops fail at once), `DnsRecordDataDecoder` (one table entry per type), `DnsMnemonics`, `DnsPresentation` and the records; `Rendering/` holds `DnsTextRenderer` (dig-like) and `DnsJsonRenderer` (`Utf8JsonWriter`, relaxed escaping). Decisions recorded in ADR-1120.
+- Plan (done in-session, no subagents, to stay inside the run's cost): `Wire/` holds `DnsQueryEncoder`, `DnsMessageDecoder`, `DnsMessageReader` (ref struct; a compression pointer must point before the labels that hold it, so loops fail at once), `DnsRecordDataDecoder` (one table entry per type), `DnsMnemonics`, `DnsPresentation` and the records; `Rendering/` holds `DnsTextRenderer` (dig-like) and `DnsJsonRenderer` (`Utf8JsonWriter`, relaxed escaping). Decisions recorded in ADR-1124.
 - The library references only `Curl.Extension.Abstractions.UnitLibrary` (for BL-4337); it needs no shared layer yet. Build's `VerifyExtensionIsolation` passes with the full `dotnet build`.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Extension.DnsQuery.UnitLibrary` gives 100% line, 100% branch, max complexity 10, no failing member; 86 tests. Full fast run green on Windows; the tests touch no file system, path, OS error text or certificate, so they are platform-neutral.
 

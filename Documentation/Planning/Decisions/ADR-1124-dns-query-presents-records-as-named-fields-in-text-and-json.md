@@ -1,4 +1,4 @@
-# ADR-1120: The DNS query extension presents records as named fields, in dig-like text and in JSON
+# ADR-1124: The DNS query extension presents records as named fields, in dig-like text and in JSON
 
 - Status: Accepted
 - Date: 2026-10-29
