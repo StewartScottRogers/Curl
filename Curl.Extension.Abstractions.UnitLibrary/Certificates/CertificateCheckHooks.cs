@@ -80,13 +80,21 @@ public sealed class CertificateCheckHooks
             return result;
         }
 
-        foreach (ICertificateCheckHook hook in Hooks)
+        try
         {
-            if (await hook.RefusalOfAsync(result.PeerCertificates, host, port, cancellationToken).ConfigureAwait(false) is { } refusal)
+            foreach (ICertificateCheckHook hook in Hooks)
             {
-                await connection.DisposeAsync().ConfigureAwait(false);
-                return ConnectResult.Failed(CurlExitCode.PeerFailedVerification, refusal);
+                if (await hook.RefusalOfAsync(result.PeerCertificates, host, port, cancellationToken).ConfigureAwait(false) is { } refusal)
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                    return ConnectResult.Failed(CurlExitCode.PeerFailedVerification, refusal);
+                }
             }
+        }
+        catch
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            throw;
         }
 
         return result;

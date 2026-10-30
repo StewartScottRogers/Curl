@@ -57,6 +57,19 @@ public sealed class CertificateCheckHooksTests
     }
 
     [TestMethod]
+    public async Task ConnectorOver_WithAHookThatThrows_DisposesTheConnectionAndLetsTheExceptionContinue()
+    {
+        TrackedConnection connection = new();
+        ThrowingHook pinning = new(Dane);
+        CertificateCheckHooks hooks = CertificateCheckHooks.ActivatedBy(ValuesOf(Dane), [values => values.IsGiven(Dane) ? pinning : null]);
+        IConnector checking = hooks.ConnectorOver(new FixedConnector(ConnectResult.Connected(connection, null, peerCertificates: Chain)));
+
+        await Assert.ThrowsExactlyAsync<FormatException>(async () => await checking.ConnectAsync(Target, CancellationToken.None));
+
+        Assert.IsTrue(connection.IsDisposed);
+    }
+
+    [TestMethod]
     public async Task ConnectorOver_WithHooksLettingTheChainStand_GivesCurlsResultBack()
     {
         ConnectResult accepted = ConnectResult.Connected(new TrackedConnection(), null, peerCertificates: Chain);
@@ -233,6 +246,14 @@ public sealed class CertificateCheckHooksTests
             GivenPort = port;
             return ValueTask.FromResult(refusal);
         }
+    }
+
+    private sealed class ThrowingHook(ExtensionOption option) : ICertificateCheckHook
+    {
+        public ExtensionOption Option => option;
+
+        public ValueTask<string?> RefusalOfAsync(IReadOnlyList<ReadOnlyMemory<byte>> peerCertificates, string host, int? port, CancellationToken cancellationToken) =>
+            throw new FormatException("malformed pin");
     }
 
     private sealed class FixedConnector(ConnectResult result, MultiplexedConnectResult? multiplexed = null) : IConnector
