@@ -55,16 +55,17 @@ internal sealed class DtlsTestServerChannel(DtlsTestServer server) : IDatagramCh
     /// <summary>Hands <paramref name="datagram" /> to the client as if the server sent it.</summary>
     public void Deliver(byte[] datagram)
     {
+        // The inbox write stays inside the lock: ReceiveAsync must never see an empty inbox for a datagram that is already on its way and call the client starved.
         lock (starvedGate)
         {
             if (starved.Task.IsCompleted)
             {
                 starved = NewStarved();
             }
-        }
 
-        Delivered.Enqueue(datagram);
-        inbox.Writer.TryWrite(datagram);
+            Delivered.Enqueue(datagram);
+            inbox.Writer.TryWrite(datagram);
+        }
     }
 
     /// <inheritdoc />
