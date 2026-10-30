@@ -1,5 +1,5 @@
 ---
-id: BL-4349
+id: BL-4352
 title: Extension: Oblivious HTTP relay POST without the transfer's own headers
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-30
 completed:
 ---
-# BL-4349 — Extension: Oblivious HTTP relay POST without the transfer's own headers
+# BL-4352 — Extension: Oblivious HTTP relay POST without the transfer's own headers
 
 ## Goal
 
