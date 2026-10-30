@@ -37,3 +37,4 @@ Split from BL-4315 (ADR-1110's "Not yet done"), which keeps only the wiring of t
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 2188fe39 d5b139e5 1b75edd2.
