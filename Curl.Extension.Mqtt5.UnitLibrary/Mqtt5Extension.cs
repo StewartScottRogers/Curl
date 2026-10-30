@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Mqtt5;
 
-/// <summary>The <c>mqtt5://</c>, <c>mqtt5s://</c> and <c>mqtt5+ws://</c> extension's description and handler factory (ADR-1085).</summary>
+/// <summary>The <c>mqtt5://</c>, <c>mqtt5s://</c> and <c>mqtt5+ws://</c> extension's description and handler factory (ADR-1086).</summary>
 public static class Mqtt5Extension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

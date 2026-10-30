@@ -1126,4 +1126,4 @@ Each option and the specific reason it lost.
 | [1084](ADR-1084-signalr-urls-negotiate-then-send-the-data-body-as-an-invocation-or-stream-invocation.md) | SignalR URLs negotiate, then send the data body as an invocation or stream invocation (BL-4108) | Accepted | 2026-10-29 |
 | [1085](ADR-1085-ws-subprotocol-names-a-websocket-subprotocol-and-sends-its-opening-messages.md) | --ws-subprotocol names a WebSocket subprotocol and sends its opening messages (BL-4114) | Accepted | 2026-10-29 |
 | [1082](ADR-1082-mqtt5-registers-three-schemes-as-one-handler-following-mqtt-version-5-0.md) | MQTT 5 registers three schemes as one handler, following OASIS MQTT Version 5.0 (BL-4115) | Accepted | 2026-10-29 |
-| [1085](ADR-1085-mqtt5-registers-three-schemes-as-one-handler-following-mqtt-version-5-0.md) | MQTT 5 registers three schemes as one handler, following OASIS MQTT Version 5.0 (BL-4115) | Accepted | 2026-10-29 |
+| [1086](ADR-1086-mqtt5-registers-three-schemes-as-one-handler-following-mqtt-version-5-0.md) | MQTT 5 registers three schemes as one handler, following OASIS MQTT Version 5.0 (BL-4115) | Accepted | 2026-10-29 |
