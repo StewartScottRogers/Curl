@@ -16,5 +16,6 @@ public static class ExtensionCertificateCheckHookCatalogue
     /// <summary>Gets the activators; every one that activates for an option group runs its check, in this order.</summary>
     public static IReadOnlyList<Func<ExtensionOptionValues, ICertificateCheckHook?>> Entries { get; } =
     [
+        Curl.Extension.MlDsaCertificates.MlDsaCertificatesExtension.HookFor,
     ];
 }

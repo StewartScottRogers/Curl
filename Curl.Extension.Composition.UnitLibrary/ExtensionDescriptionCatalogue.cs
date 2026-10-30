@@ -48,6 +48,7 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.ContentDigest.ContentDigestExtension.Description,
         Curl.Extension.ClientHints.ClientHintsExtension.Description,
         Curl.Extension.RateLimit.RateLimitExtension.Description,
+        Curl.Extension.MlDsaCertificates.MlDsaCertificatesExtension.Description,
         GoogleCloudStorage.Client.GcsExtension.Description,
         AzureStorage.Client.AzureStorageExtension.Description,
     ];
