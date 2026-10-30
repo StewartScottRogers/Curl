@@ -33,5 +33,6 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.ClientHints.ClientHintsExtension.HookFor,
         Curl.Extension.RateLimit.RateLimitExtension.HookFor,
         Curl.Extension.WebSocketExtendedConnect.Option.WebSocketExtendedConnectExtension.HookFor,
+        Curl.Extension.GrpcWeb.GrpcWebExtension.HookFor,
     ];
 }

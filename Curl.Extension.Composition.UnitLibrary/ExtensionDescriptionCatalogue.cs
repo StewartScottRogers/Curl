@@ -53,5 +53,6 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.MlDsaCertificates.MlDsaCertificatesExtension.Description,
         GoogleCloudStorage.Client.GcsExtension.Description,
         AzureStorage.Client.AzureStorageExtension.Description,
+        Curl.Extension.GrpcWeb.GrpcWebExtension.Description,
     ];
 }

@@ -58,5 +58,6 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.RateLimit.RateLimitExtension.Option,
         Curl.Extension.MlDsaCertificates.MlDsaCertificatesExtension.Option,
         Curl.Extension.WebSocketExtendedConnect.Option.WebSocketExtendedConnectExtension.Option,
+        Curl.Extension.GrpcWeb.GrpcWebExtension.Option,
     ];
 }
