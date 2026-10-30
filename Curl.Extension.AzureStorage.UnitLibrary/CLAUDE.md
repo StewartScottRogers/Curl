@@ -12,3 +12,9 @@ its registration in `ExtensionCatalogue.cs` arrive in later tasks (BL-4126).
   `AzureStorageHttpFailure`. `Expect: 100-continue` is not sent. It follows the S3 extension's client
   (ADR-1018) under this library's names; extensions never reference each other, so it is a copy, not a
   reference.
+- `Bodies/` reads and writes the bodies the handler exchanges: `AzureBlobListingParser` (List Blobs
+  `EnumerationResults`, with `NextMarker`), `AzureStorageErrorParser` (the `Error` body),
+  `AzureBlockListWriter` (Put Block List `BlockList`) and `AzureStoragePathListParser` (ADLS Gen2
+  Path List JSON; the `x-ms-continuation` header is the caller's). A parser never throws on a bad
+  body: it returns a failed `AzureStorageBodyParseResult` saying why. `System.Xml.Linq` and
+  `JsonDocument` only, so nothing needs reflection under Native AOT.
