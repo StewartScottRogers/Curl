@@ -38,3 +38,4 @@ First of the split of BL-4151 (DNSSEC and DANE TLSA extension, ADR-0999). Create
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 07b6e3f8 c5a2fcae 57817966 aa542e0e 6db41805 3d836d5e.
