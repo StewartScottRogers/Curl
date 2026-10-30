@@ -1,5 +1,5 @@
 ---
-id: BL-4284
+id: BL-4291
 title: OCI extension: HTTP/1.1 exchange and registry Bearer token auth
 priority: Low
 assignee: Claude
@@ -10,15 +10,15 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4284 — OCI extension: HTTP/1.1 exchange and registry Bearer token auth
+# BL-4291 — OCI extension: HTTP/1.1 exchange and registry Bearer token auth
 
 ## Goal
 
-`Curl.Extension.OciRegistry.UnitLibrary` exists with an HTTP/1.1 request/response exchange over an `IConnection` and the registry token flow, so the pull (BL-4285) and push (BL-4286) flows can talk to a registry.
+`Curl.Extension.OciRegistry.UnitLibrary` exists with an HTTP/1.1 request/response exchange over an `IConnection` and the registry token flow, so the pull (BL-4292) and push (BL-4293) flows can talk to a registry.
 
 ## Context
 
-Split from BL-4127 (extension 26 of 63; ADR-0999, CLAUDE.md "Extensions"). Specification: OCI Distribution Specification 1.1 and the Docker/Distribution token authentication flow it relies on (`WWW-Authenticate: Bearer realm=...,service=...,scope=...`, token endpoint answering JSON `token` or `access_token`). Extensions never reference `Curl.Protocol.*` or another extension, so the HTTP/1.1 exchange is written here; see `Curl.Extension.S3.UnitLibrary/Http` and `Curl.Extension.OAuth2.UnitLibrary/Http` for the shape (Content-Length, chunked and close-delimited bodies). Use the `new-project` skill; the solution line goes directly under the extension marker comment in `Curl.slnx` (ADR-1003). Do not register in `ExtensionCatalogue.cs` yet (BL-4285 does).
+Split from BL-4127 (extension 26 of 63; ADR-0999, CLAUDE.md "Extensions"). Specification: OCI Distribution Specification 1.1 and the Docker/Distribution token authentication flow it relies on (`WWW-Authenticate: Bearer realm=...,service=...,scope=...`, token endpoint answering JSON `token` or `access_token`). Extensions never reference `Curl.Protocol.*` or another extension, so the HTTP/1.1 exchange is written here; see `Curl.Extension.S3.UnitLibrary/Http` and `Curl.Extension.OAuth2.UnitLibrary/Http` for the shape (Content-Length, chunked and close-delimited bodies). Use the `new-project` skill; the solution line goes directly under the extension marker comment in `Curl.slnx` (ADR-1003). Do not register in `ExtensionCatalogue.cs` yet (BL-4292 does).
 
 ## Acceptance criteria
 

@@ -4,7 +4,7 @@ title: Extension: Pull and push OCI artifacts with oci://
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4092, BL-4284, BL-4285, BL-4286]
+depends-on: [BL-4091, BL-4093, BL-4092, BL-4291, BL-4292, BL-4293]
 touches: [Curl.Extension.OciRegistry.UnitLibrary, Curl.Extension.OciRegistry.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
@@ -35,10 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
-- 2026-10-29 (lane 7): Split for size before any code: an HTTP/1.1 exchange plus Bearer token auth (BL-4284), pull (BL-4285) and push (BL-4286). Extensions cannot share the S3, OAuth2 or McpClient HTTP code, so it is written again here. Once all three are Done, this task checks its criteria and runs the quality gates over the whole library.
+- 2026-10-29 (lane 7): Split for size before any code: an HTTP/1.1 exchange plus Bearer token auth (BL-4291), pull (BL-4292) and push (BL-4293). Extensions cannot share the S3, OAuth2 or McpClient HTTP code, so it is written again here. Once all three are Done, this task checks its criteria and runs the quality gates over the whole library.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 8f5bbfd4 0c7ef334 ad0964b3 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
-- 2026-10-29: Doing -> Backlog. Split for size into BL-4284, BL-4285 and BL-4286; waits on them
+- 2026-10-29: Doing -> Backlog. Split for size into BL-4291, BL-4292 and BL-4293; waits on them

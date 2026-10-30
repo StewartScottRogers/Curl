@@ -1,20 +1,20 @@
 ---
-id: BL-4285
+id: BL-4292
 title: OCI extension: oci:// pull of manifests and blobs
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4284]
+depends-on: [BL-4291]
 touches: [Curl.Extension.OciRegistry.UnitLibrary/Client, Curl.Extension.OciRegistry.UnitTests/Client, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4285 — OCI extension: oci:// pull of manifests and blobs
+# BL-4292 — OCI extension: oci:// pull of manifests and blobs
 
 ## Goal
 
-`curl oci://registry/repo:tag` writes the manifest and `oci://registry/repo@sha256:...` a blob, through the registry token auth of BL-4284.
+`curl oci://registry/repo:tag` writes the manifest and `oci://registry/repo@sha256:...` a blob, through the registry token auth of BL-4291.
 
 ## Context
 
