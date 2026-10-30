@@ -37,3 +37,4 @@ Run no `Measure-CodeQuality.ps1` here: it took 64 minutes for Composition. BL-43
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: e93d9b26 81e106cc 42b24d12 a7e7b52e 1d40d7f1.
