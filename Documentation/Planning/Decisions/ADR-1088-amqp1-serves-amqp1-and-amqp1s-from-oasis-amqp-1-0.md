@@ -1,4 +1,4 @@
-# ADR-1085 — AMQP 1.0 serves amqp1 and amqp1s, following OASIS AMQP Version 1.0
+# ADR-1088 — AMQP 1.0 serves amqp1 and amqp1s, following OASIS AMQP Version 1.0
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
