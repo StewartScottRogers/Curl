@@ -30,3 +30,4 @@ Found by BL-4311's run on 2026-10-29: in the full `dotnet test --filter "TestCat
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: a1f5021a 3d836d5e.
