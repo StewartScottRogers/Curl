@@ -1187,3 +1187,4 @@ Each option and the specific reason it lost.
 | [1139](ADR-1139-connect-rpc-sends-connect-unary-and-streaming-calls-with-json.md) | --connect-rpc sends Connect unary and streaming calls with JSON (BL-4104) | Accepted | 2026-10-29 |
 | [1140](ADR-1140-dns-query-serves-dns-urls-over-udp-and-tcp.md) | The DNS query extension serves dns: URLs over UDP and TCP, chosen by --dns-transport and --dns-json (BL-4337) | Accepted | 2026-10-29 |
 | [1141](ADR-1141-certificate-checks-get-the-port-the-checking-connector-opened-the-connection-to.md) | Certificate checks get the port the checking connector opened the connection to (BL-4331) | Accepted | 2026-10-29 |
+| [1129](ADR-1129-plugin-protocol-hands-unknown-schemes-to-curl-proto-helpers.md) | The plugin protocol extension hands unknown schemes to `curl-proto-<scheme>` helpers (BL-4160) | Accepted | 2026-10-29 |

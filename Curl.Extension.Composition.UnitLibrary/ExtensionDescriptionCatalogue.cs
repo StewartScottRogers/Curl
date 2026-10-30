@@ -59,5 +59,6 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.GrpcWeb.GrpcWebExtension.Description,
         Curl.Extension.RecordReplay.RecordReplayExtension.Description,
         DnsQuery.Client.DnsQueryExtension.Description,
+        PluginProtocol.PluginProtocolExtension.Description,
     ];
 }

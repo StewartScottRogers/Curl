@@ -32,5 +32,6 @@ internal static class ExtensionCatalogue
         GoogleCloudStorage.Client.GcsExtension.CreateHandler,
         AzureStorage.Client.AzureStorageExtension.CreateHandler,
         DnsQuery.Client.DnsQueryExtension.CreateHandler,
+        services => PluginProtocol.PluginProtocolExtension.CreateHandler(services, ExtensionDescriptionCatalogue.Entries.SelectMany(description => description.Schemes)),
     ];
 }
