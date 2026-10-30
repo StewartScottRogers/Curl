@@ -27,5 +27,6 @@ internal static class ExtensionCatalogue
         Amqp1.Client.Amqp1Extension.CreateHandler,
         WebTransport.WebTransportExtension.CreateHandler,
         S3.Client.S3Extension.CreateHandler,
+        Amqp0.Client.Amqp0Extension.CreateHandler,
     ];
 }

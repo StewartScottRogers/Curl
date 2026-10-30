@@ -273,10 +273,6 @@ public sealed class Amqp0ProtocolHandlerTests
     }
 
     [TestMethod]
-    public void Constructor_NullConnector_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => new Amqp0ProtocolHandler(null!));
-
-    [TestMethod]
     public async Task ExecuteAsync_NullContext_Throws() =>
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await new Amqp0ProtocolHandler(new ScriptedAmqp0Connector(ConnectResult.Refused("x"))).ExecuteAsync(null!));
 

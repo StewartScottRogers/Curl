@@ -15,7 +15,8 @@ Tested against the AMQP 0-9-1 specification (2008-11-13) with RabbitMQ's errata 
   `Amqp0ReplyCode` (ADR-1056).
 - `Client/`: `Amqp0ProtocolHandler` for `amqp://` and `amqps://` over the `IConnector` it is given, the URL's
   `/virtual-host/queue` (`Amqp0UrlQueue`), the publish or basic.get flow (`Amqp0ClientFlow`) over whole frames
-  (`Amqp0FrameChannel`), and its exit codes and messages (ADR-1060). No option or registration yet: BL-4117 adds them.
+  (`Amqp0FrameChannel`), and its exit codes and messages (ADR-1060), and `Amqp0Extension`, the description and handler factory
+  `Curl.Extension.Composition` registers (ADR-1082).
 
 References only `Curl.Extension.Abstractions` (and through it `Curl.Protocol.Abstractions`). Held to the four
 quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.Amqp0.UnitTests`.

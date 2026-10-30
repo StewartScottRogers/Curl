@@ -8,19 +8,14 @@ namespace Curl.Extension.Amqp0.Client;
 /// otherwise takes one message with basic.get and writes its body to the output. <c>--user</c> is the PLAIN login,
 /// guest/guest without it. The exchange itself is <see cref="Amqp0ClientFlow"/>.
 /// </summary>
-public sealed class Amqp0ProtocolHandler : IProtocolHandler
+/// <param name="connector">Makes the TCP or TLS connection.</param>
+public sealed class Amqp0ProtocolHandler(IConnector connector) : IProtocolHandler
 {
     private const string SecureScheme = "amqps";
 
     private const int DefaultPort = 5672;
 
     private const int SecureDefaultPort = 5671;
-
-    private readonly IConnector connector;
-
-    /// <summary>Creates the handler over <paramref name="connector"/>, which makes the TCP or TLS connection.</summary>
-    public Amqp0ProtocolHandler(IConnector connector) =>
-        this.connector = connector ?? throw new ArgumentNullException(nameof(connector));
 
     /// <summary>The schemes served: <c>amqp</c> and <c>amqps</c>.</summary>
     public IReadOnlyCollection<string> SupportedSchemes { get; } = ["amqp", SecureScheme];
