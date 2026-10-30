@@ -4,12 +4,13 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.ResumableUpload.Http;
 
-/// <summary>A fake <see cref="IConnection"/> that replays recorded response bytes, at most <c>readSize</c> per read, and records what is written.</summary>
-internal sealed class RecordedConnection(string response, int readSize = int.MaxValue) : IConnection
+/// <summary>A fake <see cref="IConnection"/> that replays recorded response bytes, at most <c>readSize</c> per read, records what is written, and breaks (an <see cref="IOException"/>) on the write after the first <c>writesBeforeBreak</c>.</summary>
+internal sealed class RecordedConnection(string response, int readSize = int.MaxValue, int writesBeforeBreak = int.MaxValue) : IConnection
 {
     private readonly byte[] responseBytes = Encoding.Latin1.GetBytes(response);
     private readonly MemoryStream written = new();
     private int position;
+    private int writes;
 
     public bool IsSecure => false;
 
@@ -29,6 +30,11 @@ internal sealed class RecordedConnection(string response, int readSize = int.Max
 
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
+        if (writes++ >= writesBeforeBreak)
+        {
+            throw new IOException("The connection was reset.");
+        }
+
         written.Write(buffer.Span);
         return ValueTask.CompletedTask;
     }
@@ -39,5 +45,11 @@ internal sealed class RecordedConnection(string response, int readSize = int.Max
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public bool IsDisposed { get; private set; }
+
+    public ValueTask DisposeAsync()
+    {
+        IsDisposed = true;
+        return ValueTask.CompletedTask;
+    }
 }

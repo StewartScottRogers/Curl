@@ -1,9 +1,16 @@
 # Curl.Extension.ResumableUpload.UnitLibrary
 
 The resumable upload extension (ADR-0999), for `--resumable-upload`. Namespace
-`Curl.Extension.ResumableUpload`. It references the base class library and `Curl.Protocol.Abstractions`
-(for `IConnection`), never `Curl.Protocol.Http` or another extension. The client flow (BL-4307) and the
-option, its registration in `ExtensionCatalogue.cs` and its description (BL-4129) arrive in later tasks.
+`Curl.Extension.ResumableUpload`. It references the base class library, `Curl.Protocol.Abstractions`
+(for `IConnection`) and `Curl.Extension.Abstractions` (for `ITransferHook`), never `Curl.Protocol.Http` or
+another extension. The option, its registration in `ExtensionCatalogue.cs` and its description (BL-4129)
+arrive in a later task.
+
+- `Transfer/ResumableUploadTransferHook` uploads an http or https transfer's `-T` body in place of curl's
+  handler (ADR-1097): `OPTIONS` picks `TusUploadProtocol` or `IetfUploadProtocol`, `ResumableUploadFlow`
+  creates the upload, appends, and after a broken connection retrieves the offset and appends from it,
+  `ResumableUploadSession` sends the requests through curl's connector, and `ResumableUploadOutcome` makes
+  the last response the transfer's. Its constructor takes how many resumptions to allow.
 
 - `Http/ResumableUploadHttpClientConnection` sends one HTTP/1.1 request at a time over an `IConnection`
   (RFC 9112), its body optionally from `BodyOffset`, and returns a `ResumableUploadHttpResponse` whose
