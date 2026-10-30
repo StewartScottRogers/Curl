@@ -4,7 +4,7 @@ using System.Text;
 namespace Curl.Extension.CodeGeneration;
 
 /// <summary>
-/// Writes <c>--csharp</c>'s file (ADR-1128): a C# file-based program sending each request with <c>HttpClient</c>, as
+/// Writes <c>--csharp</c>'s file (ADR-1138): a C# file-based program sending each request with <c>HttpClient</c>, as
 /// its documentation shows. One <c>HttpClientHandler</c> takes curl's redirect and decompression settings
 /// (<c>AllowAutoRedirect</c>, <c>MaxAutomaticRedirections</c>, <c>AutomaticDecompression</c>); each request is an
 /// <c>HttpRequestMessage</c> whose fields go on <c>request.Headers</c>, or on <c>request.Content.Headers</c> for the

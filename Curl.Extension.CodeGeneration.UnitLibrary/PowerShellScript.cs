@@ -4,7 +4,7 @@ using System.Text;
 namespace Curl.Extension.CodeGeneration;
 
 /// <summary>
-/// Writes <c>--powershell</c>'s file (ADR-1128): a PowerShell 7 script sending each request with
+/// Writes <c>--powershell</c>'s file (ADR-1138): a PowerShell 7 script sending each request with
 /// <c>Invoke-RestMethod</c>, by the parameters its documentation names. <c>-Uri</c>; <c>-Method</c> for a
 /// <c>WebRequestMethod</c> name, else <c>-CustomMethod</c>; <c>-Headers</c> for the fields, with
 /// <c>-SkipHeaderValidation</c> so each is sent as given and fields of one name joined with <c>", "</c>;

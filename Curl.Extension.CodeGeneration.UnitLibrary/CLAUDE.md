@@ -1,6 +1,6 @@
 # Curl.Extension.CodeGeneration.UnitLibrary
 
-The `--csharp` and `--powershell` extension (ADR-0999, ADR-1128): the way `--libcurl` writes C, it writes the HTTP
+The `--csharp` and `--powershell` extension (ADR-0999, ADR-1138): the way `--libcurl` writes C, it writes the HTTP
 requests a command line sends as C# using `HttpClient` and as a PowerShell script using `Invoke-RestMethod`.
 Namespace `Curl.Extension.CodeGeneration`. It references only `Curl.Extension.Abstractions.UnitLibrary` and the
 shared layers it brings.

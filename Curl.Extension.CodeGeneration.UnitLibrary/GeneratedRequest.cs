@@ -3,7 +3,7 @@ using System.Text;
 namespace Curl.Extension.CodeGeneration;
 
 /// <summary>
-/// One HTTP request as the generated code sends it (ADR-1128): the method and URL curl sends, the request fields the
+/// One HTTP request as the generated code sends it (ADR-1138): the method and URL curl sends, the request fields the
 /// command line gave (with <c>-A</c>, <c>-e</c>, the body's <c>Content-Type</c> and the credentials' <c>Authorization</c>
 /// among them), the body, and whether redirects are followed and the body decompressed.
 /// </summary>

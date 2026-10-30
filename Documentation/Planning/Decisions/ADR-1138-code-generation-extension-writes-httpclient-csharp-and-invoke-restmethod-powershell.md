@@ -1,4 +1,4 @@
-# ADR-1128 — The code generation extension writes HttpClient C# with `--csharp` and Invoke-RestMethod PowerShell with `--powershell`
+# ADR-1138 — The code generation extension writes HttpClient C# with `--csharp` and Invoke-RestMethod PowerShell with `--powershell`
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

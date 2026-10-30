@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.CodeGeneration;
 
 /// <summary>
-/// The <c>--csharp</c> and <c>--powershell</c> extension (ADR-1128): as <c>--libcurl</c> writes a C program, they
+/// The <c>--csharp</c> and <c>--powershell</c> extension (ADR-1138): as <c>--libcurl</c> writes a C program, they
 /// write a C# program using <c>HttpClient</c> and a PowerShell script using <c>Invoke-RestMethod</c> that send the
 /// requests the command line sends. The transfer itself runs unchanged. <c>Curl.Extension.Composition</c> registers
 /// its options, description and transfer hook.

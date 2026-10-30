@@ -4,7 +4,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.CodeGeneration;
 
 /// <summary>
-/// The <c>--csharp</c> and <c>--powershell</c> transfer hook (ADR-1128). Before each transfer of its option group it
+/// The <c>--csharp</c> and <c>--powershell</c> transfer hook (ADR-1138). Before each transfer of its option group it
 /// adds the transfer's request to those it has seen and writes every file again, so a command line with several URLs
 /// gives one program sending them in order, as <c>--libcurl</c> does. A file it cannot write is reported on the
 /// transfer's diagnostic log, as <c>--libcurl</c> warns, and the transfer runs unchanged.
