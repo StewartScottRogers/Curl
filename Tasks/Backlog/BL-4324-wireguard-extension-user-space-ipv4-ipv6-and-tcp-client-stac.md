@@ -4,7 +4,7 @@ title: WireGuard extension: user-space IPv4, IPv6 and TCP client stack
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4322]
+depends-on: [BL-4326]
 touches: [Curl.Extension.WireGuard.UnitLibrary/IpStack, Curl.Extension.WireGuard.UnitTests/IpStack]
 requirement: none
 created: 2026-10-29

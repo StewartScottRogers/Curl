@@ -4,7 +4,7 @@ title: WireGuard extension: Noise IK handshake, message formats and transport da
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4321, BL-4322]
+depends-on: [BL-4325, BL-4326]
 touches: [Curl.Extension.WireGuard.UnitLibrary/Noise, Curl.Extension.WireGuard.UnitLibrary/Messages, Curl.Extension.WireGuard.UnitTests/Noise, Curl.Extension.WireGuard.UnitTests/Messages]
 requirement: none
 created: 2026-10-29
@@ -14,11 +14,11 @@ completed:
 
 ## Goal
 
-`Curl.Extension.WireGuard.UnitLibrary` performs the WireGuard initiator's Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s handshake and seals and opens transport data messages, given the configuration from BL-4322 and a datagram channel it is handed.
+`Curl.Extension.WireGuard.UnitLibrary` performs the WireGuard initiator's Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s handshake and seals and opens transport data messages, given the configuration from BL-4326 and a datagram channel it is handed.
 
 ## Context
 
-Split from BL-4147. Specification: WireGuard whitepaper (Donenfeld, revision e2da747, 2020-06-01) sections 5.4.1-5.4.7 and 6; Noise Protocol Framework revision 34 (IK pattern, psk2 modifier). Uses `X25519`, `AeadChaCha20Poly1305` and, from BL-4321, `Blake2s`, `HmacBlake2s`, `AeadXChaCha20Poly1305` in `Curl.Cryptography.UnitLibrary`. Inject `TimeProvider` (TAI64N timestamps, REKEY timers) and the random source; no network: tests drive the initiator against a responder written in the tests from the same sections, or against recorded bytes.
+Split from BL-4147. Specification: WireGuard whitepaper (Donenfeld, revision e2da747, 2020-06-01) sections 5.4.1-5.4.7 and 6; Noise Protocol Framework revision 34 (IK pattern, psk2 modifier). Uses `X25519`, `AeadChaCha20Poly1305` and, from BL-4325, `Blake2s`, `HmacBlake2s`, `AeadXChaCha20Poly1305` in `Curl.Cryptography.UnitLibrary`. Inject `TimeProvider` (TAI64N timestamps, REKEY timers) and the random source; no network: tests drive the initiator against a responder written in the tests from the same sections, or against recorded bytes.
 
 ## Acceptance criteria
 

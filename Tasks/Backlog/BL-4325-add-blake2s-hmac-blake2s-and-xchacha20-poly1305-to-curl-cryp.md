@@ -1,5 +1,5 @@
 ---
-id: BL-4321
+id: BL-4325
 title: Add BLAKE2s, HMAC-BLAKE2s and XChaCha20-Poly1305 to Curl.Cryptography
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4321 — Add BLAKE2s, HMAC-BLAKE2s and XChaCha20-Poly1305 to Curl.Cryptography
+# BL-4325 — Add BLAKE2s, HMAC-BLAKE2s and XChaCha20-Poly1305 to Curl.Cryptography
 
 ## Goal
 

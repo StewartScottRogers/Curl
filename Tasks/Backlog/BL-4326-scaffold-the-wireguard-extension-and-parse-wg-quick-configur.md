@@ -1,5 +1,5 @@
 ---
-id: BL-4322
+id: BL-4326
 title: Scaffold the WireGuard extension and parse wg-quick configuration files
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4322 — Scaffold the WireGuard extension and parse wg-quick configuration files
+# BL-4326 — Scaffold the WireGuard extension and parse wg-quick configuration files
 
 ## Goal
 
