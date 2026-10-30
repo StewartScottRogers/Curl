@@ -1,4 +1,4 @@
-# ADR-1149 — --quic-migrate moves a QUIC transfer to a new local address after path loss
+# ADR-1150 — --quic-migrate moves a QUIC transfer to a new local address after path loss
 
 - **Status:** Accepted
 - **Date:** 2026-10-30

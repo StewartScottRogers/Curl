@@ -4,7 +4,7 @@ using Curl.Extension.Abstractions.Description;
 
 namespace Curl.Extension.QuicMigration;
 
-/// <summary>The <c>--quic-migrate</c> extension's option, description and connection hook activator (ADR-1149).</summary>
+/// <summary>The <c>--quic-migrate</c> extension's option, description and connection hook activator (ADR-1150).</summary>
 public static class QuicMigrationExtension
 {
     /// <summary>Gets <c>--quic-migrate</c>, a flag.</summary>
