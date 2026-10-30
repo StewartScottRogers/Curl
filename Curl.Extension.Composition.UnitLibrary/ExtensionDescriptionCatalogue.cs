@@ -39,5 +39,6 @@ internal static class ExtensionDescriptionCatalogue
         Amqp1.Client.Amqp1Extension.Description,
         S3.Client.S3Extension.Description,
         Amqp0.Client.Amqp0Extension.Description,
+        OciRegistry.Client.OciRegistryExtension.Description,
     ];
 }

@@ -28,5 +28,6 @@ internal static class ExtensionCatalogue
         WebTransport.WebTransportExtension.CreateHandler,
         S3.Client.S3Extension.CreateHandler,
         Amqp0.Client.Amqp0Extension.CreateHandler,
+        OciRegistry.Client.OciRegistryExtension.CreateHandler,
     ];
 }

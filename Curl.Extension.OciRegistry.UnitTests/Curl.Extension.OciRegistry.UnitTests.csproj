@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Extension.OciRegistry.UnitLibrary\Curl.Extension.OciRegistry.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Extension.Composition.UnitLibrary\Curl.Extension.Composition.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Core.UnitLibrary\Curl.Core.UnitLibrary.csproj" />
   </ItemGroup>
 
 </Project>
