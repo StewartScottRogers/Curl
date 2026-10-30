@@ -1,4 +1,4 @@
-# ADR-1153: The Oblivious HTTP extension sends requests through a relay with --ohttp-relay and --ohttp-keys
+# ADR-1157: The Oblivious HTTP extension sends requests through a relay with --ohttp-relay and --ohttp-keys
 
 - Status: Accepted
 - Date: 2026-10-30

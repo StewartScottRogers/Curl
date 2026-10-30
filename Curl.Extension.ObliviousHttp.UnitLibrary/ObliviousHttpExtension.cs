@@ -6,7 +6,7 @@ using Curl.Extension.ObliviousHttp.Relay;
 namespace Curl.Extension.ObliviousHttp;
 
 /// <summary>
-/// The <c>--ohttp-relay</c> extension (ADR-1153): sends an HTTP transfer as an Oblivious HTTP request
+/// The <c>--ohttp-relay</c> extension (ADR-1157): sends an HTTP transfer as an Oblivious HTTP request
 /// (RFC 9458) through the named relay, encapsulated to the gateway key configuration <c>--ohttp-keys</c>
 /// names, or to the one the target's <c>/.well-known/ohttp-gateway</c> serves (RFC 9540).
 /// <c>Curl.Extension.Composition</c> registers its options, description and transfer hook.

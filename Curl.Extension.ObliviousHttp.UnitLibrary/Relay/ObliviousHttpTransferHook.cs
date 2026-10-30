@@ -6,7 +6,7 @@ using Curl.Extension.ObliviousHttp.Encapsulation;
 namespace Curl.Extension.ObliviousHttp.Relay;
 
 /// <summary>
-/// The <c>--ohttp-relay</c> transfer hook (ADR-1153), the client of RFC 9458 section 2: reads the gateway's key
+/// The <c>--ohttp-relay</c> transfer hook (ADR-1157), the client of RFC 9458 section 2: reads the gateway's key
 /// configuration (<see cref="KeyConfigurationSource" />), encodes the transfer's request as Binary HTTP
 /// (<see cref="InnerRequest" />), encapsulates it (section 4.3), POSTs it to the relay as <c>message/ohttp-req</c>
 /// (section 5), decapsulates the <c>message/ohttp-res</c> answer (section 4.4) and writes the response it carries
