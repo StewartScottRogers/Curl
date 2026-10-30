@@ -26,5 +26,6 @@ internal static class ExtensionCatalogue
         Mqtt5.Mqtt5Extension.CreateHandler,
         Amqp1.Client.Amqp1Extension.CreateHandler,
         WebTransport.WebTransportExtension.CreateHandler,
+        S3.Client.S3Extension.CreateHandler,
     ];
 }

@@ -36,5 +36,6 @@ internal static class ExtensionDescriptionCatalogue
         SignalR.SignalRExtension.Description,
         Mqtt5.Mqtt5Extension.Description,
         Amqp1.Client.Amqp1Extension.Description,
+        S3.Client.S3Extension.Description,
     ];
 }

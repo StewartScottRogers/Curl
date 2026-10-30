@@ -1131,3 +1131,4 @@ Each option and the specific reason it lost.
 | [1082](ADR-1082-amqp1-serves-amqp1-and-amqp1s-from-oasis-amqp-1-0.md) | AMQP 1.0 serves amqp1 and amqp1s, following OASIS AMQP Version 1.0 (BL-4118) | Accepted | 2026-10-29 |
 | [1088](ADR-1088-amqp1-serves-amqp1-and-amqp1s-from-oasis-amqp-1-0.md) | AMQP 1.0 serves amqp1 and amqp1s, following OASIS AMQP Version 1.0 (BL-4118) | Accepted | 2026-10-29 |
 | [1089](ADR-1089-webtransport-opens-one-session-over-http-3-and-carries-the-data-by-the-wt-query-field.md) | WebTransport opens one session over HTTP/3 and carries the data by the wt query field (BL-4113) | Accepted | 2026-10-29 |
+| [1090](ADR-1090-s3-urls-download-upload-in-parts-and-list-signed-with-sigv4.md) | s3:// URLs download, upload in parts and list, signed with SigV4 (BL-4124) | Accepted | 2026-10-29 |
