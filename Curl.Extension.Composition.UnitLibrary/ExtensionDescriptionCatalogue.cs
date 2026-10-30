@@ -28,6 +28,7 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.HttpCache.HttpCacheExtension.Description,
         Curl.Extension.SegmentedDownload.SegmentedDownloadExtension.Description,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.Description,
+        Curl.Extension.Checksum.ChecksumExtension.Description,
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.Description,
         McpClient.Client.McpClientExtension.Description,
         OAuth2.Options.OAuth2Options.Description,

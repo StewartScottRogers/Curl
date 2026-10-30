@@ -25,6 +25,7 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.SegmentedDownload.SegmentedDownloadExtension.Option,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.Option,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.SeedOption,
+        Curl.Extension.Checksum.ChecksumExtension.Option,
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.DnsOverTlsOption,
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.DnsOverQuicOption,
         HttpFile.HttpFileOptions.File,
