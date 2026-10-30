@@ -24,6 +24,12 @@ registration arrive in BL-4125.
   `GcsErrorResponse` (`Code`, `Message`, `Details`).
 - Both match elements by local name and return a `GcsXmlParseResult`, never an exception, with the
   reason when a body is not well-formed or lacks a required element (`Xml/GcsXmlBody`).
+- `Http/GcsHttpClientConnection` sends one HTTP/1.1 request at a time over an `IConnection`
+  (method, target, `Host`, headers, optional body with `Content-Length`) and reads the status
+  line, headers and a body framed by `Content-Length`, chunked or the close (RFC 9112), saying
+  whether the connection persists; every failure is a `GcsHttpException` naming a
+  `GcsHttpFailure`. TLS comes from `ConnectTarget.UseTls` through the connector. It is the S3
+  extension's `Http/` shape, written here because an extension references no other extension.
 
 Tested against the specification, not against curl. Held to the four quality gates in the root
 `CLAUDE.md`. Its tests are in `Curl.Extension.GoogleCloudStorage.UnitTests`.
