@@ -35,5 +35,6 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.RateLimit.RateLimitExtension.HookFor,
         Curl.Extension.WebSocketExtendedConnect.Option.WebSocketExtendedConnectExtension.HookFor,
         Curl.Extension.GrpcWeb.GrpcWebExtension.HookFor,
+        Curl.Extension.RecordReplay.RecordReplayExtension.HookFor,
     ];
 }

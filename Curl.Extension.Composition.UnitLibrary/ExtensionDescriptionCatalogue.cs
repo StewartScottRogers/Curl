@@ -55,5 +55,6 @@ internal static class ExtensionDescriptionCatalogue
         GoogleCloudStorage.Client.GcsExtension.Description,
         AzureStorage.Client.AzureStorageExtension.Description,
         Curl.Extension.GrpcWeb.GrpcWebExtension.Description,
+        Curl.Extension.RecordReplay.RecordReplayExtension.Description,
     ];
 }

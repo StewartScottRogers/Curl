@@ -60,5 +60,7 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.MlDsaCertificates.MlDsaCertificatesExtension.Option,
         Curl.Extension.WebSocketExtendedConnect.Option.WebSocketExtendedConnectExtension.Option,
         Curl.Extension.GrpcWeb.GrpcWebExtension.Option,
+        Curl.Extension.RecordReplay.RecordReplayExtension.RecordOption,
+        Curl.Extension.RecordReplay.RecordReplayExtension.ReplayOption,
     ];
 }
