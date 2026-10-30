@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4091, BL-4093, BL-4094]
-touches: [Curl.Extension.Har.UnitLibrary, Curl.Extension.Har.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Extension.Har.UnitLibrary, Curl.Extension.Har.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-30 (BL-4155 run 1): Written and in the stash: the library (HarExtension, HarTransferHook, HarDocument, HarTimings, HarExchange, BodyCopyingStream, CLAUDE.md), 26 unit tests in Curl.Extension.Har.UnitTests (all pass), one line each in the option, description and transfer hook catalogues (added to touches: transfer hooks have no scheme, so no ExtensionCatalogue line, as BL-4134 did; all are merge=union shared list files), the Curl.slnx line, and ADR-1127. Builds clean (complexity gate passes). Left for the next claim: run `Measure-CodeQuality.ps1 -Library Curl.Extension.Har.UnitLibrary,Curl.Extension.Composition.UnitLibrary -ReportPath ...` once (this run's attempt hit its time limit while Curl.Mcp.UnitTests' test host crashed under load), fix any gap, run the fast tests, tick the boxes and commit. No follow-up task filed: the work lives in this task's stash, so a separate task would wait on it.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 429822e8 6472bf92 b9114855 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-30: Doing -> Backlog. Out of time: code and 26 passing tests written (in stash); quality-gate measurement, fast tests and commit remain
