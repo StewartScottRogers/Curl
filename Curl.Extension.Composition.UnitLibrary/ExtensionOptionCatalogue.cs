@@ -33,6 +33,8 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.Sigstore.SigstoreExtension.RootOption,
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.DnsOverTlsOption,
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.DnsOverQuicOption,
+        Curl.Extension.ObliviousDoh.ObliviousDohExtension.ProxyOption,
+        Curl.Extension.ObliviousDoh.ObliviousDohExtension.TargetOption,
         HttpFile.HttpFileOptions.File,
         HttpFile.HttpFileOptions.Environment,
         PrivacyPass.Options.PrivacyPassOptions.Issuer,

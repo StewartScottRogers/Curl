@@ -33,6 +33,7 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.Checksum.ChecksumExtension.Description,
         Curl.Extension.Sigstore.SigstoreExtension.Description,
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.Description,
+        Curl.Extension.ObliviousDoh.ObliviousDohExtension.Description,
         McpClient.Client.McpClientExtension.Description,
         OAuth2.Options.OAuth2Options.Description,
         PrivacyPass.Options.PrivacyPassOptions.Description,

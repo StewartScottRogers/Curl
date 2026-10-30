@@ -18,5 +18,6 @@ public static class ExtensionResolverHookCatalogue
     [
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.ActivateDnsOverTls,
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.ActivateDnsOverQuic,
+        Curl.Extension.ObliviousDoh.ObliviousDohExtension.ActivateResolver,
     ];
 }
