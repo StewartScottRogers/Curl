@@ -30,3 +30,4 @@ completed:
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-10-30: Doing -> Blocked. Stewart: dark factory timed out after 120 min and again after 30 min of overtime; see Z:\repos\Curl.logs\BL-4358-20261030-060635-L1.jsonl
