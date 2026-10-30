@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.DnsQuery.Transport.Https;
 
 /// <summary>
-/// The status line and the headers of a DoH server's HTTP/1.1 response that say how to read its body (ADR-1145).
+/// The status line and the headers of a DoH server's HTTP/1.1 response that say how to read its body (ADR-1148).
 /// </summary>
 /// <param name="StatusCode">The status code.</param>
 /// <param name="ContentType">The <c>Content-Type</c> header's value, or <see langword="null" /> when there is none.</param>

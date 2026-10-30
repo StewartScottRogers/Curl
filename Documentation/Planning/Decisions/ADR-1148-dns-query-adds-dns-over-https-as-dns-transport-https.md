@@ -1,4 +1,4 @@
-# ADR-1145: The DNS query extension adds DNS over HTTPS as --dns-transport https
+# ADR-1148: The DNS query extension adds DNS over HTTPS as --dns-transport https
 
 - Status: Accepted
 - Date: 2026-10-30

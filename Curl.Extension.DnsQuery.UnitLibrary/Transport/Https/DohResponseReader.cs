@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.DnsQuery.Transport.Https;
 
 /// <summary>
-/// Reads a DoH server's HTTP/1.1 response from a connection (RFC 8484 section 4.2, ADR-1145): skips informational
+/// Reads a DoH server's HTTP/1.1 response from a connection (RFC 8484 section 4.2, ADR-1148): skips informational
 /// responses, checks the final one is a 200 <c>application/dns-message</c>, and gives its body, framed by
 /// <c>Transfer-Encoding: chunked</c>, by <c>Content-Length</c>, or by the connection's end.
 /// </summary>

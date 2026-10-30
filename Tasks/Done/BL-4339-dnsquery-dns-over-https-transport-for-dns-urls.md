@@ -32,7 +32,7 @@ Builds on BL-4337's `Transport/DnsQueryTransportSelection.cs` (depends on BL-433
 ## Notes
 
 - Added `Curl.Extension.DnsQuery.UnitTests/Transport/DnsQueryTransportSelectionTests.cs` to touches: its test pins `Names` and the exit 2 message, which now list `https`; no other task in Doing names it.
-- Decided (ADR-1145): `--dns-transport https`; the DoH URI is `https://<URL server>[:port]/dns-query`, port 443 by default, no option for another path; POST (no base64url, no URI limit; GET only helps caches) with `Content-Type` and `Accept` `application/dns-message` and `Connection: close`; HTTP/1.1 written in the extension (`Transport/Https`: `DnsHttpsTransport`, `DohRequest`, `DohResponseHead`, `DohResponseReader`); the random Message ID kept. Non-200 is exit 22, another content type or a malformed response exit 8, an early close exit 56.
+- Decided (ADR-1148): `--dns-transport https`; the DoH URI is `https://<URL server>[:port]/dns-query`, port 443 by default, no option for another path; POST (no base64url, no URI limit; GET only helps caches) with `Content-Type` and `Accept` `application/dns-message` and `Connection: close`; HTTP/1.1 written in the extension (`Transport/Https`: `DnsHttpsTransport`, `DohRequest`, `DohResponseHead`, `DohResponseReader`); the random Message ID kept. Non-200 is exit 22, another content type or a malformed response exit 8, an early close exit 56.
 - Verified: 214 DnsQuery unit tests and the whole fast run green (0 failed); Measure-CodeQuality for Curl.Extension.DnsQuery.UnitLibrary 100% line and branch, max complexity 10, 0 failing members; live `curl --dns-transport https dns://dns.google/example.com` printed the two A records.
 
 

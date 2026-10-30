@@ -1,6 +1,6 @@
 # Curl.Extension.DnsQuery.UnitLibrary
 
-The DNS query extension (ADR-0999, ADR-1124, ADR-1140, ADR-1143, ADR-1145). Namespaces `Curl.Extension.DnsQuery.Wire`,
+The DNS query extension (ADR-0999, ADR-1124, ADR-1140, ADR-1143, ADR-1148). Namespaces `Curl.Extension.DnsQuery.Wire`,
 `Curl.Extension.DnsQuery.Rendering`, `Curl.Extension.DnsQuery.Client` and `Curl.Extension.DnsQuery.Transport`. It
 references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers `Curl.Networking.UnitLibrary` (for
 `SystemDnsServers`) and `Curl.Quic.UnitLibrary` (the DNS-over-QUIC client); never a `Curl.Protocol.*` library or another extension (not even `Curl.Extension.EncryptedDns`).

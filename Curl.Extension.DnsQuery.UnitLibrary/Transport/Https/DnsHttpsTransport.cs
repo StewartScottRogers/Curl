@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.DnsQuery.Transport.Https;
 
 /// <summary>
-/// Sends a query over DNS over HTTPS (RFC 8484, ADR-1145): opens a TCP connection to the server, port 443 by default,
+/// Sends a query over DNS over HTTPS (RFC 8484, ADR-1148): opens a TCP connection to the server, port 443 by default,
 /// runs the TLS handshake through curl's TLS provider checking the certificate against the server's host (section 5),
 /// POSTs the query to <c>/dns-query</c> as <c>application/dns-message</c> over HTTP/1.1 (section 4.1) and reads the
 /// 200 answer's body (section 4.2).

@@ -3,7 +3,7 @@ using System.Text;
 namespace Curl.Extension.DnsQuery.Transport.Https;
 
 /// <summary>
-/// Writes the HTTP/1.1 request that carries a DNS query over DNS over HTTPS (RFC 8484 section 4.1, ADR-1145): a POST to
+/// Writes the HTTP/1.1 request that carries a DNS query over DNS over HTTPS (RFC 8484 section 4.1, ADR-1148): a POST to
 /// <see cref="Path" /> whose body is the query in wire format, with <c>Content-Type</c> and <c>Accept</c>
 /// <see cref="MediaType" /> (sections 4.1 and 6), and <c>Connection: close</c>, since one connection carries one query.
 /// </summary>
