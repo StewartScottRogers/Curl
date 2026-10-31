@@ -3,12 +3,12 @@ id: AF-0482
 title: BL-3563 cost $9.19 (8.6x the $1.07 median) over three opus runs, the last stopped at the 80-turn cap
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3563:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-4235
+tasks: BL-4235
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.

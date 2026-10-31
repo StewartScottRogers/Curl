@@ -3,12 +3,12 @@ id: AF-0462
 title: Requirements.md coverage note lists SMB among protocols the code implements and registers, but smb/smbs are registered only as a refusing DisabledProtocolHandler
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Product/Requirements.md:Coverage-SMB-registered:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-4224
+tasks: BL-4224
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
@@ -45,3 +45,4 @@ Select-String -Path Documentation/Product/Requirements.md, Curl.Engine.UnitLibra
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.

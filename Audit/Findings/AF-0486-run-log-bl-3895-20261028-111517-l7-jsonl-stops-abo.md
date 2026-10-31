@@ -3,12 +3,12 @@ id: AF-0486
 title: Run log BL-3895-20261028-111517-L7.jsonl stops about 2 minutes before its run ended, losing the result record and its cost
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3895:unfinished-run
 reproduction: none
-task: none
-tasks:
+task: BL-4239
+tasks: BL-4239
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.

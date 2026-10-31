@@ -3,12 +3,12 @@ id: AF-0475
 title: CI red 121 min from run 40407460127 (f45fc41f, Format_OpenSslUnprintableNames on Linux) while BL-3878 sat unclaimed
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:40407460127:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-4228
+tasks: BL-4228
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.

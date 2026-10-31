@@ -3,12 +3,12 @@ id: AF-0483
 title: BL-3617 cost $6.38 (5.9x median): its first opus run hit the 80-turn cap, the second took 68 turns
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3617:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-4236
+tasks: BL-4236
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.

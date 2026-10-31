@@ -3,12 +3,12 @@ id: AF-0455
 title: ParallelProgressMeter.AddTotals's UploadTotalAdded = true can become false with no test failing, so the -Z meter adds an upload's size again on every update
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/ParallelProgressMeter.cs:AddTotals-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ParallelProgressMeter.cs:266:true
-task: none
-tasks:
+task: BL-4178
+tasks: BL-4178
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.

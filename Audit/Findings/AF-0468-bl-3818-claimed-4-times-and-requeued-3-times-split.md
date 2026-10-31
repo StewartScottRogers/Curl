@@ -3,12 +3,12 @@ id: AF-0468
 title: BL-3818 claimed 4 times and requeued 3 times, splitting off BL-4026, BL-4044 and BL-4056 one run at a time
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3818:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-4186
+tasks: BL-4186
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.

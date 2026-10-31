@@ -3,12 +3,12 @@ id: AF-0474
 title: BL-3837 (CI quality-gate fix) claimed 3 times: requeued on BL-3831, then Blocked on an unrelated Linux failure
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3837:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-4191
+tasks: BL-4191
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
@@ -45,3 +45,4 @@ Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.lo
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
