@@ -31,3 +31,4 @@ Shift-end review 2026-10-31 (code-reviewer). Curl.Extension.ObliviousHttp.UnitLi
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 9162473c f86e4ea3 f874b647.
