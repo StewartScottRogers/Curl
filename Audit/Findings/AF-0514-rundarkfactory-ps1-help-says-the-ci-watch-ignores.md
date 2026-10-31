@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:RunDarkFactory.ps1:CI-WATCH-help:false-help
 reproduction: none
-task: none
-tasks:
+task: BL-4436
+tasks: BL-4436
 found: 2026-10-31
 found-at: 23bacbc6c04b8e06a4eecb79636da4891dca4c01
 scorecard: 2026-10-31_1149.md

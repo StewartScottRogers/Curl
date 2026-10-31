@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:CLAUDE.md:Dark-factory-CI-watch:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-4437
+tasks: BL-4437
 found: 2026-10-31
 found-at: 23bacbc6c04b8e06a4eecb79636da4891dca4c01
 scorecard: 2026-10-31_1149.md

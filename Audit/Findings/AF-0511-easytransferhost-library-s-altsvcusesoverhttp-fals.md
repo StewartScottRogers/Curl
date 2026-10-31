@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitLibrary/EasyTransferHost.cs:PhysicalFileSystem-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EasyTransferHost.cs:41:false
-task: none
-tasks:
+task: BL-4433
+tasks: BL-4433
 found: 2026-10-31
 found-at: 23bacbc6c04b8e06a4eecb79636da4891dca4c01
 scorecard: 2026-10-31_1149.md

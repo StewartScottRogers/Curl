@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/LibTestStepsTests.cs:EasySetOption_ThatSucceeds_GoesOnAndSetsTheOption:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-4434
+tasks: BL-4434
 found: 2026-10-31
 found-at: 23bacbc6c04b8e06a4eecb79636da4891dca4c01
 scorecard: 2026-10-31_1149.md
