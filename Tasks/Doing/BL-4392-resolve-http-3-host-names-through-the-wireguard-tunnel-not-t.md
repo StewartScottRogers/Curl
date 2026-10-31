@@ -31,3 +31,4 @@ Shift-end review 2026-10-31 (code-reviewer). Curl.Console/CurlComposition.cs:528
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 0658ce8f acf3d8d1 5a90b930.
