@@ -9,7 +9,7 @@ touches: [Curl.Extension.Protocol.Amqp0.UnitLibrary, Curl.Extension.Protocol.Amq
 requirement: none
 lane: no
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4438 — Rename the 20 scheme extensions to Curl.Extension.Protocol.<Name>
 
@@ -37,3 +37,6 @@ Stewart, 2026-10-31: rename `Curl.Extension.*` to `Curl.Extension.Protocol.*`, o
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: e72a470e 46035b10 a14e76c8 53b39f26 0f6b68ec.
+- 2026-10-31: Doing -> Backlog. correct the extension count in a criterion: curl --extensions lists 62, not 63
+- 2026-10-31: Backlog -> Doing. Criteria at claim: e72a470e 46035b10 a14e76c8 53b39f26 87e1334b.
+- 2026-10-31: Doing -> Done. 20 scheme extensions renamed to Curl.Extension.Protocol (ADR-1174); build clean, 114 of 114 test projects pass, curl --extensions unchanged
