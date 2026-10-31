@@ -62,6 +62,9 @@ internal abstract class SshChannel(SshTransport transport)
 
     private readonly SemaphoreSlim writeGate = new(1, 1);
 
+    // Guards received, unread, remoteWindow, remoteSentEof and remoteClosed: a reader and a sender run at once.
+    private readonly Lock stateLock = new();
+
     /// <summary>
     /// Gets the reason code of the server's <c>SSH_MSG_CHANNEL_OPEN_FAILURE</c> once the
     /// channel's open has returned <see langword="false" />, such as 2 for
@@ -90,26 +93,65 @@ internal abstract class SshChannel(SshTransport transport)
     /// <exception cref="InvalidDataException">The peer broke the framing or sent a malformed message.</exception>
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
-        while (unread.IsEmpty)
+        while (true)
         {
-            if (received.TryDequeue(out ReadOnlyMemory<byte> next))
+            lock (stateLock)
             {
-                unread = next;
-            }
-            else if (remoteSentEof || remoteClosed)
-            {
-                return 0;
-            }
-            else
-            {
-                await ReadNextMessageAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
+                if (unread.IsEmpty && received.TryDequeue(out ReadOnlyMemory<byte> next))
+                {
+                    unread = next;
+                }
 
-        int taken = Math.Min(unread.Length, buffer.Length);
-        unread[..taken].CopyTo(buffer);
-        unread = unread[taken..];
-        return taken;
+                if (!unread.IsEmpty)
+                {
+                    int taken = Math.Min(unread.Length, buffer.Length);
+                    unread[..taken].CopyTo(buffer);
+                    unread = unread[taken..];
+                    return taken;
+                }
+
+                if (remoteSentEof || remoteClosed)
+                {
+                    return 0;
+                }
+            }
+
+            await ReadNextMessageAsync(ReadCanProceed, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    // True when a waiting read has queued data, or the server's EOF or CLOSE, to act on without reading the wire.
+    private bool ReadCanProceed()
+    {
+        lock (stateLock)
+        {
+            return received.Count > 0 || remoteSentEof || remoteClosed;
+        }
+    }
+
+    // True when a waiting send has window to use, or the server's CLOSE to fail on, without reading the wire.
+    private bool SendCanProceed()
+    {
+        lock (stateLock)
+        {
+            return remoteWindow > 0 || remoteClosed;
+        }
+    }
+
+    private long ReadRemoteWindow()
+    {
+        lock (stateLock)
+        {
+            return remoteWindow;
+        }
+    }
+
+    private bool IsRemoteClosed()
+    {
+        lock (stateLock)
+        {
+            return remoteClosed;
+        }
     }
 
     /// <summary>
@@ -125,23 +167,28 @@ internal abstract class SshChannel(SshTransport transport)
     {
         while (!data.IsEmpty)
         {
-            while (remoteWindow == 0)
+            long window;
+            while ((window = ReadRemoteWindow()) == 0)
             {
-                if (remoteSentEof || remoteClosed)
+                if (IsRemoteClosed())
                 {
                     throw new EndOfStreamException("The SSH server closed the channel while its window was used up.");
                 }
 
-                await ReadNextMessageAsync(cancellationToken).ConfigureAwait(false);
+                await ReadNextMessageAsync(SendCanProceed, cancellationToken).ConfigureAwait(false);
             }
 
-            int size = (int)Math.Min(data.Length, Math.Min(remoteWindow, remoteMaximumPacketSize));
+            int size = (int)Math.Min(data.Length, Math.Min(window, remoteMaximumPacketSize));
             SshWireWriter packet = new();
             packet.WriteByte(SshConnectionMessageNumber.ChannelData);
             packet.WriteUInt32(RemoteChannelNumber);
             packet.WriteString(data.Span[..size]);
             await WritePacketAsync(packet.ToArray(), cancellationToken).ConfigureAwait(false);
-            remoteWindow -= size;
+            lock (stateLock)
+            {
+                remoteWindow -= size;
+            }
+
             data = data[size..];
         }
     }
@@ -157,9 +204,9 @@ internal abstract class SshChannel(SshTransport transport)
     internal async ValueTask CloseAsync(CancellationToken cancellationToken)
     {
         await SendChannelMessageAsync(SshConnectionMessageNumber.ChannelEof, cancellationToken).ConfigureAwait(false);
-        while (!remoteClosed)
+        while (!IsRemoteClosed())
         {
-            await ReadNextMessageAsync(cancellationToken).ConfigureAwait(false);
+            await ReadNextMessageAsync(null, cancellationToken).ConfigureAwait(false);
         }
 
         await SendChannelMessageAsync(SshConnectionMessageNumber.ChannelClose, cancellationToken).ConfigureAwait(false);
@@ -178,9 +225,9 @@ internal abstract class SshChannel(SshTransport transport)
     {
         await SendChannelMessageAsync(SshConnectionMessageNumber.ChannelEof, cancellationToken).ConfigureAwait(false);
         await SendChannelMessageAsync(SshConnectionMessageNumber.ChannelClose, cancellationToken).ConfigureAwait(false);
-        while (!remoteClosed)
+        while (!IsRemoteClosed())
         {
-            await ReadNextMessageAsync(cancellationToken).ConfigureAwait(false);
+            await ReadNextMessageAsync(null, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -217,7 +264,12 @@ internal abstract class SshChannel(SshTransport transport)
         }
 
         RemoteChannelNumber = confirmation.ReadUInt32();
-        remoteWindow = confirmation.ReadUInt32();
+        uint openingWindow = confirmation.ReadUInt32();
+        lock (stateLock)
+        {
+            remoteWindow = openingWindow;
+        }
+
         remoteMaximumPacketSize = Math.Max(confirmation.ReadUInt32(), 1);
         DiagnosticLog.ChannelOpened(channelType, true);
         return true;
@@ -232,7 +284,7 @@ internal abstract class SshChannel(SshTransport transport)
     {
         while (true)
         {
-            byte[]? payload = await ReadNextMessageAsync(cancellationToken).ConfigureAwait(false);
+            byte[]? payload = await ReadNextMessageAsync(null, cancellationToken).ConfigureAwait(false);
             if (payload is not null && (payload[0] == wanted || payload[0] == alternative))
             {
                 return payload;
@@ -240,12 +292,18 @@ internal abstract class SshChannel(SshTransport transport)
         }
     }
 
-    // Null when the message was one the channel handles itself; the payload otherwise.
-    private async ValueTask<byte[]?> ReadNextMessageAsync(CancellationToken cancellationToken)
+    // Null when the message was one the channel handles itself, or when `satisfied` already held once the gate was
+    // taken (a concurrent call read what the caller waits for, so reading on would block for nothing); the payload otherwise.
+    private async ValueTask<byte[]?> ReadNextMessageAsync(Func<bool>? satisfied, CancellationToken cancellationToken)
     {
         await readGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            if (satisfied?.Invoke() == true)
+            {
+                return null;
+            }
+
             byte[] payload = await transport.PacketReader.ReadAsync(cancellationToken).ConfigureAwait(false);
             if (payload[0] is >= SshConnectionMessageNumber.ChannelWindowAdjust and <= SshConnectionMessageNumber.ChannelRequest)
             {
@@ -286,7 +344,12 @@ internal abstract class SshChannel(SshTransport transport)
         switch (payload[0])
         {
             case SshConnectionMessageNumber.ChannelWindowAdjust:
-                remoteWindow += reader.ReadUInt32();
+                uint increment = reader.ReadUInt32();
+                lock (stateLock)
+                {
+                    remoteWindow += increment;
+                }
+
                 break;
             case SshConnectionMessageNumber.ChannelData:
                 await ReceiveAsync(reader.ReadString(), cancellationToken).ConfigureAwait(false);
@@ -296,10 +359,18 @@ internal abstract class SshChannel(SshTransport transport)
                 await ConsumeWindowAsync(reader.ReadString().Length, cancellationToken).ConfigureAwait(false);
                 break;
             case SshConnectionMessageNumber.ChannelEof:
-                remoteSentEof = true;
+                lock (stateLock)
+                {
+                    remoteSentEof = true;
+                }
+
                 break;
             case SshConnectionMessageNumber.ChannelClose:
-                remoteClosed = true;
+                lock (stateLock)
+                {
+                    remoteClosed = true;
+                }
+
                 break;
             default:
                 await RefuseIfReplyWantedAsync(reader, [SshConnectionMessageNumber.ChannelFailure, .. RemoteChannelNumberBytes()], cancellationToken).ConfigureAwait(false);
@@ -319,7 +390,11 @@ internal abstract class SshChannel(SshTransport transport)
 
     private async ValueTask ReceiveAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
     {
-        received.Enqueue(data);
+        lock (stateLock)
+        {
+            received.Enqueue(data);
+        }
+
         await ConsumeWindowAsync(data.Length, cancellationToken).ConfigureAwait(false);
     }
 

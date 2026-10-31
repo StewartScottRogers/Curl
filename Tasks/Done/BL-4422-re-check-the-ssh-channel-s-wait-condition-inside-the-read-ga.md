@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Ssh.UnitLibrary/Connection/SshChannel.cs, Curl.Ssh.UnitTests/Connection]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4422 — Re-check the SSH channel's wait condition inside the read gate so concurrent read and write cannot hang
 
@@ -26,16 +26,19 @@ Found by the shift-end review of 2026-10-31 (ADR-0710; code-reviewer rated it Cr
 
 ## Acceptance criteria
 
-- [ ] Inside `readGate`, `ReadNextMessageAsync` (or its callers) re-checks the caller's wait condition and returns without reading when it already holds: `remoteWindow > 0 || remoteClosed` for a send, queued data or EOF/close for a read.
-- [ ] `remoteWindow`, `received` and `unread` are only read and changed under one lock (or `Interlocked`), so no window adjustment or queued packet is lost.
-- [ ] A unit test in `Curl.Ssh.UnitTests/Connection` drives a concurrent read and send where the reader receives the window adjustment the writer waits for, and the send completes without a further packet from the server.
-- [ ] A unit test where the sender's read queues the only `CHANNEL_DATA` shows the waiting `ReadAsync` returns it without another packet.
-- [ ] `SendAsync` throws only on `remoteClosed`; a test shows a send after the server's EOF waits for and uses a later `WINDOW_ADJUST`, and the old `..._PeerSentEofWhileWindowIsUsedUp_ThrowsEndOfStream` test is replaced.
-- [ ] `dotnet build` is clean and the fast tests pass; `Curl.Ssh.UnitLibrary` stays at 100% line and branch coverage.
+- [x] Inside `readGate`, `ReadNextMessageAsync` (or its callers) re-checks the caller's wait condition and returns without reading when it already holds: `remoteWindow > 0 || remoteClosed` for a send, queued data or EOF/close for a read.
+- [x] `remoteWindow`, `received` and `unread` are only read and changed under one lock (or `Interlocked`), so no window adjustment or queued packet is lost.
+- [x] A unit test in `Curl.Ssh.UnitTests/Connection` drives a concurrent read and send where the reader receives the window adjustment the writer waits for, and the send completes without a further packet from the server.
+- [x] A unit test where the sender's read queues the only `CHANNEL_DATA` shows the waiting `ReadAsync` returns it without another packet.
+- [x] `SendAsync` throws only on `remoteClosed`; a test shows a send after the server's EOF waits for and uses a later `WINDOW_ADJUST`, and the old `..._PeerSentEofWhileWindowIsUsedUp_ThrowsEndOfStream` test is replaced.
+- [x] `dotnet build` is clean and the fast tests pass; `Curl.Ssh.UnitLibrary` stays at 100% line and branch coverage.
 
 ## Notes
+
+- `readGate` callers pass a predicate (`ReadCanProceed`, `SendCanProceed`) that `ReadNextMessageAsync` re-checks once it holds the gate; all channel state is guarded by one `stateLock`. `SendAsync` throws only on `remoteClosed`. Tests use a per-packet `HoldingConnection` to queue the second call behind a held read deterministically. Quality run: 0 failing members. Platform-neutral.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 11f64556 52bcb553 a979ebb2 0f6dcf32 5a8c7061 caa30fdb.
+- 2026-10-31: Doing -> Done. SshChannel re-checks its wait condition inside the read gate; state under one lock; send fails only on CLOSE; tests added.
