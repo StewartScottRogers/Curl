@@ -83,6 +83,15 @@ public sealed class ExtensionSchemeHookTests
     }
 
     [TestMethod]
+    public void ExtensionHandlerHooksOf_SchemeActivatorThrowsPlainArgumentException_IsReportedAsAnOptionError()
+    {
+        ExtensionOptionConflictException failure = Assert.ThrowsExactly<ExtensionOptionConflictException>(() => CurlComposition.ExtensionHandlerHooksOf(
+            new CommandLineOptions(), [], [_ => throw new ArgumentException("--masque needs a proxy", "values")], curlServer, new TcpConnectionListener()));
+
+        Assert.AreEqual("--masque needs a proxy", failure.Message);
+    }
+
+    [TestMethod]
     public void ExtensionHandlerHooksOf_NoExtensionOptionGiven_PassesNoHooksToTheEngine()
     {
         Assert.IsNull(CurlComposition.ExtensionHandlerHooksOf(new CommandLineOptions(), [], [ActivatedByConnect, ActivatedByRelay], curlServer, new TcpConnectionListener()));

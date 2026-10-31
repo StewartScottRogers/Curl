@@ -66,6 +66,16 @@ public sealed class ExtensionConnectionHookTests
     }
 
     [TestMethod]
+    public void ExtensionConnectionHooksOf_ActivatorThrowsPlainArgumentException_IsReportedAsAnOptionErrorWithoutTheParameterSuffix()
+    {
+        ExtensionOptionConflictException failure = Assert.ThrowsExactly<ExtensionOptionConflictException>(() => CurlComposition.ExtensionConnectionHooksOf(
+            new CommandLineOptions(),
+            [_ => throw new ArgumentException("--ssh-jump needs user@host[:port], not 'nohost'", "values")]));
+
+        Assert.AreEqual("--ssh-jump needs user@host[:port], not 'nohost'", failure.Message);
+    }
+
+    [TestMethod]
     public void ExtensionConnectionHooksOf_ActivatorThrowsArgumentNull_IsNotReportedAsAnOptionConflict()
     {
         ArgumentNullException failure = Assert.ThrowsExactly<ArgumentNullException>(() => CurlComposition.ExtensionConnectionHooksOf(

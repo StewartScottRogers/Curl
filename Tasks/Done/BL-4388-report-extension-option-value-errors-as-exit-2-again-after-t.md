@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlComposition.cs, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4388 — Report extension option value errors as exit 2 again after the narrowed catches in CurlComposition
 
@@ -22,13 +22,16 @@ Shift-end review 2026-10-31 (silent-failure-hunter). Commit 00c9022dc narrowed t
 
 ## Acceptance criteria
 
-- [ ] `curl --ssh-jump nohost https://x` exits 2 printing `curl: --ssh-jump needs user@host[:port], not 'nohost'` and the `curl: try 'curl --help'` line, proven by a test in Curl.Console.UnitTests.
-- [ ] Through InProcessCurl the same command returns exit 2 and throws nothing, proven by a test.
-- [ ] dotnet build is clean, the fast tests pass and Curl.Console keeps 100% line and branch coverage.
+- [x] `curl --ssh-jump nohost https://x` exits 2 printing `curl: --ssh-jump needs user@host[:port], not 'nohost'` and the `curl: try 'curl --help'` line, proven by a test in Curl.Console.UnitTests.
+- [x] Through InProcessCurl the same command returns exit 2 and throws nothing, proven by a test.
+- [x] dotnet build is clean, the fast tests pass and Curl.Console keeps 100% line and branch coverage.
 
 ## Notes
+
+Fixed by a second catch (plain ArgumentException only, so ArgumentNullException from an extension bug still propagates) at the three CurlComposition catch sites, via OptionValueErrorOf which strips the " (Parameter ...)" suffix. Tests added in InProcessCurlTests, ExtensionConnectionHookTests, ExtensionSchemeHookTests, ExtensionResolverHookTests. Measure-CodeQuality for Curl.Console: 0 failing members. CI on Linux/macOS: tests are platform-neutral.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: e63b344d 916d45b8 caf5fbe2.
+- 2026-10-31: Doing -> Done. Plain ArgumentException from extension activators is exit 2 again
