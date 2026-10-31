@@ -3,8 +3,8 @@ id: AF-0492
 title: ADR-1165 (Accepted) says known_hosts, user authentication and key files stay in Curl.Protocol.Ssh, but they now live in Curl.Ssh.UnitLibrary
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-1165-the-ssh-transport-layer-is-a-shared-library.md:known_hosts-and-authentication-stay-in-protocol-library:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
