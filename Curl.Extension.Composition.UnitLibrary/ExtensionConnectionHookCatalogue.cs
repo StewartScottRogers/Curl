@@ -21,5 +21,6 @@ public static class ExtensionConnectionHookCatalogue
         Curl.Extension.QuicMigration.QuicMigrationExtension.Activate,
         Curl.Extension.Masque.MasqueExtension.Activate,
         Curl.Extension.WireGuard.WireGuardExtension.Activate,
+        Curl.Extension.SshJump.SshJumpExtension.Activate,
     ];
 }

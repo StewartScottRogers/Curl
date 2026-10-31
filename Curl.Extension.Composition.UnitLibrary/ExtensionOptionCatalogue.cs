@@ -13,6 +13,7 @@ internal static class ExtensionOptionCatalogue
     internal static IReadOnlyList<ExtensionOption> Entries { get; } =
     [
         Curl.Extension.NamedPipe.NamedPipeExtension.Option,
+        Curl.Extension.SshJump.SshJumpExtension.Option,
         Curl.Extension.VirtualMachineSocket.VirtualMachineSocketExtension.Option,
         Curl.Extension.QuicMigration.QuicMigrationExtension.Option,
         Curl.Extension.WireGuard.WireGuardExtension.Option,

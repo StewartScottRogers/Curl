@@ -18,6 +18,8 @@
     <InternalsVisibleTo Include="Curl.Protocol.Ssh.UnitLibrary" />
     <InternalsVisibleTo Include="Curl.Protocol.Ssh.UnitTests" />
     <InternalsVisibleTo Include="Curl.Ssh.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Extension.SshJump.UnitLibrary" />
+    <InternalsVisibleTo Include="Curl.Extension.SshJump.UnitTests" />
   </ItemGroup>
 
 </Project>

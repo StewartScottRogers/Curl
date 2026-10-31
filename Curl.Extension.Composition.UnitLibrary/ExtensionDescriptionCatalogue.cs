@@ -13,6 +13,7 @@ internal static class ExtensionDescriptionCatalogue
     internal static IReadOnlyList<ExtensionDescription> Entries { get; } =
     [
         Curl.Extension.NamedPipe.NamedPipeExtension.Description,
+        Curl.Extension.SshJump.SshJumpExtension.Description,
         Curl.Extension.VirtualMachineSocket.VirtualMachineSocketExtension.Description,
         Curl.Extension.QuicMigration.QuicMigrationExtension.Description,
         Curl.Extension.WireGuard.WireGuardExtension.Description,
