@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4416 — Fix AF-0506: BL-4112 cost $5.81 (3.5 times the $1.67 median) with no Done; one 81-turn run hit the turn cap at $5.10
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: BL-4112 was too big for one run. Its 81-turn run (L5) reread a growing context (10.2M cache-read tokens) until the 80-turn cap (`MaxRunTurns`, RunDarkFactory.ps1:502) stopped it at $5.10. The cap then did its job: the split run (L7, $0.21) filed smaller tasks and deferred BL-4112 (ADR-1155). Remaining waste was the 60+ turns before the size was noticed; the lane prompt already tells a run to hand back by turn 65 (AF-0482) and to size the task before the first edit, which post-dates this run. No further change to RunDarkFactory.ps1: the cost was the intended cap behaviour, recorded as unavoidable. No code changed, so build and tests are unaffected.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-31: Doing -> Done. Cause named: BL-4112 too big for one run, 80-turn cap worked as designed; recorded as unavoidable
