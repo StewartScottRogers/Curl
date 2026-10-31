@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Restart.ps1, DarkFactory/Heartbeat.ps1, DarkFactory/ShiftCoordinator.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4426 — Keep a removed coordinator stamp removed at -Restart and at shift end
 
@@ -39,3 +39,4 @@ Found by the shift-end review of 2026-10-31 (ADR-0710; silent-failure-hunter, Im
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: ffcbdbd6 98b7d745 06448ffb 2b72ed81.
+- 2026-10-31: Doing -> Done. restart order and retire flag done
