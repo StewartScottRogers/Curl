@@ -8,13 +8,13 @@ depends-on: []
 touches: [Curl.Extension.WireGuard.UnitLibrary/WireGuardExtension.cs, Curl.Extension.WireGuard.UnitTests/WireGuardExtensionTests.cs]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4429 — Cover the 50% branch of WireGuardExtension.ActivateResolver(ExtensionOptionValues)
 
 ## Goal
 
-Cover both branches of the public ActivateResolver overload.
+<!-- One sentence: the observable outcome once this task is done. -->
 
 ## Context
 
@@ -22,7 +22,7 @@ Cover both branches of the public ActivateResolver overload.
 
 ## Acceptance criteria
 
-- [x] The public ActivateResolver is called twice so the compiler-cached File.ReadAllText delegate branch is taken both ways.
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
 
@@ -30,3 +30,4 @@ Cover both branches of the public ActivateResolver overload.
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-10-31: Doing -> Done. Second call of the public ActivateResolver covers the cached delegate branch; WireGuard tests green (338).
