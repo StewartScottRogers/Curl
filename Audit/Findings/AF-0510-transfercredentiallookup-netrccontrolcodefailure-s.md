@@ -3,8 +3,8 @@ id: AF-0510
 title: TransferCredentialLookup.NetrcControlCodeFailure's HasControlCode(Login) || HasControlCode(Password) can become && with no test failing, so a netrc entry with a control code in only one of them is sent instead of refused with exit 26
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:NetrcControlCodeFailure-or:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:230:||
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
