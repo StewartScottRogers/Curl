@@ -3,8 +3,8 @@ id: AF-0512
 title: EasySetOption_ThatSucceeds_GoesOnAndSetsTheOption never checks that the option was set
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/LibTestStepsTests.cs:EasySetOption_ThatSucceeds_GoesOnAndSetsTheOption:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/LibTestStepsTests.cs -Pat
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
