@@ -3,8 +3,8 @@ id: AF-0509
 title: BL-4341 cost $5.61: an 81-turn, 74-minute run hit the turn cap at $4.93 before a 21-turn rerun finished it
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-4341:BL-4341:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
