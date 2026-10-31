@@ -32,3 +32,4 @@ Shift-end review 2026-10-31 (factory code-reviewer) of BL-4353 / ADR-1160. DarkF
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: f066160a ff5015e1 ed3abac8 caed2003.
