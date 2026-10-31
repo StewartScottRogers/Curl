@@ -9,7 +9,7 @@ touches: [Curl.slnx, CLAUDE.md, DarkFactory/LaneRules.md, .claude/skills/new-pro
 requirement: none
 lane: no
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4441 — Group the solution folders as Original and Extended
 
@@ -35,3 +35,4 @@ Stewart, 2026-10-31: rework the solution folders for the renamed projects, optio
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 28c871e3 67064269 0b0c3c03.
+- 2026-10-31: Doing -> Done. Curl.slnx groups /Original/ and /Extended/ (ADR-1178); build clean
