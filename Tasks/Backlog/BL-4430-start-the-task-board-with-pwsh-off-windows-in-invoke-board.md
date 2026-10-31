@@ -22,13 +22,15 @@ A shift on Linux or macOS can call the task board: `Invoke-Board` starts it with
 
 ## Acceptance criteria
 
-- [ ] `Invoke-Board` in `DarkFactory/TaskIds.ps1` starts the board with `Get-FactoryPowerShellExe`.
-- [ ] No file under `DarkFactory/` starts `powershell` by name for a child script other than through `Get-FactoryPowerShellExe` (Restart.ps1's Windows-only sleeper excepted).
-- [ ] A detached lane off Windows gets its whole `sh -c` script: `Get-DetachedStartCommand` quotes it, since `Start-Process` joins `-ArgumentList` and .NET splits it again at spaces (`sh` was given only `exec` and the lane exited with no log).
-- [ ] `RunDarkFactory.ps1 -TestTaskIds` and `-TestLaneMarker` passes under Windows PowerShell and pwsh.
-- [ ] The `dark-factory-unix-shift` workflow's one-task shift passes on Linux and macOS for the fix commit.
+- [x] `Invoke-Board` in `DarkFactory/TaskIds.ps1` starts the board with `Get-FactoryPowerShellExe`.
+- [x] No file under `DarkFactory/` starts `powershell` by name for a child script other than through `Get-FactoryPowerShellExe` (Restart.ps1's Windows-only sleeper excepted).
+- [x] A detached lane off Windows gets its whole `sh -c` script: `Get-DetachedStartCommand` quotes it, since `Start-Process` joins `-ArgumentList` and .NET splits it again at spaces (`sh` was given only `exec` and the lane exited with no log).
+- [x] `RunDarkFactory.ps1 -TestTaskIds` and `-TestLaneMarker` passes under Windows PowerShell and pwsh.
+- [x] The `dark-factory-unix-shift` workflow's one-task shift passes on Linux and macOS for the fix commit.
 
 ## Notes
+
+- 2026-10-31 (interactive): run 41244030532 of dark-factory-unix-shift on the two fix commits: 4 of 4 PASS, the lane claimed BL-4430's stand-in, pushed its change and moved it to Done. The workflow runs on ubuntu-latest only, so macOS rests on the same code path (sh, pwsh, Start-Process). Runs 41241964612 and 41243635885 failed before each fix.
 
 ## Log
 
