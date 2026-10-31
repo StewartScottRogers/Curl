@@ -13,8 +13,8 @@ closed:
 regression: true
 items: [behaviour:test4001]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
-task: BL-2335
-tasks: [BL-2335]
+task: BL-4379
+tasks: [BL-2335, BL-4379]
 ---
 # GF-0092 - An --ech ecl: handshake the server does not accept exits 35 instead of 101 (ECH required) on macOS
 
@@ -48,3 +48,4 @@ Platform-specific (macOS). The likely cause is the harness, not Curl's ECH clien
 - 2026-10-15_0900: Filed BL-2335.
 - 2026-10-15_1657: Closed: run 2026-10-15_1657 measured every item as match or excluded on macos.
 - 2026-10-30_2103: Reopened as a regression: run 2026-10-30_2103 measured behaviour:test4001 as gap again on macos.
+- 2026-10-30_2202: Filed BL-4379.

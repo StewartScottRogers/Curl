@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [behaviour:test4000, behaviour:test4001]
 touches: [Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-4381
+tasks: [BL-4381]
 ---
 # GF-0100 - The gap tool's in-process curl refuses --ech, so the ECH cases send no request (test4000) and exit 2 instead of 101 (test4001)
 
@@ -37,3 +37,4 @@ In Curl.Console/InProcessCurl.cs, make CreateDialingRunner (and the IConnector o
 ## Log
 
 - 2026-10-30_2103: Opened by gap-behaviour.
+- 2026-10-30_2202: Filed BL-4381.
