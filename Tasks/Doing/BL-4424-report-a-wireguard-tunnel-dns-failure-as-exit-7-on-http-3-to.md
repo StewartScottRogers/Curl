@@ -35,3 +35,4 @@ Found by the shift-end review of 2026-10-31 (ADR-0710; type-design-analyzer, Imp
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: ccb20bcc 39ef855a bee97540 88ec633d.
