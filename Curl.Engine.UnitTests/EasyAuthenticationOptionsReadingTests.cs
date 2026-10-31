@@ -84,6 +84,25 @@ public sealed class EasyAuthenticationOptionsReadingTests
     }
 
     [TestMethod]
+    [DataRow("machine h login a\u0001b password netrc-pw\n", DisplayName = "control code in the login only")]
+    [DataRow("machine h login netrc-user password a\u0001b\n", DisplayName = "control code in the password only")]
+    public void TryLookUp_NetrcEntryWithAControlCodeInOneFieldOnFtp_FailsWithExit26(string netrcText)
+    {
+        // One field alone is enough: either the login or the password with a byte below 0x20 is refused (AF-0510).
+        InMemoryDataFileReader reader = new();
+        reader.Files[NetrcPath] = Encoding.UTF8.GetBytes(netrcText);
+        EasyAuthenticationOptions options = new() { Netrc = NetrcUsage.Required, NetrcFile = NetrcPath };
+        Diagnostics.Arrange("netrc", netrcText);
+
+        bool looked = Lookup(reader).TryLookUp(options, CurlUrl.Parse("ftp://h/"), out _, out TransferResult? failure);
+        Diagnostics.Act("looked / failure", $"{looked} / {failure?.ExitCode}");
+
+        Assert.IsFalse(looked);
+        Assert.AreEqual(CurlExitCode.ReadError, failure!.ExitCode);
+        Assert.AreEqual(TransferCredentialLookup.NetrcControlCodeMessage, failure.ErrorMessage);
+    }
+
+    [TestMethod]
     public void TryLookUp_NetrcIgnored_SendsTheUrlsCredentials()
     {
         EasyAuthenticationOptions options = new() { NetrcFile = NetrcPath };

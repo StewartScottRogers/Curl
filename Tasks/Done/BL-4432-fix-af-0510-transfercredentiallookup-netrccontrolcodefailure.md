@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitTests/EasyAuthenticationOptionsReadingTests.cs]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4432 — Fix AF-0510: TransferCredentialLookup.NetrcControlCodeFailure's HasControlCode(Login) || HasControlCode(Password) can become && with no test failing, so a netrc entry with a control code in only one of them is sent instead of refused with exit 26
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- touches narrowed from Curl.Engine.UnitLibrary to the one test file the fix lands in: the production code is right, only a test was missing; no task in Doing on origin/work/dark-factory holds that file. Not pushed separately: the lane prompt forbids a lane pushing, so the shift integrates it with the fix.
+- Fix: TryLookUp_NetrcEntryWithAControlCodeInOneFieldOnFtp_FailsWithExit26, two rows (0x01 in the login only, in the password only) on ftp://, each expecting exit 26 and the control code message, so the || to && mutant fails.
+- Reproduction: the finding's mutation script is closed to lanes, so the mutant was applied by hand (the || at TransferCredentialLookup.cs:230 made &&): both new rows failed under it and passed once it was reverted, so the mutant is killed. Production code is unchanged, so no Measure-CodeQuality run was needed. dotnet build clean; fast tests green (exit 0). Platform-neutral: no paths, OS text or certificates.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-31: Doing -> Done. A netrc entry with a control code in only its login or only its password is pinned to exit 26 on ftp, killing AF-0510's mutant
