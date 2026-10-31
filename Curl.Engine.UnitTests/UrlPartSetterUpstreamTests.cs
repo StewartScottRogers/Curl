@@ -48,6 +48,18 @@ public sealed class UrlPartSetterUpstreamTests
     }
 
     [TestMethod]
+    [DataRow("a%b")]
+    [DataRow("a%")]
+    public void Set_FragmentEndingInAPercentAndAtMostOneCharacter_StoresTheTextAsGiven(string fragment)
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://a/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Fragment, fragment, CurlUrlFlags.None));
+
+        Assert.AreEqual(fragment, Got(url, CurlUrlPart.Fragment));
+    }
+
+    [TestMethod]
     public void Set_EmptyFragmentUnderUrlEncode_LeavesTheFragmentUnset()
     {
         using ManagedCurlUrlHandle url = Parsed("http://a/#f");
