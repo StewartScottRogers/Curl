@@ -49,3 +49,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
