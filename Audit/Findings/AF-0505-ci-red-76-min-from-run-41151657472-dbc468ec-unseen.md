@@ -3,8 +3,8 @@ id: AF-0505
 title: CI red 76 min from run 41151657472 (dbc468ec) unseen: every coordinator from 15:24 on 10-30 could not list CI runs with gh
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:41151657472:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
