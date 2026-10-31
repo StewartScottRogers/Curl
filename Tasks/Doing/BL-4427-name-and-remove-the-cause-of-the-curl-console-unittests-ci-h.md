@@ -31,3 +31,4 @@ Split from BL-4421 (its criterion 1). BL-4421 already landed `Curl.Console.UnitT
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 68c218e4.
