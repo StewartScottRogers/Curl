@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskIds.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4430 — Start the task board with pwsh off Windows in Invoke-Board
 
@@ -36,3 +36,4 @@ A shift on Linux or macOS can call the task board: `Invoke-Board` starts it with
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: adc685eb 3c83af8c 72c73e7a 782f81de 1eec992f.
+- 2026-10-31: Doing -> Done. Invoke-Board uses Get-FactoryPowerShellExe and a detached lane's sh -c script is quoted; dark-factory-unix-shift run 41244030532 passed 4 of 4
