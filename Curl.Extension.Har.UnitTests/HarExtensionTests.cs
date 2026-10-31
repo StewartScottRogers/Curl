@@ -34,6 +34,7 @@ public sealed class HarExtensionTests
     public void Composition_ActivatesTheHookOnlyWhenTheOptionIsGiven()
     {
         Assert.IsTrue(TransferHooks.ActivatedBy(Given(), ExtensionTransferHookCatalogue.Entries).Hooks.OfType<HarTransferHook>().Any());
+        Assert.IsFalse(TransferHooks.ActivatedBy(ExtensionOptionValues.None, ExtensionTransferHookCatalogue.Entries).Hooks.OfType<HarTransferHook>().Any());
     }
 
     [TestMethod]
