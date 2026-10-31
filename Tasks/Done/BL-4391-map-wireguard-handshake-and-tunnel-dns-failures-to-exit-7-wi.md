@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.WireGuard.UnitLibrary/Tunnel/WireGuardConnector.cs, Curl.Extension.WireGuard.UnitLibrary/Tunnel/WireGuardDatagramConnector.cs, Curl.Extension.WireGuard.UnitTests/Tunnel]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4391 — Map WireGuard handshake and tunnel DNS failures to exit 7 with their reason
 
@@ -34,3 +34,4 @@ Shift-end review 2026-10-31 (code-reviewer, silent-failure-hunter). Curl.Extensi
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 815246ea c69aaf5a f874b647.
+- 2026-10-31: Doing -> Done. WireGuard SocketException and tunnel DNS failures now exit 7; tests added, 100% coverage
