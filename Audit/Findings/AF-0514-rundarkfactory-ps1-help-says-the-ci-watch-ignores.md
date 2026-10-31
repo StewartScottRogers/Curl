@@ -3,8 +3,8 @@ id: AF-0514
 title: RunDarkFactory.ps1 help says the CI watch ignores cancelled runs, but it now reads them for hangs and files Fix CI hang tasks
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:RunDarkFactory.ps1:CI-WATCH-help:false-help
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path RunDarkFactory.ps1, DarkFactory/CiWatch.ps1 -Pattern 'cancel
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
