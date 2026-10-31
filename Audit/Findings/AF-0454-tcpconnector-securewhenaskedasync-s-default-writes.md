@@ -3,8 +3,8 @@ id: AF-0454
 title: TcpConnector.SecureWhenAskedAsync's default writesSslFilterAdded = false can become true with no test failing, adding an SSL-filter line to -v output after every CONNECT tunnel
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.cs:SecureWhenAskedAsync-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.cs:2169:false
 task: BL-4177
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: mechanical
+closed-by: 2026-10-31_0358.md
 ---
 # AF-0454 - TcpConnector.SecureWhenAskedAsync's default writesSslFilterAdded = false can become true with no test failing, adding an SSL-filter line to -v output after every CONNECT tunnel
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: no | Ran the -Site reproduction: TcpConnector.cs:2169 `bool writesSslFilterAdded = false` -> `true`, outcome killed (resolvedLine 2169; baseline excluded the 3 failing ECH tests). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

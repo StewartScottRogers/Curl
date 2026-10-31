@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | The run budget again ran out twice with the work stashed. BL-4170 was requeued at 09:24:52 ('Run budget spent after the tokenizer (left uncommitted for the shift's stash)') and at 14:29:53 ('Run budget spent after the parser and descriptors (uncommitted for the shift's stash)'), then Blocked on the cost cap. No template-placeholder criteria were seen in this window.
+
 ## Log
 
 - 2026-10-29: filed proposed.

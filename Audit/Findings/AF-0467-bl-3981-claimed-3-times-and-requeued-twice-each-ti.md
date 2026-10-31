@@ -3,8 +3,8 @@ id: AF-0467
 title: BL-3981 claimed 3 times and requeued twice, each time on a missing dependency (BL-3976, then BL-3990)
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces.
 key: process:logs:BL-3981:redone-work
 reproduction: none
 task: BL-4185
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_0358.md
 ---
 # AF-0467 - BL-3981 claimed 3 times and requeued twice, each time on a missing dependency (BL-3976, then BL-3990)
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: no | Rule re-run over this window (283 tasks Done, 66 requeues). No task was requeued twice on a missing dependency: every task has at most one *.prerequisite-requeue.txt (BL-4380, BL-4328, BL-4315 ... one each). The tasks requeued twice had a different second reason: BL-4112 dependency then turn cap, BL-4328 held file then turn cap.
+
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces.

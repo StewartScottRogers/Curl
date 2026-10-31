@@ -3,8 +3,8 @@ id: AF-0455
 title: ParallelProgressMeter.AddTotals's UploadTotalAdded = true can become false with no test failing, so the -Z meter adds an upload's size again on every update
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/ParallelProgressMeter.cs:AddTotals-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ParallelProgressMeter.cs:266:true
 task: BL-4178
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: mechanical
+closed-by: 2026-10-31_0358.md
 ---
 # AF-0455 - ParallelProgressMeter.AddTotals's UploadTotalAdded = true can become false with no test failing, so the -Z meter adds an upload's size again on every update
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: no | Ran the -Site reproduction: ParallelProgressMeter.cs:266 true -> false in AddTotals, outcome killed (resolvedLine 266). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | Rule re-run over this window (Since 2026-10-29): tasksClaimedMoreThanOnce 50, requeues 66. Tasks were again requeued repeatedly before being split and Deferred. BL-4112 was requeued at 10:18:11 and 16:25:53 (80-turn cap), then split by split-BL-4112-20261029-164929-L7 and Deferred. BL-4328 was requeued at 22:16:33 and 00:07:54 (80-turn cap), then split at 13:04:46 and Deferred. BL-4131 was requeued at 18:56:56 and 08:09:38, then split at 15:46:39 and Deferred.
+
 ## Log
 
 - 2026-10-29: filed proposed.

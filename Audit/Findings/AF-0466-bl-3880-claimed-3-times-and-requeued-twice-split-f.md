@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | Split-for-size requeues were again followed by a second requeue and a third claim. BL-4124: split for size at 10:20:59, then 'Lane 12 could not integrate: rebase conflict' at 16:08:23, third claim L11 at 16:09:54. BL-4132: split for size at 18:54:56, then 'Out of time' at 08:10:29, third claim at 08:11:06. BL-4137: split at 20:00:08, then 'Out of time' at 08:11:56, third claim at 08:13:00.
+
 ## Log
 
 - 2026-10-29: filed proposed.

@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | Tasks were again split piecemeal across runs. BL-4131 was split for size into BL-4303/4304/4305 at 18:56:56 on 10-29, ran a 106-min claim, then was split again into BL-4373/BL-4374 at 15:46:39 on 10-30. BL-4112 filed BL-4194/4195/4196 at 10:18:11, then after an 81-turn run was split again into BL-4294..BL-4297 at 17:11:16.
+
 ## Log
 
 - 2026-10-29: filed proposed.

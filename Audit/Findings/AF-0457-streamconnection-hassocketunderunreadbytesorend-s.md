@@ -3,8 +3,8 @@ id: AF-0457
 title: StreamConnection.HasSocketUnderUnreadBytesOrEnd's || can become && with no test failing, so the check before a write misses a peer that already sent bytes or its FIN
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/StreamConnection.cs:HasSocketUnderUnreadBytesOrEnd-or:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/StreamConnection.cs:77:||
 task: BL-4180
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: mechanical
+closed-by: 2026-10-31_0358.md
 ---
 # AF-0457 - StreamConnection.HasSocketUnderUnreadBytesOrEnd's || can become && with no test failing, so the check before a write misses a peer that already sent bytes or its FIN
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: no | Ran the -Site reproduction: StreamConnection.cs:77 `network.Socket.Available > 0 || HasUnreadEnd(network.Socket)` -> `&&`, outcome killed (resolvedLine 77). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
