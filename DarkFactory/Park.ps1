@@ -10,7 +10,11 @@ function Invoke-Park {
     # summary and the end-of-shift report saying it has not (BL-1071). The push that failed
     # to integrate often failed because the remote was out of reach, so the move is retried
     # for several minutes, waiting -RetrySeconds between tries.
-    param([string]$Id, [string]$Why, [int[]]$RetrySeconds = @(10, 30, 60, 120, 300))
+    # A run that ended in Blocked or Deferred (-State) keeps that folder and its reason on the
+    # shared branch (BL-4425): only the code is parked, so a block for Stewart still raises the alarm.
+    param([string]$Id, [string]$Why, [int[]]$RetrySeconds = @(10, 30, 60, 120, 300), [string]$State = '')
+    $keep = $State -in 'Blocked', 'Deferred'
+    $keptReason = if ($keep) { (Get-LastLogLine $Id) -replace '^\S+\s+\w+ -> \w+\.\s*', '' } else { '' }
     $park = "factory/$Id-lane-$Lane-$Stamp"
     # A local branch too: lanes may not fetch, but every worktree sees local branches.
     Invoke-Git @('branch', '-f', $park, 'HEAD') | Out-Null
@@ -21,7 +25,11 @@ function Invoke-Park {
             if ($wait) { Start-Sleep -Seconds $wait }
             if (-not (Sync-Lane)) { continue }
             if ((Get-TaskState $Id) -ne 'Doing') { return '' }
-            Invoke-Board @('move', '-Id', $Id, '-To', 'Backlog', '-Reason', "Lane $Lane could not integrate: $Why. The work is on branch $park; start with git cherry-pick --no-commit $park and fix it.") | Out-Null
+            if ($keep) {
+                Invoke-Board @('move', '-Id', $Id, '-To', $State, '-Reason', "$keptReason (Lane $Lane could not integrate its code: $Why. The code is on branch $park; start with git cherry-pick --no-commit $park and fix it.)") | Out-Null
+            } else {
+                Invoke-Board @('move', '-Id', $Id, '-To', 'Backlog', '-Reason', "Lane $Lane could not integrate: $Why. The work is on branch $park; start with git cherry-pick --no-commit $park and fix it.") | Out-Null
+            }
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
             Invoke-Git @('commit', '-q', '-m', "chore(tasks): park $Id - $Why", '-m', $SkipCiNote) | Out-Null
             if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return '' }
@@ -162,7 +170,9 @@ if ($TestPark) {
     git -C $repo config user.name t; git -C $repo config user.email t@t
     git -C $repo checkout -q -b work 2>&1 | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Tasks\Doing'), (Join-Path $repo 'Tasks\Backlog') | Out-Null
-    foreach ($id in 'BL-001', 'BL-002', 'BL-004', 'BL-005') {
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Tasks\Blocked') | Out-Null
+    Set-Content -Path (Join-Path $repo 'Tasks\Blocked\.gitkeep') -Value ''
+    foreach ($id in 'BL-001','BL-002', 'BL-004', 'BL-005', 'BL-006') {
         Set-Content -Path (Join-Path $repo "Tasks\Doing\$id-park-me.md") -Encoding UTF8 -Value @(
             '---', "id: $id", 'title: Park me', 'priority: Normal', 'assignee: Claude', 'pipeline: direct',
             'depends-on: []', 'touches: [x]', 'requirement: none', 'created: 2026-10-01', 'completed:', '---',
@@ -185,6 +195,17 @@ if ($TestPark) {
             $shared = @(git -C $repo ls-tree -r --name-only origin/work Tasks) -join ' '
             $log = (git -C $repo show 'origin/work:Tasks/Backlog/BL-001-park-me.md') -join ' '
             "'$r' $(if ($shared -match 'Backlog/BL-001-' -and $shared -notmatch 'Doing/BL-001-') { 'Backlog' } else { 'Doing' }) $(if ($log -match 'branch (factory/BL-001-lane-9-test);') { $Matches[1] } else { 'no branch in the Log' })" })
+        ,@('a Blocked run whose code cannot integrate stays Blocked on the shared branch with its reason, the code only on the park branch', "'' Blocked Stewart: approve it; park reason in Log; code not shared; code on factory/BL-006-lane-9-test", {
+            New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Tasks\Blocked') | Out-Null
+            git -C $repo mv 'Tasks/Doing/BL-006-park-me.md' 'Tasks/Blocked/BL-006-park-me.md' 2>&1 | Out-Null
+            Add-Content -Path (Join-Path $repo 'Tasks\Blocked\BL-006-park-me.md') -Value '- 2026-10-31: Doing -> Blocked. Stewart: approve it.'
+            Set-Content -Path (Join-Path $repo 'blocked-code.txt') -Value 'code'
+            git -C $repo add -A 2>&1 | Out-Null; git -C $repo commit -q -m 'blocked run' 2>&1 | Out-Null
+            $r = Invoke-Park -Id 'BL-006' -Why 'build failed' -RetrySeconds @() -State 'Blocked'
+            $shared = @(git -C $repo ls-tree -r --name-only origin/work) -join ' '
+            $log = (git -C $repo show 'origin/work:Tasks/Blocked/BL-006-park-me.md') -join ' '
+            $parked = @(git -C $repo ls-tree -r --name-only 'factory/BL-006-lane-9-test') -join ' '
+            "'$r' $(if ($shared -match 'Blocked/BL-006-' -and $shared -notmatch 'Doing/BL-006-') { 'Blocked' } else { 'not Blocked' }) $(if ($log -match 'Stewart: approve it') { 'Stewart: approve it;' } else { 'no reason;' }) $(if ($log -match 'could not integrate its code: build failed') { 'park reason in Log' } else { 'no park reason' }); code $(if ($shared -match 'blocked-code.txt') { 'shared' } else { 'not shared' }); code on $(if ($parked -match 'blocked-code.txt') { 'factory/BL-006-lane-9-test' } else { 'no park branch' })" })
         ,@('a claim released past the shift end is back in Backlog on the shared branch', "'' Backlog", {
             $r = Invoke-ReleaseClaim -Id 'BL-004' -RetrySeconds @()
             $shared = @(git -C $repo ls-tree -r --name-only origin/work Tasks) -join ' '

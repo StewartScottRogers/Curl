@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Integrate.ps1, DarkFactory/ShiftRunner.ps1, DarkFactory/Park.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4425 — Keep a Blocked task Blocked when its committed code fails the shared-branch verify
 
@@ -26,14 +26,17 @@ Found by the shift-end review of 2026-10-31 (ADR-0710; silent-failure-hunter, Im
 
 ## Acceptance criteria
 
-- [ ] When `Invoke-Integrate` fails for a run whose state is `Blocked` or `Deferred`, the task reaches that same folder on the shared branch with its block reason, and the code commits are kept on the park branch with the park reason added to the task's `## Log`.
-- [ ] A `-TestIntegrateLock` (or `-TestPark`) self-test case pins it: a Blocked run whose code verify is red ends with the task in `Blocked` on `origin/work`, the code not shared, and the park branch holding it.
-- [ ] A Backlog run whose code verify is red is still parked to Backlog as now (the existing case keeps passing).
-- [ ] The factory's own self-tests touched by the change pass under Windows PowerShell and `pwsh`.
+- [x] When `Invoke-Integrate` fails for a run whose state is `Blocked` or `Deferred`, the task reaches that same folder on the shared branch with its block reason, and the code commits are kept on the park branch with the park reason added to the task's `## Log`.
+- [x] A `-TestIntegrateLock` (or `-TestPark`) self-test case pins it: a Blocked run whose code verify is red ends with the task in `Blocked` on `origin/work`, the code not shared, and the park branch holding it.
+- [x] A Backlog run whose code verify is red is still parked to Backlog as now (the existing case keeps passing).
+- [x] The factory's own self-tests touched by the change pass under Windows PowerShell and `pwsh`.
 
 ## Notes
+
+- Invoke-Park takes -State; a Blocked or Deferred run keeps its folder and reason (park reason appended), only the code goes to the park branch. ShiftRunner passes the state and no longer sets Parked for those. Pinned by a new -TestPark case; the Backlog case still passes; -TestPark passes under powershell and pwsh.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 6b7e2e23 0622445e ea1e89aa 482468a8.
+- 2026-10-31: Doing -> Done. Blocked and Deferred runs whose code fails the shared-branch verify stay in their folder; only the code is parked.
