@@ -306,6 +306,102 @@ public sealed class ObliviousHttpTransferHookTests
     }
 
     [TestMethod]
+    [DataRow(HttpAuthSchemes.Digest)]
+    [DataRow(HttpAuthSchemes.Any)]
+    public async Task ExecuteAsync_CredentialsWithASchemeOtherThanBasic_FailsWithExit2WithoutContactingAnyone(HttpAuthSchemes schemes)
+    {
+        TransferContext context = Context(http: new HttpRequestOptions { AuthSchemes = schemes }, credentials: new System.Net.NetworkCredential("a", "b"));
+
+        TransferResult result = await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, NeverCalled);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        StringAssert.Contains(result.ErrorMessage, "--digest");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BearerSchemeWithCredentials_IsCarriedAsABearerAuthorization()
+    {
+        FakeObliviousServers servers = new();
+        TransferContext context = Context(http: new HttpRequestOptions { BearerToken = "tok", AuthSchemes = HttpAuthSchemes.Bearer }, credentials: new System.Net.NetworkCredential("a", "b"));
+
+        await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, servers.Invoke);
+
+        AssertOpenedRequestFields(servers, new BinaryHttpField("authorization", "Bearer tok"));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AuthorizationHeaderWithheld_GeneratesNoAuthorization()
+    {
+        FakeObliviousServers servers = new();
+        TransferContext context = Context(http: new HttpRequestOptions { AuthorizationHeaderWithheld = true }, credentials: new System.Net.NetworkCredential("a", "b"));
+
+        await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, servers.Invoke);
+
+        AssertOpenedRequestFields(servers);
+    }
+
+    [TestMethod]
+    [DataRow("Authorization:", "authorization")]
+    [DataRow("Referer:", "referer")]
+    [DataRow("Cookie:", "cookie")]
+    public async Task ExecuteAsync_HeaderLineWithNoValue_SuppressesTheFieldTheHookWouldAdd(string line, string name)
+    {
+        FakeObliviousServers servers = new();
+        HttpRequestOptions http = new() { Headers = [line], Referer = "https://from/", CookieStrings = "a=b" };
+        TransferContext context = Context(http: http, credentials: new System.Net.NetworkCredential("a", "b"));
+
+        await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, servers.Invoke);
+
+        BinaryHttpField[] others = [.. new BinaryHttpField[] { new("authorization", "Basic YTpi"), new("referer", "https://from/"), new("cookie", "a=b") }.Where(field => field.Name != name)];
+        AssertOpenedRequestFields(servers, others);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_NonAsciiPasswordOnWindows_IsEncodedInTheAnsiCodePage()
+    {
+        await AssertBasicValueAsync("dTpw5A==");
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_NonAsciiPasswordOnPosix_IsEncodedAsUtf8()
+    {
+        await AssertBasicValueAsync("w6Q=");
+    }
+
+    [TestMethod]
+    [DataRow(HttpFailMode.FailWithBody, 404, 22, "gone")]
+    [DataRow(HttpFailMode.FailWithBody, 200, 0, "gone")]
+    public async Task ExecuteAsync_FailWithBody_WritesTheBodyAndExits22OnlyForAnInnerErrorStatus(HttpFailMode fail, int status, int exitCode, string body)
+    {
+        FakeObliviousServers servers = new() { BinaryResponse = FakeObliviousServers.KnownLengthResponse(status, [], "gone") };
+        TransferContext context = Context(http: new HttpRequestOptions { Fail = fail });
+
+        TransferResult result = await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, servers.Invoke);
+
+        Assert.AreEqual((CurlExitCode)exitCode, result.ExitCode);
+        Assert.AreEqual(body, Text(context.Output));
+        if (exitCode == 22)
+        {
+            Assert.AreEqual("The requested URL returned error: 404", result.ErrorMessage);
+        }
+    }
+
+    private static async Task AssertBasicValueAsync(string base64)
+    {
+        FakeObliviousServers servers = new();
+        TransferContext context = Context(credentials: new System.Net.NetworkCredential("u", "pä"));
+
+        await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, servers.Invoke);
+
+        AssertOpenedRequestFields(servers, new BinaryHttpField("authorization", "Basic " + base64));
+    }
+
+    private static void AssertOpenedRequestFields(FakeObliviousServers servers, params BinaryHttpField[] fields) =>
+        CollectionAssert.AreEqual(BinaryHttpRequestEncoder.EncodeKnownLength(new BinaryHttpRequest("GET", "https", "example.com", "/r", fields, ReadOnlyMemory<byte>.Empty)), servers.OpenedRequest);
+
+    [TestMethod]
     [DataRow(true, false, "a compressed response (--compressed)")]
     [DataRow(false, true, "a cookie file (-b)")]
     public async Task ExecuteAsync_CompressedOrCookieFile_FailsWithExit2WithoutContactingAnyone(bool compressed, bool cookieFile, string refused)
