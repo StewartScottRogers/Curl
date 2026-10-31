@@ -258,7 +258,11 @@ function Invoke-TimedExternalCall {
     # errors, $LASTEXITCODE set. A timeout is traced, and exits 124, instead of hanging the loop.
     param([string]$Tool, [object[]]$CallArgs)
     $CallArgs = ConvertTo-NativeCallArguments $CallArgs
+    # A pass can make several calls of up to ExternalCallSeconds each: the stamp is refreshed
+    # either side of each, so waiting on a slow network never ages it past the threshold (ADR-1160).
+    Write-CoordinatorStamp
     $result = Invoke-ExternalWithTimeout -FilePath $script:ExternalTools[$Tool] -CallArgs $CallArgs -Seconds $script:ExternalCallSeconds
+    Write-CoordinatorStamp
     if ($result.TimedOut) { Write-Trace '-' 'timeout' "$Tool $(Get-Short ($CallArgs -join ' ') 70) gave no answer in $($script:ExternalCallSeconds)s; stopped" 'Red' }
     $global:LASTEXITCODE = $result.ExitCode
     foreach ($line in $result.Errors) { Write-Error $line -ErrorAction Continue }
@@ -319,10 +323,18 @@ function Write-CoordinatorStamp {
             $script:CoordinatorArguments = if ($own -and "$($own.CommandLine)" -match "$leaf`"?\s*(.*)$") { $Matches[1].Trim() } else { '' }
         }
         New-Item -ItemType Directory -Force -Path (Split-Path $Path) -ErrorAction Stop | Out-Null
-        $text = "pid=$PID`nat=$(Get-UtcStamp)`nshiftEnd=$(Get-UtcStamp $End)`nscript=$FactoryScript`ndir=$FactoryScriptDir`nargs=$($script:CoordinatorArguments)`n"
+        $text = "pid=$PID`nheartbeat=$HeartbeatMinutes`nat=$(Get-UtcStamp)`nshiftEnd=$(Get-UtcStamp $End)`nscript=$FactoryScript`ndir=$FactoryScriptDir`nargs=$($script:CoordinatorArguments)`n"
         [System.IO.File]::WriteAllText("$Path.tmp", $text)
         Move-Item -LiteralPath "$Path.tmp" -Destination $Path -Force -ErrorAction Stop
-    } catch { }
+        $script:CoordinatorStampFailing = $false
+    } catch {
+        # Traced on the first failure only: a stamp that cannot be written gets a healthy
+        # coordinator replaced within 3 heartbeats, so the reason must be in the log.
+        if (-not $script:CoordinatorStampFailing) {
+            Write-Trace '-' 'watchdog' "coordinator.stamp not written (lanes will replace this coordinator): $(Get-Short $_.Exception.Message 80)" 'Red'
+        }
+        $script:CoordinatorStampFailing = $true
+    }
 }
 
 function Read-CoordinatorStamp {
@@ -377,6 +389,24 @@ function Stop-FactoryProcessOnly {
     if (Test-FactoryOnWindows) { & taskkill /PID $ProcessId /F 2>&1 | Out-Null } else { & kill -9 $ProcessId 2>&1 | Out-Null }
 }
 
+function Test-CoordinatorProcessAlive {
+    # True when -Table (Get-FactoryProcessTable's rows) holds the coordinator named in a stamp
+    # (-Fields): its pid running that script, not a lane. A pid Windows reused does not match.
+    param([object[]]$Table, [hashtable]$Fields)
+    $mine = [regex]::Escape($Fields['script'])
+    $row = $Table | Where-Object { $_.ProcessId -eq [int]$Fields['pid'] -and "$($_.CommandLine)" -match "-File\s+`"?$mine`"?(\s|$)" -and "$($_.CommandLine)" -notmatch '\s-Lane\s' }
+    return [bool]$row
+}
+
+function Get-StaleCoordinatorChildIds {
+    # The processes to stop beside the coordinator named in a stamp: what it started, but only
+    # while that pid is still the coordinator, as a dead pid may be reused and its children
+    # belong to someone else (BL-4396). Empty when the coordinator is gone.
+    param([object[]]$Table, [hashtable]$Fields)
+    if (-not (Test-CoordinatorProcessAlive -Table $Table -Fields $Fields)) { return @() }
+    return @(Get-CoordinatorOwnProcessIds -Table $Table -CoordinatorId ([int]$Fields['pid']))
+}
+
 function Restart-StaleCoordinator {
     # Replaces the coordinator named in its stamp: stops it and what it started, but no lane,
     # then starts a coordinator with its arguments plus -TakeOverShift and this shift's stamp,
@@ -386,10 +416,8 @@ function Restart-StaleCoordinator {
     $lock.Dispose()
     $coordinatorId = [int]$Fields['pid']
     $table = @(Get-FactoryProcessTable)
-    $mine = [regex]::Escape($Fields['script'])
-    $alive = $table | Where-Object { $_.ProcessId -eq $coordinatorId -and "$($_.CommandLine)" -match "-File\s+`"?$mine`"?(\s|$)" -and "$($_.CommandLine)" -notmatch '\s-Lane\s' }
-    foreach ($id in (Get-CoordinatorOwnProcessIds -Table $table -CoordinatorId $coordinatorId)) { Stop-FactoryProcessOnly $id }
-    if ($alive) { Stop-FactoryProcessOnly $coordinatorId }
+    foreach ($id in (Get-StaleCoordinatorChildIds -Table $table -Fields $Fields)) { Stop-FactoryProcessOnly $id }
+    if (Test-CoordinatorProcessAlive -Table $table -Fields $Fields) { Stop-FactoryProcessOnly $coordinatorId }
     $hoursLeft = [math]::Max(0.01, ((ConvertFrom-UtcStamp $Fields['shiftEnd']) - (Get-Date).ToUniversalTime()).TotalHours).ToString([System.Globalization.CultureInfo]::InvariantCulture)
     $forward = @([regex]::Matches("$($Fields['args'])", '"[^"]*"|\S+') | ForEach-Object { $_.Value })
     $forward = Set-ForwardedArgument $forward @{ Hours = $hoursLeft; ShiftStamp = $Stamp; TakeOverShift = [switch]$true }
@@ -412,7 +440,7 @@ function Invoke-CoordinatorWatchdogIfDue {
         $replacing = Get-CoordinatorReplacingPath
         $since = $null
         if (Test-Path -LiteralPath $replacing) { $since = (Get-Item -LiteralPath $replacing).LastWriteTimeUtc }
-        $decision = Get-CoordinatorWatchdogDecision -Now (Get-Date).ToUniversalTime() -StampAt (ConvertFrom-UtcStamp $fields['at']) -ShiftEnd (ConvertFrom-UtcStamp $fields['shiftEnd']) -HeartbeatMinutes $HeartbeatMinutes -ReplacingSince $since
+        $decision = Get-CoordinatorWatchdogDecision -Now (Get-Date).ToUniversalTime() -StampAt (ConvertFrom-UtcStamp $fields['at']) -ShiftEnd (ConvertFrom-UtcStamp $fields['shiftEnd']) -HeartbeatMinutes $(if ($fields.ContainsKey('heartbeat')) { [int]$fields['heartbeat'] } else { $HeartbeatMinutes }) -ReplacingSince $since
         if ($decision.Action -ne 'replace') { return }
         # A replacement begun over 10 minutes ago never came up: its lock is cleared first.
         if ($null -ne $since) { Remove-Item -LiteralPath $replacing -ErrorAction SilentlyContinue }

@@ -8,6 +8,10 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 Amends ADR-0120: its table gains `Curl.Ssh.UnitLibrary`.
 
+Amended later (BL-4402, AF-0492): more of the SSH layer moved into `Curl.Ssh.UnitLibrary` after
+this decision (`known_hosts`, key files, user authentication, the session channel); the bullets
+below say where they are superseded.
+
 ## Context
 
 `--ssh-jump` (BL-4145) is an extension, and an extension references no `Curl.Protocol.*` library
@@ -34,14 +38,17 @@ the SCP and SFTP layers, the user authentication, the private key files and `kno
   `SshTransport` takes only it. `SshDiagnosticLog` stays in the protocol library with the SFTP
   and `known_hosts` lines, and writes through the `SshTransportLog` it wraps, so the log lines
   and their order do not change.
-- `known_hosts` (`KnownHostsFile`, `SshHostKeyChecker` and the rest of `HostKeys`), the private
-  key files, user authentication, the session channel, SCP and SFTP stay in the protocol
-  library: they are curl's SSH protocol options, not the transport.
+- *Superseded (BL-4402, AF-0492):* `known_hosts` (`KnownHostsFile`, `SshHostKeyChecker` and the
+  rest of `HostKeys`), the private key files and user authentication were first to stay in the
+  protocol library. They now live in `Curl.Ssh.UnitLibrary` (`HostKeys/`, `Keys/`,
+  `Authentication/`), and the session channel with them (ADR-1166). Only SCP, SFTP,
+  `SshDiagnosticLog`, `SshProtocolHandler` and the like stay in `Curl.Protocol.Ssh.UnitLibrary`.
 - `SshWireDecoders` stays in `Curl.Protocol.Ssh`. It is the public entry point the fuzzer
   calls (ADR-0394), and it also decodes SFTP attributes, which are protocol-library types; moving
   it would split one fuzz surface across two libraries and break the fuzzer's `using` line, which
   a lane cannot change.
-- Every moved type stays `internal`; `Curl.Ssh.UnitLibrary` grants `InternalsVisibleTo` to the
+- Every moved type stays `internal`, except `ISshRandomSource`, `SystemSshRandomSource` and
+  `SshAlgorithmPreferences`, which are public; `Curl.Ssh.UnitLibrary` grants `InternalsVisibleTo` to the
   protocol library and its unit and integration tests, the conformance SSH server and its tests,
   `Curl.Conformance.UnitProgram.UnitLibrary` and `Curl.Ssh.UnitTests`. An extension that uses the
   layer adds itself to that list.

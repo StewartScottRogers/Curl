@@ -755,6 +755,10 @@ internal static class CurlComposition
         {
             throw OptionConflictOf(conflict);
         }
+        catch (ArgumentException badValue) when (badValue.GetType() == typeof(ArgumentException))
+        {
+            throw OptionValueErrorOf(badValue);
+        }
     }
 
     /// <summary>Puts a handler through <paramref name="schemeHooks" /> first and then <paramref name="transferHooks" />, so the transfer hooks see an extension's transfers too.</summary>
@@ -799,6 +803,10 @@ internal static class CurlComposition
         {
             throw OptionConflictOf(conflict);
         }
+        catch (ArgumentException badValue) when (badValue.GetType() == typeof(ArgumentException))
+        {
+            throw OptionValueErrorOf(badValue);
+        }
     }
 
     /// <summary>
@@ -829,6 +837,10 @@ internal static class CurlComposition
         {
             throw OptionConflictOf(conflict);
         }
+        catch (ArgumentException badValue) when (badValue.GetType() == typeof(ArgumentException))
+        {
+            throw OptionValueErrorOf(badValue);
+        }
     }
 
     /// <summary>Gives the engine's <c>extensionResolver</c> for an option group's resolver hook.</summary>
@@ -836,6 +848,11 @@ internal static class CurlComposition
     /// <returns><see cref="ResolverHooks.ResolverOver" />, or <see langword="null" /> without a hook, so the engine keeps curl's resolver.</returns>
     internal static Func<IDnsResolver, IDnsResolver>? ExtensionResolverOf(ResolverHooks? hooks) =>
         hooks is { Hook: not null } ? hooks.ResolverOver : null;
+
+    // An extension option's bad value as curl's command-line error. ArgumentException.Message ends with
+    // " (Parameter 'values')", which curl's line does not carry.
+    private static ExtensionOptionConflictException OptionValueErrorOf(ArgumentException badValue) =>
+        new(badValue.Message.Replace($" (Parameter '{badValue.ParamName}')", string.Empty, StringComparison.Ordinal));
 
     // An extension hook conflict as curl's command-line error.
     private static ExtensionOptionConflictException OptionConflictOf(ExtensionHookConflictException conflict) =>

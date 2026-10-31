@@ -15,9 +15,25 @@ public sealed class OAuth2TokenCacheLocationTests
     [TestMethod]
     public void FindDefaultDirectory_EarlierOnesUnsetOrEmpty_TakesTheFirstSet()
     {
-        var variables = new Dictionary<string, string> { ["XDG_CONFIG_HOME"] = string.Empty, ["APPDATA"] = "/app/data", ["USERPROFILE"] = "/profile" };
+        var variables = new Dictionary<string, string> { ["XDG_CONFIG_HOME"] = string.Empty, ["USERPROFILE"] = "/profile", ["APPDATA"] = "/app/data" };
 
-        Assert.AreEqual("/app/data", OAuth2TokenCacheLocation.FindDefaultDirectory(variables.GetValueOrDefault));
+        Assert.AreEqual("/profile", OAuth2TokenCacheLocation.FindDefaultDirectory(variables.GetValueOrDefault, isWindows: true));
+    }
+
+    [TestMethod]
+    public void FindDefaultDirectory_NotWindows_IgnoresUserProfileAndAppData()
+    {
+        var variables = new Dictionary<string, string> { ["USERPROFILE"] = "/profile", ["APPDATA"] = "/app/data" };
+
+        Assert.IsNull(OAuth2TokenCacheLocation.FindDefaultDirectory(variables.GetValueOrDefault, isWindows: false));
+    }
+
+    [TestMethod]
+    public void FindDefaultDirectory_NoPlatformGiven_AsksTheRunningOperatingSystem()
+    {
+        var variables = new Dictionary<string, string> { ["USERPROFILE"] = "/profile" };
+
+        Assert.AreEqual(OperatingSystem.IsWindows() ? "/profile" : null, OAuth2TokenCacheLocation.FindDefaultDirectory(variables.GetValueOrDefault));
     }
 
     [TestMethod]
@@ -25,6 +41,6 @@ public sealed class OAuth2TokenCacheLocationTests
     {
         Assert.IsNull(OAuth2TokenCacheLocation.FindDefaultDirectory(_ => null));
         CollectionAssert.AreEqual(
-            new[] { "CURL_HOME", "XDG_CONFIG_HOME", "HOME", "APPDATA", "USERPROFILE" }, OAuth2TokenCacheLocation.SearchedVariables.ToArray());
+            new[] { "CURL_HOME", "XDG_CONFIG_HOME", "HOME", "USERPROFILE", "APPDATA" }, OAuth2TokenCacheLocation.SearchedVariables.ToArray());
     }
 }

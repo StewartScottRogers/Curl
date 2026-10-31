@@ -8,9 +8,15 @@ function Get-IdlePollDecision {
     # when -ClaimableId names a task claimable now, else 'wait' - also when only cost-capped
     # tasks (-CappedIds) are ready. Why is the trace text. Pure: the clock, the usage and the
     # board are its arguments, so -TestHeartbeat drives it.
-    param([datetime]$Now, [datetime]$Deadline, [string]$UsageStop, [string]$ClaimableId, [string[]]$CappedIds = @())
-    if ($Now -ge $Deadline) { return [pscustomobject]@{ Action = 'stop'; Why = "the -Hours deadline $($Deadline.ToString('HH:mm', [System.Globalization.CultureInfo]::InvariantCulture)) has passed" } }
+    # -CiFixId (Get-ReadyCiFixTaskId) names a ready CI fix, which the -Hours deadline does not
+    # hold (ADR-1158, BL-4412): lanes run to the shift's time and past it, so the merge's CI
+    # wait always polls after the deadline, and BL-4369 and BL-4370, filed while the lanes of
+    # shift 20261030-060635 finished, waited the whole 37-minute merge wait for the next shift.
+    param([datetime]$Now, [datetime]$Deadline, [string]$UsageStop, [string]$ClaimableId, [string[]]$CappedIds = @(), [string]$CiFixId = '')
+    $deadlineText = $Deadline.ToString('HH:mm', [System.Globalization.CultureInfo]::InvariantCulture)
+    if ($Now -ge $Deadline -and -not $CiFixId) { return [pscustomobject]@{ Action = 'stop'; Why = "the -Hours deadline $deadlineText has passed" } }
     if ($UsageStop) { return [pscustomobject]@{ Action = 'stop'; Why = $UsageStop } }
+    if ($Now -ge $Deadline) { return [pscustomobject]@{ Action = 'start'; Why = "$CiFixId is a ready CI fix, which the -Hours deadline $deadlineText does not hold (ADR-1158)" } }
     if ($ClaimableId) { return [pscustomobject]@{ Action = 'start'; Why = "$ClaimableId is claimable" } }
     $why = if ($CappedIds.Count) { "only cost-capped tasks ready ($($CappedIds -join ', '))" } else { 'nothing claimable' }
     return [pscustomobject]@{ Action = 'wait'; Why = $why }
@@ -72,6 +78,14 @@ function Write-IdlePollHeartbeat {
     Write-Heartbeat 'idle' 'polling'
 }
 
+function Write-TakeOverStartStamp {
+    # A -TakeOverShift coordinator's first stamp, for -Hours from now; nothing for any other
+    # coordinator, whose loop writes the first. -Path is for the self-test.
+    param([double]$Hours, [string]$Path = (Get-CoordinatorStampPath))
+    if (-not $TakeOverShift) { return }
+    Write-CoordinatorStamp -Path $Path -End (Get-Date).AddHours($Hours)
+}
+
 if ($TestCoordinatorWatchdog) {
     # The stale-stamp decision, the stamp file, which processes a replacement stops, and a
     # timed external call, with no shift, lane or network.
@@ -104,6 +118,14 @@ if ($TestCoordinatorWatchdog) {
         $fields = Read-CoordinatorStamp $stampFile
         $back = ConvertFrom-UtcStamp $fields['shiftEnd']
         & $check 'the stamp holds the pid, the arguments and the shift end' ($fields['pid'] -ceq "$PID" -and $fields['args'] -ceq '-Lanes Auto -Continuous' -and $back -eq $end.ToUniversalTime() -and (ConvertFrom-UtcStamp $fields['at'])) "pid=$($fields['pid']) args=$($fields['args']) shiftEnd=$($fields['shiftEnd'])"
+        & $check 'the stamp holds the heartbeat interval the lanes use' ($fields['heartbeat'] -ceq "$HeartbeatMinutes") "heartbeat=$($fields['heartbeat'])"
+        $script:CoordinatorStampFailing = $false
+        $blocker = Join-Path $scratch 'afile'
+        [System.IO.File]::WriteAllText($blocker, 'x')
+        Write-CoordinatorStamp -Path (Join-Path $blocker 'coordinator.stamp') -End $end
+        & $check 'a failed stamp write is traced once' ($script:CoordinatorStampFailing -eq $true) "failing=$($script:CoordinatorStampFailing)"
+        Write-CoordinatorStamp -Path $stampFile -End $end
+        & $check 'a stamp write that works again clears the failure' ($script:CoordinatorStampFailing -eq $false) "failing=$($script:CoordinatorStampFailing)"
         & $check 'a missing stamp reads as empty' ((Read-CoordinatorStamp (Join-Path $scratch 'none')).Count -eq 0) 'empty'
     } finally { Remove-Item $scratch -Recurse -Force -ErrorAction SilentlyContinue }
     $table = @(
@@ -114,6 +136,28 @@ if ($TestCoordinatorWatchdog) {
         [pscustomobject]@{ ProcessId = 13; ParentProcessId = 12; CommandLine = 'dotnet build' })
     $stop = (Get-CoordinatorOwnProcessIds -Table $table -CoordinatorId 10) -join ','
     & $check 'a replacement stops what the coordinator started, deepest first, and no lane' ($stop -ceq '14,11') $stop
+    $deadCoordinator = @{ pid = '10'; script = 'RunDarkFactory.ps1' }
+    $liveTable = $table | ForEach-Object { $_ }
+    $liveTable[0].CommandLine = 'powershell -File RunDarkFactory.ps1 -Lanes 2'
+    $aliveIds = (Get-StaleCoordinatorChildIds -Table $liveTable -Fields $deadCoordinator) -join ','
+    & $check 'a live coordinator has its children stopped' ($aliveIds -ceq '14,11') $aliveIds
+    $reusedTable = @([pscustomobject]@{ ProcessId = 10; ParentProcessId = 1; CommandLine = 'notepad.exe' }) + @($table | Select-Object -Skip 1)
+    $reusedIds = @(Get-StaleCoordinatorChildIds -Table $reusedTable -Fields $deadCoordinator)
+    & $check 'a dead coordinator pid reused by another program has no children stopped' ($reusedIds.Count -eq 0) ($reusedIds -join ',')
+    $goneIds = @(Get-StaleCoordinatorChildIds -Table @($table | Select-Object -Skip 1) -Fields $deadCoordinator)
+    & $check 'a coordinator pid that is gone has no children stopped' ($goneIds.Count -eq 0) ($goneIds -join ',')
+    $takeScratch = Join-Path ([IO.Path]::GetTempPath()) "takeover-stamp-$PID"
+    try {
+        $keepTakeOver = $TakeOverShift
+        $script:CoordinatorArguments = '-Lanes Auto'
+        $TakeOverShift = [switch]$false
+        Write-TakeOverStartStamp -Hours 2 -Path (Join-Path $takeScratch 'other.stamp')
+        $TakeOverShift = [switch]$true
+        Write-TakeOverStartStamp -Hours 2 -Path (Join-Path $takeScratch 'take.stamp')
+        $takeFields = Read-CoordinatorStamp (Join-Path $takeScratch 'take.stamp')
+        & $check 'a takeover coordinator writes its stamp at start-up, another does not' ($takeFields['pid'] -ceq "$PID" -and -not (Test-Path (Join-Path $takeScratch 'other.stamp'))) "pid=$($takeFields['pid'])"
+        $TakeOverShift = $keepTakeOver
+    } finally { Remove-Item $takeScratch -Recurse -Force -ErrorAction SilentlyContinue }
     & $check 'git push and gh calls are timed' ((Test-TimedExternalCall 'git' @('-C', 'x y', 'push', '-q')) -and (Test-TimedExternalCall 'gh' @('run', 'list')) -and (Test-TimedExternalCall 'git' @('fetch'))) 'timed'
     $native = (ConvertTo-NativeCallArguments @('run', 'list', '--json', @('databaseId', 'status'), '--limit', 1)) -join '|'
     & $check 'a timed call passes an unquoted a,b as "a,b", as to a native command (BL-4377)' ($native -ceq 'run|list|--json|databaseId,status|--limit|1') $native
@@ -244,6 +288,10 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         return $Fallback
     }
 
+    # A coordinator taking over writes its stamp before the machine probe and any wait below,
+    # which can block for hours: until it does, the lanes see the stamp of the coordinator it
+    # replaced, and kill this one too (BL-4396).
+    Write-TakeOverStartStamp -Hours $Hours
     if ($AutoLanes) {
         # Sized before any lane starts: the machine cap, probed now while nothing builds if
         # machine-lanes.json no longer describes this PC, then the start count from the last
@@ -272,7 +320,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # on a fresh session, and the wait does not count against -Hours.
     # Known from here, so the wait for a fresh session below keeps watching CI (BL-1031).
     $script:CiWatchBranch = $branch
-    $weekly = Wait-ForFreshSession
+    $weekly = if ($TakeOverShift) { $null } else { Wait-ForFreshSession }
     if ($weekly) { Write-Trace '-' 'shift' $weekly 'Red'; Set-OwnTabLabel 'ALARM, read'; Invoke-Alarm -Reasons @($weekly); exit 2 }
     $shiftEnd = (Get-Date).AddHours($Hours)
 
@@ -675,14 +723,16 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     git -C $Root fetch -q origin master 2>&1 | Out-Null
     $masterBefore = "$(git -C $Root rev-parse origin/master 2>$null)".Trim()
     # Under -Continuous the merge's CI wait polls the board like the idle poll below (BL-3142):
-    # a task claimable during the wait starts the next shift beside the merge, once.
+    # a task claimable during the wait starts the next shift beside the merge, once. The wait
+    # always comes after the -Hours deadline (lanes finish their last task past it), so only a
+    # ready CI fix starts one then (BL-4412); other work waits for the merge's own hand-over.
     $handOver = @{ Done = $false }
     $pollDuringMerge = if ($Continuous) {
         {
             if ($handOver.Done) { return }
             if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
             $claimable = Get-MergeWaitClaimableTaskId
-            $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $claimable.Id -CappedIds $claimable.Capped
+            $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $claimable.Id -CappedIds $claimable.Capped -CiFixId (Get-ReadyCiFixTaskId)
             if ($poll.Action -eq 'start' -and @(& $startNextShift "$($poll.Why) during the merge's CI wait" -Beside)[-1]) { $handOver.Done = $true }
         }
     }

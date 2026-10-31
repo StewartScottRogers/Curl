@@ -163,8 +163,9 @@ function Update-BoardBeforePush {
 }
 
 function Test-IncomingIsBoardOnly {
-    # True when every file that changed between two commits of the shared branch is a task
-    # file, which no test selection covers. False when git cannot say.
+    # True when every file that changed between two commits (of the shared branch, or the
+    # shared branch and this lane's HEAD) is a task file, which no test selection covers.
+    # False when git cannot say.
     param([string]$From, [string]$To)
     $names = @(git -C $Root diff --name-only --no-renames $From $To 2>$null | Where-Object { $_ })
     if ($LASTEXITCODE -ne 0) { return $false }
@@ -232,10 +233,13 @@ function Invoke-Integrate {
                 if ($rebase -eq 'conflict') { $attempt--; $conflict = $true; break }
                 $boardWhy = Update-BoardBeforePush -Id $Id
                 if ($boardWhy) { return $boardWhy }
-                if ($State -eq 'Done') {
+                # A run whose task went back to Backlog or Blocked commits the code it finished
+                # and tested (AF-0496), so its commits are verified like a finished task's
+                # whenever they change more than task files; the repair run is for Done alone.
+                if ($State -eq 'Done' -or -not (Test-IncomingIsBoardOnly "origin/$Branch" 'HEAD')) {
                     Set-HeartbeatStep @('verify', 'build and fast tests on the shared branch')
                     $red = Test-Green -Id $Id -Base "origin/$Branch"
-                    if ($red) { $red = Repair-IntegrationBreak -Id $Id -Red $red }
+                    if ($red -and $State -eq 'Done') { $red = Repair-IntegrationBreak -Id $Id -Red $red }
                     if ($red) { return "$red after rebasing onto the other lanes' work" }
                     Write-Trace $Id 'verify' 'build and fast tests green on the shared branch'
                 }
@@ -315,8 +319,9 @@ if ($TestIntegrateLock) {
     # A race during the verify (BL-3060): the stand-in verify counts its runs and, on the runs
     # -Races names ('board' = a task-file-only push, 'code' = a push changing a file the tests
     # cover), pushes from the other clone before the lane's own push. Redefining Test-Green
-    # here replaces the real one only for this self-test, which exits when it has run.
-    $script:Verifies = 0; $script:Races = @{}; $script:Pushed = 0; $script:RaceCase = 0
+    # here replaces the real one only for this self-test, which exits when it has run. It
+    # answers $script:RedVerify, '' for green.
+    $script:Verifies = 0; $script:Races = @{}; $script:Pushed = 0; $script:RaceCase = 0; $script:RedVerify = ''
     function Test-Green {
         param([string]$Id = '-', [string]$Base = '')
         $script:Verifies++
@@ -330,7 +335,23 @@ if ($TestIntegrateLock) {
             git -C $other add -A 2>&1 | Out-Null; git -C $other commit -q -m "race $($script:Pushed)" 2>&1 | Out-Null
             git -C $other push -q origin work 2>&1 | Out-Null
         }
-        return ''
+        return $script:RedVerify
+    }
+    # A run that sent its task back to Backlog or Blocked commits the code it finished and
+    # tested (AF-0496): the lane commits -File (a code file, or a task file) and integrates
+    # with the task in -State, its verify answering -Red.
+    $laneRequeues = {
+        param([string]$State, [string]$File, [string]$Red = '')
+        & $fresh
+        $script:Verifies = 0; $script:Races = @{}; $script:RedVerify = $Red; $script:RaceCase++
+        $path = Join-Path $repo ($File -f $script:RaceCase)
+        Set-Content -Path $path -Value 'requeued'
+        git -C $repo add -A 2>&1 | Out-Null; git -C $repo commit -q -m 'requeued' 2>&1 | Out-Null
+        $r = Invoke-Integrate -Id 'BL-001' -State $State 6>$null
+        $script:RedVerify = ''
+        $git = "$(git -C $repo ls-tree -r --name-only origin/work | Where-Object { $_ -eq ($File -f $script:RaceCase).Replace('\', '/') })"
+        & $fresh
+        return "'$r' $($script:Verifies) verifies, lane work shared: $([bool]$git)"
     }
     $lanePushes = {
         param([hashtable]$Races)
@@ -354,6 +375,18 @@ if ($TestIntegrateLock) {
                 & $lanePushes @{ 1 = 'code'; 2 = 'code'; 3 = 'code' } })
             ,@('a task-file-only race on the third attempt still pushes: the fast retry spends no attempt', "'' 3 verifies, lane work shared: True", {
                 & $lanePushes @{ 1 = 'code'; 2 = 'code'; 3 = 'board' } })
+            ,@('a requeued run''s committed code is verified and integrated like a finished task''s (AF-0496)', "'' 1 verifies, lane work shared: True", {
+                & $laneRequeues 'Backlog' 'requeued-code-{0}.txt' })
+            ,@('a blocked run''s committed code is verified and integrated too', "'' 1 verifies, lane work shared: True", {
+                & $laneRequeues 'Blocked' 'blocked-code-{0}.txt' })
+            ,@('a requeue that commits only its task file is pushed with no verify', "'' 0 verifies, lane work shared: True", {
+                & $laneRequeues 'Backlog' 'Tasks\Backlog\BL-001-requeued-{0}.md' })
+            ,@('a requeued run''s code that goes red on the shared branch is not pushed, and gets no repair run', "'build failed after rebasing onto the other lanes' work' 1 verifies, lane work shared: False", {
+                & $laneRequeues 'Backlog' 'requeued-red-{0}.txt' 'build failed' })
+            ,@('both task prompts commit a Backlog or Blocked run''s finished, tested code rather than leave it to the stash', 'True True False False', {
+                $commits = 'Commit with it, by logical unit as in rule {0}, every code change that is complete in'
+                $tested = 'covered by its own tests so CI''s'
+                "$($Prompt.Contains(($commits -f 4)) -and $Prompt.Contains($tested)) $($LanePrompt.Contains(($commits -f 5)) -and $LanePrompt.Contains($tested) -and $LanePrompt.Contains('the shift integrates them like a finished task''s')) $($Prompt.Contains('commit only the task board change')) $($LanePrompt.Contains('commit only the task board change'))" })
             ,@('the shift-end review push is made under the integrate lock, not by the reviewer', 'True False', {
                 $end = & $source 'ShiftEnd.ps1'
                 "$($end -match 'Push-ReviewCommitsUnderLock') $($end -match '(?m)^4\..*\band push to origin')" })

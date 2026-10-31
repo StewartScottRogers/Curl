@@ -93,6 +93,29 @@ public sealed class WireGuardDatagramConnectorTests
     }
 
     [TestMethod]
+    public async Task OpenAsync_SocketFailsDuringTheHandshake_CannotConnectAndClosesTheSocket()
+    {
+        FailingUdp udp = new(new SocketException((int)SocketError.ConnectionReset));
+
+        DatagramOpenResult result = await Connector(udp, TunnelTestPeer.Configuration()).OpenAsync("10.0.0.1", 443, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.StartsWith("Failed to connect to 10.0.0.1 port 443 through the WireGuard tunnel: ", result.ErrorMessage);
+        Assert.IsTrue(udp.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_HostNameWithAnUnreachablePeer_CannotConnectNotUnresolved()
+    {
+        TunnelTestPeer peer = new() { OpenFailure = new SocketException((int)SocketError.NetworkUnreachable) };
+
+        DatagramOpenResult result = await Connector(peer, TunnelTestPeer.Configuration(extraInterfaceLine: "DNS = 10.0.0.53")).OpenAsync("example.com", 443, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.StartsWith("Failed to connect to 10.0.0.53 port 53 through the WireGuard tunnel: ", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task OpenAsync_HandshakeTimesOut_CannotConnectAndClosesTheSocket()
     {
         FailingUdp udp = new(new TimeoutException("no response"));

@@ -50,6 +50,112 @@ public sealed class CompressionDictionaryTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_NoDictionaryOffered_WritesTheBodyToTheOutputBeforeTheResponseEnds()
+    {
+        var context = Context(ResourceUrl);
+        string? atFirstChunk = null;
+
+        var result = await Hook().ExecuteAsync(context, async sent =>
+        {
+            await sent.Output.WriteAsync("first "u8.ToArray());
+            atFirstChunk = Text(context.Output);
+            await sent.Output.WriteAsync("second"u8.ToArray());
+            return TransferResult.Success(12);
+        });
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual("first ", atFirstChunk);
+        Assert.AreEqual("first second", Text(context.Output));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StreamedDictionaryAfterARedirect_IsStoredUnderTheEffectiveUrl_Rfc9842Section2_1()
+    {
+        var report = new TransferReport
+        {
+            ResponseCode = 200,
+            EffectiveUrl = "https://other.example/app/dictionary.txt",
+            ResponseHeaders = [new("Use-As-Dictionary", "match=\"/app/*\", id=\"v1\"")],
+        };
+
+        await Hook().ExecuteAsync(Context(ResourceUrl), async sent =>
+        {
+            await sent.Output.WriteAsync("dictionary"u8.ToArray());
+            return TransferResult.Success(10) with { Report = report };
+        });
+        var elsewhere = Origin(200, "x");
+        await Hook().ExecuteAsync(Context("https://other.example/app/main.js"), elsewhere.Invoke);
+        var requested = Origin(200, "x");
+        await Hook().ExecuteAsync(Context(ResourceUrl), requested.Invoke);
+
+        Assert.IsTrue(elsewhere.Sent!.Http!.Headers.Any(line => line.StartsWith("Available-Dictionary:", StringComparison.Ordinal)));
+        Assert.IsEmpty(requested.Sent!.Http!.Headers);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StreamedBodyLongerThanTheStoredLimit_ReachesTheOutputAndIsNotStored()
+    {
+        var context = Context(DictionaryUrl);
+        var body = new byte[CompressionDictionaryTransferHook.StoredBodyLimit + 1];
+
+        await Hook().ExecuteAsync(context, async sent =>
+        {
+            await sent.Output.WriteAsync(body);
+            return TransferResult.Success(body.Length) with
+            {
+                Report = new TransferReport { ResponseCode = 200, ResponseHeaders = [new("Use-As-Dictionary", "match=\"/app/*\"")] },
+            };
+        });
+
+        Assert.AreEqual(body.Length, ((MemoryStream)context.Output).Length);
+        Assert.IsFalse(Directory.Exists(_directory));
+    }
+
+    [TestMethod]
+    public async Task CopyingStream_WritesThroughKeepsACopyUpToTheLimitAndRefusesReadingAndSeeking()
+    {
+        var destination = new MemoryStream();
+        var copying = new CompressionDictionaryTransferHook.CopyingStream(destination, 4);
+
+        copying.Write([1, 2], 0, 2);
+        copying.Write([3]);
+        await copying.WriteAsync(new byte[] { 4 });
+        await copying.FlushAsync();
+        copying.Flush();
+
+        Assert.IsFalse(copying.Overflowed);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, copying.Copied);
+        copying.Write([5]);
+        Assert.IsTrue(copying.Overflowed);
+        copying.Write([6]);
+        Assert.AreEqual(6, destination.Length);
+        Assert.IsFalse(copying.CanRead);
+        Assert.IsFalse(copying.CanSeek);
+        Assert.IsTrue(copying.CanWrite);
+        Assert.ThrowsExactly<NotSupportedException>(() => copying.Length);
+        Assert.ThrowsExactly<NotSupportedException>(() => copying.Position);
+        Assert.ThrowsExactly<NotSupportedException>(() => copying.Position = 1);
+        Assert.ThrowsExactly<NotSupportedException>(() => copying.Read(new byte[1], 0, 1));
+        Assert.ThrowsExactly<NotSupportedException>(() => copying.Seek(0, SeekOrigin.Begin));
+        Assert.ThrowsExactly<NotSupportedException>(() => copying.SetLength(0));
+    }
+    [TestMethod]
+    public async Task ExecuteAsync_StreamedDictionaryWithAnEffectiveUrlThatIsNotAbsolute_IsStoredUnderTheRequestedUrl()
+    {
+        var report = new TransferReport
+        {
+            ResponseCode = 200,
+            EffectiveUrl = "not a url",
+            ResponseHeaders = [new("Use-As-Dictionary", "match=\"/app/*\"")],
+        };
+
+        await Hook().ExecuteAsync(Context(ResourceUrl), _ => ValueTask.FromResult(TransferResult.Success(0) with { Report = report }));
+        var requested = Origin(200, "x");
+        await Hook().ExecuteAsync(Context(ResourceUrl), requested.Invoke);
+
+        Assert.IsTrue(requested.Sent!.Http!.Headers.Any(line => line.StartsWith("Available-Dictionary:", StringComparison.Ordinal)));
+    }
+    [TestMethod]
     public async Task ExecuteAsync_ATransferItTakesNoPartIn_IsPassedOnAsGiven_Rfc9842Section2_2()
     {
         foreach (var context in new[] { Context("ftp://example.com/f", withHttp: false), Context("ftp://example.com/f"), Context(ResourceUrl, noBody: true), Context(ResourceUrl, range: true), Context(ResourceUrl, resumeFrom: 5) })

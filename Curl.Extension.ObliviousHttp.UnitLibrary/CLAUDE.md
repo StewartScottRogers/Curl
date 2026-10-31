@@ -27,8 +27,8 @@ that `Curl.Extension.Composition` registers.
   short or does not authenticate `EncapsulatedResponseException`. `ObliviousHttpMediaTypes` names the media types.
 - `Relay/` is the client flow (ADR-1157): `ObliviousHttpTransferHook` reads the key configuration
   (`KeyConfigurationSource`: a file, a URL, or the target's `/.well-known/ohttp-gateway`), encodes the transfer as a
-  Binary HTTP request (`InnerRequest`, which refuses `-T`, `-I`, `-r`, `-C`, `-z` and `-F` with exit 2), POSTs it
-  encapsulated to the relay through curl's handler (`HookRequest`) and writes the decapsulated response
+  Binary HTTP request (`InnerRequest`, which carries `-u`, `--oauth2-bearer`, `-e` and `-b` strings as headers and refuses `-T`, `-I`, `-r`, `-C`, `-z`, `-F`, `--compressed` and `-b` files with exit 2), POSTs it
+  encapsulated to the relay through curl's handler (`HookRequest`) and writes the decapsulated response (exit 22 and no body for an inner 400 or above under `-f`)
   (`InnerResponseOutput`). A failure ends the transfer through `ObliviousTransferException`.
 
 Tested against the specifications, not against curl, with RFC 9180 Appendix A.1.1 and A.2.1, the RFC 9292

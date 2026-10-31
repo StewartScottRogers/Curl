@@ -399,4 +399,20 @@ public sealed class InProcessCurlTests
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
             ValueTask.FromResult(ConnectResult.Failed(CurlExitCode.CouldntConnect, "Could not connect to server"));
     }
+
+    [TestMethod]
+    public async Task RunAsync_ExtensionOptionWithBadValue_ReturnsTwoWithTheTryHelpLineAndThrowsNothing()
+    {
+        using MemoryStream standardOutput = new();
+        using MemoryStream standardError = new();
+        using MemoryStream standardInput = new();
+        RecordingDatagramConnector datagramConnector = new(CurlExitCode.CouldntConnect, "unused");
+
+        int exitCode = await InProcessCurl.RunAsync(["--ssh-jump", "nohost", "https://x"], standardOutput, standardError, standardInput, new RefusingConnector(), datagramConnector);
+
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(
+            "curl: --ssh-jump needs user@host[:port], not 'nohost'\ncurl: try 'curl --help' or 'curl --manual' for more information\n",
+            Encoding.UTF8.GetString(standardError.ToArray()).ReplaceLineEndings("\n"));
+    }
 }

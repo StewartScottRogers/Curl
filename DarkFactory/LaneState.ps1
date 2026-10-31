@@ -178,6 +178,16 @@ if ($TestHeartbeat) {
             ,@('usage over the stop threshold stops', 'stop', (& $poll $now 'session tokens 86% used, reset 04:00' 'BL-3011' @()))
             ,@('only cost-capped tasks waits', 'wait', (& $poll $now '' '' @('BL-2969')))
         )
+        # A ready CI fix past the -Hours deadline starts the next shift (BL-4412): shift
+        # 20261030-060635 ended at 14:07, its lanes at 14:44, and its merge-wait polls said stop
+        # with BL-4369 ready until the merge gave up at 15:21. Usage still stops it.
+        $ciDeadline = [datetime]'2026-10-30 14:07'
+        $ciPoll = Get-IdlePollDecision -Now ([datetime]'2026-10-30 14:49') -Deadline $ciDeadline -UsageStop '' -ClaimableId 'BL-4369' -CiFixId 'BL-4369'
+        $cases += ,@('a ready CI fix past the deadline starts the next shift', 'start', $ciPoll.Action)
+        $cases += ,@('its trace names the CI fix and the deadline', 'BL-4369 is a ready CI fix, which the -Hours deadline 14:07 does not hold (ADR-1158)', $ciPoll.Why)
+        $cases += ,@('a ready CI fix past the deadline still stops at the usage limit', 'stop', (Get-IdlePollDecision -Now ([datetime]'2026-10-30 14:49') -Deadline $ciDeadline -UsageStop 'session tokens 86% used' -ClaimableId 'BL-4369' -CiFixId 'BL-4369').Action)
+        $cases += ,@('ordinary work past the deadline still stops', 'stop', (Get-IdlePollDecision -Now ([datetime]'2026-10-30 14:49') -Deadline $ciDeadline -UsageStop '' -ClaimableId 'BL-4300' -CiFixId '').Action)
+        $cases += ,@('before the deadline a CI fix starts as any claimable task does', 'BL-4300 is claimable', (Get-IdlePollDecision -Now ([datetime]'2026-10-30 13:49') -Deadline $ciDeadline -UsageStop '' -ClaimableId 'BL-4300' -CiFixId 'BL-4369').Why)
         # The merge-wait poll leaves out what this shift requeued (AF-0369): BL-3151 is ready
         # but was sent back by a lane of this shift, so BL-3152 is offered; with BL-3151 alone
         # nothing is claimable, and a task nobody requeued stays claimable.
@@ -206,6 +216,25 @@ if ($TestHeartbeat) {
         $cases += ,@('a pending merge wait polls the board every poll interval', '11', "$($script:polls)")
         $cases += ,@('the next shift starts once, at the second poll', '1', "$($script:started)")
         $cases += ,@('the merge wait still ends with its own line', 'not merged: CI did not finish on aaaaaaa within 60 min', "$($wait.Failure)")
+        # The 20261030-060635 shift end again (BL-4412): lanes ended at 14:44, past the 14:07
+        # deadline, with BL-4369 ready. The coordinator's poll starts the next shift at the
+        # first poll, 14:49, and only once.
+        $script:fakeNow = [datetime]'2026-10-30 14:44'
+        $script:ciStartedAt = @()
+        $ciHandOver = @{ Done = $false }
+        function gh { '[{"status":"in_progress","conclusion":null}]' }
+        function git { '' }
+        function Get-Date { param($Format) $script:fakeNow }
+        function Start-Sleep { param($Seconds) $script:fakeNow = $script:fakeNow.AddSeconds($Seconds) }
+        try {
+            $ciFixPoll = {
+                if ($ciHandOver.Done) { return }
+                $p = Get-IdlePollDecision -Now (Get-Date) -Deadline ([datetime]'2026-10-30 14:07') -UsageStop '' -ClaimableId 'BL-4369' -CiFixId 'BL-4369'
+                if ($p.Action -eq 'start') { $script:ciStartedAt += (Get-Date).ToString('HH:mm'); $ciHandOver.Done = $true }
+            }
+            Wait-MergeCiRun -Branch 'factory/test' -Head ('a' * 40) -OnPoll $ciFixPoll -PollMinutes 5 -HandOver $ciHandOver | Out-Null
+        } finally { Remove-Item function:gh, function:git, function:Get-Date, function:Start-Sleep }
+        $cases += ,@('a CI fix ready past the deadline starts the next shift at the merge wait''s first poll, once', '14:49', "$($script:ciStartedAt -join ',')")
         # A poll that throws, or writes output, leaves the wait and its result intact (BL-3150).
         $script:fakeNow = [datetime]'2026-10-22 14:20'
         $script:throwPolls = 0

@@ -63,16 +63,27 @@ function Get-OrphanAction {
     if ($parked.Count) { return [pscustomobject]@{ Action = 'backlog'; Lane = 0; Branch = $parked[-1]; Why = '' } }
     $ahead = @($LaneBranchesAhead | Where-Object { $_ })
     if ($ahead.Count) {
-        return [pscustomobject]@{ Action = 'refuse'; Lane = 0; Branch = ''; Why = "$Id is in Doing and held by no lane, no parked branch factory/$Id-lane-* exists, and lane branches $($ahead -join ', ') have commits beyond the shift branch; which one is its work cannot be told" }
+        return [pscustomobject]@{ Action = 'refuse'; Lane = 0; Branch = ''; Why = "$Id is in Doing and held by no lane, no parked branch factory/$Id-lane-* exists, and lane branches $($ahead -join ', ') have commits beyond the shift branch, or git could not say; which one is its work cannot be told" }
     }
     return [pscustomobject]@{ Action = 'backlog'; Lane = 0; Branch = ''; Why = '' }
 }
 
+$UnknownLaneBranches = '(git could not say which lane branches are ahead)'
+
 function Get-LaneBranchesAhead {
-    # The local factory/lane-<n> branches with commits that origin/$ShiftBranch lacks.
+    # The local factory/lane-<n> branches with commits that origin/$ShiftBranch lacks. A git
+    # query that fails (no origin/$ShiftBranch, say) is not "no commits": the answer then
+    # holds $UnknownLaneBranches, so Get-OrphanAction refuses rather than requeues.
     param([string]$ShiftBranch = $branch, [string]$Repo = $Root)
     $refs = @(git -C $Repo for-each-ref --format='%(refname:short)' 'refs/heads/factory/lane-*' 2>$null)
-    return @($refs | Where-Object { $_ -and [int](git -C $Repo rev-list --count "origin/$ShiftBranch..$_" 2>$null) -gt 0 })
+    if ($LASTEXITCODE -ne 0) { return @($UnknownLaneBranches) }
+    $ahead = @()
+    foreach ($ref in @($refs | Where-Object { $_ })) {
+        $count = git -C $Repo rev-list --count "origin/$ShiftBranch..$ref" 2>$null
+        if ($LASTEXITCODE -ne 0) { return @($UnknownLaneBranches) }
+        if ([int]$count -gt 0) { $ahead += $ref }
+    }
+    return $ahead
 }
 
 function Invoke-ReleaseClaim {
@@ -87,8 +98,11 @@ function Invoke-ReleaseClaim {
             if (-not (Sync-Lane)) { continue }
             if ((Get-TaskState $Id) -ne 'Doing') { return '' }
             Invoke-Board @('move', '-Id', $Id, '-To', 'Backlog', '-Reason', "Lane $Lane claimed it after the shift's time was up and never started it.") | Out-Null
-            Invoke-Git @('add', '-A', 'Tasks') | Out-Null
-            Invoke-Git @('commit', '-q', '-m', "chore(tasks): release unstarted claim $Id - shift time up", '-m', $SkipCiNote) | Out-Null
+            # A move that failed leaves the task in Doing: pushing that would report a release
+            # that never happened, so the task's state is checked before anything is committed.
+            if ((Get-TaskState $Id) -eq 'Doing') { continue }
+            if (-not (Invoke-Git @('add', '-A', 'Tasks'))) { continue }
+            if (-not (Invoke-Git @('commit', '-q', '-m', "chore(tasks): release unstarted claim $Id - shift time up", '-m', $SkipCiNote))) { continue }
             if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return '' }
         }
     } finally { $lock.Dispose() }
@@ -148,7 +162,7 @@ if ($TestPark) {
     git -C $repo config user.name t; git -C $repo config user.email t@t
     git -C $repo checkout -q -b work 2>&1 | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Tasks\Doing'), (Join-Path $repo 'Tasks\Backlog') | Out-Null
-    foreach ($id in 'BL-001', 'BL-002', 'BL-004') {
+    foreach ($id in 'BL-001', 'BL-002', 'BL-004', 'BL-005') {
         Set-Content -Path (Join-Path $repo "Tasks\Doing\$id-park-me.md") -Encoding UTF8 -Value @(
             '---', "id: $id", 'title: Park me', 'priority: Normal', 'assignee: Claude', 'pipeline: direct',
             'depends-on: []', 'touches: [x]', 'requirement: none', 'created: 2026-10-01', 'completed:', '---',
@@ -175,6 +189,14 @@ if ($TestPark) {
             $r = Invoke-ReleaseClaim -Id 'BL-004' -RetrySeconds @()
             $shared = @(git -C $repo ls-tree -r --name-only origin/work Tasks) -join ' '
             "'$r' $(if ($shared -match 'Backlog/BL-004-' -and $shared -notmatch 'Doing/BL-004-') { 'Backlog' } else { 'Doing' })" })
+        ,@('a release whose board move failed reports the task still in Doing rather than released', 'still in Doing', {
+            function Invoke-Board { param([string[]]$BoardArgs) }
+            $r = Invoke-ReleaseClaim -Id 'BL-005' -RetrySeconds @() 6>$null
+            if ($r -match '^BL-005 CLAIM NOT RELEASED ') { 'still in Doing' } else { "'$r'" } })
+        ,@('a lane-branch query that git fails is unknown, and an orphan is refused on it', 'unknown refuse', {
+            $ahead = @(Get-LaneBranchesAhead 'no-such-branch' $repo)
+            $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches @() -DirtyLanes @() -LaneBranchesAhead $ahead
+            "$(if ($ahead -contains $UnknownLaneBranches) { 'unknown' } else { "'$ahead'" }) $($a.Action)" })
         ,@('a park that cannot push says so for the summary', 'BL-002 PARK NOT PUSHED, still in Doing, branch kept', {
             git -C $repo remote set-url origin (Join-Path $temp 'gone.git') 2>&1 | Out-Null
             # The git failures it traces are expected here, so they are not printed.

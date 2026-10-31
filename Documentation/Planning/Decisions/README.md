@@ -1217,3 +1217,6 @@ Each option and the specific reason it lost.
 | [1168](ADR-1168-the-openssl-build-trusts-its-built-in-ca-bundle-when-the-environment-empties-the-system-store.md) | The OpenSSL build trusts its built-in CA bundle when the environment empties the system store (BL-4383) | Accepted | 2026-10-30 |
 | [1169](ADR-1169-the-ratchet-runs-lib670-over-a-clock-that-skips-its-pause.md) | The ratchet runs lib670 over a clock that skips its pause (BL-4378) | Accepted | 2026-10-31 |
 | [1170](ADR-1170-a-coordinator-whose-start-up-sync-brings-in-factory-code-runs-itself-again-in-the-same-process.md) | A coordinator whose start-up sync brings in factory code runs itself again in the same process (BL-4386) | Accepted | 2026-10-31 |
+| [1171](ADR-1171-a-dictionary-hook-without-an-offered-dictionary-streams-the-body-and-keeps-a-bounded-copy.md) | A dictionary hook without an offered dictionary streams the body and keeps a bounded copy (BL-4393) | Accepted | 2026-10-31 |
+| [1172](ADR-1172-wireguard-looks-up-http-3-host-names-through-a-resolver-hook-over-the-tunnel-dns.md) | `--wireguard` looks up HTTP/3 host names through a resolver hook over the tunnel's DNS (BL-4392) | Accepted | 2026-10-31 |
+| [1173](ADR-1173-the-ci-watch-files-a-job-its-timeout-cancelled-as-a-hang.md) | The CI watch files a job its timeout cancelled as a hang (BL-4420) | Accepted | 2026-10-31 |

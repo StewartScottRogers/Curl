@@ -16,6 +16,11 @@ internal static class InnerResponseOutput
     /// <param name="context">The transfer.</param>
     public static async Task<TransferResult> WriteAsync(BinaryHttpResponse response, string method, ITransferContext context)
     {
+        if (FailsOnStatus(response.StatusCode, context))
+        {
+            return TransferResult.Failure(CurlExitCode.HttpReturnedError, $"The requested URL returned error: {response.StatusCode}");
+        }
+
         byte[] head = Encoding.Latin1.GetBytes($"HTTP/1.1 {response.StatusCode} \r\n" + string.Concat(response.Headers.Select(field => $"{field.Name}: {field.Value}\r\n")) + "\r\n");
         await WriteIfGivenAsync(context.HeaderOutput, head, context.CancellationToken);
         await WriteIfGivenAsync(context.DumpHeaderOutput, head, context.CancellationToken);
@@ -33,6 +38,8 @@ internal static class InnerResponseOutput
             },
         };
     }
+
+    private static bool FailsOnStatus(int statusCode, ITransferContext context) => statusCode >= 400 && context.Http!.Fail == HttpFailMode.Fail;
 
     private static async Task WriteIfGivenAsync(Stream? output, byte[] bytes, CancellationToken cancellationToken)
     {

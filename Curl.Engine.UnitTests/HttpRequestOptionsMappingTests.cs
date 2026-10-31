@@ -30,6 +30,8 @@ public sealed class HttpRequestOptionsMappingTests
             HttpHeaders = ["X: 1"],
             UserAgent = "a/1",
             Referer = "http://r/",
+            Cookie = "a=b",
+            CookieFiles = ["jar.txt"],
             AutoReferer = true,
             RequestTarget = "*",
             AcceptEncoding = string.Empty,
@@ -52,6 +54,8 @@ public sealed class HttpRequestOptionsMappingTests
         CollectionAssert.AreEqual(new[] { "X: 1", "If-None-Match: \"e\"" }, mapped.Headers.ToArray());
         Assert.AreEqual("a/1", mapped.UserAgent);
         Assert.AreEqual("http://r/", mapped.Referer);
+        Assert.AreEqual("a=b", mapped.CookieStrings);
+        Assert.IsTrue(mapped.HasCookieFiles);
         Assert.IsTrue(mapped.AutoReferer);
         Assert.AreEqual("*", mapped.RequestTarget);
         Assert.IsTrue(mapped.Compressed);

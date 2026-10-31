@@ -47,7 +47,20 @@ function Add-StoppedShiftEnd {
     return $line.TrimEnd()
 }
 
+function Remove-StoppedCoordinatorStamp {
+    # -Restart stops the coordinator on purpose, so its stamp must not read as a coordinator
+    # whose loop stopped: the lanes would replace it 9 minutes on, beside the new shift (BL-4396).
+    param([string]$StampPath)
+    Remove-Item -LiteralPath $StampPath -Force -ErrorAction SilentlyContinue
+}
+
 if ($TestRestart) {
+    $stampScratch = Join-Path ([IO.Path]::GetTempPath()) "restart-stamp-$PID.stamp"
+    Set-Content $stampScratch 'pid=1' -Encoding UTF8
+    Remove-StoppedCoordinatorStamp $stampScratch
+    Remove-StoppedCoordinatorStamp $stampScratch
+    $ok8 = -not (Test-Path $stampScratch)
+    Write-Host "$(if ($ok8) { 'PASS' } else { 'FAIL' }) -Restart removes the coordinator stamp, present or not, so no lane replaces the stopped coordinator: $ok8" -ForegroundColor $(if ($ok8) { 'Green' } else { 'Red' })
     $phases = @{ 1 = 'run'; 2 = 'integrate'; 3 = 'claim'; 4 = 'tokens'; 5 = 'wait'; 6 = 'finished'; 7 = '' }
     $got = (Select-LanesToStop $phases) -join ','
     $ok = $got -ceq '1,4,5,6,7'
@@ -76,7 +89,7 @@ if ($TestRestart) {
     $same = (Set-ForwardedArgument $old @{}) -join ' '
     $ok7 = $same -ceq ($old -join ' ')
     Write-Host "$(if ($ok7) { 'PASS' } else { 'FAIL' }) with nothing beside -Restart the old arguments carry over unchanged: $same" -ForegroundColor $(if ($ok7) { 'Green' } else { 'Red' })
-    exit $(if ($ok -and $ok2 -and $ok3 -and $ok4 -and $ok5 -and $ok6 -and $ok7) { 0 } else { 1 })
+    exit $(if ($ok -and $ok2 -and $ok3 -and $ok4 -and $ok5 -and $ok6 -and $ok7 -and $ok8) { 0 } else { 1 })
 }
 
 if ($Restart) {
@@ -101,6 +114,7 @@ if ($Restart) {
     $lanesDir = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
     $stamp = if ($lanesDir) { $lanesDir.Name.Substring(6) } else { '' }
     Write-Host "Stopping the shift's coordinator (pid $($coordinator.ProcessId)) first, so it restarts no lane."
+    if ($stamp) { Remove-StoppedCoordinatorStamp (Get-CoordinatorStampPath -ForStamp $stamp) }
     Stop-FactoryProcessTree $coordinator.ProcessId
     while ($stamp) {
         $phases = @{}

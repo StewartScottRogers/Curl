@@ -56,8 +56,8 @@ internal sealed class SshDirectTcpipChannel(SshTransport transport, string targe
     public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     /// <summary>
-    /// Closes the channel once, as <see cref="SshChannel.CloseAsync" /> does: <c>EOF</c>,
-    /// the server's <c>CLOSE</c>, then the client's.
+    /// Closes the channel once, as <see cref="SshChannel.CloseAtOnceAsync" /> does: <c>EOF</c> and
+    /// <c>CLOSE</c> together, then the server's <c>CLOSE</c>, so a target that ignores a half-close cannot hold it up.
     /// </summary>
     /// <returns>A task that completes once the channel is closed.</returns>
     public async ValueTask DisposeAsync()
@@ -68,6 +68,6 @@ internal sealed class SshDirectTcpipChannel(SshTransport transport, string targe
         }
 
         closed = true;
-        await CloseAsync(CancellationToken.None).ConfigureAwait(false);
+        await CloseAtOnceAsync(CancellationToken.None).ConfigureAwait(false);
     }
 }

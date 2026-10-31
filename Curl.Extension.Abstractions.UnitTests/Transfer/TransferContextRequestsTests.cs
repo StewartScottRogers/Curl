@@ -4,6 +4,19 @@ namespace Curl.Extension.Abstractions.Transfer;
 public sealed class TransferContextRequestsTests
 {
     [TestMethod]
+    public void WithRequest_EmptyBody_SendsNoHttpBodyAndKeepsNoRequestTarget()
+    {
+        TransferContext own = new() { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), PostData = new byte[] { 1 }, Http = new HttpRequestOptions { Body = new BytesBody(new byte[] { 1 }, "text/plain"), RequestTarget = "/hidden" } };
+
+        ITransferContext given = own.WithRequest(CurlUrl.Parse("http://example.com/keys"), "GET", ReadOnlyMemory<byte>.Empty);
+
+        Assert.IsNull(given.Http!.Body);
+        Assert.IsNull(given.Http.RequestTarget);
+        Assert.AreEqual(0, given.PostData!.Value.Length);
+        Assert.AreEqual("/hidden", own.Http.RequestTarget);
+    }
+
+    [TestMethod]
     public void WithRequest_UrlMethodAndBody_GivesThemInPlaceOfItsOwn()
     {
         TransferContext own = new() { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), PostData = new byte[] { 1 }, Http = new HttpRequestOptions { Headers = ["X-Curl: own"], CustomMethod = "PUT" } };

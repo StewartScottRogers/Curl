@@ -110,8 +110,10 @@ internal sealed class WireGuardConnector(
     /// </summary>
     private async ValueTask<ConnectResult> ResolveAndConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
-        IPAddress? destination = await ResolveThroughTunnelAsync(target.Host, cancellationToken).ConfigureAwait(false);
-        return destination is null ? Unresolved(target) : await ConnectToAsync(destination, target, cancellationToken).ConfigureAwait(false);
+        TunnelResolution resolution = await ResolveThroughTunnelAsync(target.Host, cancellationToken).ConfigureAwait(false);
+        return resolution.Address is null
+            ? resolution.Failure ?? Unresolved(target)
+            : await ConnectToAsync(resolution.Address, target, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -120,15 +122,18 @@ internal sealed class WireGuardConnector(
     /// </summary>
     /// <param name="host">The host name.</param>
     /// <param name="cancellationToken">Cancels the lookup.</param>
-    /// <returns>The address, or <see langword="null" /> when there is no DNS server to ask or no answer.</returns>
-    internal async ValueTask<IPAddress?> ResolveThroughTunnelAsync(string host, CancellationToken cancellationToken)
+    /// <returns>
+    /// The address; no address and no failure when there is no DNS server to ask or no answer; or the failure to reach
+    /// the DNS server through the tunnel, which is a connect failure and not an unresolved name.
+    /// </returns>
+    internal async ValueTask<TunnelResolution> ResolveThroughTunnelAsync(string host, CancellationToken cancellationToken)
     {
         IPAddress? server = configuration.Interface.DnsServers.Select(AddressOrNull).FirstOrDefault(address => address is not null);
-        return server is null ? null : await ResolveAsync(server, host, cancellationToken).ConfigureAwait(false);
+        return server is null ? new TunnelResolution(null, null) : await ResolveAsync(server, host, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Asks <paramref name="server" /> for <paramref name="host" />'s A record, or AAAA when the interface has no IPv4 address.</summary>
-    private async ValueTask<IPAddress?> ResolveAsync(IPAddress server, string host, CancellationToken cancellationToken)
+    private async ValueTask<TunnelResolution> ResolveAsync(IPAddress server, string host, CancellationToken cancellationToken)
     {
         ushort type = configuration.Interface.Addresses.Any(address => address.Address.AddressFamily == AddressFamily.InterNetwork)
             ? WireGuardDnsMessage.AddressType
@@ -143,16 +148,17 @@ internal sealed class WireGuardConnector(
         }
         catch (ArgumentException)
         {
-            return null;
+            return new TunnelResolution(null, null);
         }
 
-        ConnectResult opened = await ConnectToAsync(server, new ConnectTarget(server.ToString(), WireGuardDnsMessage.Port, false), cancellationToken).ConfigureAwait(false);
+        ConnectTarget dnsTarget = new(server.ToString(), WireGuardDnsMessage.Port, false);
+        ConnectResult opened = await ConnectToAsync(server, dnsTarget, cancellationToken).ConfigureAwait(false);
         return opened.Connection is { } connection
-            ? await ExchangeAsync(connection, query, id, type, cancellationToken).ConfigureAwait(false)
-            : null;
+            ? await ExchangeAsync(connection, dnsTarget, query, id, type, cancellationToken).ConfigureAwait(false)
+            : new TunnelResolution(null, opened);
     }
 
-    private static async ValueTask<IPAddress?> ExchangeAsync(IConnection connection, byte[] query, ushort id, ushort type, CancellationToken cancellationToken)
+    private static async ValueTask<TunnelResolution> ExchangeAsync(IConnection connection, ConnectTarget dnsTarget, byte[] query, ushort id, ushort type, CancellationToken cancellationToken)
     {
         await using (connection.ConfigureAwait(false))
         {
@@ -162,11 +168,11 @@ internal sealed class WireGuardConnector(
                 await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
                 byte[]? length = await ReadExactlyAsync(connection, 2, cancellationToken).ConfigureAwait(false);
                 byte[]? response = length is null ? null : await ReadExactlyAsync(connection, (length[0] << 8) | length[1], cancellationToken).ConfigureAwait(false);
-                return response is null ? null : WireGuardDnsMessage.AddressesIn(response, id, type).FirstOrDefault();
+                return new TunnelResolution(response is null ? null : WireGuardDnsMessage.AddressesIn(response, id, type).FirstOrDefault(), null);
             }
-            catch (IOException)
+            catch (IOException exception)
             {
-                return null;
+                return new TunnelResolution(null, Unreachable(dnsTarget, exception));
             }
         }
     }
@@ -179,6 +185,9 @@ internal sealed class WireGuardConnector(
             ? ConnectResult.Failed(CurlExitCode.CouldntConnect, $"Failed to connect to {target.Host} port {target.Port}: no WireGuard peer's AllowedIPs and interface Address cover it")
             : await ConnectThroughAsync(peer, source, new IPEndPoint(destination, target.Port), target, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>Tells whether <paramref name="exception" /> is the tunnel not being reachable: a timeout, or an I/O or socket failure.</summary>
+    internal static bool IsTunnelFailure(Exception exception) => exception is TimeoutException or IOException or SocketException;
 
     private static ConnectResult Unreachable(ConnectTarget target, Exception exception) =>
         ConnectResult.Failed(CurlExitCode.CouldntConnect, $"Failed to connect to {target.Host} port {target.Port} through the WireGuard tunnel: {exception.Message}");
@@ -209,7 +218,7 @@ internal sealed class WireGuardConnector(
         }
 
         await udp.DisposeAsync().ConfigureAwait(false);
-        return failure is TimeoutException or IOException ? Unreachable(target, failure) : throw failure;
+        return WireGuardConnector.IsTunnelFailure(failure) ?Unreachable(target, failure) : throw failure;
     }
 
     private async ValueTask<ConnectResult> ConnectOverAsync(IWireGuardUdpChannel udp, WireGuardPeer peer, IPAddress source, IPEndPoint destination, ConnectTarget target, CancellationToken cancellationToken)

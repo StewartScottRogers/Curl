@@ -12,6 +12,23 @@ public sealed class ObliviousHttpTransferHookTests
     public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
+    public async Task ExecuteAsync_UserBodyAndRequestTarget_NeverReachTheKeyServerOrTheRelayInClear()
+    {
+        FakeObliviousServers servers = new();
+        TransferContext context = Context("https://example.com/hello.txt", new HttpRequestOptions { RequestTarget = "/private/account" }, "secret"u8.ToArray());
+
+        await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, servers.Invoke);
+
+        ITransferContext keys = servers.Sent[0];
+        Assert.AreEqual(0, keys.PostData!.Value.Length);
+        Assert.IsNull(keys.Http!.RequestTarget);
+        Assert.AreEqual("https://example.com/.well-known/ohttp-gateway", keys.Url.OriginalString);
+        CollectionAssert.DoesNotContain(keys.Http.Headers.Where(h => h.StartsWith("Content-Type", StringComparison.Ordinal)).ToList(), "Content-Type: application/x-www-form-urlencoded");
+        Assert.IsNull(servers.Sent[1].Http!.RequestTarget);
+        Assert.AreEqual(RelayUrl, servers.Sent[1].Url.OriginalString);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NoKeysOption_FetchesTheWellKnownGatewayKeysThenPostsTheEncapsulatedRequestToTheRelay()
     {
         FakeObliviousServers servers = new();
@@ -246,6 +263,61 @@ public sealed class ObliviousHttpTransferHookTests
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
     }
 
+    [TestMethod]
+    [DataRow(HttpFailMode.Fail, 404, 22, "")]
+    [DataRow(HttpFailMode.Fail, 200, 0, "gone")]
+    [DataRow(HttpFailMode.None, 404, 0, "gone")]
+    public async Task ExecuteAsync_FailMode_ExitsWith22AndNoBodyOnlyForAnInnerErrorStatus(HttpFailMode fail, int status, int exitCode, string body)
+    {
+        FakeObliviousServers servers = new() { BinaryResponse = FakeObliviousServers.KnownLengthResponse(status, [], "gone") };
+        TransferContext context = Context(http: new HttpRequestOptions { Fail = fail });
+
+        TransferResult result = await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, servers.Invoke);
+
+        Assert.AreEqual((CurlExitCode)exitCode, result.ExitCode);
+        Assert.AreEqual(body, Text(context.Output));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CredentialsBearerRefererAndCookies_AreCarriedInsideTheEncapsulatedRequest()
+    {
+        FakeObliviousServers servers = new();
+        HttpRequestOptions http = new() { Referer = "https://from/", CookieStrings = "a=b" };
+        TransferContext context = Context("https://example.com/r", http, credentials: new System.Net.NetworkCredential("alice", "secret"));
+
+        await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, servers.Invoke);
+
+        byte[] expected = BinaryHttpRequestEncoder.EncodeKnownLength(new BinaryHttpRequest(
+            "GET", "https", "example.com", "/r", [new("authorization", "Basic YWxpY2U6c2VjcmV0"), new("referer", "https://from/"), new("cookie", "a=b")], ReadOnlyMemory<byte>.Empty));
+        CollectionAssert.AreEqual(expected, servers.OpenedRequest);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BearerToken_IsCarriedAsABearerAuthorization()
+    {
+        FakeObliviousServers servers = new();
+        TransferContext context = Context("https://example.com/r", new HttpRequestOptions { BearerToken = "tok" }, credentials: new System.Net.NetworkCredential("a", "b"));
+
+        await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, servers.Invoke);
+
+        byte[] expected = BinaryHttpRequestEncoder.EncodeKnownLength(new BinaryHttpRequest(
+            "GET", "https", "example.com", "/r", [new("authorization", "Bearer tok")], ReadOnlyMemory<byte>.Empty));
+        CollectionAssert.AreEqual(expected, servers.OpenedRequest);
+    }
+
+    [TestMethod]
+    [DataRow(true, false, "a compressed response (--compressed)")]
+    [DataRow(false, true, "a cookie file (-b)")]
+    public async Task ExecuteAsync_CompressedOrCookieFile_FailsWithExit2WithoutContactingAnyone(bool compressed, bool cookieFile, string refused)
+    {
+        TransferContext context = Context(http: new HttpRequestOptions { Compressed = compressed, HasCookieFiles = cookieFile });
+
+        TransferResult result = await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, NeverCalled);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        StringAssert.EndsWith(result.ErrorMessage, refused);
+    }
+
     private static ValueTask<TransferResult> NeverCalled(ITransferContext context) => throw new AssertFailedException("A server was contacted.");
 
     private static string Text(Stream stream) => Encoding.Latin1.GetString(((MemoryStream)stream).ToArray());
@@ -258,7 +330,8 @@ public sealed class ObliviousHttpTransferHookTests
         bool noBody = false,
         ByteRange? range = null,
         long? resumeFrom = null,
-        TimeCondition? timeCondition = null) => new()
+        TimeCondition? timeCondition = null,
+        System.Net.NetworkCredential? credentials = null) => new()
         {
             Url = CurlUrl.Parse(url),
             Output = new MemoryStream(),
@@ -271,5 +344,6 @@ public sealed class ObliviousHttpTransferHookTests
             Range = range,
             ResumeFrom = resumeFrom,
             TimeCondition = timeCondition,
+            Credentials = credentials,
         };
 }

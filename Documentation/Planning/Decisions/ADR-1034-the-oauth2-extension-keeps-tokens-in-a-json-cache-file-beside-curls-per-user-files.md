@@ -15,7 +15,7 @@ are ours to choose, using only the base class library.
 
 - **Location.** The file is `curl-oauth2-tokens.json` in a directory the caller names. The default
   directory (`OAuth2TokenCacheLocation.FindDefaultDirectory`) is the first set, non-empty one of
-  `CURL_HOME`, `XDG_CONFIG_HOME`, `HOME`, `APPDATA`, `USERPROFILE`: the variables curl searches for
+  `CURL_HOME`, `XDG_CONFIG_HOME`, `HOME` and, on Windows only, `USERPROFILE` then `APPDATA`: the variables curl searches for
   its own per-user `.curlrc`, so the cache sits beside curl's own per-user files. The directory is
   created when missing.
 - **Format.** UTF-8 JSON written with `Utf8JsonWriter` and read with `JsonDocument` (no reflection,

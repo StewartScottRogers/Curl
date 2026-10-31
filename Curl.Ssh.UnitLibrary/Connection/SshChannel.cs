@@ -56,6 +56,12 @@ internal abstract class SshChannel(SshTransport transport)
 
     private bool remoteClosed;
 
+    // One packet read at a time, and one packet write at a time: a pending read must not be split by a second one,
+    // and a window adjustment must not interleave with a data write (each write advances the MAC sequence).
+    private readonly SemaphoreSlim readGate = new(1, 1);
+
+    private readonly SemaphoreSlim writeGate = new(1, 1);
+
     /// <summary>
     /// Gets the reason code of the server's <c>SSH_MSG_CHANNEL_OPEN_FAILURE</c> once the
     /// channel's open has returned <see langword="false" />, such as 2 for
@@ -121,6 +127,11 @@ internal abstract class SshChannel(SshTransport transport)
         {
             while (remoteWindow == 0)
             {
+                if (remoteSentEof || remoteClosed)
+                {
+                    throw new EndOfStreamException("The SSH server closed the channel while its window was used up.");
+                }
+
                 await ReadNextMessageAsync(cancellationToken).ConfigureAwait(false);
             }
 
@@ -129,7 +140,7 @@ internal abstract class SshChannel(SshTransport transport)
             packet.WriteByte(SshConnectionMessageNumber.ChannelData);
             packet.WriteUInt32(RemoteChannelNumber);
             packet.WriteString(data.Span[..size]);
-            await transport.PacketWriter.WriteAsync(packet.ToArray(), cancellationToken).ConfigureAwait(false);
+            await WritePacketAsync(packet.ToArray(), cancellationToken).ConfigureAwait(false);
             remoteWindow -= size;
             data = data[size..];
         }
@@ -194,7 +205,7 @@ internal abstract class SshChannel(SshTransport transport)
         open.WriteUInt32(InitialWindowSize);
         open.WriteUInt32(MaximumPacketSize);
         open.WriteBytes(typeSpecificData);
-        await transport.PacketWriter.WriteAsync(open.ToArray(), cancellationToken).ConfigureAwait(false);
+        await WritePacketAsync(open.ToArray(), cancellationToken).ConfigureAwait(false);
         byte[] answer = await WaitForAsync(SshConnectionMessageNumber.ChannelOpenConfirmation, SshConnectionMessageNumber.ChannelOpenFailure, cancellationToken).ConfigureAwait(false);
         SshWireReader confirmation = new(answer.AsMemory(1));
         confirmation.ReadUInt32();
@@ -232,14 +243,22 @@ internal abstract class SshChannel(SshTransport transport)
     // Null when the message was one the channel handles itself; the payload otherwise.
     private async ValueTask<byte[]?> ReadNextMessageAsync(CancellationToken cancellationToken)
     {
-        byte[] payload = await transport.PacketReader.ReadAsync(cancellationToken).ConfigureAwait(false);
-        if (payload[0] is >= SshConnectionMessageNumber.ChannelWindowAdjust and <= SshConnectionMessageNumber.ChannelRequest)
+        await readGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            await HandleChannelMessageAsync(payload, cancellationToken).ConfigureAwait(false);
-            return null;
-        }
+            byte[] payload = await transport.PacketReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            if (payload[0] is >= SshConnectionMessageNumber.ChannelWindowAdjust and <= SshConnectionMessageNumber.ChannelRequest)
+            {
+                await HandleChannelMessageAsync(payload, cancellationToken).ConfigureAwait(false);
+                return null;
+            }
 
-        return await HandleConnectionMessageAsync(payload, cancellationToken).ConfigureAwait(false);
+            return await HandleConnectionMessageAsync(payload, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            readGate.Release();
+        }
     }
 
     private async ValueTask<byte[]?> HandleConnectionMessageAsync(byte[] payload, CancellationToken cancellationToken)
@@ -249,7 +268,7 @@ internal abstract class SshChannel(SshTransport transport)
             case SshMessageNumber.Disconnect:
                 throw new EndOfStreamException("The SSH server disconnected.");
             case SshMessageNumber.KeyExchangeInit:
-                await transport.ReExchangeKeysAsync(payload, cancellationToken).ConfigureAwait(false);
+                await ReExchangeKeysAsync(payload, cancellationToken).ConfigureAwait(false);
                 return null;
             case SshConnectionMessageNumber.GlobalRequest:
                 await RefuseIfReplyWantedAsync(new SshWireReader(payload.AsMemory(1)), [SshConnectionMessageNumber.RequestFailure], cancellationToken).ConfigureAwait(false);
@@ -294,7 +313,7 @@ internal abstract class SshChannel(SshTransport transport)
         request.ReadString();
         if (request.ReadBoolean())
         {
-            await transport.PacketWriter.WriteAsync(refusal, cancellationToken).ConfigureAwait(false);
+            await WritePacketAsync(refusal, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -316,14 +335,40 @@ internal abstract class SshChannel(SshTransport transport)
         adjust.WriteByte(SshConnectionMessageNumber.ChannelWindowAdjust);
         adjust.WriteUInt32(RemoteChannelNumber);
         adjust.WriteUInt32((uint)(InitialWindowSize - localWindow));
-        await transport.PacketWriter.WriteAsync(adjust.ToArray(), cancellationToken).ConfigureAwait(false);
+        await WritePacketAsync(adjust.ToArray(), cancellationToken).ConfigureAwait(false);
         localWindow = InitialWindowSize;
+    }
+
+    private async ValueTask WritePacketAsync(byte[] payload, CancellationToken cancellationToken)
+    {
+        await writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await transport.PacketWriter.WriteAsync(payload, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            writeGate.Release();
+        }
+    }
+
+    private async ValueTask ReExchangeKeysAsync(byte[] keyExchangeInit, CancellationToken cancellationToken)
+    {
+        await writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await transport.ReExchangeKeysAsync(keyExchangeInit, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            writeGate.Release();
+        }
     }
 
     private async ValueTask SendChannelMessageAsync(byte messageNumber, CancellationToken cancellationToken)
     {
         byte[] message = [messageNumber, .. RemoteChannelNumberBytes()];
-        await transport.PacketWriter.WriteAsync(message, cancellationToken).ConfigureAwait(false);
+        await WritePacketAsync(message, cancellationToken).ConfigureAwait(false);
     }
 
     private byte[] RemoteChannelNumberBytes()

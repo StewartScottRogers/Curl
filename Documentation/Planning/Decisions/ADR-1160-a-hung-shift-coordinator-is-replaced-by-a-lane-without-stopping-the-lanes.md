@@ -44,3 +44,14 @@ only, because a lane's `git push` under the integrate lock may legitimately be s
 The old coordinator's herdr tab stays open at a prompt; the lanes' tabs are not known to the
 new coordinator, so it does not close them or relabel them at shift end. `-TestCoordinatorWatchdog`
 proves the decision, the stamp, the processes stopped and the timeout.
+
+## Amendment (BL-4394)
+
+Decided by Claude under Stewart's delegation. A failed stamp write is traced once
+(`coordinator.stamp not written`), and clears when a write works again. The stamp is refreshed
+before and after every timed gh or git call (`Invoke-TimedExternalCall`) rather than the
+threshold being raised: one pass can make four or more calls of up to 180 s each, so any fixed
+threshold would either miss a real hang or fire during a GitHub slowdown, while a refresh keeps
+the stamp younger than one call (180 s) plus local work. Lanes are not given `-HeartbeatMinutes`
+(it would change what a lane publishes); the stamp carries a `heartbeat=` line and the lane
+reads its threshold from there, so the 3-interval threshold does follow the coordinator's `-HeartbeatMinutes`.

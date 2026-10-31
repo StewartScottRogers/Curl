@@ -293,7 +293,10 @@
                  a GitHub outage never parks finished work or counts as a lost race
                  (AF-0025, BL-1281).
       run        /task-run in the lane's worktree. The run commits but never pushes.
-      integrate  The lane rebases its commits onto the shared branch, builds the whole
+      integrate  The lane rebases its commits onto the shared branch - a run that sent its
+                 task back to Backlog or Blocked commits the code it finished and tested,
+                 and those commits are checked as below unless they change only task
+                 files (AF-0496) - builds the whole
                  solution, runs the fast tests of the test projects its commits can
                  affect - those of every project they change and of every project that
                  depends on one, through a ProjectReference or a linked file; all of them

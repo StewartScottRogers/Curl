@@ -78,6 +78,15 @@ public sealed class ExtensionResolverHookTests
     }
 
     [TestMethod]
+    public void ExtensionResolverHooksOf_ActivatorThrowsPlainArgumentException_IsReportedAsAnOptionError()
+    {
+        ExtensionOptionConflictException failure = Assert.ThrowsExactly<ExtensionOptionConflictException>(() => CurlComposition.ExtensionResolverHooksOf(
+            new CommandLineOptions(), [_ => throw new ArgumentException("--odoh-config needs a value", "values")]));
+
+        Assert.AreEqual("--odoh-config needs a value", failure.Message);
+    }
+
+    [TestMethod]
     public void ExtensionResolverHooksOf_NoExtensionOptionGiven_PassesNoResolverToTheEngine()
     {
         ResolverHooks hooks = CurlComposition.ExtensionResolverHooksOf(new CommandLineOptions(), [ActivatedByDot, ActivatedByDoq]);
