@@ -9,7 +9,7 @@ touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary, Curl.Extended.Protocol.Amqp0
 requirement: none
 lane: no
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4440 — Rename the scheme extensions to Curl.Extended.Protocol.<Name>
 
@@ -37,3 +37,4 @@ Stewart, 2026-10-31: rename `Curl.Extension.Protocol.*` (BL-4438, ADR-1174) to `
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: ee39f02c 79a01002 23abc1ea df2e5a51 3d836d5e.
+- 2026-10-31: Doing -> Done. scheme extensions renamed to Curl.Extended.Protocol under /Extended/Protocols/ (ADR-1177); build clean, 114 of 114 test projects pass, isolation rules cover the new prefix
