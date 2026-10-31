@@ -3,8 +3,8 @@ id: AF-0490
 title: UseProtocolVersion_OnStdio_DoesNothing asserts only that the session it just made is not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Extension.McpClient.UnitTests/Client/McpProtocolHandlerTests.cs:UseProtocolVersion_OnStdio_DoesNothing:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Extension.McpClient.UnitTests/Client/McpProtocolHandler
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
