@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/CiWatch.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4420 — File a CI job cancelled by its timeout-minutes as a hang, not ignore it as cancelled
 
@@ -24,16 +24,20 @@ A job cancelled by its timeout can be told apart from one cancelled by a person 
 
 ## Acceptance criteria
 
-- [ ] A CI run whose job was cancelled by its timeout is examined, not skipped, and files one High task titled `Fix CI hang in <job> (<assembly>)` with the run, commit, job, the last `Test run for` assembly, and the time of the last log line before the silence.
-- [ ] A run cancelled by a newer push, by a person, or before any job started still files nothing.
-- [ ] A hang already named by a live task is not filed again (as for failing tests).
-- [ ] `RunDarkFactory.ps1 -TestCiWatch` covers the three cases with stand-in `-ListRuns`, `-ReadJobs` and `-ReadLog` blocks and reports 0 FAIL under Windows PowerShell and `pwsh`.
+- [x] A CI run whose job was cancelled by its timeout is examined, not skipped, and files one High task titled `Fix CI hang in <job> (<assembly>)` with the run, commit, job, the last `Test run for` assembly, and the time of the last log line before the silence.
+- [x] A run cancelled by a newer push, by a person, or before any job started still files nothing.
+- [x] A hang already named by a live task is not filed again (as for failing tests).
+- [x] `RunDarkFactory.ps1 -TestCiWatch` covers the three cases with stand-in `-ListRuns`, `-ReadJobs` and `-ReadLog` blocks and reports 0 FAIL under Windows PowerShell and `pwsh`.
 
 ## Notes
 
 - 2026-10-31 (interactive): not reproduced locally. `Curl.Console.UnitTests` at ad7f977c with `--blame-hang-timeout 3m`, three runs, each 3104 passed in 3 s (without coverage collection). The next CI run (bb37b9b3) passed every job, so the hang is intermittent; a filed hang task should say so.
+- 2026-10-31 (lane 1): the test chosen is the log's silence (ADR-1173): a cancelled job that started and ran at least 15 minutes (`$CiHangSilenceMinutes`) is read from `gh run view --job <id> --log`, and is a hang when its log says it exceeded its maximum execution time or ends with `##[error]The operation was canceled.` after 15 minutes without a line. It needs no read of `ci.yml` (a guard file) and only one log read per long cancelled job; a push or person cancels mid-output. 15 minutes is the default taken: well above any gap between test lines, well below the 45-minute timeout.
+- The hang task's Context says a hang can be intermittent. A hang is filed at once (like a build error), not after the confirm wait, since a cancelled run has no next run to confirm it on the same commit.
+- Not run: dotnet build and the fast tests, since only `DarkFactory/CiWatch.ps1` changed (no C#); `RunDarkFactory.ps1 -TestCiWatch` reports 84 PASS, 0 FAIL under Windows PowerShell and `pwsh`. No Measure-CodeQuality.ps1 run: no library changed.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 258b24e8 3c8fb19c 6a9f3801 95af59d2.
+- 2026-10-31: Doing -> Done. CI watch files a job its timeout-minutes cancelled as a hang; -TestCiWatch 84 PASS, 0 FAIL under both shells

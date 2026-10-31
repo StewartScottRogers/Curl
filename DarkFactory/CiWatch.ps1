@@ -18,6 +18,9 @@ $script:CiWatchBranch = ''
 # failure seen on one platform in only the newest run waits for the next run to confirm it.
 $CiWindowRuns = 6
 $CiConfirmMinutes = 5
+# How long a cancelled job's log must have been silent before its "The operation was canceled."
+# for the watch to read it as a hang its timeout-minutes cut short, not a cancel (BL-4420).
+$CiHangSilenceMinutes = 15
 
 function Get-CiPlatform {
     # "Build and test (ubuntu-latest)" -> Linux; the platform's name, or the job's when unknown.
@@ -156,7 +159,7 @@ function Get-CiVerdicts {
         $failure = @($Runs[$at].Failures | Where-Object { $_.Key -ceq $key })[0]
         $verdict = ''
         if ($at -eq 0) {
-            if ($failure.Kind -in 'build', 'audit' -or @($failure.Platforms).Count -ge 2 -or $failing -contains 1) { $verdict = 'regression' }
+            if ($failure.Kind -in 'build', 'audit', 'hang' -or @($failure.Platforms).Count -ge 2 -or $failing -contains 1) { $verdict = 'regression' }
             elseif ($failing.Count -gt 1) { $verdict = 'flaky' }
             elseif (($Now - $Runs[0].FinishedAt).TotalMinutes -ge $ConfirmMinutes) { $verdict = 'regression' }
         } elseif ($failing.Count -eq 1 -and $at -lt $Runs.Count - 1) { $verdict = 'flaky' }
@@ -189,6 +192,7 @@ function Get-CiTaskTitle {
     $on = ($Verdict.Platforms -join ' and ')
     if ($Verdict.Kind -eq 'audit') { return "Revert the dark factory's change to $(Get-CiAuditPath $Verdict.Key)" }
     if ($Verdict.Kind -eq 'build') { return "Fix CI build $($Verdict.Key) on $on" }
+    if ($Verdict.Kind -eq 'hang') { return "Fix CI $($Verdict.Key)" }
     if ($Verdict.Verdict -eq 'flaky') { return "Fix flaky CI test $($Verdict.Key) that failed once on $on" }
     return "Fix CI failure $($Verdict.Key) on $on"
 }
@@ -263,6 +267,7 @@ function Set-CiTaskBody {
     # Fills the new task file's Goal, Context and Acceptance criteria.
     param([string]$Path, $Verdict, [string]$RunUrl)
     if ($Verdict.Kind -eq 'audit') { Set-CiAuditTaskBody -Path $Path -Verdict $Verdict -RunUrl $RunUrl; return }
+    if ($Verdict.Kind -eq 'hang') { Set-CiHangTaskBody -Path $Path -Verdict $Verdict -RunUrl $RunUrl; return }
     $on = $Verdict.Platforms -join ' and '
     $what = if ($Verdict.Kind -eq 'build') { "the build ($($Verdict.Key))" } else { "``$($Verdict.Key)``" }
     $goal = if ($Verdict.Verdict -eq 'flaky') {
@@ -310,6 +315,88 @@ function Set-CiAuditTaskBody {
     $text = $text -replace '<!-- Why this matters.*?-->', $context.Replace('$', '$$')
     $text = $text.Replace('- [ ] <!-- A statement someone else can check from the repository without asking a question. -->', $criteria)
     [IO.File]::WriteAllText($Path, $text, (New-Object Text.UTF8Encoding $false))
+}
+
+function Get-CiHangTaskText {
+    # A hang task's Goal, Context and Acceptance criteria (BL-4420): the run, the commit, the
+    # job, the test assembly that was running and when the log fell silent (-Verdict.Message).
+    param($Verdict, [string]$RunUrl)
+    $job = "$($Verdict.Key)" -replace '^hang in (.*) \([^()]*\)$', '$1'
+    $commit = if ($Verdict.FirstSha) { "commit $($Verdict.FirstSha.Substring(0, [math]::Min(8, $Verdict.FirstSha.Length)))" } else { 'a commit not found' }
+    $project = if ($Verdict.Project) { "``$($Verdict.Project)``" } else { 'the test assembly' }
+    $goal = "``$job`` finishes well inside its ``timeout-minutes`` on every ``CI`` run; in CI run $($Verdict.RunId) it hung while $project was running."
+    $context = @(
+        "Filed by the dark factory's CI watch (BL-4420). In CI run $($Verdict.RunId) ($RunUrl) on $commit, job ``$job`` ran into its ``timeout-minutes`` and GitHub cancelled it, so the run reads as cancelled, not failed. The last test assembly it started was $project."
+        ''
+        "    $($Verdict.Message)"
+        ''
+        "A hang can be intermittent: the next run may pass. Reproduce with ``dotnet test`` on that project and ``--blame-hang-timeout 3m``, and read the job's whole log with ``gh run view $($Verdict.RunId) --log``."
+    ) -join "`n"
+    $criteria = "- [ ] What made $project hang in ``$job`` is named under Notes and removed.`n- [ ] ``$job`` finishes inside its ``timeout-minutes`` in the ``CI`` workflow for the commit that lands the fix."
+    return [pscustomobject]@{ Goal = $goal; Context = $context; Criteria = $criteria }
+}
+
+function Set-CiHangTaskBody {
+    # Fills a hang task's Goal, Context and Acceptance criteria from Get-CiHangTaskText.
+    param([string]$Path, $Verdict, [string]$RunUrl)
+    $body = Get-CiHangTaskText -Verdict $Verdict -RunUrl $RunUrl
+    $text = [IO.File]::ReadAllText($Path)
+    $text = $text.Replace('<!-- One sentence: the observable outcome once this task is done. -->', $body.Goal)
+    $text = $text -replace '<!-- Why this matters.*?-->', $body.Context.Replace('$', '$$')
+    $text = $text.Replace('- [ ] <!-- A statement someone else can check from the repository without asking a question. -->', $body.Criteria)
+    [IO.File]::WriteAllText($Path, $text, (New-Object Text.UTF8Encoding $false))
+}
+
+function Get-CiHang {
+    # The hang one cancelled job's log shows (BL-4420), or $null: the job ran into its
+    # timeout-minutes when its log says it exceeded its maximum execution time, or ends with
+    # "##[error]The operation was canceled." after at least -SilenceMinutes without a line. A job
+    # cancelled by a newer push or a person stops mid-output, without that silence. The hang's
+    # key is "hang in <job> (<assembly>)", the last "Test run for" assembly before the silence.
+    param([string]$Job, [string[]]$Log, [int]$SilenceMinutes = $CiHangSilenceMinutes)
+    $stamped = @(foreach ($raw in $Log) {
+        $parts = "$raw" -split "`t", 3
+        if ($parts.Count -lt 3 -or $parts[2] -notmatch '^(\d{4}-\d\d-\d\dT[\d:.]+Z) ?(.*)$') { continue }
+        $at = [datetime]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AdjustToUniversal)
+        [pscustomobject]@{ At = $at; Text = $Matches[2].Trim() }
+    })
+    $exceeded = 'exceeded the maximum execution time of \d+ minutes'
+    $timedOut = [bool]@($stamped | Where-Object { $_.Text -match $exceeded }).Count
+    $lines = @($stamped | Where-Object { $_.Text -notmatch $exceeded })
+    $cancelAt = -1
+    for ($i = $lines.Count - 1; $i -ge 1 -and $cancelAt -lt 0; $i--) { if ($lines[$i].Text -match '##\[error\]The operation was cancell?ed') { $cancelAt = $i } }
+    if ($cancelAt -lt 1) { return $null }
+    $before = $lines[$cancelAt - 1]
+    $silence = ($lines[$cancelAt].At - $before.At).TotalMinutes
+    if (-not $timedOut -and $silence -lt $SilenceMinutes) { return $null }
+    $assembly = 'unknown assembly'
+    foreach ($line in $lines[0..($cancelAt - 1)]) { if ($line.Text -match 'Test run for (?:.*[\\/])?([^\\/]+?)\.dll') { $assembly = $Matches[1] } }
+    $message = "Last log line at $($before.At.ToString('yyyy-MM-dd HH:mm:ss')) UTC: $($before.Text) - then nothing for $([int]$silence) min until $($lines[$cancelAt].Text)"
+    return [pscustomobject]@{
+        Key = "hang in $Job ($assembly)"; Kind = 'hang'; Platforms = @(Get-CiPlatform $Job)
+        Project = $(if ($assembly -ne 'unknown assembly') { $assembly } else { '' }); Message = $message
+    }
+}
+
+function Get-CiHangs {
+    # The hangs in a cancelled run (BL-4420): one Get-CiHang per job that was cancelled after it
+    # started and ran at least -SilenceMinutes, read from its log (-ReadLog run id, job id).
+    # Empty for a run with no such job, such as one replaced before any job started. $null when
+    # -JobsJson (`gh run view --json jobs`) or a job's log cannot be read.
+    param([string]$RunId, $JobsJson, [scriptblock]$ReadLog, [int]$SilenceMinutes = $CiHangSilenceMinutes)
+    if (-not $JobsJson) { return $null }
+    try { $jobs = @(($JobsJson | ConvertFrom-Json).jobs | Where-Object { $_ -and $_.conclusion -eq 'cancelled' }) } catch { return $null }
+    $hangs = @()
+    foreach ($job in $jobs) {
+        if (-not @($job.steps | Where-Object { $_.conclusion -and $_.conclusion -ne 'skipped' }).Count) { continue }
+        if (-not $job.startedAt -or -not $job.completedAt) { continue }
+        if (((ConvertTo-CiDateTime $job.completedAt) - (ConvertTo-CiDateTime $job.startedAt)).TotalMinutes -lt $SilenceMinutes) { continue }
+        $log = & $ReadLog $RunId "$($job.databaseId)"
+        if ($null -eq $log) { return $null }
+        $hang = Get-CiHang -Job "$($job.name)" -Log @($log) -SilenceMinutes $SilenceMinutes
+        if ($hang) { $hangs += $hang }
+    }
+    return , $hangs
 }
 
 function Test-CiFailureCovered {
@@ -412,8 +499,9 @@ function Write-GhListLine {
 }
 
 function Get-CiRuns {
-    # The newest finished CI runs on -Branch that passed or failed (cancelled ones prove
-    # nothing), newest first, each with its failures; a failed run whose log names no
+    # The newest finished CI runs on -Branch that passed or failed, newest first, each with its
+    # failures; a cancelled run only when a job ran into its timeout-minutes (Get-CiHangs, read
+    # through -ReadJobs), whose hangs are its failures; a failed run whose log names no
     # failure, or cannot be read, is left out and traced (Write-CiRunLine). $null when gh
     # cannot list them, traced with gh's exit code and error (Write-GhListLine, -Now its clock).
     # -ListRuns and -ReadLog stand in for gh in -TestCiWatch: the first returns `gh run list`'s
@@ -430,8 +518,9 @@ function Get-CiRuns {
     }
     if (-not $ReadLog) {
         $ReadLog = {
-            param([string]$Id)
-            $log = @(gh run view $Id --log-failed 2>$null | ForEach-Object { "$_" })
+            param([string]$Id, [string]$JobId)
+            $log = if ($JobId) { @(gh run view $Id --job $JobId --log 2>$null | ForEach-Object { "$_" }) }
+                else { @(gh run view $Id --log-failed 2>$null | ForEach-Object { "$_" }) }
             if ($LASTEXITCODE -ne 0) { return $null }
             return , $log
         }
@@ -456,7 +545,7 @@ function Get-CiRuns {
     $runs = @()
     foreach ($listedRun in $listed) {
         if ($runs.Count -ge $CiWindowRuns) { break }
-        if ($listedRun.status -ne 'completed' -or $listedRun.conclusion -notin 'success', 'failure') { continue }
+        if ($listedRun.status -ne 'completed' -or $listedRun.conclusion -notin 'success', 'failure', 'cancelled') { continue }
         $id = "$($listedRun.databaseId)"; $conclusion = $listedRun.conclusion; $sha = "$($listedRun.headSha)"
         $on = $sha.Substring(0, [math]::Min(8, $sha.Length))
         $finished = if ($listedRun.updatedAt -is [datetime]) { $listedRun.updatedAt.ToLocalTime() }
@@ -475,11 +564,19 @@ function Get-CiRuns {
             }
             $script:CiWatch.Failures[$id] = $named
         }
+        # A cancelled run counts only for a job its timeout-minutes cut short (BL-4420).
+        if ($conclusion -eq 'cancelled' -and -not $script:CiWatch.Failures.ContainsKey($id)) {
+            $hangs = Get-CiHangs -RunId $id -JobsJson (& $ReadJobs $id) -ReadLog $ReadLog
+            if ($null -eq $hangs) { Write-CiRunLine -RunId $id -Line "cancelled on ${on}: cannot read its jobs or a cancelled job's log with gh run view; trying again next heartbeat"; continue }
+            $script:CiWatch.Failures[$id] = $hangs
+        }
         # Assigned apart from the if: an if statement's output is unrolled, so one failure came
         # back as a bare object, and Windows PowerShell gives a bare object no Count - a run
         # with a single failing test looked like one with none and was dropped (BL-1031).
         $failures = @()
-        if ($conclusion -eq 'failure') { $failures = @($script:CiWatch.Failures[$id]) }
+        if ($conclusion -ne 'success') { $failures = @($script:CiWatch.Failures[$id] | Where-Object { $_ }) }
+        # Cancelled by a newer push, by a person, or before any job started: it proves nothing.
+        if ($conclusion -eq 'cancelled' -and -not $failures.Count) { continue }
         if ($conclusion -eq 'failure' -and -not $failures.Count -and $script:CiWatch.Capacity[$id]) {
             Write-CiRunLine -RunId $id -Line "failure on ${on}: runner capacity - every job that did not succeed was never given a runner; nothing to file"
             continue
@@ -1071,7 +1168,7 @@ if ($TestCiWatch) {
     & $check 'replay 36674691490: the final look files at once' '2' "$(@(Get-CiVerdicts -Now $replayAt.AddMinutes(5) -Runs $replay -ConfirmMinutes 0).Count)"
     # The case that failed live: a run with one failing test was dropped as if it had none.
     $script:ciListJson = '[{"conclusion":"failure","databaseId":36690174792,"headSha":"b86b15dfc80d1dea7a5733c9b73fd263a17533b3","status":"completed","updatedAt":"2026-09-30T08:35:42Z"},{"conclusion":"cancelled","databaseId":1,"headSha":"x","status":"completed","updatedAt":"2026-09-30T08:31:26Z"},{"conclusion":"failure","databaseId":36671448420,"headSha":"bfd523f47edea0e8d7826a657606353aa2b6b462","status":"completed","updatedAt":"2026-09-30T05:05:30Z"},{"conclusion":"failure","databaseId":99,"headSha":"9999999999","status":"completed","updatedAt":"2026-09-30T05:00:00Z"},{"conclusion":"success","databaseId":36689969747,"headSha":"c4083da8fbe96c97b45499a41bab397f52fadce4","status":"completed","updatedAt":"2026-09-30T08:33:40Z"}]'
-    $single = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
+    $single = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog -ReadJobs { '{"jobs":[]}' }
     & $check 'one failing test keeps its run; a nameless failure is kept by its job and step' '36690174792 1 macOS; 36671448420 1 Linux; 36689969747 0 ' `
         (($single | ForEach-Object { "$($_.Id) $(@($_.Failures).Count) $(@($_.Failures | ForEach-Object { $_.Platforms }) -join '+')" }) -join '; ')
     & $check 'unreadable failures traced' 'run 99 failure on 99999999: cannot read its log with gh run view --log-failed; trying again next heartbeat' `
@@ -1106,6 +1203,46 @@ if ($TestCiWatch) {
     & $check 'a failed run whose only bad job never got a runner files nothing and says runner capacity (BL-3944)' '0|run 902 failure on abcdef01: runner capacity - every job that did not succeed was never given a runner; nothing to file' "$(@($capRuns[0]).Count)|$($traced -join ';')"
     $ranRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":903,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() } -ReadJobs { $ran })
     & $check 'an empty log with a job that ran and failed is still filed (BL-3944)' '1|job unknown job step unknown step' "$($ranRuns.Count)|$($ranRuns[0].Failures[0].Key)"
+    # BL-4420: run 41217938101 on fe634e2c, whose quality shard hung in Curl.Console.UnitTests
+    # until its 45-minute timeout-minutes cancelled it, is filed as a hang; cancels are not.
+    $shard = 'Quality gates shard 3 of 3 (windows-latest)'
+    $hungLog = @(
+        "${shard}${t}Measure coverage${t}2026-10-31T16:15:58.0000000Z Passed!  - Failed:     0, Passed:    12 - Curl.Conformance.SshServer.UnitTests.dll (net10.0)"
+        "${shard}${t}Measure coverage${t}2026-10-31T16:16:02.0000000Z Test run for D:\a\Curl\Curl\Curl.Console.UnitTests\bin\Release\net10.0\Curl.Console.UnitTests.dll (.NETCoreApp,Version=v10.0)"
+        "${shard}${t}Measure coverage${t}2026-10-31T16:55:01.0000000Z ##[error]The operation was canceled.")
+    $pushedLog = @(
+        "${shard}${t}Measure coverage${t}2026-10-31T16:40:00.0000000Z Test run for D:\a\Curl\Curl\Curl.Cli.UnitTests\bin\Release\net10.0\Curl.Cli.UnitTests.dll (.NETCoreApp,Version=v10.0)"
+        "${shard}${t}Measure coverage${t}2026-10-31T16:41:00.0000000Z ##[error]The operation was canceled.")
+    $hangJobs = { param([string]$Id, [string]$Minutes) "{""jobs"":[{""databaseId"":$Id,""name"":""$shard"",""conclusion"":""cancelled"",""startedAt"":""2026-10-31T16:10:00Z"",""completedAt"":""2026-10-31T16:$Minutes`:01Z"",""steps"":[{""conclusion"":""success""},{""conclusion"":""cancelled""}]},{""databaseId"":1,""name"":""Build and test (ubuntu-latest)"",""conclusion"":""success"",""steps"":[{""conclusion"":""success""}]}]}" }
+    $hangLogs = @{ '771' = $hungLog; '772' = $pushedLog; '773' = $pushedLog }
+    $script:ciReadJobIds = @()
+    $readHangLog = { param([string]$Id, [string]$JobId) $script:ciReadJobIds += $JobId; return , @($hangLogs[$JobId]) }
+    $runList = { param([string]$Id) "[{""databaseId"":$Id,""status"":""completed"",""conclusion"":""cancelled"",""headSha"":""fe634e2c0123"",""updatedAt"":""2026-10-31T16:55:30Z""}]" }
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $hungRuns = @(Get-CiRuns -Branch 'b' -ListRuns { & $runList 41217938101 } -ReadLog $readHangLog -ReadJobs { & $hangJobs 771 55 })
+    $hung = @($hungRuns[0].Failures)[0]
+    & $check 'a job its timeout cancelled is filed as a hang (BL-4420)' '1|hang in Quality gates shard 3 of 3 (windows-latest) (Curl.Console.UnitTests)|hang|Windows|Curl.Console.UnitTests' `
+        "$($hungRuns.Count)|$($hung.Key)|$($hung.Kind)|$($hung.Platforms -join '+')|$($hung.Project)"
+    & $check 'the hang names when the log fell silent (BL-4420)' 'Last log line at 2026-10-31 16:16:02 UTC: Test run for D:\a\Curl\Curl\Curl.Console.UnitTests\bin\Release\net10.0\Curl.Console.UnitTests.dll (.NETCoreApp,Version=v10.0) - then nothing for 39 min until ##[error]The operation was canceled.' "$($hung.Message)"
+    $hangVerdict = @(Get-CiVerdicts -Runs $hungRuns -Now ([datetime]'2026-10-31T16:56:00Z').ToLocalTime())[0]
+    & $check 'a hang is filed at once as a High task (BL-4420)' 'regression|Fix CI hang in Quality gates shard 3 of 3 (windows-latest) (Curl.Console.UnitTests)|High|Curl.Console.UnitTests' `
+        "$($hangVerdict.Verdict)|$((Get-CiTaskNewArgs -Verdict $hangVerdict -Touches @('Curl.Console.UnitTests'))[2,4,8] -join '|')"
+    $hangText = Get-CiHangTaskText -Verdict $hangVerdict -RunUrl 'https://example.invalid/runs/41217938101'
+    $named = @('CI run 41217938101', 'commit fe634e2c', ('job `' + $shard + '`'), '16:16:02 UTC') | ForEach-Object { $hangText.Context.Contains($_) }
+    & $check 'the hang task names the run, the commit, the job, the assembly and the silence (BL-4420)' 'True True True True True' `
+        "$($named -join ' ') $($hangText.Goal.Contains('`Curl.Console.UnitTests`'))"
+    $script:ciReadJobIds = @()
+    $pushed = @(Get-CiRuns -Branch 'b' -ListRuns { & $runList 41217938102 } -ReadLog $readHangLog -ReadJobs { & $hangJobs 772 13 })
+    $person = @(Get-CiRuns -Branch 'b' -ListRuns { & $runList 41217938103 } -ReadLog $readHangLog -ReadJobs { & $hangJobs 773 41 })
+    $unstarted = @(Get-CiRuns -Branch 'b' -ListRuns { & $runList 41217938104 } -ReadLog $readHangLog -ReadJobs { '{"jobs":[]}' })
+    & $check 'cancelled by a push, by a person or before any job started: nothing filed (BL-4420)' '0 0 0; read only the long job 773' `
+        "$(@($pushed[0]).Count) $(@($person[0]).Count) $(@($unstarted[0]).Count); read only the long job $($script:ciReadJobIds -join ',')"
+    $coveredRepo = Join-Path ([IO.Path]::GetTempPath()) "ci-hang-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+    New-Item -ItemType Directory -Force -Path (Join-Path $coveredRepo 'Tasks/Backlog') | Out-Null
+    [IO.File]::WriteAllText((Join-Path $coveredRepo 'Tasks/Backlog/BL-9-x.md'), "# BL-9 - Fix CI $($hung.Key)`n")
+    try { $hangCovered = Test-CiFailureCovered -Key $hung.Key -Sha 'fe634e2c0123' -Repo $coveredRepo }
+    finally { Remove-Item -Recurse -Force -Path $coveredRepo -ErrorAction SilentlyContinue }
+    & $check 'a hang a live task names is not filed again (BL-4420)' 'True' "$hangCovered"
     $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
     $traced.Clear()
     $script:ciListJson = $null
