@@ -47,6 +47,8 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Notes
 
+- 2026-10-31 (interactive): measured with Measure-FactoryProcess.ps1 over a snapshot of Z:/repos/Curl.logs (files written since 2026-10-30 12:00; the one live run BL-4420-L1 left out as running) with a fresh 500-run CI list, at about 11:10 Arizona 2026-10-31. Claims hold (tasksClaimedMoreThanOnce 0 since eb3e574f6), but the second half does not: BL-4377's lane-2 run on 10-31 (03:01-03:16) built and tested its change (criteria 1-3, 0 FAIL) and left it uncommitted for the shift to stash, because criterion 4 needed a shift log; the shift then split BL-4377 for cost and BL-4384 recommitted it from the stash. Stays open: the lane rule that hands tested work back to be stashed needs a commit-then-requeue path.
+
 ## Log
 
 - 2026-10-31: Created.

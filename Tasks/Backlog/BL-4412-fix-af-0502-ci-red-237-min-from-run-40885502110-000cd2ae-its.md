@@ -47,6 +47,8 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Notes
 
+- 2026-10-31 (interactive): measured with Measure-FactoryProcess.ps1 over a snapshot of Z:/repos/Curl.logs (files written since 2026-10-30 12:00; the one live run BL-4420-L1 left out as running) with a fresh 500-run CI list, at about 11:10 Arizona 2026-10-31. Since f54935070, filed CI fixes: BL-4359 filed 11:39, done 11:41; BL-4368 filed 14:02, done 14:07; BL-4378 claimed 03:02, done 03:12; but BL-4369 and BL-4370, filed 14:24 and 14:27 on 10-30 by the coordinator after its lanes had ended, were claimed only at 15:22 when the next shift started (58 min). None was requeued behind another task. Stays open: a CI fix filed with no lane running waits for the next shift.
+
 ## Log
 
 - 2026-10-31: Created.
