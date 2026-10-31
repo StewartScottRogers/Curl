@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-30
 ---
 # BL-4381 — Close GF-0100: The gap tool's in-process curl refuses --ech, so the ECH cases send no request (test4000) and exit 2 instead of 101 (test4001)
 
@@ -36,14 +36,21 @@ In Curl.Console/InProcessCurl.cs, make CreateDialingRunner (and the IConnector o
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test4000`: Curl answers what curl 8.22.0 answers, `upstream test4000 passes`, so the item measures `match`.
-- [ ] `behaviour:test4001`: Curl answers what curl 8.22.0 answers, `upstream test4001 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test4000`: Curl answers what curl 8.22.0 answers, `upstream test4000 passes`, so the item measures `match`.
+- [x] `behaviour:test4001`: Curl answers what curl 8.22.0 answers, `upstream test4001 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- `InProcessCurl` now passes `parsesAsEchBuild: true` to `CurlComposition.CreateRunner` in both runner builders (the `IConnector` overload and `CreateDialingRunner`), as `UpstreamConformanceTests.RunCurlAsync` does, so the gap tool reads `--ech` as the ratchet does (ADR-0918, ADR-0520). No new ADR: this applies ADR-0918's existing decision to the gap tool's runner.
+- Tests: `InProcessCurlTests.RunAsync_DialerEchGrease_AcceptsTheOptionAndSendsTheRequest` (`--ech grease` sends `GET /4000`, exit 0) and `RunAsync_ConnectorEchGrease_AcceptsTheOption` (parsed, reaches the transfer, exit 37 rather than 2).
+- Scope choice: only the ECH flag is switched on. The other flags `RunCurlAsync` sets (`parsesAsQuicBuild`, the `honours*Variable` flags, `honoursDebugWriteOutVariables`) change behaviour of other gap items; they belong to whatever gap finding measures them, not to GF-0100.
+- The gap tool itself (`Gap/Tools`) is outside a lane's reach, so the re-measure is left to the next gap analysis (ADR-0433 decision 5). test4001 also needs a TLS 1.3 server on the gap side; Windows SslStream serves TLS 1.3 by default.
+- The criteria for test4000 and test4001 are ticked as the Curl side of the finding; the ratchet already passes both through the same composition flag. Change is platform-neutral (no paths, no TLS in the new tests). `dotnet build -warnaserror` clean, fast tests green, Measure-CodeQuality for Curl.Console: 0 failing members. No option changed, so `--ai-help` is unchanged.
 
 ## Log
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: 840ea224 5c327db7 1fd5de8c 28346828.
+- 2026-10-30: Doing -> Done. InProcessCurl reads the command line as an ECH build, so the gap tool runs test4000 and test4001 as the ratchet does
