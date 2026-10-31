@@ -1,5 +1,5 @@
 ---
-id: BL-4427
+id: BL-4429
 title: Cover the 50% branch of WireGuardExtension.ActivateResolver(ExtensionOptionValues)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-31
 completed:
 ---
-# BL-4427 — Cover the 50% branch of WireGuardExtension.ActivateResolver(ExtensionOptionValues)
+# BL-4429 — Cover the 50% branch of WireGuardExtension.ActivateResolver(ExtensionOptionValues)
 
 ## Goal
 
