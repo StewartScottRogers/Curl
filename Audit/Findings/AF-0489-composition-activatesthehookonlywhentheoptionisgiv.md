@@ -3,8 +3,8 @@ id: AF-0489
 title: Composition_ActivatesTheHookOnlyWhenTheOptionIsGiven never checks that the hook stays off without the option
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Extension.Har.UnitTests/HarExtensionTests.cs:Composition_ActivatesTheHookOnlyWhenTheOptionIsGiven:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Extension.Har.UnitTests/HarExtensionTests.cs -Pattern '
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
