@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | The Quality gates (windows-latest) job again turned CI red for over 30 min. Run 41071219626 (302d7dd3) was red 486.12 min, starting with BL-4349 (Quality gates step Measure coverage, complexity and CRAP), filed 07:52:26 and Done 09:03:11. Run 40885502110 (237.13 min) also began with a quality-gate failure, BL-4083.
+
 ## Log
 
 - 2026-10-29: filed proposed.

@@ -3,8 +3,8 @@ id: AF-0483
 title: BL-3617 cost $6.38 (5.9x median): its first opus run hit the 80-turn cap, the second took 68 turns
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Audit 2026-10-31_0358.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-4236) are Done at bfe08061f844, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
 key: process:logs:BL-3617:cost-outlier
 reproduction: none
 task: BL-4236
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: task-done-historical
+closed-by: 2026-10-31_0358.md
 ---
 # AF-0483 - BL-3617 cost $6.38 (5.9x median): its first opus run hit the 80-turn cap, the second took 68 turns
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Audit 2026-10-31_0358.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-4236) are Done at bfe08061f844, so it closes without a re-audit (ADR-0422, amended 2026-10-14).

@@ -42,6 +42,8 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0986-*.md -Pattern 'kee
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: no | Ran the reproduction. ADR-0986 no longer matches 'keeps the synthetic `FirstTransferSocket`'. Its status line now says 'Its second Decision point is replaced by ADR-0997 and ADR-0998: `FirstTransferSocket` and `RunningTransferCheckInterval` are gone.' The non-test .cs count for FirstTransferSocket|RunningTransferCheckInterval is 0.
+
 ## Log
 
 - 2026-10-29: filed proposed.

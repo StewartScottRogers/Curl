@@ -3,8 +3,8 @@ id: AF-0460
 title: Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing has no assertion, so the listener's closing is never checked
 auditor: quality
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces.
 key: quality:Curl.Engine.UnitTests/SocketActionGatedResolverTests.cs:Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing:no-assertion
 reproduction: none
 task: BL-4241
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_0358.md
 ---
 # AF-0460 - Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing has no assertion, so the listener's closing is never checked
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Engine.UnitTests/SocketActionGatedResolverTests.cs -Pat
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: no | Ran the Select-String reproduction. Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing now connects a probe socket to the disposed listener's end point and asserts Assert.ThrowsExactly<SocketException> with SocketErrorCode == SocketError.ConnectionRefused.
+
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces.

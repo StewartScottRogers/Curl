@@ -3,8 +3,8 @@ id: AF-0461
 title: --curves, --sigalgs, --crlfile, --proxy-crlfile and --tcp-fastopen fail with exit 4 'setopt 0x... got bad argument' on Windows where curl 8.22.0 Schannel carries on and exits 0
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces.
 key: conformance:Curl.Console/ToolEasyHandle.cs:IgnoredWhenNotBuiltIn:exit-code
 reproduction: none
 task: BL-4182
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_0358.md
 ---
 # AF-0461 - --curves, --sigalgs, --crlfile, --proxy-crlfile and --tcp-fastopen fail with exit 4 'setopt 0x... got bad argument' on Windows where curl 8.22.0 Schannel carries on and exits 0
 
@@ -42,7 +42,10 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($c in @('
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: no | Ran the reproduction against curl 8.22.0 (x86_64-w64-mingw32) Schannel and the Release Curl.Console that Invoke-DifferentialConformance.ps1 had just built from this tree. Outcomes: --curves 1 exit 0 on both; --sigalgs 1 exit 0 on both; --tcp-fastopen exit 0 on both; no 'setopt ... got bad argument' text. Also ran --crlfile and --proxy-crlfile. With an existing file: exit 0 on both. With a missing file: exit 2 on both, with identical text "curl: The file 'x.pem' provided to --crlfile does not exist" / "option --crlfile: is badly used here".
+
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces.

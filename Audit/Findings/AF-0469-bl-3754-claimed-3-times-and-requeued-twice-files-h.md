@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | Same cause: a held file, then a remainder split. BL-4328 was requeued at 22:16:33 ('Needs Curl.Console/CurlComposition.cs, held by BL-4320 in Doing'), requeued again at 00:07:54 on the 80-turn cap, and split into BL-4362..BL-4365 at 13:04:46 on 10-30. BL-4083 (CI fix) was also requeued on EngineComposition.cs held by BL-4082.
+
 ## Log
 
 - 2026-10-29: filed proposed.

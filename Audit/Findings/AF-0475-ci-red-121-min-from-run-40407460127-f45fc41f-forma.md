@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | ciRedSpells: run 40885502110 (000cd2ae) was red 237.13 min, 14:07:29Z-18:04:37Z, while its filed fix BL-4083 sat unclaimed in Backlog from 07:24:44 to 10:46:11 MST.
+
 ## Log
 
 - 2026-10-29: filed proposed.

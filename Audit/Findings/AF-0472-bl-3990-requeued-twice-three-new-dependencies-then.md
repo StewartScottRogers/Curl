@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | BL-4112 was requeued at 10:18:11 on three new dependencies (BL-4196, BL-4194, BL-4195), then at 16:25:53 on the 80-turn cap, then Deferred ('Split into BL-4298, BL-4295, BL-4296 and BL-4297; cost cap exceeded'). BL-4170 was also Blocked on its cost cap after two requeues.
+
 ## Log
 
 - 2026-10-29: filed proposed.

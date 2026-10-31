@@ -42,6 +42,8 @@ Select-String -Path Documentation/Product/Requirements.md, Curl.Engine.UnitLibra
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: no | Ran the reproduction. Requirements.md no longer matches 'SCP and SMB are registered'. Lines 11-13 now read 'SFTP and SCP are registered in Curl.Console too. SMB is registered only as disabled: smb:// and smbs:// URLs fail with exit 1 and Protocol "<scheme>" is disabled'. That matches EngineComposition.cs:194 (new DisabledProtocolHandler(["smb", "smbs"])) and DisabledProtocolHandler's CurlExitCode.UnsupportedProtocol.
+
 ## Log
 
 - 2026-10-29: filed proposed.

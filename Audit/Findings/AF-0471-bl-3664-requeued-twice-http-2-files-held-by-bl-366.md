@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | Requeues with the fix stashed were followed by Deferred and split. BL-4131 was requeued at 08:09:38 ('Shift deadline: code done and 99 tests pass'; result: 'uncommitted for the shift to stash'), then Deferred and split into BL-4373/BL-4374. BL-4132 was requeued at 08:10:29 ('fixed in the stash') and BL-4137 at 08:11:56 ('uncommitted, stashed'); both needed a third claim.
+
 ## Log
 
 - 2026-10-29: filed proposed.
