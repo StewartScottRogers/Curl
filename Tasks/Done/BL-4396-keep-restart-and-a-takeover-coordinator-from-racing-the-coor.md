@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Restart.ps1, DarkFactory/ShiftCoordinator.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4396 — Keep -Restart and a takeover coordinator from racing the coordinator watchdog
 
@@ -35,3 +35,4 @@ Shift-end review 2026-10-31 (factory code-reviewer) of BL-4353 / ADR-1160. DarkF
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: f066160a ff5015e1 ed3abac8 caed2003.
+- 2026-10-31: Doing -> Done. Restart clears the stamp, watchdog kills children of a live coordinator only, takeover stamps first
