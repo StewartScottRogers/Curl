@@ -3,8 +3,8 @@ id: AF-0498
 title: BL-4131 requeued twice (split for size, then a 106-minute 'shift deadline' run) and then Deferred and split again
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-4131:BL-4131:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Z:/repos/Curl.audit/20261031-035829/logs/DarkFactory-*-L*.lo
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
