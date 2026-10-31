@@ -3,8 +3,8 @@ id: AF-0487
 title: DohDnsResolver's forward-proxy target can flip proxy.Kind == ProxyKind.Https to != with no test failing, so DoH to an HTTPS proxy goes in plaintext
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/DohDnsResolver.cs:ConnectTarget-eq:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DohDnsResolver.cs:160:==
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
