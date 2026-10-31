@@ -8,7 +8,7 @@ depends-on: [BL-4320, BL-4375, BL-4376]
 touches: [Curl.Ssh.UnitLibrary, Curl.Ssh.UnitTests, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests/Compression, Curl.Protocol.Ssh.UnitTests/PacketProtection, Curl.Protocol.Ssh.UnitTests/Negotiation, Curl.Protocol.Ssh.UnitTests/GlobalUsings/Curl.Protocol.Ssh.Compression.cs, Curl.Protocol.Ssh.UnitTests/GlobalUsings/Curl.Protocol.Ssh.PacketProtection.cs, Curl.Protocol.Ssh.UnitTests/GlobalUsings/Curl.Protocol.Ssh.Negotiation.cs, Curl.Protocol.Ssh.UnitTests/Fakes, Curl.Conformance.SshServer.UnitLibrary, Curl.Conformance.SshServer.UnitTests, Curl.Console/CurlComposition.cs, Curl.Engine.UnitLibrary/EngineComposition.PlatformBuilds.cs, Curl.Engine.UnitTests/EngineCompositionPlatformLibraryTests.cs]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-30
 ---
 # BL-4364 — Move SSH compression, packet protection and negotiation into Curl.Ssh.UnitLibrary
 
@@ -22,12 +22,14 @@ Part 3 of BL-4328. Move the three folders with their tests (same folder names) f
 
 ## Acceptance criteria
 
-- [ ] Compression, PacketProtection and Negotiation and their tests exist only in `Curl.Ssh.UnitLibrary` / `Curl.Ssh.UnitTests`, under namespaces `Curl.Ssh.Compression`, `Curl.Ssh.PacketProtection` and `Curl.Ssh.Negotiation`.
-- [ ] `Curl.Protocol.Ssh.UnitLibrary`, the conformance SSH server, Curl.Console and Curl.Engine build and behave as before.
-- [ ] The changed libraries meet the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Compression, PacketProtection and Negotiation and their tests exist only in `Curl.Ssh.UnitLibrary` / `Curl.Ssh.UnitTests`, under namespaces `Curl.Ssh.Compression`, `Curl.Ssh.PacketProtection` and `Curl.Ssh.Negotiation`.
+- [x] `Curl.Protocol.Ssh.UnitLibrary`, the conformance SSH server, Curl.Console and Curl.Engine build and behave as before.
+- [x] The changed libraries meet the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-30 (interactive): nothing was left once BL-4375 and BL-4376 landed BL-4362's move: Compression, PacketProtection and Negotiation and their tests are in Curl.Ssh.UnitLibrary/UnitTests under `Curl.Ssh.<Folder>`; BL-4376 measured the three SSH libraries at 0 failing gates; build clean and 112 fast-test assemblies passed at 2b5b4064e.
 
 - 2026-10-30 (BL-4367): `touches` narrowed from the whole Curl.Protocol.Ssh.UnitTests to the files and folders this task changes there. That project now imports each moving namespace once, in `GlobalUsings/Curl.Protocol.Ssh.<Folder>.cs`, so moving a folder changes that one file (to `global using Curl.Ssh.<Folder>;`) rather than the using lines of every test that names its types; root types moved to Curl.Ssh get their own new `GlobalUsings/Curl.Ssh.cs`.
 
@@ -37,3 +39,6 @@ Part 3 of BL-4328. Move the three folders with their tests (same folder names) f
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Deferred. Its work is already in BL-4362's stashed change (the whole BL-4328 move, ADR-1162); look again once BL-4362 is Done, when nothing should be left
+- 2026-10-30: Deferred -> Backlog. BL-4362's parts are Done; closing
+- 2026-10-30: Backlog -> Doing. Interactive close Criteria at claim: 6a46503b 728fc3b0 e35aff77 3d836d5e.
+- 2026-10-30: Doing -> Done. Work landed with BL-4362's parts; criteria checked interactively
