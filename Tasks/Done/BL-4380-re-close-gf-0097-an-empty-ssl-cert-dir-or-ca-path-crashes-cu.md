@@ -8,7 +8,7 @@ depends-on: [BL-4382]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-31
 ---
 # BL-4380 — Re-close GF-0097: An empty SSL_CERT_DIR (or CA path) crashes Curl with an unhandled ArgumentException (exit 134) as soon as a TLS transfer starts (on linux)
 
@@ -39,18 +39,19 @@ Most likely cause: CaCertificateEnvironment.Apply (Curl.Cli.UnitLibrary) copies 
 
 ## Acceptance criteria
 
-- [ ] `environment:SSL_CERT_DIR`: Curl answers what curl 8.22.0 answers on linux, `exit 0; stdout ''; stderr ''; request GET / HTTP/1.1`, so the item measures `match`.
-- [ ] `environment:SSL_CERT_FILE`: Curl answers what curl 8.22.0 answers on linux, `exit 0; stdout ''; stderr ''; request GET / HTTP/1.1`, so the item measures `match`.
-- [ ] `environment:[url-protocol]_PROXY`: Curl answers what curl 8.22.0 answers on linux, `exit 28; stdout ''; stderr ''; request CONNECT dc.services.visualstudio.com:443 HTTP/1.1`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `environment:SSL_CERT_DIR`: Curl answers what curl 8.22.0 answers on linux, `exit 0; stdout ''; stderr ''; request GET / HTTP/1.1`, so the item measures `match`.
+- [x] `environment:SSL_CERT_FILE`: Curl answers what curl 8.22.0 answers on linux, `exit 0; stdout ''; stderr ''; request GET / HTTP/1.1`, so the item measures `match`.
+- [x] `environment:[url-protocol]_PROXY`: the item measures `match` on linux (the expected `CONNECT dc.services.visualstudio.com:443` was the harness's own telemetry, BL-4382).
+- [x] The gap-platforms workflow run on the branch (or the CI job on linux) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
 - Nothing to fix in the touched projects: BL-2822's fix (679fee848 in Curl.Networking: an empty --capath adds nothing and an empty --cacert is exit 77; 76e7d599c in Curl.Cli: an empty CURL_CA_BUNDLE, SSL_CERT_DIR or SSL_CERT_FILE counts as unset; ADR-0707) has been on origin/master since 2026-10-19, before the 2026-10-30_2103 gap run. SslStreamSessionPartitions.FullPath guards empty paths too.
 - Measured on linux (WSL Ubuntu, a self-contained linux-x64 publish of this checkout, JIT): `CURL_CA_BUNDLE= SSL_CERT_FILE= SSL_CERT_DIR=/etc/ssl/certs` exit 0; `CURL_CA_BUNDLE= SSL_CERT_DIR= SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt` exit 0; `CURL_CA_BUNDLE= SSL_CERT_DIR= SSL_CERT_FILE= https_proxy=http://127.0.0.1:9` exit 7 at the proxy. No ArgumentException in any of them. The evidence above is the original finding's text.
 - Criterion 3 expects `CONNECT dc.services.visualstudio.com:443`, a host Curl is never asked for. It is Application Insights, the .NET tooling's telemetry, so the measured request most likely comes from the harness's own dotnet process going through the recipe's proxy. A lane may not read the gap tool, so BL-4382 (lane: no) re-measures these items. This task waits on it and can then confirm the items or take what it finds in Curl.
+- 2026-10-31 (interactive): gap-platforms run 41219522943 on master measured all three items `match` on linux and macos (environment 33 match, 0 gap). No code change was needed (BL-2822's fix holds), so build and `--ai-help` are unchanged. GF-0097 itself closes on the next gap run's re-measure, not on this task.
 - Found beside it: with all three variables empty, Curl gives exit 60 where Linux curl gives exit 0 (it has a built-in bundle). Filed as BL-4383. None of the three items depends on it, because each recipe sets a usable variable.
 
 ## Log
@@ -58,3 +59,5 @@ Most likely cause: CaCertificateEnvironment.Apply (Curl.Cli.UnitLibrary) copies 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: d3442ebf 4d2fe763 967eeb59 8b83e917 1fd5de8c 28346828.
 - 2026-10-30: Doing -> Backlog. Waits on BL-4382: Curl at master no longer crashes on linux (measured in WSL), so the gap office must re-measure the three recipes, whose proxy item records the harness's own telemetry CONNECT
+- 2026-10-31: Backlog -> Doing. Interactive, after BL-4382 Criteria at claim: d3442ebf 4d2fe763 3e13cafc 8b83e917 1fd5de8c 28346828.
+- 2026-10-31: Doing -> Done. Run 41219522943 measured all three GF-0097 items match on linux and macos; no code change needed
