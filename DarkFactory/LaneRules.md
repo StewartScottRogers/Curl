@@ -15,7 +15,9 @@ interfaces so it can be unit tested without a network.
 
 ## Toolchain and commands
 - .NET SDK 10 (`global.json` pins it). Target framework `net10.0` unless a project says
-  otherwise. Solution file `Curl.slnx` at the repository root. Shell is Windows.
+  otherwise. Solution file `Curl.slnx` at the repository root. The shell is the host's: Windows
+  PowerShell on Windows, PowerShell 7 (`pwsh`) on Linux and macOS; scripts build paths with
+  `Join-Path` or forward slashes (BL-3934).
 - Build: `dotnet build`
 - Fast tests (default): `dotnet test --filter "TestCategory!=Integration"`
 - Integration tests only: `dotnet test --filter "TestCategory=Integration"`

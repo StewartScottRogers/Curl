@@ -13,7 +13,14 @@ injected interfaces so it can be unit tested without a network. See
 ## Toolchain
 - .NET Software Development Kit 10 (`global.json` at the repository root pins SDK 10.0.401 with `rollForward: latestFeature`). Target framework: `net10.0` unless a project states otherwise.
 - The solution file lives at the repository root (`Curl.slnx` preferred, `Curl.sln` acceptable).
-- Shell is Windows. Use PowerShell or `cmd` syntax, backslash paths are fine.
+- The repository is worked on Windows, Linux and macOS (BL-3934). Every script is one PowerShell
+  copy that runs under Windows PowerShell and, off Windows, PowerShell 7 (`pwsh`, required); each
+  `.cmd` entry point has a `.sh` launcher beside it: `RunDarkFactory.sh`, `RunClaude.sh`,
+  `hrdrClaudeNative.sh`, `Audit/RunAudit.sh`, `Gap/RunGapAnalysis.sh`, `Measure-CodeQuality.sh`,
+  `Record-CurlExchange.sh`, `Record-StapledOcspExchange.sh`, `New-DifferentialPki.sh`,
+  `Set-DifferentialEnvironment.sh`, `Update-PublicSuffixList.sh`, `Setup-UnixFactoryHost.sh` and
+  `install.sh`. On Windows, PowerShell or `cmd` syntax and backslash paths are fine; in a script,
+  build paths with `Join-Path` or forward slashes so it runs everywhere.
 
 ## Build and test commands
 - Build: `dotnet build`
