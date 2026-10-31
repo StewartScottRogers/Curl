@@ -20,7 +20,7 @@
 //                  that answers "x", a data reader that finds no file). The input is the
 //                  arguments as UTF-8 joined by NUL bytes, seeded from real option names in
 //                  CommandLineOptionTable. A refusal is expected; an exception is not.
-//   ssh            Curl.Protocol.Ssh: every SshWireDecoders method on the whole input -
+//   ssh            Curl.Original.Protocol.Ssh: every SshWireDecoders method on the whole input -
 //                  CountWholePacketsAsync (unprotected binary packets, back to back),
 //                  TryInflatePayload (one zlib-compressed packet payload), TryDecodeKexInit
 //                  (a KEXINIT payload, message number 20 first), TryDecodeSftpAttributes (SFTP
@@ -43,14 +43,14 @@
 
 #:project ../../../Curl.Tls.UnitLibrary/Curl.Tls.UnitLibrary.csproj
 #:project ../../../Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj
-#:project ../../../Curl.Protocol.Ssh.UnitLibrary/Curl.Protocol.Ssh.UnitLibrary.csproj
+#:project ../../../Curl.Original.Protocol.Ssh.UnitLibrary/Curl.Original.Protocol.Ssh.UnitLibrary.csproj
 
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text;
 using Curl.Cli;
-using Curl.Protocol.Ssh;
+using Curl.Original.Protocol.Ssh;
 using Curl.Tls;
 
 return FuzzApp.Run(args);
