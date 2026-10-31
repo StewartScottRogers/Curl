@@ -49,3 +49,4 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
