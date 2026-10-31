@@ -31,3 +31,4 @@ Shift-end review 2026-10-31 (silent-failure-hunter). Commit 00c9022dc narrowed t
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: e63b344d 916d45b8 caf5fbe2.
