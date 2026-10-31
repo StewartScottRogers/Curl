@@ -66,3 +66,4 @@ A hang can be intermittent: the next run may pass. Reproduce with `dotnet test` 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 3fca587f 2911d5f5.
 - 2026-10-31: Doing -> Backlog. Cause not yet named: no local repro in 36 runs; the project now runs under a 3-minute blame hang timeout so CI's next hang names the stuck test (see Notes)
+- 2026-10-31: Backlog -> Deferred. Split for cost cap into BL-4427 (name and remove the cause) and BL-4428 (confirm CI shard finishes in time)
