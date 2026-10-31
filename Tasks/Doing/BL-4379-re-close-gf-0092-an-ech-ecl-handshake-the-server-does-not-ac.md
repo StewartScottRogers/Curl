@@ -49,3 +49,4 @@ Platform-specific (macOS). The likely cause is the harness, not Curl's ECH clien
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 45ea446b 5e325fc7 1fd5de8c 28346828.
