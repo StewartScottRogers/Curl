@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Curl.Extension.Abstractions;
 using Curl.Extension.Abstractions.Connection;
+using Curl.Extension.Abstractions.Resolution;
 using Curl.Extension.Composition;
 using Curl.Extension.WireGuard.UnitTests.Tunnel;
 
@@ -26,6 +27,24 @@ public sealed class WireGuardExtensionTests
         Assert.AreEqual("192.0.2.1", wireGuard.Configuration.Peers[0].Endpoint!.Host);
     }
 
+    [TestMethod]
+    public void ActivateResolver_WithoutTheOption_GivesNoHook()
+    {
+        Assert.IsNull(WireGuardExtension.ActivateResolver(ExtensionOptionValues.None));
+        Assert.IsNull(WireGuardExtension.ActivateResolver(ExtensionOptionValues.None, _ => throw new AssertFailedException("nothing to read"), new TunnelTestPeer(), TimeProvider.System, RandomNumberGenerator.Create()));
+    }
+
+    [TestMethod]
+    public void ActivateResolver_WithAConfiguration_GivesTheTunnelsResolverHook()
+    {
+        IResolverHook? hook = WireGuardExtension.ActivateResolver(ValuesOf("wg0.conf"), _ => TunnelTestPeer.ConfigurationText(), new TunnelTestPeer(), TimeProvider.System, RandomNumberGenerator.Create());
+
+        Assert.AreSame(WireGuardExtension.Option, Assert.IsInstanceOfType<WireGuardResolverHook>(hook).Option);
+    }
+
+    [TestMethod]
+    public void ResolverHookCatalogue_ActivatesWireGuardForItsOption() =>
+        Assert.IsTrue(ExtensionResolverHookCatalogue.Entries.Contains(WireGuardExtension.ActivateResolver));
     [TestMethod]
     public void Activate_UnreadableFile_IsTheCommandLineError()
     {

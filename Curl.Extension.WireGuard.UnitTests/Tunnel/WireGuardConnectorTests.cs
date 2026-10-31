@@ -176,10 +176,10 @@ public sealed class WireGuardConnectorTests
         Assert.StartsWith("Failed to connect to 10.0.0.53 port 53 through the WireGuard tunnel: ", result.ErrorMessage);
     }
 
-    private static ushort IdOf(byte[] query) => (ushort)((query[2] << 8) | query[3]);
+    internal static ushort IdOf(byte[] query) => (ushort)((query[2] << 8) | query[3]);
 
     /// <summary>Accepts the DNS tunnel's handshake and TCP connection and reads the framed query.</summary>
-    private static async Task<(IpPacket Packet, TcpSegment Syn, byte[] Query)> AcceptDnsQueryAsync(TunnelTestPeer peer)
+    internal static async Task<(IpPacket Packet, TcpSegment Syn, byte[] Query)> AcceptDnsQueryAsync(TunnelTestPeer peer)
     {
         await peer.AcceptHandshakeAsync();
         var (packet, syn) = await peer.AcceptTcpAsync();
@@ -188,7 +188,7 @@ public sealed class WireGuardConnectorTests
     }
 
     /// <summary>Sends a framed NOERROR answer holding <paramref name="answers" />, then acknowledges the client's FIN with the server's own.</summary>
-    private static async Task AnswerAndCloseAsync(TunnelTestPeer peer, IpPacket packet, TcpSegment syn, byte[] query, params byte[][] answers)
+    internal static async Task AnswerAndCloseAsync(TunnelTestPeer peer, IpPacket packet, TcpSegment syn, byte[] query, params byte[][] answers)
     {
         byte[] answer = WireGuardDnsMessageTests.Response(IdOf(query), 0x8180, answers);
         byte[] framed = [(byte)(answer.Length >> 8), (byte)answer.Length, .. answer];

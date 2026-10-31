@@ -45,7 +45,8 @@ public sealed class WireGuardHttp3EndToEndTests
                 new RefusingDatagramConnector(),
                 parsesAsWindowsBuild: false,
                 parsesAsQuicBuild: true,
-                extensionConnectionHookActivators: [values => WireGuardExtension.Activate(values, _ => TunnelTestPeer.ConfigurationText(), peer, TimeProvider.System, random)])
+                extensionConnectionHookActivators: [values => WireGuardExtension.Activate(values, _ => TunnelTestPeer.ConfigurationText(), peer, TimeProvider.System, random)],
+                extensionResolverHookActivators: [values => WireGuardExtension.ActivateResolver(values, _ => TunnelTestPeer.ConfigurationText(), peer, TimeProvider.System, random)])
             .RunAsync(["-s", "-S", "--wireguard", "wg0.conf", "--http3-only", "-k", "https://10.0.0.1/"]);
         await relayStop.CancelAsync();
         int relayedDatagrams = await relaying;
