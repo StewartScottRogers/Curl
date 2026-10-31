@@ -3,12 +3,12 @@ id: AF-0491
 title: OAuth2TokenCacheLocation's summary says it searches curl's own .curlrc variables, but its order and platforms differ from curl's
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Extension.OAuth2.UnitLibrary/Cache/OAuth2TokenCacheLocation.cs:OAuth2TokenCacheLocation:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-4401
+tasks: BL-4401
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
@@ -47,3 +47,4 @@ Select-String -Path Curl.Extension.OAuth2.UnitLibrary/Cache/OAuth2TokenCacheLoca
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
