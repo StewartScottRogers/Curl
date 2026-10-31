@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Names the test that hangs instead of letting a run wait out CI's timeout (BL-4421). -->
+  <PropertyGroup>
+    <RunSettingsFilePath>$(MSBuildProjectDirectory)/HangBlame.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="MSTest" />
   </ItemGroup>

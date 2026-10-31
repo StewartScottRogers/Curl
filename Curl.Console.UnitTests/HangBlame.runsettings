@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Every dotnet test run of Curl.Console.UnitTests runs under the blame collector (BL-4421):
+  a test that stays running for three minutes ends the run with the name of the test that
+  hung, where CI's quality shard 3 once sat silent until its timeout-minutes cancelled it.
+  The whole project normally finishes in seconds, so three minutes only catches a hang.
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="blame" enabled="True">
+        <Configuration>
+          <CollectDumpOnTestSessionHang TestTimeout="3m" HangDumpType="None" />
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+  <LoggerRunSettings>
+    <Loggers>
+      <Logger friendlyName="blame" enabled="True" />
+    </Loggers>
+  </LoggerRunSettings>
+</RunSettings>
