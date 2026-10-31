@@ -1,5 +1,5 @@
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.HostKeys;
+using Curl.Ssh.HostKeys;
 
 namespace Curl.Protocol.Ssh;
 

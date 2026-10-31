@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh;
-using Curl.Protocol.Ssh.Authentication;
+using Curl.Ssh.Authentication;
 using Curl.Protocol.Ssh.Connection;
 using Curl.Protocol.Ssh.Sftp;
 using Curl.Ssh;

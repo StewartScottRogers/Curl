@@ -1,9 +1,9 @@
 using System.Runtime.ExceptionServices;
 using System.Text;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Authentication;
-using Curl.Protocol.Ssh.HostKeys;
-using Curl.Protocol.Ssh.Keys;
+using Curl.Ssh.Authentication;
+using Curl.Ssh.HostKeys;
+using Curl.Ssh.Keys;
 using Curl.Protocol.Ssh.Scp;
 using Curl.Protocol.Ssh.Sftp;
 using Curl.Ssh;

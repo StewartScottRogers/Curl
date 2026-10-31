@@ -60,7 +60,7 @@ public sealed class SshDiagnosticLogTests
         Diagnostics.Arrange("level", DiagnosticLogLevel.Verbose);
         Diagnostics.Arrange("steps", "no methods listed, channel refused, exec refused, SFTP answer 101, scp upload started, transfer failed");
 
-        log.AuthenticationMethodsListed(null);
+        new SshAuthenticationLog(log.Transport).AuthenticationMethodsListed(null);
         log.ChannelOpened(false);
         log.ChannelRequested("exec"u8.ToArray(), "scp -t '/x'"u8.ToArray(), succeeded: false);
         log.SftpAnswerRead([101, 0, 0, 0, 1]);
@@ -91,9 +91,9 @@ public sealed class SshDiagnosticLogTests
         log.Transport.KeysReExchanged(Algorithms);
         log.Transport.HostKeyPresented([]);
         log.HostKeyAccepted(new SshOptions(), null);
-        log.AuthenticationMethodsListed("password");
-        log.AuthenticationTried("password");
-        log.AuthenticationEnded("password", succeeded: false);
+        new SshAuthenticationLog(log.Transport).AuthenticationMethodsListed("password");
+        new SshAuthenticationLog(log.Transport).AuthenticationTried("password");
+        new SshAuthenticationLog(log.Transport).AuthenticationEnded("password", succeeded: false);
         log.ChannelOpened(true);
         log.ChannelRequested([], [], succeeded: true);
         log.SftpRequestSent(3, 0);

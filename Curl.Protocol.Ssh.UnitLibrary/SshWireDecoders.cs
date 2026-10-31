@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using Curl.Protocol.Ssh.HostKeys;
 using Curl.Protocol.Ssh.Sftp;
 using Curl.Ssh.Compression;
 using Curl.Ssh.HostKeys;

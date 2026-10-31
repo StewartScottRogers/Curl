@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using Curl.Protocol.Ssh.HostKeys;
 using Curl.Ssh.HostKeys;
 
 namespace Curl.Conformance.SshServer;
