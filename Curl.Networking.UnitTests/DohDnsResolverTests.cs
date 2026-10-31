@@ -191,6 +191,26 @@ public sealed class DohDnsResolverTests
     }
 
     [TestMethod]
+    [DataRow(ProxyKind.Https, "proxy.example", 3129, true, DisplayName = "an https:// proxy gets TLS")]
+    [DataRow(ProxyKind.Http, "proxy.example", 3128, false, DisplayName = "an http:// proxy gets none")]
+    [DataRow(ProxyKind.Http10, "proxy.example", 3128, false, DisplayName = "an http/1.0 proxy gets none")]
+    public async Task ResolveAsync_WithAnHttpDohServerThroughAForwardProxy_ConnectsToTheProxyWithTlsOnlyForAnHttpsProxy(ProxyKind kind, string proxyHost, int proxyPort, bool expectedTls)
+    {
+        // AF-0487: the forward-proxy target's TLS follows the proxy's scheme, not the DoH server's.
+        var connector = new FakeConnector();
+        var dohUrl = new Uri("http://dns.example/dns-query");
+        var resolver = new DohDnsResolver(connector, dohUrl) { Proxy = new ProxyEndpoint(kind, proxyHost, proxyPort, null) };
+        ArrangeResolve(dohUrl, "example.test");
+
+        await resolver.ResolveAsync("example.test", CancellationToken.None);
+
+        WriteTargets(connector);
+        var expectedTarget = new ConnectTarget(proxyHost, proxyPort, expectedTls) { IsForwardProxy = true, PoolScheme = "http" };
+        Diagnostics.Assert("first target", expectedTarget, connector.Targets[0]);
+        Assert.AreEqual(expectedTarget, connector.Targets[0]);
+    }
+
+    [TestMethod]
     public async Task ResolveAsync_TheMeasuredAAnswerAndAnEmptyAaaaAnswer_ReturnsTheIPv4Address()
     {
         // ADR-0152: A answered 127.0.0.1 TTL 60, AAAA NOERROR with no record; curl printed

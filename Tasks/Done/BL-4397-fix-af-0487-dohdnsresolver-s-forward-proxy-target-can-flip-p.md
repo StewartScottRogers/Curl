@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/DohDnsResolverTests.cs]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4397 — Fix AF-0487: DohDnsResolver's forward-proxy target can flip proxy.Kind == ProxyKind.Https to != with no test failing, so DoH to an HTTPS proxy goes in plaintext
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added Curl.Networking.UnitTests/DohDnsResolverTests.cs to touches: the fix is a test there (no task in Doing on origin/work/dark-factory names Curl.Networking). No production change was needed: the code is right, only the test was missing.
+- New data-row test ResolveAsync_WithAnHttpDohServerThroughAForwardProxy_ConnectsToTheProxyWithTlsOnlyForAnHttpsProxy pins the whole forward-proxy ConnectTarget (TLS on for Https, off for Http and Http10, IsForwardProxy, PoolScheme) for an http:// DoH server.
+- Mutant check: lanes may not run the audit office mutation tool, so I applied the same mutant (== to != at DohDnsResolver.cs:160) by hand. All 3 rows failed under it and pass without it, so the mutant is killed. The re-audit runs the finding command itself.
+- dotnet build clean (0 warnings); the fast tests (TestCategory!=Integration) had no failures on Windows. The test is platform-neutral (fake connector, no paths or certificates).
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-31: Doing -> Done. DoH forward-proxy target's TLS choice is pinned by a test that kills the AF-0487 mutant
