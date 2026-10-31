@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_0358.md | not re-audited | overlaps planted defect PD-503 in BL-4999-20261030-235500-L9.jsonl, so the auditor's verdict (reproduces yes) is set aside: unfinishedRuns = ['BL-4999-20261030-235500-L9.jsonl']. The run log stops after three assistant lines ('Running the fast tests.') with no result record, so its cost is lost. Select-String '"type":"result"' finds no match. No lane trace or coordinator line names BL-4999.
+- 2026-10-31 | 2026-10-31_1149.md | not re-audited | overlaps planted defect PD-503 in BL-4999-20261031-090000-L9.jsonl, so the auditor's verdict (reproduces no) is set aside: By mechanism over this window: unfinishedRuns lists one file, BL-4999-20261031-090000-L9.jsonl, but its cause is different. No lane claimed BL-4999 and there was no lane 9 (filed as process:logs:BL-4999:unfinished-run). All 30 run logs written by real lane claims hold their type=result record, so no run log stopped before its run ended.
 
 ## Log
 

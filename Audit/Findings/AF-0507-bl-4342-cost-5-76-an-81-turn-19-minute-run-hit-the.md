@@ -3,19 +3,19 @@ id: AF-0507
 title: BL-4342 cost $5.76: an 81-turn, 19-minute run hit the turn cap at $5.00 before a 19-turn rerun finished it
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Its task BL-4417 is Done at work/dark-factory edc61f80642f; a cost-outlier finding records a past run's cost, which no fix can change, so it closes as task-done-historical (ADR-0422, 2026-10-14).
 key: process:BL-4342:BL-4342:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-4417
+tasks: BL-4417
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: task-done-historical
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0507 - BL-4342 cost $5.76: an 81-turn, 19-minute run hit the turn cap at $5.00 before a 19-turn rerun finished it
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: no task over $5 (maximum $1.65) and no run hit the turn cap (maximum 40 turns). Fix task BL-4417 Done.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Its task BL-4417 is Done at work/dark-factory edc61f80642f; a cost-outlier finding records a past run's cost, which no fix can change, so it closes as task-done-historical (ADR-0422, 2026-10-14).

@@ -3,8 +3,8 @@ id: AF-0473
 title: BL-4012 requeued twice (claimed with template-placeholder criteria, then the run budget ran out with stashed work) and then Deferred
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:BL-4012:redone-work
 reproduction: none
 task: BL-4190
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0473 - BL-4012 requeued twice (claimed with template-placeholder criteria, then the run budget ran out with stashed work) and then Deferred
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | The run budget again ran out twice with the work stashed. BL-4170 was requeued at 09:24:52 ('Run budget spent after the tokenizer (left uncommitted for the shift's stash)') and at 14:29:53 ('Run budget spent after the parser and descriptors (uncommitted for the shift's stash)'), then Blocked on the cost cap. No template-placeholder criteria were seen in this window.
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: requeues 0, tasksClaimedMoreThanOnce 0. No run ran out of budget with stashed work.
 
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0462
 title: Requirements.md coverage note lists SMB among protocols the code implements and registers, but smb/smbs are registered only as a refusing DisabledProtocolHandler
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_1149.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-31_0358.md, 2026-10-31_1149.md).
 key: truthfulness:Documentation/Product/Requirements.md:Coverage-SMB-registered:false-statement
 reproduction: none
 task: BL-4224
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: consecutive
+closed-by: 2026-10-31_0358.md, 2026-10-31_1149.md
 ---
 # AF-0462 - Requirements.md coverage note lists SMB among protocols the code implements and registers, but smb/smbs are registered only as a refusing DisabledProtocolHandler
 
@@ -43,8 +43,10 @@ Select-String -Path Documentation/Product/Requirements.md, Curl.Engine.UnitLibra
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_0358.md | reproduces: no | Ran the reproduction. Requirements.md no longer matches 'SCP and SMB are registered'. Lines 11-13 now read 'SFTP and SCP are registered in Curl.Console too. SMB is registered only as disabled: smb:// and smbs:// URLs fail with exit 1 and Protocol "<scheme>" is disabled'. That matches EngineComposition.cs:194 (new DisabledProtocolHandler(["smb", "smbs"])) and DisabledProtocolHandler's CurlExitCode.UnsupportedProtocol.
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the reproduction: 'SCP and SMB are registered' no longer matches Requirements.md. Only EngineComposition.cs:194 (the DisabledProtocolHandler line) matches. Requirements.md:11-13 now says 'SMB is registered only as disabled: smb:// and smbs:// URLs fail with exit 1', which DisabledProtocolHandler.cs does (CurlExitCode.UnsupportedProtocol, 'Protocol "<scheme>" is disabled').
 
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-31_0358.md, 2026-10-31_1149.md).

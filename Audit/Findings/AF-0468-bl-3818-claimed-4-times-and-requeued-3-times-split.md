@@ -3,8 +3,8 @@ id: AF-0468
 title: BL-3818 claimed 4 times and requeued 3 times, splitting off BL-4026, BL-4044 and BL-4056 one run at a time
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:BL-3818:redone-work
 reproduction: none
 task: BL-4186
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0468 - BL-3818 claimed 4 times and requeued 3 times, splitting off BL-4026, BL-4044 and BL-4056 one run at a time
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | Tasks were again split piecemeal across runs. BL-4131 was split for size into BL-4303/4304/4305 at 18:56:56 on 10-29, ran a 106-min claim, then was split again into BL-4373/BL-4374 at 15:46:39 on 10-30. BL-4112 filed BL-4194/4195/4196 at 10:18:11, then after an 81-turn run was split again into BL-4294..BL-4297 at 17:11:16.
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: tasksClaimedMoreThanOnce 0, requeues 0. No task split off parts one run at a time. The only split (BL-4377, 06:07) was one cost-cap split run that filed BL-4384 and BL-4385 at once, each done in one claim.
 
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

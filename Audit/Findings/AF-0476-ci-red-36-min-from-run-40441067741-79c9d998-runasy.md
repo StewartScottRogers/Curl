@@ -3,8 +3,8 @@ id: AF-0476
 title: CI red 36 min from run 40441067741 (79c9d998, RunAsync_OutputInUtf8ConfigFileOnWindows on Linux and macOS)
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:40441067741:ci-red
 reproduction: none
 task: BL-4229
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0476 - CI red 36 min from run 40441067741 (79c9d998, RunAsync_OutputInUtf8ConfigFileOnWindows on Linux and macOS)
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | A Linux and macOS test regression again turned CI red for over 30 min. Run 40984137987 (4c618d0f) was red 138.85 min; BL-4299 (Build_RelativeRealm_ReturnsNull on Linux+macOS) was filed at 18:50:48, claimed 19:31:03 and Done 19:48:21.
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: ciRedMinutes 0, no red spells. No CI failure in the window.
 
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

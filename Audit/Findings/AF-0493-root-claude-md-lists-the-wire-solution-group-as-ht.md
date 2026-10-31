@@ -3,12 +3,12 @@ id: AF-0493
 title: Root CLAUDE.md lists the /Wire/ solution group as Http2, Http3, Quic, Zstandard; Curl.slnx also has HttpDatagram, Protobuf, Ssh and WebSocket there
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:Wire-solution-folder-list:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-4403
+tasks: BL-4403
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
@@ -42,6 +42,9 @@ Select-String -Path CLAUDE.md -Pattern '/Wire/.: Http2, Http3, Quic, Zstandard -
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the reproduction: the old pattern '/Wire/.: Http2, Http3, Quic, Zstandard -' no longer matches CLAUDE.md. CLAUDE.md now lists 'Http2, Http3, HttpDatagram, Protobuf, Quic, Ssh, WebSocket, Zstandard', which covers the Curl.slnx lines 261, 265, 273 and 277.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.

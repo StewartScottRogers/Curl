@@ -3,19 +3,19 @@ id: AF-0487
 title: DohDnsResolver's forward-proxy target can flip proxy.Kind == ProxyKind.Https to != with no test failing, so DoH to an HTTPS proxy goes in plaintext
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/DohDnsResolver.cs:ConnectTarget-eq:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DohDnsResolver.cs:160:==
-task: none
-tasks:
+task: BL-4397
+tasks: BL-4397
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: mechanical
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0487 - DohDnsResolver's forward-proxy target can flip proxy.Kind == ProxyKind.Https to != with no test failing, so DoH to an HTTPS proxy goes in plaintext
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the -Site command: 'killed Curl.Networking.UnitLibrary/DohDnsResolver.cs:160 ==' (resolvedLine 160, 'proxy.Kind == ProxyKind.Https' mutated to '!='); outcome killed. Baseline left out 3 HandBuiltTlsProviderTests ECH tests that fail unmutated. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

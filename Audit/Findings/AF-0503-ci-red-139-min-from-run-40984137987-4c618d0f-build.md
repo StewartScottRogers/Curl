@@ -3,19 +3,19 @@ id: AF-0503
 title: CI red 139 min from run 40984137987 (4c618d0f, Build_RelativeRealm_ReturnsNull on Linux and macOS, then the quality gates)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:40984137987:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-4413
+tasks: BL-4413
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0503 - CI red 139 min from run 40984137987 (4c618d0f, Build_RelativeRealm_ReturnsNull on Linux and macOS, then the quality gates)
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: ciRedMinutes 0, no red spells, no failing CI run.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
