@@ -9,6 +9,7 @@ touches: [Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Conforman
 requirement: none
 created: 2026-10-30
 completed:
+---
 # BL-4378 — Fix flaky CI test UpstreamCase_RunThroughCurl_HoldsTheRatchet (test670, 60 s timeout on Windows)
 
 ## Goal

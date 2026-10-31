@@ -5,10 +5,11 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [DarkFactory/CiWatch.ps1]
+touches: [DarkFactory/CiWatch.ps1, DarkFactory/ShiftEnd.ps1]
 requirement: none
 created: 2026-10-30
 completed:
+---
 # BL-4377 — Say why CI watch cannot list the CI runs, and say again while it still cannot
 
 ## Goal
@@ -27,6 +28,8 @@ When the coordinator's CI watch cannot list the `CI` runs, its log line carries 
 - [ ] The cause of the first-heartbeat failure is named in Notes from a shift's log after this change, and fixed if it is the factory's own (for example a call made before the shift's environment is ready).
 
 ## Notes
+
+- 2026-10-31 (interactive): the shift-end merge has the same blindness. DarkFactory-20261030-220408.log: `merge not merged: CI did not finish on 8029938 within 60 min` at 23:33 Arizona, yet CI run on 802993809 was created 05:31 UTC (22:31) and completed success 06:00 UTC (23:00). Find the merge wait's gh call (ShiftEnd.ps1) and give it the same error text and re-trace; a blind wait costs a whole shift's merge to master. Add `DarkFactory/ShiftEnd.ps1` to touches if it changes.
 
 ## Log
 
