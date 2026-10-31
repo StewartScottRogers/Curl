@@ -36,3 +36,4 @@ Second of three moves that give BL-4145's `--ssh-jump` extension an SSH client i
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 23ab75f6 5e26d2e1 e35aff77 3d836d5e.
