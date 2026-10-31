@@ -272,8 +272,32 @@ public sealed partial class UpstreamConformanceTests
         };
     }
 
-    // The ported libtest programs the ratchet runs a <tool> case's program from, over CreateEngine.
-    private static readonly UpstreamLibTests LibTests = new(LibTestPrograms.Ported, CreateEngine);
+    // The ported libtest programs the ratchet runs a <tool> case's program from, over CreateEngine, with lib670's
+    // pause taken off the wall clock (ADR-1169).
+    private static readonly UpstreamLibTests LibTests = new(
+        new LibTestPrograms(LibTestPrograms.Ported.ProgramNames.Select(name => name == Lib670WithItsPauseSkipped.Name ? new Lib670WithItsPauseSkipped() : LibTestPrograms.Ported.Find(name)!)),
+        CreateEngine);
+
+    // lib670 (cases 670 to 673), each run over its own PauseSkippingClock: the pause still holds until the program
+    // unpauses, but its PAUSE_TIME seconds pass at once, so a loaded runner cannot stretch them to the hang limit (BL-4378).
+    private sealed class Lib670WithItsPauseSkipped : ILibTest
+    {
+        internal const string Name = "lib670";
+
+        public string ProgramName => Name;
+
+        public Task<LibTestResult> RunAsync(LibTestContext context, CancellationToken cancellationToken) =>
+            new Lib670(new PauseSkippingClock()).RunAsync(context, cancellationToken);
+    }
+
+    // The system clock, but every reading after the first, the moment lib670's pause began, is Lib670.PauseSeconds later.
+    private sealed class PauseSkippingClock : TimeProvider
+    {
+        private int readings;
+
+        public override long GetTimestamp() =>
+            TimeProvider.System.GetTimestamp() + (Interlocked.Increment(ref readings) == 1 ? 0 : Lib670.PauseSeconds * TimestampFrequency);
+    }
 
     // The signing time of upstream's debug build under CURL_FORCETIME: CURL_HTTPSIG_CREATED seconds after the epoch
     // when the case sets it (test5004), else the epoch itself.
