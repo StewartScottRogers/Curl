@@ -34,3 +34,4 @@ When the coordinator's CI watch cannot list the `CI` runs, its log line carries 
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 842ca840 c081c1f2 9d88f1e3 cd4e4eec.
