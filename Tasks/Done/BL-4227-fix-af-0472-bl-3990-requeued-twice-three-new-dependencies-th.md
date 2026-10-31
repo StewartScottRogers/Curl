@@ -1,6 +1,6 @@
 ---
-id: BL-4188
-title: Fix AF-0470: BL-3639 requeued twice (files held by BL-3570/BL-3893, then the 80-turn cap) and then Deferred and split
+id: BL-4227
+title: Fix AF-0472: BL-3990 requeued twice (three new dependencies, then the cost cap) and then Deferred and split
 priority: Normal
 assignee: Claude
 pipeline: direct
@@ -9,34 +9,34 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-31
 ---
-# BL-4188 — Fix AF-0470: BL-3639 requeued twice (files held by BL-3570/BL-3893, then the 80-turn cap) and then Deferred and split
+# BL-4227 — Fix AF-0472: BL-3990 requeued twice (three new dependencies, then the cost cap) and then Deferred and split
 
 ## Goal
 
-The cause of the factory behaviour the audit office reported as AF-0470 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
+The cause of the factory behaviour the audit office reported as AF-0472 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
 
 ## Context
 
-Filed from audit finding AF-0470 (Medium, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0470-bl-3639-requeued-twice-files-held-by-bl-3570-bl-38.md`.
+Filed from audit finding AF-0472 (Medium, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0472-bl-3990-requeued-twice-three-new-dependencies-then.md`.
 
-Location: `logs/DarkFactory-20261028-052757-L9.log:20`
+Location: `logs/DarkFactory-20261029-014637-L1.log:15`
 
-Location: `logs/DarkFactory-20261028-052757-L9.log:20`
+Location: `logs/DarkFactory-20261029-014637-L1.log:15`
 
-Requeue 1 at 2026-10-26 17:55:48 after 27 turns: 'Waiting on BL-3570 (holds ...CommandLineOptionTable.cs) and BL-3893 (holds ...CommandLineRefusal.cs)' (DarkFactory-20261026-151632-L6.log:104). Requeue 2 at 2026-10-28 06:28:00: 81 turns in 14.2 min, stopped at the 80-turn cap (DarkFactory-20261028-052757-L9.log:20). The task was then Deferred and split into BL-3972, BL-3973 and BL-3974. Cost $5.30.
+Requeue 1 at 2026-10-28 21:30:06: 'Needs BL-4036 ..., BL-4037 ... and BL-4038 ...' (DarkFactory-20261028-201954-L6.log:35). Requeue 2 at 2026-10-29 01:52:02: 'Cost cap: the plan and decisions are under Notes' (DarkFactory-20261029-014637-L1.log:15). The task was then Deferred and split into BL-4068 and BL-4069. The tool reports claims=2, cost $2.41.
 
 Reproduction, from the finding:
 
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-25 -LogRoot Z:/repos/Curl.audit/20261029-060658/logs -CiRunsJson Z:/repos/Curl.audit/20261029-060658/logs/ci-runs.json -OutFile $env:TEMP/process.json; Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.log -Pattern 'BL-3639 (claim|end|REQUEUE)'
+powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-25 -LogRoot Z:/repos/Curl.audit/20261029-060658/logs -CiRunsJson Z:/repos/Curl.audit/20261029-060658/logs/ci-runs.json -OutFile $env:TEMP/process.json; Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.log -Pattern 'BL-3990 (claim|REQUEUE)'
 ```
 
 - Expected: Fewer than 2 requeues.
-- Actual: BL-3639: 2 REQUEUE lines, outcome requeued, then Deferred.
+- Actual: BL-3990: 2 REQUEUE lines, outcome requeued, then Deferred.
 
 The reproduction measures a frozen copy of the logs, which no fix can change, so this task's evidence is the same measurement run over the live logs written after the fix landed (ADR-0761). The finding closes only when a later re-audit by the process auditor confirms the fix, never because this task reaches Done.
 
@@ -54,3 +54,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-31: Backlog -> Doing. Interactive measurement Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-31: Doing -> Done. Measured 2026-10-31: the finding's expected result holds since its fix landed (see Notes); build clean, fast tests 114 assemblies passed

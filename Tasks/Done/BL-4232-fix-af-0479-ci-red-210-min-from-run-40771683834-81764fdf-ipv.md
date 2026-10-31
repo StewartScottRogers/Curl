@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-31
 ---
 # BL-4232 — Fix AF-0479: CI red 210 min from run 40771683834 (81764fdf): IPv6/IPv4-literal tests plus two tests CiWatch named '-4' and '-6'
 
@@ -54,3 +54,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-31: Backlog -> Doing. Interactive measurement Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-31: Doing -> Done. Measured 2026-10-31: the finding's expected result holds since its fix landed (see Notes); build clean, fast tests 114 assemblies passed

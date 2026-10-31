@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4415 — Fix AF-0505: CI red 76 min from run 41151657472 (dbc468ec) unseen: every coordinator from 15:24 on 10-30 could not list CI runs with gh
 
@@ -52,3 +52,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Interactive measurement Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-31: Doing -> Done. Measured 2026-10-31: the finding's expected result holds since its fix landed (see Notes); build clean, fast tests 114 assemblies passed

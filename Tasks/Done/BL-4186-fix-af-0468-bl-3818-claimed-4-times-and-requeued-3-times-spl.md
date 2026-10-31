@@ -1,6 +1,6 @@
 ---
-id: BL-4184
-title: Fix AF-0466: BL-3880 claimed 3 times and requeued twice (split for size, then a file held by another task)
+id: BL-4186
+title: Fix AF-0468: BL-3818 claimed 4 times and requeued 3 times, splitting off BL-4026, BL-4044 and BL-4056 one run at a time
 priority: Normal
 assignee: Claude
 pipeline: direct
@@ -9,34 +9,34 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-31
 ---
-# BL-4184 — Fix AF-0466: BL-3880 claimed 3 times and requeued twice (split for size, then a file held by another task)
+# BL-4186 — Fix AF-0468: BL-3818 claimed 4 times and requeued 3 times, splitting off BL-4026, BL-4044 and BL-4056 one run at a time
 
 ## Goal
 
-The cause of the factory behaviour the audit office reported as AF-0466 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
+The cause of the factory behaviour the audit office reported as AF-0468 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
 
 ## Context
 
-Filed from audit finding AF-0466 (Medium, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0466-bl-3880-claimed-3-times-and-requeued-twice-split-f.md`.
+Filed from audit finding AF-0468 (Medium, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0468-bl-3818-claimed-4-times-and-requeued-3-times-split.md`.
 
-Location: `logs/DarkFactory-20261028-111517-L4.log:27`
+Location: `logs/DarkFactory-20261029-014637-L2.log:41`
 
-Location: `logs/DarkFactory-20261028-111517-L4.log:27`
+Location: `logs/DarkFactory-20261029-014637-L2.log:41`
 
-The task Log shows 3 claims on 2026-10-28. Requeue 1 at 09:42:20: 'Split for size: waits on BL-3948 ... BL-3952' (DarkFactory-20261028-052757-L4.log:137). Requeue 2 at 11:52:36: 'Waits on BL-3975 (-m writes its timeout line twice; HttpProtocolHandler.cs, held by BL-3874)' (DarkFactory-20261028-111517-L4.log:27). Claim 3 finished Done. The tool reports claims=3, cost $2.39.
+The task Log shows 4 claims (2026-10-28 to 10-29); the tool reports claims=3, outcome requeued, cost $0.89. Requeues: 19:52:56 'Needs BL-4026 (ConnectTarget SNI host ...)' (DarkFactory-20261028-172341-L8.log:67); 22:03:05 'Code for the ldaps second connection landed; real-curl measurement and NTLM flags left to BL-4044' (DarkFactory-20261028-201954-L4.log:41); 02:44:44 'the --cacert variant is BL-4056's work' (DarkFactory-20261029-014637-L2.log:41). Done on claim 4. Each run found the next missing piece, so scoping happened across claims instead of before the first.
 
 Reproduction, from the finding:
 
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-25 -LogRoot Z:/repos/Curl.audit/20261029-060658/logs -CiRunsJson Z:/repos/Curl.audit/20261029-060658/logs/ci-runs.json -OutFile $env:TEMP/process.json; Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.log -Pattern 'BL-3880 (claim|REQUEUE|DONE)'
+powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-25 -LogRoot Z:/repos/Curl.audit/20261029-060658/logs -CiRunsJson Z:/repos/Curl.audit/20261029-060658/logs/ci-runs.json -OutFile $env:TEMP/process.json; Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.log -Pattern 'BL-3818 (claim|REQUEUE|DONE)'
 ```
 
 - Expected: Fewer than 3 claims and fewer than 2 requeues.
-- Actual: BL-3880 claims=3, 2 REQUEUE lines.
+- Actual: BL-3818: 3 REQUEUE lines; 4 claims in its task Log.
 
 The reproduction measures a frozen copy of the logs, which no fix can change, so this task's evidence is the same measurement run over the live logs written after the fix landed (ADR-0761). The finding closes only when a later re-audit by the process auditor confirms the fix, never because this task reaches Done.
 
@@ -54,3 +54,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-31: Backlog -> Doing. Interactive measurement Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-31: Doing -> Done. Measured 2026-10-31: the finding's expected result holds since its fix landed (see Notes); build clean, fast tests 114 assemblies passed

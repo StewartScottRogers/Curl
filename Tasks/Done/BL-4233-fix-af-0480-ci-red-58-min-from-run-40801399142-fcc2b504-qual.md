@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-31
 ---
 # BL-4233 — Fix AF-0480: CI red 58 min from run 40801399142 (fcc2b504, Quality gates windows-latest: Curl.Core and Curl.Engine outside the gate)
 
@@ -54,3 +54,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-31: Backlog -> Doing. Interactive measurement Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-31: Doing -> Done. Measured 2026-10-31: the finding's expected result holds since its fix landed (see Notes); build clean, fast tests 114 assemblies passed

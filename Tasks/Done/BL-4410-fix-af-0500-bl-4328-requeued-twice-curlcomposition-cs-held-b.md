@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4410 — Fix AF-0500: BL-4328 requeued twice (CurlComposition.cs held by BL-4320, then the 80-turn cap) and then Deferred and split
 
@@ -52,3 +52,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Interactive measurement Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-31: Doing -> Done. Measured 2026-10-31: the finding's expected result holds since its fix landed (see Notes); build clean, fast tests 114 assemblies passed

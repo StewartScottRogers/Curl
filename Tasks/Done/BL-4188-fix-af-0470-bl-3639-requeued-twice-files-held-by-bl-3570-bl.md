@@ -1,6 +1,6 @@
 ---
-id: BL-4183
-title: Fix AF-0465: BL-3563 claimed 3 times and requeued 3 times before it was split and Deferred
+id: BL-4188
+title: Fix AF-0470: BL-3639 requeued twice (files held by BL-3570/BL-3893, then the 80-turn cap) and then Deferred and split
 priority: Normal
 assignee: Claude
 pipeline: direct
@@ -9,34 +9,34 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-31
 ---
-# BL-4183 — Fix AF-0465: BL-3563 claimed 3 times and requeued 3 times before it was split and Deferred
+# BL-4188 — Fix AF-0470: BL-3639 requeued twice (files held by BL-3570/BL-3893, then the 80-turn cap) and then Deferred and split
 
 ## Goal
 
-The cause of the factory behaviour the audit office reported as AF-0465 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
+The cause of the factory behaviour the audit office reported as AF-0470 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
 
 ## Context
 
-Filed from audit finding AF-0465 (Medium, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0465-bl-3563-claimed-3-times-and-requeued-3-times-befor.md`.
+Filed from audit finding AF-0470 (Medium, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0470-bl-3639-requeued-twice-files-held-by-bl-3570-bl-38.md`.
 
-Location: `logs/DarkFactory-20261028-052757-L1.log:53`
+Location: `logs/DarkFactory-20261028-052757-L9.log:20`
 
-Location: `logs/DarkFactory-20261028-052757-L1.log:53`
+Location: `logs/DarkFactory-20261028-052757-L9.log:20`
 
-Claim 1 (L5, 2026-10-26 09:30:59) ran 17 turns and was requeued at 09:39:14: 'Needs BL-3846 ... and BL-3847 first' (DarkFactory-20261026-063535-L5.log:152). Claim 2 (L5, 15:19:03) ran 62 turns over 33.7 min and was requeued at 15:57:12: 'Needs BL-3890 ... the multi wiring is in the stash' (DarkFactory-20261026-151632-L5.log:33). Claim 3 (L1, 2026-10-28 06:01:02) ran 81 turns over 53.3 min and was requeued at 06:56:09 on the 80-turn cap (DarkFactory-20261028-052757-L1.log:53). The task was then Deferred and split into BL-3976, BL-3977 and BL-3978. The dependencies were found by running the task, not before claiming it, and the split came only after a capped run. Total cost $9.19.
+Requeue 1 at 2026-10-26 17:55:48 after 27 turns: 'Waiting on BL-3570 (holds ...CommandLineOptionTable.cs) and BL-3893 (holds ...CommandLineRefusal.cs)' (DarkFactory-20261026-151632-L6.log:104). Requeue 2 at 2026-10-28 06:28:00: 81 turns in 14.2 min, stopped at the 80-turn cap (DarkFactory-20261028-052757-L9.log:20). The task was then Deferred and split into BL-3972, BL-3973 and BL-3974. Cost $5.30.
 
 Reproduction, from the finding:
 
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-25 -LogRoot Z:/repos/Curl.audit/20261029-060658/logs -CiRunsJson Z:/repos/Curl.audit/20261029-060658/logs/ci-runs.json -OutFile $env:TEMP/process.json; Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.log -Pattern 'BL-3563 (claim|end|REQUEUE)'
+powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-25 -LogRoot Z:/repos/Curl.audit/20261029-060658/logs -CiRunsJson Z:/repos/Curl.audit/20261029-060658/logs/ci-runs.json -OutFile $env:TEMP/process.json; Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.log -Pattern 'BL-3639 (claim|end|REQUEUE)'
 ```
 
-- Expected: A task claimed fewer than 3 times and requeued fewer than twice.
-- Actual: BL-3563 claims=3, 3 REQUEUE lines, outcome requeued, then Deferred and split.
+- Expected: Fewer than 2 requeues.
+- Actual: BL-3639: 2 REQUEUE lines, outcome requeued, then Deferred.
 
 The reproduction measures a frozen copy of the logs, which no fix can change, so this task's evidence is the same measurement run over the live logs written after the fix landed (ADR-0761). The finding closes only when a later re-audit by the process auditor confirms the fix, never because this task reaches Done.
 
@@ -54,3 +54,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-31: Backlog -> Doing. Interactive measurement Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-31: Doing -> Done. Measured 2026-10-31: the finding's expected result holds since its fix landed (see Notes); build clean, fast tests 114 assemblies passed

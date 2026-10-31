@@ -1,6 +1,6 @@
 ---
-id: BL-4185
-title: Fix AF-0467: BL-3981 claimed 3 times and requeued twice, each time on a missing dependency (BL-3976, then BL-3990)
+id: BL-4191
+title: Fix AF-0474: BL-3837 (CI quality-gate fix) claimed 3 times: requeued on BL-3831, then Blocked on an unrelated Linux failure
 priority: Normal
 assignee: Claude
 pipeline: direct
@@ -9,34 +9,34 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-31
 ---
-# BL-4185 — Fix AF-0467: BL-3981 claimed 3 times and requeued twice, each time on a missing dependency (BL-3976, then BL-3990)
+# BL-4191 — Fix AF-0474: BL-3837 (CI quality-gate fix) claimed 3 times: requeued on BL-3831, then Blocked on an unrelated Linux failure
 
 ## Goal
 
-The cause of the factory behaviour the audit office reported as AF-0467 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
+The cause of the factory behaviour the audit office reported as AF-0474 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
 
 ## Context
 
-Filed from audit finding AF-0467 (Medium, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0467-bl-3981-claimed-3-times-and-requeued-twice-each-ti.md`.
+Filed from audit finding AF-0474 (Medium, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0474-bl-3837-ci-quality-gate-fix-claimed-3-times-requeu.md`.
 
-Location: `logs/DarkFactory-20261028-201954-L3.log:37`
+Location: `logs/DarkFactory-20261026-063535-L2.log:107`
 
-Location: `logs/DarkFactory-20261028-201954-L3.log:37`
+Location: `logs/DarkFactory-20261026-063535-L2.log:107`
 
-Requeue 1 at 2026-10-28 12:45:43: 'criterion 2 needs BL-3976's ManagedMultiTransfer wiring (cycle broken...)' (DarkFactory-20261028-111517-L4.log:70). Requeue 2 at 21:24:50: 'Criterion 2 needs the 10 ms timer removed from ManagedMultiTransfer: BL-3990' (DarkFactory-20261028-201954-L3.log:37). Done on the third claim on 2026-10-29. There was a dependency cycle between BL-3976 and BL-3981 that the board did not catch before the claim. The tool reports claims=3, cost $2.47.
+The task Log shows 3 claims on 2026-10-26; the tool counts 2 (claims=2, $0.85). Requeue at 08:59:32: 'Waits on BL-3831, which covers WriteRefusalAsync's untaken branch' (DarkFactory-20261026-063535-L2.log:107). Then Doing -> Blocked because Build and test (ubuntu-latest) still failed on Format_OpenSslUnprintableNames (BL-3878's test), and Blocked -> Backlog once BL-3878 was Done. Claim 3 (DarkFactory-20261026-151632-L2.log:47, 16:37:42) finished it. A CI-fix task was filed while the task that fixed it (BL-3831) was already on the board.
 
 Reproduction, from the finding:
 
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-25 -LogRoot Z:/repos/Curl.audit/20261029-060658/logs -CiRunsJson Z:/repos/Curl.audit/20261029-060658/logs/ci-runs.json -OutFile $env:TEMP/process.json; Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.log -Pattern 'BL-3981 (claim|REQUEUE|DONE)'
+Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.log -Pattern 'BL-3837 (claim|REQUEUE|BLOCKED|DONE)'; Select-String -Path Tasks/Done/2026-10-26/BL-3837-*.md -Pattern 'Backlog -> Doing'
 ```
 
-- Expected: Fewer than 3 claims and fewer than 2 requeues.
-- Actual: BL-3981 claims=3, 2 REQUEUE lines.
+- Expected: Fewer than 3 claims.
+- Actual: 3 'Backlog -> Doing' lines in the task Log; claims at 08:54:54 (L2), and twice more in shift 20261026-151632.
 
 The reproduction measures a frozen copy of the logs, which no fix can change, so this task's evidence is the same measurement run over the live logs written after the fix landed (ADR-0761). The finding closes only when a later re-audit by the process auditor confirms the fix, never because this task reaches Done.
 
@@ -54,3 +54,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-31: Backlog -> Doing. Interactive measurement Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-31: Doing -> Done. Measured 2026-10-31: the finding's expected result holds since its fix landed (see Notes); build clean, fast tests 114 assemblies passed

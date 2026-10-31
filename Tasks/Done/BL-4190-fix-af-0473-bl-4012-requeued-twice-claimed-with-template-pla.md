@@ -1,6 +1,6 @@
 ---
-id: BL-4227
-title: Fix AF-0472: BL-3990 requeued twice (three new dependencies, then the cost cap) and then Deferred and split
+id: BL-4190
+title: Fix AF-0473: BL-4012 requeued twice (claimed with template-placeholder criteria, then the run budget ran out with stashed work) and then Deferred
 priority: Normal
 assignee: Claude
 pipeline: direct
@@ -9,34 +9,34 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-31
 ---
-# BL-4227 — Fix AF-0472: BL-3990 requeued twice (three new dependencies, then the cost cap) and then Deferred and split
+# BL-4190 — Fix AF-0473: BL-4012 requeued twice (claimed with template-placeholder criteria, then the run budget ran out with stashed work) and then Deferred
 
 ## Goal
 
-The cause of the factory behaviour the audit office reported as AF-0472 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
+The cause of the factory behaviour the audit office reported as AF-0473 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
 
 ## Context
 
-Filed from audit finding AF-0472 (Medium, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0472-bl-3990-requeued-twice-three-new-dependencies-then.md`.
+Filed from audit finding AF-0473 (Medium, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0473-bl-4012-requeued-twice-claimed-with-template-place.md`.
 
-Location: `logs/DarkFactory-20261029-014637-L1.log:15`
+Location: `logs/DarkFactory-20261028-201954-L6.log:19`
 
-Location: `logs/DarkFactory-20261029-014637-L1.log:15`
+Location: `logs/DarkFactory-20261028-201954-L6.log:19`
 
-Requeue 1 at 2026-10-28 21:30:06: 'Needs BL-4036 ..., BL-4037 ... and BL-4038 ...' (DarkFactory-20261028-201954-L6.log:35). Requeue 2 at 2026-10-29 01:52:02: 'Cost cap: the plan and decisions are under Notes' (DarkFactory-20261029-014637-L1.log:15). The task was then Deferred and split into BL-4068 and BL-4069. The tool reports claims=2, cost $2.41.
+Requeue 1 at 2026-10-28 19:06:36: 'Waits on BL-4018 ...; Goal and criteria are still the template placeholders and must be written in Backlog' (DarkFactory-20261028-172341-L11.log:65). A task with no real criteria was claimable. Requeue 2 at 21:13:58: 'Run budget ran out; 3 quality-gate failures left in the stashed work' (DarkFactory-20261028-201954-L6.log:19). The task was then Deferred and split into BL-4057 and BL-4058. The tool reports claims=2, 73.4 min, cost $2.72.
 
 Reproduction, from the finding:
 
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-25 -LogRoot Z:/repos/Curl.audit/20261029-060658/logs -CiRunsJson Z:/repos/Curl.audit/20261029-060658/logs/ci-runs.json -OutFile $env:TEMP/process.json; Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.log -Pattern 'BL-3990 (claim|REQUEUE)'
+powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-25 -LogRoot Z:/repos/Curl.audit/20261029-060658/logs -CiRunsJson Z:/repos/Curl.audit/20261029-060658/logs/ci-runs.json -OutFile $env:TEMP/process.json; Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.log -Pattern 'BL-4012 (claim|REQUEUE)'
 ```
 
-- Expected: Fewer than 2 requeues.
-- Actual: BL-3990: 2 REQUEUE lines, outcome requeued, then Deferred.
+- Expected: Fewer than 2 requeues; no claim of a task whose criteria are template placeholders.
+- Actual: BL-4012: 2 REQUEUE lines, outcome requeued, then Deferred.
 
 The reproduction measures a frozen copy of the logs, which no fix can change, so this task's evidence is the same measurement run over the live logs written after the fix landed (ADR-0761). The finding closes only when a later re-audit by the process auditor confirms the fix, never because this task reaches Done.
 
@@ -54,3 +54,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-31: Backlog -> Doing. Interactive measurement Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-31: Doing -> Done. Measured 2026-10-31: the finding's expected result holds since its fix landed (see Notes); build clean, fast tests 114 assemblies passed
