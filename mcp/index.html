@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Set up the Curl MCP server</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font-family:sans-serif;max-width:50rem;margin:2rem auto;padding:0 1rem}pre{background:#f4f4f4;padding:.7rem;overflow-x:auto}</style></head>
+<body>
+<h1>Set up the Curl MCP server</h1>
+<p>Curl.Mcp is an MCP server over stdio. It gives an agent a <code>curl</code> tool and the <code>--ai-help</code> reference as resources. Download its packages from <a href="../download/">the download page</a> (kind <code>mcp-server</code>), put every Curl.Mcp nupkg in one folder, and launch it with <code>dnx Curl.Mcp --yes --prerelease --add-source &lt;folder&gt;</code>. The configurations below assume that folder is <code>/path/to/curl-packages</code>; change it.</p>
+<p><code>CURL_MCP_ROOT</code> is the only directory the tool may read or write; set it to the project folder. With it unset every file path is refused. Details: <a href="https://github.com/StewartScottRogers/Curl/blob/master/Curl.Mcp/README.md">Curl.Mcp README</a>.</p>
+<p><strong>Checked against:</strong> the VS Code shape is the one in Curl.Mcp/README.md. The Claude Desktop, Claude Code and Copilot shapes are the clients' documented shapes as of 2026-10-22 (<code>mcpServers</code> in <code>claude_desktop_config.json</code>; <code>claude mcp add</code>; <code>servers</code> in <code>.vscode/mcp.json</code> for Copilot in VS Code). They were written from knowledge of that documentation and not fetched while building this page, so if a client rejects one, its own documentation wins.</p>
+
+<h2>Claude Desktop</h2>
+<p>Edit <code>claude_desktop_config.json</code> (Settings, Developer, Edit Config) and restart Claude Desktop:</p>
+<pre>{
+  "mcpServers": {
+    "curl": {
+      "command": "dnx",
+      "args": ["Curl.Mcp", "--yes", "--add-source", "/path/to/curl-packages"],
+      "env": { "CURL_MCP_ROOT": "/path/to/project" }
+    }
+  }
+}</pre>
+
+<h2>Claude Code</h2>
+<pre>claude mcp add curl --env CURL_MCP_ROOT=/path/to/project -- dnx Curl.Mcp --yes --prerelease --add-source /path/to/curl-packages</pre>
+
+<h2>VS Code</h2>
+<p>Add to <code>.vscode/mcp.json</code> in the workspace:</p>
+<pre>{
+  "servers": {
+    "curl": {
+      "type": "stdio",
+      "command": "dnx",
+      "args": ["Curl.Mcp", "--yes", "--add-source", "/path/to/curl-packages"],
+      "env": { "CURL_MCP_ROOT": "${workspaceFolder}" }
+    }
+  }
+}</pre>
+
+<h2>Copilot</h2>
+<p>GitHub Copilot in VS Code reads the same <code>.vscode/mcp.json</code> as above: use that block, then choose Agent mode and enable the <code>curl</code> tools. For Copilot in Visual Studio, put the same block in <code>.mcp.json</code> in the solution folder.</p>
+
+<p>See also: <a href="../llms.txt">llms.txt</a>, <a href="../ai-help/">--ai-help reference</a>.</p>
+</body></html>

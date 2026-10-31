@@ -1,0 +1,2068 @@
+{
+  "generated": "2026-10-31T05:13:55Z",
+  "target": "8.22.0",
+  "newest": "8.22.0",
+  "latest": {
+    "stamp": "2026-10-30_2103",
+    "commit": "403ec51fe3c380e4b5b914c4b1d1e6e5291492d9",
+    "platform": "macos",
+    "targetVersion": "8.22.0",
+    "newestVersion": "8.22.0",
+    "areas": {
+      "options": {
+        "x": 568,
+        "y": 568
+      },
+      "protocols": {
+        "x": 27,
+        "y": 27
+      },
+      "features": {
+        "x": 20,
+        "y": 20
+      },
+      "writeout": {
+        "x": 138,
+        "y": 138
+      },
+      "exitcodes": {
+        "x": 259,
+        "y": 259
+      },
+      "environment": {
+        "x": 33,
+        "y": 33
+      },
+      "behaviour": {
+        "x": 1484,
+        "y": 1486
+      }
+    },
+    "overall": {
+      "x": 2529,
+      "y": 2531
+    },
+    "newest": {
+      "x": 2529,
+      "y": 2531
+    }
+  },
+  "platforms": {
+    "windows": {
+      "stamp": "2026-10-30_2103",
+      "commit": "403ec51fe3c380e4b5b914c4b1d1e6e5291492d9",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 564,
+          "y": 564
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1452,
+          "y": 1454
+        }
+      },
+      "overall": {
+        "x": 2497,
+        "y": 2499
+      },
+      "newest": {
+        "x": 2497,
+        "y": 2499
+      }
+    },
+    "linux": {
+      "stamp": "2026-10-30_2103",
+      "commit": "403ec51fe3c380e4b5b914c4b1d1e6e5291492d9",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 32,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1484,
+          "y": 1486
+        }
+      },
+      "overall": {
+        "x": 2528,
+        "y": 2531
+      },
+      "newest": {
+        "x": 2528,
+        "y": 2531
+      }
+    },
+    "macos": {
+      "stamp": "2026-10-30_2103",
+      "commit": "403ec51fe3c380e4b5b914c4b1d1e6e5291492d9",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 33,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1484,
+          "y": 1486
+        }
+      },
+      "overall": {
+        "x": 2529,
+        "y": 2531
+      },
+      "newest": {
+        "x": 2529,
+        "y": 2531
+      }
+    }
+  },
+  "lowest": {
+    "platform": "linux",
+    "stamp": "2026-10-30_2103",
+    "x": 2528,
+    "y": 2531
+  },
+  "history": [
+    {
+      "stamp": "2026-10-08_1640",
+      "commit": "0fcab8154bc9edd94631a50dfe69b45e56103d61",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.21.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 573
+        },
+        "protocols": {
+          "x": 27,
+          "y": 29
+        },
+        "features": {
+          "x": 16,
+          "y": 23
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 578,
+          "y": 1326
+        }
+      },
+      "overall": {
+        "x": 1609,
+        "y": 2390
+      },
+      "newest": {
+        "x": 1609,
+        "y": 2390
+      }
+    },
+    {
+      "stamp": "2026-10-08_2029",
+      "commit": "6383c57058094f578fbb0580b9eea86f7c54cca1",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 573
+        },
+        "protocols": {
+          "x": 27,
+          "y": 29
+        },
+        "features": {
+          "x": 18,
+          "y": 23
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 651,
+          "y": 1327
+        }
+      },
+      "overall": {
+        "x": 1684,
+        "y": 2391
+      },
+      "newest": {
+        "x": 1684,
+        "y": 2391
+      }
+    },
+    {
+      "stamp": "2026-10-10_0657",
+      "commit": "124a991e4e94f00b7f2601b719f980e202d0c231",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 573
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 1042,
+          "y": 1402
+        }
+      },
+      "overall": {
+        "x": 2076,
+        "y": 2459
+      },
+      "newest": {
+        "x": 2076,
+        "y": 2459
+      }
+    },
+    {
+      "stamp": "2026-10-11_0936",
+      "commit": "73b24de56af52ce71fbb11463260368249d462e3",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 1218,
+          "y": 1394
+        }
+      },
+      "overall": {
+        "x": 2252,
+        "y": 2446
+      },
+      "newest": {
+        "x": 2252,
+        "y": 2446
+      }
+    },
+    {
+      "stamp": "2026-10-11_1950",
+      "commit": "9271d48eed05c110220206d6996edd11ecccf1d5",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 1241,
+          "y": 1394
+        }
+      },
+      "overall": {
+        "x": 2275,
+        "y": 2446
+      },
+      "newest": {
+        "x": 2275,
+        "y": 2446
+      }
+    },
+    {
+      "stamp": "2026-10-12_0951",
+      "commit": "6e0e22221eb6c219fb70e6d9d9ddf0732717879a",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 37,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1240,
+          "y": 1394
+        }
+      },
+      "overall": {
+        "x": 2287,
+        "y": 2443
+      },
+      "newest": {
+        "x": 2287,
+        "y": 2443
+      }
+    },
+    {
+      "stamp": "2026-10-12_2042",
+      "commit": "7851aca9b37fbcc5b3c59186942d0fefd00f04ac",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1241,
+          "y": 1394
+        }
+      },
+      "overall": {
+        "x": 2290,
+        "y": 2443
+      },
+      "newest": {
+        "x": 2290,
+        "y": 2443
+      }
+    },
+    {
+      "stamp": "2026-10-13_1406",
+      "commit": "ea349cba55ff1071102d656cf71828453b0b36c5",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 576,
+          "y": 576
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1250,
+          "y": 1417
+        }
+      },
+      "overall": {
+        "x": 2307,
+        "y": 2474
+      },
+      "newest": {
+        "x": 2307,
+        "y": 2474
+      }
+    },
+    {
+      "stamp": "2026-10-14_0904",
+      "commit": "9ffb1cb168b2bd7e9b4c356afb7614996d61993f",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 576
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1271,
+          "y": 1387
+        }
+      },
+      "overall": {
+        "x": 2320,
+        "y": 2444
+      },
+      "newest": {
+        "x": 2320,
+        "y": 2444
+      }
+    },
+    {
+      "stamp": "2026-10-15_0304",
+      "commit": "6840229aa577fb1a017a9eafc5f0d758db124387",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1390,
+          "y": 1427
+        }
+      },
+      "overall": {
+        "x": 2439,
+        "y": 2476
+      },
+      "newest": {
+        "x": 2439,
+        "y": 2476
+      }
+    },
+    {
+      "stamp": "2026-10-15_0543",
+      "commit": "433a1953297ac88e63b8a711cf293bfb54f6e77a",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1396,
+          "y": 1427
+        }
+      },
+      "overall": {
+        "x": 2445,
+        "y": 2476
+      },
+      "newest": {
+        "x": 2445,
+        "y": 2476
+      }
+    },
+    {
+      "stamp": "2026-10-15_0751",
+      "commit": "a62a7149d175dc43fac44407f9ba228fbef0947f",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1396,
+          "y": 1427
+        }
+      },
+      "overall": {
+        "x": 2445,
+        "y": 2476
+      },
+      "newest": {
+        "x": 2445,
+        "y": 2476
+      }
+    },
+    {
+      "stamp": "2026-10-15_0751",
+      "commit": "a62a7149d175dc43fac44407f9ba228fbef0947f",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 565,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 29
+        },
+        "features": {
+          "x": 19,
+          "y": 22
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1408,
+          "y": 1445
+        }
+      },
+      "overall": {
+        "x": 2444,
+        "y": 2494
+      },
+      "newest": {
+        "x": 2444,
+        "y": 2494
+      }
+    },
+    {
+      "stamp": "2026-10-15_0751",
+      "commit": "a62a7149d175dc43fac44407f9ba228fbef0947f",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 565,
+          "y": 568
+        },
+        "protocols": {
+          "x": 25,
+          "y": 29
+        },
+        "features": {
+          "x": 19,
+          "y": 22
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1407,
+          "y": 1445
+        }
+      },
+      "overall": {
+        "x": 2441,
+        "y": 2494
+      },
+      "newest": {
+        "x": 2441,
+        "y": 2494
+      }
+    },
+    {
+      "stamp": "2026-10-15_1657",
+      "commit": "adf07bc2bf2b55cd554c8fe52b7a24ddf3d0eba0",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1396,
+          "y": 1427
+        }
+      },
+      "overall": {
+        "x": 2445,
+        "y": 2476
+      },
+      "newest": {
+        "x": 2445,
+        "y": 2476
+      }
+    },
+    {
+      "stamp": "2026-10-15_1657",
+      "commit": "adf07bc2bf2b55cd554c8fe52b7a24ddf3d0eba0",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1410,
+          "y": 1445
+        }
+      },
+      "overall": {
+        "x": 2449,
+        "y": 2490
+      },
+      "newest": {
+        "x": 2449,
+        "y": 2490
+      }
+    },
+    {
+      "stamp": "2026-10-15_1657",
+      "commit": "adf07bc2bf2b55cd554c8fe52b7a24ddf3d0eba0",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1409,
+          "y": 1445
+        }
+      },
+      "overall": {
+        "x": 2448,
+        "y": 2490
+      },
+      "newest": {
+        "x": 2448,
+        "y": 2490
+      }
+    },
+    {
+      "stamp": "2026-10-17_2225",
+      "commit": "16c54eb486bfa45f682830cb5668cf6d79ec2259",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1396,
+          "y": 1427
+        }
+      },
+      "overall": {
+        "x": 2445,
+        "y": 2476
+      },
+      "newest": {
+        "x": 2445,
+        "y": 2476
+      }
+    },
+    {
+      "stamp": "2026-10-17_2225",
+      "commit": "16c54eb486bfa45f682830cb5668cf6d79ec2259",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1410,
+          "y": 1443
+        }
+      },
+      "overall": {
+        "x": 2449,
+        "y": 2488
+      },
+      "newest": {
+        "x": 2449,
+        "y": 2488
+      }
+    },
+    {
+      "stamp": "2026-10-17_2225",
+      "commit": "16c54eb486bfa45f682830cb5668cf6d79ec2259",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 28,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1410,
+          "y": 1443
+        }
+      },
+      "overall": {
+        "x": 2449,
+        "y": 2488
+      },
+      "newest": {
+        "x": 2449,
+        "y": 2488
+      }
+    },
+    {
+      "stamp": "2026-10-19_0804",
+      "commit": "9c855201763179a9c6ee85d89fa601d455b981ec",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1404,
+          "y": 1436
+        }
+      },
+      "overall": {
+        "x": 2453,
+        "y": 2485
+      },
+      "newest": {
+        "x": 2453,
+        "y": 2485
+      }
+    },
+    {
+      "stamp": "2026-10-19_0804",
+      "commit": "9c855201763179a9c6ee85d89fa601d455b981ec",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 30,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1421,
+          "y": 1452
+        }
+      },
+      "overall": {
+        "x": 2462,
+        "y": 2497
+      },
+      "newest": {
+        "x": 2462,
+        "y": 2497
+      }
+    },
+    {
+      "stamp": "2026-10-19_0804",
+      "commit": "9c855201763179a9c6ee85d89fa601d455b981ec",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 30,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1421,
+          "y": 1452
+        }
+      },
+      "overall": {
+        "x": 2462,
+        "y": 2497
+      },
+      "newest": {
+        "x": 2462,
+        "y": 2497
+      }
+    },
+    {
+      "stamp": "2026-10-19_1329",
+      "commit": "e2e0325cb16a50de45d57fe6eab3a8b22ec41b0a",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1405,
+          "y": 1436
+        }
+      },
+      "overall": {
+        "x": 2454,
+        "y": 2485
+      },
+      "newest": {
+        "x": 2454,
+        "y": 2485
+      }
+    },
+    {
+      "stamp": "2026-10-19_1329",
+      "commit": "e2e0325cb16a50de45d57fe6eab3a8b22ec41b0a",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 33,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1421,
+          "y": 1452
+        }
+      },
+      "overall": {
+        "x": 2466,
+        "y": 2497
+      },
+      "newest": {
+        "x": 2466,
+        "y": 2497
+      }
+    },
+    {
+      "stamp": "2026-10-19_1329",
+      "commit": "e2e0325cb16a50de45d57fe6eab3a8b22ec41b0a",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 33,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1421,
+          "y": 1452
+        }
+      },
+      "overall": {
+        "x": 2466,
+        "y": 2497
+      },
+      "newest": {
+        "x": 2466,
+        "y": 2497
+      }
+    },
+    {
+      "stamp": "2026-10-22_0148",
+      "commit": "9732950621848913b8949764f9e83d207d2bfa80",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1422,
+          "y": 1452
+        }
+      },
+      "overall": {
+        "x": 2471,
+        "y": 2501
+      },
+      "newest": {
+        "x": 2471,
+        "y": 2501
+      }
+    },
+    {
+      "stamp": "2026-10-22_0148",
+      "commit": "9732950621848913b8949764f9e83d207d2bfa80",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 33,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1458,
+          "y": 1488
+        }
+      },
+      "overall": {
+        "x": 2503,
+        "y": 2533
+      },
+      "newest": {
+        "x": 2503,
+        "y": 2533
+      }
+    },
+    {
+      "stamp": "2026-10-22_0148",
+      "commit": "9732950621848913b8949764f9e83d207d2bfa80",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 33,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1458,
+          "y": 1488
+        }
+      },
+      "overall": {
+        "x": 2503,
+        "y": 2533
+      },
+      "newest": {
+        "x": 2503,
+        "y": 2533
+      }
+    },
+    {
+      "stamp": "2026-10-23_1637",
+      "commit": "fc447fc533b6662427f12bb402bd4b93cee2889f",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 564,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 19
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1456,
+          "y": 1457
+        }
+      },
+      "overall": {
+        "x": 2501,
+        "y": 2507
+      },
+      "newest": {
+        "x": 2501,
+        "y": 2507
+      }
+    },
+    {
+      "stamp": "2026-10-23_1637",
+      "commit": "fc447fc533b6662427f12bb402bd4b93cee2889f",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 33,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1488,
+          "y": 1488
+        }
+      },
+      "overall": {
+        "x": 2533,
+        "y": 2533
+      },
+      "newest": {
+        "x": 2533,
+        "y": 2533
+      }
+    },
+    {
+      "stamp": "2026-10-23_1637",
+      "commit": "fc447fc533b6662427f12bb402bd4b93cee2889f",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 33,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1488,
+          "y": 1488
+        }
+      },
+      "overall": {
+        "x": 2533,
+        "y": 2533
+      },
+      "newest": {
+        "x": 2533,
+        "y": 2533
+      }
+    },
+    {
+      "stamp": "2026-10-25_1542",
+      "commit": "cb96798969fdc083bbbf245bc653f5fc69cb8acf",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 564,
+          "y": 564
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1456,
+          "y": 1456
+        }
+      },
+      "overall": {
+        "x": 2501,
+        "y": 2501
+      },
+      "newest": {
+        "x": 2501,
+        "y": 2501
+      }
+    },
+    {
+      "stamp": "2026-10-25_1542",
+      "commit": "cb96798969fdc083bbbf245bc653f5fc69cb8acf",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 33,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1488,
+          "y": 1488
+        }
+      },
+      "overall": {
+        "x": 2533,
+        "y": 2533
+      },
+      "newest": {
+        "x": 2533,
+        "y": 2533
+      }
+    },
+    {
+      "stamp": "2026-10-25_1542",
+      "commit": "cb96798969fdc083bbbf245bc653f5fc69cb8acf",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 33,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1488,
+          "y": 1488
+        }
+      },
+      "overall": {
+        "x": 2533,
+        "y": 2533
+      },
+      "newest": {
+        "x": 2533,
+        "y": 2533
+      }
+    },
+    {
+      "stamp": "2026-10-30_2103",
+      "commit": "403ec51fe3c380e4b5b914c4b1d1e6e5291492d9",
+      "platform": "windows",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 564,
+          "y": 564
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 39,
+          "y": 39
+        },
+        "behaviour": {
+          "x": 1452,
+          "y": 1454
+        }
+      },
+      "overall": {
+        "x": 2497,
+        "y": 2499
+      },
+      "newest": {
+        "x": 2497,
+        "y": 2499
+      }
+    },
+    {
+      "stamp": "2026-10-30_2103",
+      "commit": "403ec51fe3c380e4b5b914c4b1d1e6e5291492d9",
+      "platform": "linux",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 32,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1484,
+          "y": 1486
+        }
+      },
+      "overall": {
+        "x": 2528,
+        "y": 2531
+      },
+      "newest": {
+        "x": 2528,
+        "y": 2531
+      }
+    },
+    {
+      "stamp": "2026-10-30_2103",
+      "commit": "403ec51fe3c380e4b5b914c4b1d1e6e5291492d9",
+      "platform": "macos",
+      "targetVersion": "8.22.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 568
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 20,
+          "y": 20
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 33,
+          "y": 33
+        },
+        "behaviour": {
+          "x": 1484,
+          "y": 1486
+        }
+      },
+      "overall": {
+        "x": 2529,
+        "y": 2531
+      },
+      "newest": {
+        "x": 2529,
+        "y": 2531
+      }
+    }
+  ],
+  "open": [
+    {
+      "id": "GF-0097",
+      "title": "An empty SSL_CERT_DIR (or CA path) crashes Curl with an unhandled ArgumentException (exit 134) as soon as a TLS transfer starts",
+      "area": "environment",
+      "platform": "linux",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Most likely cause: CaCertificateEnvironment.Apply (Curl.Cli.UnitLibrary) copies the SSL_CERT_DIR value verbatim, and the measuring tool most likely clears the variable by setting it empty on Linux. The empty value reaches ServerCertificateVerification.ReadCaCertificateDirectory (Curl.Networking.UnitLibrary) and Directory.GetFiles(\"\") throws ArgumentException, which ListFilesOrNothing does not catch. Fix: (1) in ListFilesOrNothing and ReadTextOrNothing catch ArgumentException and NotSupportedException too, so an empty or malformed --capath adds nothing, as in curl's OpenSSL build. (2) In ReadCaCertificates, treat an empty CaCertificateFile as an unusable file (exit 77) and never let an unhandled exception escape. An empty SSL_CERT_FILE would otherwise crash in File.ReadAllText(\"\"). (3) Confirm with a probe what curl 8.22.0 does with SSL_CERT_DIR='' and SSL_CERT_FILE='' and match it (docs/cmdline-opts/_ENVIRONMENT.md, CURL_CA_BUNDLE / SSL_CERT_DIR / SSL_CERT_FILE). Add focused unit tests in Curl.Networking.UnitTests and Curl.Cli.UnitTests. This is a linux/macos cause (the Schannel build reads none of these variables).",
+      "items": 3,
+      "tasks": [
+        "BL-2822",
+        "BL-4380"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0097-an-empty-ssl-cert-dir-or-ca-path-crashes-curl-with-an-unhand.md"
+    },
+    {
+      "id": "GF-0092",
+      "title": "An --ech ecl: handshake the server does not accept exits 35 instead of 101 (ECH required) on macOS",
+      "area": "behaviour",
+      "platform": "macos",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Platform-specific (macOS). The likely cause is the harness, not Curl's ECH client. With an ecl: config list, HandBuiltTlsProvider.HandshakeAsync (Curl.Networking.UnitLibrary) offers TLS 1.3 only (settings.EchConfigs is not null, so runsTls12 is false; BL-1950), as curl's OpenSSL build does. The harness's HTTPS stand-in, Curl.Conformance.UnitLibrary/TlsServerStream.cs, is an SslStream server, and on macOS .NET's server-side SslStream negotiates at most TLS 1.2. The handshake therefore fails on the protocol version (exit 35) before the client can see that the server ignored the ECH offer and send ech_required (exit 101). Change Curl.Conformance.UnitLibrary so its HTTPS server speaks TLS 1.3 on macOS, as upstream's stunnel/OpenSSL server does: for example, serve TLS through Curl's hand-built TLS 1.3 server code (Curl.Tls.UnitLibrary) when the platform's SslStream server cannot. Add a unit test in Curl.Conformance.UnitTests that the macOS HTTPS stand-in completes a TLS 1.3-only ClientHello. Then rerun test4001 on macOS. If it still exits 35, check Tls13ClientHandshake's ech_required decision (TlsAlertDescription.EchRequired) against a server that ignores the ECH extension, and add a focused test in Curl.Tls.UnitTests (ADR-0482). Explained by ADR-0327 (ECH runs only on the hand-built client) and ADR-0359 (exit 101 text as measured with OpenSSL); neither explains the macOS-only exit 35.",
+      "items": 1,
+      "tasks": [
+        "BL-2335",
+        "BL-4379"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0092-an-ech-ecl-handshake-the-server-does-not-accept-exits-35-ins.md"
+    },
+    {
+      "id": "GF-0100",
+      "title": "The gap tool's in-process curl refuses --ech, so the ECH cases send no request (test4000) and exit 2 instead of 101 (test4001)",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Console/InProcessCurl.cs, make CreateDialingRunner (and the IConnector overload of RunAsync) pass parsesAsEchBuild: true to CurlComposition.CreateRunner, as UpstreamConformanceTests.RunCurlAsync does. This keeps the in-process runner in step with the harness's feature list, which names ECH (ADR-0520). Also check the other parse flags RunCurlAsync sets (parsesAsQuicBuild, the honours*Variable flags), so the gap tool and the ratchet run curl the same way. Add a Curl.Console.UnitTests test in InProcessCurlTests.cs: '--ech grease' through InProcessCurl.RunAsync is accepted and makes its request. test4001 also needs the gap tool's HTTPS server to speak TLS 1.3 (UpstreamConformanceTests.NeedsTls13ServerCases, BL-1949); Windows SslStream serves TLS 1.3. Explained by ADR-0918: the product curl refuses --ech as every reference build does. Only the conformance runners read the command line as an ECH build, and the gap tool's runner was never switched on.",
+      "items": 2,
+      "tasks": [
+        "BL-4381"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0100-the-gap-tool-s-in-process-curl-refuses-ech-so-the-ech-cases.md"
+    }
+  ],
+  "closed": [
+    {
+      "id": "GF-0098",
+      "title": "--http2 runs an h2c Upgrade in Curl (exit 8), while the Windows reference curl, built without nghttp2, refuses --http2 with exit 2",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "No change to Curl's HTTP/2 Upgrade handling: Curl.Protocol.Http.UnitLibrary already does what upstream's test1704 <verify> asks (exit 8, the h2c request bytes), and the gap comes only from the Windows reference build having no HTTP2/h2c feature. Recommend rejecting the finding: to match it literally, Curl.Cli.UnitLibrary (CommandLineParser.cs / CommandLineRefusal.cs) would have to refuse --http2 on Windows with exit 2 and 'option --http2: the installed libcurl version does not support this', which removes a feature and breaks the 'complete reimplementation is the default answer' rule in CLAUDE.md. The lasting fix is office work: the measurement should exclude a case the harness ran as reference-lacks:<feature> when its <features> names one the reference's curl -V lacks (h2c here). Today rule 4 of Gap/Tools/ConvertTo-BehaviourMeasurement.ps1 checks this only for cases the harness skipped (Get-SkippedVerdict). Explained by ADR-0788: an HTTP/2 status line over HTTP/1 is refused with exit 8 on every platform, measured from an HTTP/2-built Windows curl.",
+      "items": 1,
+      "tasks": [
+        "BL-3431"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0098-http2-runs-an-h2c-upgrade-in-curl-exit-8-while-the-windows-r.md"
+    },
+    {
+      "id": "GF-0031",
+      "title": "Curl lists HTTP2 in Features; the Windows reference build does not",
+      "area": "features",
+      "platform": "windows",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific and drop HTTP2 from the Windows line, keeping it where the matched reference lists it. Update CurlVersionTextTests in Curl.Cli.UnitTests. Explained by ADR-0141: HTTP/2 is hand-built and accepted everywhere, but offered by default only off Windows, so the Windows build does not offer it by default.",
+      "items": 1,
+      "tasks": [
+        "BL-1824",
+        "BL-3430"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0031-curl-lists-http2-in-features-the-windows-reference-build-doe.md"
+    },
+    {
+      "id": "GF-0090",
+      "title": "--ssl-sessions on Linux does not read the file and print the session-file warnings real curl prints",
+      "area": "options",
+      "platform": "linux",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": "8.12.0",
+      "suggestion": "In Curl.Cli.UnitLibrary, where SslSessionsFile (CommandLineGlobalState, CommandLineOptions) is applied on non-Schannel builds, load the file when the option is parsed, before the no-URL check, and print curl's warnings to standard error: 'Warning: unrecognized line N in SSL session file', 'Warning: <path>' and 'Warning: invalid shmax base64 encoding in line N', following the session-file format in docs/cmdline-opts/ssl-sessions.md. The TLS library that holds session tickets also needs the load and save. The cause is OpenSSL-build-specific (Schannel refuses the option). Measure real curl for the exact warning text and line rules. Keep `--ai-help` right for the options this changes (CLAUDE.md).",
+      "items": 1,
+      "tasks": [
+        "BL-2333",
+        "BL-2717"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0090-ssl-sessions-on-linux-does-not-read-the-file-and-print-the-s.md"
+    },
+    {
+      "id": "GF-0096",
+      "title": "A request sent through a CONNECT tunnel the proxy already closed fails with 'Recv failure: Connection was reset' where curl prints 'Connection was aborted'",
+      "area": "behaviour",
+      "platform": "windows",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Networking.UnitLibrary, StreamConnection.ReadAsync rewrites every Windows read that fails with SocketError.ConnectionAborted as SocketError.ConnectionReset (ReportsAbortedReadAsReset). Narrow that rewrite to the case it was measured for: a peer that resets a connection it never half-closed (RST arriving just after the request). When the peer had already closed its side (FIN seen, as StreamConnection.HasPeerClosed detects) before Curl wrote the request, and the RST is the answer to that write, keep the WSAECONNABORTED so CurlSocketErrorText.ReceiveFailure prints curl's 'Recv failure: Connection was aborted'. For example, record HasPeerClosed in WriteAsync before writing, and skip the rewrite on the next failed read when it was true. Re-measure both shapes (upstream test1802's closed CONNECT tunnel, and BL-1450's reset-after-accept URLs) with Record-CurlExchange.ps1 before pinning, and add focused unit tests in Curl.Networking.UnitTests (StreamConnection) for both (ADR-0482). Explained by ADR-0419: the aborted-to-reset rewrite was decided for a reset right after accept; it does not cover a peer that closed before the request, where the Schannel curl prints 'aborted' in 9 of 11 runs; the ADR should be amended with the narrower rule.",
+      "items": 1,
+      "tasks": [
+        "BL-2821"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0096-a-request-sent-through-a-connect-tunnel-the-proxy-already-cl.md"
+    },
+    {
+      "id": "GF-0099",
+      "title": "HTTP/2 options are accepted by Curl but refused by the reference curl as unsupported by its libcurl",
+      "area": "options",
+      "platform": "windows",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": "7.33.0",
+      "suggestion": "The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2, so it refuses these options. Curl implements HTTP/2 and accepts them. The gap is a reference-build difference, not a missing option: the yardstick is upstream's release, where a build with nghttp2 accepts these options. Close it by one of two routes. (a) Re-measure these facets against a reference curl built with HTTP/2, and mark them match or excluded with a reason. (b) Add a build-feature switch in Curl.Cli.UnitLibrary (the CommandLineParser branch that handles --http2, --http2-prior-knowledge and --proxy-http2, with their entries in CommandLineOptionTable) so a Curl build without HTTP/2 prints 'option --X: the installed libcurl version does not support this' (see docs/cmdline-opts/http2.md, http2-prior-knowledge.md and proxy-http2.md). Route (a) is likely right, because Curl always carries HTTP/2. Keep `--ai-help` right for the options this changes (CLAUDE.md).",
+      "items": 4,
+      "tasks": [
+        "BL-3432"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0099-http-2-options-are-accepted-by-curl-but-refused-by-the-refer.md"
+    }
+  ],
+  "regressions": [
+    {
+      "id": "GF-0097",
+      "title": "An empty SSL_CERT_DIR (or CA path) crashes Curl with an unhandled ArgumentException (exit 134) as soon as a TLS transfer starts",
+      "area": "environment",
+      "platform": "linux",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Most likely cause: CaCertificateEnvironment.Apply (Curl.Cli.UnitLibrary) copies the SSL_CERT_DIR value verbatim, and the measuring tool most likely clears the variable by setting it empty on Linux. The empty value reaches ServerCertificateVerification.ReadCaCertificateDirectory (Curl.Networking.UnitLibrary) and Directory.GetFiles(\"\") throws ArgumentException, which ListFilesOrNothing does not catch. Fix: (1) in ListFilesOrNothing and ReadTextOrNothing catch ArgumentException and NotSupportedException too, so an empty or malformed --capath adds nothing, as in curl's OpenSSL build. (2) In ReadCaCertificates, treat an empty CaCertificateFile as an unusable file (exit 77) and never let an unhandled exception escape. An empty SSL_CERT_FILE would otherwise crash in File.ReadAllText(\"\"). (3) Confirm with a probe what curl 8.22.0 does with SSL_CERT_DIR='' and SSL_CERT_FILE='' and match it (docs/cmdline-opts/_ENVIRONMENT.md, CURL_CA_BUNDLE / SSL_CERT_DIR / SSL_CERT_FILE). Add focused unit tests in Curl.Networking.UnitTests and Curl.Cli.UnitTests. This is a linux/macos cause (the Schannel build reads none of these variables).",
+      "items": 3,
+      "tasks": [
+        "BL-2822",
+        "BL-4380"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0097-an-empty-ssl-cert-dir-or-ca-path-crashes-curl-with-an-unhand.md"
+    },
+    {
+      "id": "GF-0092",
+      "title": "An --ech ecl: handshake the server does not accept exits 35 instead of 101 (ECH required) on macOS",
+      "area": "behaviour",
+      "platform": "macos",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Platform-specific (macOS). The likely cause is the harness, not Curl's ECH client. With an ecl: config list, HandBuiltTlsProvider.HandshakeAsync (Curl.Networking.UnitLibrary) offers TLS 1.3 only (settings.EchConfigs is not null, so runsTls12 is false; BL-1950), as curl's OpenSSL build does. The harness's HTTPS stand-in, Curl.Conformance.UnitLibrary/TlsServerStream.cs, is an SslStream server, and on macOS .NET's server-side SslStream negotiates at most TLS 1.2. The handshake therefore fails on the protocol version (exit 35) before the client can see that the server ignored the ECH offer and send ech_required (exit 101). Change Curl.Conformance.UnitLibrary so its HTTPS server speaks TLS 1.3 on macOS, as upstream's stunnel/OpenSSL server does: for example, serve TLS through Curl's hand-built TLS 1.3 server code (Curl.Tls.UnitLibrary) when the platform's SslStream server cannot. Add a unit test in Curl.Conformance.UnitTests that the macOS HTTPS stand-in completes a TLS 1.3-only ClientHello. Then rerun test4001 on macOS. If it still exits 35, check Tls13ClientHandshake's ech_required decision (TlsAlertDescription.EchRequired) against a server that ignores the ECH extension, and add a focused test in Curl.Tls.UnitTests (ADR-0482). Explained by ADR-0327 (ECH runs only on the hand-built client) and ADR-0359 (exit 101 text as measured with OpenSSL); neither explains the macOS-only exit 35.",
+      "items": 1,
+      "tasks": [
+        "BL-2335",
+        "BL-4379"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0092-an-ech-ecl-handshake-the-server-does-not-accept-exits-35-ins.md"
+    }
+  ],
+  "release": null
+}
