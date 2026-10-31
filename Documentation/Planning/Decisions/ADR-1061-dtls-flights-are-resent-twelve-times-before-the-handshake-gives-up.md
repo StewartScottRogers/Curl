@@ -13,7 +13,7 @@ arrive (RFC 6347 section 4.2.4). Section 4.2.4.1 recommends a 1 second initial t
 
 ## Decision
 
-- `DtlsFlightRetransmitter` (`Curl.Extension.Coap.Dtls.Retransmission`) starts the timer at 1 second, doubles it
+- `DtlsFlightRetransmitter` (`Curl.Extension.Protocol.Coap.Dtls.Retransmission`) starts the timer at 1 second, doubles it
   after each resend and caps it at 60 seconds, on the transfer's `TimeProvider`.
 - It resends a flight at most **12** times, OpenSSL's `DTLS1_TMO_ALERT_COUNT`, the library behind curl's
   Linux and macOS builds. With the timer it waits 1+2+4+8+16+32 seconds then 60 seconds seven times, about

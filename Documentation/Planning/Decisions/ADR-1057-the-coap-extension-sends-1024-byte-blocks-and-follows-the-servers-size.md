@@ -14,7 +14,7 @@ CoAP, so the extension (ADR-0999, ADR-1047) follows the RFC and takes the simple
 
 ## Decision
 
-`Curl.Extension.Coap.UnitLibrary/Blockwise/CoapBlockwiseTransfer` wraps each `CoapExchange`:
+`Curl.Extension.Protocol.Coap.UnitLibrary/Blockwise/CoapBlockwiseTransfer` wraps each `CoapExchange`:
 
 - **Upload (`-d`, `-T`).** A payload of 1024 bytes or less goes out whole, with no Block1 option. A larger
   one goes out in 1024-byte blocks (SZX 6), each with Block1, the next after each 2.31 Continue. When a

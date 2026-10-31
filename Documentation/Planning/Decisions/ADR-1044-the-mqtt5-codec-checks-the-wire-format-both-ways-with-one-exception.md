@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4115 adds an MQTT 5 client as the extension `Curl.Extension.Mqtt5.UnitLibrary` (ADR-0999). Upstream curl speaks
+BL-4115 adds an MQTT 5 client as the extension `Curl.Extension.Protocol.Mqtt5.UnitLibrary` (ADR-0999). Upstream curl speaks
 only MQTT 3.1.1 (`mqtt://`), so OASIS MQTT Version 5.0 (7 March 2019) decides. BL-4242 is the first of its parts:
 the data types (section 1.5), fixed header (2.1), properties (2.2.2), reason codes (2.4), every control packet
 (chapter 3), the topic rules (4.7, 4.8.2) and malformed packets (4.13), as pure byte-level code.

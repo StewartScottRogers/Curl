@@ -43,6 +43,6 @@ shared layers `Curl.Networking.UnitLibrary` and `Curl.Quic.UnitLibrary`.
 
 - `curl --dns-transport tls dns://9.9.9.9/example.com` and `curl --dns-transport quic dns://dns.adguard-dns.com/example.com`
   work, with `--dns-json` as before; `--dns-transport`'s help and its exit 2 message list `udp, tcp, tls, quic`.
-- The extension references `Curl.Quic.UnitLibrary`, and `Curl.Quic` lets `Curl.Extension.DnsQuery.UnitTests` see its
+- The extension references `Curl.Quic.UnitLibrary`, and `Curl.Quic` lets `Curl.Extension.Protocol.DnsQuery.UnitTests` see its
   internals so the in-memory QUIC test server (copied from EncryptedDns's tests) can run the real client.
 - DNS over HTTPS (BL-4339) adds its name and case the same way.

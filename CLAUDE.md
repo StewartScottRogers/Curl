@@ -326,7 +326,8 @@ Curl/
 
 ### Project naming
 - Production library: `Curl.<Area>.UnitLibrary`, protocols `Curl.Protocol.<Name>.UnitLibrary`,
-  extensions `Curl.Extension.<Name>.UnitLibrary` (see "Extensions" below).
+  extensions `Curl.Extension.<Name>.UnitLibrary`, or `Curl.Extension.Protocol.<Name>.UnitLibrary`
+  for one that serves its own URL scheme (see "Extensions" below).
 - Tests: the same name with `.UnitTests` instead of `.UnitLibrary`.
 - Integration tests, once an area has any: the same name with `.IntegrationTests`
   instead of `.UnitLibrary` (ADR-0421).
@@ -358,8 +359,8 @@ under one folder for its group (ADR-0731):
   in `/Protocols/Abstractions/`.
 - `/Conformance/<Part>/`: each `Curl.Conformance.<Part>.*`, and the harness itself
   (`Curl.Conformance.UnitLibrary` and `.UnitTests`) in `/Conformance/Harness/`.
-- `/Extensions/<Name>/`: each `Curl.Extension.<Name>.*`, with the registry in
-  `/Extensions/Composition/`.
+- `/Extensions/<Name>/`: each `Curl.Extension.<Name>.*`, `/Extensions/Protocol/<Name>/`: each
+  `Curl.Extension.Protocol.<Name>.*`, with the registry in `/Extensions/Composition/`.
 - `/Shared/`: the shared projects (Audit, Claude, Documentation, Gap, Tasks).
 
 A new area goes in the group it belongs to, in a folder named for the area. Solution
@@ -373,10 +374,13 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
 What Curl adds beyond upstream curl - a scheme or feature curl does not have - is an
 *extension*, kept apart from curl's own protocols (ADR-0999):
 
-- Each is `Curl.Extension.<Name>.UnitLibrary` with its `.UnitTests`, registered by one line in
+- Each is `Curl.Extension.<Name>.UnitLibrary` with its `.UnitTests`; one that serves its own URL
+  scheme (an `ExtensionCatalogue.cs` handler) is a *protocol extension*,
+  `Curl.Extension.Protocol.<Name>.UnitLibrary` (ADR-1174). Each is registered by one line in
   `Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs` (a shared list file).
 - It joins the solution with exactly one line in `Curl.slnx`, directly under the marker comment in the
-  Extensions section: a single-line `<Folder Name="/Extensions/<Name>/">` holding both `<Project/>`
+  Extensions section: a single-line `<Folder Name="/Extensions/<Name>/">` (`/Extensions/Protocol/<Name>/`
+  for a protocol extension) holding both `<Project/>`
   elements (`merge=union`, ADR-1003). Composition references every extension by wildcard, so no csproj
   is edited and `Curl.slnx` and that csproj need not be in the task's `touches`.
 - Only the hosts (`Curl.Console`, `Curl.Api`, `Curl.Mcp`) and the extensions reference an

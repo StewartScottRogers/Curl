@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Extension.Amqp0.UnitLibrary, Curl.Extension.Amqp0.UnitTests, Curl.Extension.Amqp1.UnitLibrary, Curl.Extension.Amqp1.UnitTests, Curl.Extension.AzureStorage.UnitLibrary, Curl.Extension.AzureStorage.UnitTests, Curl.Extension.Coap.UnitLibrary, Curl.Extension.Coap.UnitTests, Curl.Extension.DnsQuery.UnitLibrary, Curl.Extension.DnsQuery.UnitTests, Curl.Extension.GoogleCloudStorage.UnitLibrary, Curl.Extension.GoogleCloudStorage.UnitTests, Curl.Extension.Grpc.UnitLibrary, Curl.Extension.Grpc.UnitTests, Curl.Extension.Kafka.UnitLibrary, Curl.Extension.Kafka.UnitTests, Curl.Extension.McpClient.IntegrationTests, Curl.Extension.McpClient.UnitLibrary, Curl.Extension.McpClient.UnitTests, Curl.Extension.Mqtt5.UnitLibrary, Curl.Extension.Mqtt5.UnitTests, Curl.Extension.Nats.UnitLibrary, Curl.Extension.Nats.UnitTests, Curl.Extension.OciRegistry.UnitLibrary, Curl.Extension.OciRegistry.UnitTests, Curl.Extension.PluginProtocol.UnitLibrary, Curl.Extension.PluginProtocol.UnitTests, Curl.Extension.Redis.UnitLibrary, Curl.Extension.Redis.UnitTests, Curl.Extension.S3.UnitLibrary, Curl.Extension.S3.UnitTests, Curl.Extension.SignalR.UnitLibrary, Curl.Extension.SignalR.UnitTests, Curl.Extension.SocketIo.UnitLibrary, Curl.Extension.SocketIo.UnitTests, Curl.Extension.Stomp.UnitLibrary, Curl.Extension.Stomp.UnitTests, Curl.Extension.WebTransport.UnitLibrary, Curl.Extension.WebTransport.UnitTests, Curl.Extension.Xmpp.UnitLibrary, Curl.Extension.Xmpp.UnitTests, Curl.Extension.Composition.UnitLibrary, Curl.Extension.Composition.UnitTests, Curl.slnx]
+touches: [Curl.Extension.Protocol.Amqp0.UnitLibrary, Curl.Extension.Protocol.Amqp0.UnitTests, Curl.Extension.Protocol.Amqp1.UnitLibrary, Curl.Extension.Protocol.Amqp1.UnitTests, Curl.Extension.Protocol.AzureStorage.UnitLibrary, Curl.Extension.Protocol.AzureStorage.UnitTests, Curl.Extension.Protocol.Coap.UnitLibrary, Curl.Extension.Protocol.Coap.UnitTests, Curl.Extension.Protocol.DnsQuery.UnitLibrary, Curl.Extension.Protocol.DnsQuery.UnitTests, Curl.Extension.Protocol.GoogleCloudStorage.UnitLibrary, Curl.Extension.Protocol.GoogleCloudStorage.UnitTests, Curl.Extension.Protocol.Grpc.UnitLibrary, Curl.Extension.Protocol.Grpc.UnitTests, Curl.Extension.Protocol.Kafka.UnitLibrary, Curl.Extension.Protocol.Kafka.UnitTests, Curl.Extension.Protocol.McpClient.IntegrationTests, Curl.Extension.Protocol.McpClient.UnitLibrary, Curl.Extension.Protocol.McpClient.UnitTests, Curl.Extension.Protocol.Mqtt5.UnitLibrary, Curl.Extension.Protocol.Mqtt5.UnitTests, Curl.Extension.Protocol.Nats.UnitLibrary, Curl.Extension.Protocol.Nats.UnitTests, Curl.Extension.Protocol.OciRegistry.UnitLibrary, Curl.Extension.Protocol.OciRegistry.UnitTests, Curl.Extension.Protocol.Plugin.UnitLibrary, Curl.Extension.Protocol.Plugin.UnitTests, Curl.Extension.Protocol.Redis.UnitLibrary, Curl.Extension.Protocol.Redis.UnitTests, Curl.Extension.Protocol.S3.UnitLibrary, Curl.Extension.Protocol.S3.UnitTests, Curl.Extension.Protocol.SignalR.UnitLibrary, Curl.Extension.Protocol.SignalR.UnitTests, Curl.Extension.Protocol.SocketIo.UnitLibrary, Curl.Extension.Protocol.SocketIo.UnitTests, Curl.Extension.Protocol.Stomp.UnitLibrary, Curl.Extension.Protocol.Stomp.UnitTests, Curl.Extension.Protocol.WebTransport.UnitLibrary, Curl.Extension.Protocol.WebTransport.UnitTests, Curl.Extension.Protocol.Xmpp.UnitLibrary, Curl.Extension.Protocol.Xmpp.UnitTests, Curl.Extension.Composition.UnitLibrary, Curl.Extension.Composition.UnitTests, Curl.slnx]
 requirement: none
 lane: no
 created: 2026-10-31
@@ -23,13 +23,15 @@ Stewart, 2026-10-31: rename `Curl.Extension.*` to `Curl.Extension.Protocol.*`, o
 
 ## Acceptance criteria
 
-- [ ] Each of the 20 projects (and its tests) is `Curl.Extension.Protocol.<Name>.*` in folder, csproj, assembly and namespace; PluginProtocol is `Curl.Extension.Protocol.Plugin`.
-- [ ] `Curl.slnx` holds them under `/Extensions/Protocol/<Name>/`.
-- [ ] No live file (code, docs, `CLAUDE.md`, `LaneRules.md`, open tasks) names an old project; `Tasks/Done`, audit findings and scorecards keep history.
-- [ ] An ADR records the rule (an extension that serves its own scheme is a protocol extension).
-- [ ] `dotnet build` is clean and the fast tests pass; `curl --extensions` lists the same 63 extensions as before.
+- [x] Each of the 20 projects (and its tests) is `Curl.Extension.Protocol.<Name>.*` in folder, csproj, assembly and namespace; PluginProtocol is `Curl.Extension.Protocol.Plugin`.
+- [x] `Curl.slnx` holds them under `/Extensions/Protocol/<Name>/`.
+- [x] No live file (code, docs, `CLAUDE.md`, `LaneRules.md`, open tasks) names an old project; `Tasks/Done`, audit findings and scorecards keep history.
+- [x] An ADR records the rule (an extension that serves its own scheme is a protocol extension).
+- [x] `dotnet build` is clean and the fast tests pass; `curl --extensions` lists the same 62 extensions as before.
 
 ## Notes
+
+- 2026-10-31 (interactive): 41 folders moved, 938 files changed. Build clean; fast tests 114 of 114 projects pass; `curl --extensions` identical before and after (62 lines). Inside `Curl.Extension.Protocol` a partly qualified `Protocol.Abstractions` resolved to the new namespace, so 3 extension files now write `Curl.Protocol.Abstractions` in full, and Composition's catalogues name the renamed ones as `Protocol.<Name>`. The quality gates are left to CI's quality job (no code changed but names).
 
 ## Log
 

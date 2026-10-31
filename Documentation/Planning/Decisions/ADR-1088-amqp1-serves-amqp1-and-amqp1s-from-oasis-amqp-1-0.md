@@ -7,10 +7,10 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4118 is extension 17 of 63: an AMQP 1.0 client as `Curl.Extension.Amqp1.UnitLibrary` (ADR-0999). Its type codec
+BL-4118 is extension 17 of 63: an AMQP 1.0 client as `Curl.Extension.Protocol.Amqp1.UnitLibrary` (ADR-0999). Its type codec
 (ADR-1053), frames (ADR-1058) and client (ADR-1062) landed under BL-4258, BL-4256 and BL-4257; this task registers the
 extension and records the names it takes, the specification it follows and what it leaves out. Extension 16
-(BL-4117, `Curl.Extension.Amqp0.UnitLibrary`, AMQP 0-9-1) takes `amqp://` and `amqps://`, the names RabbitMQ and the
+(BL-4117, `Curl.Extension.Protocol.Amqp0.UnitLibrary`, AMQP 0-9-1) takes `amqp://` and `amqps://`, the names RabbitMQ and the
 AMQP 0-9-1 URI specification use, so AMQP 1.0 must take other names.
 
 ## Decision

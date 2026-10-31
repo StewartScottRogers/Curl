@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4244 adds `mqtt5+ws://host[:port]/topic` to `Curl.Extension.Mqtt5.UnitLibrary` (ADR-0999): ADR-1049's publish or
+BL-4244 adds `mqtt5+ws://host[:port]/topic` to `Curl.Extension.Protocol.Mqtt5.UnitLibrary` (ADR-0999): ADR-1049's publish or
 subscribe flow carried over a WebSocket connection, as OASIS MQTT Version 5.0 section 6 describes. Upstream curl has
 no such scheme to match. The WebSocket request and the MQTT topic both want the URL path, so the path, the default
 port and how the topic is carried need deciding.

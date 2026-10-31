@@ -13,7 +13,7 @@ is tested against the Amazon S3 API reference "Authenticating Requests (AWS Sign
 
 ## Decision
 
-- `Curl.Extension.S3.UnitLibrary` holds its own signer in `Signing/`, base class library only
+- `Curl.Extension.Protocol.S3.UnitLibrary` holds its own signer in `Signing/`, base class library only
   (`SHA256`, `HMACSHA256`). `S3RequestSigner.Sign` takes an `S3SigningRequest` (method, unencoded path,
   query parameters, headers including `host`, payload hash or `UNSIGNED-PAYLOAD`) and `S3Credentials`
   (access key ID, secret key, region), reads the time from an injected `TimeProvider`, and returns the

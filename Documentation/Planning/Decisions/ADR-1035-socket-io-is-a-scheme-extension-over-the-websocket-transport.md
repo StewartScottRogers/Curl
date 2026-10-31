@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4109 adds Socket.IO as an extension (ADR-0999), `Curl.Extension.SocketIo.UnitLibrary`. Upstream
+BL-4109 adds Socket.IO as an extension (ADR-0999), `Curl.Extension.Protocol.SocketIo.UnitLibrary`. Upstream
 curl has no Socket.IO support, so the specifications decide: the Socket.IO protocol v5
 (socket.io/docs/v4/socket-io-protocol) and the Engine.IO protocol v4
 (socket.io/docs/v4/engine-io-protocol), as published in 2026. An extension references no

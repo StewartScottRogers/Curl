@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Extension.Protocol.Grpc.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Extension.Abstractions.UnitLibrary\Curl.Extension.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Http2.UnitLibrary\Curl.Http2.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protobuf.UnitLibrary\Curl.Protobuf.UnitLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

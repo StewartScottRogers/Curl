@@ -110,7 +110,7 @@ public sealed class OAuth2TransferHookTests
     {
         Url = CurlUrl.Parse("https://api.example.com/resource"),
         Output = new MemoryStream(),
-        Http = new Protocol.Abstractions.HttpRequestOptions { Headers = ["X-Own: 1"] },
+        Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Headers = ["X-Own: 1"] },
     };
 
     private static Func<ITransferContext, ValueTask<TransferResult>> Recording(List<string> headers) => context =>

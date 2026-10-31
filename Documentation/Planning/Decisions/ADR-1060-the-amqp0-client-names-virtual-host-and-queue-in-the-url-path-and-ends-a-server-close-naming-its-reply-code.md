@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4260 adds `Amqp0ProtocolHandler` and `Amqp0ClientFlow` to `Curl.Extension.Amqp0.UnitLibrary` (ADR-0999) for
+BL-4260 adds `Amqp0ProtocolHandler` and `Amqp0ClientFlow` to `Curl.Extension.Protocol.Amqp0.UnitLibrary` (ADR-0999) for
 `amqp://` (port 5672) and `amqps://` (port 5671), on BL-4259's codec (ADR-1056). Upstream curl has no AMQP, so the
 model for what the user sees is curl's `mqtt://` (and ADR-1049 for MQTT 5): with `-d` publish, otherwise receive and
 write the payload. The URL form follows RabbitMQ's URI specification, `amqp://user:pass@host:port/vhost`, which names

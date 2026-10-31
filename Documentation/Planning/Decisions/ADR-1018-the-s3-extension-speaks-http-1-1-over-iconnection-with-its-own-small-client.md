@@ -12,7 +12,7 @@ the `IConnection` seam.
 
 ## Decision
 
-`Curl.Extension.S3.UnitLibrary/Http/S3HttpClientConnection` sends one request at a time over one
+`Curl.Extension.Protocol.S3.UnitLibrary/Http/S3HttpClientConnection` sends one request at a time over one
 `IConnection` (RFC 9112 §3, §5), streaming a request body of a declared length with `Content-Length`,
 and reads the status line (§4) and fields (§5), exposing the body as a forward-only asynchronous
 stream framed by `Content-Length`, the chunked coding (§7.1) or the close (§6.3).

@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4120 adds NATS as an extension (ADR-0999), `Curl.Extension.Nats.UnitLibrary`. Upstream curl has no
+BL-4120 adds NATS as an extension (ADR-0999), `Curl.Extension.Protocol.Nats.UnitLibrary`. Upstream curl has no
 NATS support, so the specification decides: the NATS client protocol
 (docs.nats.io/reference/reference-protocols/nats-protocol), protocol version 1 as NATS Server 2.10
 serves it in 2026. An extension references no `Curl.Protocol.*` library, and the protocol is plain

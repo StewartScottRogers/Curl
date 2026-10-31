@@ -14,7 +14,7 @@ the protocol versions to speak, a mapping from curl's options to requests, and e
 
 - Schemes `kafka` (default port 9092, the broker's conventional plaintext port) and `kafkas` (default port 9093, the
   conventional TLS listener port; Kafka registers no URL scheme), TLS from curl's connector, so `-k`, `--cacert` and
-  the other TLS options apply. The library is `Curl.Extension.Kafka.UnitLibrary`; it adds no command-line option.
+  the other TLS options apply. The library is `Curl.Extension.Protocol.Kafka.UnitLibrary`; it adds no command-line option.
 - URL form `kafka://host[:port]/topic[/partition][?offset=N]`: the first path segment, URL-decoded, is the topic; the
   second, a decimal number, the partition (default 0); the query `offset=N` the offset a consume starts at (default
   0). No topic, a third segment, a partition or query in any other form ends with exit 3 before connecting.

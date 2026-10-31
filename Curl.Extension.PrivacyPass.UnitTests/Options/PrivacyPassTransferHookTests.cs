@@ -226,7 +226,7 @@ public sealed class PrivacyPassTransferHookTests
         Output = new MemoryStream(),
         HeaderOutput = headerOutput,
         DumpHeaderOutput = headerOutput is null ? null : new MemoryStream(),
-        Http = new Protocol.Abstractions.HttpRequestOptions { Headers = ["X-Own: 1"] },
+        Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Headers = ["X-Own: 1"] },
     };
 
     // The first send writes "body" and "head" and gives first; any later one succeeds.

@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4243 adds `Mqtt5ProtocolHandler` to `Curl.Extension.Mqtt5.UnitLibrary` (ADR-0999) for `mqtt5://` and `mqtt5s://`,
+BL-4243 adds `Mqtt5ProtocolHandler` to `Curl.Extension.Protocol.Mqtt5.UnitLibrary` (ADR-0999) for `mqtt5://` and `mqtt5s://`,
 on BL-4242's codec (ADR-1044). Upstream curl has no MQTT 5, so its `mqtt://` handler (MQTT 3.1.1, `lib/mqtt.c`, ported
 as `Curl.Protocol.Mqtt.UnitLibrary`) is the model for what the user sees, and OASIS MQTT Version 5.0 for the wire.
 MQTT 5 adds reason codes to CONNACK, SUBACK and DISCONNECT, which curl's handler never meets.

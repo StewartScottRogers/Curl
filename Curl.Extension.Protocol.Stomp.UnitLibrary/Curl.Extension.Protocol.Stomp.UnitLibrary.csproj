@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Extension.Abstractions.UnitLibrary\Curl.Extension.Abstractions.UnitLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Extension.Protocol.Stomp.UnitTests" />
+  </ItemGroup>
+
+</Project>

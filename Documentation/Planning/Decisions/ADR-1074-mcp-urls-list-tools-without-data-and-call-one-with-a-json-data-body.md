@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4159 adds `McpProtocolHandler` in `Curl.Extension.McpClient.UnitLibrary/Client`, an extension (ADR-0999) that lets
+BL-4159 adds `McpProtocolHandler` in `Curl.Extension.Protocol.McpClient.UnitLibrary/Client`, an extension (ADR-0999) that lets
 curl list and call the tools of a Model Context Protocol server. Upstream curl has no MCP, so there is no curl output to
 match; the Model Context Protocol specification, revision 2025-06-18 (the latest dated revision), decides the wire. The
 JSON-RPC wire format (BL-4214), the Streamable HTTP transport (BL-4215) and the stdio transport (BL-4216) were already

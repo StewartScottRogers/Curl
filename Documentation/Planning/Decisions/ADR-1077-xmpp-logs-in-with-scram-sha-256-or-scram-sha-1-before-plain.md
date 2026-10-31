@@ -11,7 +11,7 @@ logged in with SASL PLAIN only. Many servers offer SCRAM, and some offer it with
 
 ## Decision
 
-- SCRAM is now done. Each SASL mechanism is one file in `Curl.Extension.Xmpp.UnitLibrary/Client` that adds itself to
+- SCRAM is now done. Each SASL mechanism is one file in `Curl.Extension.Protocol.Xmpp.UnitLibrary/Client` that adds itself to
   `XmppSaslMechanisms` from a `[ModuleInitializer]` (no central switch, no reflection): `XmppSaslPlain`,
   `XmppSaslAnonymous`, `XmppScramSha1` and `XmppScramSha256`, the last two over the shared `XmppScramExchange`.
 - With `--user` the client takes the first mechanism the server offers of SCRAM-SHA-256, SCRAM-SHA-1, PLAIN; without

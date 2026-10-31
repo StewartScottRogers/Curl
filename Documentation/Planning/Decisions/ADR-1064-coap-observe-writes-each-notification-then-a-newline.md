@@ -14,7 +14,7 @@ observation, a way to tell notifications apart in the output, and a way for the 
 
 ## Decision
 
-- **Option.** `--coap-observe`, a flag declared by `Curl.Extension.Coap.Observe.CoapObserveTransferHook` and
+- **Option.** `--coap-observe`, a flag declared by `Curl.Extension.Protocol.Coap.Observe.CoapObserveTransferHook` and
   registered in `ExtensionOptionCatalogue` and `ExtensionTransferHookCatalogue`. The name follows the
   extension's scheme, as `--graphql-*` and `--jsonrpc` do.
 - **Reaching the handler.** The option activates a transfer hook (ADR-1007) that hands a `coap://` transfer to
