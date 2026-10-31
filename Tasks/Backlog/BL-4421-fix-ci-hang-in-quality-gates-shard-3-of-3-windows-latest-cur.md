@@ -45,7 +45,7 @@ A hang can be intermittent: the next run may pass. Reproduce with `dotnet test` 
   runs). Each passed in 4 to 6 s. I ruled out a read of the real stdin: `Program.Main`'s
   tests open it, but the refused command line never reads it, and the runs with stdin held
   open did not hang.
-- **Done (complete in itself):** `Curl.Console.UnitTests/HangBlame.runsettings`, selected by
+- **Done (complete in itself, commit 9ce35d213):** `Curl.Console.UnitTests/HangBlame.runsettings`, selected by
   the project's `RunSettingsFilePath`, runs every `dotnet test` of this project under the
   blame collector with a 3-minute hang timeout and no dump. With `--collect "Code Coverage"`
   it reports `Data collector 'Blame' message: All tests finished running` and all 3104 tests
