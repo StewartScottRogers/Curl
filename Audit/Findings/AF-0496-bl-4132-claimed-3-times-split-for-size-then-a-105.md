@@ -3,8 +3,8 @@ id: AF-0496
 title: BL-4132 claimed 3 times: split for size, then a 105-minute run that ran out of time with its fix stashed
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:BL-4132:BL-4132:redone-work
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0496 - BL-4132 claimed 3 times: split for size, then a 105-minute run that ran out of time with its fix stashed
 
@@ -42,6 +42,9 @@ Select-String -Path Z:/repos/Curl.audit/20261031-035829/logs/DarkFactory-*-L*.lo
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: requeues 0, tasksClaimedMoreThanOnce 0. No run ran out of time with its fix stashed. The longest run (BL-4389, 72.6 min) ended Done.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

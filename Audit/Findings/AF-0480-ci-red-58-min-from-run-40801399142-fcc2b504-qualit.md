@@ -3,8 +3,8 @@ id: AF-0480
 title: CI red 58 min from run 40801399142 (fcc2b504, Quality gates windows-latest: Curl.Core and Curl.Engine outside the gate)
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:40801399142:ci-red
 reproduction: none
 task: BL-4233
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0480 - CI red 58 min from run 40801399142 (fcc2b504, Quality gates windows-latest: Curl.Core and Curl.Engine outside the gate)
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | The Quality gates (windows-latest) job again turned CI red for over 30 min. Run 41071219626 (302d7dd3) was red 486.12 min, starting with BL-4349 (Quality gates step Measure coverage, complexity and CRAP), filed 07:52:26 and Done 09:03:11. Run 40885502110 (237.13 min) also began with a quality-gate failure, BL-4083.
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: ciRedMinutes 0, no red spells. No quality-gate failure in any CI run in the window.
 
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

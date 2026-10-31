@@ -3,8 +3,8 @@ id: AF-0489
 title: Composition_ActivatesTheHookOnlyWhenTheOptionIsGiven never checks that the hook stays off without the option
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: quality:Curl.Extension.Har.UnitTests/HarExtensionTests.cs:Composition_ActivatesTheHookOnlyWhenTheOptionIsGiven:name-lies
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0489 - Composition_ActivatesTheHookOnlyWhenTheOptionIsGiven never checks that the hook stays off without the option
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Extension.Har.UnitTests/HarExtensionTests.cs -Pattern '
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the Select-String: line 37 now reads 'Assert.IsFalse(TransferHooks.ActivatedBy(ExtensionOptionValues.None, ExtensionTransferHookCatalogue.Entries).Hooks.OfType<HarTransferHook>().Any());', so the test checks that the hook stays off without the option.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

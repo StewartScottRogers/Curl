@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the reproduction: 'the session channel, SCP and SFTP stay in the protocol' count is 0, and Curl.Ssh.UnitLibrary declares the three classes (count 3). ADR-1165 now has an 'Amended later (BL-4402, AF-0492)' note and a Superseded bullet saying known_hosts, key files and user authentication live in Curl.Ssh.UnitLibrary.
+
 ## Log
 
 - 2026-10-31: filed proposed.

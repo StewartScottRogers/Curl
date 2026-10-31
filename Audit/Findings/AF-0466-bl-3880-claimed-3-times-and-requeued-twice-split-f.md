@@ -3,8 +3,8 @@ id: AF-0466
 title: BL-3880 claimed 3 times and requeued twice (split for size, then a file held by another task)
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:BL-3880:redone-work
 reproduction: none
 task: BL-4184
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0466 - BL-3880 claimed 3 times and requeued twice (split for size, then a file held by another task)
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | Split-for-size requeues were again followed by a second requeue and a third claim. BL-4124: split for size at 10:20:59, then 'Lane 12 could not integrate: rebase conflict' at 16:08:23, third claim L11 at 16:09:54. BL-4132: split for size at 18:54:56, then 'Out of time' at 08:10:29, third claim at 08:11:06. BL-4137: split at 20:00:08, then 'Out of time' at 08:11:56, third claim at 08:13:00.
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: tasksClaimedMoreThanOnce 0, requeues 0 across 25 tasks done. No split-for-size requeue and no requeue on a held file.
 
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

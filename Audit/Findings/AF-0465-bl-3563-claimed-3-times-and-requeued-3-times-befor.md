@@ -3,8 +3,8 @@ id: AF-0465
 title: BL-3563 claimed 3 times and requeued 3 times before it was split and Deferred
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:BL-3563:redone-work
 reproduction: none
 task: BL-4183
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0465 - BL-3563 claimed 3 times and requeued 3 times before it was split and Deferred
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | Rule re-run over this window (Since 2026-10-29): tasksClaimedMoreThanOnce 50, requeues 66. Tasks were again requeued repeatedly before being split and Deferred. BL-4112 was requeued at 10:18:11 and 16:25:53 (80-turn cap), then split by split-BL-4112-20261029-164929-L7 and Deferred. BL-4328 was requeued at 22:16:33 and 00:07:54 (80-turn cap), then split at 13:04:46 and Deferred. BL-4131 was requeued at 18:56:56 and 08:09:38, then split at 15:46:39 and Deferred.
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Re-audited by mechanism (Process.md) over this window: Measure-FactoryProcess.ps1 -Since 2026-10-31 on this audit's logs shows 25 tasks done, tasksClaimedMoreThanOnce 0, requeues 0. Every task in the window has claims 1, and the lane logs show no REQUEUE line. No task was claimed 3 times.
 
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

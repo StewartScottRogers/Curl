@@ -3,8 +3,8 @@ id: AF-0504
 title: CI red 486 min from run 41071219626 (302d7dd3): the quality gates, then a run of five further failures
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:41071219626:ci-red
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0504 - CI red 486 min from run 41071219626 (302d7dd3): the quality gates, then a run of five further failures
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: ciRedMinutes 0, no red spells. The last failure (41151657472, dbc468ec) was followed by success 41160265908 at 02:49Z on 10-31, before the window.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

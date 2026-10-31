@@ -3,8 +3,8 @@ id: AF-0469
 title: BL-3754 claimed 3 times and requeued twice (files held by BL-4031/BL-4022, then a remainder split to BL-4067)
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:BL-3754:redone-work
 reproduction: none
 task: BL-4187
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0469 - BL-3754 claimed 3 times and requeued twice (files held by BL-4031/BL-4022, then a remainder split to BL-4067)
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | Same cause: a held file, then a remainder split. BL-4328 was requeued at 22:16:33 ('Needs Curl.Console/CurlComposition.cs, held by BL-4320 in Doing'), requeued again at 00:07:54 on the 80-turn cap, and split into BL-4362..BL-4365 at 13:04:46 on 10-30. BL-4083 (CI fix) was also requeued on EngineComposition.cs held by BL-4082.
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: tasksClaimedMoreThanOnce 0, requeues 0. No requeue on files held by another task and no remainder split.
 
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

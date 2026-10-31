@@ -42,6 +42,8 @@ Select-String -Path CLAUDE.md -Pattern '/Wire/.: Http2, Http3, Quic, Zstandard -
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the reproduction: the old pattern '/Wire/.: Http2, Http3, Quic, Zstandard -' no longer matches CLAUDE.md. CLAUDE.md now lists 'Http2, Http3, HttpDatagram, Protobuf, Quic, Ssh, WebSocket, Zstandard', which covers the Curl.slnx lines 261, 265, 273 and 277.
+
 ## Log
 
 - 2026-10-31: filed proposed.

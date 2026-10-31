@@ -42,6 +42,8 @@ Select-String -Path Curl.Extension.OAuth2.UnitLibrary/Cache/OAuth2TokenCacheLoca
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the reproduction. OAuth2TokenCacheLocation.SearchedVariables is CURL_HOME, XDG_CONFIG_HOME, HOME, USERPROFILE, APPDATA, with the last two Windows-only (WindowsOnlyFrom = 3). DefaultConfigFileSearch.cs:52-56 has the same order, with USERPROFILE and APPDATA marked WindowsOnly true. The summary's claim to follow curl's .curlrc order and platforms is now true.
+
 ## Log
 
 - 2026-10-31: filed proposed.

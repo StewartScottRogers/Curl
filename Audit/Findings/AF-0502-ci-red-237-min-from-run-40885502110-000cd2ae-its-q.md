@@ -3,8 +3,8 @@ id: AF-0502
 title: CI red 237 min from run 40885502110 (000cd2ae): its quality-gate fix BL-4083 was requeued behind BL-4082 for 3 h 22 min
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:40885502110:ci-red
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0502 - CI red 237 min from run 40885502110 (000cd2ae): its quality-gate fix BL-4083 was requeued behind BL-4082 for 3 h 22 min
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: ciRedMinutes 0, no red spells, and no CI-fix task was requeued (requeues 0).
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
