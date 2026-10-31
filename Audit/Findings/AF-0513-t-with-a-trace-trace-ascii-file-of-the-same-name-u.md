@@ -3,8 +3,8 @@ id: AF-0513
 title: -T with a --trace/--trace-ascii file of the same name uploads 0 bytes and exits 0 where curl exits 26
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Console/CurlCommandRunner.cs:--upload-file:exit-code
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release -v q; $d=(New-Item -ItemType Directory -For
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
