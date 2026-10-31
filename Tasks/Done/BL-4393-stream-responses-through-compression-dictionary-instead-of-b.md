@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.CompressionDictionary.UnitLibrary/CompressionDictionaryTransferHook.cs, Curl.Extension.CompressionDictionary.UnitTests/CompressionDictionaryTransferHookTests.cs]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4393 — Stream responses through --compression-dictionary instead of buffering the whole body
 
@@ -22,13 +22,16 @@ Shift-end review 2026-10-31 (type-design-analyzer). Curl.Extension.CompressionDi
 
 ## Acceptance criteria
 
-- [ ] A test in CompressionDictionaryTransferHookTests shows bytes of a response without Use-As-Dictionary reach the output before the response ends.
-- [ ] A test shows a dictionary received after a redirect is stored under the effective URL.
-- [ ] dotnet build is clean, the fast tests pass and the library keeps 100% line and branch coverage.
+- [x] A test in CompressionDictionaryTransferHookTests shows bytes of a response without Use-As-Dictionary reach the output before the response ends.
+- [x] A test shows a dictionary received after a redirect is stored under the effective URL.
+- [x] dotnet build is clean, the fast tests pass and the library keeps 100% line and branch coverage.
 
 ## Notes
+
+Decision in ADR-1171: with no dictionary advertised the body streams and a copy up to 16 MiB is kept to store; with a dictionary advertised the body is still held, as it may need decoding (headers are known only after the transfer). CI on Linux and macOS: tests are platform-neutral and fast tests are green here.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 2e78e4b1 0e7256db f874b647.
+- 2026-10-31: Doing -> Done. Streams responses without an offered dictionary; stores under effective URL
