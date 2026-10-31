@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Abstractions.UnitLibrary/Transfer/TransferContextRequests.cs, Curl.Extension.Abstractions.UnitTests/Transfer, Curl.Extension.ObliviousHttp.UnitLibrary/Relay/HookRequest.cs, Curl.Extension.ObliviousHttp.UnitTests/Relay]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4389 — Keep the user body and request target out of Oblivious HTTP key and relay requests
 
@@ -22,14 +22,17 @@ Shift-end review 2026-10-31 (silent-failure-hunter, type-design-analyzer). Curl.
 
 ## Acceptance criteria
 
-- [ ] The key-configuration GET carries no body, no Content-Type and the key URL's own path even when -d and --request-target are given, proven by a test in Curl.Extension.ObliviousHttp.UnitTests/Relay.
-- [ ] The relay POST's request line is the relay URL's path, never --request-target, proven by a test.
-- [ ] TransferContextRequests has a test for its no-body case in Curl.Extension.Abstractions.UnitTests/Transfer.
-- [ ] dotnet build is clean, the fast tests pass and both libraries keep 100% line and branch coverage.
+- [x] The key-configuration GET carries no body, no Content-Type and the key URL's own path even when -d and --request-target are given, proven by a test in Curl.Extension.ObliviousHttp.UnitTests/Relay.
+- [x] The relay POST's request line is the relay URL's path, never --request-target, proven by a test.
+- [x] TransferContextRequests has a test for its no-body case in Curl.Extension.Abstractions.UnitTests/Transfer.
+- [x] dotnet build is clean, the fast tests pass and both libraries keep 100% line and branch coverage.
 
 ## Notes
+
+WithRequest now clears --request-target and gives an empty body no HTTP body (so no Content-Type); the -d body was already replaced by the hook's empty body. Complexity split into three helpers. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 640168f4 9d92ce2b 4b5b2cba 9d71032c.
+- 2026-10-31: Doing -> Done. Key GET and relay POST no longer carry the user body or request target

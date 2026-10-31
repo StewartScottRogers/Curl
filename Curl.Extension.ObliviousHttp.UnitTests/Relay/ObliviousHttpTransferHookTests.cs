@@ -12,6 +12,23 @@ public sealed class ObliviousHttpTransferHookTests
     public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
+    public async Task ExecuteAsync_UserBodyAndRequestTarget_NeverReachTheKeyServerOrTheRelayInClear()
+    {
+        FakeObliviousServers servers = new();
+        TransferContext context = Context("https://example.com/hello.txt", new HttpRequestOptions { RequestTarget = "/private/account" }, "secret"u8.ToArray());
+
+        await new ObliviousHttpTransferHook(RelayUrl, null).ExecuteAsync(context, servers.Invoke);
+
+        ITransferContext keys = servers.Sent[0];
+        Assert.AreEqual(0, keys.PostData!.Value.Length);
+        Assert.IsNull(keys.Http!.RequestTarget);
+        Assert.AreEqual("https://example.com/.well-known/ohttp-gateway", keys.Url.OriginalString);
+        CollectionAssert.DoesNotContain(keys.Http.Headers.Where(h => h.StartsWith("Content-Type", StringComparison.Ordinal)).ToList(), "Content-Type: application/x-www-form-urlencoded");
+        Assert.IsNull(servers.Sent[1].Http!.RequestTarget);
+        Assert.AreEqual(RelayUrl, servers.Sent[1].Url.OriginalString);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NoKeysOption_FetchesTheWellKnownGatewayKeysThenPostsTheEncapsulatedRequestToTheRelay()
     {
         FakeObliviousServers servers = new();
