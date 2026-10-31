@@ -16,7 +16,7 @@ codes for the failures.
 
 - Schemes `redis` and `rediss` (TLS from curl's connector, so `-k`, `--cacert` and the other TLS options apply), both
   on port 6379 when the URL names none: the URI scheme registrations give 6379 and name no separate TLS port. The
-  library is `Curl.Extension.Protocol.Redis.UnitLibrary`; it adds no command-line option.
+  library is `Curl.Extended.Protocol.Redis.UnitLibrary`; it adds no command-line option.
 - The URL is `redis://[user:password@]host[:port]/[db]/command/argument/...`. An all-digit first path segment is the
   URI scheme's `db-number`, sent as `SELECT db` before the command. Every later segment, URL-decoded and sent as UTF-8,
   is one argument, so `%2F` puts a `/` inside an argument and an empty segment is an empty argument. `-d` (and its

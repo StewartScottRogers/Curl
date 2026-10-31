@@ -13,7 +13,7 @@ forbid changing `Curl.Tls` for an extension. Upstream curl has no CoAP, so no cu
 
 ## Decision
 
-- `Curl.Extension.Protocol.Coap.Dtls.Handshake.DtlsClientHandshake` is its own state machine over `IDatagramChannel`, built
+- `Curl.Extended.Protocol.Coap.Dtls.Handshake.DtlsClientHandshake` is its own state machine over `IDatagramChannel`, built
   on `Curl.Tls`'s public pieces (`ServerHello`, `Tls12CertificateMessage`, `Tls12ServerKeyExchange`,
   `Tls12ClientKeyExchange`, `EcdhKeyShare`, `TlsPrf`) and the extension's own `Dtls/Wire`, `Dtls/Record` and
   `Dtls/Retransmission`.

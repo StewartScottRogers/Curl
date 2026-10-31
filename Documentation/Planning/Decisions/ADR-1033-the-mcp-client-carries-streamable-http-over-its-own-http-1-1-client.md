@@ -9,12 +9,12 @@
 The McpClient extension sends MCP messages over the Streamable HTTP transport (Model Context Protocol
 2025-06-18, "Base Protocol > Transports > Streamable HTTP"). An extension may not reference
 `Curl.Original.Protocol.Http` or another extension (ADR-0999), so it cannot borrow curl's HTTP stack or
-`Curl.Extension.Protocol.S3`'s small HTTP/1.1 client.
+`Curl.Extended.Protocol.S3`'s small HTTP/1.1 client.
 
 ## Decision
 
-`Curl.Extension.Protocol.McpClient.UnitLibrary/StreamableHttp/` holds its own minimal HTTP/1.1 client, adapted from
-`Curl.Extension.Protocol.S3`'s: request line and headers, Content-Length, chunked and close-delimited response
+`Curl.Extended.Protocol.McpClient.UnitLibrary/StreamableHttp/` holds its own minimal HTTP/1.1 client, adapted from
+`Curl.Extended.Protocol.S3`'s: request line and headers, Content-Length, chunked and close-delimited response
 bodies (RFC 9112 §6.3), interim 1xx responses skipped, and the connection kept only when a response was
 read to its end and leaves it open. `McpStreamableHttpTransport` sits on it:
 

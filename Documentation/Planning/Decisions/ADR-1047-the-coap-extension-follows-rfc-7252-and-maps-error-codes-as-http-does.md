@@ -8,7 +8,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 ## Context
 
 Upstream curl has no CoAP support, so the extension (ADR-0999) is tested against its specification. BL-4245
-built the message codec (`Curl.Extension.Protocol.Coap.UnitLibrary/Wire`); BL-4246 makes requests over UDP with it.
+built the message codec (`Curl.Extended.Protocol.Coap.UnitLibrary/Wire`); BL-4246 makes requests over UDP with it.
 RFC 7252 leaves to the client how a response is shown and when it gives up, and curl has no CoAP answer to
 match, so these choices follow the nearest curl behaviour, HTTP's.
 

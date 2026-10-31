@@ -16,7 +16,7 @@ Curl.Http3 (server-opened streams handed to the caller, BL-4223) and Curl.HttpDa
 
 - Scheme `webtransport` (no command-line option, so no `https://` behaviour changes): `webtransport://host[:port]/path`
   dials QUIC over curl's datagram connector to UDP port 443 by default, offers ALPN `h3`, and sends an extended CONNECT
-  (`:protocol webtransport`, `:scheme https`) for the path. The library is `Curl.Extension.Protocol.WebTransport.UnitLibrary`.
+  (`:protocol webtransport`, `:scheme https`) for the path. The library is `Curl.Extended.Protocol.WebTransport.UnitLibrary`.
 - Version followed: draft-ietf-webtrans-http3-16. The client sends SETTINGS_ENABLE_CONNECT_PROTOCOL, SETTINGS_H3_DATAGRAM
   and SETTINGS_WT_ENABLED (section 3.1) and refuses a server that does not allow sessions.
 - The query field `wt=` chooses how the `-d` data travels, and is not sent to the server: `wt=bidi` (the default) on a

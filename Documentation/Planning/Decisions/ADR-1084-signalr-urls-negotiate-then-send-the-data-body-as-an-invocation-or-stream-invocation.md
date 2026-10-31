@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4108 finishes the SignalR extension (ADR-0999) `Curl.Extension.Protocol.SignalR.UnitLibrary`, whose JSON hub
+BL-4108 finishes the SignalR extension (ADR-0999) `Curl.Extended.Protocol.SignalR.UnitLibrary`, whose JSON hub
 protocol codec (ADR-1032) and negotiate and WebSocket transport (ADR-1038) are already built. Upstream curl
 has no SignalR support, so the specifications decide: ASP.NET Core's `HubProtocol.md` and
 `TransportProtocols.md` (dotnet/aspnetcore `src/SignalR/docs/specs`, as published in 2026): the JSON hub

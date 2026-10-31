@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Curl.Extension.Protocol.DnsQuery.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Extended.Protocol.DnsQuery.UnitTests" />
     <InternalsVisibleTo Include="Curl.Extension.EncryptedDns.UnitTests" />
-    <InternalsVisibleTo Include="Curl.Extension.Protocol.WebTransport.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Extended.Protocol.WebTransport.UnitTests" />
     <InternalsVisibleTo Include="Curl.Networking.UnitTests" />
     <InternalsVisibleTo Include="Curl.Quic.UnitTests" />
   </ItemGroup>

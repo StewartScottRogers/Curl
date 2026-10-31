@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4118 adds an AMQP 1.0 client as the extension `Curl.Extension.Protocol.Amqp1.UnitLibrary` (ADR-0999). Upstream curl has no
+BL-4118 adds an AMQP 1.0 client as the extension `Curl.Extended.Protocol.Amqp1.UnitLibrary` (ADR-0999). Upstream curl has no
 AMQP, so OASIS AMQP Version 1.0 (29 October 2012) decides. BL-4258 is its first part: the type system of Part 1,
 as pure byte-level code in `Types/`, on which BL-4256 builds the frames and performatives.
 

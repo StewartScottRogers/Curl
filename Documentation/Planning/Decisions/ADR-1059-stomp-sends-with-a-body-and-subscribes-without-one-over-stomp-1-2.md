@@ -14,7 +14,7 @@ ports, a mapping from curl's options to frames, and exit codes for the failures.
 
 - Schemes `stomp` (default port 61613, the IANA-registered STOMP port) and `stomps` (default port 61614, RabbitMQ's
   STOMP-over-TLS port; the specification names none), TLS from curl's connector, so `-k`, `--cacert` and the other
-  TLS options apply. The library is `Curl.Extension.Protocol.Stomp.UnitLibrary`; it adds no command-line option.
+  TLS options apply. The library is `Curl.Extended.Protocol.Stomp.UnitLibrary`; it adds no command-line option.
 - The URL's path, URL-decoded and with its leading `/`, is the destination (`stomp://host/queue/a` is `/queue/a`). A
   URL with no path after `/` ends with exit 3 before connecting.
 - Only version 1.2 is offered: `CONNECT` with `accept-version:1.2`, `host` set to the URL's host and `heart-beat:0,0`.

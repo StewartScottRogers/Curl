@@ -7,7 +7,7 @@
 
 ## Context
 
-`Curl.Extension.Protocol.DnsQuery` (split from BL-4150, ADR-0999) sends a DNS query and shows the answer. Upstream curl has
+`Curl.Extended.Protocol.DnsQuery` (split from BL-4150, ADR-0999) sends a DNS query and shows the answer. Upstream curl has
 no such feature, so the codec and its output are tested against RFC 1035, RFC 2782, RFC 3597 and RFC 8659, not
 against curl. Two choices had no RFC to settle them: how the decoded RDATA is held so both a text and a JSON writer
 can show it, and how a decoder tells a compression pointer loop from a legal pointer.

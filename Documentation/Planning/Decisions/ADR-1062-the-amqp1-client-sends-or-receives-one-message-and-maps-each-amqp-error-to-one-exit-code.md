@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4257 adds `Amqp1ProtocolHandler` in `Curl.Extension.Protocol.Amqp1.UnitLibrary/Client`, serving `amqp1://host[:5672]/address`
+BL-4257 adds `Amqp1ProtocolHandler` in `Curl.Extended.Protocol.Amqp1.UnitLibrary/Client`, serving `amqp1://host[:5672]/address`
 and `amqp1s://host[:5671]/address` over the frames of ADR-1058. Upstream curl has no AMQP, so there is no curl output
 to match; the OASIS AMQP Version 1.0 specification decides the wire, and curl's own exit codes decide how a failure
 ends.

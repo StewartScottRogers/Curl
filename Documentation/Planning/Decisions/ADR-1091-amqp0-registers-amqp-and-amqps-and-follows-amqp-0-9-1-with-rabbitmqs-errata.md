@@ -8,12 +8,12 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 ## Context
 
 BL-4259 built the AMQP 0-9-1 codec (ADR-1056) and BL-4260 the client flow (ADR-1060) in
-`Curl.Extension.Protocol.Amqp0.UnitLibrary`. BL-4117 registers it as an extension (ADR-0999) so `curl` serves its URLs, lists
+`Curl.Extended.Protocol.Amqp0.UnitLibrary`. BL-4117 registers it as an extension (ADR-0999) so `curl` serves its URLs, lists
 it in `curl --extensions` and `curl --ai-help extensions` (ADR-1008), and stays out of the way with `CURL_EXTENSIONS=0`.
 
 ## Decision
 
-- **Names.** The extension is `amqp0` (the `0` tells it apart from AMQP 1.0, `Curl.Extension.Protocol.Amqp1`, BL-4118). Its
+- **Names.** The extension is `amqp0` (the `0` tells it apart from AMQP 1.0, `Curl.Extended.Protocol.Amqp1`, BL-4118). Its
   schemes are `amqp` (port 5672) and `amqps` (port 5671, TLS), the schemes of RabbitMQ's URI specification. It adds no
   command-line option: the URL path names the virtual host and queue, `-d` chooses publish, and `--user` the login
   (ADR-1060).

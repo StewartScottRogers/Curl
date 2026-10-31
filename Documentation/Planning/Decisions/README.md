@@ -1220,4 +1220,7 @@ Each option and the specific reason it lost.
 | [1171](ADR-1171-a-dictionary-hook-without-an-offered-dictionary-streams-the-body-and-keeps-a-bounded-copy.md) | A dictionary hook without an offered dictionary streams the body and keeps a bounded copy (BL-4393) | Accepted | 2026-10-31 |
 | [1172](ADR-1172-wireguard-looks-up-http-3-host-names-through-a-resolver-hook-over-the-tunnel-dns.md) | `--wireguard` looks up HTTP/3 host names through a resolver hook over the tunnel's DNS (BL-4392) | Accepted | 2026-10-31 |
 | [1173](ADR-1173-the-ci-watch-files-a-job-its-timeout-cancelled-as-a-hang.md) | The CI watch files a job its timeout cancelled as a hang (BL-4420) | Accepted | 2026-10-31 |
+| [1174](ADR-1174-extensions-that-serve-their-own-scheme-are-curl-extension-protocol.md) | Extensions that serve their own URL scheme are named `Curl.Extension.Protocol.<Name>` (BL-4438) | Superseded by 1177 | 2026-10-31 |
 | [1175](ADR-1175-a-t-file-is-sized-before-the-trace-file-opens.md) | A `-T` file is sized before the trace file opens (BL-4435) | Accepted | 2026-10-31 |
+| [1176](ADR-1176-curls-own-protocols-are-curl-original-protocol.md) | Curl's own protocols are named `Curl.Original.Protocol.<Name>` (BL-4439) | Accepted | 2026-10-31 |
+| [1177](ADR-1177-extensions-that-serve-their-own-scheme-are-curl-extended-protocol.md) | Extensions that serve their own URL scheme are named `Curl.Extended.Protocol.<Name>` (BL-4440) | Accepted | 2026-10-31 |

@@ -13,7 +13,7 @@ specification, not against curl (ADR-0999).
 
 ## Decision
 
-- `Curl.Extension.Protocol.McpClient.UnitLibrary/Wire` writes messages with `Utf8JsonWriter` and reads them with
+- `Curl.Extended.Protocol.McpClient.UnitLibrary/Wire` writes messages with `Utf8JsonWriter` and reads them with
   `JsonDocument`, both BCL and AOT-safe with no serializer reflection.
 - `McpRequestWriter` gives each request the next id, a JSON number starting at 1, and takes an id only when the
   request is written. `initialize` asks for protocol version `2025-06-18` and declares an empty `capabilities`

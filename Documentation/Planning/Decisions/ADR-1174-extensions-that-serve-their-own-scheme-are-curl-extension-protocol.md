@@ -1,6 +1,6 @@
 # ADR-1174: Extensions that serve their own URL scheme are named Curl.Extension.Protocol.<Name>
 
-- Status: Accepted
+- Status: Superseded by ADR-1177
 - Date: 2026-10-31
 - Asked for by Stewart (2026-10-31: rename the extension projects to `Curl.Extension.Protocol.*`, scheme
   extensions only, under an `/Extensions/Protocol/` solution folder); the dividing rule decided by Claude

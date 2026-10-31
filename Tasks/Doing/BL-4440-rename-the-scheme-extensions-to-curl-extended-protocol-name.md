@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Extension.Protocol.Amqp0.UnitLibrary, Curl.Extension.Protocol.Amqp0.UnitTests, Curl.Extension.Protocol.Amqp1.UnitLibrary, Curl.Extension.Protocol.Amqp1.UnitTests, Curl.Extension.Protocol.AzureStorage.UnitLibrary, Curl.Extension.Protocol.AzureStorage.UnitTests, Curl.Extension.Protocol.Coap.UnitLibrary, Curl.Extension.Protocol.Coap.UnitTests, Curl.Extension.Protocol.DnsQuery.UnitLibrary, Curl.Extension.Protocol.DnsQuery.UnitTests, Curl.Extension.Protocol.GoogleCloudStorage.UnitLibrary, Curl.Extension.Protocol.GoogleCloudStorage.UnitTests, Curl.Extension.Protocol.Grpc.UnitLibrary, Curl.Extension.Protocol.Grpc.UnitTests, Curl.Extension.Protocol.Kafka.UnitLibrary, Curl.Extension.Protocol.Kafka.UnitTests, Curl.Extension.Protocol.McpClient.IntegrationTests, Curl.Extension.Protocol.McpClient.UnitLibrary, Curl.Extension.Protocol.McpClient.UnitTests, Curl.Extension.Protocol.Mqtt5.UnitLibrary, Curl.Extension.Protocol.Mqtt5.UnitTests, Curl.Extension.Protocol.Nats.UnitLibrary, Curl.Extension.Protocol.Nats.UnitTests, Curl.Extension.Protocol.OciRegistry.UnitLibrary, Curl.Extension.Protocol.OciRegistry.UnitTests, Curl.Extension.Protocol.Plugin.UnitLibrary, Curl.Extension.Protocol.Plugin.UnitTests, Curl.Extension.Protocol.Redis.UnitLibrary, Curl.Extension.Protocol.Redis.UnitTests, Curl.Extension.Protocol.S3.UnitLibrary, Curl.Extension.Protocol.S3.UnitTests, Curl.Extension.Protocol.SignalR.UnitLibrary, Curl.Extension.Protocol.SignalR.UnitTests, Curl.Extension.Protocol.SocketIo.UnitLibrary, Curl.Extension.Protocol.SocketIo.UnitTests, Curl.Extension.Protocol.Stomp.UnitLibrary, Curl.Extension.Protocol.Stomp.UnitTests, Curl.Extension.Protocol.WebTransport.UnitLibrary, Curl.Extension.Protocol.WebTransport.UnitTests, Curl.Extension.Protocol.Xmpp.UnitLibrary, Curl.Extension.Protocol.Xmpp.UnitTests, Curl.Extension.Composition.UnitLibrary, Directory.Build.props, Curl.slnx]
+touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary, Curl.Extended.Protocol.Amqp0.UnitTests, Curl.Extended.Protocol.Amqp1.UnitLibrary, Curl.Extended.Protocol.Amqp1.UnitTests, Curl.Extended.Protocol.AzureStorage.UnitLibrary, Curl.Extended.Protocol.AzureStorage.UnitTests, Curl.Extended.Protocol.Coap.UnitLibrary, Curl.Extended.Protocol.Coap.UnitTests, Curl.Extended.Protocol.DnsQuery.UnitLibrary, Curl.Extended.Protocol.DnsQuery.UnitTests, Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary, Curl.Extended.Protocol.GoogleCloudStorage.UnitTests, Curl.Extended.Protocol.Grpc.UnitLibrary, Curl.Extended.Protocol.Grpc.UnitTests, Curl.Extended.Protocol.Kafka.UnitLibrary, Curl.Extended.Protocol.Kafka.UnitTests, Curl.Extended.Protocol.McpClient.IntegrationTests, Curl.Extended.Protocol.McpClient.UnitLibrary, Curl.Extended.Protocol.McpClient.UnitTests, Curl.Extended.Protocol.Mqtt5.UnitLibrary, Curl.Extended.Protocol.Mqtt5.UnitTests, Curl.Extended.Protocol.Nats.UnitLibrary, Curl.Extended.Protocol.Nats.UnitTests, Curl.Extended.Protocol.OciRegistry.UnitLibrary, Curl.Extended.Protocol.OciRegistry.UnitTests, Curl.Extended.Protocol.Plugin.UnitLibrary, Curl.Extended.Protocol.Plugin.UnitTests, Curl.Extended.Protocol.Redis.UnitLibrary, Curl.Extended.Protocol.Redis.UnitTests, Curl.Extended.Protocol.S3.UnitLibrary, Curl.Extended.Protocol.S3.UnitTests, Curl.Extended.Protocol.SignalR.UnitLibrary, Curl.Extended.Protocol.SignalR.UnitTests, Curl.Extended.Protocol.SocketIo.UnitLibrary, Curl.Extended.Protocol.SocketIo.UnitTests, Curl.Extended.Protocol.Stomp.UnitLibrary, Curl.Extended.Protocol.Stomp.UnitTests, Curl.Extended.Protocol.WebTransport.UnitLibrary, Curl.Extended.Protocol.WebTransport.UnitTests, Curl.Extended.Protocol.Xmpp.UnitLibrary, Curl.Extended.Protocol.Xmpp.UnitTests, Curl.Extension.Composition.UnitLibrary, Directory.Build.props, Curl.slnx]
 requirement: none
 lane: no
 created: 2026-10-31
@@ -23,13 +23,15 @@ Stewart, 2026-10-31: rename `Curl.Extension.Protocol.*` (BL-4438, ADR-1174) to `
 
 ## Acceptance criteria
 
-- [ ] Each of the 20 (41 projects) is `Curl.Extended.Protocol.<Name>.*` in folder, csproj, assembly and namespace, under `/Extended/Protocols/<Name>/` in `Curl.slnx`.
-- [ ] Composition references them by wildcard, and `VerifyExtensionIsolation` still treats them as extensions: one given a reference to a curl protocol or to another extension fails the build.
-- [ ] `curl --extensions` lists the same 62 extensions as before.
-- [ ] No live file outside the audit and gap paths names `Curl.Extension.Protocol`; ADR-1174 is superseded by an ADR naming the new rule, and `CLAUDE.md`, `LaneRules.md` and the glossary state it.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Each of the 20 (41 projects) is `Curl.Extended.Protocol.<Name>.*` in folder, csproj, assembly and namespace, under `/Extended/Protocols/<Name>/` in `Curl.slnx`.
+- [x] Composition references them by wildcard, and `VerifyExtensionIsolation` still treats them as extensions: one given a reference to a curl protocol or to another extension fails the build.
+- [x] `curl --extensions` lists the same 62 extensions as before.
+- [x] No live file outside the audit and gap paths names `Curl.Extension.Protocol`; ADR-1174 is superseded by an ADR naming the new rule, and `CLAUDE.md`, `LaneRules.md` and the glossary state it.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-31 (interactive): 41 folders moved, about 920 files changed. Build clean; fast tests 114 of 114 projects pass; `curl --extensions` identical (62 lines). `Curl.Extended.Protocol.Coap` given a reference to `Curl.Original.Protocol.Http`, to `Curl.Extension.Har` and to `Curl.Extended.Protocol.Redis` failed the build each time (ADR-0999). Composition gains a second wildcard reference, `Directory.Build.props` a second prefix in `_IsExtensionProject` and `_ExtensionReference`, and the ADR index the rows for 1174, 1176 and 1177.
 
 ## Log
 

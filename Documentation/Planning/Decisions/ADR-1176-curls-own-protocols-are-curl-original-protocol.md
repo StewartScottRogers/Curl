@@ -8,7 +8,7 @@
 ## Context
 
 ADR-0999 keeps what Curl adds beyond upstream curl apart from curl's own protocols, and ADR-1174 named the
-extensions that serve their own scheme `Curl.Extension.Protocol.<Name>`. Curl's own protocols were
+extensions that serve their own scheme `Curl.Extension.Protocol.<Name>` (`Curl.Extended.Protocol.<Name>` since ADR-1177). Curl's own protocols were
 `Curl.Protocol.<Name>`, a name that did not say they are the ones upstream curl has.
 
 ## Decision

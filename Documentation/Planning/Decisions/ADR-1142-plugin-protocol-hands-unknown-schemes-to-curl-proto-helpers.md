@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4160 adds `Curl.Extension.Protocol.Plugin.UnitLibrary` (ADR-0999): a URL whose scheme Curl does not serve
+BL-4160 adds `Curl.Extended.Protocol.Plugin.UnitLibrary` (ADR-0999): a URL whose scheme Curl does not serve
 runs through a program the user installs, `curl-proto-<scheme>`, found on `PATH`. Upstream curl has nothing
 like it, so the specification is git's remote-helper model (gitremote-helpers, git 2.47 documentation,
 <https://git-scm.com/docs/gitremote-helpers>), adapted: git runs `git-remote-<transport>` for a URL

@@ -41,4 +41,4 @@ extension is tested against the protocol guide.
 ## Consequences
 
 `kafka://` and `kafkas://` reach SASL_PLAINTEXT and SASL_SSL listeners with PLAIN. The client code is
-`KafkaClientFlow.AuthenticateAsync` and the wire code `Curl.Extension.Protocol.Kafka.UnitLibrary/Wire/KafkaSasl`.
+`KafkaClientFlow.AuthenticateAsync` and the wire code `Curl.Extended.Protocol.Kafka.UnitLibrary/Wire/KafkaSasl`.
