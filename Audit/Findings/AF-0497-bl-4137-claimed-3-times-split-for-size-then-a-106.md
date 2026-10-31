@@ -3,8 +3,8 @@ id: AF-0497
 title: BL-4137 claimed 3 times: split for size, then a 106-minute, 83-turn run that ran out of time with its code stashed
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-4137:BL-4137:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Z:/repos/Curl.audit/20261031-035829/logs/DarkFactory-*-L*.lo
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
