@@ -32,3 +32,4 @@ Shift-end review 2026-10-31 (silent-failure-hunter, factory code-reviewer) of BL
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 74dd1568 e03315f3 d7470d17 caed2003.
