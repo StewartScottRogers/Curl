@@ -33,3 +33,4 @@ Split from BL-4377 (its criterion 4). Likely cause, from reproduction: the timed
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: fc9fd4c6 111a9fbf.
