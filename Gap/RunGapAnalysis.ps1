@@ -13,6 +13,12 @@
        -Restart) unless -AlongsideShift is given. Then git fetch origin.
     2. git worktree add --detach <stamp>\tree <Ref>. Every measurement runs against that
        tree's commit, never against the checkout this script was started from.
+    The platform measured here is the one this script runs on (BL-3928): windows from
+    Gap\RunGapAnalysis.cmd, linux or macos from Gap/RunGapAnalysis.sh (PowerShell 7). The
+    others selected come from gap-platforms.yml, which measures only linux and macos, so off
+    Windows a selected windows is missing, with the reason. "Windows" in steps 3 to 5 below
+    means the platform measured here, and "linux and macos" the platforms measured by CI.
+
     3. When linux or macos is selected: gh workflow run gap-platforms.yml --ref master
        -f ref=<commit> -f request=<stamp>, then the run is found in gh run list by its title
        "Gap platforms <stamp> <commit>" (up to two minutes). A dispatch that fails leaves
@@ -99,8 +105,9 @@
     Does the refusals, then prints every step's command and changes nothing: no fetch, no
     dispatch, no run folder, no worktree.
 .PARAMETER NewTab
-    Starts the run in a new herdr tab when HERDR_ENV=1, otherwise in a new console window,
-    and returns at once.
+    Starts the run in a new herdr tab when HERDR_ENV=1, otherwise in a new console window
+    (off Windows, a detached pwsh writing <repo>.gap/RunGapAnalysis-<stamp>.log), and returns
+    at once.
 .PARAMETER NoTasks
     Skips step 10: no tasks are filed on work/dark-factory.
 .PARAMETER NoPullRequest
@@ -121,6 +128,8 @@
     Gap\RunGapAnalysis.cmd -NewTab
 .EXAMPLE
     Gap\RunGapAnalysis.cmd -Areas exitcodes,writeout -Platforms windows -AlongsideShift
+.EXAMPLE
+    Gap/RunGapAnalysis.sh -NewTab -Platforms linux,macos
 #>
 param(
     [string] $Ref = 'origin/work/dark-factory',
@@ -143,6 +152,12 @@ $ErrorActionPreference = 'Stop'
 $script:Shell = (Get-Process -Id $PID).Path
 if ([System.IO.Path]::GetFileNameWithoutExtension($script:Shell) -eq 'dotnet') { $script:Shell = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source }
 $script:Commands = @{ git = 'git'; gh = 'gh'; claude = 'claude'; shell = $script:Shell }
+# The platform this run measures itself (BL-3928): windows from Gap\RunGapAnalysis.cmd, linux
+# or macos from Gap/RunGapAnalysis.sh. The others come from gap-platforms.yml, which measures
+# only linux and macos, so windows is measured only from a Windows checkout.
+$script:OnWindows = $PSVersionTable.PSVersion.Major -lt 6 -or $IsWindows
+$script:LocalPlatform = if ($script:OnWindows) { 'windows' } elseif ($IsMacOS) { 'macos' } else { 'linux' }
+$script:PowerShellExe = if ($script:OnWindows) { 'powershell' } else { 'pwsh' }
 $script:AllAreas = @('options', 'protocols', 'features', 'writeout', 'exitcodes', 'environment', 'behaviour')
 $script:AllPlatforms = @('windows', 'linux', 'macos')
 $script:Sleep = { param([int] $Seconds) Start-Sleep -Seconds $Seconds }
@@ -164,8 +179,10 @@ function Get-GapRunRefusal {
 
 function Get-ProcessCommandLines {
     # Every running process's command line; empty where the platform cannot tell.
-    try { return @(Get-CimInstance Win32_Process -ErrorAction Stop | ForEach-Object { [string]$_.CommandLine }) }
-    catch { return @() }
+    try {
+        if ($script:OnWindows) { return @(Get-CimInstance Win32_Process -ErrorAction Stop | ForEach-Object { [string]$_.CommandLine }) }
+        return @(& ps -axo 'args=' | ForEach-Object { "$_".Trim() })
+    } catch { return @() }
 }
 
 function Resolve-GapAreas {
@@ -507,7 +524,7 @@ function Sync-GapBoard {
     }
     $upstream = @(Invoke-GapQuery 'git' @('-C', $Board, 'rev-parse', 'origin/work/dark-factory')) | Select-Object -First 1
     if (-not $upstream) { $upstream = 'origin/work/dark-factory' }
-    $taskBoard = Join-Path $Board '.claude\skills\task-board\task-board.ps1'
+    $taskBoard = Join-Path $Board '.claude/skills/task-board/task-board.ps1'
     # dedupe leaves git cat-file's exit code 1 (a file not in -Since) in $LASTEXITCODE, so the
     # outcome is whether it threw, not that code.
     $command = "`$env:CLAUDE_PROJECT_DIR = '" + $Board.Replace("'", "''") + "'; try { & '" + $taskBoard.Replace("'", "''") + "' dedupe -Since '" + $upstream + "'; exit 0 } catch { Write-Output `$_; exit 1 }"
@@ -618,6 +635,9 @@ function Invoke-GapSelfTest {
     & $report '-Areas features,protocols selects them in run order' (((Resolve-GapAreas @('features,protocols')).Areas -join ',') -eq 'protocols,features')
     $threw = $false; try { Resolve-GapAreas @('nope') | Out-Null } catch { $threw = $true }
     & $report 'an unknown area is refused' $threw
+    $expectedLocal = if ($PSVersionTable.PSVersion.Major -lt 6 -or $IsWindows) { 'windows' } elseif ($IsMacOS) { 'macos' } else { 'linux' }
+    & $report "the platform measured here is this machine's ($expectedLocal)" ($script:LocalPlatform -eq $expectedLocal)
+    & $report 'the process table shows this run' (@(Get-ProcessCommandLines | Where-Object { $_ -match 'RunGapAnalysis\.ps1' }).Count -gt 0)
     & $report 'no -Platforms selects windows, linux and macos' (((Resolve-GapPlatforms @()) -join ',') -eq 'windows,linux,macos')
     & $report '-Platforms macos,windows selects them in platform order' (((Resolve-GapPlatforms @('macos,windows')) -join ',') -eq 'windows,macos')
     $threw = $false; try { Resolve-GapPlatforms @('beos') | Out-Null } catch { $threw = $true }
@@ -721,11 +741,11 @@ function Test-GapTwoFilers {
         $origin = Join-Path $Root 'origin.git'; $seed = Join-Path $Root 'seed'
         git init -q --bare $origin 2>$null | Out-Null
         git init -q $seed 2>$null | Out-Null
-        $skill = Join-Path $seed '.claude\skills\task-board'
-        New-Item -ItemType Directory -Force -Path $skill, (Join-Path $seed 'Tasks\Backlog') | Out-Null
-        $source = Join-Path $script:RepositoryRoot '.claude\skills\task-board'
+        $skill = Join-Path $seed '.claude/skills/task-board'
+        New-Item -ItemType Directory -Force -Path $skill, (Join-Path $seed 'Tasks/Backlog') | Out-Null
+        $source = Join-Path $script:RepositoryRoot '.claude/skills/task-board'
         foreach ($name in 'task-board.ps1', 'TASK-TEMPLATE.md') { Copy-Item -LiteralPath (Join-Path $source $name) -Destination $skill }
-        $task = { param([string] $Folder, [string] $Id, [string] $Slug) [IO.File]::WriteAllText((Join-Path $Folder "Tasks\Backlog\$Id-$Slug.md"), "---`nid: $Id`ntitle: $Slug`n---`n# $Id - $Slug`n", (New-Object Text.UTF8Encoding($false))) }
+        $task = { param([string] $Folder, [string] $Id, [string] $Slug) [IO.File]::WriteAllText((Join-Path $Folder "Tasks/Backlog/$Id-$Slug.md"), "---`nid: $Id`ntitle: $Slug`n---`n# $Id - $Slug`n", (New-Object Text.UTF8Encoding($false))) }
         & $task $seed 'BL-001' 'seed'
         foreach ($command in @(@('add', '-A'), @('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'seed'), @('branch', '-M', 'work/dark-factory'), @('remote', 'add', 'origin', $origin), @('push', '-q', 'origin', 'work/dark-factory'))) { git -C $seed @command 2>$null | Out-Null }
         $audit = Join-Path $Root 'audit'; $gap = Join-Path $Root 'gap'
@@ -788,7 +808,7 @@ if ($NewTab) {
         $pane = $created.result.root_pane.pane_id
         if ($pane) {
             & $herdr pane wait-output $pane --match '>' --timeout 15000 2>&1 | Out-Null
-            $line = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" " + ($forward -join ' ')
+            $line = "$script:PowerShellExe -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" " + ($forward -join ' ')
             # herdr's argument parser strips bare inner quotes; \" survives as a literal quote.
             & $herdr pane run $pane $line.Replace('"', '\"') 2>&1 | Out-Null
             Write-Host "Gap run started in herdr tab '$label'."
@@ -796,9 +816,19 @@ if ($NewTab) {
         }
         Write-Host 'Could not create a herdr tab; using a console window.' -ForegroundColor DarkYellow
     }
-    $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', "`"$PSCommandPath`"") + $forward
-    Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -WorkingDirectory $script:RepositoryRoot | Out-Null
-    Write-Host 'Gap run started in a new console window.'
+    if ($script:OnWindows) {
+        $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', "`"$PSCommandPath`"") + $forward
+        Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -WorkingDirectory $script:RepositoryRoot | Out-Null
+        Write-Host 'Gap run started in a new console window.'
+        exit 0
+    }
+    # No console windows off Windows: a detached pwsh writing its output beside the run folders.
+    $gapRoot = Join-Path (Split-Path $script:RepositoryRoot -Parent) "$(Split-Path $script:RepositoryRoot -Leaf).gap"
+    New-Item -ItemType Directory -Force -Path $gapRoot | Out-Null
+    $out = Join-Path $gapRoot ('RunGapAnalysis-' + (Get-Date).ToString('yyyy-MM-dd_HHmm') + '.log')
+    $argList = @('-NoProfile', '-File', "`"$PSCommandPath`"") + $forward
+    $p = Start-Process -FilePath 'pwsh' -ArgumentList $argList -WorkingDirectory $script:RepositoryRoot -RedirectStandardOutput $out -RedirectStandardError "$out.err" -PassThru
+    Write-Host "Gap run started as pid $($p.Id), writing $out."
     exit 0
 }
 
@@ -807,10 +837,11 @@ if (-not $CurlVersion) {
 }
 $stamp = (Get-Date).ToString('yyyy-MM-dd_HHmm')
 $repoName = Split-Path $script:RepositoryRoot -Leaf
-$runDirectory = Join-Path (Split-Path $script:RepositoryRoot -Parent) "$repoName.gap\$stamp"
+$runDirectory = Join-Path (Join-Path (Split-Path $script:RepositoryRoot -Parent) "$repoName.gap") $stamp
 $tree = Join-Path $runDirectory 'tree'
 $measurements = Join-Path $runDirectory 'measurements'
-$remotePlatforms = @($platformSelection | Where-Object { $_ -ne 'windows' })
+$local = $script:LocalPlatform
+$remotePlatforms = @($platformSelection | Where-Object { $_ -ne 'windows' -and $_ -ne $local })
 if (-not $DryRun) {
     New-Item -ItemType Directory -Force -Path $measurements | Out-Null
     $script:LogFile = Join-Path $runDirectory 'gap.log'
@@ -846,33 +877,36 @@ Write-Host '== Step 2: the measured tree'
 if ((Invoke-GapStep 'tree' 'git' @('-C', $script:RepositoryRoot, 'worktree', 'add', '--detach', $tree, $Ref)) -ne 0) { Stop-GapRun "could not create the tree at $Ref." }
 $commit = if ($DryRun) { '<commit of ' + $Ref + '>' } else { (& git -C $tree rev-parse HEAD).Trim() }
 
-Write-Host '== Step 3: ask gap-platforms.yml to measure linux and macos'
+Write-Host "== Step 3: ask gap-platforms.yml to measure $(if ($remotePlatforms.Count) { $remotePlatforms -join ' and ' } else { 'nothing' })"
 $platformRun = $null
 $dispatchedAt = Get-Date
 if ($remotePlatforms.Count -gt 0) { $platformRun = Start-GapPlatformRun $stamp $commit }
 else { Write-GapLog 'No remote platform selected; gap-platforms.yml not dispatched.' }
 
-Write-Host '== Step 4: measure windows here'
+Write-Host "== Step 4: measure $local here"
 $states = [ordered]@{}
-# The release folder, for the windows measurement and for every analyst's prompt.
+if ($platformSelection -contains 'windows' -and $local -ne 'windows') {
+    $states['windows'] = [pscustomobject]@{ State = 'missing'; Reason = "windows is measured only from a Windows checkout (Gap\RunGapAnalysis.cmd); this run is on $local"; Status = $null }
+}
+# The release folder, for the local measurement and for every analyst's prompt.
 if ((Invoke-GapTool 'release' 'Get-UpstreamRelease.ps1' @('-Version', $CurlVersion)) -ne 0) { Stop-GapRun "could not fetch curl $CurlVersion." }
 $release = if ($DryRun) { '<release folder>' } else { @($script:LastOutput | Where-Object { $_ })[-1].Trim() }
-if ($platformSelection -contains 'windows') {
-    $statusFile = Join-Path $runDirectory 'status-windows.json'
-    $measure = @('-Tree', $tree, '-OutDirectory', (Join-Path $measurements 'windows'), '-WorkDirectory', (Join-Path $runDirectory 'work-windows'), '-StatusFile', $statusFile, '-Version', $CurlVersion, '-Release', $release, '-Areas', ($selection.Areas -join ','))
+if ($platformSelection -contains $local) {
+    $statusFile = Join-Path $runDirectory "status-$local.json"
+    $measure = @('-Tree', $tree, '-OutDirectory', (Join-Path $measurements $local), '-WorkDirectory', (Join-Path $runDirectory "work-$local"), '-StatusFile', $statusFile, '-Version', $CurlVersion, '-Release', $release, '-Areas', ($selection.Areas -join ','))
     if ($DryRun) { $measure += '-DryRun' }
-    $code = Invoke-GapTool 'measure-windows' 'Measure-GapAreas.ps1' $measure
+    $code = Invoke-GapTool "measure-$local" 'Measure-GapAreas.ps1' $measure
     $measureScript = Join-Path $script:ToolsDirectory 'Measure-GapAreas.ps1'
     if ($DryRun -and (Test-Path -LiteralPath $measureScript)) { & $script:Commands.shell -NoProfile -ExecutionPolicy Bypass -File $measureScript @measure }
     $status = $null
     if (-not $DryRun -and (Test-Path -LiteralPath $statusFile)) { try { $status = Get-Content -LiteralPath $statusFile -Raw | ConvertFrom-Json } catch { $status = $null } }
-    $measuredHere = -not $DryRun -and (Test-Path -LiteralPath (Join-Path $measurements 'windows')) -and @(Get-ChildItem -LiteralPath (Join-Path $measurements 'windows') -Filter '*.json' -File).Count -gt 0
-    if ($DryRun) { $states['windows'] = [pscustomobject]@{ State = 'measured'; Reason = 'dry run'; Status = $null } }
-    elseif ($measuredHere) { $states['windows'] = [pscustomobject]@{ State = 'measured'; Reason = $(if ($code -eq 0) { $null } else { "Measure-GapAreas.ps1 exited $code; areas it did not measure are carried or missing" }); Status = $status } }
+    $measuredHere = -not $DryRun -and (Test-Path -LiteralPath (Join-Path $measurements $local)) -and @(Get-ChildItem -LiteralPath (Join-Path $measurements $local) -Filter '*.json' -File).Count -gt 0
+    if ($DryRun) { $states[$local] = [pscustomobject]@{ State = 'measured'; Reason = 'dry run'; Status = $null } }
+    elseif ($measuredHere) { $states[$local] = [pscustomobject]@{ State = 'measured'; Reason = $(if ($code -eq 0) { $null } else { "Measure-GapAreas.ps1 exited $code; areas it did not measure are carried or missing" }); Status = $status } }
     else {
         $why = "Measure-GapAreas.ps1 exited $code and measured nothing"
         if ($null -ne $status -and $status.failure) { $why += " ($($status.failure))" }
-        $states['windows'] = [pscustomobject]@{ State = 'missing'; Reason = $why; Status = $status }
+        $states[$local] = [pscustomobject]@{ State = 'missing'; Reason = $why; Status = $status }
     }
     # A measurement step that changed the tree must not be blamed on the first analyst.
     if (-not $DryRun) {
@@ -952,7 +986,7 @@ if ((Invoke-GapTool 'findings' 'Write-GapFindings.ps1' @('-RunDirectory', $runDi
 if ((Invoke-GapTool 'scorecard' 'Write-GapScorecard.ps1' @('-RunDirectory', $runDirectory, '-Stamp', $stamp, '-FindingsDirectory', $gapFindings, '-ScorecardsDirectory', $gapScorecards)) -ne 0) { Write-GapLog 'Write-GapScorecard.ps1 failed.' 'Red' }
 $inventorySource = Join-Path (Split-Path $script:ToolsDirectory -Parent) "Upstream/$CurlVersion"
 $inventoryTarget = Join-Path $gapWorktree "Gap/Upstream/$CurlVersion"
-if ($DryRun) { Write-Host "[inventories] copy $inventorySource\*.json to $inventoryTarget when they differ" }
+if ($DryRun) { Write-Host "[inventories] copy $(Join-Path $inventorySource '*.json') to $inventoryTarget when they differ" }
 elseif ((Test-Path -LiteralPath $inventorySource) -and ([System.IO.Path]::GetFullPath($inventorySource) -ne [System.IO.Path]::GetFullPath($inventoryTarget))) {
     New-Item -ItemType Directory -Force -Path $inventoryTarget | Out-Null
     foreach ($file in (Get-ChildItem -LiteralPath $inventorySource -Filter '*.json')) {
