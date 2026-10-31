@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.OAuth2.UnitLibrary]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4401 — Fix AF-0491: OAuth2TokenCacheLocation's summary says it searches curl's own .curlrc variables, but its order and platforms differ from curl's
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Decision: made OAuth2TokenCacheLocation follow curl's conf_list (USERPROFILE before APPDATA, both Windows-only via an optional isWindows parameter) rather than weaken the doc; ADR-1034 and tests updated. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-31: Doing -> Done. Cache location now follows curl's order, Windows-only variables included
