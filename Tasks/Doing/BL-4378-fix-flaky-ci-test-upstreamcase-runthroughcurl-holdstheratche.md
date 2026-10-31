@@ -31,3 +31,4 @@ CI run 41151657472 on work/dark-factory (head dbc468ecd, `Build and test (window
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 0b537d40 ef46a41e b1a38405.
