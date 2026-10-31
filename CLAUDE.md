@@ -352,7 +352,7 @@ under one folder for its group (ADR-0731):
   Mcp - the ways Curl is used.
 - `/CommandLine/`: Cli, Config, Output.
 - `/Transfer/`: Cookies, Core, Engine, Networking.
-- `/Wire/`: Http2, Http3, Quic, Zstandard - framing and encoding below the protocols.
+- `/Wire/`: Http2, Http3, HttpDatagram, Protobuf, Quic, Ssh, WebSocket, Zstandard - framing and encoding below the protocols.
 - `/Security/`: Authentication, Cryptography, HttpMessageSignatures, Kerberos, Ntlm, Tls.
 - `/Protocols/<Name>/`: each `Curl.Protocol.<Name>.*`, and `Curl.Protocol.Abstractions.*`
   in `/Protocols/Abstractions/`.
