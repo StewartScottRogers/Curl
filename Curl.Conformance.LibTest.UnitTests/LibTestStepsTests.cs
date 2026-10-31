@@ -103,14 +103,17 @@ public sealed partial class LibTestStepsTests
     [TestMethod]
     public async Task EasySetOption_ThatSucceeds_GoesOnAndSetsTheOption()
     {
-        await using CurlLibrary library = CurlGlobal.Init(new FakeCurlEngine());
+        string? url = null;
+        await using CurlLibrary library = CurlGlobal.Init(new FakeCurlEngine { Performing = o => { url = o.Network.Url; return CurlCode.Ok; } });
         await using CurlEasy easy = library.EasyInit();
         var error = new StringWriter();
         var steps = new LibTestSteps(error);
 
         bool goesOn = steps.EasySetOption(easy, CurlOption.Url, "http://127.0.0.1/500");
+        await easy.PerformAsync();
 
         Assert.IsTrue(goesOn);
+        Assert.AreEqual("http://127.0.0.1/500", url);
         Assert.AreEqual(CurlCode.Ok, steps.Result);
         Assert.AreEqual(string.Empty, error.ToString());
     }
