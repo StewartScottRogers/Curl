@@ -3,8 +3,8 @@ id: AF-0503
 title: CI red 139 min from run 40984137987 (4c618d0f, Build_RelativeRealm_ReturnsNull on Linux and macOS, then the quality gates)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:40984137987:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
