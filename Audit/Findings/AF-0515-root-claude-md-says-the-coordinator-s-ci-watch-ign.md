@@ -3,8 +3,8 @@ id: AF-0515
 title: Root CLAUDE.md says the coordinator's CI watch ignores cancelled runs, but it files hangs from them
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:Dark-factory-CI-watch:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path CLAUDE.md, DarkFactory/CiWatch.ps1 -Pattern '\(cancelled one
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
