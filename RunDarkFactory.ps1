@@ -219,8 +219,10 @@
 
     Lanes test only on Windows, so a lane shift's coordinator watches CI for them (BL-987).
     Every -HeartbeatMinutes (3 when publishing is off) it reads the newest finished CI runs
-    on the shift's branch that passed or failed - cancelled ones prove nothing, and with
-    several lanes pushing most are cancelled - and reads each failed run's failures once
+    on the shift's branch that passed or failed - a cancelled run is read only when a job
+    ran into its timeout-minutes, whose hang is its failure, filed as a High "Fix CI hang
+    in <job> (<assembly>)" task (ADR-1173); with several lanes pushing most cancelled
+    runs prove nothing - and reads each failed run's failures once
     from `gh run view <id> --log-failed`: every "Failed <TestName>" line, or every compiler
     "error" line when the build broke. Over the last six such runs, newest first, a failure
     is a regression when it fails in the newest run and broke the build, failed on two
