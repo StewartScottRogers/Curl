@@ -42,6 +42,8 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0982-*.md, Curl.Engine.
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: no | Ran the reproduction. ADR-0982 no longer matches '`FirstTransferSocket` number'. Its status line says 'Its point on a transfer with no dialled socket is replaced in part by ADR-0997: `FirstTransferSocket` is gone.' The only match left is ManagedMultiTransfer.WaitSockets.cs:136 ('none for'), the code's own doc, which agrees.
+
 ## Log
 
 - 2026-10-29: filed proposed.

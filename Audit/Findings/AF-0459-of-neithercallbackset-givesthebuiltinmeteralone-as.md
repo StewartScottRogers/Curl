@@ -3,8 +3,8 @@ id: AF-0459
 title: Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone asserts only that CallbackTransferProgress.Of returned something
 auditor: quality
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces.
 key: quality:Curl.Engine.UnitTests/CallbackTransferProgressTests.cs:Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone:weak-assertion
 reproduction: none
 task: BL-4240
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_0358.md
 ---
 # AF-0459 - Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone asserts only that CallbackTransferProgress.Of returned something
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Engine.UnitTests/CallbackTransferProgressTests.cs -Patt
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: no | Ran the Select-String reproduction. Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone now drives the meter (ReportTransferStarted, ReportDownloaded(10, 10), ReportTransferDone, FinishMeter) and asserts the stderr starts with "  % Total    % Received % Xferd  Average Speed", ends with a newline, and that progress.Aborted and abort.IsCancellationRequested are false.
+
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_0358.md: the reproduction no longer reproduces.

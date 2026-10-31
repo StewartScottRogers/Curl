@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | A Linux and macOS test regression again turned CI red for over 30 min. Run 40984137987 (4c618d0f) was red 138.85 min; BL-4299 (Build_RelativeRealm_ReturnsNull on Linux+macOS) was filed at 18:50:48, claimed 19:31:03 and Done 19:48:21.
+
 ## Log
 
 - 2026-10-29: filed proposed.

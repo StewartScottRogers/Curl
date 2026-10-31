@@ -42,6 +42,8 @@ Select-String -Path Z:/repos/Curl.audit/20261029-060658/logs/DarkFactory-*-L*.lo
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | A CI fix was again requeued behind another task. BL-4083 (Fix flaky CI test job Quality gates windows-latest) was claimed by L1 at 07:21:03 and requeued at 07:24:44 ('Needs Curl.Engine.UnitLibrary/EngineComposition.cs, held whole by BL-4082'). It was reclaimed only at 10:46:11 and Done at 11:02:18, against ADR-1158. The Blocked part is not repeated: the only BLOCKED in the window is BL-4358, a timeout.
+
 ## Log
 
 - 2026-10-29: filed proposed.

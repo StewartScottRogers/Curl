@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | BL-4328 shows exactly this cause in this window. L14 requeued it at 22:16:33 (file held by BL-4320). L7 ran 81 turns and requeued it at 00:07:54 ('Dark factory stopped at its 80-turn cap'). It was then Deferred and split into BL-4362, BL-4363, BL-4364 and BL-4365.
+
 ## Log
 
 - 2026-10-29: filed proposed.
