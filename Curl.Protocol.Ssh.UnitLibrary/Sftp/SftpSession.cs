@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
-using Curl.Protocol.Ssh.Connection;
 using Curl.Ssh;
+using Curl.Ssh.Connection;
 using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Sftp;
@@ -74,7 +74,13 @@ internal sealed class SftpSession
 
     private uint nextRequestId;
 
-    private SftpSession(SshSessionChannel channel) => this.channel = channel;
+    private readonly SshDiagnosticLog log;
+
+    private SftpSession(SshSessionChannel channel, SshDiagnosticLog log)
+    {
+        this.channel = channel;
+        this.log = log;
+    }
 
     /// <summary>
     /// Opens a session channel, starts the <c>sftp</c> subsystem and exchanges
@@ -97,7 +103,7 @@ internal sealed class SftpSession
         SshSessionChannel channel = new(transport);
         await RequireAsync(() => channel.OpenAsync(cancellationToken), UnableToStartupChannel).ConfigureAwait(false);
         await RequireAsync(() => channel.RequestSubsystemAsync(SubsystemName, cancellationToken), UnableToRequestSubsystem).ConfigureAwait(false);
-        SftpSession session = new(channel);
+        SftpSession session = new(channel, new SshDiagnosticLog(transport.DiagnosticLog));
         byte[] version = [];
         await RequireAsync(
             async () =>
@@ -748,7 +754,7 @@ internal sealed class SftpSession
         request.WriteUInt32(id);
         writeFields(request);
         await SendPacketAsync(request.ToArray(), cancellationToken).ConfigureAwait(false);
-        channel.DiagnosticLog.SftpRequestSent(type, id);
+        log.SftpRequestSent(type, id);
         return id;
     }
 
@@ -774,7 +780,7 @@ internal sealed class SftpSession
             byte[] packet = await ReadPacketAsync(cancellationToken).ConfigureAwait(false);
             if (packet.Length >= 5 && BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(1)) == id)
             {
-                channel.DiagnosticLog.SftpAnswerRead(packet);
+                log.SftpAnswerRead(packet);
                 return (packet[0], new SshWireReader(packet.AsMemory(5)));
             }
         }

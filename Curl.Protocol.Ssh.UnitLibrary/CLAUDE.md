@@ -69,8 +69,10 @@ default files through an injected `HOME` reader), `--pubkey` and `--pass`,
 ADR-0122 lists, Ed25519 and bcrypt-encrypted `openssh-key-v1` included
 (`OpenSshPrivateSectionDecryption`, ADR-0263), and one `SshPrivateKey` per key type
 (`RsaSshPrivateKey`, `EcdsaSshPrivateKey`, `DsaSshPrivateKey`, `Ed25519SshPrivateKey`), which signs;
-`Connection` holds `SshSessionChannel`, one RFC 4254 `session` channel with libssh2's
-window and packet size, which starts a subsystem or an `exec` command; `Scp` holds
+`Curl.Ssh`'s `Connection` (ADR-1166) holds `SshChannel`, one RFC 4254 channel with libssh2's
+window and packet size, logged through `SshChannelLog`; `SshSessionChannel`, the `session`
+channel, which starts a subsystem or an `exec` command; and `SshDirectTcpipChannel`, a
+`direct-tcpip` channel read and written as an `IConnection`. Here, `Scp` holds
 `ScpFileDownload`, which runs `scp -pf` (`ScpCommand`, `ScpRemotePath`), reads its `T`
 and `C` lines with libssh2's checks (`ScpFileHeaderReader`, `ScpHeaderNumber`) and copies
 the file (ADR-0225), and `ScpFileUpload`, which runs `scp -t`, sends the `C` line with

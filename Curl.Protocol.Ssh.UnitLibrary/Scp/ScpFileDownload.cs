@@ -1,6 +1,6 @@
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Connection;
 using Curl.Ssh;
+using Curl.Ssh.Connection;
 using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Scp;

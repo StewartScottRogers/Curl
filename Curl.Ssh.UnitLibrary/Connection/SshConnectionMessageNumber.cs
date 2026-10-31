@@ -1,4 +1,4 @@
-namespace Curl.Protocol.Ssh.Connection;
+namespace Curl.Ssh.Connection;
 
 /// <summary>
 /// The connection-protocol message numbers of RFC 4254 section 9 that this library reads

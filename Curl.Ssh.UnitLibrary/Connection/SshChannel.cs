@@ -1,13 +1,14 @@
 using System.Text;
 using Curl.Ssh.Transport;
 
-namespace Curl.Protocol.Ssh.Connection;
+namespace Curl.Ssh.Connection;
 
 /// <summary>
-/// One <c>session</c> channel of the SSH connection protocol (RFC 4254) as libssh2 1.11.1
-/// opens it for curl 8.21.0: a 2 MiB window and 32 KiB packets, a subsystem started with a
-/// reply wanted, the channel's data read and written as a byte stream within both
-/// windows, and the channel closed as measured (ADR-0220).
+/// One channel of the SSH connection protocol (RFC 4254 section 5) as libssh2 1.11.1 opens
+/// it for curl 8.21.0: a 2 MiB window and 32 KiB packets, the channel's data read and
+/// written as a byte stream within both windows, and the channel closed as measured
+/// (ADR-0220). <see cref="SshSessionChannel" /> and <see cref="SshDirectTcpipChannel" /> open
+/// it with their own channel type.
 /// </summary>
 /// <remarks>
 /// While it waits, the channel answers what the connection asks of it: a <c>KEXINIT</c>
@@ -16,7 +17,7 @@ namespace Curl.Protocol.Ssh.Connection;
 /// it does not wait for is skipped.
 /// </remarks>
 /// <param name="transport">The transport, after the user is authenticated.</param>
-internal sealed class SshSessionChannel(SshTransport transport)
+internal abstract class SshChannel(SshTransport transport)
 {
     /// <summary>The client's number for the channel: the first and only one it opens.</summary>
     internal const uint LocalChannelNumber = 0;
@@ -45,8 +46,6 @@ internal sealed class SshSessionChannel(SshTransport transport)
 
     private ReadOnlyMemory<byte> unread;
 
-    private uint remoteChannelNumber;
-
     private long remoteWindow;
 
     private uint remoteMaximumPacketSize;
@@ -58,120 +57,22 @@ internal sealed class SshSessionChannel(SshTransport transport)
     private bool remoteClosed;
 
     /// <summary>
-    /// Gets the reason code of the server's <c>SSH_MSG_CHANNEL_OPEN_FAILURE</c> once
-    /// <see cref="OpenAsync" /> has returned <see langword="false" />, such as 2 for
+    /// Gets the reason code of the server's <c>SSH_MSG_CHANNEL_OPEN_FAILURE</c> once the
+    /// channel's open has returned <see langword="false" />, such as 2 for
     /// <c>SSH_OPEN_CONNECT_FAILED</c>; 0 before then.
     /// </summary>
     internal uint OpenFailureReasonCode { get; private set; }
 
     /// <summary>
-    /// Gets where the session's steps are logged: beside the transport's log, to the same diagnostic log.
+    /// Gets where the channel's steps are logged: beside the transport's log, to the same diagnostic log.
     /// </summary>
-    internal SshDiagnosticLog DiagnosticLog { get; } = new(transport.DiagnosticLog);
+    internal SshChannelLog DiagnosticLog { get; } = new(transport.DiagnosticLog);
 
-    /// <summary>
-    /// Sends <c>SSH_MSG_CHANNEL_OPEN</c> for a <c>session</c> channel and waits for the
-    /// server's answer.
-    /// </summary>
-    /// <param name="cancellationToken">Cancels the request.</param>
-    /// <returns>Whether the server opened the channel.</returns>
-    /// <exception cref="EndOfStreamException">The peer closed or disconnected.</exception>
-    /// <exception cref="InvalidDataException">The peer broke the framing or sent a malformed message.</exception>
-    internal async ValueTask<bool> OpenAsync(CancellationToken cancellationToken)
-    {
-        SshWireWriter open = new();
-        open.WriteByte(SshConnectionMessageNumber.ChannelOpen);
-        open.WriteString("session"u8);
-        open.WriteUInt32(LocalChannelNumber);
-        open.WriteUInt32(InitialWindowSize);
-        open.WriteUInt32(MaximumPacketSize);
-        await transport.PacketWriter.WriteAsync(open.ToArray(), cancellationToken).ConfigureAwait(false);
-        byte[] answer = await WaitForAsync(SshConnectionMessageNumber.ChannelOpenConfirmation, SshConnectionMessageNumber.ChannelOpenFailure, cancellationToken).ConfigureAwait(false);
-        SshWireReader confirmation = new(answer.AsMemory(1));
-        confirmation.ReadUInt32();
-        if (answer[0] == SshConnectionMessageNumber.ChannelOpenFailure)
-        {
-            OpenFailureReasonCode = confirmation.ReadUInt32();
-            DiagnosticLog.ChannelOpened(false);
-            return false;
-        }
+    /// <summary>Gets the transport the channel's messages go over.</summary>
+    private protected SshTransport Transport => transport;
 
-        remoteChannelNumber = confirmation.ReadUInt32();
-        remoteWindow = confirmation.ReadUInt32();
-        remoteMaximumPacketSize = Math.Max(confirmation.ReadUInt32(), 1);
-        DiagnosticLog.ChannelOpened(true);
-        return true;
-    }
-
-    /// <summary>
-    /// Sends <c>SSH_MSG_CHANNEL_REQUEST</c> to start <paramref name="subsystem" />, with a
-    /// reply wanted, and waits for the reply.
-    /// </summary>
-    /// <param name="subsystem">The subsystem's name, such as <c>sftp</c>.</param>
-    /// <param name="cancellationToken">Cancels the request.</param>
-    /// <returns>Whether the server started the subsystem.</returns>
-    /// <exception cref="EndOfStreamException">The peer closed or disconnected.</exception>
-    /// <exception cref="InvalidDataException">The peer broke the framing or sent a malformed message.</exception>
-    internal ValueTask<bool> RequestSubsystemAsync(string subsystem, CancellationToken cancellationToken) =>
-        RequestProcessAsync("subsystem"u8.ToArray(), Encoding.ASCII.GetBytes(subsystem), cancellationToken);
-
-    /// <summary>
-    /// Sends <c>SSH_MSG_CHANNEL_REQUEST</c> to run <paramref name="command" /> with
-    /// <c>exec</c>, with a reply wanted, as libssh2 starts <c>scp</c>, and waits for the
-    /// reply.
-    /// </summary>
-    /// <param name="command">The command line's bytes, such as <c>scp -pf '/f'</c>.</param>
-    /// <param name="cancellationToken">Cancels the request.</param>
-    /// <returns>Whether the server started the command.</returns>
-    /// <exception cref="EndOfStreamException">The peer closed or disconnected.</exception>
-    /// <exception cref="InvalidDataException">The peer broke the framing or sent a malformed message.</exception>
-    internal ValueTask<bool> RequestExecAsync(byte[] command, CancellationToken cancellationToken) =>
-        RequestProcessAsync("exec"u8.ToArray(), command, cancellationToken);
-
-    // RFC 4254 section 6.5: the request's type, want-reply, then the subsystem or command.
-    private async ValueTask<bool> RequestProcessAsync(byte[] requestType, byte[] value, CancellationToken cancellationToken)
-    {
-        SshWireWriter request = new();
-        request.WriteByte(SshConnectionMessageNumber.ChannelRequest);
-        request.WriteUInt32(remoteChannelNumber);
-        request.WriteString(requestType);
-        request.WriteBoolean(true);
-        request.WriteString(value);
-        await transport.PacketWriter.WriteAsync(request.ToArray(), cancellationToken).ConfigureAwait(false);
-        byte[] answer = await WaitForAsync(SshConnectionMessageNumber.ChannelSuccess, SshConnectionMessageNumber.ChannelFailure, cancellationToken).ConfigureAwait(false);
-        bool started = answer[0] == SshConnectionMessageNumber.ChannelSuccess;
-        DiagnosticLog.ChannelRequested(requestType, value, started);
-        return started;
-    }
-
-    /// <summary>
-    /// Sends <paramref name="data" /> as <c>SSH_MSG_CHANNEL_DATA</c>, in packets no larger
-    /// than the server accepts, waiting for a window adjustment whenever the server's
-    /// window is used up.
-    /// </summary>
-    /// <param name="data">The bytes to send.</param>
-    /// <param name="cancellationToken">Cancels the send.</param>
-    /// <returns>A task that completes once every byte is sent.</returns>
-    /// <exception cref="EndOfStreamException">The peer closed or disconnected while the window was used up.</exception>
-    internal async ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
-    {
-        while (!data.IsEmpty)
-        {
-            while (remoteWindow == 0)
-            {
-                await ReadNextMessageAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            int size = (int)Math.Min(data.Length, Math.Min(remoteWindow, remoteMaximumPacketSize));
-            SshWireWriter packet = new();
-            packet.WriteByte(SshConnectionMessageNumber.ChannelData);
-            packet.WriteUInt32(remoteChannelNumber);
-            packet.WriteString(data.Span[..size]);
-            await transport.PacketWriter.WriteAsync(packet.ToArray(), cancellationToken).ConfigureAwait(false);
-            remoteWindow -= size;
-            data = data[size..];
-        }
-    }
+    /// <summary>Gets the server's number for the channel, once it is open.</summary>
+    private protected uint RemoteChannelNumber { get; private set; }
 
     /// <summary>
     /// Reads the next bytes of the channel's data into <paramref name="buffer" />.
@@ -181,7 +82,7 @@ internal sealed class SshSessionChannel(SshTransport transport)
     /// <returns>How many bytes were read; 0 once the server has sent <c>EOF</c> or <c>CLOSE</c> and every byte before it was read.</returns>
     /// <exception cref="EndOfStreamException">The peer closed or disconnected.</exception>
     /// <exception cref="InvalidDataException">The peer broke the framing or sent a malformed message.</exception>
-    internal async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         while (unread.IsEmpty)
         {
@@ -206,8 +107,37 @@ internal sealed class SshSessionChannel(SshTransport transport)
     }
 
     /// <summary>
+    /// Sends <paramref name="data" /> as <c>SSH_MSG_CHANNEL_DATA</c>, in packets no larger
+    /// than the server accepts, waiting for a window adjustment whenever the server's
+    /// window is used up (RFC 4254 section 5.2).
+    /// </summary>
+    /// <param name="data">The bytes to send.</param>
+    /// <param name="cancellationToken">Cancels the send.</param>
+    /// <returns>A task that completes once every byte is sent.</returns>
+    /// <exception cref="EndOfStreamException">The peer closed or disconnected while the window was used up.</exception>
+    internal async ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+    {
+        while (!data.IsEmpty)
+        {
+            while (remoteWindow == 0)
+            {
+                await ReadNextMessageAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            int size = (int)Math.Min(data.Length, Math.Min(remoteWindow, remoteMaximumPacketSize));
+            SshWireWriter packet = new();
+            packet.WriteByte(SshConnectionMessageNumber.ChannelData);
+            packet.WriteUInt32(RemoteChannelNumber);
+            packet.WriteString(data.Span[..size]);
+            await transport.PacketWriter.WriteAsync(packet.ToArray(), cancellationToken).ConfigureAwait(false);
+            remoteWindow -= size;
+            data = data[size..];
+        }
+    }
+
+    /// <summary>
     /// Closes the channel as libssh2 does: sends <c>SSH_MSG_CHANNEL_EOF</c>, waits for the
-    /// server's <c>SSH_MSG_CHANNEL_CLOSE</c>, then sends its own.
+    /// server's <c>SSH_MSG_CHANNEL_CLOSE</c>, then sends its own (RFC 4254 section 5.3).
     /// </summary>
     /// <param name="cancellationToken">Cancels the close.</param>
     /// <returns>A task that completes once the client's <c>CLOSE</c> is sent.</returns>
@@ -243,7 +173,51 @@ internal sealed class SshSessionChannel(SshTransport transport)
         }
     }
 
-    private async ValueTask<byte[]> WaitForAsync(byte wanted, byte alternative, CancellationToken cancellationToken)
+    /// <summary>
+    /// Sends <c>SSH_MSG_CHANNEL_OPEN</c> for <paramref name="channelType" />, with the
+    /// client's channel number, window and packet size and then
+    /// <paramref name="typeSpecificData" />, and waits for the server's answer (RFC 4254
+    /// section 5.1).
+    /// </summary>
+    /// <param name="channelType">The channel type's name, such as <c>session</c>.</param>
+    /// <param name="typeSpecificData">The fields the channel type adds, already encoded.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>Whether the server opened the channel.</returns>
+    /// <exception cref="EndOfStreamException">The peer closed or disconnected.</exception>
+    /// <exception cref="InvalidDataException">The peer broke the framing or sent a malformed message.</exception>
+    private protected async ValueTask<bool> OpenChannelAsync(string channelType, byte[] typeSpecificData, CancellationToken cancellationToken)
+    {
+        SshWireWriter open = new();
+        open.WriteByte(SshConnectionMessageNumber.ChannelOpen);
+        open.WriteString(Encoding.ASCII.GetBytes(channelType));
+        open.WriteUInt32(LocalChannelNumber);
+        open.WriteUInt32(InitialWindowSize);
+        open.WriteUInt32(MaximumPacketSize);
+        open.WriteBytes(typeSpecificData);
+        await transport.PacketWriter.WriteAsync(open.ToArray(), cancellationToken).ConfigureAwait(false);
+        byte[] answer = await WaitForAsync(SshConnectionMessageNumber.ChannelOpenConfirmation, SshConnectionMessageNumber.ChannelOpenFailure, cancellationToken).ConfigureAwait(false);
+        SshWireReader confirmation = new(answer.AsMemory(1));
+        confirmation.ReadUInt32();
+        if (answer[0] == SshConnectionMessageNumber.ChannelOpenFailure)
+        {
+            OpenFailureReasonCode = confirmation.ReadUInt32();
+            DiagnosticLog.ChannelOpened(channelType, false);
+            return false;
+        }
+
+        RemoteChannelNumber = confirmation.ReadUInt32();
+        remoteWindow = confirmation.ReadUInt32();
+        remoteMaximumPacketSize = Math.Max(confirmation.ReadUInt32(), 1);
+        DiagnosticLog.ChannelOpened(channelType, true);
+        return true;
+    }
+
+    /// <summary>Waits for the message <paramref name="wanted" /> or <paramref name="alternative" />, answering every other one.</summary>
+    /// <param name="wanted">One message number waited for.</param>
+    /// <param name="alternative">The other message number waited for.</param>
+    /// <param name="cancellationToken">Cancels the wait.</param>
+    /// <returns>The message's payload, from its number on.</returns>
+    private protected async ValueTask<byte[]> WaitForAsync(byte wanted, byte alternative, CancellationToken cancellationToken)
     {
         while (true)
         {
@@ -340,7 +314,7 @@ internal sealed class SshSessionChannel(SshTransport transport)
 
         SshWireWriter adjust = new();
         adjust.WriteByte(SshConnectionMessageNumber.ChannelWindowAdjust);
-        adjust.WriteUInt32(remoteChannelNumber);
+        adjust.WriteUInt32(RemoteChannelNumber);
         adjust.WriteUInt32((uint)(InitialWindowSize - localWindow));
         await transport.PacketWriter.WriteAsync(adjust.ToArray(), cancellationToken).ConfigureAwait(false);
         localWindow = InitialWindowSize;
@@ -355,7 +329,7 @@ internal sealed class SshSessionChannel(SshTransport transport)
     private byte[] RemoteChannelNumberBytes()
     {
         SshWireWriter number = new();
-        number.WriteUInt32(remoteChannelNumber);
+        number.WriteUInt32(RemoteChannelNumber);
         return number.ToArray();
     }
 }

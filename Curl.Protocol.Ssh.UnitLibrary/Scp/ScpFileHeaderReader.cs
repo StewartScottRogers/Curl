@@ -1,6 +1,6 @@
 using System.Text;
-using Curl.Protocol.Ssh.Connection;
 using Curl.Ssh;
+using Curl.Ssh.Connection;
 
 namespace Curl.Protocol.Ssh.Scp;
 

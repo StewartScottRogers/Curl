@@ -1,7 +1,7 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Protocol.Ssh;
+namespace Curl.Ssh;
 
 /// <summary>
 /// The connection an SSH session's transport reads and writes, passed through to the

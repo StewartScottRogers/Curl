@@ -61,8 +61,8 @@ public sealed class SshDiagnosticLogTests
         Diagnostics.Arrange("steps", "no methods listed, channel refused, exec refused, SFTP answer 101, scp upload started, transfer failed");
 
         new SshAuthenticationLog(log.Transport).AuthenticationMethodsListed(null);
-        log.ChannelOpened(false);
-        log.ChannelRequested("exec"u8.ToArray(), "scp -t '/x'"u8.ToArray(), succeeded: false);
+        new SshChannelLog(log.Transport).ChannelOpened("session", false);
+        new SshChannelLog(log.Transport).ChannelRequested("exec"u8.ToArray(), "scp -t '/x'"u8.ToArray(), succeeded: false);
         log.SftpAnswerRead([101, 0, 0, 0, 1]);
         log.TransferStarted("scp", "/x", isUpload: true);
         log.TransferEnded(TransferResult.Failure(CurlExitCode.PartialFile, "short"), TimeSpan.Zero);
@@ -94,8 +94,8 @@ public sealed class SshDiagnosticLogTests
         new SshAuthenticationLog(log.Transport).AuthenticationMethodsListed("password");
         new SshAuthenticationLog(log.Transport).AuthenticationTried("password");
         new SshAuthenticationLog(log.Transport).AuthenticationEnded("password", succeeded: false);
-        log.ChannelOpened(true);
-        log.ChannelRequested([], [], succeeded: true);
+        new SshChannelLog(log.Transport).ChannelOpened("session", true);
+        new SshChannelLog(log.Transport).ChannelRequested([], [], succeeded: true);
         log.SftpRequestSent(3, 0);
         log.SftpAnswerRead([101]);
         log.TransferStarted("sftp", "/f", isUpload: false);

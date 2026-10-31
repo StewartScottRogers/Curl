@@ -26,7 +26,7 @@ public sealed partial class ScpFileDownloadTests
         Diagnostics.AssertProgress(new[] { (3L, (long?)6) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (3L, (long?)6) }, outcome.Progress);
         List<byte[]> written = SftpServerScript.SshPayloads(outcome.Written);
-        Assert.AreEqual(Connection.SshConnectionMessageNumber.ChannelClose, written[^1][0], "the channel is still closed");
+        Assert.AreEqual(SshConnectionMessageNumber.ChannelClose, written[^1][0], "the channel is still closed");
     }
 
     [TestMethod]

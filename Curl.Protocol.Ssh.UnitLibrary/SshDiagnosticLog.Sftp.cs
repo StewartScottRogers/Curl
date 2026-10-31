@@ -1,31 +1,13 @@
 using System.Buffers.Binary;
 using System.Globalization;
-using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Sftp;
 
 namespace Curl.Protocol.Ssh;
 
-/// <content>The session channel, its requests and the SFTP requests and answers (BL-4366).</content>
+/// <content>The SFTP requests and answers (BL-4366); the channel logs its own steps in Curl.Ssh's <c>SshChannelLog</c>.</content>
 internal sealed partial class SshDiagnosticLog
 {
-    /// <summary>Logs, at <c>verbose</c>, a session channel's opening and whether the server opened it.</summary>
-    /// <param name="opened">Whether the server opened it.</param>
-    internal void ChannelOpened(bool opened) =>
-        WriteIfEnabled(DiagnosticLogLevel.Verbose, opened ? "session channel opened" : "session channel refused");
-
-    /// <summary>Logs, at <c>verbose</c>, a channel request for a subsystem or a command and the server's answer.</summary>
-    /// <param name="requestType"><c>subsystem</c> or <c>exec</c>.</param>
-    /// <param name="value">The subsystem's name or the command line.</param>
-    /// <param name="succeeded">Whether the server started it.</param>
-    internal void ChannelRequested(byte[] requestType, byte[] value, bool succeeded)
-    {
-        if (log.IsEnabled(DiagnosticLogLevel.Verbose))
-        {
-            Write(DiagnosticLogLevel.Verbose, $"channel request {Encoding.Latin1.GetString(requestType)} {Encoding.Latin1.GetString(value)}: {(succeeded ? "started" : "refused")}");
-        }
-    }
-
     /// <summary>Logs, at <c>verbose</c>, an SFTP request sent.</summary>
     /// <param name="type">The request's <c>SSH_FXP_*</c> packet type.</param>
     /// <param name="id">The request's id.</param>
