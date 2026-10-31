@@ -3,19 +3,19 @@ id: AF-0488
 title: UrlPartSetter.UpperCasedEscapes's index + 2 < text.Length can become <= with no test failing, so a part ending in %X throws
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/UrlPartSetter.cs:UpperCasedEscapes-lt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartSetter.cs:262:<
-task: none
-tasks:
+task: BL-4398
+tasks: BL-4398
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: mechanical
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0488 - UrlPartSetter.UpperCasedEscapes's index + 2 < text.Length can become <= with no test failing, so a part ending in %X throws
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the -Site command: 'killed Curl.Engine.UnitLibrary/UrlPartSetter.cs:262 <' (resolvedLine 262, 'index + 2 < text.Length' mutated to '<='); outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

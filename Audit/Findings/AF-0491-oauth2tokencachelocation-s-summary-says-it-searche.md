@@ -3,12 +3,12 @@ id: AF-0491
 title: OAuth2TokenCacheLocation's summary says it searches curl's own .curlrc variables, but its order and platforms differ from curl's
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Extension.OAuth2.UnitLibrary/Cache/OAuth2TokenCacheLocation.cs:OAuth2TokenCacheLocation:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-4401
+tasks: BL-4401
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
@@ -42,6 +42,9 @@ Select-String -Path Curl.Extension.OAuth2.UnitLibrary/Cache/OAuth2TokenCacheLoca
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the reproduction. OAuth2TokenCacheLocation.SearchedVariables is CURL_HOME, XDG_CONFIG_HOME, HOME, USERPROFILE, APPDATA, with the last two Windows-only (WindowsOnlyFrom = 3). DefaultConfigFileSearch.cs:52-56 has the same order, with USERPROFILE and APPDATA marked WindowsOnly true. The summary's claim to follow curl's .curlrc order and platforms is now true.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.

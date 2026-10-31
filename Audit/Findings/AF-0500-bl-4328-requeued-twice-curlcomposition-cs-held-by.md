@@ -3,19 +3,19 @@ id: AF-0500
 title: BL-4328 requeued twice (CurlComposition.cs held by BL-4320, then the 80-turn cap) and then Deferred and split
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:BL-4328:BL-4328:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-4410
+tasks: BL-4410
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0500 - BL-4328 requeued twice (CurlComposition.cs held by BL-4320, then the 80-turn cap) and then Deferred and split
 
@@ -42,6 +42,10 @@ Select-String -Path Z:/repos/Curl.audit/20261031-035829/logs/DarkFactory-*-L*.lo
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: requeues 0. No requeue on a held file and no turn-cap requeue. Overlap waits (45 min) delayed claims but sent back no claimed task.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

@@ -3,19 +3,19 @@ id: AF-0499
 title: BL-4112 requeued twice (three new dependencies, then the 80-turn cap at $5.10) and then Deferred and split
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:BL-4112:BL-4112:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-4409
+tasks: BL-4409
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0499 - BL-4112 requeued twice (three new dependencies, then the 80-turn cap at $5.10) and then Deferred and split
 
@@ -42,6 +42,10 @@ Select-String -Path Z:/repos/Curl.audit/20261031-035829/logs/DarkFactory-*-L*.lo
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: requeues 0. No run hit the 80-turn cap (maximum 40 turns).
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

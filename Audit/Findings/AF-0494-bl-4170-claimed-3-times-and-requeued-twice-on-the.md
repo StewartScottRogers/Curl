@@ -3,19 +3,19 @@ id: AF-0494
 title: BL-4170 claimed 3 times and requeued twice on the run budget with work stashed; its split's push was refused
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:BL-4170:BL-4170:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-4404
+tasks: BL-4404
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0494 - BL-4170 claimed 3 times and requeued twice on the run budget with work stashed; its split's push was refused
 
@@ -42,6 +42,10 @@ Select-String -Path Z:/repos/Curl.audit/20261031-035829/logs/DarkFactory-*-L*.lo
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: tasksClaimedMoreThanOnce 0, requeues 0. No requeue on the run budget, and the BL-4377 split pushed its parts (BL-4384 and BL-4385 both Done).
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

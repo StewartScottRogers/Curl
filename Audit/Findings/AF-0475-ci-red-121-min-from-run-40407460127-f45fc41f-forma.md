@@ -3,8 +3,8 @@ id: AF-0475
 title: CI red 121 min from run 40407460127 (f45fc41f, Format_OpenSslUnprintableNames on Linux) while BL-3878 sat unclaimed
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:40407460127:ci-red
 reproduction: none
 task: BL-4228
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0475 - CI red 121 min from run 40407460127 (f45fc41f, Format_OpenSslUnprintableNames on Linux) while BL-3878 sat unclaimed
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | ciRedSpells: run 40885502110 (000cd2ae) was red 237.13 min, 14:07:29Z-18:04:37Z, while its filed fix BL-4083 sat unclaimed in Backlog from 07:24:44 to 10:46:11 MST.
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: ciRedMinutes 0, ciRedSpells empty (ciRunsFrom 2026-10-29T05:44:37Z covers the window). Every non-cancelled CI run from 41160265908 (02:29Z) to 41227713497 succeeded.
 
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
