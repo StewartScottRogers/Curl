@@ -114,6 +114,8 @@ internal static class HttpRequestOptionsMapping
             CommandLineTextEncoding = commandLineTextEncoding ?? Encoding.Latin1,
             UserAgent = http.UserAgent,
             Referer = http.Referer,
+            CookieStrings = http.Cookie,
+            HasCookieFiles = http.CookieFiles.Count > 0,
             AutoReferer = http.AutoReferer,
             Body = RequestBodyOf(http, transfer, formBody),
             Fail = behaviour.FailOnError ? HttpFailMode.Fail : settings.FailMode,

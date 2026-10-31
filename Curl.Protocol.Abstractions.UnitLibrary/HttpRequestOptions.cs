@@ -59,6 +59,18 @@ public sealed record HttpRequestOptions
     public string? Referer { get; init; }
 
     /// <summary>
+    /// Gets the cookie strings from <c>-b name=value</c>, joined as curl joins them, or
+    /// <see langword="null" /> when none was given.
+    /// </summary>
+    public string? CookieStrings { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a <c>-b</c> cookie file was given, whose cookies the HTTP
+    /// handler's cookie store sends.
+    /// </summary>
+    public bool HasCookieFiles { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether a followed redirect sends the URL it came from as its
     /// <c>Referer</c>, without user information or fragment, as <c>-e "...;auto"</c> asks
     /// curl 8.21.0 to (BL-361 Notes).

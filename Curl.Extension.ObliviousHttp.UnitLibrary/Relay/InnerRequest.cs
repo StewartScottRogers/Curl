@@ -1,3 +1,4 @@
+using System.Text;
 using Curl.Extension.ObliviousHttp.BinaryHttp;
 
 namespace Curl.Extension.ObliviousHttp.Relay;
@@ -28,6 +29,9 @@ internal static class InnerRequest
         List<BinaryHttpField> headers = [.. http.Headers.Select(FieldOf).OfType<BinaryHttpField>()];
         AddUnlessGiven(headers, "user-agent", http.UserAgent);
         AddUnlessGiven(headers, "content-type", context.PostData is null ? null : FormContentType);
+        AddUnlessGiven(headers, "authorization", AuthorizationOf(context));
+        AddUnlessGiven(headers, "referer", http.Referer);
+        AddUnlessGiven(headers, "cookie", http.CookieStrings);
         return new BinaryHttpRequest(MethodOf(context), context.Url.Scheme, AuthorityOf(context.Url), PathOf(context.Url, http), headers, context.PostData ?? ReadOnlyMemory<byte>.Empty);
     }
 
@@ -42,7 +46,17 @@ internal static class InnerRequest
         (context => context.Range is not null || context.ResumeFrom is not null, "a range or resumed transfer (-r, -C)"),
         (context => context.TimeCondition is not null, "a time condition (-z)"),
         (context => context.Http!.Body is not null, "a form (-F)"),
+        (context => context.Http!.Compressed, "a compressed response (--compressed)"),
+        (context => context.Http!.HasCookieFiles, "a cookie file (-b)"),
     ];
+
+    /// <summary>Bearer token (<c>--oauth2-bearer</c>) first, else Basic credentials (<c>-u</c>), as the <c>Authorization</c> value.</summary>
+    private static string? AuthorizationOf(ITransferContext context) =>
+        context.Http!.BearerToken is { } token
+            ? "Bearer " + token
+            : context.Credentials is { } credentials
+                ? "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(credentials.UserName + ":" + credentials.Password))
+                : null;
 
     private static string? RefusalOf(ITransferContext context) =>
         Array.Find(Refusals, refusal => refusal.Applies(context)).Refused;
