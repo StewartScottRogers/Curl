@@ -357,6 +357,19 @@ function Get-SeedingProblems($Manifest, [string[]]$Chosen, [string[]]$AvoidFiles
     return $problems
 }
 
+function ConvertFrom-SeederManifest([string]$Text) {
+    # The seeder's manifest as an object. A seeder that writes a Windows path inside a string
+    # without doubling its backslashes (Curl.Console\bin\Debug, audit 20261030-210336) leaves
+    # JSON that does not parse. Only then is every backslash but those of \", \\ and \/ doubled
+    # and the text parsed again, so the path's \b and \n stay letters rather than becoming
+    # control characters, and one unescaped path no longer fails the whole audit.
+    try { return $Text | ConvertFrom-Json }
+    catch {
+        $repaired = [regex]::Replace($Text, '\\(.)', { param($m) if ('"\/'.Contains($m.Groups[1].Value)) { $m.Value } else { '\\' + $m.Groups[1].Value } })
+        return $repaired | ConvertFrom-Json
+    }
+}
+
 function Get-AvoidPromptLines([object[]]$Awaited) {
     # The seeder prompt's avoid list, one file per line with the findings that name it.
     $byFile = [ordered]@{}
@@ -398,6 +411,9 @@ if ($SelfTest) {
     Check 'a -NewTab or -Restart launcher does not count as a shift' ((Get-RefusalReason @($launcher, $restart, $other) '' $false) -eq '') 'none'
     Check 'the lane marker refuses, even alongside a shift' ((Get-RefusalReason @($shift) '1' $true) -like '*CURL_DARK_FACTORY_LANE*') 'marker'
     Check 'nothing running and no marker: no refusal' ((Get-RefusalReason @($other) '' $false) -eq '') 'none'
+    $unescaped = ConvertFrom-SeederManifest '{ "planted": [ { "trigger": "planted build (Curl.Console\bin\Debug\net10.0\curl.exe) exits 25", "quote": "a \"b\" \\ c" } ] }'
+    Check 'a manifest with an unescaped Windows path parses, the path kept as written' ($unescaped.planted[0].trigger -eq 'planted build (Curl.Console\bin\Debug\net10.0\curl.exe) exits 25' -and $unescaped.planted[0].quote -eq 'a "b" \ c') "$($unescaped.planted[0].trigger) | $($unescaped.planted[0].quote)"
+    Check 'a valid manifest parses unchanged, its \n a newline' ((ConvertFrom-SeederManifest '{ "d": "x\ny" }').d -eq "x`ny") 'valid'
     Check '-AlongsideShift runs while a shift runs' ((Get-RefusalReason @($shift, $lane) '' $true) -eq '') 'none'
     $scratch = Join-Path ([IO.Path]::GetTempPath()) ('runaudit-selftest-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force $scratch | Out-Null
@@ -641,7 +657,7 @@ try {
     $seedPrompt = "Seed an audit. Worktree: $plantedTree (detached at $auditedCommit). Log copy: $logs. Manifest path: $manifest. Seed: $Seed. Count: $Planted. Plant at least one defect for each of these auditors: $($Selected -join ', '), and only for them.$avoidPrompt Follow your instructions exactly; change nothing outside the worktree, the log copy and the manifest path."
     $null = Invoke-Agent 'audit-seeder' $Models.seeder $seedPrompt $auditTree (Join-Path $RunDir 'seeder.md')
     if (-not (Test-Path -LiteralPath $manifest)) { throw 'The seeder wrote no manifest.' }
-    $seeded = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+    $seeded = ConvertFrom-SeederManifest (Get-Content -LiteralPath $manifest -Raw)
     Write-Step "seeded: $(@($seeded.planted).Count) defects"
     $seedingProblems = @(Get-SeedingProblems $seeded $Selected $avoidFiles)
     $seedingProblems | ForEach-Object { Write-Step "Warning: $_" }
