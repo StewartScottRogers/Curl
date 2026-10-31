@@ -405,6 +405,12 @@ function Invoke-CommandRecipe([hashtable] $Variables, [string[]] $Arguments) {
 # Every variable a recorded recipe may set; each recorded run clears them all first.
 $script:RecordedVariableNames = @('http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY', 'ftp_proxy', 'FTP_PROXY', 'all_proxy', 'ALL_PROXY', 'no_proxy', 'NO_PROXY', 'NETRC', 'CURL_CA_BUNDLE', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'SSLKEYLOGFILE', 'HOME', 'USERPROFILE', 'APPDATA', 'CURL_HOME', 'XDG_CONFIG_HOME')
 
+# Set for every recorded run, so the recorder's own pwsh (and any dotnet it starts) sends
+# nothing through a recipe's proxy. Under an empty HOME, pwsh 7 sends its startup telemetry
+# to dc.services.visualstudio.com through HTTPS_PROXY - the recorder's own port - and that
+# CONNECT was measured as curl's (GF-0097's [url-protocol]_PROXY item, BL-4382).
+$script:RecorderQuietVariables = @{ POWERSHELL_TELEMETRY_OPTOUT = '1'; POWERSHELL_UPDATECHECK = 'Off'; DOTNET_CLI_TELEMETRY_OPTOUT = '1'; DOTNET_NOLOGO = '1' }
+
 # The subject Record-CurlExchange.ps1 gives its throwaway root (New-IssuedByThrowawayRoot).
 $script:ThrowawayRootCommonName = 'Record-CurlExchange throwaway root'
 
@@ -442,8 +448,9 @@ function Get-WrittenSummary([string] $Path) {
 function Invoke-RecordedRun([string] $Curl, [hashtable] $Recipe, [int] $Port) {
     $folder = New-TempFolder 'gap-env-recorded-'
     $saved = @{}
-    foreach ($name in $script:RecordedVariableNames) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
+    foreach ($name in @($script:RecordedVariableNames) + @($script:RecorderQuietVariables.Keys)) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
     try {
+        foreach ($name in $script:RecorderQuietVariables.Keys) { [Environment]::SetEnvironmentVariable($name, $script:RecorderQuietVariables[$name]) }
         $resolve ={ param([string] $Text) $Text.Replace('{SERVER}', "http://127.0.0.1:$port").Replace('{PORT}', [string]$port).Replace('{FOLDER}', $folder) }
         $emptyHome = Join-Path $folder 'gap-home'
         [void] [System.IO.Directory]::CreateDirectory($emptyHome)
@@ -469,7 +476,7 @@ function Invoke-RecordedRun([string] $Curl, [hashtable] $Recipe, [int] $Port) {
             written = $written
         }
     } finally {
-        foreach ($name in $script:RecordedVariableNames) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
+        foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
         Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
@@ -761,6 +768,17 @@ function Invoke-SelfTest {
             if ($null -eq $runs -or $runs.Candidate.exitCode -ne 7) { $ran = $false }
         }
         Report $ran 'the config, home and command recipes run for real and reach the explicit Curl.Console'
+        # A stand-in recorder that answers with the variables it was started with (BL-4382).
+        Write-Utf8File (Join-Path $temp 'Record-CurlExchange.ps1') @'
+param([int] $Port, [string] $Curl, [string] $CurlArgs, [string] $OutDirectory, [Parameter(ValueFromRemainingArguments)] $Rest)
+[void] [System.IO.Directory]::CreateDirectory($OutDirectory)
+[System.IO.File]::WriteAllText((Join-Path $OutDirectory 'exitcode.txt'), '0')
+[System.IO.File]::WriteAllText((Join-Path $OutDirectory 'stdout.bin'), "$env:POWERSHELL_TELEMETRY_OPTOUT|$env:DOTNET_CLI_TELEMETRY_OPTOUT|$env:HTTPS_PROXY")
+[System.IO.File]::WriteAllText((Join-Path $OutDirectory 'stderr.txt'), '')
+'@
+        $before = [Environment]::GetEnvironmentVariable('POWERSHELL_TELEMETRY_OPTOUT')
+        $quiet = Invoke-RecordedRun 'stand-in-curl' (New-RecordedRecipe @{ HTTPS_PROXY = '{SERVER}' } @('https://gap.invalid/', '-s')) 5555
+        Report ($quiet.stdout -ceq '1|1|http://127.0.0.1:5555' -and "$([Environment]::GetEnvironmentVariable('POWERSHELL_TELEMETRY_OPTOUT'))" -ceq "$before") 'a recorded run starts its recorder with pwsh and dotnet telemetry off, and puts the variables back after'
         $recipes = @($inventory.items | ForEach-Object { Get-Recipe $_ } | Where-Object { $null -ne $_ })
         Report ($recipes.Count -gt 0 -and @($recipes | Where-Object { -not ($_.ContainsKey('Run') -and $_.ContainsKey('Arguments') -and $_.ContainsKey('Documented')) }).Count -eq 0) 'every recipe has Run, Arguments and Documented'
     } finally {
