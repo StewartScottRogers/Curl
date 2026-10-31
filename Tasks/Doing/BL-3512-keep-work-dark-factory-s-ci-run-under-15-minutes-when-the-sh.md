@@ -40,3 +40,4 @@ Interactive only: ci.yml is a guard file and changes only through the `audit` br
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Interactive session: skip the factory/merge PR duplicate CI and Integration runs on guard/bl-3512 from master Criteria at claim: af56919a b59972c4 59fec9cb.
 - 2026-10-25: Doing -> Backlog. Waiting on CI for PR #238 (guard/bl-3512, ece8175aa); reclaim to merge and measure
+- 2026-10-30: Backlog -> Doing. Interactive session: skip master push CI jobs whose tree a passing run already tested, on guard/bl-3512-tested-tree from master Criteria at claim: af56919a b59972c4 59fec9cb.
