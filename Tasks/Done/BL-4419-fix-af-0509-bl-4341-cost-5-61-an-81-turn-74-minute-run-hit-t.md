@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4419 — Fix AF-0509: BL-4341 cost $5.61: an 81-turn, 74-minute run hit the turn cap at $4.93 before a 21-turn rerun finished it
 
@@ -41,12 +41,14 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
+- 2026-10-31 (lane 3): Cause of AF-0509's cost: BL-4341 (gRPC extension, unary client flow) was claimed 2 times. Claim 1 (81 turns, $4.93, 74 minutes, 9.8 million cache-read tokens) was a feature-pipeline task with a wide `touches` (client code, three Composition catalogues, two csproj files, a transfer hook, CurlCompositionTests) and ran to the 80-turn cap; every turn re-read the growing run, which drove the cache-read cost. Claim 2 (21 turns, $0.68) finished it from the stashed work. The turn cap and the stash/reapply handoff did their job (no rerun loop, no repeated failing test run in RunDarkFactory.ps1), and the task's own Notes show the quality run was scoped to one library. Nothing in RunDarkFactory.ps1 drove the cost, so no change is made: recorded as unavoidable (same pattern as AF-0508, BL-4342 and BL-4112). The historical cost cannot be re-measured; the first audit after Done closes it.
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-31: Doing -> Done. Cause named and recorded as unavoidable; see Notes
