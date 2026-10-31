@@ -367,7 +367,7 @@ public sealed class ObliviousHttpTransferHookTests
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task ExecuteAsync_NonAsciiPasswordOnPosix_IsEncodedAsUtf8()
     {
-        await AssertBasicValueAsync("w6Q=");
+        await AssertBasicValueAsync("dTpww6Q=");
     }
 
     [TestMethod]

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ObliviousHttp.UnitTests, Curl.Extension.ObliviousHttp.UnitLibrary]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4431 — Fix CI failure ExecuteAsync_NonAsciiPasswordOnPosix_IsEncodedAsUtf8 on Linux and macOS
 
@@ -26,7 +26,7 @@ Lanes test only on Windows, so reproduce with `gh run view 41243817728 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `ExecuteAsync_NonAsciiPasswordOnPosix_IsEncodedAsUtf8` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `ExecuteAsync_NonAsciiPasswordOnPosix_IsEncodedAsUtf8` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
 
@@ -34,3 +34,4 @@ Lanes test only on Windows, so reproduce with `gh run view 41243817728 --log-fai
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: d3928e4f.
+- 2026-10-31: Doing -> Done. ExecuteAsync_NonAsciiPasswordOnPosix_IsEncodedAsUtf8 expects the UTF-8 Base64 of the whole u:pä credential
