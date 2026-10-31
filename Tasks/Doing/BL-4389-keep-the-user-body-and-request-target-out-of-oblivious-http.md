@@ -32,3 +32,4 @@ Shift-end review 2026-10-31 (silent-failure-hunter, type-design-analyzer). Curl.
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 640168f4 9d92ce2b 4b5b2cba 9d71032c.
