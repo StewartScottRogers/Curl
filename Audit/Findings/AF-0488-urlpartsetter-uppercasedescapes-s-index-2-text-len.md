@@ -3,8 +3,8 @@ id: AF-0488
 title: UrlPartSetter.UpperCasedEscapes's index + 2 < text.Length can become <= with no test failing, so a part ending in %X throws
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/UrlPartSetter.cs:UpperCasedEscapes-lt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartSetter.cs:262:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
