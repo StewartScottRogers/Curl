@@ -4,7 +4,7 @@ title: Re-close GF-0097: An empty SSL_CERT_DIR (or CA path) crashes Curl with an
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-4382]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-30
@@ -48,7 +48,13 @@ Most likely cause: CaCertificateEnvironment.Apply (Curl.Cli.UnitLibrary) copies 
 
 ## Notes
 
+- Nothing to fix in the touched projects: BL-2822's fix (679fee848 in Curl.Networking: an empty --capath adds nothing and an empty --cacert is exit 77; 76e7d599c in Curl.Cli: an empty CURL_CA_BUNDLE, SSL_CERT_DIR or SSL_CERT_FILE counts as unset; ADR-0707) has been on origin/master since 2026-10-19, before the 2026-10-30_2103 gap run. SslStreamSessionPartitions.FullPath guards empty paths too.
+- Measured on linux (WSL Ubuntu, a self-contained linux-x64 publish of this checkout, JIT): `CURL_CA_BUNDLE= SSL_CERT_FILE= SSL_CERT_DIR=/etc/ssl/certs` exit 0; `CURL_CA_BUNDLE= SSL_CERT_DIR= SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt` exit 0; `CURL_CA_BUNDLE= SSL_CERT_DIR= SSL_CERT_FILE= https_proxy=http://127.0.0.1:9` exit 7 at the proxy. No ArgumentException in any of them. The evidence above is the original finding's text.
+- Criterion 3 expects `CONNECT dc.services.visualstudio.com:443`, a host Curl is never asked for. It is Application Insights, the .NET tooling's telemetry, so the measured request most likely comes from the harness's own dotnet process going through the recipe's proxy. A lane may not read the gap tool, so BL-4382 (lane: no) re-measures these items. This task waits on it and can then confirm the items or take what it finds in Curl.
+- Found beside it: with all three variables empty, Curl gives exit 60 where Linux curl gives exit 0 (it has a built-in bundle). Filed as BL-4383. None of the three items depends on it, because each recipe sets a usable variable.
+
 ## Log
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: d3442ebf 4d2fe763 967eeb59 8b83e917 1fd5de8c 28346828.
+- 2026-10-30: Doing -> Backlog. Waits on BL-4382: Curl at master no longer crashes on linux (measured in WSL), so the gap office must re-measure the three recipes, whose proxy item records the harness's own telemetry CONNECT
