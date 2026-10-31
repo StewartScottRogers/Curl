@@ -103,9 +103,9 @@ internal sealed partial class ManagedMultiTransfer
     /// perform has started and whose message is not yet queued, in the order added (but none for one that
     /// waits for an earlier transfer's connection, <see cref="WaitsForEarlierConnection" />) - the transfer's real
     /// socket once its dial has one (its operating system socket, or ADR-0955's engine number for a connection with
-    /// none), with or without a socket callback (ADR-0982), and until then, or for a transfer that is not a
-    /// <see cref="ManagedEasyTransfer" />, the engine-numbered socket the socket callback is told of for it
-    /// (<see cref="FirstTransferSocket" />) - then, while there is any, the threaded resolver's <see cref="ResolverWakeupSocket" />.
+    /// none), with or without a socket callback (ADR-0982); a transfer with no socket the handle knows (before its dial
+    /// has one, or one that is not a <see cref="ManagedEasyTransfer" />) gives none
+    /// - then, while there is any socket, the threaded resolver's <see cref="ResolverWakeupSocket" />.
     /// </summary>
     /// <param name="sockets">Filled with up to its length of sockets, each with no returned events.</param>
     /// <param name="socketCount">How many sockets the handle waits on, even past <paramref name="sockets" />' length.</param>
@@ -122,13 +122,7 @@ internal sealed partial class ManagedMultiTransfer
             return CurlMultiCode.BadHandle;
         }
 
-        List<MultiEntry> running = entries.FindAll(entry => !entry.Done && entry.Perform is not null);
-        List<CurlSocket> waiting = [.. running.Where((entry, index) => !WaitsForEarlierConnection(entry, running.Take(index))).Select(WaitSocketOf)];
-        if (waiting.Count > 0)
-        {
-            waiting.Add(new CurlSocket(ResolverWakeupSocket));
-        }
-
+        List<CurlSocket> waiting = WaitedSockets();
         socketCount = waiting.Count;
         for (int index = 0; index < Math.Min(waiting.Count, sockets.Length); index++)
         {
@@ -138,4 +132,20 @@ internal sealed partial class ManagedMultiTransfer
         return waiting.Count > sockets.Length ? CurlMultiCode.OutOfMemory : CurlMultiCode.Ok;
     }
 
+    /// <summary>
+    /// The sockets <see cref="GetWaitSockets" /> answers, in order: each running transfer's known socket (none for
+    /// one that waits for an earlier transfer's connection or has no socket the handle knows), then, while there
+    /// is any, the threaded resolver's <see cref="ResolverWakeupSocket" />.
+    /// </summary>
+    private List<CurlSocket> WaitedSockets()
+    {
+        List<MultiEntry> running = entries.FindAll(entry => !entry.Done && entry.Perform is not null);
+        List<CurlSocket> waiting = [.. running.Where((entry, index) => !WaitsForEarlierConnection(entry, running.Take(index))).Select(WaitSocketOf).OfType<CurlSocket>()];
+        if (waiting.Count > 0)
+        {
+            waiting.Add(new CurlSocket(ResolverWakeupSocket));
+        }
+
+        return waiting;
+    }
 }

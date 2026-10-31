@@ -53,6 +53,8 @@
     <!-- For its public InProcessCurl, which the curl tool's runner adapter calls (BL-2382). -->
     <!-- Built runtime-agnostic, as a library, so each per-runtime pack needs no restore of it for that runtime. -->
     <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained" />
+    <!-- The extensions' handlers, which the host passes to its engine (ADR-0999, ADR-1071). -->
+    <ProjectReference Include="..\Curl.Extension.Composition.UnitLibrary\Curl.Extension.Composition.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Mcp.Protocol.UnitLibrary\Curl.Mcp.Protocol.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Mcp.UnitLibrary\Curl.Mcp.UnitLibrary.csproj" />
   </ItemGroup>

@@ -9,7 +9,9 @@ namespace Curl.Networking;
 /// <summary>
 /// Pins <see cref="TcpPendingConnection" /> through its accept seam, over a socket bound to
 /// loopback that nothing connects to; the real accept is in
-/// <see cref="TcpConnectionListenerTests" />' <c>Integration</c> test (BL-456).
+/// <see cref="TcpConnectionListenerTests" />' <c>Integration</c> test (BL-456). One test
+/// accepts a loopback peer that sends nothing, to see the FIN when the accepted connection is
+/// disposed (AF-0458, ADR-1022).
 /// </summary>
 [TestClass]
 public sealed class TcpPendingConnectionTests
@@ -130,6 +132,34 @@ public sealed class TcpPendingConnectionTests
         Diagnostics.Act("has connection waiting", waiting);
         Diagnostics.Assert("has connection waiting", false, waiting);
         Assert.IsFalse(waiting);
+    }
+
+    [TestMethod]
+    public async Task AcceptAsync_AcceptedConnectionDisposed_ClosesTheAcceptedSocket()
+    {
+        // AF-0458: the accepted connection owns its socket, so disposing it sends the peer a FIN;
+        // an active-mode data connection's peer otherwise never sees the upload end.
+        // Nothing crosses the socket but the handshake and the FIN (ADR-0421).
+        var cancellationToken = TestContext.CancellationToken;
+        await using var pending = new TcpPendingConnection(ListeningSocket());
+        using var peer = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await peer.ConnectAsync(pending.LocalEndPoint, cancellationToken);
+        Diagnostics.Arrange("peer", "connected to the listening socket over loopback");
+        var result = await pending.AcceptAsync(cancellationToken);
+        Assert.IsNotNull(result.Connection);
+
+        using (Diagnostics.Phase("dispose the accepted connection"))
+        {
+            await result.Connection.DisposeAsync();
+        }
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        int received = await peer.ReceiveAsync(new byte[1], SocketFlags.None, timeout.Token);
+
+        Diagnostics.Act("bytes the peer received after dispose", received);
+        Diagnostics.Assert("bytes the peer received after dispose (0 is the FIN)", 0, received);
+        Assert.AreEqual(0, received);
     }
 
 

@@ -178,12 +178,6 @@ internal sealed partial class ManagedMultiTransfer
             return TellWaitedSocket(callback, entry, wait);
         }
 
-        if (NeedsSocket(entry))
-        {
-            entry.Socket = WaitSocketOf(entry);
-            return callback(entry.Transfer, entry.Socket.Value, CurlPoll.In, null);
-        }
-
         return 0;
     }
 
@@ -215,17 +209,22 @@ internal sealed partial class ManagedMultiTransfer
     private static CurlSocket? WaitedSocketOf(MultiEntry entry, TransferSocketWait wait, CurlPoll waiting) =>
         entry.Done || wait.Socket is not { } handle || waiting == CurlPoll.None ? null : new CurlSocket(handle);
 
-    private static bool NeedsSocket(MultiEntry entry) => !entry.Done && entry.Perform is not null && entry.Socket is null;
-
     /// <summary>
     /// Whether an action on <paramref name="socket" /> wakes <paramref name="wait" />: an action on its own socket,
-    /// or a timeout action while it has no operating system socket (an in-memory connection), which the timer's
-    /// <see cref="RunningTransferCheckInterval" /> brings the application back for.
+    /// or a timeout action while it has no operating system socket (an in-memory connection), which the timer's 0
+    /// brings the application back for (ADR-0998).
     /// </summary>
     private static bool IsActionFor(TransferSocketWait wait, CurlSocket socket) =>
         wait.Socket is { } handle ? new CurlSocket(handle) == socket : socket == CurlMultiSockets.Timeout;
 
     private static CurlSocketSelect SelectOf(CurlPoll waiting) => (CurlSocketSelect)(int)(waiting & CurlPoll.InOut);
+
+    /// <summary>
+    /// How long a transfer still connecting is let go on before its connect's <see cref="CurlPoll.Out" /> wait counts as
+    /// settled: a connect that completes at once (loopback) moves on to its read wait in that time, as libcurl's
+    /// action runs the connect through to it (CGR-034 C_75, C_21).
+    /// </summary>
+    private const long ConnectGraceMilliseconds = 50;
 
     /// <summary>
     /// Lets each running transfer whose socket the application polls go on until it waits on that socket again or
@@ -243,12 +242,13 @@ internal sealed partial class ManagedMultiTransfer
 
     private void Settle(MultiEntry entry)
     {
-        long until = Environment.TickCount64 + (long)SocketWaitSettleLimit.TotalMilliseconds;
+        long began = Environment.TickCount64;
+        long until = began + (long)SocketWaitSettleLimit.TotalMilliseconds;
         while (true)
         {
             Task changed = entry.NextChange;
             long left = until - Environment.TickCount64;
-            if (IsSettled(entry) || left <= 0)
+            if (IsSettled(entry, Environment.TickCount64 - began >= ConnectGraceMilliseconds) || left <= 0)
             {
                 return;
             }
@@ -259,7 +259,7 @@ internal sealed partial class ManagedMultiTransfer
                 continue;
             }
 
-            Task.WaitAny([changed, entry.Perform!, callbackQueue.Arrived], TimeSpan.FromMilliseconds(left));
+            Task.WaitAny([changed, entry.Perform!, callbackQueue.Arrived], TimeSpan.FromMilliseconds(Math.Min(left, ConnectGraceMilliseconds)));
         }
     }
 
@@ -268,9 +268,12 @@ internal sealed partial class ManagedMultiTransfer
     /// socket, with no deadline passed: one whose deadline has passed is let go on until its own timer ends it, as
     /// libcurl's timeout action fails it with <see cref="CurlCode.OperationTimedOut" /> in that call (CGR-034 C_75).
     /// </summary>
-    private bool IsSettled(MultiEntry entry) =>
+    private bool IsSettled(MultiEntry entry, bool connectGraceOver) =>
         entry.Perform!.IsCompleted
-        || ((IsWaitingOnItsSocket(entry) || IsWaitingWithoutSocket(entry)) && !(entry.SocketWait!.EarliestDeadline <= timeProvider.GetUtcNow()));
+        || ((IsWaitingOnItsSettledSocket(entry, connectGraceOver) || IsWaitingWithoutSocket(entry)) && !(entry.SocketWait!.EarliestDeadline <= timeProvider.GetUtcNow()));
+
+    private static bool IsWaitingOnItsSettledSocket(MultiEntry entry, bool connectGraceOver) =>
+        IsWaitingOnItsSocket(entry) && (connectGraceOver || !entry.SocketWait!.IsConnecting);
 
     private static bool IsWaitingWithoutSocket(MultiEntry entry) => entry.SocketWait!.IsWaitingWithoutSocket;
 

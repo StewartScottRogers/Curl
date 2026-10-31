@@ -29,6 +29,8 @@ internal sealed class SessionTicketRecordDetector
 
     private const int Tls13RecordOverhead = 17;
 
+    private const int CloseNotifyPlaintextLength = 2;
+
     /// <summary>
     /// Gets the event a received ticket record is reported as: a TLS 1.3 <c>NewSessionTicket</c>,
     /// of which only the handshake type is given, as curl's Schannel build words no more of it.
@@ -39,6 +41,15 @@ internal sealed class SessionTicketRecordDetector
         ContentType = TlsContentType.Handshake,
         Sent = false,
         Bytes = new byte[] { 4 },
+    };
+
+    /// <summary>Gets the event the server's received <c>close_notify</c> alert is reported as.</summary>
+    internal static readonly TlsMessageEvent CloseNotifyReceived = new()
+    {
+        ProtocolVersion = 0x0304,
+        ContentType = TlsContentType.Alert,
+        Sent = false,
+        Bytes = new byte[] { 1, 0 },
     };
 
     private readonly byte[] _header = new byte[RecordHeaderLength];
@@ -92,14 +103,28 @@ internal sealed class SessionTicketRecordDetector
         _finished = true;
         for (int tickets = 0; tickets < _plaintextLengths.Count; tickets++)
         {
-            if (RecordsFromAccountFor(tickets, plaintextRead))
+            if (RunEndAccountingFor(tickets, plaintextRead) is int end and >= 0)
             {
+                CloseNotifyFollows = ClosesWithCloseNotify(end);
                 return tickets;
             }
         }
 
         return 0;
     }
+
+    /// <summary>
+    /// Gets the event a received <c>NewSessionTicket</c> is reported as; by default
+    /// <see cref="NewSessionTicketReceived" />, which names no renegotiated handshake.
+    /// </summary>
+    public TlsMessageEvent TicketMessage { get; set; } = NewSessionTicketReceived;
+
+    /// <summary>
+    /// Gets whether <see cref="CountTicketRecords" /> found the server's <c>close_notify</c>
+    /// already received after the records the read returned: one last complete record of
+    /// two bytes of plaintext, the alert's level and description (BL-4067).
+    /// </summary>
+    public bool CloseNotifyFollows { get; private set; }
 
     /// <summary>
     /// Reports each ticket record <see cref="CountTicketRecords" /> finds to
@@ -110,22 +135,34 @@ internal sealed class SessionTicketRecordDetector
     /// <param name="events">Where the tickets are reported.</param>
     public void ReportTicketRecords(int plaintextRead, ITransferEvents events)
     {
+        bool counted = !_finished && plaintextRead != 0;
         for (int ticketRecords = CountTicketRecords(plaintextRead); ticketRecords > 0; ticketRecords--)
         {
-            events.ReportTlsMessage(NewSessionTicketReceived);
+            events.ReportTlsMessage(TicketMessage);
+        }
+
+        if (counted && CloseNotifyFollows)
+        {
+            events.ReportTlsMessage(CloseNotifyReceived);
         }
     }
 
-    private bool RecordsFromAccountFor(int first, int plaintextRead)
+    // The index after the run of records from first whose plaintext is exactly the read, or -1.
+    private int RunEndAccountingFor(int first, int plaintextRead)
     {
         int plaintext = 0;
-        for (int index = first; index < _plaintextLengths.Count && plaintext < plaintextRead; index++)
+        int index = first;
+        for (; index < _plaintextLengths.Count && plaintext < plaintextRead; index++)
         {
             plaintext += _plaintextLengths[index];
         }
 
-        return plaintext == plaintextRead;
+        return plaintext == plaintextRead ? index : -1;
     }
+
+    private bool ClosesWithCloseNotify(int next) =>
+        next == _plaintextLengths.Count - 1 && _plaintextLengths[next] == CloseNotifyPlaintextLength &&
+        _bodyBytesLeft == 0 && _headerBytesRead == 0;
 
     private ReadOnlySpan<byte> SkipBody(ReadOnlySpan<byte> received)
     {

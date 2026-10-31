@@ -634,12 +634,48 @@ public sealed class WsProtocolHandler(
             return 0;
         }
 
-        WsUploadFrames? callbackFrames = (upload as IWsUploadFrameSource)?.UploadFrames;
         long sent = RawMode
             ? await SendRawUploadAsync(connection, context, upload).ConfigureAwait(false)
-            : await SendFramedUploadAsync(connection, context, upload, callbackFrames ?? new WsUploadFrames(), fillsReads: callbackFrames is null, trace).ConfigureAwait(false);
+            : await SendFramedOrMessageUploadAsync(connection, context, upload, trace).ConfigureAwait(false);
         context.Events.ReportInfo(sent == 0 ? WsInfoLines.UploadedNothing : WsInfoLines.UploadSent(sent));
         context.Progress.ReportUploaded(sent, sent);
+        return sent;
+    }
+
+    /// <summary>
+    /// Sends the messages of an <see cref="IWsUploadMessageSource" /> upload one frame each
+    /// (<see cref="SendMessagesAsync" />, BL-4253), and any other upload read by read (<see cref="SendFramedUploadAsync" />).
+    /// </summary>
+    /// <returns>The bytes the upload counts as sent.</returns>
+    private async ValueTask<long> SendFramedOrMessageUploadAsync(IConnection connection, ITransferContext context, Stream upload, WsFrameTrace trace)
+    {
+        if (upload is IWsUploadMessageSource messageSource)
+        {
+            return await SendMessagesAsync(connection, context, messageSource.Messages, trace).ConfigureAwait(false);
+        }
+
+        WsUploadFrames? callbackFrames = (upload as IWsUploadFrameSource)?.UploadFrames;
+        return await SendFramedUploadAsync(connection, context, upload, callbackFrames ?? new WsUploadFrames(), fillsReads: callbackFrames is null, trace).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends each of <paramref name="messages" /> as one final masked frame of its own opcode, in order, so an
+    /// extension's subprotocol gets one text frame per message (BL-4253, ADR-1041). The stream's own bytes are not read.
+    /// </summary>
+    /// <returns>The sum of the message payloads.</returns>
+    private async ValueTask<long> SendMessagesAsync(IConnection connection, ITransferContext context, IReadOnlyList<WsUploadMessage> messages, WsFrameTrace trace)
+    {
+        long sent = 0;
+        foreach (WsUploadMessage message in messages)
+        {
+            byte[] bytes = WsFrameEncoder.Encode(message.Opcode, isFinal: true, message.Payload.Span, randomSource);
+            trace.FrameEncoded(message.Opcode, message.Payload.Length);
+            new WsTransferLog(context.DiagnosticLog).Frame("sent", message.Opcode, isFinal: true, message.Payload.Length);
+            context.Events.ReportDataSent(bytes);
+            await SendAsync(connection, bytes, context.CancellationToken).ConfigureAwait(false);
+            sent += message.Payload.Length;
+        }
+
         return sent;
     }
 

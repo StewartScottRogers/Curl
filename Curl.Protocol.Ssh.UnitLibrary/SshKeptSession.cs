@@ -17,6 +17,8 @@ namespace Curl.Protocol.Ssh;
 /// <param name="loginKey">The login the session authenticated (<see cref="LoginKeyOf" />).</param>
 internal sealed class SshKeptSession(SshTransport transport, SshSessionConnection connection, SftpSessionSlot sftp, string loginKey) : IConnectionSession
 {
+    private bool isShutDown;
+
     /// <summary>Gets the authenticated transport.</summary>
     internal SshTransport Transport => transport;
 
@@ -42,8 +44,19 @@ internal sealed class SshKeptSession(SshTransport transport, SshSessionConnectio
     internal void UseConnection(IConnection current) => connection.Current = current;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Ends the session once: a failed transfer on a reused connection shuts it down and the
+    /// cache's close of that connection shuts it down again, yet curl sends one
+    /// <c>DISCONNECT</c> (BL-4059).
+    /// </remarks>
     public async ValueTask ShutDownAsync(CancellationToken cancellationToken)
     {
+        if (isShutDown)
+        {
+            return;
+        }
+
+        isShutDown = true;
         await sftp.CloseIgnoringFailureAsync(cancellationToken).ConfigureAwait(false);
         await SshProtocolHandler.DisconnectIgnoringFailureAsync(transport, cancellationToken).ConfigureAwait(false);
     }

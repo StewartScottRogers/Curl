@@ -19,7 +19,7 @@ namespace Curl.Engine;
 /// polling timer, so an application's own event loop drives the transfer (ADR-0973).
 /// </summary>
 [TestClass]
-public sealed class Cgr034Tests
+public sealed partial class Cgr034Tests
 {
     private const nint Handle = 777;
     private static readonly TimeSpan LongestWait = TimeSpan.FromSeconds(30);
@@ -105,7 +105,9 @@ public sealed class Cgr034Tests
         (_, running) = await multi.SocketActionAsync(socket!.Value, CurlSocketSelect.Out, CancellationToken.None);
         for (int step = 0; running > 0 && step < 100; step++)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(Math.Max(timer, 10)));
+            // Past the deadline the timer named, not on it (BL-4082): a Windows timer can wake a few milliseconds early,
+            // and the engine then tells the few left as a fresh short timeout before the transfer times out.
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Max(timer, 0) + 100));
             (_, running) = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
         }
 
@@ -161,100 +163,6 @@ public sealed class Cgr034Tests
         Assert.AreEqual(0, running);
         Assert.IsTrue(multi.TryReadInfo(out CurlMultiMessage? message, out _));
         Assert.AreEqual(CurlCode.Ok, message.Result);
-    }
-
-    [TestMethod]
-    public async Task SocketAction_RefusedConnect_TellsOutOnTheConnectingSocketThenRemoveWithCouldntConnect()
-    {
-        SocketDialer dialer = new(Response) { Held = true, Refuses = true };
-        List<string> calls = [];
-        await using ManagedCurlEngine engine = EngineOver(dialer);
-        await using IMultiTransfer multi = PatientMultiOf(engine);
-        CurlSocket? socket = null;
-        multi.Options = new MultiOptions
-        {
-            Socket = (_, s, poll, _) =>
-            {
-                calls.Add($"S={(int)poll}");
-                socket = s;
-                return 0;
-            },
-            Timer = milliseconds =>
-            {
-                calls.Add($"T{milliseconds}");
-                return 0;
-            },
-        };
-        IEasyTransfer easy = engine.CreateEasy();
-        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/" } };
-
-        multi.Add(easy);
-        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
-        CurlSocket connecting = socket!.Value;
-        dialer.Release.SetResult();
-        (CurlMultiCode code, int running) = (CurlMultiCode.Ok, 1);
-        for (int step = 0; running > 0 && step < 50; step++)
-        {
-            (code, running) = await multi.SocketActionAsync(connecting, CurlSocketSelect.Out, CancellationToken.None);
-        }
-
-        Assert.AreEqual(CurlMultiCode.Ok, code);
-        Assert.AreEqual(0, running);
-        Assert.AreEqual(new CurlSocket(Handle), connecting);
-        CollectionAssert.AreEqual(new[] { "T0", "S=2", "T-1", "S=4" }, calls, string.Join(" ", calls));
-        Assert.IsTrue(multi.TryReadInfo(out CurlMultiMessage? message, out _));
-        Assert.AreEqual(CurlCode.CouldntConnect, message.Result);
-    }
-
-    [TestMethod]
-    public async Task SocketAction_ThreeTransfersAssigned_TellsEachItsOwnSocketWithTheValueAssigned()
-    {
-        SocketDialer dialer = new(Response);
-        Dictionary<CurlSocket, CurlPoll> waiting = [];
-        List<string> calls = [];
-        await using ManagedCurlEngine engine = EngineOver(dialer);
-        await using IMultiTransfer multi = PatientMultiOf(engine);
-        multi.Options = new MultiOptions
-        {
-            Socket = (_, s, poll, state) =>
-            {
-                calls.Add($"S{s.Handle}={(int)poll}:{state ?? "-"}");
-                waiting[s] = poll;
-                return 0;
-            },
-        };
-        for (int index = 0; index < 3; index++)
-        {
-            IEasyTransfer easy = engine.CreateEasy();
-            easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/" } };
-            multi.Add(easy);
-        }
-
-        (_, int running) = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
-        for (int step = 0; running > 0 && step < 20; step++)
-        {
-            foreach ((CurlSocket s, CurlPoll poll) in waiting.ToArray())
-            {
-                Assert.AreEqual(CurlMultiCode.Ok, multi.Assign(s, $"a{s.Handle}"));
-                waiting.Remove(s);
-                (_, running) = await multi.SocketActionAsync(s, (CurlSocketSelect)(int)poll, CancellationToken.None);
-            }
-        }
-
-        Assert.AreEqual(0, running);
-        foreach (nint handle in new nint[] { Handle, Handle + 1, Handle + 2 })
-        {
-            CollectionAssert.AreEqual(
-                new[] { $"S{handle}=2:-", $"S{handle}=1:a{handle}", $"S{handle}=4:a{handle}" },
-                calls.Where(call => call.StartsWith($"S{handle}=", StringComparison.Ordinal)).ToArray(),
-                string.Join(" ", calls));
-        }
-
-        for (int index = 0; index < 3; index++)
-        {
-            Assert.IsTrue(multi.TryReadInfo(out CurlMultiMessage? message, out _));
-            Assert.AreEqual(CurlCode.Ok, message.Result);
-        }
     }
 
     [TestMethod]

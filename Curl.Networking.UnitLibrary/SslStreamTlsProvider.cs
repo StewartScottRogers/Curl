@@ -208,6 +208,10 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     internal TlsClientOptions Options => _options;
 
     /// <inheritdoc />
+    public ServerCertificateChainVerdict VerifyServerCertificateChain(IReadOnlyList<ReadOnlyMemory<byte>> certificates, string targetHost) =>
+        _verification.VerifyChain(certificates, targetHost);
+
+    /// <inheritdoc />
     public ITlsProvider WithSystemStoreOnlyTrust() =>
         new SslStreamTlsProvider(ISystemStoreTrustTlsProvider.SystemStoreOnly(_options), _matchesSchannelBuild, _timeProvider, _certificateStore)
         {
@@ -344,6 +348,24 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         AuthenticateAsClientAsync(plaintext, targetHost, events, isProxy, [], cancellationToken);
 
     /// <summary>
+    /// Performs the origin's client handshake, offering <paramref name="applicationProtocols" /> through ALPN, as
+    /// the six-argument overload does with <c>isProxy</c> <see langword="false" /> (ADR-1066).
+    /// </summary>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the trust and the completed handshake are reported.</param>
+    /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>The same result the three-argument overload describes.</returns>
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        IReadOnlyList<string> applicationProtocols,
+        CancellationToken cancellationToken) =>
+        AuthenticateAsClientAsync(plaintext, targetHost, events, isProxy: false, applicationProtocols, cancellationToken);
+
+    /// <summary>
     /// Performs the client handshake as
     /// <see cref="AuthenticateAsClientAsync(IConnection, string, ITransferEvents, bool, CancellationToken)" />
     /// does, offering <paramref name="applicationProtocols" /> through ALPN unless
@@ -441,11 +463,15 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             await AuthenticateSslStreamAsClientAsync(sslStream, authenticationOptions, cancellationToken).ConfigureAwait(false);
             await transport.ReleaseHeldWritesAsync(cancellationToken).ConfigureAwait(false);
             peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
-            events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification, offeredApplicationProtocols, transport.HandshakeRecords) with
+            var handshake = DescribeHandshake(sslStream, peerVerification, offeredApplicationProtocols, transport.HandshakeRecords) with
             {
                 IsProxy = isProxy,
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
-            });
+                CaCertificateFile = _options.CaCertificateFile,
+                CaCertificateCount = CustomTrustCertificateCount(chainPolicy),
+            };
+            events.ReportTlsHandshake(handshake);
+            NameRenegotiatedHandshake(transport.TicketRecords, handshake);
             ReportRevocationCheckIncomplete(events, peerVerification);
             return ConnectResult.Connected(
                 new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild)
@@ -526,6 +552,10 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
         return [.. sent];
     }
+
+    // Each ticket the Schannel build renegotiates for checks this handshake's certificate again (BL-4067).
+    private static void NameRenegotiatedHandshake(SessionTicketRecordDetector? ticketRecords, TlsHandshakeEvent handshake) =>
+        ticketRecords?.TicketMessage = SessionTicketRecordDetector.NewSessionTicketReceived with { RenegotiatedHandshake = handshake };
 
     // The Schannel build watches the records read for TLS 1.3 session tickets (BL-1089); the
     // OpenSSL build reads the handshake records for the group and signature names (BL-4041).
@@ -688,6 +718,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CaCertificateDirectory = options.CaCertificateDirectory,
         HasCaCertificateBlob = options.CaCertificateBlob is not null,
     };
+
+    private static int CustomTrustCertificateCount(X509ChainPolicy? chainPolicy) => chainPolicy?.CustomTrustStore.Count ?? 0;
 
     // A certificate --ssl-revoke-best-effort accepted with its revocation status offline or
     // unknown is a warning in the diagnostic log (ADR-0222, decision 2; BL-968), which only

@@ -133,7 +133,7 @@ scheme's user and password with `CURLAUTH_ONLY` unless `PreAuthenticate`; `UseCo
 `SendAsync` calls its `WithBehaviour`, then `HandlerProxyMapping`, and `ApplyBehaviour`. Tests in
 `Curl.Api.UnitTests/HttpMessageHandler/Behaviour`.
 
-Reference `Curl.Api.UnitLibrary` (the seam) and `Curl.Engine.UnitLibrary` (only for
+Reference `Curl.Api.UnitLibrary` (the seam), `Curl.Extension.Composition.UnitLibrary` (only for the extensions' handlers `Create` passes the engine, off under `CURL_EXTENSIONS=0`; ADR-0999, ADR-1071) and `Curl.Engine.UnitLibrary` (only for
 `ManagedCurlEngine` in `Composition/`), nothing else. Never reference `Libcurl` or a protocol
 library.
 

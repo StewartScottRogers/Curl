@@ -52,10 +52,9 @@ internal sealed partial class ManagedMultiTransfer
     /// <summary>
     /// The timer callback's value: the handle's timeout with no transfer running or no socket callback set, the
     /// earliest deadline of the transfers when every running one waits on its real socket (-1 when none has one,
-    /// as libcurl's), 0 while one on a socket wait still computes, waiting on nothing after
-    /// <see cref="SocketWaitSettleLimit" />, as libcurl's <c>Curl_expire(data, 0)</c> for a transfer that can run on
-    /// (ADR-0986), else at most <see cref="RunningTransferCheckInterval" />, for transfers the application cannot
-    /// poll a socket for (ADR-0973).
+    /// as libcurl's, ADR-0973), else 0, as libcurl's <c>Curl_expire(data, 0)</c> for a transfer that can run on: one
+    /// on a socket wait still computing, waiting on nothing after <see cref="SocketWaitSettleLimit" /> (ADR-0986), or
+    /// one with no socket the application can poll (ADR-0998).
     /// </summary>
     private long TimerMilliseconds()
     {
@@ -66,31 +65,8 @@ internal sealed partial class ManagedMultiTransfer
 
     // A handle timeout other than 0 means no transfer waits to start or to be reported (TimeoutMilliseconds), so
     // every running one has a perform in progress.
-    private long RunningTimerMilliseconds(long handleTimeout, List<MultiEntry> running)
-    {
-        if (handleTimeout != 0 && running.TrueForAll(IsWaitingOnItsSocket))
-        {
-            return MillisecondsUntil(running.Min(EarliestDeadlineOf));
-        }
-
-        return CheckIntervalMilliseconds(handleTimeout, running);
-    }
-
-    // 0 while a running transfer on a socket wait computes (ADR-0986), else the check interval within the handle's timeout.
-    private static long CheckIntervalMilliseconds(long handleTimeout, List<MultiEntry> running)
-    {
-        if (running.Exists(IsComputing))
-        {
-            return 0;
-        }
-
-        long check = (long)RunningTransferCheckInterval.TotalMilliseconds;
-        return handleTimeout < 0 ? check : Math.Min(handleTimeout, check);
-    }
-
-    // A running transfer on a socket wait that waits on nothing computes, or has ended and waits to be reported:
-    // either way the next action has work for it.
-    private static bool IsComputing(MultiEntry entry) => entry.SocketWait is { Waiting: CurlPoll.None };
+    private long RunningTimerMilliseconds(long handleTimeout, List<MultiEntry> running) =>
+        handleTimeout != 0 && running.TrueForAll(IsWaitingOnItsSocket) ? MillisecondsUntil(running.Min(EarliestDeadlineOf)) : 0;
 
     private static DateTimeOffset? EarliestDeadlineOf(MultiEntry entry) => entry.SocketWait!.EarliestDeadline;
 

@@ -52,6 +52,22 @@ public sealed class Http3PeerUnidirectionalStreamsTests
     }
 
     [TestMethod]
+    [DataRow("4054", 0x54L, DisplayName = "WebTransport's unknown type")]
+    [DataRow("21", 0x21L, DisplayName = "a grease type")]
+    [DataRow("02", 0x02L, DisplayName = "the QPACK encoder type")]
+    [DataRow("", null, DisplayName = "a stream ending before its type")]
+    public async Task ReadTypeAsync_AnyType_GivesItsNumber(string hex, long? expected)
+    {
+        Diagnostics.Arrange("stream", hex);
+
+        var type = await new Http3PeerUnidirectionalStreams().ReadTypeAsync(StreamOf(hex), CancellationToken.None);
+
+        Diagnostics.Act("stream type", type);
+        Diagnostics.Assert("stream type", expected, type);
+        Assert.AreEqual(expected, type);
+    }
+
+    [TestMethod]
     [DataRow("00")]
     [DataRow("02")]
     [DataRow("03")]

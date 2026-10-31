@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Extension.Abstractions.UnitLibrary\Curl.Extension.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Http2.UnitLibrary\Curl.Http2.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Http3.UnitLibrary\Curl.Http3.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.WebSocket.UnitLibrary\Curl.WebSocket.UnitLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Extension.WebSocketExtendedConnect.UnitTests" />
+  </ItemGroup>
+
+</Project>

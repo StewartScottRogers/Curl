@@ -802,6 +802,25 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.IsTrue(wire.IsDisposed);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_Http2ContentLengthWithNul_IsIgnoredAndEndsWithAnExitCode()
+    {
+        HpackEncoder server = new();
+        byte[] response = Http2Response(
+            Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200"), new("content-length", "1\0")]), isEndStream: true, isEndHeaders: true));
+        ScriptedConnection wire = new(response, 65536);
+
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("response frames", "HEADERS 200 content-length \"1\\0\" (end stream)");
+
+        TransferResult result = await Handler(QueueConnector.For(wire))
+            .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
     private static TransferContext Http2Context(string url, Stream output, Stream? headerOutput = null, HttpRequestOptions? options = null, Stream? upload = null) =>
         new()
         {

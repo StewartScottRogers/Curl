@@ -32,8 +32,12 @@ field as the option it extends, and clamps the two buffer sizes rather than refu
 `EasyProxyOptions` options with `setopt.c`'s checks, keeps a copy of the `PROXYHEADER` list, and
 turns `HAPROXYPROTOCOL` on whenever `HAPROXY_CLIENT_IP` is set (ADR-0576). `Options/Tls` sets the `EasyTlsOptions`
 options (ADR-0580): `TlsPeerOptionSetters.Origin` and `.Proxy` write the origin's options and their
-`PROXY_*` twins with one method each, blobs are copied, and `SSLENGINE` with a name,
-`SSLENGINE_DEFAULT` and `SSL_FALSESTART` answer `NotBuiltIn`, Curl having no crypto engines or False Start.
+`PROXY_*` twins with one method each, blobs are copied, and `SSL_FALSESTART` answers `NotBuiltIn`, Curl
+having no False Start. Options the platform build's TLS backend or OS lacks answer its code behind one
+`*IsBuiltIn` flag each (ADR-0991, ADR-0995): under Schannel (Windows) `CRLFILE`, `ISSUERCERT`, `SSL_EC_CURVES`,
+`SSL_SIGNATURE_ALGORITHMS`, `TLS13_CIPHERS`, `PROXY_CAPATH`, `SSLENGINE` with a name, `SSLENGINE_DEFAULT` and
+`TCP_FASTOPEN` answer `NotBuiltIn`; under OpenSSL `SSLENGINE` with a name answers `SslEngineNotFound`, Curl having no
+engines. `KRBLEVEL` and `PROXYTYPE` 8 answer `NotBuiltIn` everywhere.
 
 `Options/Callbacks` implements `AddCallbackSetters` once, calling one partial method per callback area
 (`AddReadWriteCallbackSetters`, `AddProgressCallbackSetters` and the rest), which each area implements in

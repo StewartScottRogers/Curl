@@ -14,28 +14,45 @@ namespace Curl.Networking;
 public sealed class Cgr284Tests
 {
     [TestMethod]
-    public async Task ConnectAsync_CallerCancelsWhileResolving_FailsWithResolvingTimedOut()
+    public async Task ConnectAsync_LimitPassesWhileResolving_FailsWithResolvingTimedOut()
+    {
+        var clock = new ManualTimeProvider();
+        var connector = new TcpConnector(
+            new HangingDnsResolver(() => clock.Advance((long)TcpConnector.DefaultConnectTimeout.TotalMilliseconds)),
+            new FakeTcpDialer(),
+            new FakeTlsProvider(),
+            clock);
+
+        var result = await connector.ConnectAsync(new ConnectTarget("foo.test", 80, UseTls: false), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Resolving timed out after 300000 milliseconds", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_CallerCancelsBeforeLimitWhileResolving_ThrowsAndReportsNoTimeout()
     {
         using var cancel = new CancellationTokenSource();
+        var events = new RecordingTransferEvents();
         var connector = new TcpConnector(
-            new HangingDnsResolver(cancel),
+            new HangingDnsResolver(() => cancel.Cancel()),
             new FakeTcpDialer(),
             new FakeTlsProvider(),
             new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(new ConnectTarget("foo.test", 80, UseTls: false), cancel.Token);
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await connector.ConnectAsync(new ConnectTarget("foo.test", 80, UseTls: false) { Events = events }, cancel.Token));
 
-        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
-        Assert.AreEqual("Resolving timed out after 0 milliseconds", result.ErrorMessage);
+        Assert.IsFalse(events.Info.Exists(line => line.Contains("Resolving timed out", StringComparison.Ordinal)));
     }
 
-    private sealed class HangingDnsResolver(CancellationTokenSource cancel) : IDnsResolver
+    private sealed class HangingDnsResolver(Action interrupt) : IDnsResolver
     {
-        public async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
+        public ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
         {
-            await cancel.CancelAsync();
+            interrupt();
             cancellationToken.ThrowIfCancellationRequested();
-            return [];
+            return ValueTask.FromResult<IReadOnlyList<IPAddress>>([]);
         }
     }
 }

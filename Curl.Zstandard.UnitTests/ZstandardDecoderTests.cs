@@ -527,6 +527,40 @@ public sealed class ZstandardDecoderTests
         CollectionAssert.AreEqual(expected, output, name);
     }
 
+    /// <summary>
+    /// RFC 8878 section 5: a raw content dictionary primes the history. The frame is libzstd
+    /// 1.5.7's <c>ZSTD_compress_usingDict</c> at level 1 of "Then the quick brown fox jumps
+    /// over the lazy dog." against the raw dictionary "The quick brown fox jumps over the lazy
+    /// dog. ": the literals are "Then", and the rest are matches into the dictionary.
+    /// </summary>
+    [TestMethod]
+    public void Decompress_RawContentDictionary_PrimesTheHistory()
+    {
+        var frame = Convert.FromHexString("28B52FFD20316D0000205468656E0200AB2AC0844904");
+        var decoder = new ZstandardDecoder(Ascii("The quick brown fox jumps over the lazy dog. "), 1UL << 20);
+        var destination = new byte[64];
+
+        var status = decoder.Decompress(frame, destination, out _, out var written);
+
+        Assert.AreEqual(OperationStatus.Done, status);
+        Assert.AreEqual("Then the quick brown fox jumps over the lazy dog.", Encoding.ASCII.GetString(destination, 0, written));
+    }
+
+    [TestMethod]
+    public void Decompress_RawContentDictionaryWindowPastLimit_IsWindowTooLarge()
+    {
+        var decoder = new ZstandardDecoder(Ascii("abc"), 1024);
+
+        var status = decoder.Decompress([0x28, 0xB5, 0x2F, 0xFD, 0x00, 0x08, 0x01, 0x00, 0x00], new byte[4], out _, out _);
+
+        Assert.AreEqual(OperationStatus.InvalidData, status);
+        Assert.AreEqual(ZstandardDecodeError.FrameParameterWindowTooLarge, decoder.LastError);
+    }
+
+    [TestMethod]
+    public void Constructor_MaxWindowSizeBelowOneKibibyte_Throws() =>
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new ZstandardDecoder(ReadOnlyMemory<byte>.Empty, 1023));
+
     private static byte[] Ascii(string text) => Encoding.ASCII.GetBytes(text);
 
     private static byte[] Repeat(byte value, int count) => Enumerable.Repeat(value, count).ToArray();

@@ -64,6 +64,31 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
+    public async Task AuthenticateAsClientAsync_ThroughITlsProvidersAlpnOverload_OffersTheProtocolsAsTheOrigin()
+    {
+        var events = new RecordingTransferEvents();
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = RunEchoServerAsync(server, SslProtocols.None);
+        ITlsProvider provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), SchannelBuild);
+        Diagnostics.Arrange("application protocols", string.Join(",", Http11));
+
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, Http11, CancellationToken.None);
+        }
+
+        ActResult(result);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        var handshake = Assert.ContainsSingle(events.Handshakes);
+        Diagnostics.Assert("offered", "http/1.1", string.Join(",", handshake.OfferedApplicationProtocols));
+        CollectionAssert.AreEqual(Http11, handshake.OfferedApplicationProtocols.ToArray());
+        Assert.IsFalse(handshake.IsProxy);
+        await result.Connection!.DisposeAsync();
+        await IgnoreFailureAsync(serverTask);
+    }
+
+    [TestMethod]
     public async Task AuthenticateAsClientAsync_WithNullApplicationProtocols_ThrowsArgumentNullException()
     {
         Diagnostics.Arrange("application protocols", "null");

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Net;
 
 namespace Curl.Protocol.Abstractions;
@@ -313,4 +314,12 @@ public sealed record TransferReport
     /// <see langword="false" /> otherwise, or for a transfer that is not HTTP.
     /// </summary>
     public bool DigestStaysAvailable { get; init; }
+
+    /// <summary>
+    /// Gets the write-out values an extension's transfer hook gave this transfer, by variable name
+    /// (ADR-1130): <c>-w</c> prints the value given under <c>name</c> for <c>%{name}</c> only when
+    /// curl itself has no variable of that name, so an extension can add variables but never
+    /// change one of curl's. Empty, the default, for every transfer no extension reported on.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> ExtensionWriteOutValues { get; init; } = ReadOnlyDictionary<string, string>.Empty;
 }

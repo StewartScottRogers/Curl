@@ -34,6 +34,12 @@
     "Gap/") is accepted; the lane rewords it. The bare words are matched case-sensitively,
     so "audit" and "gap" in prose ("gap analysis") pass.
 
+    Claude Code starts it through sh (Git Bash on Windows) with the command in
+    .claude/settings.json, which runs it with powershell where there is one and pwsh
+    otherwise, so it guards lanes on Windows, Linux and macOS alike. With neither on PATH,
+    that command refuses a lane's every call itself (ADR-1015).
+    Audit/Guard/Test-GuardHooks.ps1 proves both on each platform in CI.
+
     Not covered: a Grep or Glob over a folder that contains Audit or Gap, such as the
     repository root, still searches it.
 #>

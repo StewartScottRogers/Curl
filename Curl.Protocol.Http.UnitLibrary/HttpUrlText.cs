@@ -135,7 +135,10 @@ internal static class HttpUrlText
     internal static string WireHostAndPort(CurlUrl url) =>
         url.IsDefaultPort ? WireHost(url) : string.Create(CultureInfo.InvariantCulture, $"{WireHost(url)}:{url.Port}");
 
-    private static string WireHost(CurlUrl url) => Ascii.IsValid(url.Host) ? url.Host : url.IdnHost;
+    /// <summary>
+    /// Gives the host as written when it is ASCII and <see cref="CurlUrl.IdnHost" /> otherwise.
+    /// </summary>
+    internal static string WireHost(CurlUrl url) => Ascii.IsValid(url.Host) ? url.Host : url.IdnHost;
 
     /// <summary>
     /// Gives the scheme, <c>://</c>, the user information with its <c>@</c> when the URL has

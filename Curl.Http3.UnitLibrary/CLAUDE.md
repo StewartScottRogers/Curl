@@ -23,17 +23,18 @@ buffer, whatever the frame's length, as nghttp3 does, returning an `Http3FrameOr
 `SETTINGS` and its QPACK encoder and decoder streams; `Http3PeerUnidirectionalStreams`
 sorts the server's streams by type, `Http3ControlStreamReader` reads its control stream
 and `Http3PeerQpackStreams` feeds its QPACK streams to `QpackDecoder` and `QpackEncoder`.
-Every RFC 9114 violation is an `Http3Exception` carrying its `Http3ErrorCode`. Request
-streams (sending a request, reading a response) are the HTTP handler's:
-`Curl.Protocol.Http.UnitLibrary`'s `Http3StreamConnection` builds them from these frames and
-QPACK (BL-731, ADR-0172).
+Every RFC 9114 violation is an `Http3Exception` carrying its `Http3ErrorCode`.
+`Http3ClientSession` (BL-4201) is the HTTP/3 client session: over an `IMultiplexedConnection` it opens the local streams, reads the peer's (reporting its SETTINGS, extended CONNECT and GOAWAY, and keeping a peer stream failure as `ConnectionError`), and opens `Http3ClientRequestStream`s, which send HEADERS from any field list and read the response, with no curl text in either. Any caller may use them (an extension
+opening an extended CONNECT stream, say); `Curl.Protocol.Http.UnitLibrary`'s `Http3Session`
+and `Http3StreamConnection` are curl's adapters over them, adding its log lines, messages and
+exit codes (BL-731, ADR-0172, BL-4194).
 
 ## Rules
 
 - **Base class library plus `Curl.Http2.UnitLibrary`, and nothing else.** QPACK reuses
   HPACK's Huffman code from `Curl.Http2.UnitLibrary` (ADR-0144), never the other way
-  round. `Curl.Protocol.Abstractions.UnitLibrary` is added by
-  the first task that needs its stream contracts. No package, and no other project
+  round. `Curl.Protocol.Abstractions.UnitLibrary` gives it the QUIC stream contracts
+  (`IMultiplexedConnection`, BL-4201). No package, and no other project
   reference.
 - **Never a reference to `Curl.Quic.UnitLibrary`.** QUIC streams arrive through the
   Abstractions contracts (ADR-0144 section 2), so HTTP/3 is tested over in-memory streams

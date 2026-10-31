@@ -84,6 +84,12 @@ public sealed class Cgr109Tests
         await Task.WhenAll(http.WhenStartedAsync("/a"), http.WhenStartedAsync("/1"));
         await clock.WhenTimersDueAsync(10000, 3);
         http.Fail("/a", CurlExitCode.CouldntConnect, "Could not connect to server");
+        await clock.WhenTimersDueAsync(1000, 1);
+        for (int step = 0; step < 80 && !run.IsCompleted; step++)
+        {
+            clock.Advance(100);
+            await Task.Delay(5);
+        }
 
         int exitCode = await run;
         Diagnostics.Assert("exit code", 7, exitCode);
@@ -147,7 +153,7 @@ public sealed class Cgr109Tests
     /// A clock that moves only when <see cref="Advance" /> is called and then fires, on the caller's thread,
     /// every timer whose due time has come, so a <c>-m</c> limit passes exactly when the test says.
     /// </summary>
-    private sealed class TimerFiringClock : TimeProvider
+    internal sealed class TimerFiringClock : TimeProvider
     {
         private readonly List<FiringTimer> timers = [];
 

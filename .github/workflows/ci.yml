@@ -28,8 +28,49 @@ concurrency:
 # next work/dark-factory run (BL-3512: run 40206727905's jobs started up to 11 minutes late).
 # Each such job's if repeats the test, since a job's if cannot read workflow env. The audit
 # guard keeps its own if, under which it already skips that pull request.
+#
+# A push to master whose merge commit holds the very tree of one of its parents that a CI push
+# run already passed (the shift-end merge, an audit or gap merge that had master merged in)
+# runs none of those jobs either: tested-tree finds that run and every other job's if reads
+# its answer. Run in full, it only repeated that test while it took runners from the next
+# work/dark-factory run (BL-3512: master's run 40844580348 left run 40845247630 at 15m01s).
+# On every other push and pull request tested-tree is skipped and adds no wait.
 
 jobs:
+  tested-tree:
+    name: Tree already tested
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tested: ${{ steps.find.outputs.tested }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Find a passed CI push run on a parent with the same tree
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tree=$(git rev-parse 'HEAD^{tree}')
+          tested=false
+          for parent in $(git rev-list --parents -n 1 HEAD | cut -d' ' -f2-); do
+            [ "$(git rev-parse "$parent^{tree}")" = "$tree" ] || continue
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$parent&event=push&status=success" --jq '.total_count')
+            if [ "${passed:-0}" -gt 0 ]; then
+              echo "Tree $tree is $parent's, whose CI push run passed; skipping the build, test, pack and quality jobs."
+              tested=true
+              break
+            fi
+          done
+          [ "$tested" = true ] || echo "No parent with tree $tree has a passed CI push run; running every job."
+          echo "tested=$tested" >> "$GITHUB_OUTPUT"
+
   # Audit guard layer 3 (ADR-0267): fails when work/dark-factory, pushed or as a pull
   # request, carries a change of its own to Audit/, an auditor agent, or one of the guards
   # (the audit hook, .claude/settings.json, this workflow, task-board.ps1). Those reach
@@ -62,9 +103,69 @@ jobs:
           & $guard -Base origin/master -Head HEAD
           exit $LASTEXITCODE
 
+  # The guard files work on every platform (BL-3926, ADR-1015): each hook command in
+  # .claude/settings.json starts through sh and the audit guard hook refuses a lane, and the
+  # audit guard's own self-test passes.
+  guard-hooks:
+    name: Guard hooks (${{ matrix.os }})
+    needs: tested-tree
+    if: ${{ !cancelled() && needs.tested-tree.outputs.tested != 'true' && !startsWith(github.head_ref, 'factory/merge-') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hook commands start and the audit guard hook refuses a lane
+        shell: pwsh
+        run: ./Audit/Guard/Test-GuardHooks.ps1
+
+      - name: Audit guard self-test
+        shell: pwsh
+        run: ./Audit/Guard/Test-AuditPathsUntouched.ps1 -SelfTest
+
+  # The audit office's scripts work on every platform (BL-3927): every self-test of
+  # Audit/RunAudit.ps1, Audit/Tools and Audit/PlantedDefects, under Windows PowerShell on
+  # Windows and pwsh elsewhere, as RunAudit.cmd and RunAudit.sh run them.
+  audit-self-tests:
+    name: Audit self-tests (${{ matrix.os }})
+    needs: tested-tree
+    if: ${{ !cancelled() && needs.tested-tree.outputs.tested != 'true' && !startsWith(github.head_ref, 'factory/merge-') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Run every audit self-test
+        shell: pwsh
+        run: |
+          $exe = if ($IsWindows) { 'powershell' } else { 'pwsh' }
+          $failed = @()
+          foreach ($script in @(Get-Item Audit/RunAudit.ps1) + @(Get-ChildItem Audit/Tools/*.ps1, Audit/PlantedDefects/*.ps1)) {
+            if ((Get-Content -Raw $script.FullName) -notmatch '\[switch\]\$SelfTest') { continue }
+            Write-Host "::group::$($script.Name)"
+            & $exe -NoProfile -ExecutionPolicy Bypass -File $script.FullName -SelfTest
+            $code = $LASTEXITCODE
+            Write-Host '::endgroup::'
+            if ($code) { $failed += $script.Name; Write-Host "::error::$($script.Name) -SelfTest exited $code" }
+          }
+          if ($failed) { exit 1 }
+
   test:
     name: Build and test (${{ matrix.os }})
-    if: ${{ !startsWith(github.head_ref, 'factory/merge-') }}
+    needs: tested-tree
+    if: ${{ !cancelled() && needs.tested-tree.outputs.tested != 'true' && !startsWith(github.head_ref, 'factory/merge-') }}
     strategy:
       fail-fast: false
       matrix:
@@ -91,7 +192,8 @@ jobs:
   # .mcp/server.json. The packages are uploaded, never published.
   mcp-pack:
     name: Pack Curl.Mcp (${{ matrix.os }})
-    if: ${{ !startsWith(github.head_ref, 'factory/merge-') }}
+    needs: tested-tree
+    if: ${{ !cancelled() && needs.tested-tree.outputs.tested != 'true' && !startsWith(github.head_ref, 'factory/merge-') }}
     strategy:
       fail-fast: false
       matrix:
@@ -194,7 +296,8 @@ jobs:
   # count is the matrix below and -ShardCount; change both together.
   quality-shard:
     name: Quality gates shard ${{ matrix.shard }} of 3 (windows-latest)
-    if: ${{ !startsWith(github.head_ref, 'factory/merge-') }}
+    needs: tested-tree
+    if: ${{ !cancelled() && needs.tested-tree.outputs.tested != 'true' && !startsWith(github.head_ref, 'factory/merge-') }}
     strategy:
       fail-fast: false
       matrix:
@@ -234,8 +337,8 @@ jobs:
   # gate, with one ::error annotation per such member as the single job gave.
   quality:
     name: Quality gates (windows-latest)
-    needs: quality-shard
-    if: ${{ !cancelled() && !startsWith(github.head_ref, 'factory/merge-') }}
+    needs: [tested-tree, quality-shard]
+    if: ${{ !cancelled() && needs.tested-tree.outputs.tested != 'true' && !startsWith(github.head_ref, 'factory/merge-') }}
     runs-on: windows-latest
     timeout-minutes: 45
     env:

@@ -102,6 +102,35 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
             ? (CurlExitCode.SslCrlBadfile, TlsFailureMessages.OpenSslRevocationListFileUnusable(options.CertificateRevocationListFile!))
             : (CurlExitCode.SslCacertBadfile, CaCertificateFileUnusable());
 
+    /// <summary>
+    /// Verifies a chain apart from any handshake (ADR-1052): reads the trust anchors as a
+    /// handshake does and judges the chain with the <see cref="HandBuiltCertificateVerifier" />
+    /// the hand-built client hands its chain to, so <c>-k</c>, <c>--cacert</c>, <c>--capath</c>,
+    /// <c>--crlfile</c>, <c>--pinnedpubkey</c>, exit 60 and every message are the handshake's.
+    /// </summary>
+    /// <param name="certificates">The DER certificates the server sent, its own first.</param>
+    /// <param name="targetHost">The host the certificate is checked against.</param>
+    /// <returns>The verdict, with the exit code and message a handshake would fail with.</returns>
+    internal ServerCertificateChainVerdict VerifyChain(IReadOnlyList<ReadOnlyMemory<byte>> certificates, string targetHost)
+    {
+        ArgumentNullException.ThrowIfNull(certificates);
+        ArgumentNullException.ThrowIfNull(targetHost);
+        try
+        {
+            var (chainPolicy, anchorsBesideSystemStore, revocationLists) = ReadTrustAnchors();
+            var verdict = new HandBuiltCertificateVerifier(this, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost)
+                .Verify(new ServerCertificateChain([.. certificates.Select(der => der.ToArray())], targetHost, null));
+            return verdict.IsAccepted ? ServerCertificateChainVerdict.Accepted : Rejection(((CurlExitCode, string))verdict.Rejection!);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
+        {
+            return Rejection(TrustAnchorsUnusable(exception));
+        }
+    }
+
+    private static ServerCertificateChainVerdict Rejection((CurlExitCode ExitCode, string Message) failure) =>
+        ServerCertificateChainVerdict.Rejected(failure.ExitCode, failure.Message);
+
     private CertificateRevocationListFile? ReadRevocationLists() =>
         matchesSchannelBuild || options.CertificateRevocationListFile is null
             ? null

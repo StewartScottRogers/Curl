@@ -201,13 +201,39 @@ public static class CommandLineParser
     {
         ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
 
-        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable, actsAsQuicBuild, actsAsEchBuild, actsAsCAresBuild);
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable, actsAsQuicBuild, actsAsEchBuild, actsAsCAresBuild, []);
+    }
+
+    /// <summary>
+    /// Parses <paramref name="arguments"/> as the overload without <paramref name="extensionOptions"/> does, also
+    /// reading each of <paramref name="extensionOptions"/> where curl has no option of its name (ADR-1006). A host
+    /// passes none when extensions are off, so every such name is then refused as curl refuses an unknown option.
+    /// </summary>
+    /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
+    /// <param name="pathExists">Reports whether a path exists, as for the overload with <paramref name="pathExists"/>.</param>
+    /// <param name="passwordPrompt">Asks for a password, as for the overload with <paramref name="passwordPrompt"/>.</param>
+    /// <param name="dataFileReader">Reads <c>-d @file</c>, as for the overload with <paramref name="dataFileReader"/>.</param>
+    /// <param name="defaultConfigFileSearch">Where the default config file is looked for.</param>
+    /// <param name="isWindows">Whether to read the arguments as curl on Windows does.</param>
+    /// <param name="readEnvironmentVariable">Reads the run's environment.</param>
+    /// <param name="actsAsQuicBuild">Whether to read the arguments as a curl built with QUIC does.</param>
+    /// <param name="actsAsEchBuild">Whether to read the arguments as a curl built with ECH does.</param>
+    /// <param name="actsAsCAresBuild">Whether to read the arguments as a curl built with c-ares does.</param>
+    /// <param name="extensionOptions">The extensions' long options; no two share a name.</param>
+    /// <returns>As the overload without <paramref name="extensionOptions"/> returns.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild, bool actsAsCAresBuild, IReadOnlyList<CommandLineExtensionOption> extensionOptions)
+    {
+        ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
+        ArgumentNullException.ThrowIfNull(extensionOptions);
+
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable, actsAsQuicBuild, actsAsEchBuild, actsAsCAresBuild, extensionOptions);
     }
 
     private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows) =>
-        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileCandidates, isWindows, ProcessEnvironmentVariable, actsAsQuicBuild: false, actsAsEchBuild: false, actsAsCAresBuild: false);
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileCandidates, isWindows, ProcessEnvironmentVariable, actsAsQuicBuild: false, actsAsEchBuild: false, actsAsCAresBuild: false, extensionOptions: []);
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild, bool actsAsCAresBuild)
+    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild, bool actsAsCAresBuild, IReadOnlyList<CommandLineExtensionOption> extensionOptions)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(pathExists);
@@ -215,12 +241,7 @@ public static class CommandLineParser
         ArgumentNullException.ThrowIfNull(dataFileReader);
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
 
-        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows, ActsAsQuicBuild = actsAsQuicBuild, ActsAsEchBuild = actsAsEchBuild, ActsAsCAresBuild = actsAsCAresBuild, ReadEnvironmentVariable = readEnvironmentVariable };
-        if (isWindows)
-        {
-            options.ConfigFileWireTextEncoding = ConfigFileWireText.WindowsAnsiCodePage(() => System.Text.CodePagesEncodingProvider.Instance.GetEncoding(0));
-        }
-
+        CommandLineOptions options = CreateOptions(isWindows, readEnvironmentVariable, actsAsQuicBuild, actsAsEchBuild, actsAsCAresBuild, extensionOptions);
         if (!SkipsDefaultConfigFile(arguments))
         {
             ConfigFileApplier.ApplyDefaultFile(options, defaultConfigFileCandidates, pathExists, dataFileReader);
@@ -229,6 +250,18 @@ public static class CommandLineParser
         return arguments.Count == 0 && options.Urls.Count == 0
             ? CommandLineParseResult.RefusedEmpty(options)
             : ParseArguments(options, arguments, pathExists, passwordPrompt, dataFileReader);
+    }
+
+    /// <summary>Creates the options a parse starts from: the build it acts as, the run's environment and the extensions' options by name.</summary>
+    private static CommandLineOptions CreateOptions(bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild, bool actsAsCAresBuild, IReadOnlyList<CommandLineExtensionOption> extensionOptions)
+    {
+        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows, ActsAsQuicBuild = actsAsQuicBuild, ActsAsEchBuild = actsAsEchBuild, ActsAsCAresBuild = actsAsCAresBuild, ReadEnvironmentVariable = readEnvironmentVariable, ExtensionOptions = extensionOptions.ToDictionary(option => option.LongName, StringComparer.Ordinal) };
+        if (isWindows)
+        {
+            options.ConfigFileWireTextEncoding = ConfigFileWireText.WindowsAnsiCodePage(() => System.Text.CodePagesEncodingProvider.Instance.GetEncoding(0));
+        }
+
+        return options;
     }
 
     /// <summary>
@@ -385,9 +418,49 @@ public static class CommandLineParser
         string longName = equals >= 0 ? nameAndValue[..equals] : nameAndValue;
         string? attachedValue = equals >= 0 ? nameAndValue[(equals + 1)..] : null;
         options.FirstOptionOfArgument = true;
-        return CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option)
-            ? ApplyLong(options, option, argument, attachedValue, reader)
+        if (CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
+        {
+            return ApplyLong(options, option, argument, attachedValue, reader);
+        }
+
+        return options.ExtensionOptions.TryGetValue(longName, out CommandLineExtensionOption? extensionOption)
+            ? ApplyExtensionOption(options, extensionOption, argument, attachedValue, reader)
             : ParseUnlistedLong(options, argument, longName, attachedValue, reader);
+    }
+
+    /// <summary>
+    /// Records an extension's long option (ADR-1006) in <see cref="CommandLineOptions.ExtensionOptionValues"/>:
+    /// a flag as the empty string (any attached value ignored, as for curl's own flags), and an option that
+    /// takes a value with the attached value or else the next argument, refused as curl refuses a missing one.
+    /// </summary>
+    private static CommandLineRefusal? ApplyExtensionOption(CommandLineOptions options, CommandLineExtensionOption option, string argument, string? attachedValue, ArgumentReader reader)
+    {
+        if (!option.TakesValue)
+        {
+            options.SetExtensionOptionValue(option.LongName, string.Empty);
+            return null;
+        }
+
+        string? value = attachedValue ?? (reader.TryTakeNext(out string next) ? next : null);
+        if (value is null)
+        {
+            return CommandLineRefusal.RequiresParameter(argument);
+        }
+
+        options.SetExtensionOptionValue(option.LongName, value);
+        return null;
+    }
+
+    /// <summary>
+    /// Reports whether <paramref name="longName"/> (without its <c>--</c>) is the long name of one of curl's own
+    /// options, which an extension option may not take (ADR-1006).
+    /// </summary>
+    /// <param name="longName">The long name.</param>
+    /// <returns><see langword="true"/> when curl has an option of that name.</returns>
+    public static bool IsCurlLongOption(string longName)
+    {
+        ArgumentNullException.ThrowIfNull(longName);
+        return CommandLineOptionTable.TryFindLong(longName, out _);
     }
 
     /// <summary>

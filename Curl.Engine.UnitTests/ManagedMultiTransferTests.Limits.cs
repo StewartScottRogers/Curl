@@ -1,3 +1,4 @@
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Multi;
@@ -64,24 +65,28 @@ public sealed partial class ManagedMultiTransferTests
     public async Task PerformAsync_PendingTransfer_IsNotToldToTheSocketCallbackUntilItStarts()
     {
         await using ManagedCurlEngine engine = new();
-        await using IMultiTransfer multi = engine.CreateMulti();
-        List<IEasyTransfer> told = [];
+        await using SocketHoldingTransfer first = HoldingSocket(engine, 0x1001, UntilReadable, "http://a.example/");
+        await using SocketHoldingTransfer second = HoldingSocket(engine, 0x1002, UntilReadable, "http://a.example/");
+        await using ManagedMultiTransfer multi = (ManagedMultiTransfer)engine.CreateMulti();
+        List<(IEasyTransfer Easy, nint Socket)> told = [];
         multi.Options = new MultiOptions
         {
             MaxTotalConnections = 1,
-            Socket = (easy, _, what, _) => { told.Add(easy); return 0; },
+            Socket = (easy, socket, what, _) => { told.Add((easy, socket.Handle)); return 0; },
         };
-        ControlledEasyTransfer first = To("http://a.example/"), second = To("http://a.example/");
+
+        // The action lets the woken transfer run on to its end; a busy runner can take longer than the 200 ms default (BL-4050).
+        multi.SocketWaitSettleLimit = TimeSpan.FromSeconds(30);
         multi.Add(first);
         multi.Add(second);
 
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
         int toldWhileHeld = told.Count;
-        first.Finish(CurlCode.Ok);
+        await multi.SocketActionAsync(new CurlSocket(0x1001), CurlSocketSelect.In, CancellationToken.None);
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
         Assert.AreEqual(1, toldWhileHeld);
-        CollectionAssert.AreEqual(new IEasyTransfer[] { first, first, second }, told);
+        CollectionAssert.AreEqual(new (IEasyTransfer, nint)[] { (first, 0x1001), (first, 0x1001), (second, 0x1002) }, told, string.Join(" | ", told));
     }
 
     [TestMethod]
@@ -117,16 +122,21 @@ public sealed partial class ManagedMultiTransferTests
     public async Task GetWaitSockets_PipeWaitingTransferToARunningOneSOrigin_HoldsNoSocketOfItsOwnUnderMultiplex(CurlPipelining pipelining, bool pipeWait, HttpVersion version, string secondUrl, int expectedCount)
     {
         await using ManagedCurlEngine engine = new();
+        await using SocketHoldingTransfer first = HoldingSocket(engine, 0x1001, UntilCancelled, "http://h.example/", version, pipeWait);
+        await using SocketHoldingTransfer second = HoldingSocket(engine, 0x1002, UntilCancelled, secondUrl, version, pipeWait);
         await using IMultiTransfer multi = engine.CreateMulti();
         multi.Options = new MultiOptions { Pipelining = pipelining };
-        ControlledEasyTransfer first = PipeWaiting(To("http://h.example/", version), pipeWait), second = PipeWaiting(To(secondUrl, version), pipeWait);
         multi.Add(first);
         multi.Add(second);
         await multi.PerformAsync(CancellationToken.None);
+        await Task.WhenAll(first.SocketTaken.Task, second.SocketTaken.Task).WaitAsync(TimeSpan.FromSeconds(30));
+        CurlWaitSocket[] sockets = new CurlWaitSocket[3];
 
-        CurlMultiCode code = multi.GetWaitSockets(new CurlWaitSocket[3], out int count);
+        CurlMultiCode code = multi.GetWaitSockets(sockets, out int count);
 
         Assert.AreEqual((CurlMultiCode.Ok, expectedCount), (code, count));
+        Assert.AreEqual((nint)0x1001, sockets[0].Socket.Handle);
+        Assert.AreEqual(expectedCount == 3 ? 0x1002 : ManagedMultiTransfer.ResolverWakeupSocket, sockets[1].Socket.Handle);
     }
 
     [TestMethod]
@@ -359,10 +369,4 @@ public sealed partial class ManagedMultiTransferTests
             Http = new EasyHttpOptions { HttpVersion = version },
         },
     };
-
-    private static ControlledEasyTransfer PipeWaiting(ControlledEasyTransfer transfer, bool pipeWait)
-    {
-        transfer.Options = transfer.Options with { Http = transfer.Options.Http with { PipeWait = pipeWait } };
-        return transfer;
-    }
 }

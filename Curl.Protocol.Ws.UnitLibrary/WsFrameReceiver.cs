@@ -57,7 +57,7 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
 
     private readonly WsFrameTrace trace = trace ?? WsFrameTrace.Off;
 
-    private readonly WsFrameDecoder decoder = new(diagnosticLog, trace);
+    private readonly WsFrameDecoder decoder = new(new WsFrameDecodeReporter(diagnosticLog, trace));
 
     /// <summary>Decodes the same bytes into frame runs when each write's frame is shown, else <see langword="null" />.</summary>
     private readonly WsFrameMetadataDecoder? frames = performConnection is not null && !rawMode ? new WsFrameMetadataDecoder() : null;
@@ -167,7 +167,7 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
     /// them on undecoded, with no ping to answer and no violation to fail on.
     /// </summary>
     private WsDecodedBytes Decode(ReadOnlySpan<byte> bytes) =>
-        rawMode ? new WsDecodedBytes(bytes.ToArray(), LastPing: null, Failure: null) : decoder.Decode(bytes);
+        rawMode ? new WsDecodedBytes(bytes.ToArray(), LastPing: null, ViolationMessage: null) : decoder.Decode(bytes);
 
     /// <summary>
     /// Gives how many of the <paramref name="length" /> bytes just received stay under
@@ -191,9 +191,9 @@ internal sealed class WsFrameReceiver(IConnection connection, IWebSocketRandomSo
             BytesDelivered += decoded.Payload.Length;
         }
 
-        if (decoded.Failure is { } failure)
+        if (decoded.ViolationMessage is { } violation)
         {
-            throw failure;
+            throw new WsTransferException(CurlExitCode.RecvError, violation) { IsFrameViolation = true };
         }
 
         if (isCut)

@@ -71,6 +71,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 on Windows, PowerShell 7 elsewhere (BL-3927).
+$PowerShellExe = if ($PSVersionTable.PSVersion.Major -lt 6 -or $IsWindows) { 'powershell' } else { 'pwsh' }
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $Utf8 = New-Object Text.UTF8Encoding $false
 
@@ -297,7 +299,7 @@ function New-FindingTask($Finding, $Reopen, [string[]]$Earlier, [string]$BoardSc
     # Its evidence runs the audit office's process measurement, which a lane may not read (ADR-0761).
     if ($Finding.Auditor -eq 'process' -and -not "$($Finding.Key)".EndsWith(':cost-outlier')) { $newArgs += '-NoLane' }
     if ($WhatIf) { Write-Host "would file: $($newArgs -join ' ')"; return '' }
-    $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $BoardScript @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $out = (& $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File $BoardScript @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
     if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Error "task-board.ps1 new failed for $($Finding.Id): $out" -ErrorAction Continue; return 'failed' }
     $id = $Matches[1]
     Set-TaskBody (Join-Path $Root $Matches[2]) $Finding $Reopen $Earlier

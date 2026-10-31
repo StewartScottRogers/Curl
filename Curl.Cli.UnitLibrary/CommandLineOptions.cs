@@ -17,6 +17,7 @@ public sealed class CommandLineOptions
     private readonly List<string> urls = [];
     private readonly List<UrlOutput> urlOutputs = [];
     private readonly List<string> uploadFiles = [];
+    private readonly Dictionary<string, string> extensionOptionValues = new(StringComparer.Ordinal);
 
     private readonly List<bool> remoteNameAllAtEachUploadFile = [];
     private readonly List<string> telnetOptions = [];
@@ -210,7 +211,10 @@ public sealed class CommandLineOptions
     /// <see cref="HelpRequested"/>, <see cref="ManualRequested"/>, <see cref="EngineListRequested"/> or
     /// <see cref="CaEmbedDumpRequested"/>), which ends parsing where it stands.
     /// </summary>
-    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested || AiHelpRequested || EngineListRequested || CaEmbedDumpRequested;
+    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested || AiHelpRequested || ExtensionsRequested || BuildInformationRequested;
+
+    /// <summary>Whether <see cref="EngineListRequested"/> or <see cref="CaEmbedDumpRequested"/> asked for the TLS build's information.</summary>
+    private bool BuildInformationRequested => EngineListRequested || CaEmbedDumpRequested;
 
     /// <summary>
     /// <see langword="true"/> when <c>--ai-help</c> was given on the command line. Parsing stops there, as it
@@ -233,6 +237,13 @@ public sealed class CommandLineOptions
         AiHelpRequested = true;
         AiHelpSubject = subject.Length == 0 ? null : subject;
     }
+
+    /// <summary>
+    /// <see langword="true"/> when <c>--extensions</c>, Curl's own option (ADR-1008), was given on the command
+    /// line. Parsing stops there, as it does for <c>--help</c>; the console lists Curl's extensions and exits 0
+    /// instead of transferring. An <c>extensions</c> line in a <c>-K</c> file does not set it.
+    /// </summary>
+    public bool ExtensionsRequested { get => globals.ExtensionsRequested; internal set => globals.ExtensionsRequested = value; }
 
     /// <summary>Records <c>--help</c> and its subject, an empty one read as none.</summary>
     /// <param name="subject">The subject as given, empty when there was none.</param>
@@ -267,6 +278,7 @@ public sealed class CommandLineOptions
         ManualRequested = false;
         AiHelpRequested = false;
         AiHelpSubject = null;
+        ExtensionsRequested = false;
         EngineListRequested = false;
         CaEmbedDumpRequested = false;
     }
@@ -326,6 +338,18 @@ public sealed class CommandLineOptions
     /// This process's environment unless <see cref="CommandLineParser"/> is given the run's own reader (BL-1943).
     /// </summary>
     internal Func<string, string?> ReadEnvironmentVariable { get => globals.ReadEnvironmentVariable; set => globals.ReadEnvironmentVariable = value; }
+
+    /// <summary>The extensions' long options <see cref="CommandLineParser"/> reads beyond curl's own, by name (ADR-1006).</summary>
+    internal IReadOnlyDictionary<string, CommandLineExtensionOption> ExtensionOptions { get => globals.ExtensionOptions; set => globals.ExtensionOptions = value; }
+
+    /// <summary>
+    /// The value this group gave each extension option (<see cref="CommandLineExtensionOption"/>), by long name:
+    /// the last value given, or the empty string for a flag (ADR-1006).
+    /// </summary>
+    public IReadOnlyDictionary<string, string> ExtensionOptionValues => extensionOptionValues;
+
+    /// <summary>Records <paramref name="value"/> as this group's value of the extension option <paramref name="longName"/>, replacing an earlier one.</summary>
+    internal void SetExtensionOptionValue(string longName, string value) => extensionOptionValues[longName] = value;
 
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get => globals.Silent; internal set => globals.Silent = value; }

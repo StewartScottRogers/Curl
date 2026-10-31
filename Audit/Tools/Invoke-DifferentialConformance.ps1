@@ -48,9 +48,11 @@
     The generator's seed. Default 0.
 
 .PARAMETER Curl
-    The reference curl. Default: Git for Windows' curl, found as Record-CurlExchange.ps1 finds
-    it: ucrt64\bin\curl.exe first (Git 2.56.0 and later, curl 8.22.0), then mingw64\bin\curl.exe,
-    beside git.exe and then under Program Files\Git.
+    The reference curl. Default on Windows: Git for Windows' curl, found as
+    Record-CurlExchange.ps1 finds it: ucrt64\bin\curl.exe first (Git 2.56.0 and later, curl
+    8.22.0), then mingw64\bin\curl.exe, beside git.exe and then under Program Files\Git. Off
+    Windows: CURL_DIFFERENTIAL_REFERENCE (set by sourcing Set-DifferentialEnvironment.sh, the
+    OpenSSL build), else the first curl on PATH.
 
 .PARAMETER Candidate
     The executable under test. Default: Curl.Console of this repository, built first with
@@ -90,6 +92,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 on Windows, PowerShell 7 elsewhere (BL-3927).
+$OnWindows = $PSVersionTable.PSVersion.Major -lt 6 -or $IsWindows
+$PowerShellExe = if ($OnWindows) { 'powershell' } else { 'pwsh' }
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $record = Join-Path $repo 'Record-CurlExchange.ps1'
 
@@ -139,6 +144,14 @@ $Normalisations = @(
 
 function Get-ReferenceCurl {
     if ($Curl) { return (Resolve-Path $Curl).Path }
+    if (-not $OnWindows) {
+        # Off Windows the reference is the OpenSSL build: the one Set-DifferentialEnvironment.sh
+        # chose, else the first curl on PATH.
+        if ($env:CURL_DIFFERENTIAL_REFERENCE) { return $env:CURL_DIFFERENTIAL_REFERENCE }
+        $onPath = Get-Command curl -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($onPath) { return $onPath.Source }
+        throw 'The reference curl was not found; source Set-DifferentialEnvironment.sh or pass -Curl.'
+    }
     # Git for Windows 2.56.0 moved its curl from mingw64\bin to ucrt64\bin: try ucrt64 first,
     # then mingw64, beside git.exe and then under Program Files.
     $roots = @()
@@ -227,15 +240,15 @@ function New-RunFolder([string]$Folder) {
 }
 
 function Invoke-Recorded([string]$Command, [string]$Folder, [int]$Seconds) {
-    # Runs one Record-CurlExchange.ps1 command from $Folder in its own Windows PowerShell.
+    # Runs one Record-CurlExchange.ps1 command from $Folder in its own PowerShell process.
     New-RunFolder $Folder
     $script = Join-Path $Folder 'run.ps1'
     [IO.File]::WriteAllText($script, "Set-Location -LiteralPath $(ConvertTo-Quoted $Folder)`r`n$Command`r`n")
-    $p = Start-Process -FilePath 'powershell' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$script`"") `
+    $p = Start-Process -FilePath $PowerShellExe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$script`"") `
         -WorkingDirectory $Folder -NoNewWindow -PassThru -RedirectStandardOutput (Join-Path $Folder 'record.out') -RedirectStandardError (Join-Path $Folder 'record.err')
     $null = $p.Handle
     if (-not $p.WaitForExit($Seconds * 1000)) {
-        & taskkill /PID $p.Id /T /F 2>&1 | Out-Null
+        if ($OnWindows) { & taskkill /PID $p.Id /T /F 2>&1 | Out-Null } else { $p.Kill($true) }
         [IO.File]::WriteAllText((Join-Path $Folder 'exitcode.txt'), 'timeout')
     }
 }
@@ -296,7 +309,7 @@ if (-not $Candidate) {
     & dotnet build (Join-Path $repo 'Curl.Console') -c Release -nologo -v q 2>&1 | Out-Null
     $ErrorActionPreference = 'Stop'
     if ($LASTEXITCODE -ne 0) { throw 'dotnet build Curl.Console -c Release failed.' }
-    $Candidate = @(Get-ChildItem (Join-Path $repo 'Curl.Console\bin\Release') -Recurse -Filter 'curl.exe' | Sort-Object LastWriteTime -Descending)[0].FullName
+    $Candidate = @(Get-ChildItem (Join-Path $repo 'Curl.Console/bin/Release') -Recurse -File -Filter $(if ($OnWindows) { 'curl.exe' } else { 'curl' }) | Sort-Object LastWriteTime -Descending)[0].FullName
 }
 $Candidate = (Resolve-Path $Candidate).Path
 $candidateName = [IO.Path]::GetFileNameWithoutExtension($Candidate)

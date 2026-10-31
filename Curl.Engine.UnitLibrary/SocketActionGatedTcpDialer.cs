@@ -24,7 +24,7 @@ namespace Curl.Engine;
 /// <param name="wait">What the transfer waits for on its socket.</param>
 internal sealed class SocketActionGatedTcpDialer(ITcpDialer inner, TransferSocketWait wait) : ITcpDialer
 {
-    private readonly ITcpDialer dialer = inner.PublishingSocketsTo(wait.ConnectingOn);
+    private readonly ITcpDialer dialer = inner.HoldingFailedSocketsUntil(wait.HoldFailedConnectAsync).PublishingSocketsTo(wait.ConnectingOn);
 
     /// <summary>
     /// Gives <paramref name="dialer" /> gated on <paramref name="wait" />, or <paramref name="dialer" /> itself

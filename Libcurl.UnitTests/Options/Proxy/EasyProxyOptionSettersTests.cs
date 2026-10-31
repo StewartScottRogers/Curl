@@ -27,12 +27,13 @@ public sealed class EasyProxyOptionSettersTests
     }
 
     [TestMethod]
-    public void SetOption_Proxytype_TakesHttpToSocks5HostnameAndRefusesTheRest()
+    public void SetOption_Proxytype_TakesHttpToSocks5HostnameRefusesHttps3AsNotBuiltInAndTheRestAsBad()
     {
         Assert.AreEqual(ProxyType.Socks5Hostname, SetOk(new EasyOptions(), CurlOption.Proxytype, ProxyType.Socks5Hostname).Proxy.ProxyType);
         Assert.AreEqual(ProxyType.Http, SetOk(new EasyOptions(), CurlOption.Proxytype, 0L).Proxy.ProxyType);
         AssertRefused(CurlOption.Proxytype, -1L, CurlCode.BadFunctionArgument);
-        AssertRefused(CurlOption.Proxytype, 8L, CurlCode.BadFunctionArgument);
+        AssertRefused(CurlOption.Proxytype, 8L, CurlCode.NotBuiltIn);
+        AssertRefused(CurlOption.Proxytype, 9L, CurlCode.BadFunctionArgument);
     }
 
     [TestMethod]

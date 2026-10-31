@@ -12,7 +12,7 @@ public sealed class QuicClientConnectorTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task RunHandshakeAsync_InMemoryServer_Completes()
     {
         Diagnostics.Arrange("server", "in-memory QUIC server, no connect timeout");
@@ -23,7 +23,7 @@ public sealed class QuicClientConnectorTests
         QuicHandshakeFailure? failure;
         using (Diagnostics.Phase("handshake"))
         {
-            failure = await new QuicClientConnector(new ManualTimerTimeProvider()).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
+            failure = await new QuicClientConnector(new ManualTimerTimeProvider()).RunHandshakeAsync(handshake, channel, null, TestContext.CancellationToken);
         }
 
         Diagnostics.Act("failure", failure?.Message ?? "null");
@@ -41,7 +41,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task RunHandshakeAsync_SilentPeerAndNoConnectTimeout_ClosesWithInternalErrorAndExit55After10Seconds()
     {
         Diagnostics.Arrange("peer", "silent, no connect timeout; clock advances 9999 ms then 1 ms");
@@ -49,7 +49,7 @@ public sealed class QuicClientConnectorTests
         QuicTestChannel channel = new(null);
         using QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client(clock: clock);
 
-        Task<QuicHandshakeFailure?> run = new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
+        Task<QuicHandshakeFailure?> run = new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, TestContext.CancellationToken);
         clock.Advance(9999);
         Diagnostics.Assert("run completed after 9999 ms", false, run.IsCompleted);
         Assert.IsFalse(run.IsCompleted);
@@ -71,7 +71,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task RunHandshakeAsync_SilentPeer_ProbesTheInitialWithExponentialBackoff()
     {
         Diagnostics.Arrange("peer", "silent, no connect timeout; probe timeouts at 999, 1998 and 3996 ms after each wait");
@@ -80,7 +80,7 @@ public sealed class QuicClientConnectorTests
         using QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client(clock: clock);
         List<int> sentBeforeEachProbe = [];
 
-        Task<QuicHandshakeFailure?> run = new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
+        Task<QuicHandshakeFailure?> run = new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, TestContext.CancellationToken);
 
         // PTO = 333 + 4 x 166.5 = 999 ms before any RTT sample, doubling each time it fires (RFC 9002 section 6.2.1): at 999, 2997 and 6993 ms.
         using (Diagnostics.Phase("probes"))
@@ -117,7 +117,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task RunHandshakeAsync_SilentPeerAndConnectTimeout_ClosesWithNoErrorAndExit28()
     {
         Diagnostics.Arrange("peer", "silent; connect timeout 1 s; clock advances 1008 ms");
@@ -125,7 +125,7 @@ public sealed class QuicClientConnectorTests
         QuicTestChannel channel = new(null);
         using QuicClientConnectionState handshake = QuicClientConnectionStateTest.Client();
 
-        Task<QuicHandshakeFailure?> run = new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, TimeSpan.FromSeconds(1), CancellationToken.None);
+        Task<QuicHandshakeFailure?> run = new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, TimeSpan.FromSeconds(1), TestContext.CancellationToken);
         clock.Advance(1008);
         QuicHandshakeFailure? failure = await run;
 
@@ -142,7 +142,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task RunHandshakeAsync_VersionNegotiationWithoutVersion1_FailsWithExit7()
     {
         Diagnostics.Arrange("server", "answers with Version Negotiation listing only 0xff00001d");
@@ -153,7 +153,7 @@ public sealed class QuicClientConnectorTests
         QuicHandshakeFailure? failure;
         using (Diagnostics.Phase("handshake"))
         {
-            failure = await new QuicClientConnector(new ManualTimerTimeProvider()).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
+            failure = await new QuicClientConnector(new ManualTimerTimeProvider()).RunHandshakeAsync(handshake, channel, null, TestContext.CancellationToken);
         }
 
         Diagnostics.Act("failure", FormattableString.Invariant($"{failure?.ExitCode}: {failure?.Message}"));
@@ -164,7 +164,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task RunHandshakeAsync_DatagramFromAnotherEndpoint_IsIgnored()
     {
         Diagnostics.Arrange("stray datagram", "1200 zero bytes from 127.0.0.1:9, queued before the handshake");
@@ -176,7 +176,7 @@ public sealed class QuicClientConnectorTests
         QuicHandshakeFailure? failure;
         using (Diagnostics.Phase("handshake"))
         {
-            failure = await new QuicClientConnector(new ManualTimerTimeProvider()).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
+            failure = await new QuicClientConnector(new ManualTimerTimeProvider()).RunHandshakeAsync(handshake, channel, null, TestContext.CancellationToken);
         }
 
         Diagnostics.Act("failure", failure?.Message ?? "null");
@@ -185,7 +185,7 @@ public sealed class QuicClientConnectorTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task RunHandshakeAsync_CallerCancels_Throws()
     {
         Diagnostics.Arrange("cancellation token", "already cancelled");
@@ -197,10 +197,10 @@ public sealed class QuicClientConnectorTests
         TaskCanceledException cancelled = await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => connector.RunHandshakeAsync(handshake, new QuicTestChannel(null), null, cancellation.Token));
         Diagnostics.Act("cancelled run exception", cancelled.GetType().Name);
         Diagnostics.Assert("cancelled run exception", nameof(TaskCanceledException), cancelled.GetType().Name);
-        ArgumentNullException noHandshake = await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => connector.RunHandshakeAsync(null!, new QuicTestChannel(null), null, CancellationToken.None));
+        ArgumentNullException noHandshake = await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => connector.RunHandshakeAsync(null!, new QuicTestChannel(null), null, TestContext.CancellationToken));
         Diagnostics.Act("null handshake exception", FormattableString.Invariant($"{noHandshake.GetType().Name}: {noHandshake.ParamName}"));
         Diagnostics.Assert("null handshake exception", nameof(ArgumentNullException), noHandshake.GetType().Name);
-        ArgumentNullException noChannel = await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => connector.RunHandshakeAsync(handshake, null!, null, CancellationToken.None));
+        ArgumentNullException noChannel = await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => connector.RunHandshakeAsync(handshake, null!, null, TestContext.CancellationToken));
         Diagnostics.Act("null channel exception", FormattableString.Invariant($"{noChannel.GetType().Name}: {noChannel.ParamName}"));
         Diagnostics.Assert("null channel exception", nameof(ArgumentNullException), noChannel.GetType().Name);
     }

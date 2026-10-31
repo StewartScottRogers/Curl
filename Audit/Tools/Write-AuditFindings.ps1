@@ -143,6 +143,8 @@ $MechanicalOutcomes = @{}
 $TestOutcomes = @{}
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 on Windows, PowerShell 7 elsewhere (BL-3927).
+$PowerShellExe = if ($PSVersionTable.PSVersion.Major -lt 6 -or $IsWindows) { 'powershell' } else { 'pwsh' }
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 
 function ConvertTo-NameList([string[]]$Names) {
@@ -338,7 +340,7 @@ function Invoke-MechanicalReproduction($Target) {
     $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'Invoke-MutationTest.ps1'), '-Site', "$($site.File):$($site.Line):$($site.Operator)", '-Commit', $Commit, '-ExcludeBaselineFailures', '-TimeoutSeconds', '600', '-OutFile', $out)
     if ($member) { $arguments += @('-Member', $member) }
     $ErrorActionPreference = 'Continue'
-    & powershell @arguments *> $log
+    & $PowerShellExe @arguments *> $log
     $outcome = 'unverified'
     $raw = ''
     if (Test-Path -LiteralPath $out) {
@@ -804,14 +806,14 @@ if ($SelfTest) {
         $catchesJson = @((Get-Content -LiteralPath (Join-Path $ReportDirectory 'catches.json') -Raw | ConvertFrom-Json) | ForEach-Object { $_ })
         Check 'a planted-defect match is skipped and in catches.json' ($catchesJson.Count -eq 2 -and @($catchesJson | Where-Object { $_.planted -eq 'PD-101' }).Count -eq 2 -and -not ((Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -match 'FixedTimeEquals replaced')) "catches $($catchesJson.Count)"
         $af6 = Text 'AF-0006'
-        Check 'reproduces false from a reliable auditor closes it, blocked or not' ($af6 -match '(?m)^status: closed$' -and $af6 -match '(?m)^closed: 2026-10-14$' -and $af6 -match '(?m)^closed-by: 2026-10-14_0930.md$') 'AF-0006'
-        Check 'closing writes the reason and a last Log line' ($af6 -match '(?m)^reason: Re-audit 2026-10-14_0930.md: the reproduction no longer reproduces\.$' -and $af6 -match '(?s)reproduces: no \|[^\n]*\n\n## Log\n\n- 2026-10-01: filed proposed\.\n- 2026-10-02: proposed -> blocked\.[^\n]*\n- 2026-10-14: blocked -> closed\. Re-audit 2026-10-14_0930.md: the reproduction no longer reproduces\.\n$') 'AF-0006'
+        Check 'reproduces false from a reliable auditor closes it, blocked or not' ($af6 -match '(?m)^status: closed\r?$' -and $af6 -match '(?m)^closed: 2026-10-14\r?$' -and $af6 -match '(?m)^closed-by: 2026-10-14_0930.md\r?$') 'AF-0006'
+        Check 'closing writes the reason and a last Log line' ($af6 -match '(?m)^reason: Re-audit 2026-10-14_0930.md: the reproduction no longer reproduces\.\r?$' -and $af6 -match '(?s)reproduces: no \|[^\n]*\n\r?\n## Log\r?\n\r?\n- 2026-10-01: filed proposed\.\r?\n- 2026-10-02: proposed -> blocked\.[^\n]*\n- 2026-10-14: blocked -> closed\. Re-audit 2026-10-14_0930.md: the reproduction no longer reproduces\.\r?\n$') 'AF-0006'
         $af5 = Text 'AF-0005'
-        Check 'reproduces false from an unreliable auditor does not close it' ($af5 -match '(?m)^status: proposed$' -and $af5 -match 'reproduces: no') 'AF-0005'
+        Check 'reproduces false from an unreliable auditor does not close it' ($af5 -match '(?m)^status: proposed\r?$' -and $af5 -match 'reproduces: no') 'AF-0005'
         $af2 = Text 'AF-0002'
-        Check 'a finding whose task is Done, with no re-audit, stays open' ($af2 -ceq $before[(Split-Path (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-0002-*.md').FullName -Leaf)] -and $af2 -match '(?m)^status: accepted$') 'AF-0002 unchanged'
+        Check 'a finding whose task is Done, with no re-audit, stays open' ($af2 -ceq $before[(Split-Path (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-0002-*.md').FullName -Leaf)] -and $af2 -match '(?m)^status: accepted\r?$') 'AF-0002 unchanged'
         $af3 = Text 'AF-0003'
-        Check 'a rejected finding stays rejected and gains only a still-reported line' ($af3 -match '(?m)^status: rejected$' -and $af3 -match 'still reported') 'AF-0003'
+        Check 'a rejected finding stays rejected and gains only a still-reported line' ($af3 -match '(?m)^status: rejected\r?$' -and $af3 -match 'still reported') 'AF-0003'
         $af4 = Text 'AF-0004'
         $af8 = Text 'AF-0008'
         Check 'a key matching a closed finding files a new one naming it' ($af4 -ceq $before[(Split-Path (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-0004-*.md').FullName -Leaf)] -and $af8 -match 'Reappeared; previously AF-0004') 'AF-0008'

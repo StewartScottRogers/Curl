@@ -239,7 +239,8 @@ in "Git and GitHub"). A lane that meets an audit path stops and leaves it to an 
 session.
 
 Run an audit with `Audit\RunAudit.cmd -NewTab` (in herdr, like the factory; never with
-`Start-Process`). `-Auditors` picks some of the five (and warns about any left out that have
+`Start-Process`); on Linux and macOS, with `Audit/RunAudit.sh -NewTab` (PowerShell 7, `pwsh`,
+required; same arguments, BL-3927). `-Auditors` picks some of the five (and warns about any left out that have
 accepted findings, which go un-re-audited), `-Planted` the defect count (default
 8), `-Ref` the commit (default `origin/work/dark-factory`), `-DryRun` prints the plan. It
 refuses inside a factory process and while a shift runs; `-AlongsideShift` runs it anyway,
@@ -279,7 +280,9 @@ Seven read-only analysts group each area's gaps by cause: `gap-behaviour` (Opus)
 `gap-options` and `gap-environment` (Sonnet), `gap-protocols`, `gap-features`,
 `gap-writeout` and `gap-exitcodes` (Haiku).
 
-Run it with `Gap\RunGapAnalysis.cmd -NewTab` (in herdr; never with `Start-Process`).
+Run it with `Gap\RunGapAnalysis.cmd -NewTab` (in herdr; never with `Start-Process`), or on
+Linux and macOS with `Gap/RunGapAnalysis.sh -NewTab` (PowerShell 7, `pwsh`, required; same
+arguments), which measures its own platform locally and leaves windows to a Windows run (BL-3928).
 Findings are `Gap/Findings/GF-####-*.md` on the `gap` branch, and close only when a later
 run re-measures every item as `match` (or `excluded` with a reason), never because a task reached Done. Claude files
 their tasks without asking (`Gap/Triage.md`); Stewart may reject any finding. The weekly
@@ -307,7 +310,8 @@ Curl/
 ```
 
 ### Project naming
-- Production library: `Curl.<Area>.UnitLibrary`, protocols `Curl.Protocol.<Name>.UnitLibrary`.
+- Production library: `Curl.<Area>.UnitLibrary`, protocols `Curl.Protocol.<Name>.UnitLibrary`,
+  extensions `Curl.Extension.<Name>.UnitLibrary` (see "Extensions" below).
 - Tests: the same name with `.UnitTests` instead of `.UnitLibrary`.
 - Integration tests, once an area has any: the same name with `.IntegrationTests`
   instead of `.UnitLibrary` (ADR-0421).
@@ -339,6 +343,8 @@ under one folder for its group (ADR-0731):
   in `/Protocols/Abstractions/`.
 - `/Conformance/<Part>/`: each `Curl.Conformance.<Part>.*`, and the harness itself
   (`Curl.Conformance.UnitLibrary` and `.UnitTests`) in `/Conformance/Harness/`.
+- `/Extensions/<Name>/`: each `Curl.Extension.<Name>.*`, with the registry in
+  `/Extensions/Composition/`.
 - `/Shared/`: the shared projects (Audit, Claude, Documentation, Gap, Tasks).
 
 A new area goes in the group it belongs to, in a folder named for the area. Solution
@@ -347,6 +353,26 @@ directories on disk stay flat. The `Solution Items` and `Scripts` solution folde
 loose files only.
 
 Each project folder may contain its own `CLAUDE.md` with project-specific rules; follow it when working in that folder.
+
+### Extensions
+What Curl adds beyond upstream curl - a scheme or feature curl does not have - is an
+*extension*, kept apart from curl's own protocols (ADR-0999):
+
+- Each is `Curl.Extension.<Name>.UnitLibrary` with its `.UnitTests`, registered by one line in
+  `Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs` (a shared list file).
+- It joins the solution with exactly one line in `Curl.slnx`, directly under the marker comment in the
+  Extensions section: a single-line `<Folder Name="/Extensions/<Name>/">` holding both `<Project/>`
+  elements (`merge=union`, ADR-1003). Composition references every extension by wildcard, so no csproj
+  is edited and `Curl.slnx` and that csproj need not be in the task's `touches`.
+- Only the hosts (`Curl.Console`, `Curl.Api`, `Curl.Mcp`) and the extensions reference an
+  extension. An extension references `Curl.Protocol.Abstractions` and the shared layers, never a
+  `Curl.Protocol.*` library and never another extension but `Curl.Extension.Abstractions`.
+  `VerifyExtensionIsolation` in `Directory.Build.props` fails the build otherwise.
+- An extension never changes what curl does: it adds a scheme or option curl refuses, is put after
+  curl's handlers (a clash fails composition), leaves `curl -V` and `Libcurl` alone, and
+  `CURL_EXTENSIONS=0` turns every extension off.
+- It is tested against its specification, not against curl; the gap office and conformance audits
+  leave it out. The four quality gates apply.
 
 ## Solution-wide conventions
 - **Say what it does, do what it says.** Every name - project, file, type, member,

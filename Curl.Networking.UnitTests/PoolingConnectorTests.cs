@@ -23,6 +23,19 @@ public sealed class PoolingConnectorTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
+    public async Task HttpOverTlsApplicationProtocols_IsTheInnerConnectorsList()
+    {
+        var inner = new H2OfferingConnector();
+        await using var pool = new PoolingConnector(inner, _time);
+
+        var protocols = pool.HttpOverTlsApplicationProtocols;
+
+        Diagnostics.Act("protocols", string.Join(",", protocols));
+        Diagnostics.Assert("protocols", "h2,http/1.1", string.Join(",", protocols));
+        Assert.AreSame(HttpApplicationProtocols.H2ThenHttp11, protocols);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WithNullTarget_ThrowsArgumentNullException()
     {
         await using var pool = CreatePool();
@@ -1083,4 +1096,12 @@ public sealed class PoolingConnectorTests
     }
 
     private PoolingConnector CreatePool() => new(_inner, _time);
+
+    private sealed class H2OfferingConnector : IConnector
+    {
+        public IReadOnlyList<string> HttpOverTlsApplicationProtocols => HttpApplicationProtocols.H2ThenHttp11;
+
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+    }
 }

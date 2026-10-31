@@ -14,6 +14,9 @@ internal static class EasyProxyOptionSetters
     /// <summary>The largest port <c>CURLOPT_PROXYPORT</c> takes.</summary>
     private const long MostPort = 65535;
 
+    /// <summary><c>CURLPROXY_HTTPS3</c>: an HTTPS proxy over HTTP/3, which a build without <c>USE_PROXY_HTTP3</c> refuses.</summary>
+    private const long HttpsThreeProxyType = 8;
+
     /// <summary>Adds the proxy rows to <paramref name="setters"/>.</summary>
     /// <param name="setters">The rows to add to.</param>
     internal static void AddTo(Dictionary<CurlOption, EasyOptionSetter> setters)
@@ -67,10 +70,15 @@ internal static class EasyProxyOptionSetters
         return port is < 0 or > MostPort ? CurlCode.BadFunctionArgument : Set(ref options, p => p with { ProxyPort = (int)port });
     }
 
-    /// <summary><c>CURLOPT_PROXYTYPE</c>: <c>CURLPROXY_HTTP</c> to <c>CURLPROXY_SOCKS5_HOSTNAME</c>; any other value is <see cref="CurlCode.BadFunctionArgument"/>.</summary>
+    /// <summary><c>CURLOPT_PROXYTYPE</c>: <c>CURLPROXY_HTTP</c> to <c>CURLPROXY_SOCKS5_HOSTNAME</c>; <c>CURLPROXY_HTTPS3</c> (8) is <see cref="CurlCode.NotBuiltIn"/>, Curl having no HTTP/3 proxy (ADR-0995), and any other value <see cref="CurlCode.BadFunctionArgument"/>.</summary>
     private static CurlCode SetProxyType(ref EasyOptions options, object? value)
     {
         var type = NumberOf(value);
+        if (type == HttpsThreeProxyType)
+        {
+            return CurlCode.NotBuiltIn;
+        }
+
         return type is < (long)ProxyType.Http or > (long)ProxyType.Socks5Hostname
             ? CurlCode.BadFunctionArgument
             : Set(ref options, p => p with { ProxyType = (ProxyType)type });

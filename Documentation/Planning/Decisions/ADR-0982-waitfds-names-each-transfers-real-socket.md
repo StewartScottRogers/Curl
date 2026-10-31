@@ -1,6 +1,7 @@
 # ADR-0982: curl_multi_waitfds names each transfer's real socket, with or without a socket callback
 
-Status: Accepted. Decided by Claude under Stewart's delegation (BL-4037, for CGR-034).
+Status: Accepted. Decided by Claude under Stewart's delegation (BL-4037, for CGR-034). Its point on a transfer
+with no dialled socket is replaced in part by ADR-0997: `FirstTransferSocket` is gone.
 
 ## Context
 
@@ -18,8 +19,9 @@ ADR-0955); without one it had no wait, so the engine knew no socket to report.
   socket actions, the timer and the settle loop never see it.
 - `GetWaitSockets` names that recorded socket (the operating system socket, or ADR-0955's engine number for a
   connection with none) with or without a socket callback, and a socket callback set later is told the same
-  socket. Until the dial has a socket, and for a transfer that is not a `ManagedEasyTransfer`, it keeps the
-  `FirstTransferSocket` number.
+  socket. (Replaced in part by ADR-0997.) Until the dial has a socket, and for a transfer that is not a
+  `ManagedEasyTransfer`, the transfer is now told no socket and left out of `GetWaitSockets` (ADR-0997), where
+  this ADR first kept a synthetic number from `FirstTransferSocket` for it.
 
 ## Consequences
 

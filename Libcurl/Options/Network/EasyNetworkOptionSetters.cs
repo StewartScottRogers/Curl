@@ -29,6 +29,19 @@ internal static class EasyNetworkOptionSetters
         "rtmpte", "rtmps", "rtmpts", "gopher", "smb", "smbs", "mqtt", "gophers", "ws", "wss",
     ];
 
+    /// <summary>
+    /// Whether this build takes c-aresx27s <c>CURLOPT_DNS_SERVERS</c>, <c>_INTERFACE</c>, <c>_LOCAL_IP4</c> and <c>_LOCAL_IP6</c>: on
+    /// everywhere, Curlx27s own resolver taking them where the platformx27s threaded-resolver curl answers
+    /// <see cref="CurlCode.UnknownOption"/>, as <c>setopt.c</c> does without <c>USE_RESOLV_ARES</c> (ADR-0995).
+    /// </summary>
+    internal static bool AresIsBuiltIn { get; set; } = true;
+
+    /// <summary>
+    /// Whether this platform's curl takes <c>CURLOPT_TCP_FASTOPEN</c>: Windows has none of <c>CONNECT_DATA_IDEMPOTENT</c>,
+    /// <c>MSG_FASTOPEN</c> or <c>TCP_FASTOPEN_CONNECT</c> and answers <see cref="CurlCode.NotBuiltIn"/> (ADR-0995).
+    /// </summary>
+    internal static bool TcpFastOpenIsBuiltIn { get; set; } = !OperatingSystem.IsWindows();
+
     /// <summary>Adds the network rows to <paramref name="setters"/>.</summary>
     /// <param name="setters">The rows to add to.</param>
     internal static void AddTo(Dictionary<CurlOption, EasyOptionSetter> setters)
@@ -165,13 +178,17 @@ internal static class EasyNetworkOptionSetters
     /// <summary><c>CURLOPT_DNS_USE_GLOBAL_CACHE</c>: deprecated, and ignored with <see cref="CurlCode.Ok"/>, as libcurl does.</summary>
     private static CurlCode IgnoreDnsUseGlobalCache(ref EasyOptions o, object? v) => CurlCode.Ok;
 
-    private static CurlCode SetDnsServers(ref EasyOptions o, object? v) => Set(ref o, n => n with { DnsServers = (string?)v });
+    /// <summary><c>CURLOPT_DNS_SERVERS</c>: the servers, or <see cref="CurlCode.UnknownOption"/> where <see cref="AresIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetDnsServers(ref EasyOptions o, object? v) => !AresIsBuiltIn ? CurlCode.UnknownOption : Set(ref o, n => n with { DnsServers = (string?)v });
 
-    private static CurlCode SetDnsInterface(ref EasyOptions o, object? v) => Set(ref o, n => n with { DnsInterface = (string?)v });
+    /// <summary><c>CURLOPT_DNS_INTERFACE</c>: the interface, or <see cref="CurlCode.UnknownOption"/> where <see cref="AresIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetDnsInterface(ref EasyOptions o, object? v) => !AresIsBuiltIn ? CurlCode.UnknownOption : Set(ref o, n => n with { DnsInterface = (string?)v });
 
-    private static CurlCode SetDnsLocalIPv4(ref EasyOptions o, object? v) => Set(ref o, n => n with { DnsLocalIPv4 = (string?)v });
+    /// <summary><c>CURLOPT_DNS_LOCAL_IP4</c>: the address, or <see cref="CurlCode.UnknownOption"/> where <see cref="AresIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetDnsLocalIPv4(ref EasyOptions o, object? v) => !AresIsBuiltIn ? CurlCode.UnknownOption : Set(ref o, n => n with { DnsLocalIPv4 = (string?)v });
 
-    private static CurlCode SetDnsLocalIPv6(ref EasyOptions o, object? v) => Set(ref o, n => n with { DnsLocalIPv6 = (string?)v });
+    /// <summary><c>CURLOPT_DNS_LOCAL_IP6</c>: the address, or <see cref="CurlCode.UnknownOption"/> where <see cref="AresIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetDnsLocalIPv6(ref EasyOptions o, object? v) => !AresIsBuiltIn ? CurlCode.UnknownOption : Set(ref o, n => n with { DnsLocalIPv6 = (string?)v });
 
     private static CurlCode SetDnsShuffleAddresses(ref EasyOptions o, object? v) => Set(ref o, n => n with { DnsShuffleAddresses = IsOn(v) });
 
@@ -182,7 +199,8 @@ internal static class EasyNetworkOptionSetters
 
     private static CurlCode SetTcpNoDelay(ref EasyOptions o, object? v) => Set(ref o, n => n with { TcpNoDelay = IsOn(v) });
 
-    private static CurlCode SetTcpFastOpen(ref EasyOptions o, object? v) => Set(ref o, n => n with { TcpFastOpen = IsOn(v) });
+    /// <summary><c>CURLOPT_TCP_FASTOPEN</c>: on for non-zero, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="TcpFastOpenIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetTcpFastOpen(ref EasyOptions o, object? v) => !TcpFastOpenIsBuiltIn ? CurlCode.NotBuiltIn : Set(ref o, n => n with { TcpFastOpen = IsOn(v) });
 
     private static CurlCode SetTcpKeepAlive(ref EasyOptions o, object? v) => Set(ref o, n => n with { TcpKeepAlive = IsOn(v) });
 

@@ -131,10 +131,9 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_KeptAliveOverUnixSocket_ReportsTheLowerCasedSocketPathAndPort0LeftIntact()
+    public async Task ExecuteAsync_KeptAliveOverUnixSocket_ReportsTheUrlHostAndPortLeftIntact()
     {
-        // curl 8.21.0 -v --unix-socket "C:\Users\Public\BL794 Sock.sock" http://Example.COM:8080/x
-        // ends "Connection #0 to host c:\users\public\bl794 sock.sock:0 left intact" (BL-794 Notes).
+        // curl 8.22.0 -v --unix-socket and --connect-to end "Connection #0 to host <URL host>:<port> left intact" (BL-3741, CGR-212).
         foreach (int chunkSize in ChunkSizes)
         {
             ScriptedConnection connection = Connection("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\n\r\nhi", chunkSize);
@@ -149,7 +148,7 @@ public sealed partial class HttpProtocolHandlerTests
             WriteEvents("info lines", events.Info);
             Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
-            string[] expectedInfo = InfoLines(AssumeClose + "|" + Http10KeepAlive, @"Connection #0 to host c:\users\public\bl794 sock-z.sock:0 left intact");
+            string[] expectedInfo = InfoLines(AssumeClose + "|" + Http10KeepAlive, "Connection #0 to host 127.0.0.1:18977 left intact");
             WriteExpectedLines("info lines", expectedInfo, events.Info);
             CollectionAssert.AreEqual(
                 expectedInfo,

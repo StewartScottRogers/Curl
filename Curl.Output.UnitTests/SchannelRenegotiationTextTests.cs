@@ -31,6 +31,88 @@ public sealed class SchannelRenegotiationTextTests
         CollectionAssert.AreEqual(MeasuredLines, actual);
     }
 
+    // Measured: curl 8.22.0 (mingw, Schannel) -v --cacert against openssl s_server -WWW (BL-4067).
+    [TestMethod]
+    public void Lines_TicketAfterCaFileHandshake_ReturnsStoreCacheAndHostNameLinesInside()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        TlsHandshakeEvent handshake = new()
+        {
+            ProtocolVersion = System.Security.Authentication.SslProtocols.Tls13,
+            CipherSuite = null,
+            NegotiatedApplicationProtocol = null,
+            OfferedApplicationProtocols = [],
+            ServerCertificate = null,
+            CertificateVerified = true,
+            VerifiedHostName = "localhost",
+            CaCertificateFile = "srv.crt",
+        };
+        TlsMessageEvent message = Ticket() with { RenegotiatedHandshake = handshake };
+        string[] expected =
+        [
+            "schannel: remote party requests renegotiation",
+            "schannel: renegotiating SSL/TLS connection",
+            "schannel: reusing certificate store from cache",
+            "schannel: connection hostname (localhost) validated against certificate name (localhost)",
+            "schannel: SSL/TLS connection renegotiated",
+        ];
+        diagnostics.Arrange("message", Describe(message));
+
+        string[] actual = SchannelRenegotiationText.Lines(message).ToArray();
+
+        ReportLines(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
+    public void Lines_TicketAfterSystemStoreHandshake_ReturnsTheThreeRenegotiationLines()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        TlsHandshakeEvent handshake = new()
+        {
+            ProtocolVersion = System.Security.Authentication.SslProtocols.Tls13,
+            CipherSuite = null,
+            NegotiatedApplicationProtocol = null,
+            OfferedApplicationProtocols = [],
+            ServerCertificate = null,
+            CertificateVerified = true,
+        };
+        TlsMessageEvent message = Ticket() with { RenegotiatedHandshake = handshake };
+        diagnostics.Arrange("message", Describe(message));
+
+        string[] actual = SchannelRenegotiationText.Lines(message).ToArray();
+
+        ReportLines(diagnostics, MeasuredLines, actual);
+        CollectionAssert.AreEqual(MeasuredLines, actual);
+    }
+
+    [TestMethod]
+    public void Lines_ReceivedCloseNotify_ReturnsTheCloseNotificationLine()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        TlsMessageEvent message = Ticket() with { ContentType = TlsContentType.Alert, Bytes = new byte[] { 1, 0 } };
+        string[] expected = ["schannel: server close notification received (close_notify)"];
+        diagnostics.Arrange("message", Describe(message));
+
+        string[] actual = SchannelRenegotiationText.Lines(message).ToArray();
+
+        ReportLines(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
+    public void Lines_ReceivedOtherAlert_ReturnsNone()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        TlsMessageEvent message = Ticket() with { ContentType = TlsContentType.Alert, Bytes = new byte[] { 2, 40 } };
+        diagnostics.Arrange("message", Describe(message));
+
+        int count = SchannelRenegotiationText.Lines(message).Count;
+
+        ReportCount(diagnostics, count);
+        Assert.AreEqual(0, count);
+    }
+
     [TestMethod]
     public void Lines_SentHandshakeMessage_ReturnsNone()
     {

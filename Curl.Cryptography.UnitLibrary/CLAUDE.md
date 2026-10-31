@@ -46,6 +46,14 @@ Namespace `Curl.Cryptography`. It holds:
   internal `Initialize`, `Absorb` and `Finish` steps the AEAD drives.
 - `AeadChaCha20Poly1305` (public, `IDisposable`): AEAD_CHACHA20_POLY1305 - `Encrypt` and
   `TryDecrypt`, which returns `false` with the plaintext zeroed on a wrong tag.
+- `HChaCha20` (public, static): draft-irtf-cfrg-xchacha-03's subkey derivation -
+  `DeriveSubkey` from a key and a 16-byte nonce.
+- `AeadXChaCha20Poly1305` (public, `IDisposable`): AEAD_XCHACHA20_POLY1305, a 24-byte
+  nonce - `Encrypt` and `TryDecrypt`, on `HChaCha20` and `AeadChaCha20Poly1305`.
+- `Blake2s` (public, `IDisposable`): RFC 7693, keyed (up to 32 bytes) or unkeyed, digest
+  of 1 to 32 bytes - static `HashData`, and `AppendData` and `GetHashAndReset`.
+- `HmacBlake2s` (public, static): RFC 2104's HMAC over 32-byte `Blake2s`, block size 64 -
+  `HashData`. WireGuard's HMAC and HKDF.
 - `BlowfishPiDigits` (internal): Blowfish's initial P-array and S-boxes, the hexadecimal
   digits of pi.
 - `BlowfishState` (internal): the P-array and S-boxes, the 16 rounds, and OpenBSD's two

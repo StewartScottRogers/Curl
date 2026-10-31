@@ -22,7 +22,7 @@ public sealed class CurlTransferToolIntegrationTests
         listener.Start();
         int port = ((IPEndPoint)listener.LocalEndpoint).Port;
         Task<string> served = LoopbackHttpResponder.ServeOneResponseAsync(listener, "HTTP/1.1 201 Created\r\nContent-Type: text/plain\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello");
-        IMcpTool tool = CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, new McpResponseCap(McpResponseCap.DefaultMaxBytes)).FindTool("transfer")!;
+        IMcpTool tool = CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, new McpResponseCap(McpResponseCap.DefaultMaxBytes), _ => null, _ => []).FindTool("transfer")!;
 
         using JsonDocument arguments = JsonDocument.Parse($$"""{"url":"http://127.0.0.1:{{port}}/item","headers":[{"name":"X-Test","value":"yes"}]}""");
         McpToolCallResult result = await tool.CallAsync(arguments.RootElement, CancellationToken.None);

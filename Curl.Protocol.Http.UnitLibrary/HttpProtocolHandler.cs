@@ -1083,6 +1083,11 @@ public sealed class HttpProtocolHandler(
         IConnection connection,
         TransferReport? earlier)
     {
+        if (RefusesAbsoluteFormHost(plan))
+        {
+            return AbsoluteFormTargetUnbuilt(plan, connect);
+        }
+
         if (HttpTimeConditionLimit.Refuses(plan.Context.TimeCondition, OperatingSystem.IsWindows()))
         {
             connection.MarkReusable();
@@ -1250,6 +1255,48 @@ public sealed class HttpProtocolHandler(
     /// (<see cref="HttpTimeConditionLimit" />): exit 43 before any byte is sent, the connection
     /// left intact, as measured (BL-381 Notes).
     /// </summary>
+    /// <summary>
+    /// Tells whether the request goes to a forward proxy in absolute form for a host whose wire
+    /// form (<see cref="HttpUrlText.WireHost" />) curl cannot put in that target
+    /// (<see cref="RefusesAbsoluteFormHost(string)" />).
+    /// </summary>
+    private static bool RefusesAbsoluteFormHost(HttpRequestPlan plan) =>
+        plan.ForwardProxy is not null && RefusesAbsoluteFormHost(HttpUrlText.WireHost(plan.Context.Url));
+
+    /// <summary>
+    /// Tells whether <paramref name="wireHost" /> holds a character curl's
+    /// <c>curl_url_set(CURLUPART_HOST)</c> refuses (<see cref="HostCharactersUrlSetRefuses" />), as a
+    /// UTS 46 mapping can leave one (<c>a℀b.test</c> is <c>aa/cb.test</c>, BL-4081). An IPv6
+    /// literal, the only host with a <c>:</c>, is never refused: curl parses it apart, zone and all.
+    /// </summary>
+    internal static bool RefusesAbsoluteFormHost(string wireHost) =>
+        !wireHost.Contains(':', StringComparison.Ordinal) && wireHost.AsSpan().ContainsAny(HostCharactersUrlSetRefuses);
+
+    /// <summary>
+    /// The characters curl 8.18.0's <c>hostname_check</c> refuses in a host given to
+    /// <c>curl_url_set(CURLUPART_HOST)</c>.
+    /// </summary>
+    private static readonly System.Buffers.SearchValues<char> HostCharactersUrlSetRefuses =
+        System.Buffers.SearchValues.Create(" \r\n\t/:#?!@{}[]\\$'\"^`*<>=;,+&()%");
+
+    /// <summary>
+    /// Fails a request whose absolute-form target curl cannot build
+    /// (<see cref="RefusesAbsoluteFormHost(HttpRequestPlan)" />) as curl 8.18.0 does once the proxy connection is
+    /// open: <c>curl_url_set</c> fails, <c>http_target</c> answers <c>CURLE_OUT_OF_MEMORY</c> (exit 27,
+    /// <c>Out of memory</c>) and no byte reaches the proxy (measured with libidn2 2.3.8, BL-4077).
+    /// </summary>
+    private static HttpAttemptOutcome AbsoluteFormTargetUnbuilt(HttpRequestPlan plan, ConnectResult connect)
+    {
+        TransferReport report = new()
+        {
+            UsedProxy = true,
+            LocalEndPoint = connect.LocalEndPoint,
+            Timings = new TransferTimings(plan.Started, connect.Timings, null, null, null, plan.Context.TimeProvider.GetTimestamp()),
+        };
+        TransferResult failed = TransferResult.Failure(CurlExitCode.OutOfMemory, "Out of memory") with { Report = report };
+        return new HttpAttemptOutcome(failed, null, KeepsAlive: false);
+    }
+
     private static HttpAttemptOutcome TimeValueRefused(HttpRequestPlan plan, ConnectResult connect)
     {
         TransferReport report = new()
@@ -1307,18 +1354,14 @@ public sealed class HttpProtocolHandler(
         exitCode is not (CurlExitCode.Ok or CurlExitCode.GotNothing);
 
     /// <summary>
-    /// Names a connection left intact by its Unix domain socket, else by the <c>--connect-to</c>
-    /// destination the connector reports it dialled, else by the alt-svc alternative it was
-    /// dialled to, else by the target's host and port: curl 8.21.0 names the host it connected
-    /// to, not the origin (BL-623 case 1, BL-900, BL-975), except through a CONNECT tunnel or a
-    /// SOCKS proxy, where it names the origin, not the proxy (BL-1074).
+    /// Names a connection left intact by the alt-svc alternative it was dialled to, else by the
+    /// target's host and port: curl 8.22.0 names the URL's host and port even when <c>--connect-to</c>
+    /// or <c>--unix-socket</c> dialled elsewhere (measured, BL-3741, CGR-212).
     /// </summary>
     private static string LeftIntactLine(ConnectTarget target, ConnectResult connect) =>
-        (connect.UnixSocketPath, connect.MappedHost, target.AltSvcRoute) switch
+        target.AltSvcRoute switch
         {
-            ({ } socketPath, _, _) => HttpConnectionInfoLines.LeftIntactOverUnixSocket(connect.ConnectionNumber, socketPath),
-            (null, { } mappedHost, _) => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, mappedHost, connect.MappedPort),
-            (null, null, { Alternative: var alternative }) => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, alternative.Host, alternative.Port),
+            { Alternative: var alternative } => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, alternative.Host, alternative.Port),
             _ => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, target.Host, target.Port),
         };
 
@@ -1799,6 +1842,7 @@ public sealed class HttpProtocolHandler(
             plan.Context.DiagnosticLog,
             TracesStreamsOf(streams) ? plan.Context.Events : null);
         (stream as Http2StreamConnection)?.PushSink = Http2PushSink;
+        (stream as Http2StreamConnection)?.ReceiveBytesPerSecond = plan.Options.ReceiveBytesPerSecond;
         return stream;
     }
 

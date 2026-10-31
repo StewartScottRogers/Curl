@@ -50,7 +50,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     /// is read whole; <c>DATA</c> of any length streams through <see cref="dataBuffer" />
     /// (ADR-0172, BL-838).
     /// </summary>
-    internal const long MaximumFramePayloadLength = 16 * 1024 * 1024;
+    internal const long MaximumFramePayloadLength = Http3ClientRequestStream.MaximumFramePayloadLength;
 
     /// <summary>The most <c>DATA</c> payload bytes one read off the stream takes.</summary>
     internal const int DataBufferLength = 16 * 1024;
@@ -63,9 +63,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
     private ReadOnlyMemory<byte> unread;
 
-    private IMultiplexedStream? stream;
-
-    private Http3FrameReader? frames;
+    private Http3ClientRequestStream? request;
 
     private long bodyBytesSent;
 
@@ -117,7 +115,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     /// <exception cref="HttpTransferException">The connection was lost (the connection's own exit code).</exception>
     public async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
-        if (stream is null)
+        if (request is null)
         {
             await StartAsync(buffer, cancellationToken).ConfigureAwait(false);
             return;
@@ -146,7 +144,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
             return;
         }
 
-        await WriteOnStreamAsync(ReadOnlyMemory<byte>.Empty, endStream: true, cancellationToken).ConfigureAwait(false);
+        await WriteOnStreamAsync(() => request!.EndRequestAsync(cancellationToken)).ConfigureAwait(false);
         isRequestEnded = true;
     }
 
@@ -166,11 +164,11 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
     /// <summary>Echoes a response head line as its <c>header:</c> trace line, before it is reported (BL-1208).</summary>
     /// <param name="line">The line about to be reported, its line end included.</param>
-    internal void EchoResponseLineBefore(byte[] line) => trace.ResponseLineReporting(stream!.StreamId, line);
+    internal void EchoResponseLineBefore(byte[] line) => trace.ResponseLineReporting(request!.StreamId, line);
 
     /// <summary>Echoes the response's status line as its <c>status:</c> trace line, after it is reported (BL-1208).</summary>
     /// <param name="line">The line just reported, its line end included.</param>
-    internal void EchoResponseLineAfter(byte[] line) => trace.ResponseLineReported(stream!.StreamId, line);
+    internal void EchoResponseLineAfter(byte[] line) => trace.ResponseLineReported(request!.StreamId, line);
 
     /// <summary>
     /// Marks the transfer on this stream done with the session and writes curl's
@@ -180,7 +178,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     internal void ReportTransferDone(long connectionNumber)
     {
         (long? streamsLeft, int streamsInUse) = session.EndRequestStream();
-        trace.TransferDone(stream!.StreamId, connectionNumber, streamsLeft, streamsInUse);
+        trace.TransferDone(request!.StreamId, connectionNumber, streamsLeft, streamsInUse);
     }
 
     /// <summary>
@@ -216,19 +214,18 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         isRequestEnded = bodyLength == 0;
         try
         {
-            stream = await session.OpenRequestStreamAsync(frameLog, cancellationToken, trace).ConfigureAwait(false);
+            request = await session.OpenRequestStreamAsync(frameLog, cancellationToken, trace).ConfigureAwait(false);
         }
         catch (MultiplexedConnectionFailedException lost)
         {
             throw Lost(lost);
         }
 
-        frames = new Http3FrameReader(new MultiplexedStreamAdapter(stream), MaximumFramePayloadLength);
         List<HeaderField> fields = Http2RequestHeaders.Of(head.Span, scheme);
-        openedLines?.Report(session.VersionName, stream.StreamId, fields);
-        byte[] section = session.Encoder.EncodeFieldSection(stream.StreamId, fields);
-        await WriteOnStreamAsync(new Http3HeadersFrame(section).ToBytes(), isRequestEnded, cancellationToken).ConfigureAwait(false);
-        frameLog.FrameSent("HEADERS", stream.StreamId, section.Length);
+        openedLines?.Report(session.VersionName, request.StreamId, fields);
+        int sectionLength = 0;
+        await WriteOnStreamAsync(async () => sectionLength = await request.SendHeadersAsync(fields, isRequestEnded, cancellationToken).ConfigureAwait(false)).ConfigureAwait(false);
+        frameLog.FrameSent("HEADERS", request.StreamId, sectionLength);
     }
 
     private async ValueTask SendDataAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
@@ -240,16 +237,16 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
         bodyBytesSent += data.Length;
         bool isLast = bodyBytesSent == bodyLength;
-        await WriteOnStreamAsync(new Http3DataFrame(data).ToBytes(), isLast, cancellationToken).ConfigureAwait(false);
-        frameLog.FrameSent("DATA", stream!.StreamId, data.Length);
+        await WriteOnStreamAsync(() => request!.SendDataAsync(data, isLast, cancellationToken)).ConfigureAwait(false);
+        frameLog.FrameSent("DATA", request!.StreamId, data.Length);
         isRequestEnded = isLast;
     }
 
-    private async ValueTask WriteOnStreamAsync(ReadOnlyMemory<byte> bytes, bool endStream, CancellationToken cancellationToken)
+    private static async ValueTask WriteOnStreamAsync(Func<ValueTask> write)
     {
         try
         {
-            await stream!.WriteAsync(bytes, endStream, cancellationToken).ConfigureAwait(false);
+            await write().ConfigureAwait(false);
         }
         catch (MultiplexedConnectionFailedException lost)
         {
@@ -290,7 +287,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
         try
         {
-            return await frames!.ReadFrameOrDataAsync(dataBuffer, cancellationToken).ConfigureAwait(false);
+            return await request!.ReadFrameOrDataAsync(dataBuffer, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception) when (session.ConnectionError is { } connectionError)
         {
@@ -300,7 +297,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         catch (MultiplexedStreamResetException reset) when (reset.ApplicationErrorCode == (long)Http3ErrorCode.RequestRejected)
         {
             session.StopNewStreams();
-            string refusal = HttpTransferMessages.Http3StreamRefused(stream!.StreamId);
+            string refusal = HttpTransferMessages.Http3StreamRefused(request!.StreamId);
             throw new HttpTransferException(CurlExitCode.RecvError, refusal) { IsStreamRefused = true, InfoLines = [refusal] };
         }
         catch (MultiplexedStreamResetException reset) when (reset.ApplicationErrorCode == (long)Http3ErrorCode.NoError || (isFinalHeadReceived && ignoresBody))
@@ -309,7 +306,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         }
         catch (MultiplexedStreamResetException reset)
         {
-            frameLog.StreamResetReceived(stream!.StreamId, reset.ApplicationErrorCode);
+            frameLog.StreamResetReceived(request!.StreamId, reset.ApplicationErrorCode);
             throw Reset(reset.ApplicationErrorCode);
         }
         catch (MultiplexedConnectionFailedException lost)
@@ -328,17 +325,17 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     /// </summary>
     private HttpTransferException Reset(long errorCode) => new(
         bodyBytesReceived > 0 ? CurlExitCode.PartialFile : CurlExitCode.Http3,
-        HttpTransferMessages.Http3StreamReset(stream!.StreamId, errorCode));
+        HttpTransferMessages.Http3StreamReset(request!.StreamId, errorCode));
 
     private void ReceiveEnd()
     {
         if (!isFinalHeadReceived)
         {
-            throw new HttpTransferException(CurlExitCode.Http3, HttpTransferMessages.Http3StreamClosedBeforeHead(stream!.StreamId));
+            throw new HttpTransferException(CurlExitCode.Http3, HttpTransferMessages.Http3StreamClosedBeforeHead(request!.StreamId));
         }
 
         isResponseEnded = true;
-        trace.StreamClosed(stream!.StreamId);
+        trace.StreamClosed(request!.StreamId);
     }
 
     /// <summary>
@@ -346,8 +343,8 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     /// </summary>
     private void ReceiveHeaders(Http3HeadersFrame frame)
     {
-        frameLog.FrameReceived("HEADERS", stream!.StreamId, frame.EncodedFieldSection.Length);
-        IReadOnlyList<HeaderField> fields = Decode(frame.EncodedFieldSection);
+        frameLog.FrameReceived("HEADERS", request!.StreamId, frame.EncodedFieldSection.Length);
+        IReadOnlyList<HeaderField> fields = Decode(frame);
         if (isFinalHeadReceived)
         {
             trailers.Write(Http2ResponseHead.FormatTrailers(fields));
@@ -356,12 +353,12 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
         if (Http2ResponseHead.StatusOf(fields) is not { } statusCode)
         {
-            stream!.Abort((long)Http3ErrorCode.MessageError);
+            request!.Stream.Abort((long)Http3ErrorCode.MessageError);
             throw Reset((long)Http3ErrorCode.MessageError);
         }
 
         received.Enqueue(Http2ResponseHead.Format(session.VersionName, statusCode, fields));
-        trace.HeadReceived(stream!.StreamId, statusCode);
+        trace.HeadReceived(request!.StreamId, statusCode);
         isFinalHeadReceived = statusCode >= 200;
     }
 
@@ -371,7 +368,7 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
     /// </summary>
     private void ReceiveData(int count)
     {
-        frameLog.FrameReceived("DATA", stream!.StreamId, count);
+        frameLog.FrameReceived("DATA", request!.StreamId, count);
         if (!isFinalHeadReceived)
         {
             throw ReadStreamFailed(Nghttp3ErrorName(Http3ErrorCode.FrameUnexpected));
@@ -379,19 +376,18 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
 
         received.Enqueue(dataBuffer.AsMemory(0, count));
         bodyBytesReceived += count;
-        trace.DataReceived(stream!.StreamId, count);
+        trace.DataReceived(request!.StreamId, count);
     }
 
     /// <summary>
     /// Decodes a field section. It never blocks: the session advertises no dynamic table and
     /// no blocked streams, so a section that refers to the dynamic table fails instead.
     /// </summary>
-    private IReadOnlyList<HeaderField> Decode(ReadOnlyMemory<byte> section)
+    private IReadOnlyList<HeaderField> Decode(Http3HeadersFrame frame)
     {
         try
         {
-            _ = session.Decoder.TryDecodeFieldSection(stream!.StreamId, section.Span, out IReadOnlyList<HeaderField>? fields);
-            return fields!;
+            return request!.DecodeFieldSection(frame);
         }
         catch (QpackException)
         {

@@ -24,9 +24,9 @@ namespace Curl.Engine;
 /// started while the socket callback is set runs on a
 /// <see cref="TransferSocketWait" />, its real socket told with <see cref="CurlPoll.Out" /> or
 /// <see cref="CurlPoll.In" /> and the timer with its earliest deadline (ADR-0973), and one started without it records
-/// its real socket on a <see cref="TransferSocketWait" /> that never gates its I/O (ADR-0982); any other running transfer is
-/// one engine-numbered socket, and while one runs the timer asks to be called back every
-/// <see cref="RunningTransferCheckInterval" /> (ADR-0599). <see cref="GetHandles" />,
+/// its real socket on a <see cref="TransferSocketWait" /> that never gates its I/O (ADR-0982); any other running transfer has
+/// no socket the handle knows, so the application is told none for it, and while one runs the timer is 0, as
+/// libcurl's <c>Curl_expire(data, 0)</c> for a transfer that can run on (ADR-0998). <see cref="GetHandles" />,
 /// <see cref="GetWaitSockets" />, <see cref="GetInfo" />, the notifications and
 /// <c>CURLMOPT_NETWORK_CHANGED</c> follow curl 8.22.0 (ADR-0604). A transfer that would open a connection
 /// past <see cref="MultiOptions.MaxHostConnections" /> or <see cref="MultiOptions.MaxTotalConnections" />
@@ -67,7 +67,6 @@ internal sealed partial class ManagedMultiTransfer(
     private uint enabledNotifications;
     private long transfersAdded;
     private TaskCompletionSource wakeupSignal = NewWakeupSignal();
-    private nint nextTransferSocket = FirstTransferSocket;
     private long reportedTimerMilliseconds = -1;
     private DateTimeOffset reportedTimerDue;
     private bool abortedByCallback;
@@ -80,17 +79,10 @@ internal sealed partial class ManagedMultiTransfer(
     public bool IsInTransferCallback => PerformingHandle.Value == this;
 
     /// <summary>
-    /// Gets the first socket number the handle gives a running transfer. The managed engine's
-    /// connections are not operating system descriptors the application could wait on, so each running
-    /// transfer is one number of the handle's own, above any descriptor a process is likely to hold.
-    /// </summary>
-    internal static nint FirstTransferSocket { get; } = 0x4000_0000;
-
-    /// <summary>
     /// Gets the socket number <see cref="GetWaitSockets" /> gives after the running transfers' sockets while any
     /// transfer runs: the wakeup descriptor of libcurl's threaded resolver, which <c>curl_version_info</c>'s
-    /// <c>AsynchDNS</c> without c-ares says this build has (<see cref="ManagedCurlVersion" />), just below
-    /// <see cref="FirstTransferSocket" />.
+    /// <c>AsynchDNS</c> without c-ares says this build has (<see cref="ManagedCurlVersion" />), a number
+    /// above any descriptor a process is likely to hold.
     /// </summary>
     internal static nint ResolverWakeupSocket { get; } = 0x3FFF_FFFF;
 
@@ -99,13 +91,6 @@ internal sealed partial class ManagedMultiTransfer(
     /// operating system poll set to add them to, so it asks <see cref="IWaitSocketPoller" /> each interval.
     /// </summary>
     internal static TimeSpan SocketPollInterval { get; } = TimeSpan.FromMilliseconds(10);
-
-    /// <summary>
-    /// Gets the longest time the timer callback is given while a running transfer does not wait on a real socket
-    /// the application polls (one with no socket wait, or one still connecting or resolving): the timer is what
-    /// brings the application back to <see cref="SocketActionAsync" /> to see it move on.
-    /// </summary>
-    internal static TimeSpan RunningTransferCheckInterval { get; } = TimeSpan.FromMilliseconds(10);
 
     /// <summary>
     /// Gets the longest a perform or socket action lets a transfer with a socket wait go on before it answers, when

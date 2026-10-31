@@ -31,6 +31,38 @@ public sealed class ITlsProviderTests
         Assert.AreEqual("mail.example", provider.TargetHost);
     }
 
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithApplicationProtocolsNotOverridden_RunsTheHandshakeOfferingNothing()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        var provider = new HostRecordingTlsProvider();
+        var plaintext = new UnusedConnection();
+        diagnostics.Arrange("application protocols", "h2,http/1.1");
+
+        ConnectResult secured = await ((ITlsProvider)provider)
+            .AuthenticateAsClientAsync(plaintext, "www.example", new StubTransferEvents(), ["h2", "http/1.1"], CancellationToken.None);
+
+        diagnostics.Act("provider target host", provider.TargetHost);
+        diagnostics.Assert("target host", "www.example", provider.TargetHost);
+        Assert.AreSame(plaintext, secured.Connection);
+        Assert.AreEqual("www.example", provider.TargetHost);
+    }
+
+    [TestMethod]
+    public void VerifyServerCertificateChain_NotOverridden_RejectsTheChainWithExit60()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("chain", "one certificate, host coap.example");
+
+        var verdict = ((ITlsProvider)new HostRecordingTlsProvider()).VerifyServerCertificateChain([new byte[] { 1 }], "coap.example");
+
+        diagnostics.Act("exit code", verdict.ExitCode);
+        diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, verdict.ExitCode);
+        Assert.IsFalse(verdict.IsAccepted);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, verdict.ExitCode);
+        Assert.IsFalse(string.IsNullOrEmpty(verdict.ErrorMessage));
+    }
+
     private sealed class HostRecordingTlsProvider : ITlsProvider
     {
         public string? TargetHost { get; private set; }

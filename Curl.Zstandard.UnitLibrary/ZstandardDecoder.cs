@@ -60,6 +60,9 @@ public sealed class ZstandardDecoder
 
     private readonly ulong maxWindowSize;
 
+    /// <summary>The raw content dictionary (RFC 8878 section 5) every frame's history starts with; empty for none.</summary>
+    private readonly ReadOnlyMemory<byte> rawContentDictionary;
+
     /// <summary>The frame's latest content, which matches copy from.</summary>
     private readonly ZstandardHistory history = new();
 
@@ -108,6 +111,21 @@ public sealed class ZstandardDecoder
         ArgumentOutOfRangeException.ThrowIfLessThan(maxWindowLog, MinimumMaxWindowLog);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(maxWindowLog, MaximumMaxWindowLog);
         maxWindowSize = 1UL << maxWindowLog;
+    }
+
+    /// <summary>
+    /// Creates a decoder whose frames are compressed against <paramref name="rawContentDictionary" />,
+    /// a raw content dictionary (RFC 8878 section 5): it primes each frame's history before the
+    /// first block, so matches may reach back into it, while the repeat offsets and entropy
+    /// tables start at their defaults. It refuses frames whose window exceeds
+    /// <paramref name="maxWindowSize" /> bytes, and frames that name a <c>Dictionary_ID</c>.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxWindowSize" /> is below RFC 8878's minimum window, 1 KiB.</exception>
+    public ZstandardDecoder(ReadOnlyMemory<byte> rawContentDictionary, ulong maxWindowSize)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxWindowSize, 1UL << MinimumMaxWindowLog);
+        this.rawContentDictionary = rawContentDictionary;
+        this.maxWindowSize = maxWindowSize;
     }
 
     private enum Stage
@@ -300,7 +318,8 @@ public sealed class ZstandardDecoder
 
         frameContentWritten = 0;
         contentChecksum.Reset();
-        history.Reset(frameHeader.WindowSize + (2UL * (ulong)BlockMaximumSize) + HistoryMargin);
+        history.Reset(frameHeader.WindowSize + (2UL * (ulong)BlockMaximumSize) + HistoryMargin + (ulong)rawContentDictionary.Length);
+        history.Append(rawContentDictionary.Span);
         literalsDecoder?.StartFrame();
         sequencesDecoder?.StartFrame();
         return Expect(Stage.BlockHeader, BlockHeaderLength);

@@ -261,13 +261,12 @@ function Get-LaneMarker {
 }
 
 function New-ClaudeRunStartInfo {
-    # The process start info Invoke-TaskRun runs claude -p with: cmd.exe in this checkout,
-    # inheriting this process's environment (so CURL_DARK_FACTORY_LANE) plus the Bash
-    # tool's time limits.
-    param([string]$Arguments)
+    # The process start info Invoke-TaskRun runs claude -p with: $CommandLine in the
+    # platform's shell (Set-FactoryShellCommand) in this checkout, inheriting this process's
+    # environment (so CURL_DARK_FACTORY_LANE) plus the Bash tool's time limits.
+    param([string]$CommandLine)
     $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $env:ComSpec
-    $psi.Arguments = $Arguments
+    Set-FactoryShellCommand $psi $CommandLine
     $psi.WorkingDirectory = $Root
     $psi.EnvironmentVariables['BASH_DEFAULT_TIMEOUT_MS'] = '1800000'
     $psi.EnvironmentVariables['BASH_MAX_TIMEOUT_MS'] = '3600000'
@@ -292,7 +291,7 @@ if ($TestLaneMarker) {
     $saved = $env:CURL_DARK_FACTORY_LANE
     try {
         $env:CURL_DARK_FACTORY_LANE = Get-LaneMarker -ForLane 3
-        $probe = [System.Diagnostics.Process]::Start((New-ClaudeRunStartInfo '/d /c echo %CURL_DARK_FACTORY_LANE%'))
+        $probe = [System.Diagnostics.Process]::Start((New-ClaudeRunStartInfo $(if (Test-FactoryOnWindows) { 'echo %CURL_DARK_FACTORY_LANE%' } else { 'echo $CURL_DARK_FACTORY_LANE' })))
         $probe.StandardInput.Close()
         $seen = $probe.StandardOutput.ReadToEnd().Trim()
         $probe.WaitForExit()

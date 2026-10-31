@@ -24,4 +24,8 @@
     <Compile Include="..\Curl.Console.UnitTests\WriteAndFlushRecordingStream.cs" Link="ConsoleFakes\WriteAndFlushRecordingStream.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Using Include="Curl.WebSocket" />
+  </ItemGroup>
+
 </Project>

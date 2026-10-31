@@ -27,12 +27,27 @@ gives each easy handle a multi of its own (`data->multi_easy`, `lib/easy.c`).
   library easy handle and each multi handle looks names up in its own; a share handle sharing DNS
   still links them (ADR-0606), and the curl tool's transfers keep the engine-wide cache (ADR-0542).
 - Upstream test1512 comes off `PassingUpstreamCases.txt`: in the harness its second handle no longer
-  finds the first handle's `CURLOPT_RESOLVE` entry. The measured libcurl behaviour and libcurl's own
-  source win over a case whose pass in upstream's suite this lane could not explain without
-  building `lib1512` against real libcurl; BL-3913 checks that.
+  finds the first handle's `CURLOPT_RESOLVE` entry, and real libcurl 8.22.0 does not find it either
+  (BL-3913, below).
+
+## Measurement (BL-3913, 2026-10-29)
+
+Upstream's `tests/libtest/lib1512.c` at tag `curl-8_22_0`, translated call for call to P/Invoke, was
+run against the real libcurl 8.22.0 DLL (`curl-8.22.0_2-win64-mingw`, `libcurl/8.22.0 LibreSSL/4.3.2`)
+with a loopback HTTP server serving test1512's reply:
+
+- `curl_easy_setopt(CURLOPT_DNS_USE_GLOBAL_CACHE, 1L)` returns 0 on both handles.
+- The first `curl_easy_perform` returns 0 (`[DNS] added server.example.curl:<port>:127.0.0.1 to cache`).
+- The second returns 6 (`CURLE_COULDNT_RESOLVE_HOST`, `Could not resolve host: server.example.curl`).
+- The server saw one request, `GET /path/15120001`; test1512 expects two.
+
+So upstream's suite does not pass test1512 either: `tests/data/DISABLED` has listed 1512 since curl
+commit 4b0028f82d (2013-08-10, "shut of test 1512 for now", for intermittent failures), and it is
+still there at `curl-8_22_0`, so `runtests.pl` never runs it. test1512 stays off the ratchet for good;
+Curl's second perform failing with 6 matches libcurl.
 
 ## Consequences
 
 - A new handle's resolver-start callback runs for every name it has not looked up itself, and
   `CURLMOPT_NETWORK_CHANGED`'s `ClearDns` empties only that multi handle's names.
-- test1512 shows `Inconclusive` until BL-3913 says how upstream's run of it reaches the second host.
+- test1512 shows `Inconclusive`, as it would in upstream's suite, where `DISABLED` skips it.

@@ -109,7 +109,10 @@
     curl still sends until it stops for two seconds or closes its end. Default -1: off.
     Each read then waits up to five seconds, so curl's one-second wait for
     100 Continue does not end the read early. Use it to measure a response that arrives
-    while the body is being sent (BL-319, BL-395).
+    while the body is being sent (BL-319, BL-395). With ResponseDelayMilliseconds over
+    1000, RespondAfterBodyBytes 0 holds each answer until curl's one-second wait for
+    100 Continue has expired, so curl has begun sending the body before the answer
+    comes: a deterministic early answer to an Expect: 100-continue upload (BL-3827).
 
 .PARAMETER RequestReadMilliseconds
     How long each read of an HTTP request waits for its next byte before the request is
@@ -397,7 +400,11 @@
     every byte curl sent, and transcript.txt one line per step: "> " and the bytes a read
     took, or "< " and the bytes sent, as lowercase hex pairs separated by spaces, and "= "
     lines for how the session ended. Response, Connections, ResponseDelayMilliseconds and
-    Reset are ignored. With -Tls it serves TLS from the first byte, as ldaps:// expects.
+    Reset are ignored. With -Tls it serves TLS from the first byte, as ldaps:// expects:
+    when the first step is a read, it handshakes every connection that sends bytes, reads
+    each inside TLS, and serves the session on the first to send bytes there, so a
+    connection curl handshakes and closes unused is skipped and WinLDAP's own second ldaps
+    connection is answered (BL-4044); transcript.txt notes each handshake.
 
     For example, this script answers curl's LDAP simple bind with success and records
     the search request that follows it:
@@ -1868,8 +1875,12 @@ $serveScriptedSession = {
     # WinLDAP opens two connections at once and writes on only one of them, so when the
     # script starts with a read, every connection curl opens is accepted and the session
     # is served on the first that has bytes waiting; the others are held open until it ends.
+    # With -Tls, a connection that completes or fails its handshake and then closes without
+    # sending a byte inside TLS is skipped, so the session is served on the next one: curl's
+    # Windows build opens ldaps:// itself, closes it, and WinLDAP speaks on a second TLS
+    # connection of its own (BL-4044).
     function Select-SpokenConnection {
-        param([System.Collections.Generic.List[object]] $Accepted)
+        param([System.Collections.Generic.List[object]] $Accepted, [System.Collections.Generic.List[object]] $Skipped)
         $clock = [System.Diagnostics.Stopwatch]::StartNew()
         while ($clock.ElapsedMilliseconds -lt $IdleMilliseconds) {
             # curl can exit without writing on any connection, as the Windows build does for
@@ -1880,7 +1891,7 @@ $serveScriptedSession = {
                 return $null
             }
             foreach ($candidate in $Accepted) {
-                if ($candidate.Client.Available -gt 0) { return $candidate }
+                if (-not $Skipped.Contains($candidate) -and $candidate.Client.Available -gt 0) { return $candidate }
             }
             Start-Sleep -Milliseconds 10
         }
@@ -1895,16 +1906,55 @@ $serveScriptedSession = {
     }
     try {
         $client = $accepted[0]
+        $stream = $null
         if ($Steps.Count -gt 0 -and $Steps[0].Kind -eq 'read') {
-            $client = Select-SpokenConnection -Accepted $accepted
-            if ($accepted.Count -gt 1) { [void] $Transcript.Append("= curl opened $($accepted.Count) connections; the session is served on the first to send`r`n") }
-            if ($null -eq $client) {
-                [void] $Transcript.Append("= $($Steps[0].Text) timed out after $IdleMilliseconds ms with 0 bytes; session ended`r`n")
-                return , @(, $received.ToArray())
+            $skipped = New-Object System.Collections.Generic.List[object]
+            # With -Tls, each connection that says something is handshaken and then read
+            # inside TLS; the session goes to the first whose TLS read brings bytes.
+            $secured = New-Object System.Collections.Generic.List[object]
+            $clock = [System.Diagnostics.Stopwatch]::StartNew()
+            while ($null -eq $stream) {
+                $client = Select-SpokenConnection -Accepted $accepted -Skipped $skipped
+                if ($null -eq $client -and $secured.Count -eq 0) {
+                    [void] $Transcript.Append("= $($Steps[0].Text) timed out after $IdleMilliseconds ms with 0 bytes; session ended`r`n")
+                    return , @(, $received.ToArray())
+                }
+                if (-not $ImplicitTls) { $stream = $client.GetStream(); break }
+                if ($null -ne $client) {
+                    [void] $skipped.Add($client)
+                    $connectionNumber = $accepted.IndexOf($client) + 1
+                    try {
+                        $secure = Wrap-Tls -Stream $client.GetStream()
+                        [void] $Transcript.Append("= TLS handshake completed on connection $connectionNumber`r`n")
+                        $candidateBuffer = New-Object byte[] 65536
+                        $secured.Add([pscustomobject] @{ Client = $client; Stream = $secure; Buffer = $candidateBuffer; Read = $secure.ReadAsync($candidateBuffer, 0, $candidateBuffer.Length); Number = $connectionNumber })
+                    } catch {
+                        [void] $Transcript.Append("= TLS handshake on connection $connectionNumber failed: $($_.Exception.GetBaseException().Message)`r`n")
+                    }
+                }
+                foreach ($candidate in $secured.ToArray()) {
+                    if (-not $candidate.Read.IsCompleted) { continue }
+                    $count = if ($candidate.Read.IsFaulted) { 0 } else { $candidate.Read.Result }
+                    if ($count -gt 0) {
+                        $client = $candidate.Client
+                        $stream = $candidate.Stream
+                        [byte[]] $chosenBytes = $candidate.Buffer
+                        $received.Write($chosenBytes, 0, [int] $count)
+                        for ($index = 0; $index -lt $count; $index++) { $unconsumed.Add($chosenBytes[$index]) }
+                        break
+                    }
+                    [void] $Transcript.Append("= curl closed connection $($candidate.Number) without sending inside TLS`r`n")
+                    [void] $secured.Remove($candidate)
+                }
+                if ($null -eq $stream -and $clock.ElapsedMilliseconds -ge $IdleMilliseconds * 6) {
+                    [void] $Transcript.Append("= $($Steps[0].Text) timed out with 0 bytes inside TLS; session ended`r`n")
+                    return , @(, $received.ToArray())
+                }
             }
+            if ($accepted.Count -gt 1) { [void] $Transcript.Append("= curl opened $($accepted.Count) connections; the session is served on the first to send`r`n") }
         }
-        $stream = $client.GetStream()
-        if ($ImplicitTls) {
+        if ($null -eq $stream) { $stream = $client.GetStream() }
+        if ($ImplicitTls -and $stream -isnot [System.Net.Security.SslStream]) {
             $stream = Wrap-Tls -Stream $stream
             [void] $Transcript.Append("= TLS handshake completed`r`n")
         }

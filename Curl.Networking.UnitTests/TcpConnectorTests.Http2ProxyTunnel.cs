@@ -138,6 +138,23 @@ public sealed partial class TcpConnectorTests
     internal static Task<List<Http2Frame>> ReadClientFramesAsync(List<byte> written) =>
         ReadFramesAsync(written.Skip(Http2Connection.ClientPreface.Length).ToArray());
 
+    [TestMethod]
+    public async Task ConnectAsync_ThroughAnH2TunnelToAnHttpsOriginWithoutSetupTracing_WritesNoSslFilterAddedLine()
+    {
+        // Without --trace-config setup the h2 tunnel's TLS to the origin adds no SSL-filter line (AF-0454).
+        var proxyTls = new ScriptedConnection(ProxyFrames(StatusHeaders(1, "200")));
+        var tlsProvider = new AlpnRecordingTlsProvider(proxyTls, "h2");
+        var events = new RecordingTransferEvents();
+        var connector = CreateHttp2ProxyConnector(tlsProvider, proxyHttp2: true);
+
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 443, UseTls: true) { Events = events, Proxy = HttpsProxy, PoolScheme = "https" });
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.Contains("CONNECT phase completed", events.Info);
+        Assert.DoesNotContain(TcpConnector.SslFilterAddedLine, events.Info);
+    }
+
     private static async Task<List<Http2Frame>> ReadFramesAsync(byte[] bytes)
     {
         using var stream = new MemoryStream(bytes);

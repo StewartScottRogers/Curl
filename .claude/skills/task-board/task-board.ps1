@@ -67,8 +67,14 @@
     byte-order mark in the system code page, so a non-ASCII literal would be
     corrupted when it runs.
 
+    It runs alike under Windows PowerShell 5.1 and under pwsh on Windows, Linux and
+    macOS (BL-3926); off Windows, start it with pwsh in place of powershell.
+
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1 status
+
+.EXAMPLE
+    pwsh -NoProfile -File .claude/skills/task-board/task-board.ps1 status
 
 .EXAMPLE
     ... task-board.ps1 new -Title "Parse --max-time" -Pipeline feature -DependsOn BL-012,BL-013 -Touches Curl.Cli.UnitLibrary,Curl.Cli.UnitTests

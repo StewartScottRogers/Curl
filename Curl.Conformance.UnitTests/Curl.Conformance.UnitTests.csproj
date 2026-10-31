@@ -25,4 +25,8 @@
     <ContentWithTargetPath Include="CurlTestCases\Original\docs\**;CurlTestCases\Original\include\**;CurlTestCases\Original\lib\**;CurlTestCases\Original\src\**;CurlTestCases\Original\projects\OS400\ccsidcurl.c" TargetPath="CurlTestCases\$([System.String]::Copy('%(RelativeDir)').Substring(22))%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Using Include="Curl.WebSocket" />
+  </ItemGroup>
+
 </Project>
