@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Park.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4395 — Check git results in Park.ps1 so a failed release or ahead query never orphans or requeues a task
 
@@ -34,3 +34,4 @@ Shift-end review 2026-10-31 (silent-failure-hunter). DarkFactory/Park.ps1:78-96:
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 083e959f c94a812f caed2003.
+- 2026-10-31: Doing -> Done. Park.ps1 checks git results; self-tests added and passing
