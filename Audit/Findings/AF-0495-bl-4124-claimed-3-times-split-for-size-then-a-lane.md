@@ -3,8 +3,8 @@ id: AF-0495
 title: BL-4124 claimed 3 times: split for size, then a lane-12 rebase conflict the resolver could not settle
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-4124:BL-4124:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Z:/repos/Curl.audit/20261031-035829/logs/DarkFactory-*-L*.lo
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
