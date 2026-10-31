@@ -362,22 +362,70 @@ function Test-CiRunWithoutRunner {
     return $true
 }
 
+function Invoke-GhRunList {
+    # Runs `gh run list -Arguments` and returns its JSON, or, when gh exits non-zero, an object
+    # with its ExitCode and Error (the first line it wrote to stderr), so a trace can say why
+    # gh could not list the runs (BL-4377) rather than discard its stderr.
+    param([string[]]$Arguments)
+    # Under Stop, Windows PowerShell would throw on gh's first stderr line rather than keep it.
+    $ErrorActionPreference = 'Continue'
+    $global:LASTEXITCODE = 0
+    $lines = @(gh run list @Arguments 2>&1)
+    $exit = $LASTEXITCODE
+    $errors = @($lines | Where-Object { $_ -is [Management.Automation.ErrorRecord] } | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+    if ($exit -ne 0) { return [pscustomobject]@{ ExitCode = $exit; Error = $(if ($errors.Count) { $errors[0] } else { 'no error text' }) } }
+    return (@($lines | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] } | ForEach-Object { "$_" }) -join "`n")
+}
+
+function Get-GhListFailure {
+    # '' when -Listed is gh's JSON (Invoke-GhRunList or a stand-in succeeded); otherwise why
+    # gh could not list the runs: "exit <code>: <first stderr line>".
+    param($Listed)
+    if ($Listed -is [string]) { return '' }
+    if ($null -eq $Listed) { return 'gh gave no output and no exit code' }
+    return "exit $($Listed.ExitCode): $(Get-Short "$($Listed.Error)" 160)"
+}
+
+function Write-GhListLine {
+    # Traces gh failing to list the CI runs (BL-4377): the first failure with -Failure (gh's
+    # exit code and first stderr line), again at most every -EveryMinutes while it keeps
+    # failing with how long it has, and one "listing CI runs again" line on the first list
+    # that works after it. -State keeps FailingSince and TracedAt between calls; -Failure is
+    # '' when gh listed the runs.
+    param([hashtable]$State, [string]$What, [string]$Failure, [datetime]$Now, [string]$Kind = 'ci', [int]$EveryMinutes = 30)
+    if (-not $Failure) {
+        if ($State.FailingSince) {
+            Write-Trace '-' $Kind "listing CI runs again $What, after $([int]($Now - $State.FailingSince).TotalMinutes) min unable to" 'DarkGray'
+            $State.FailingSince = $null
+        }
+        return
+    }
+    if (-not $State.FailingSince) {
+        $State.FailingSince = $Now
+        $State.TracedAt = $Now
+        Write-Trace '-' $Kind "cannot list the CI runs $What with gh ($Failure)" 'DarkYellow'
+        return
+    }
+    if (($Now - $State.TracedAt).TotalMinutes -lt $EveryMinutes) { return }
+    $State.TracedAt = $Now
+    Write-Trace '-' $Kind "still cannot list the CI runs $What with gh, for $([int]($Now - $State.FailingSince).TotalMinutes) min ($Failure)" 'DarkYellow'
+}
+
 function Get-CiRuns {
     # The newest finished CI runs on -Branch that passed or failed (cancelled ones prove
     # nothing), newest first, each with its failures; a failed run whose log names no
     # failure, or cannot be read, is left out and traced (Write-CiRunLine). $null when gh
-    # cannot list them. -ListRuns and -ReadLog stand in for gh in -TestCiWatch: the first
-    # returns `gh run list`'s JSON, the second a run's `--log-failed` lines, $null if unreadable.
-    param([string]$Branch, [scriptblock]$ListRuns, [scriptblock]$ReadLog, [scriptblock]$ReadJobs)
+    # cannot list them, traced with gh's exit code and error (Write-GhListLine, -Now its clock).
+    # -ListRuns and -ReadLog stand in for gh in -TestCiWatch: the first returns `gh run list`'s
+    # JSON or Invoke-GhRunList's failure, the second a run's `--log-failed` lines, $null if unreadable.
+    param([string]$Branch, [scriptblock]$ListRuns, [scriptblock]$ReadLog, [scriptblock]$ReadJobs, [datetime]$Now = (Get-Date))
     # No --jq: Windows PowerShell strips the double quotes a jq filter needs from a native
     # command's arguments. Its ConvertFrom-Json turns "[]" into one empty element, hence the
     # databaseId filter.
     if (-not $ListRuns) {
         $ListRuns = {
             param([string]$Branch)
-            $json = (gh run list --workflow CI --branch $Branch --limit 30 --json databaseId,status,conclusion,headSha,updatedAt 2>$null) -join "`n"
-            if ($LASTEXITCODE -ne 0) { return $null }
-            return $json
+            Invoke-GhRunList -Arguments @('--workflow', 'CI', '--branch', $Branch, '--limit', '30', '--json', 'databaseId,status,conclusion,headSha,updatedAt')
         }
     }
     if (-not $ReadLog) {
@@ -397,7 +445,10 @@ function Get-CiRuns {
         }
     }
     $json = & $ListRuns $Branch
-    if ($null -eq $json) { Write-CiRunLine -Key 'list' -Line "cannot list the CI runs on $Branch with gh"; return $null }
+    if (-not $script:CiWatch.List) { $script:CiWatch.List = @{} }
+    $failure = Get-GhListFailure $json
+    Write-GhListLine -State $script:CiWatch.List -What "on $Branch" -Failure $failure -Now $Now
+    if ($failure) { return $null }
     try { $listed = @($json | ConvertFrom-Json | ForEach-Object { $_ } | Where-Object { $_.databaseId }) }
     catch { Write-CiRunLine -Key 'list' -Line "cannot read gh's list of CI runs on $Branch"; return $null }
     # Kept for Get-CiRunningRun and Stop-CiRunWithoutFix, which read the runs not finished yet.
@@ -1060,7 +1111,32 @@ if ($TestCiWatch) {
     $script:ciListJson = $null
     $first = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
     $second = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
-    & $check 'gh cannot list: no runs, traced once' 'True True; cannot list the CI runs on work with gh' "$($null -eq $first) $($null -eq $second); $($traced -join '|')"
+    & $check 'gh cannot list: no runs, traced once' 'True True; cannot list the CI runs on work with gh (gh gave no output and no exit code)' "$($null -eq $first) $($null -eq $second); $($traced -join '|')"
+    # BL-4377: gh's exit code and first stderr line, traced again at most every 30 min while
+    # listing keeps failing, and once when it lists again.
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $traced.Clear()
+    $blindAt = [datetime]'2026-10-30 15:22'
+    $refused = { param([string]$Branch) [pscustomobject]@{ ExitCode = 4; Error = 'To get started with GitHub CLI, please run:  gh auth login' } }
+    $null = Get-CiRuns -Branch 'work' -ListRuns $refused -ReadLog $readLog -Now $blindAt
+    & $check 'gh cannot list: its exit code and first stderr line (BL-4377)' 'cannot list the CI runs on work with gh (exit 4: To get started with GitHub CLI, please run: gh auth login)' ($traced -join '|')
+    $null = Get-CiRuns -Branch 'work' -ListRuns $refused -ReadLog $readLog -Now $blindAt.AddMinutes(3)
+    $null = Get-CiRuns -Branch 'work' -ListRuns $refused -ReadLog $readLog -Now $blindAt.AddMinutes(29)
+    & $check 'gh still cannot list within 30 min: no new line (BL-4377)' '1' "$($traced.Count)"
+    $null = Get-CiRuns -Branch 'work' -ListRuns $refused -ReadLog $readLog -Now $blindAt.AddMinutes(31)
+    $null = Get-CiRuns -Branch 'work' -ListRuns $refused -ReadLog $readLog -Now $blindAt.AddMinutes(34)
+    & $check 'gh still cannot list after 30 min: said again with how long (BL-4377)' '2|still cannot list the CI runs on work with gh, for 31 min (exit 4: To get started with GitHub CLI, please run: gh auth login)' "$($traced.Count)|$($traced[1])"
+    $script:ciListJson = '[]'
+    $null = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog -Now $blindAt.AddMinutes(40)
+    $null = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog -Now $blindAt.AddMinutes(43)
+    & $check 'gh lists again: one line (BL-4377)' '3|listing CI runs again on work, after 40 min unable to' "$($traced.Count)|$($traced[2])"
+    $script:ciListJson = $null
+    & $check 'Invoke-GhRunList: a failing gh gives its exit code and first stderr line (BL-4377)' 'exit 1: HTTP 401: Bad credentials' (Get-GhListFailure (& {
+        function gh { Write-Error 'HTTP 401: Bad credentials'; Write-Error 'second line'; $global:LASTEXITCODE = 1 }
+        Invoke-GhRunList -Arguments @('--workflow', 'CI') }))
+    & $check 'Invoke-GhRunList: a gh that lists gives its JSON (BL-4377)' '[]' (& {
+        function gh { '[]' }
+        Invoke-GhRunList -Arguments @('--workflow', 'CI') })
     # What a coordinator log line says for each run it examined, and that it says it once.
     $verdicts = @(Get-CiVerdicts -Now $replayAt.AddMinutes(31) -Runs $replay)
     $waiting = Get-CiRunOutcome -Run $replay[0] -Runs $replay -Verdicts @() -Settled @{} -ConfirmMinutes 5

@@ -27,10 +27,17 @@ function Wait-MergeCiRun {
     $deadline = (Get-Date).AddMinutes($MergeCiWaitMinutes)
     $nextPoll = (Get-Date).AddMinutes($PollMinutes)
     $run = $null
+    # Why gh cannot list the runs, traced as the CI watch traces it (BL-4377): shift
+    # 20261030-220408 waited out its 60 minutes blind while CI had passed at its 30th.
+    $listState = @{}
+    $listFailure = ''
     # A board-only head commit started no run (AF-0089), so start one on it by hand.
     if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
     while ($true) {
-        $run = @(gh run list --workflow CI --branch $Branch --commit $head --limit 1 --json status,conclusion 2>$null | ConvertFrom-Json)
+        $listed = Invoke-GhRunList -Arguments @('--workflow', 'CI', '--branch', $Branch, '--commit', $head, '--limit', '1', '--json', 'status,conclusion')
+        $listFailure = Get-GhListFailure $listed
+        Write-GhListLine -State $listState -What "for the merge of $short" -Failure $listFailure -Now (Get-Date) -Kind 'shift'
+        $run = if ($listFailure -or -not "$listed".Trim()) { @() } else { @($listed | ConvertFrom-Json) }
         if ($run.Count -and $run[0].status -eq 'completed' -and $run[0].conclusion -ne 'cancelled') { break }
         # A newer push replaced this commit's waiting run (ADR-0693): merge the newer commit,
         # which holds all of this one, once CI passes on it (shift 20261019-150735 gave up here).
@@ -47,7 +54,10 @@ function Wait-MergeCiRun {
             $short = $head.Substring(0, 7)
             if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
         }
-        if ((Get-Date) -ge $deadline) { return @{ Failure = "not merged: CI did not finish on $short within $MergeCiWaitMinutes min" } }
+        if ((Get-Date) -ge $deadline) {
+            $blind = if ($listFailure) { "; gh could not list its runs since $($listState.FailingSince.ToString('HH:mm')) ($listFailure)" } else { '' }
+            return @{ Failure = "not merged: CI did not finish on $short within $MergeCiWaitMinutes min$blind" }
+        }
         if ($OnPoll -and (Get-Date) -ge $nextPoll) {
             $nextPoll = (Get-Date).AddMinutes($PollMinutes)
             # A poll that throws or writes output must not abort the merge wait or corrupt its result (BL-3150).

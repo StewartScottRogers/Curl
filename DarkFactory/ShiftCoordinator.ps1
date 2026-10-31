@@ -95,6 +95,8 @@ if ($TestCoordinatorWatchdog) {
     $stop = (Get-CoordinatorOwnProcessIds -Table $table -CoordinatorId 10) -join ','
     & $check 'a replacement stops what the coordinator started, deepest first, and no lane' ($stop -ceq '14,11') $stop
     & $check 'git push and gh calls are timed' ((Test-TimedExternalCall 'git' @('-C', 'x y', 'push', '-q')) -and (Test-TimedExternalCall 'gh' @('run', 'list')) -and (Test-TimedExternalCall 'git' @('fetch'))) 'timed'
+    $native = (ConvertTo-NativeCallArguments @('run', 'list', '--json', @('databaseId', 'status'), '--limit', 1)) -join '|'
+    & $check 'a timed call passes an unquoted a,b as "a,b", as to a native command (BL-4377)' ($native -ceq 'run|list|--json|databaseId,status|--limit|1') $native
     & $check 'local git calls are not timed' (-not (Test-TimedExternalCall 'git' @('-C', 'x', 'status')) -and -not (Test-TimedExternalCall 'git' @())) 'not timed'
     $shell = Get-FactoryPowerShellExe
     $fast = Invoke-ExternalWithTimeout -FilePath $shell -CallArgs @('-NoProfile', '-Command', "'a b'; [Console]::Error.WriteLine('oops'); exit 3") -Seconds 60

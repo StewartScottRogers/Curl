@@ -244,10 +244,20 @@ function Invoke-ExternalWithTimeout {
     return [pscustomobject]@{ TimedOut = $false; ExitCode = $process.ExitCode; Output = (& $toLines $out.Result); Errors = (& $toLines $err.Result) }
 }
 
+function ConvertTo-NativeCallArguments {
+    # A wrapper function's $args as PowerShell would pass them to the native command: an
+    # unquoted a,b,c reaches a function as an array, which a native command gets as "a,b,c".
+    # Cast to [string[]] it became "a b c", so every timed `gh run list --json a,b` failed with
+    # "Unknown JSON field" and the CI watch and shift-end merge wait were blind (BL-4377).
+    param([object[]]$CallArgs)
+    return @($CallArgs | ForEach-Object { if ($_ -is [array]) { @($_ | ForEach-Object { "$_" }) -join ',' } else { "$_" } })
+}
+
 function Invoke-TimedExternalCall {
     # One timed gh or git call as the command itself would answer: output lines, stderr as
     # errors, $LASTEXITCODE set. A timeout is traced, and exits 124, instead of hanging the loop.
-    param([string]$Tool, [string[]]$CallArgs)
+    param([string]$Tool, [object[]]$CallArgs)
+    $CallArgs = ConvertTo-NativeCallArguments $CallArgs
     $result = Invoke-ExternalWithTimeout -FilePath $script:ExternalTools[$Tool] -CallArgs $CallArgs -Seconds $script:ExternalCallSeconds
     if ($result.TimedOut) { Write-Trace '-' 'timeout' "$Tool $(Get-Short ($CallArgs -join ' ') 70) gave no answer in $($script:ExternalCallSeconds)s; stopped" 'Red' }
     $global:LASTEXITCODE = $result.ExitCode
