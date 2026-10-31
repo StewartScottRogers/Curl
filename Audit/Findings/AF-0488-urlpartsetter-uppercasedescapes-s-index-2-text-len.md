@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitLibrary/UrlPartSetter.cs:UpperCasedEscapes-lt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartSetter.cs:262:<
-task: none
-tasks:
+task: BL-4398
+tasks: BL-4398
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md

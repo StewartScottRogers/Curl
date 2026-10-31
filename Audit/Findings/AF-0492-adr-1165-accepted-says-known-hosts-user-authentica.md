@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-1165-the-ssh-transport-layer-is-a-shared-library.md:known_hosts-and-authentication-stay-in-protocol-library:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-4402
+tasks: BL-4402
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md

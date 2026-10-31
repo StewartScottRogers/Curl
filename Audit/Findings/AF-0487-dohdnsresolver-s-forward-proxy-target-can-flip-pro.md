@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/DohDnsResolver.cs:ConnectTarget-eq:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DohDnsResolver.cs:160:==
-task: none
-tasks:
+task: BL-4397
+tasks: BL-4397
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md

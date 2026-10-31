@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:BL-4124:BL-4124:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-4405
+tasks: BL-4405
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
