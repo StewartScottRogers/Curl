@@ -34,3 +34,4 @@ A hang can be intermittent: the next run may pass. Reproduce with `dotnet test` 
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 3fca587f 2911d5f5.
