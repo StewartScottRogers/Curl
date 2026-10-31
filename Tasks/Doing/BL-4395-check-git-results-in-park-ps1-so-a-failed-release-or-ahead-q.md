@@ -22,11 +22,13 @@ Shift-end review 2026-10-31 (silent-failure-hunter). DarkFactory/Park.ps1:78-96:
 
 ## Acceptance criteria
 
-- [ ] Invoke-ReleaseClaim returns a failure reason when the task is still in Doing after the push (checked with Get-TaskState or the pushed tree), shown by a self-test.
-- [ ] Get-LaneBranchesAhead reports an unknown result when git exits non-zero, and Get-OrphanAction refuses rather than requeues on it, shown by a self-test.
-- [ ] The factory's -Test* self-tests pass under Windows PowerShell and pwsh.
+- [x] Invoke-ReleaseClaim returns a failure reason when the task is still in Doing after the push (checked with Get-TaskState or the pushed tree), shown by a self-test.
+- [x] Get-LaneBranchesAhead reports an unknown result when git exits non-zero, and Get-OrphanAction refuses rather than requeues on it, shown by a self-test.
+- [x] The factory's -Test* self-tests pass under Windows PowerShell and pwsh.
 
 ## Notes
+
+- Invoke-ReleaseClaim checks Get-TaskState after the move and every git step, retrying then reporting CLAIM NOT RELEASED. Get-LaneBranchesAhead returns a marker entry on any git failure; Get-OrphanAction already refuses on a non-empty list. Two new -TestPark cases; -TestPark passes under pwsh and Windows PowerShell.
 
 ## Log
 
