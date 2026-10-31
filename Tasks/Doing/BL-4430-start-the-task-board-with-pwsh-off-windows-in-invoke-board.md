@@ -35,3 +35,4 @@ A shift on Linux or macOS can call the task board: `Invoke-Board` starts it with
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: adc685eb 3c83af8c 72c73e7a 782f81de 1eec992f.
