@@ -3,8 +3,8 @@ id: AF-0470
 title: BL-3639 requeued twice (files held by BL-3570/BL-3893, then the 80-turn cap) and then Deferred and split
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: process:logs:BL-3639:redone-work
 reproduction: none
 task: BL-4188
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0470 - BL-3639 requeued twice (files held by BL-3570/BL-3893, then the 80-turn cap) and then Deferred and split
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_0358.md | reproduces: yes | BL-4328 shows exactly this cause in this window. L14 requeued it at 22:16:33 (file held by BL-4320). L7 ran 81 turns and requeued it at 00:07:54 ('Dark factory stopped at its 80-turn cap'). It was then Deferred and split into BL-4362, BL-4363, BL-4364 and BL-4365.
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: requeues 0. No run hit the turn cap (largest run 40 turns, BL-4390). Overlap waits were 45 of 464.1 lane minutes, but no claimed task was sent back.
 
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.

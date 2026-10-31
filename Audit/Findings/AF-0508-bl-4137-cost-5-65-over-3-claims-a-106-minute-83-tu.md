@@ -3,19 +3,19 @@ id: AF-0508
 title: BL-4137 cost $5.65 over 3 claims; a 106-minute, 83-turn run ($3.91) ran out of time with its code stashed
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Its task BL-4418 is Done at work/dark-factory edc61f80642f; a cost-outlier finding records a past run's cost, which no fix can change, so it closes as task-done-historical (ADR-0422, 2026-10-14).
 key: process:BL-4137:BL-4137:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-4418
+tasks: BL-4418
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: task-done-historical
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0508 - BL-4137 cost $5.65 over 3 claims; a 106-minute, 83-turn run ($3.91) ran out of time with its code stashed
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | By mechanism over this window: no task over $5 and no multi-claim task (tasksClaimedMoreThanOnce 0). Fix task BL-4418 Done.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Its task BL-4418 is Done at work/dark-factory edc61f80642f; a cost-outlier finding records a past run's cost, which no fix can change, so it closes as task-done-historical (ADR-0422, 2026-10-14).

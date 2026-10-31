@@ -3,19 +3,19 @@ id: AF-0490
 title: UseProtocolVersion_OnStdio_DoesNothing asserts only that the session it just made is not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
 key: quality:Curl.Extension.McpClient.UnitTests/Client/McpProtocolHandlerTests.cs:UseProtocolVersion_OnStdio_DoesNothing:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-4400
+tasks: BL-4400
 found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-31
+closed-how: reliable-reaudit
+closed-by: 2026-10-31_1149.md
 ---
 # AF-0490 - UseProtocolVersion_OnStdio_DoesNothing asserts only that the session it just made is not null
 
@@ -42,6 +42,10 @@ Select-String -Path Curl.Extension.McpClient.UnitTests/Client/McpProtocolHandler
 
 ## Re-audits
 
+- 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the Select-String: after session.UseProtocolVersion("2025-06-18") the test asserts Assert.AreEqual(string.Empty, process.WrittenInput) (line 188), not just that the session is non-null.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
+- 2026-10-31: accepted -> closed. Re-audit 2026-10-31_1149.md: the reproduction no longer reproduces.
