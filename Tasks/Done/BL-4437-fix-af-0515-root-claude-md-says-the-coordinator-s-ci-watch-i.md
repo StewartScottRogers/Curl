@@ -8,7 +8,7 @@ depends-on: []
 touches: [CLAUDE.md]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4437 — Fix AF-0515: Root CLAUDE.md says the coordinator's CI watch ignores cancelled runs, but it files hangs from them
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+CLAUDE.md now says a cancelled run is read only for a job that ran into its timeout-minutes (ADR-1173). Docs-only; Curl.Console builds clean, fast tests not rerun as no code changed.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-31: Doing -> Done. CLAUDE.md corrected per AF-0515

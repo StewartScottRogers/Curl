@@ -201,7 +201,7 @@ for the live board page.
 Lanes test only on Windows, so the coordinator of a lane shift watches CI for them
 (BL-987): on each heartbeat it reads the finished `CI` runs on the shift's branch (and the
 failed jobs of the one still running, ADR-0811)
-(cancelled ones ignored) and, for every new failing test or build error in
+(a cancelled one is read only for a job that ran into its timeout-minutes, whose hang is filed, ADR-1173) and, for every new failing test or build error in
 `gh run view <id> --log-failed`, files and pushes a High task - "Fix CI failure <test> on
 Linux and macOS", or "Fix flaky CI test <test> ..." for one that failed once between
 passing runs - with the run, platforms, first failing commit, error message and the test's
