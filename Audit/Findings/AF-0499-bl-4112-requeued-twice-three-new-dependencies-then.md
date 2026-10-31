@@ -3,8 +3,8 @@ id: AF-0499
 title: BL-4112 requeued twice (three new dependencies, then the 80-turn cap at $5.10) and then Deferred and split
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-4112:BL-4112:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Z:/repos/Curl.audit/20261031-035829/logs/DarkFactory-*-L*.lo
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
