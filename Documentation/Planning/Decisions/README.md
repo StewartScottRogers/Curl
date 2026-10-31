@@ -1214,3 +1214,4 @@ Each option and the specific reason it lost.
 | [1165](ADR-1165-the-ssh-transport-layer-is-a-shared-library.md) | The SSH transport layer is a shared library (BL-4362) | Accepted | 2026-10-30 |
 | [1166](ADR-1166-ssh-channels-are-a-shared-layer-with-direct-tcpip-as-a-connection.md) | SSH channels are a shared layer, with direct-tcpip as a connection (BL-4330) | Accepted | 2026-10-30 |
 | [1167](ADR-1167-ssh-jump-reaches-servers-through-a-direct-tcpip-channel.md) | --ssh-jump reaches servers through a direct-tcpip channel (BL-4145) | Accepted | 2026-10-30 |
+| [1168](ADR-1168-the-openssl-build-trusts-its-built-in-ca-bundle-when-the-environment-empties-the-system-store.md) | The OpenSSL build trusts its built-in CA bundle when the environment empties the system store (BL-4383) | Accepted | 2026-10-30 |

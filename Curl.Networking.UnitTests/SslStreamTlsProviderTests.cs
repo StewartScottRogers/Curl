@@ -1019,6 +1019,82 @@ public sealed partial class SslStreamTlsProviderTests
             failure);
     }
 
+    // curl's built-in bundle does not depend on SSL_CERT_FILE or SSL_CERT_DIR, where .NET's
+    // OpenSSL store is emptied by either set empty (measured with Debian's curl 8.18.0, BL-4383).
+    [TestMethod]
+    [DataRow("SSL_CERT_FILE")]
+    [DataRow("SSL_CERT_DIR")]
+    public void VerifyChain_OpenSslBuildWithAnEmptiedSystemStore_TrustsTheFirstDefaultCaBundleThatExists(string emptyVariable)
+    {
+        var bundle = WriteCaFile("ca-certificates.crt", s_serverCertificate.ExportCertificatePem());
+        var verification = DefaultCaBundleVerification(new TlsClientOptions(), OpenSslBuild, emptyVariable, bundle);
+
+        var verdict = verification.VerifyChain([s_serverCertificate.RawData], CertificateHost);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, verdict.ExitCode);
+
+        Assert.AreEqual(bundle, verification.DefaultCaBundleFile);
+        Assert.IsTrue(verdict.IsAccepted);
+    }
+
+    [TestMethod]
+    public void VerifyChain_OpenSslBuildWithAnEmptiedSystemStoreAndAnUnusableDefaultCaBundle_IsExit77NamingTheBundle()
+    {
+        var bundle = WriteCaFile("ca-certificates.crt", UndecodableCertificatePem);
+        var verification = DefaultCaBundleVerification(new TlsClientOptions(), OpenSslBuild, "SSL_CERT_FILE", bundle);
+
+        var verdict = verification.VerifyChain([s_serverCertificate.RawData], CertificateHost);
+        Diagnostics.Assert("message", $"error adding trust anchors from file: {bundle}", verdict.ErrorMessage);
+
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, verdict.ExitCode);
+        Assert.AreEqual($"error adding trust anchors from file: {bundle}", verdict.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow(SchannelBuild, "SSL_CERT_FILE", false, true)]
+    [DataRow(OpenSslBuild, "SSL_CERT_FILE", true, true)]
+    [DataRow(OpenSslBuild, "UNRELATED", false, true)]
+    [DataRow(OpenSslBuild, "SSL_CERT_DIR", false, false)]
+    public void DefaultCaBundleFile_WithoutEmptiedStoreOrWithCaCertificateFileOrInTheSchannelBuildOrWithNoBundle_IsNone(
+        bool matchesSchannelBuild, string emptyVariable, bool withCaCertificateFile, bool bundleExists)
+    {
+        var bundle = bundleExists
+            ? WriteCaFile("ca-certificates.crt", s_serverCertificate.ExportCertificatePem())
+            : Path.Combine(_caFileDirectory, "missing.crt");
+        var options = withCaCertificateFile ? new TlsClientOptions(CaCertificateFile: bundle) : new TlsClientOptions();
+        var verification = DefaultCaBundleVerification(options, matchesSchannelBuild, emptyVariable, bundle);
+
+        var defaultBundle = verification.DefaultCaBundleFile;
+        Diagnostics.Act("default bundle", defaultBundle ?? "(none)");
+
+        Assert.IsNull(defaultBundle);
+        Assert.IsNull(verification.DefaultCaBundleFile);
+    }
+
+    [TestMethod]
+    public void ConfigureCaBundleCandidates_AreCurlConfiguresSearchOrder()
+    {
+        string[] expected =
+        [
+            "/etc/ssl/certs/ca-certificates.crt",
+            "/etc/pki/tls/certs/ca-bundle.crt",
+            "/usr/share/ssl/certs/ca-bundle.crt",
+            "/usr/local/share/certs/ca-root-nss.crt",
+            "/etc/ssl/cert.pem",
+        ];
+
+        var candidates = ServerCertificateVerification.ConfigureCaBundleCandidates;
+
+        CollectionAssert.AreEqual(expected, candidates);
+    }
+
+    private ServerCertificateVerification DefaultCaBundleVerification(
+        TlsClientOptions options, bool matchesSchannelBuild, string emptyVariable, string bundle) =>
+        new(options, matchesSchannelBuild, TimeProvider.System)
+        {
+            ReadEnvironmentVariable = name => name == emptyVariable ? string.Empty : null,
+            DefaultCaBundleCandidates = [Path.Combine(_caFileDirectory, "absent.crt"), bundle],
+        };
+
     private string WriteUnusableCaFile(string content) => content switch
     {
         "empty" => WriteCaFile("empty.pem", string.Empty),
