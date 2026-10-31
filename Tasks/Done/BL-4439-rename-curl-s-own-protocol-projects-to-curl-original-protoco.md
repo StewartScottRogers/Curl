@@ -9,7 +9,7 @@ touches: [Curl.Original.Protocol.Dict.UnitLibrary, Curl.Original.Protocol.Dict.U
 requirement: none
 lane: no
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4439 — Rename curl's own protocol projects to Curl.Original.Protocol.<Name>
 
@@ -38,3 +38,4 @@ Stewart, 2026-10-31: rename `Curl.Protocol.*` to `Curl.Original.Protocol.*`, kee
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: be3fb4c0 963f259f 0256f0cd dabd8fca 21b67014 3d836d5e.
+- 2026-10-31: Doing -> Done. curl's own protocols renamed to Curl.Original.Protocol under /Original/Protocols/ (ADR-1176); build clean, 114 of 114 test projects pass, isolation checks follow the new name
