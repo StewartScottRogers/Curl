@@ -3,10 +3,11 @@ using System.Text;
 using Curl.Cryptography;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh;
-using Curl.Protocol.Ssh.KeyExchange;
-using Curl.Protocol.Ssh.Negotiation;
-using Curl.Protocol.Ssh.PacketProtection;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh;
+using Curl.Ssh.KeyExchange;
+using Curl.Ssh.Negotiation;
+using Curl.Ssh.PacketProtection;
+using Curl.Ssh.Transport;
 
 namespace Curl.Conformance.SshServer;
 

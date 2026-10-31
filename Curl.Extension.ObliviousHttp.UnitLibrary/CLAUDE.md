@@ -1,8 +1,9 @@
 # Curl.Extension.ObliviousHttp.UnitLibrary
 
-The Oblivious HTTP extension (ADR-0999, ADR-1104), tested against RFC 9458 and RFC 9180. Namespace
-`Curl.Extension.ObliviousHttp`. It references only `Curl.Cryptography.UnitLibrary`, a shared layer, and is not yet
-registered in any Composition catalogue (BL-4137 does that).
+The Oblivious HTTP extension (ADR-0999, ADR-1104, ADR-1157), tested against RFC 9458, RFC 9540 and RFC 9180. Namespace
+`Curl.Extension.ObliviousHttp`. It references only `Curl.Cryptography.UnitLibrary` and `Curl.Extension.Abstractions.UnitLibrary`.
+`ObliviousHttpExtension` gives the `--ohttp-relay` and `--ohttp-keys` options, the description and the transfer hook
+that `Curl.Extension.Composition` registers.
 
 - `Hpke/` is HPKE base mode (RFC 9180 sections 5.1, 5.2 and 5.3) over `Curl.Cryptography`'s `Hpke`, which holds the
   KEM, key schedule and AEADs: `HpkeSender.SetUp` (a fresh ephemeral key, or a given one for test vectors) gives the
@@ -24,6 +25,11 @@ registered in any Composition catalogue (BL-4137 does that).
   context whose `DecapsulateResponse` opens the `message/ohttp-res` body. Bad bytes throw
   `MalformedKeyConfigurationException`, nothing usable `UnsupportedKeyConfigurationException`, a response that is
   short or does not authenticate `EncapsulatedResponseException`. `ObliviousHttpMediaTypes` names the media types.
+- `Relay/` is the client flow (ADR-1157): `ObliviousHttpTransferHook` reads the key configuration
+  (`KeyConfigurationSource`: a file, a URL, or the target's `/.well-known/ohttp-gateway`), encodes the transfer as a
+  Binary HTTP request (`InnerRequest`, which refuses `-T`, `-I`, `-r`, `-C`, `-z` and `-F` with exit 2), POSTs it
+  encapsulated to the relay through curl's handler (`HookRequest`) and writes the decapsulated response
+  (`InnerResponseOutput`). A failure ends the transfer through `ObliviousTransferException`.
 
 Tested against the specifications, not against curl, with RFC 9180 Appendix A.1.1 and A.2.1, the RFC 9292
 section 5 examples and RFC 9458 Appendix A. Held to the four quality

@@ -214,9 +214,11 @@ function Invoke-Integrate {
         if (-not (Resolve-RebaseConflictUnlocked -Id $Id)) { return $unsettled }
     }
     $attempt = 0
+    # A CI fix goes before the ordinary integrations waiting for the lock (ADR-1158).
+    $ciFix = Test-CiFixTitle (Get-TaskTitle $Id)
     while ($true) {
         Write-Heartbeat 'integrate' 'waiting for the integrate lock'
-        $lock = Enter-Lock
+        $lock = Enter-Lock -Priority:$ciFix
         Write-Heartbeat 'integrate'
         $conflict = $false
         try {
@@ -361,6 +363,20 @@ if ($TestIntegrateLock) {
             ,@('the probe sees the integrate lock while it is held', 'True False', {
                 $lock = Enter-Lock; $held = & $testLockHeld; $lock.Dispose()
                 "$held $(& $testLockHeld)" })
+            ,@('a CI fix waiting with -Priority holds other lanes back; its stale marker or its own does not (ADR-1158)', 'True False False True False', {
+                $other3 = Get-LockPriorityPath 3
+                Set-Content -Path $other3 -Value 'x'
+                $fresh3 = Test-LockPriorityWaiting
+                (Get-Item $other3).LastWriteTime = (Get-Date).AddMinutes(-2)
+                $stale3 = Test-LockPriorityWaiting
+                Remove-Item $other3
+                Set-Content -Path (Get-LockPriorityPath) -Value 'x'
+                $own = Test-LockPriorityWaiting
+                Remove-Item (Get-LockPriorityPath)
+                $lock = Enter-Lock -Priority; $held = & $testLockHeld; $lock.Dispose()
+                "$fresh3 $stale3 $own $held $(Test-Path (Get-LockPriorityPath))" })
+            ,@('an integration of a CI fix asks for the lock with -Priority', 'True', {
+                "$((& $source 'Integrate.ps1') -match 'Enter-Lock -Priority:\$ciFix')" })
             ,@('a clean integration pushes, with no resolve', "'' ours-1 0 resolves", {
                 & $commit $repo 'ours-1'
                 $r = & $integrate

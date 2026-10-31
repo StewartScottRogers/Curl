@@ -1,5 +1,6 @@
-using Curl.Protocol.Ssh.Compression;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Ssh.Compression;
+using Curl.Ssh.Fakes;
 using Curl.Testing;
 
 namespace Curl.Protocol.Ssh;
@@ -178,7 +179,7 @@ public sealed class SshWireDecodersTests
     [TestMethod]
     public async Task SshByteArrayConnection_WritesAreDiscardedAndItHasNoAddress()
     {
-        await using Transport.SshByteArrayConnection connection = new(new byte[] { 1 });
+        await using Curl.Ssh.Transport.SshByteArrayConnection connection = new(new byte[] { 1 });
         Diagnostics.Arrange("connection bytes", "01");
 
         await connection.WriteAsync(new byte[] { 2 }, CancellationToken.None);

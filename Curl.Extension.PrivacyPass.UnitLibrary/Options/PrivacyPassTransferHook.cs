@@ -7,8 +7,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.PrivacyPass.Options;
 
 /// <summary>
-/// Runs the transfer and, when it is answered 401 with a <c>PrivateToken</c> challenge of token type <c>0x0002</c>
-/// (RFC 9577 §2.1), gets a token for it from the issuer (<see cref="PrivacyPassIssuance"/>) and runs the transfer again
+/// Runs the transfer and, when it is answered 401 with a <c>PrivateToken</c> challenge of token type <c>0x0001</c>
+/// or <c>0x0002</c> (RFC 9577 §2.1), gets a token for it from the issuer (<see cref="PrivacyPassIssuance"/>) and runs the transfer again
 /// with <c>Authorization: PrivateToken</c> (RFC 9577 §2.2) after curl's own request headers (ADR-1110).
 /// </summary>
 /// <remarks>
@@ -67,7 +67,7 @@ internal sealed class PrivacyPassTransferHook(Uri? issuerUrl, Func<int, byte[]> 
         }
     }
 
-    /// <summary>Finds the first <c>PrivateToken</c> challenge of token type <c>0x0002</c> in a 401's <c>WWW-Authenticate</c> fields.</summary>
+    /// <summary>Finds the first <c>PrivateToken</c> challenge of token type <c>0x0001</c> or <c>0x0002</c> in a 401's <c>WWW-Authenticate</c> fields.</summary>
     /// <param name="result">The transfer's result.</param>
     /// <returns>The challenge, or <see langword="null"/> when the response is not a 401 or has none.</returns>
     internal static PrivateTokenChallengeHeader? AnswerableChallenge(TransferResult result) =>
@@ -75,7 +75,7 @@ internal sealed class PrivacyPassTransferHook(Uri? issuerUrl, Func<int, byte[]> 
             ? report.ResponseHeaders
                 .Where(field => string.Equals(field.Key, "WWW-Authenticate", StringComparison.OrdinalIgnoreCase))
                 .SelectMany(field => PrivateTokenChallengeHeader.FindAll(field.Value))
-                .FirstOrDefault(header => header.Challenge.TokenType == PrivacyPassIssuance.BlindRsaTokenType)
+                .FirstOrDefault(header => header.Challenge.TokenType is PrivacyPassIssuance.VoprfTokenType or PrivacyPassIssuance.BlindRsaTokenType)
             : null;
 
     // An issuer origin is discovered through its directory (RFC 9578 §4), which must list the challenge's key; any other URL is the request URL.

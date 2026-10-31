@@ -51,11 +51,10 @@ public sealed class ConnectionHooksTests
     [TestMethod]
     public void ActivatedBy_WithTwoExtensionsClaimingTheConnection_FailsNamingBothOptions()
     {
-        ArgumentException failure = Assert.ThrowsExactly<ArgumentException>(() => ConnectionHooks.ActivatedBy(
+        ExtensionHookConflictException failure = Assert.ThrowsExactly<ExtensionHookConflictException>(() => ConnectionHooks.ActivatedBy(
             ValuesOf(Pipe, Tunnel),
             [ExampleHook.ActivatedBy(Pipe, new ExampleHook(Pipe)), ExampleHook.ActivatedBy(Tunnel, new ExampleHook(Tunnel))]));
 
-        Assert.AreEqual("values", failure.ParamName);
         StringAssert.StartsWith(failure.Message, "the options --example-pipe and --example-tunnel each supply the connection a transfer runs over; give only one of them");
     }
 

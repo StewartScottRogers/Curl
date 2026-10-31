@@ -19,6 +19,9 @@ public sealed class PrivacyPassTransferHookTests
 {
     private const string IssuerUrl = "https://issuer.example/token-request";
 
+    private static readonly string VoprfWwwAuthenticate =
+        $"PrivateToken challenge=\"{Base64Url.Encode(VoprfTestIssuer.Challenge)}\", token-key=\"{Base64Url.Encode(VoprfTestIssuer.EncodedPublicKey)}\"";
+
     [TestMethod]
     public async Task ExecuteAsync_PrivateTokenChallenge_SendsTheTransferAgainWithAVerifyingToken()
     {
@@ -41,6 +44,51 @@ public sealed class PrivacyPassTransferHookTests
         CollectionAssert.AreEqual(SHA256.HashData(TestIssuer.Challenge), token[34..66]);
         CollectionAssert.AreEqual(SHA256.HashData(TestIssuer.Spki), token[66..98]);
         Assert.IsTrue(TestIssuer.Verifies(token[..98], token[98..]));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_VoprfChallenge_SendsTheTransferAgainWithTheIssuersPrfOutput()
+    {
+        var issuer = new EvaluatingIssuerConnection();
+        List<ITransferContext> sent = [];
+
+        var result = await Hook().ExecuteAsync(Context(), Services(new FixedConnector(issuer)), Answering(sent, Challenged(VoprfWwwAuthenticate)));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(2, sent);
+        // RFC 9578 §5.1: token_type 1 then the last byte of SHA-256(token-key).
+        CollectionAssert.AreEqual(new byte[] { 0, 1, SHA256.HashData(VoprfTestIssuer.EncodedPublicKey)[^1] }, issuer.TokenRequest[..3]);
+        var authorization = sent[1].Http!.Headers[^1];
+        StringAssert.StartsWith(authorization, "Authorization: PrivateToken token=\"");
+        var token = Base64Url.Decode(authorization["Authorization: PrivateToken token=\"".Length..^1])!;
+        // §5.3: token_type, nonce(32), challenge_digest(32), token_key_id(32), authenticator(Nh = 48).
+        Assert.HasCount(2 + 32 + 32 + 32 + VoprfP384Sha384.OutputLength, token);
+        CollectionAssert.AreEqual(SHA256.HashData(VoprfTestIssuer.Challenge), token[34..66]);
+        CollectionAssert.AreEqual(VoprfTestIssuer.Output(token[..98]), token[98..]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_VoprfProofNotVerifying_FailsAsAWeirdReplyWithoutSendingAgain()
+    {
+        List<ITransferContext> sent = [];
+
+        var result = await Hook().ExecuteAsync(
+            Context(), Services(new FixedConnector(new EvaluatingIssuerConnection(corruptProof: true))), Answering(sent, Challenged(VoprfWwwAuthenticate)));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.HasCount(1, sent);
+    }
+
+    [TestMethod]
+    public void AnswerableChallenge_UnknownTypeBeforeAVoprfOne_PicksTheVoprfOne()
+    {
+        byte[] unknown = [0x00, 0x03, .. VoprfTestIssuer.Challenge[2..]];
+        var field = $"PrivateToken challenge=\"{Base64Url.Encode(unknown)}\", token-key=\"AAAA\", {VoprfWwwAuthenticate}";
+
+        var challenge = PrivacyPassTransferHook.AnswerableChallenge(Challenged(field));
+
+        Assert.AreEqual(PrivacyPassIssuance.VoprfTokenType, challenge!.Challenge.TokenType);
+        Assert.IsNull(PrivacyPassTransferHook.AnswerableChallenge(Challenged($"PrivateToken challenge=\"{Base64Url.Encode(unknown)}\", token-key=\"AAAA\"")));
     }
 
     [TestMethod]

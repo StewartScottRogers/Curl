@@ -50,7 +50,8 @@ public sealed class SocketOpenerTcpDialerTests
     [TestMethod]
     public async Task ConnectAsync_WithAnOpenerOnAClosedPort_AsksOnceTellsOnceThatTheSocketClosedAndFailsWithExit7()
     {
-        var port = ClosedLoopbackPort();
+        using var refused = await RefusedLoopbackPort.OpenAsync();
+        var port = refused.Port;
         var opener = new RecordingSocketOpener(_ => TcpSocketOpenDecision.Proceed);
 
         var result = await ConnectAsync(port, opener);
@@ -80,7 +81,8 @@ public sealed class SocketOpenerTcpDialerTests
     [TestMethod]
     public async Task DialAsync_WithASuppliedSocketWhoseConnectFails_ThrowsAndTellsTheOpenerItClosed()
     {
-        var endPoint = new IPEndPoint(IPAddress.Loopback, ClosedLoopbackPort());
+        using var refused = await RefusedLoopbackPort.OpenAsync();
+        var endPoint = refused.EndPoint;
         using var supplied = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         var opener = new RecordingSocketOpener(_ => TcpSocketOpenDecision.Supplied(supplied.Handle, alreadyConnected: false));
         var dialer = new SocketOpenerTcpDialer(new FakeTcpDialer(), opener);
@@ -159,14 +161,6 @@ public sealed class SocketOpenerTcpDialerTests
     }
 
     private static int PortOf(Socket listener) => ((IPEndPoint)listener.LocalEndPoint!).Port;
-
-    /// <summary>A loopback port nothing listens on: one the system just handed a socket, now closed.</summary>
-    private static int ClosedLoopbackPort()
-    {
-        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        return PortOf(socket);
-    }
 
     private sealed class RecordingSocketOpener(Func<IPEndPoint, TcpSocketOpenDecision> decide) : ITcpSocketOpener
     {

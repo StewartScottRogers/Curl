@@ -1,5 +1,6 @@
-using Curl.Protocol.Ssh.PacketProtection;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh;
+using Curl.Ssh.PacketProtection;
+using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh;
 

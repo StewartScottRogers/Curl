@@ -72,6 +72,7 @@
     <InternalsVisibleTo Include="Curl.Console.IntegrationTests" />
     <InternalsVisibleTo Include="Curl.Console.UnitTests" />
     <InternalsVisibleTo Include="Curl.Conformance.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Extension.WireGuard.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>

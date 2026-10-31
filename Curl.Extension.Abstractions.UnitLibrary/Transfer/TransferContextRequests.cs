@@ -12,12 +12,44 @@ public static class TransferContextRequests
     /// <param name="url">The URL to send the request to.</param>
     /// <param name="method">The HTTP method, as <c>-X</c> gives it; <see langword="null" /> keeps the transfer's own. A transfer that is not HTTP has none to set.</param>
     /// <param name="body">The request body, as <c>--data-binary</c> gives it; <see langword="null" /> keeps the transfer's own.</param>
-    /// <returns>The same transfer with the URL, method and body replaced and every other member its own.</returns>
+    /// <returns>The same transfer with the URL, method and body replaced the HTTP body set to <paramref name="body" /> when given, and every other member its own.</returns>
     public static ITransferContext WithRequest(this ITransferContext context, CurlUrl url, string? method, ReadOnlyMemory<byte>? body)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(url);
         HttpRequestOptions? http = method is null || context.Http is null ? context.Http : context.Http with { CustomMethod = method };
-        return new RetargetedTransferContext(context, url, http, body ?? context.PostData);
+        if (body is { } bytes && http is not null)
+        {
+            http = http with { Body = new BytesBody(bytes, "application/x-www-form-urlencoded") };
+        }
+
+        return new RetargetedTransferContext(context, url, http, body ?? context.PostData, context.Credentials);
+    }
+
+    /// <summary>Gives <paramref name="context" /> without the request headers and credentials of the transfer's own options.</summary>
+    /// <remarks>
+    /// Drops <c>-H</c>, <c>-A</c>, <c>-e</c>, <c>--referer ;auto</c>, <c>-b</c> cookie strings, <c>--oauth2-bearer</c>, <c>--aws-sigv4</c>,
+    /// <c>--user</c> and the HTTP signature, so an extension's own request to a third party, such as an Oblivious HTTP relay,
+    /// carries only what the extension adds with <see cref="TransferContextRequestHeaders.WithRequestHeaders" />. Proxy headers stay: they go to the proxy.
+    /// </remarks>
+    /// <param name="context">The transfer the hook was given.</param>
+    /// <returns>The same transfer with those options cleared; a transfer that is not HTTP keeps its own members but loses its credentials.</returns>
+    public static ITransferContext WithoutOwnHeaders(this ITransferContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        HttpRequestOptions? http = context.Http is null
+            ? null
+            : context.Http with
+            {
+                Headers = [],
+                UserAgent = null,
+                Referer = null,
+                AutoReferer = false,
+                SendsCookieStrings = false,
+                BearerToken = null,
+                AwsSigV4 = null,
+                HttpSignature = null,
+            };
+        return new RetargetedTransferContext(context, context.Url, http, context.PostData, null);
     }
 }

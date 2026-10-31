@@ -83,7 +83,42 @@ public sealed partial class EngineCompositionTests
         Assert.IsInstanceOfType<UdpDatagramConnector>(transports.UdpDatagramConnector);
     }
 
-    private static CurlTransports TransportsOf(string[] arguments, Func<IDatagramConnector, IDatagramConnector> extensionDatagramConnector)
+    [TestMethod]
+    public async Task CreateTransports_UnderDialingWithAHookDatagramConnector_OpensTheQuicChannelThroughTheHook()
+    {
+        RecordingDatagramConnector dialingConnector = new(CurlExitCode.CouldntConnect, ConnectFailure);
+        RecordingDatagramConnector hookConnector = new(CurlExitCode.CouldntConnect, ConnectFailure);
+        Diagnostics.Arrange("URL", "https://127.0.0.1:47261/");
+
+        CurlTransports transports = TransportsOf(["--http3-only", "https://127.0.0.1:47261/"], _ => hookConnector, new EngineDialing(new TcpDialer(), new LoopbackDnsResolver(), dialingConnector));
+        await transports.TcpConnector.ConnectMultiplexedAsync(new ConnectTarget("127.0.0.1", 47261, true), TestContext.CancellationToken);
+        Diagnostics.Act("opens through the hook", $"{hookConnector.Opens.Count},{dialingConnector.Opens.Count}");
+
+        Diagnostics.Assert("opens through the hook", "1,0", $"{hookConnector.Opens.Count},{dialingConnector.Opens.Count}");
+        Assert.AreSame(dialingConnector, transports.UdpDatagramConnector);
+        Assert.HasCount(1, hookConnector.Opens);
+        Assert.IsEmpty(dialingConnector.Opens);
+    }
+
+    [TestMethod]
+    public async Task CreateTransports_UnderDialingWithoutAHookOrWithOneThatKeepsCurls_OpensTheQuicChannelThroughTheDialingConnector()
+    {
+        foreach (Func<IDatagramConnector, IDatagramConnector>? hook in new Func<IDatagramConnector, IDatagramConnector>?[] { null, given => given })
+        {
+            RecordingDatagramConnector dialingConnector = new(CurlExitCode.CouldntConnect, ConnectFailure);
+            Diagnostics.Arrange("hook", hook is null ? "none" : "keeps curl's");
+
+            CurlTransports transports = TransportsOf(["--http3-only", "https://127.0.0.1:47261/"], hook, new EngineDialing(new TcpDialer(), new LoopbackDnsResolver(), dialingConnector));
+            await transports.TcpConnector.ConnectMultiplexedAsync(new ConnectTarget("127.0.0.1", 47261, true), TestContext.CancellationToken);
+            Diagnostics.Act("opens through the dialing connector", dialingConnector.Opens.Count);
+
+            Diagnostics.Assert("opens through the dialing connector", 1, dialingConnector.Opens.Count);
+            Assert.AreSame(dialingConnector, transports.UdpDatagramConnector);
+            Assert.HasCount(1, dialingConnector.Opens);
+        }
+    }
+
+    private static CurlTransports TransportsOf(string[] arguments, Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector, EngineDialing? dialing = null)
     {
         CommandLineOptions options = CommandLineParser.Parse(arguments, _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false, _ => null, actsAsQuicBuild: true).Options!;
         return EngineComposition.CreateTransports(
@@ -101,6 +136,7 @@ public sealed partial class EngineCompositionTests
             null,
             null,
             static resolver => resolver,
+            dialing,
             extensionDatagramConnector: extensionDatagramConnector);
     }
 }

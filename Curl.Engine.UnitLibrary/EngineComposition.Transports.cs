@@ -129,7 +129,7 @@ internal static partial class EngineComposition
     /// <param name="extensionDatagramConnector">
     /// An activated extension connection hook's datagram connector over curl's UDP connector (ADR-1010): when it
     /// replaces curl's, QUIC opens its channels through it (<see cref="QuicDatagramConnectorOf" />, BL-4318);
-    /// <see langword="null" />, or one that keeps curl's, for the socket QUIC dialer. Unused under <paramref name="dialing" />.
+    /// <see langword="null" />, or one that keeps curl's, for the socket QUIC dialer. Under <paramref name="dialing" /> it replaces only the datagram connector QUIC opens through (BL-4357).
     /// <see cref="CurlTransports.UdpDatagramConnector" /> stays curl's, which the dispatch hands the hook again for the datagram protocols.
     /// </param>
     /// <returns>The connectors and the pieces they were built from.</returns>
@@ -202,7 +202,7 @@ internal static partial class EngineComposition
         Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector) =>
         dialing is null
             ? NetworkDialersOf(tcpDialer, tlsClientOptions, traces, timeProvider, createDatagramConnector(), extensionDatagramConnector)
-            : (CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, dialing.DatagramConnector), dialing.TcpDialer, dialing.DatagramConnector);
+            : (CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, QuicDatagramConnectorOf(dialing.DatagramConnector, extensionDatagramConnector) ?? dialing.DatagramConnector), dialing.TcpDialer, dialing.DatagramConnector);
 
     /// <summary>
     /// The dialers on the real network: a QUIC dialer that opens its channels through the connection hook's datagram

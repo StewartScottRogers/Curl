@@ -7,6 +7,8 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 Amended by ADR-1017 (2026-10-29, BL-4196), which adds `Curl.WebSocket.UnitLibrary` to the table.
 
+Amended by ADR-1165 (2026-10-30, BL-4362), which adds `Curl.Ssh.UnitLibrary` to the table.
+
 Amended by ADR-0185 (2026-09-29, BL-785), as "Adding a hand-built library" below
 provides: the table gains `Curl.Zstandard.UnitLibrary`, and `Curl.Tls.UnitLibrary` may
 reference it.
@@ -54,6 +56,7 @@ A `Curl.Protocol.*.UnitLibrary` may reference exactly these projects:
 | `Curl.Http3.UnitLibrary` | QPACK and HTTP/3 framing | `Curl.Http2.UnitLibrary`, `Curl.Protocol.Abstractions.UnitLibrary` |
 | `Curl.Zstandard.UnitLibrary` | The Zstandard (RFC 8878) decoder and XXH64 (added by ADR-0185) | nothing |
 | `Curl.WebSocket.UnitLibrary` | The WebSocket (RFC 6455 section 5) frame codec (added by ADR-1017) | nothing |
+| `Curl.Ssh.UnitLibrary` | The SSH (RFC 4253) client transport: packets, key exchange, packet protection, compression, negotiation, host key signatures (added by ADR-1165) | `Curl.Cryptography.UnitLibrary`, `Curl.Protocol.Abstractions.UnitLibrary` |
 
 A protocol library may reference any library on the list that it uses; which protocol
 uses which is that protocol's own design, not this ADR's. "May reference" in the table

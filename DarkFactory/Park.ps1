@@ -48,9 +48,12 @@ function Get-OrphanAction {
     # What shift start does with task $Id, in Doing but held by no lane of the previous shift
     # (BL-1071): adopt it into the one lane worktree with uncommitted work, so that lane
     # resumes it; return it to Backlog when no worktree has work and a parked branch holds
-    # it; otherwise refuse, saying why. -DirtyLanes are the lanes not already adopted whose
-    # worktrees have uncommitted work.
-    param([string]$Id, [string[]]$ParkedBranches, [int[]]$DirtyLanes)
+    # it, or when no work for it exists anywhere (BL-4347: a claim a lane never started);
+    # refuse, saying why, when a lane branch holds commits beyond the shift branch, since
+    # which lane's work they are cannot be told. -DirtyLanes are the lanes not already
+    # adopted whose worktrees have uncommitted work; -LaneBranchesAhead the factory/lane-<n>
+    # branches with commits the shift branch lacks.
+    param([string]$Id, [string[]]$ParkedBranches, [int[]]$DirtyLanes, [string[]]$LaneBranchesAhead = @())
     $dirty = @($DirtyLanes | Where-Object { $_ })
     if ($dirty.Count -eq 1) { return [pscustomobject]@{ Action = 'adopt'; Lane = $dirty[0]; Branch = ''; Why = '' } }
     if ($dirty.Count -gt 1) {
@@ -58,7 +61,38 @@ function Get-OrphanAction {
     }
     $parked = @($ParkedBranches | Where-Object { $_ } | Sort-Object)
     if ($parked.Count) { return [pscustomobject]@{ Action = 'backlog'; Lane = 0; Branch = $parked[-1]; Why = '' } }
-    return [pscustomobject]@{ Action = 'refuse'; Lane = 0; Branch = ''; Why = "$Id is in Doing and held by no lane, no lane worktree has uncommitted work and no parked branch factory/$Id-lane-* exists" }
+    $ahead = @($LaneBranchesAhead | Where-Object { $_ })
+    if ($ahead.Count) {
+        return [pscustomobject]@{ Action = 'refuse'; Lane = 0; Branch = ''; Why = "$Id is in Doing and held by no lane, no parked branch factory/$Id-lane-* exists, and lane branches $($ahead -join ', ') have commits beyond the shift branch; which one is its work cannot be told" }
+    }
+    return [pscustomobject]@{ Action = 'backlog'; Lane = 0; Branch = ''; Why = '' }
+}
+
+function Get-LaneBranchesAhead {
+    # The local factory/lane-<n> branches with commits that origin/$ShiftBranch lacks.
+    param([string]$ShiftBranch = $branch, [string]$Repo = $Root)
+    $refs = @(git -C $Repo for-each-ref --format='%(refname:short)' 'refs/heads/factory/lane-*' 2>$null)
+    return @($refs | Where-Object { $_ -and [int](git -C $Repo rev-list --count "origin/$ShiftBranch..$_" 2>$null) -gt 0 })
+}
+
+function Invoke-ReleaseClaim {
+    # A lane that claimed task $Id and is past the shift's end before starting it returns the
+    # claim to Backlog on the shared branch, so no task is left in Doing held by no lane
+    # (BL-4347). Returns '' once the task has left Doing there, or a line saying it has not.
+    param([string]$Id, [int[]]$RetrySeconds = @(10, 30, 60))
+    $lock = Enter-Lock
+    try {
+        foreach ($wait in @(0) + $RetrySeconds) {
+            if ($wait) { Start-Sleep -Seconds $wait }
+            if (-not (Sync-Lane)) { continue }
+            if ((Get-TaskState $Id) -ne 'Doing') { return '' }
+            Invoke-Board @('move', '-Id', $Id, '-To', 'Backlog', '-Reason', "Lane $Lane claimed it after the shift's time was up and never started it.") | Out-Null
+            Invoke-Git @('add', '-A', 'Tasks') | Out-Null
+            Invoke-Git @('commit', '-q', '-m', "chore(tasks): release unstarted claim $Id - shift time up", '-m', $SkipCiNote) | Out-Null
+            if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return '' }
+        }
+    } finally { $lock.Dispose() }
+    return "$Id CLAIM NOT RELEASED  claimed past the shift's end, and its move to Backlog never reached $Branch, so it is still in Doing there."
 }
 
 function Stop-ShiftStart {
@@ -114,7 +148,7 @@ if ($TestPark) {
     git -C $repo config user.name t; git -C $repo config user.email t@t
     git -C $repo checkout -q -b work 2>&1 | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Tasks\Doing'), (Join-Path $repo 'Tasks\Backlog') | Out-Null
-    foreach ($id in 'BL-001', 'BL-002') {
+    foreach ($id in 'BL-001', 'BL-002', 'BL-004') {
         Set-Content -Path (Join-Path $repo "Tasks\Doing\$id-park-me.md") -Encoding UTF8 -Value @(
             '---', "id: $id", 'title: Park me', 'priority: Normal', 'assignee: Claude', 'pipeline: direct',
             'depends-on: []', 'touches: [x]', 'requirement: none', 'created: 2026-10-01', 'completed:', '---',
@@ -137,6 +171,10 @@ if ($TestPark) {
             $shared = @(git -C $repo ls-tree -r --name-only origin/work Tasks) -join ' '
             $log = (git -C $repo show 'origin/work:Tasks/Backlog/BL-001-park-me.md') -join ' '
             "'$r' $(if ($shared -match 'Backlog/BL-001-' -and $shared -notmatch 'Doing/BL-001-') { 'Backlog' } else { 'Doing' }) $(if ($log -match 'branch (factory/BL-001-lane-9-test);') { $Matches[1] } else { 'no branch in the Log' })" })
+        ,@('a claim released past the shift end is back in Backlog on the shared branch', "'' Backlog", {
+            $r = Invoke-ReleaseClaim -Id 'BL-004' -RetrySeconds @()
+            $shared = @(git -C $repo ls-tree -r --name-only origin/work Tasks) -join ' '
+            "'$r' $(if ($shared -match 'Backlog/BL-004-' -and $shared -notmatch 'Doing/BL-004-') { 'Backlog' } else { 'Doing' })" })
         ,@('a park that cannot push says so for the summary', 'BL-002 PARK NOT PUSHED, still in Doing, branch kept', {
             git -C $repo remote set-url origin (Join-Path $temp 'gone.git') 2>&1 | Out-Null
             # The git failures it traces are expected here, so they are not printed.
@@ -155,9 +193,17 @@ if ($TestPark) {
             Set-Content -Path (Join-Path $repo 'half-done.txt') -Value 'half'
             $a = Get-OrphanAction -Id 'BL-002' -ParkedBranches (Get-ParkedBranches 'BL-002' $repo) -DirtyLanes @(@(9) | Where-Object { Test-WorktreeDirty $repo })
             "$($a.Action) $($a.Lane)" })
-        ,@('an orphan with no work anywhere is refused, saying why', 'refuse no parked branch', {
-            $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches (Get-ParkedBranches 'BL-003' $repo) -DirtyLanes @()
-            "$($a.Action) $(if ($a.Why -match 'no parked branch factory/BL-003-lane-\* exists') { 'no parked branch' } else { $a.Why })" })
+        ,@('an orphan with no work anywhere goes to Backlog with no branch', "backlog ''", {
+            $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches (Get-ParkedBranches 'BL-003' $repo) -DirtyLanes @() -LaneBranchesAhead (Get-LaneBranchesAhead 'work' $repo)
+            "$($a.Action) '$($a.Branch)'" })
+        ,@('an orphan with a lane branch holding commits beyond the shift branch is refused, saying why', 'refuse lane branches factory/lane-9', {
+            git -C $repo branch factory/lane-9 2>&1 | Out-Null
+            git -C $repo checkout -q factory/lane-9 2>&1 | Out-Null
+            Set-Content -Path (Join-Path $repo 'lane-work.txt') -Value 'x'
+            git -C $repo add lane-work.txt 2>&1 | Out-Null; git -C $repo commit -q -m lanework 2>&1 | Out-Null
+            git -C $repo checkout -q work 2>&1 | Out-Null
+            $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches @() -DirtyLanes @() -LaneBranchesAhead (Get-LaneBranchesAhead 'work' $repo)
+            "$($a.Action) $(if ($a.Why -match 'lane branches (factory/lane-9) have commits') { "lane branches $($Matches[1])" } else { $a.Why })" })
         ,@('a refused start raises the alarm with its reason', 'SHIFT REFUSED  BL-003 is in Doing', {
             $script:Alarmed = @()
             Stop-ShiftStart -Why 'BL-003 is in Doing' -Notify $quiet

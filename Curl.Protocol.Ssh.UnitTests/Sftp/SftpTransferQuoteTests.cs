@@ -1,9 +1,10 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Connection;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Ssh;
+using Curl.Ssh.Fakes;
 using Curl.Testing;
-using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
+using static Curl.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Sftp;
 

@@ -87,10 +87,23 @@
     among them, still run), no MCP server or claude.ai connector, no auto memory, and
     DarkFactory\LaneRules.md in place of the root CLAUDE.md; a project folder's own
     CLAUDE.md still loads when the run works there. Each run is also capped at
-    -MaxRunTurns turns (default 80, 0 for none); a run that reaches it stops, and its task
-    goes back to Backlog as too big for one run, to be split in the first turns of its next
-    claim. The task and lane prompts name the cap and ask the run to hand back what is left
-    15 turns before it (AF-0482). -TestLaneFlags proves the flags.
+    -MaxRunTurns turns (default 80, 0 for none); a run that reaches it stops, and its task,
+    too big for one run, gets the cost cap's bounded split run at once rather than a trip
+    back to Backlog for its next claim to split (ADR-1155). The task and lane prompts name
+    the cap and ask the run to hand back what is left 15 turns before it (AF-0482).
+    -TestLaneFlags proves the flags.
+
+    NO THIRD CLAIM
+
+    A task is claimed at most twice and requeued at most once (ADR-1155, AF-0465 to
+    AF-0474). A run that splits a task for size files every part, the rest of the task
+    included, as tasks of their own and moves the task to Deferred, never back to Backlog
+    to wait on its own subtasks; a run out of time hands its task back with its work for the
+    shift to stash, without filing the rest as a task it waits on. And when a run sends a
+    task back to Backlog whose Log already shows a Doing -> Backlog move (a requeue or a
+    park; not a claim released unstarted at the shift's end), the shift splits it with the
+    same bounded split run, carrying any stash to the new tasks; a split skipped or failed
+    blocks it for Stewart to triage. -TestTaskStash proves it.
 
     THE MODEL PER TASK
 
@@ -129,6 +142,10 @@
       at once              out of tokens, when the new session starts and how long until then
       -LimitWarnSeconds    before the reset: the new session is about to start
       on resuming          the new session has started, and which task it resumed
+
+    Stopping a lane stops its process tree and the MSBuild worker nodes found under it, and a
+    lane's runs build with node reuse off (MSBUILDDISABLENODEREUSE=1), so none is left behind;
+    a node is never stopped by name, so Visual Studio's and other checkouts' are untouched (BL-4348).
 
     Lanes survive being stopped. Each lane records its process and the task it holds in
     <repo>.logs\lanes-<stamp>\; the coordinator restarts a lane whose process has died (five tries
@@ -229,7 +246,13 @@
     task names the test, or when a finished task names it and the failing run predates that
     task's last commit. The task is committed in a detached worktree,
     <repo>.lanes\ci-watch, and pushed straight to the shift's branch, so lanes claim it on
-    their next claim; each filing is traced "ci filed: ..." and whispered through
+    their next claim. A CI fix goes first (ADR-1158): a claim takes the oldest ready CI-fix
+    task before anything task-board.ps1 next offers, even when its touches overlap a task in
+    Doing (that lane rebases over the fix); a lane's requeue of one keeps no other lane of
+    the shift from it; when it has waited 2 minutes with every lane busy, the coordinator
+    adds a lane for it (traced "BL-### lanes lane <n> added for this CI fix: ..."), up to 16,
+    which the next lane step retires once idle; and a lane integrating one waits for the
+    integrate lock ahead of the others. Each filing is traced "ci filed: ..." and whispered through
     .claude\hooks\whisper-milestone.ps1. Each run it examines is traced "ci run <id> ...":
     green, or each failure and whether it was filed, covered by a task, or is waiting for a
     run to confirm it - once per run, and again when that changes. The watch also runs while
@@ -260,7 +283,8 @@
     branch factory/lane-<n>), all feeding the branch this checkout is on:
 
       claim      A lane takes the next task the board offers - one whose `touches` do
-                 not overlap any task in Doing - moves it to Doing, commits and pushes
+                 not overlap any task in Doing, or a ready CI fix before it, whatever it
+                 overlaps (ADR-1158) - moves it to Doing, commits and pushes
                  that move. The push is the lock: if another lane got there first, the
                  push is refused, traced as "race", and the lane picks again. Only
                  a pushed claim is traced as "claim".
@@ -375,6 +399,23 @@
     live board page reads it. -TestHeartbeat rehearses the files, the merge and the
     commit, without pushing.
 
+    COORDINATOR WATCHDOG
+
+    A coordinator that hangs would stop the CI watch, the heartbeats and every lane restart
+    while the lanes carry on (BL-4353). Two guards. The coordinator's gh calls and its git
+    fetch, push, pull, ls-remote and clone calls run with a 180 second timeout; a call that
+    gives no answer is stopped, traced ("timeout") and exits 124, and the loop goes on. And
+    each pass of its loop the coordinator stamps <repo>.logs\lanes-<stamp>\coordinator.stamp
+    (its pid, the time, the shift's end and its arguments). Every lane checks the stamp once
+    a minute with its heartbeat; when the loop has not completed for 3 heartbeat intervals
+    (-HeartbeatMinutes, 3 when publishing is off) and the shift has time left, the first lane
+    to create coordinator.replacing stops the coordinator and what it started (a stuck git or
+    gh) - never a lane - and starts a new coordinator with the same arguments, -Hours set to
+    the time left, the shift's -ShiftStamp and -TakeOverShift. That coordinator starts no
+    lane: it takes the shift's running lanes as its own, traces "watchdog", and goes on.
+    A replacement not stamping within 10 minutes is replaced again. -TestCoordinatorWatchdog
+    proves the decision, the stamp, the processes stopped and the timeout.
+
     MACHINE PROBE (-ProbeMachine)
 
     Measures how many lanes this PC sustains, since parallel builds are a shift's CPU
@@ -385,7 +426,9 @@
     wall time is recorded but decides nothing (BL-812). The cap is the largest passing k (at
     least 1), found at the first failing step, 16, or -ProbeMaxLanes. The result goes to
     <repo>.lanes\machine-lanes.json (marked incomplete when -ProbeMaxLanes cut it short)
-    and the probe folder is deleted. Run it only when no shift is building.
+    and the probe folder is deleted. Its builds run with MSBuild node reuse off, and any worker
+    node still found under a build when its step ends is stopped, so no step leaves nodes that
+    hold memory for the next (BL-4348). Run it only when no shift is building.
 
     AUDIT CADENCE (BL-1022)
 
@@ -454,7 +497,8 @@ param(
     # defers the original (Blocked only if the split is skipped or fails). 0 means no cap (ADR-0288, ADR-0407, ADR-0478, ADR-0759).
     [double]$TaskBudgetUsd = 10,
     # The most turns a single headless run may take (claude's --max-turns); a run that
-    # reaches it stops, since its task is too big for one run. 0 means no cap (BL-3001).
+    # reaches it stops, since its task is too big for one run, and its task gets the bounded
+    # split run (ADR-1155). 0 means no cap (BL-3001).
     [ValidateRange(0, 1000)][int]$MaxRunTurns = 80,
     # Model for every run, or auto (the default) to choose one per task; see THE MODEL PER
     # TASK above. "opus" is the moving alias RunClaude.cmd also uses.
@@ -491,6 +535,12 @@ param(
     [switch]$Restart,
     # Prove which lanes -Restart may stop from their heartbeat phases, and exit.
     [switch]$TestRestart,
+    # Prove the coordinator watchdog's stale-stamp decision, the stamp file, the processes a
+    # replacement stops and the timeout on gh and git calls (BL-4353), and exit.
+    [switch]$TestCoordinatorWatchdog,
+    # Start as the replacement for a coordinator that stopped working: with -ShiftStamp it
+    # keeps that shift's running lanes instead of starting any. Started by a lane's watchdog.
+    [switch]$TakeOverShift,
     # Prove how failing test names are read from dotnet test output, and exit.
     [switch]$TestFlakyTests,
     # Prove, on a throwaway repository, which test projects a lane's commits select for the
@@ -519,8 +569,10 @@ param(
     # launcher, and that a claude -p run inherits it, and exit.
     [switch]$TestLaneMarker,
     # Prove, on a throwaway repository, that a park pushes its move to Backlog or reports
-    # that it could not, how shift start settles a task in Doing held by no lane, and that a
-    # refused start raises the alarm (BL-1071), and exit.
+    # that it could not, how shift start settles a task in Doing held by no lane (adopted,
+    # or back to Backlog when no work for it exists, refused only when a lane branch holds
+    # commits beyond the shift branch), that a claim past the shift's end is released to
+    # Backlog, and that a refused start raises the alarm (BL-1071, BL-4347), and exit.
     [switch]$TestPark,
     # Prove, on a throwaway repository, that a claim applies its task's own shift stash and
     # no other, and that a stash that no longer applies leaves the worktree clean and the

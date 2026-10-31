@@ -2,12 +2,13 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh;
-using Curl.Protocol.Ssh.Authentication;
-using Curl.Protocol.Ssh.Connection;
-using Curl.Protocol.Ssh.KeyExchange;
-using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Ssh.Sftp;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh;
+using Curl.Ssh.Authentication;
+using Curl.Ssh.Connection;
+using Curl.Ssh.KeyExchange;
+using Curl.Ssh.Negotiation;
+using Curl.Ssh.Transport;
 
 namespace Curl.Conformance.SshServer;
 

@@ -6,7 +6,8 @@ namespace Curl.Extension.Abstractions.Transfer;
 /// before curl's output, each hook may answer the transfer itself or replace the response the handler
 /// received (ADR-1019), and each hook reads the result before curl reports it. When a hook asks for the
 /// transfer to be repeated (ADR-1009), it waits that long on the transfer's <see cref="TimeProvider" /> and
-/// runs the handler again, asking the hooks' request headers afresh.
+/// runs the handler again, asking the hooks' request headers afresh; a cancellation during that wait
+/// propagates as an <see cref="OperationCanceledException" />, never as the earlier result.
 /// </summary>
 /// <param name="handler">Curl's handler.</param>
 /// <param name="hooks">The hooks, in the order they see the request; the first sees the body first.</param>
@@ -28,11 +29,7 @@ internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, I
         TransferResult result = await ExecuteOnceAsync(context, output).ConfigureAwait(false);
         for (TimeSpan? delay = RepeatAfter(result); delay is { } wait; delay = RepeatAfter(result))
         {
-            if (!await WaitAsync(context, wait).ConfigureAwait(false))
-            {
-                break;
-            }
-
+            await Task.Delay(wait, context.TimeProvider, context.CancellationToken).ConfigureAwait(false);
             result = await ExecuteOnceAsync(context, output).ConfigureAwait(false);
         }
 
@@ -77,18 +74,4 @@ internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, I
     /// <summary>Gives the delay the first hook asking for a repeat names, or <see langword="null" /> when none asks.</summary>
     private TimeSpan? RepeatAfter(TransferResult result) =>
         hooks.Select(hook => hook.RepeatAfter(result)).FirstOrDefault(delay => delay is not null);
-
-    /// <summary>Waits <paramref name="delay" /> on the transfer's clock; <see langword="false" /> when the transfer was cancelled first.</summary>
-    private static async ValueTask<bool> WaitAsync(ITransferContext context, TimeSpan delay)
-    {
-        try
-        {
-            await Task.Delay(delay, context.TimeProvider, context.CancellationToken).ConfigureAwait(false);
-            return true;
-        }
-        catch (OperationCanceledException)
-        {
-            return false;
-        }
-    }
 }

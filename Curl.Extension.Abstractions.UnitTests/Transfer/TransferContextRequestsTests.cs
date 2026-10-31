@@ -19,6 +19,31 @@ public sealed class TransferContextRequestsTests
     }
 
     [TestMethod]
+    public void WithRequest_Body_IsSentAsTheHttpBodyAndPostData()
+    {
+        TransferContext own = new() { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), Http = new HttpRequestOptions() };
+
+        ITransferContext given = own.WithRequest(CurlUrl.Parse("http://example.com/dav/"), "PROPFIND", new byte[] { 2, 3 });
+
+        BytesBody body = (BytesBody)given.Http!.Body!;
+        CollectionAssert.AreEqual(new byte[] { 2, 3 }, body.Content.ToArray());
+        Assert.AreEqual("application/x-www-form-urlencoded", body.ContentType);
+        CollectionAssert.AreEqual(new byte[] { 2, 3 }, given.PostData!.Value.ToArray());
+        Assert.IsNull(own.Http.Body);
+    }
+
+    [TestMethod]
+    public void WithRequest_NoBody_KeepsTheHttpBodyItHas()
+    {
+        BytesBody ownBody = new(new byte[] { 9 }, "text/plain");
+        TransferContext own = new() { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), Http = new HttpRequestOptions { Body = ownBody } };
+
+        ITransferContext given = own.WithRequest(CurlUrl.Parse("http://example.com/other"), "GET", null);
+
+        Assert.AreSame(ownBody, given.Http!.Body);
+    }
+
+    [TestMethod]
     public void WithRequest_NoMethodOrBody_KeepsItsOwn()
     {
         TransferContext own = new() { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), PostData = new byte[] { 1 }, Http = new HttpRequestOptions { CustomMethod = "PUT" } };
@@ -47,6 +72,61 @@ public sealed class TransferContextRequestsTests
 
         Assert.ThrowsExactly<ArgumentNullException>(() => TransferContextRequests.WithRequest(null!, own.Url, null, null));
         Assert.ThrowsExactly<ArgumentNullException>(() => own.WithRequest(null!, null, null));
+    }
+
+    [TestMethod]
+    public void WithoutOwnHeaders_HttpTransfer_ClearsHeadersAndCredentialsButKeepsMethodAndProxyHeaders()
+    {
+        TransferContext own = new()
+        {
+            Url = CurlUrl.Parse("http://example.com/"),
+            Output = new MemoryStream(),
+            Credentials = new System.Net.NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions
+            {
+                Headers = ["X-Own: 1"],
+                ProxyHeaders = ["X-Proxy: 1"],
+                CustomMethod = "PUT",
+                UserAgent = "ua",
+                Referer = "http://r/",
+                AutoReferer = true,
+                BearerToken = "t",
+                AwsSigV4 = "aws:amz",
+            },
+        };
+
+        ITransferContext given = own.WithoutOwnHeaders();
+
+        Assert.IsNull(given.Credentials);
+        Assert.IsEmpty(given.Http!.Headers);
+        CollectionAssert.AreEqual(new[] { "X-Proxy: 1" }, given.Http.ProxyHeaders.ToArray());
+        Assert.AreEqual("PUT", given.Http.CustomMethod);
+        Assert.IsNull(given.Http.UserAgent);
+        Assert.IsNull(given.Http.Referer);
+        Assert.IsFalse(given.Http.AutoReferer);
+        Assert.IsFalse(given.Http.SendsCookieStrings);
+        Assert.IsNull(given.Http.BearerToken);
+        Assert.IsNull(given.Http.AwsSigV4);
+        Assert.IsNull(given.Http.HttpSignature);
+        Assert.IsNotNull(own.Credentials);
+        Assert.HasCount(1, own.Http.Headers);
+    }
+
+    [TestMethod]
+    public void WithoutOwnHeaders_TransferThatIsNotHttp_HasNoHttpOptionsAndNoCredentials()
+    {
+        TransferContext own = new() { Url = CurlUrl.Parse("ftp://example.com/"), Output = new MemoryStream(), Credentials = new System.Net.NetworkCredential("u", "p") };
+
+        ITransferContext given = own.WithoutOwnHeaders();
+
+        Assert.IsNull(given.Http);
+        Assert.IsNull(given.Credentials);
+    }
+
+    [TestMethod]
+    public void WithoutOwnHeaders_WithoutAContext_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => TransferContextRequests.WithoutOwnHeaders(null!));
     }
 
     [TestMethod]

@@ -74,20 +74,47 @@ function Get-DetachedStartCommand {
     return @{ FilePath = 'sh'; LogPath = $log; ArgumentList = @('-c', $command) }
 }
 
-function Stop-FactoryProcessTree {
-    # Stops process $ProcessId and everything under it: taskkill /T /F on Windows, else the
-    # descendants found through Get-FactoryProcessTable, deepest first, then the process.
-    param([int]$ProcessId)
-    if (Test-FactoryOnWindows) { & taskkill /PID $ProcessId /T /F 2>&1 | Out-Null; return }
-    $table = @(Get-FactoryProcessTable)
+function Get-FactoryDescendantIds {
+    # $RootId and every process under it in $Table (ProcessId, ParentProcessId rows), the
+    # root first and each level after the one above it.
+    param([object[]]$Table, [int]$RootId)
     $order = [System.Collections.Generic.List[int]]::new()
     $queue = [System.Collections.Generic.Queue[int]]::new()
-    $queue.Enqueue($ProcessId)
+    $queue.Enqueue($RootId)
     while ($queue.Count -gt 0) {
         $parent = $queue.Dequeue()
         $order.Add($parent)
-        foreach ($child in @($table | Where-Object { $_.ParentProcessId -eq $parent })) { $queue.Enqueue([int]$child.ProcessId) }
+        foreach ($child in @($Table | Where-Object { $_.ParentProcessId -eq $parent -and $_.ProcessId -ne $parent })) { $queue.Enqueue([int]$child.ProcessId) }
     }
+    return @($order)
+}
+
+function Get-MsBuildNodeIdsUnder {
+    # The MSBuild worker nodes (dotnet ... MSBuild.dll /nodemode:N) among $RootIds and their
+    # descendants in $Table. Attribution is by parentage alone, never by name, so a node
+    # Visual Studio or another checkout's build started is never in the answer (BL-4348).
+    param([object[]]$Table, [int[]]$RootIds)
+    $under = foreach ($rootId in $RootIds) { Get-FactoryDescendantIds -Table $Table -RootId $rootId }
+    $ids = @($under | Select-Object -Unique)
+    return @($Table | Where-Object { $ids -contains [int]$_.ProcessId -and "$($_.CommandLine)" -match 'MSBuild' -and "$($_.CommandLine)" -match '/nodemode:' } |
+        ForEach-Object { [int]$_.ProcessId })
+}
+
+function Stop-FactoryProcessTree {
+    # Stops process $ProcessId and everything under it: taskkill /T /F on Windows, else the
+    # descendants found through Get-FactoryProcessTable, deepest first, then the process.
+    # MSBuild worker nodes under it are found first and stopped by id after, because a
+    # reusable node can outlive the tree taskkill walks (BL-4348).
+    param([int]$ProcessId)
+    $table = @(Get-FactoryProcessTable)
+    if (Test-FactoryOnWindows) {
+        $nodes = @(Get-MsBuildNodeIdsUnder -Table $table -RootIds @($ProcessId))
+        & taskkill /PID $ProcessId /T /F 2>&1 | Out-Null
+        foreach ($id in $nodes) { & taskkill /PID $id /F 2>&1 | Out-Null }
+        return
+    }
+    $order = [System.Collections.Generic.List[int]]::new()
+    $order.AddRange([int[]]@(Get-FactoryDescendantIds -Table $table -RootId $ProcessId))
     $order.Reverse()
     foreach ($id in $order) { & kill -9 $id 2>&1 | Out-Null }
 }
@@ -270,6 +297,8 @@ function New-ClaudeRunStartInfo {
     $psi.WorkingDirectory = $Root
     $psi.EnvironmentVariables['BASH_DEFAULT_TIMEOUT_MS'] = '1800000'
     $psi.EnvironmentVariables['BASH_MAX_TIMEOUT_MS'] = '3600000'
+    # Builds exit with their MSBuild worker nodes, so stopping the run leaves none behind (BL-4348).
+    $psi.EnvironmentVariables['MSBUILDDISABLENODEREUSE'] = '1'
     $psi.UseShellExecute = $false
     $psi.RedirectStandardInput = $true
     $psi.RedirectStandardOutput = $true
@@ -286,7 +315,15 @@ if ($TestLaneMarker) {
         @('a shift launcher off Windows logs to the -start log', ((Get-DetachedStartCommand -ScriptPath '/r/x.ps1' -ScriptArgs @() -LogDir '/l' -Stamp 'S' -OnWindows $false).LogPath), (Join-Path '/l' 'DarkFactory-S-start.log')),
         @('lane 3 is marked 3', (Get-LaneMarker -ForLane 3), '3'),
         @('a coordinator or single-lane shift is marked 0', (Get-LaneMarker -ForLane 0), '0'),
-        @('a -NewTab or -Restart launcher is not marked', (Get-LaneMarker -ForLane 0 -Launcher), '')
+        @('a -NewTab or -Restart launcher is not marked', (Get-LaneMarker -ForLane 0 -Launcher), ''),
+        @('a claude -p run turns MSBuild node reuse off', (New-ClaudeRunStartInfo 'x').EnvironmentVariables['MSBUILDDISABLENODEREUSE'], '1'),
+        @('only nodes under the stopped process are found', ((Get-MsBuildNodeIdsUnder -RootIds @(10) -Table @(
+            [pscustomobject]@{ ProcessId = 10; ParentProcessId = 1; CommandLine = 'dotnet build' }
+            [pscustomobject]@{ ProcessId = 11; ParentProcessId = 10; CommandLine = 'dotnet MSBuild.dll /nodemode:1 /nodeReuse:true' }
+            [pscustomobject]@{ ProcessId = 12; ParentProcessId = 11; CommandLine = 'dotnet MSBuild.dll /nodemode:1 /nodeReuse:true' }
+            [pscustomobject]@{ ProcessId = 13; ParentProcessId = 10; CommandLine = 'dotnet other.dll' }
+            [pscustomobject]@{ ProcessId = 20; ParentProcessId = 2; CommandLine = 'dotnet MSBuild.dll /nodemode:1 /nodeReuse:true' }
+            [pscustomobject]@{ ProcessId = 21; ParentProcessId = 20; CommandLine = 'dotnet MSBuild.dll /nodemode:1 /nodeReuse:true' })) -join ','), '11,12')
     )
     $saved = $env:CURL_DARK_FACTORY_LANE
     try {

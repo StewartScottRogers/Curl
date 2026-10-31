@@ -12,7 +12,8 @@ namespace Curl.Console;
 /// It builds the same runner as <c>UpstreamConformanceTests.RunCurlAsync</c>: one run connection cache, so a later request
 /// or URL reuses a kept-alive connection as the executable does (BL-1795), the progress meter
 /// on, and every <c>%output{}</c> target of a <c>-w</c> template written to disk, with each line
-/// feed as CR LF on Windows (ADR-0081).
+/// feed as CR LF on Windows (ADR-0081), and the command line read as an ECH build, so <c>--ech</c> is
+/// accepted as the harness that lists ECH among the features expects (BL-4381, ADR-0918).
 /// </summary>
 public static class InProcessCurl
 {
@@ -48,7 +49,8 @@ public static class InProcessCurl
             securityContexts: EngineComposition.CreateDialingSecurityContextFactory(connector, datagramConnector, null, usesHandBuiltNtlm: true),
             runConnections: new ConnectionCache(TimeProvider.System),
             writesProgressMeter: true,
-            writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows())).RunAsync(arguments);
+            writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows()),
+            parsesAsEchBuild: true).RunAsync(arguments);
     }
 
     /// <summary>
@@ -188,7 +190,7 @@ public static class InProcessCurl
 
     /// <summary>
     /// Builds the dialing runner every dialing overload runs: the progress meter on, and the <c>-w</c>
-    /// <c>%output{}</c> targets written to disk with CR LF line feeds on Windows.
+    /// <c>%output{}</c> targets written to disk with CR LF line feeds on Windows, and <c>--ech</c> accepted.
     /// </summary>
     private static CurlCommandRunner CreateDialingRunner(
         Stream standardOutput,
@@ -212,5 +214,6 @@ public static class InProcessCurl
             usesHandBuiltNtlm: true,
             readEnvironmentVariable: readEnvironmentVariable,
             defaultConfigFileSearch: defaultConfigFileSearch,
-            ftpListener: ftpListener);
+            ftpListener: ftpListener,
+            parsesAsEchBuild: true);
 }

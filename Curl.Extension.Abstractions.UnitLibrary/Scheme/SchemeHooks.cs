@@ -28,13 +28,13 @@ public sealed class SchemeHooks
     /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>
     /// <param name="services">What the host lends the hook's handler (ADR-1039).</param>
     /// <returns>The activated hook, or <see cref="None" />.</returns>
-    /// <exception cref="ArgumentException">Two or more extensions' options claim curl's schemes; the message names each option.</exception>
+    /// <exception cref="ExtensionHookConflictException">Two or more extensions' options claim curl's schemes; the message names each option.</exception>
     public static SchemeHooks ActivatedBy(ExtensionOptionValues values, IEnumerable<Func<ExtensionOptionValues, ISchemeHook?>> activators, TransferHookServices services)
     {
         ArgumentNullException.ThrowIfNull(services);
         ISchemeHook[] hooks = [.. activators.Select(activator => activator(values)).OfType<ISchemeHook>()];
         return hooks.Length > 1
-            ? throw new ArgumentException($"the options {string.Join(" and ", hooks.Select(hook => $"--{hook.Option.Name}"))} each serve a curl scheme in place of curl's handler; give only one of them", nameof(values))
+            ? throw new ExtensionHookConflictException($"the options {string.Join(" and ", hooks.Select(hook => $"--{hook.Option.Name}"))} each serve a curl scheme in place of curl's handler; give only one of them")
             : new SchemeHooks(hooks.SingleOrDefault(), services);
     }
 

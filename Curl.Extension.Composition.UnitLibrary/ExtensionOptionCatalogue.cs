@@ -13,7 +13,10 @@ internal static class ExtensionOptionCatalogue
     internal static IReadOnlyList<ExtensionOption> Entries { get; } =
     [
         Curl.Extension.NamedPipe.NamedPipeExtension.Option,
+        Curl.Extension.SshJump.SshJumpExtension.Option,
         Curl.Extension.VirtualMachineSocket.VirtualMachineSocketExtension.Option,
+        Curl.Extension.QuicMigration.QuicMigrationExtension.Option,
+        Curl.Extension.WireGuard.WireGuardExtension.Option,
         GraphQl.GraphQlOptions.Document,
         GraphQl.GraphQlOptions.Variables,
         GraphQl.GraphQlOptions.Operation,
@@ -25,6 +28,9 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.Option,
         Curl.Extension.HttpCache.HttpCacheExtension.Option,
         Curl.Extension.SegmentedDownload.SegmentedDownloadExtension.Option,
+        Curl.Extension.ResumableUpload.ResumableUploadExtension.Option,
+        Curl.Extension.WebDavTools.WebDavToolsExtension.ListOption,
+        Curl.Extension.WebDavTools.WebDavToolsExtension.SyncOption,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.Option,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.SeedOption,
         Curl.Extension.Checksum.ChecksumExtension.Option,
@@ -54,9 +60,11 @@ internal static class ExtensionOptionCatalogue
         OpenApi.OpenApiOptions.Operation,
         OpenApi.OpenApiOptions.Server,
         Curl.Extension.ContentDigest.ContentDigestExtension.Option,
+        Curl.Extension.StructuredFields.StructuredFieldsExtension.Option,
         Curl.Extension.Har.HarExtension.Option,
         Curl.Extension.ClientHints.ClientHintsExtension.Option,
         Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.Option,
+        Curl.Extension.Dane.DaneExtension.Option,
         Curl.Extension.OpenTelemetry.OpenTelemetryExtension.Option,
         Curl.Extension.CodeGeneration.CodeGenerationExtension.CSharpOption,
         Curl.Extension.CodeGeneration.CodeGenerationExtension.PowerShellOption,
@@ -71,5 +79,9 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.UserFromKeychainOption,
         Curl.Extension.Dpop.DpopExtension.Option,
         Grpc.Client.GrpcExtension.ProtoOption,
+        Curl.Extension.Masque.MasqueExtension.Option,
+        Curl.Extension.CompressionDictionary.CompressionDictionaryExtension.Option,
+        Curl.Extension.ObliviousHttp.ObliviousHttpExtension.RelayOption,
+        Curl.Extension.ObliviousHttp.ObliviousHttpExtension.KeysOption,
     ];
 }

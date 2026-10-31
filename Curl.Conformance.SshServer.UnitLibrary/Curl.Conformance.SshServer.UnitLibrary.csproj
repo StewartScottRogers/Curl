@@ -3,6 +3,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Conformance.SshServer.UnitTests" />
     <InternalsVisibleTo Include="Curl.Conformance.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Extension.SshJump.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>

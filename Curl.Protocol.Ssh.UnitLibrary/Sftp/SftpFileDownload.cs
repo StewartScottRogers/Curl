@@ -1,5 +1,6 @@
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh;
+using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Sftp;
 

@@ -4,29 +4,25 @@ using Curl.Http2;
 namespace Curl.Extension.Grpc.Client;
 
 /// <summary>
-/// Makes one gRPC call on a new HTTP/2 connection (PROTOCOL-HTTP2.md "Requests" and "Responses"): sends the
+/// Makes one gRPC call on its own stream of an HTTP/2 connection (PROTOCOL-HTTP2.md "Requests" and "Responses"): sends the
 /// Request-Headers and one Length-Prefixed-Message ending the stream, and reads the Response-Headers, every
 /// Length-Prefixed-Message and the Trailers, or a Trailers-Only response.
 /// </summary>
 internal static class GrpcHttp2Call
 {
     /// <summary>Makes the call.</summary>
-    /// <param name="transport">The byte stream the connection runs on, past any TLS handshake; the caller owns it.</param>
+    /// <param name="session">The HTTP/2 connection the call opens its stream on; the caller owns it.</param>
     /// <param name="headers">The Request-Headers, names lower case, pseudo-headers first.</param>
     /// <param name="message">The request message's binary form.</param>
     /// <param name="cancellationToken">Cancels the call.</param>
     /// <returns>The response's messages and status.</returns>
     /// <exception cref="GrpcWireException">The response breaks PROTOCOL-HTTP2.md.</exception>
     /// <exception cref="GrpcClientException">The server closed the connection before the call ended (exit 16).</exception>
-    public static async Task<GrpcCallResult> RunAsync(Stream transport, IReadOnlyList<KeyValuePair<string, string>> headers, byte[] message, CancellationToken cancellationToken)
+    public static async Task<GrpcCallResult> RunAsync(GrpcHttp2Session session, IReadOnlyList<KeyValuePair<string, string>> headers, byte[] message, CancellationToken cancellationToken)
     {
-        var connection = new Http2Connection(transport);
-        await connection.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
-        int streamId = connection.OpenStream();
-        byte[] block = new HpackEncoder().Encode(headers.Select(static header => new HeaderField(header.Key, header.Value)));
-        await connection.WriteHeadersAsync(streamId, block, isEndStream: false, cancellationToken).ConfigureAwait(false);
-        Http2StreamFrame? early = await SendMessageAsync(connection, streamId, LengthPrefixedMessage.Frame(message, isCompressed: false), cancellationToken).ConfigureAwait(false);
-        return await ReadResponseAsync(connection, early, cancellationToken).ConfigureAwait(false);
+        int streamId = await session.OpenStreamAsync(headers, cancellationToken).ConfigureAwait(false);
+        Http2StreamFrame? early = await SendMessageAsync(session.Connection, streamId, LengthPrefixedMessage.Frame(message, isCompressed: false), cancellationToken).ConfigureAwait(false);
+        return await ReadResponseAsync(session, early, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -52,9 +48,10 @@ internal static class GrpcHttp2Call
         }
     }
 
-    private static async Task<GrpcCallResult> ReadResponseAsync(Http2Connection connection, Http2StreamFrame? early, CancellationToken cancellationToken)
+    private static async Task<GrpcCallResult> ReadResponseAsync(GrpcHttp2Session session, Http2StreamFrame? early, CancellationToken cancellationToken)
     {
-        var response = new ResponseReader();
+        Http2Connection connection = session.Connection;
+        var response = new ResponseReader(session.Decoder);
         Http2StreamFrame? frame = early ?? await connection.ReadStreamFrameAsync(cancellationToken).ConfigureAwait(false);
         while (frame is not null)
         {
@@ -70,9 +67,9 @@ internal static class GrpcHttp2Call
     }
 
     /// <summary>Reads one response's stream frames in order: the Response-Headers, the messages and the Trailers.</summary>
-    private sealed class ResponseReader
+    /// <param name="decoder">The connection's HPACK decoder.</param>
+    internal sealed class ResponseReader(HpackDecoder decoder)
     {
-        private readonly HpackDecoder decoder = new();
         private readonly LengthPrefixedMessageReader reader = new();
         private bool isHeadRead;
 

@@ -57,12 +57,11 @@ public sealed class SchemeHooksTests
     [TestMethod]
     public void ActivatedBy_WithTwoExtensionsClaimingCurlsSchemes_FailsNamingBothOptions()
     {
-        ArgumentException failure = Assert.ThrowsExactly<ArgumentException>(() => SchemeHooks.ActivatedBy(
+        ExtensionHookConflictException failure = Assert.ThrowsExactly<ExtensionHookConflictException>(() => SchemeHooks.ActivatedBy(
             ValuesOf(Connect, Relay),
             [ExampleHook.ActivatedBy(Connect, new ExampleHook(Connect)), ExampleHook.ActivatedBy(Relay, new ExampleHook(Relay))],
             UnusedTransferHookServices.Create()));
 
-        Assert.AreEqual("values", failure.ParamName);
         StringAssert.StartsWith(failure.Message, "the options --example-connect and --example-relay each serve a curl scheme in place of curl's handler; give only one of them");
     }
 

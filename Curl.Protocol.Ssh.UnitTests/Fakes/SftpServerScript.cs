@@ -1,8 +1,8 @@
 using System.Buffers.Binary;
 using System.Text;
-using Curl.Protocol.Ssh.Connection;
 using Curl.Protocol.Ssh.Sftp;
-using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
+using Curl.Ssh.Fakes;
+using static Curl.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Fakes;
 

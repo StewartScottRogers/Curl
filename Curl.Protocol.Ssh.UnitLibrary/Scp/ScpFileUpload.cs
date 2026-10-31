@@ -1,8 +1,9 @@
 using System.Globalization;
 using System.Text;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Connection;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh;
+using Curl.Ssh.Connection;
+using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Scp;
 

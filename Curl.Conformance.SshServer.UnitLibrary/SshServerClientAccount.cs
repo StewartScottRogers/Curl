@@ -1,6 +1,6 @@
 using System.Text;
 using Curl.Cryptography;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh.Transport;
 
 namespace Curl.Conformance.SshServer;
 

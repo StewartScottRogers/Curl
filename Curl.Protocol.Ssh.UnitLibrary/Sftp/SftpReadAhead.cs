@@ -1,3 +1,5 @@
+using Curl.Ssh;
+
 namespace Curl.Protocol.Ssh.Sftp;
 
 /// <summary>

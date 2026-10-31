@@ -13,7 +13,14 @@ injected interfaces so it can be unit tested without a network. See
 ## Toolchain
 - .NET Software Development Kit 10 (`global.json` at the repository root pins SDK 10.0.401 with `rollForward: latestFeature`). Target framework: `net10.0` unless a project states otherwise.
 - The solution file lives at the repository root (`Curl.slnx` preferred, `Curl.sln` acceptable).
-- Shell is Windows. Use PowerShell or `cmd` syntax, backslash paths are fine.
+- The repository is worked on Windows, Linux and macOS (BL-3934). Every script is one PowerShell
+  copy that runs under Windows PowerShell and, off Windows, PowerShell 7 (`pwsh`, required); each
+  `.cmd` entry point has a `.sh` launcher beside it: `RunDarkFactory.sh`, `RunClaude.sh`,
+  `hrdrClaudeNative.sh`, `Audit/RunAudit.sh`, `Gap/RunGapAnalysis.sh`, `Measure-CodeQuality.sh`,
+  `Record-CurlExchange.sh`, `Record-StapledOcspExchange.sh`, `New-DifferentialPki.sh`,
+  `Set-DifferentialEnvironment.sh`, `Update-PublicSuffixList.sh`, `Setup-UnixFactoryHost.sh` and
+  `install.sh`. On Windows, PowerShell or `cmd` syntax and backslash paths are fine; in a script,
+  build paths with `Join-Path` or forward slashes so it runs everywhere.
 
 ## Build and test commands
 - Build: `dotnet build`
@@ -169,7 +176,10 @@ alarm. `-Lanes Auto` paces lanes to the 5-hour window only; `-WeeklyPace` also s
 the weekly budget evenly to its reset (ADR-0130, BL-806). Lane runs load
 `DarkFactory/LaneRules.md` in place of this file, with no user-level settings, plugins or
 MCP servers and a `-MaxRunTurns` turn cap, so a rule a lane needs goes in both files
-(BL-3001). The factory picks the Claude
+(BL-3001). A task is claimed at most twice (ADR-1155): a split for size defers the task
+and files every part of it, the rest included, as new tasks, and a task that reaches the
+turn cap or is sent back to `Backlog` a second time gets the bounded split run instead of
+a third claim. The factory picks the Claude
 model per task - a task's front-matter `model:` wins, else opus for security, crypto,
 feature, protocol, retried and CI-fix work and sonnet for the rest, a routine feature
 task (an upstream unit program port, a harness stand-in and the like, naming no hard
@@ -196,6 +206,11 @@ failed jobs of the one still running, ADR-0811)
 Linux and macOS", or "Fix flaky CI test <test> ..." for one that failed once between
 passing runs - with the run, platforms, first failing commit, error message and the test's
 project and library as `touches`. A test a live task already names is not filed again.
+A CI fix goes first (ADR-1158): a lane's claim takes a ready one before anything `next`
+offers, even over a task in Doing that holds its files, and its run never sends it back to
+wait for that task; a lane's requeue of one keeps no other lane from it; with every lane
+busy for 2 minutes the coordinator adds a lane for it; and its integration waits for the
+integrate lock ahead of ordinary work.
 
 Every session, lanes included, whispers milestones to Stewart through the PostToolUse hook
 `.claude/hooks/whisper-milestone.ps1`: a task moved to Done, a CI failure filed, a commit

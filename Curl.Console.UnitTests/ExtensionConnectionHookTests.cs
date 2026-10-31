@@ -66,6 +66,16 @@ public sealed class ExtensionConnectionHookTests
     }
 
     [TestMethod]
+    public void ExtensionConnectionHooksOf_ActivatorThrowsArgumentNull_IsNotReportedAsAnOptionConflict()
+    {
+        ArgumentNullException failure = Assert.ThrowsExactly<ArgumentNullException>(() => CurlComposition.ExtensionConnectionHooksOf(
+            new CommandLineOptions(),
+            [_ => throw new ArgumentNullException("extensionBug")]));
+
+        Assert.AreEqual("extensionBug", failure.ParamName);
+    }
+
+    [TestMethod]
     public void ExtensionConnectionHooksOf_NoExtensionOptionGiven_PassesNoConnectorToTheEngine()
     {
         ConnectionHooks hooks = CurlComposition.ExtensionConnectionHooksOf(new CommandLineOptions(), [ActivatedByPipe, ActivatedByTunnel]);

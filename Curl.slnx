@@ -270,6 +270,10 @@
     <Project Path="Curl.Quic.UnitLibrary/Curl.Quic.UnitLibrary.csproj" />
     <Project Path="Curl.Quic.UnitTests/Curl.Quic.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/Wire/Ssh/">
+    <Project Path="Curl.Ssh.UnitLibrary/Curl.Ssh.UnitLibrary.csproj" />
+    <Project Path="Curl.Ssh.UnitTests/Curl.Ssh.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Wire/WebSocket/">
     <Project Path="Curl.WebSocket.UnitLibrary/Curl.WebSocket.UnitLibrary.csproj" />
     <Project Path="Curl.WebSocket.UnitTests/Curl.WebSocket.UnitTests.csproj" />
@@ -316,6 +320,8 @@
     <Project Path="Curl.Extension.Composition.UnitTests/Curl.Extension.Composition.UnitTests.csproj" />
   </Folder>
   <!-- A new extension adds ONE line directly below this comment: a single-line <Folder Name="/Extensions/<Name>/"> holding its UnitLibrary and UnitTests <Project/> elements. One line, so merge=union keeps two branches' lines whole (ADR-1003). -->
+  <Folder Name="/Extensions/SshJump/"><Project Path="Curl.Extension.SshJump.UnitLibrary/Curl.Extension.SshJump.UnitLibrary.csproj" /><Project Path="Curl.Extension.SshJump.UnitTests/Curl.Extension.SshJump.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/StructuredFields/"><Project Path="Curl.Extension.StructuredFields.UnitLibrary/Curl.Extension.StructuredFields.UnitLibrary.csproj" /><Project Path="Curl.Extension.StructuredFields.UnitTests/Curl.Extension.StructuredFields.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/OsCredentialStore/"><Project Path="Curl.Extension.OsCredentialStore.UnitLibrary/Curl.Extension.OsCredentialStore.UnitLibrary.csproj" /><Project Path="Curl.Extension.OsCredentialStore.UnitTests/Curl.Extension.OsCredentialStore.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/Dpop/"><Project Path="Curl.Extension.Dpop.UnitLibrary/Curl.Extension.Dpop.UnitLibrary.csproj" /><Project Path="Curl.Extension.Dpop.UnitTests/Curl.Extension.Dpop.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/GrpcWeb/"><Project Path="Curl.Extension.GrpcWeb.UnitLibrary/Curl.Extension.GrpcWeb.UnitLibrary.csproj" /><Project Path="Curl.Extension.GrpcWeb.UnitTests/Curl.Extension.GrpcWeb.UnitTests.csproj" /></Folder>
@@ -334,6 +340,7 @@
   <Folder Name="/Extensions/WireGuard/"><Project Path="Curl.Extension.WireGuard.UnitLibrary/Curl.Extension.WireGuard.UnitLibrary.csproj" /><Project Path="Curl.Extension.WireGuard.UnitTests/Curl.Extension.WireGuard.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/RecordReplay/"><Project Path="Curl.Extension.RecordReplay.UnitLibrary/Curl.Extension.RecordReplay.UnitLibrary.csproj" /><Project Path="Curl.Extension.RecordReplay.UnitTests/Curl.Extension.RecordReplay.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/VirtualMachineSocket/"><Project Path="Curl.Extension.VirtualMachineSocket.UnitLibrary/Curl.Extension.VirtualMachineSocket.UnitLibrary.csproj" /><Project Path="Curl.Extension.VirtualMachineSocket.UnitTests/Curl.Extension.VirtualMachineSocket.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/QuicMigration/"><Project Path="Curl.Extension.QuicMigration.UnitLibrary/Curl.Extension.QuicMigration.UnitLibrary.csproj" /><Project Path="Curl.Extension.QuicMigration.UnitTests/Curl.Extension.QuicMigration.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/ClientHints/"><Project Path="Curl.Extension.ClientHints.UnitLibrary/Curl.Extension.ClientHints.UnitLibrary.csproj" /><Project Path="Curl.Extension.ClientHints.UnitTests/Curl.Extension.ClientHints.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/ObliviousHttp/"><Project Path="Curl.Extension.ObliviousHttp.UnitLibrary/Curl.Extension.ObliviousHttp.UnitLibrary.csproj" /><Project Path="Curl.Extension.ObliviousHttp.UnitTests/Curl.Extension.ObliviousHttp.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/RateLimit/"><Project Path="Curl.Extension.RateLimit.UnitLibrary/Curl.Extension.RateLimit.UnitLibrary.csproj" /><Project Path="Curl.Extension.RateLimit.UnitTests/Curl.Extension.RateLimit.UnitTests.csproj" /></Folder>

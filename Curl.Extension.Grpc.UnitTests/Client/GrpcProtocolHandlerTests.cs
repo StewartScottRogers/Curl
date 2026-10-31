@@ -262,15 +262,37 @@ public sealed class GrpcProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_WithoutGrpcProto_FailsWithExit2BeforeConnecting()
+    public async Task ExecuteAsync_WithoutGrpcProto_LearnsTheTypesByServerReflectionThenCallsOnStream3()
     {
-        var call = new Call([]);
+        byte[] reply = Reflection.ReflectionFixture.Server(
+            Reflection.ReflectionFixture.Headers(1, false, GrpcServerReply.OkHeaders),
+            Reflection.ReflectionFixture.Message(1, Reflection.ReflectionFixture.FilesResponse(Reflection.ReflectionFixture.HelloWorldFile)),
+            Reflection.ReflectionFixture.Trailers(1, 0),
+            Reflection.ReflectionFixture.Headers(3, false, GrpcServerReply.OkHeaders),
+            Reflection.ReflectionFixture.Message(3, ReplyHi),
+            Reflection.ReflectionFixture.Trailers(3, 0));
+        var connection = new ScriptedConnection(reply);
+        var output = new MemoryStream();
+        var context = new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = output, PostData = Encoding.UTF8.GetBytes("{\"name\":\"World\"}") };
 
-        TransferResult result = await new GrpcProtocolHandler(call.Connector).ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream() });
+        TransferResult result = await new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection, null))).ExecuteAsync(context);
 
-        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
-        Assert.AreEqual("A gRPC call needs --grpc-proto <file>: calling without one (server reflection) is not supported yet", result.ErrorMessage);
-        Assert.IsNull(call.Connector.Target);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual(HiJson, Encoding.UTF8.GetString(output.ToArray()));
+        List<byte[]> call = await Reflection.ReflectionFixture.SentMessagesAsync(connection.Sent, 3);
+        CollectionAssert.AreEqual(HelloWorld, call.Single());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WithoutGrpcProtoOnAServerWithoutReflection_FailsWithExit22NamingGrpcProto()
+    {
+        byte[] reply = GrpcServerReply.Of(GrpcServerReply.Headers(true, ":status", "200", "content-type", "application/grpc", "grpc-status", "12"));
+        var context = new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream() };
+
+        TransferResult result = await new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(new ScriptedConnection(reply), null))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("The server did not answer gRPC server reflection (grpc-status 12 (UNIMPLEMENTED): ); give the method's .proto file with --grpc-proto", result.ErrorMessage);
     }
 
     [TestMethod]

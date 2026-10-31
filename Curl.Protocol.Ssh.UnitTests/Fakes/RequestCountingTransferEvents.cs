@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Ssh.Fakes;
 
 namespace Curl.Protocol.Ssh.Fakes;
 

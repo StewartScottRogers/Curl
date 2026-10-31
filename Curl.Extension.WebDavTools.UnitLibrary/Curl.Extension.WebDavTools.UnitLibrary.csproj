@@ -1,3 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <Using Include="Curl.Protocol.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Extension.Abstractions.UnitLibrary\Curl.Extension.Abstractions.UnitLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Extension.WebDavTools.UnitTests" />
+  </ItemGroup>
+
 </Project>

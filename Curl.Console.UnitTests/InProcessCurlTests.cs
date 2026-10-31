@@ -108,6 +108,31 @@ public sealed class InProcessCurlTests
     }
 
     [TestMethod]
+    public async Task RunAsync_DialerEchGrease_AcceptsTheOptionAndSendsTheRequest()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        (int exitCode, _, _) = await RunOverDialerAsync(["-s", "--ech", "grease", "http://origin.example/4000"], server, new LoopbackDnsResolver());
+
+        string sent = Encoding.ASCII.GetString(server.Written);
+        Diagnostics.Bytes("sent", server.Written);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Assert.StartsWith("GET /4000 HTTP/1.1\r\n", sent);
+        Assert.AreEqual(0, exitCode);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ConnectorEchGrease_AcceptsTheOption()
+    {
+        using MemoryStream standardError = new();
+
+        int exitCode = await InProcessCurl.RunAsync(["-s", "--ech", "grease", "file:///nonexistent/bl4381"], new MemoryStream(), standardError, new MemoryStream(), new RefusingConnector(), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"));
+
+        Diagnostics.Assert("exit code", 37, exitCode);
+        Assert.AreEqual(37, exitCode);
+    }
+
+    [TestMethod]
     public async Task RunAsync_DialerOnionHost_ReturnsExit6WithTheRfc7686Message()
     {
         ScriptedConnector server = new([]);

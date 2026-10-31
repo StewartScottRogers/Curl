@@ -13,7 +13,10 @@ internal static class ExtensionDescriptionCatalogue
     internal static IReadOnlyList<ExtensionDescription> Entries { get; } =
     [
         Curl.Extension.NamedPipe.NamedPipeExtension.Description,
+        Curl.Extension.SshJump.SshJumpExtension.Description,
         Curl.Extension.VirtualMachineSocket.VirtualMachineSocketExtension.Description,
+        Curl.Extension.QuicMigration.QuicMigrationExtension.Description,
+        Curl.Extension.WireGuard.WireGuardExtension.Description,
         GraphQl.GraphQlOptions.Description,
         Curl.Extension.JsonRpc.JsonRpcExtension.Description,
         ConnectRpc.ConnectRpcExtension.Description,
@@ -30,6 +33,8 @@ internal static class ExtensionDescriptionCatalogue
         Xmpp.Client.XmppExtension.Description,
         Curl.Extension.HttpCache.HttpCacheExtension.Description,
         Curl.Extension.SegmentedDownload.SegmentedDownloadExtension.Description,
+        Curl.Extension.ResumableUpload.ResumableUploadExtension.Description,
+        Curl.Extension.WebDavTools.WebDavToolsExtension.Description,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.Description,
         Curl.Extension.Checksum.ChecksumExtension.Description,
         Curl.Extension.Sigstore.SigstoreExtension.Description,
@@ -48,9 +53,11 @@ internal static class ExtensionDescriptionCatalogue
         Amqp0.Client.Amqp0Extension.Description,
         OciRegistry.Client.OciRegistryExtension.Description,
         Curl.Extension.ContentDigest.ContentDigestExtension.Description,
+        Curl.Extension.StructuredFields.StructuredFieldsExtension.Description,
         Curl.Extension.Har.HarExtension.Description,
         Curl.Extension.ClientHints.ClientHintsExtension.Description,
         Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.Description,
+        Curl.Extension.Dane.DaneExtension.Description,
         Curl.Extension.OpenTelemetry.OpenTelemetryExtension.Description,
         Curl.Extension.CodeGeneration.CodeGenerationExtension.Description,
         Curl.Extension.RateLimit.RateLimitExtension.Description,
@@ -64,5 +71,8 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.Description,
         Curl.Extension.Dpop.DpopExtension.Description,
         Grpc.Client.GrpcExtension.Description,
+        Curl.Extension.Masque.MasqueExtension.Description,
+        Curl.Extension.CompressionDictionary.CompressionDictionaryExtension.Description,
+        Curl.Extension.ObliviousHttp.ObliviousHttpExtension.Description,
     ];
 }

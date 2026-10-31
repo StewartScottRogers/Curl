@@ -24,6 +24,8 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.HookFor,
         Curl.Extension.HttpCache.HttpCacheExtension.HookFor,
         Curl.Extension.SegmentedDownload.SegmentedDownloadExtension.HookFor,
+        Curl.Extension.ResumableUpload.ResumableUploadExtension.HookFor,
+        Curl.Extension.WebDavTools.WebDavToolsExtension.HookFor,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.HookFor,
         Curl.Extension.Checksum.ChecksumExtension.HookFor,
         Curl.Extension.Sigstore.SigstoreExtension.HookFor,
@@ -31,6 +33,7 @@ public static class ExtensionTransferHookCatalogue
         PrivacyPass.Options.PrivacyPassOptions.ActivatedBy,
         Curl.Extension.WebSocketRepl.WebSocketReplExtension.HookFor,
         Curl.Extension.ContentDigest.ContentDigestExtension.HookFor,
+        Curl.Extension.StructuredFields.StructuredFieldsExtension.HookFor,
         Curl.Extension.Har.HarExtension.HookFor,
         Curl.Extension.ClientHints.ClientHintsExtension.HookFor,
         Curl.Extension.OpenTelemetry.OpenTelemetryExtension.HookFor,
@@ -43,5 +46,7 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.HookFor,
         Curl.Extension.Dpop.DpopExtension.HookFor,
         Grpc.Client.GrpcExtension.HookFor,
+        Curl.Extension.CompressionDictionary.CompressionDictionaryExtension.HookFor,
+        Curl.Extension.ObliviousHttp.ObliviousHttpExtension.HookFor,
     ];
 }

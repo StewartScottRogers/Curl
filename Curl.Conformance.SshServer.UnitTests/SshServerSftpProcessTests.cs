@@ -1,8 +1,9 @@
 using System.Buffers.Binary;
 using System.Text;
 using Curl.Protocol.Ssh;
-using Curl.Protocol.Ssh.Connection;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh;
+using Curl.Ssh.Connection;
+using Curl.Ssh.Transport;
 
 namespace Curl.Conformance.SshServer;
 

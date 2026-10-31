@@ -1,5 +1,5 @@
 using Curl.Protocol.Ldap;
-using Curl.Protocol.Ssh.Negotiation;
+using Curl.Ssh.Negotiation;
 
 namespace Curl.Engine;
 

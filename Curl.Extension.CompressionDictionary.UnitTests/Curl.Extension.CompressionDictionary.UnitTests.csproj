@@ -1,6 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Using Include="Curl.Protocol.Abstractions" />
+    <Using Include="Curl.Protocol.Abstractions.HttpRequestOptions" Alias="HttpRequestOptions" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="MSTest" />
   </ItemGroup>
 
@@ -10,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Extension.CompressionDictionary.UnitLibrary\Curl.Extension.CompressionDictionary.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Extension.Composition.UnitLibrary\Curl.Extension.Composition.UnitLibrary.csproj" />
   </ItemGroup>
 
 </Project>

@@ -10,7 +10,16 @@ request for `-x` (ADR-0250).
 
 Namespace `Curl.Extension.Masque`, with `Wire` and `Tunnel` below it. `Wire/` is the wire
 format; it works on bytes and owns no stream or socket. `Tunnel/` is the client flow (ADR-1122),
-and the option (BL-4144) builds on it.
+and `MasqueExtension` is the option (ADR-1153).
+
+- `MasqueExtension` holds `--masque <uri-template>`, its description and `Activate`: a template naming
+  `target_host` or `target_port` opens CONNECT-UDP, any other CONNECT-IP, and one that does not expand is
+  refused with an `ArgumentException`. It is registered in `Curl.Extension.Composition`'s option, description and
+  connection hook catalogues.
+- `Tunnel/MasqueConnectionHook` keeps curl's stream connector and replaces curl's datagram connector with a
+  `MasqueDatagramConnector`, so QUIC and TFTP run through the proxy. The engine takes the datagram connector before
+  it hands over the stream connector, so the proxy is reached through a `LateBoundConnector` that
+  `ConnectorOver` binds; an open before then fails with exit 7.
 
 - `MasqueUriTemplate` expands a proxy's URI template with `target_host`/`target_port`
   or `target`/`ipproto`, percent-encoding values as RFC 6570 simple expansion does.

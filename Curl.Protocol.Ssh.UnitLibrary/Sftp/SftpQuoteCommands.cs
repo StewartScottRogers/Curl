@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Globalization;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Ssh;
 
 namespace Curl.Protocol.Ssh.Sftp;
 

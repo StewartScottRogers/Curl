@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
-using Curl.Protocol.Ssh.Connection;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh;
+using Curl.Ssh.Connection;
+using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Sftp;
 
@@ -73,7 +74,13 @@ internal sealed class SftpSession
 
     private uint nextRequestId;
 
-    private SftpSession(SshSessionChannel channel) => this.channel = channel;
+    private readonly SshDiagnosticLog log;
+
+    private SftpSession(SshSessionChannel channel, SshDiagnosticLog log)
+    {
+        this.channel = channel;
+        this.log = log;
+    }
 
     /// <summary>
     /// Opens a session channel, starts the <c>sftp</c> subsystem and exchanges
@@ -96,7 +103,7 @@ internal sealed class SftpSession
         SshSessionChannel channel = new(transport);
         await RequireAsync(() => channel.OpenAsync(cancellationToken), UnableToStartupChannel).ConfigureAwait(false);
         await RequireAsync(() => channel.RequestSubsystemAsync(SubsystemName, cancellationToken), UnableToRequestSubsystem).ConfigureAwait(false);
-        SftpSession session = new(channel);
+        SftpSession session = new(channel, new SshDiagnosticLog(transport.DiagnosticLog));
         byte[] version = [];
         await RequireAsync(
             async () =>
@@ -135,12 +142,12 @@ internal sealed class SftpSession
     /// <param name="createFileMode">The permission bits, curl's <c>--create-file-mode</c>, 0644 unless given.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The file's handle.</returns>
-    /// <exception cref="SshTransferException">The server answered with a failed status: <see cref="SshTransferException.SftpOpenFailed" />.</exception>
+    /// <exception cref="SshTransferException">The server answered with a failed status: <see cref="SftpStatusFailures.OpenFailed" />.</exception>
     /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
     internal async ValueTask<byte[]> OpenForReadingAsync(byte[] path, UnixFileMode createFileMode, CancellationToken cancellationToken)
     {
         (byte[]? handle, uint status) = await OpenAsync(path, SftpOpenFlags.Read, createFileMode, cancellationToken).ConfigureAwait(false);
-        return handle ?? throw SshTransferException.SftpOpenFailed(status);
+        return handle ?? throw SftpStatusFailures.OpenFailed(status);
     }
 
     /// <summary>
@@ -340,12 +347,12 @@ internal sealed class SftpSession
     /// <param name="path">The directory's path.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The directory's handle.</returns>
-    /// <exception cref="SshTransferException">The server answered with a failed status: <see cref="SshTransferException.SftpOpenDirectoryFailed" />.</exception>
+    /// <exception cref="SshTransferException">The server answered with a failed status: <see cref="SftpStatusFailures.OpenDirectoryFailed" />.</exception>
     /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
     internal async ValueTask<byte[]> OpenDirectoryAsync(byte[] path, CancellationToken cancellationToken)
     {
         uint id = await SendRequestAsync(SftpPacketType.OpenDirectory, fields => fields.WriteString(path), cancellationToken).ConfigureAwait(false);
-        return await ReadHandleAsync(id, SshTransferException.SftpOpenDirectoryFailed, cancellationToken).ConfigureAwait(false);
+        return await ReadHandleAsync(id, SftpStatusFailures.OpenDirectoryFailed, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -355,7 +362,7 @@ internal sealed class SftpSession
     /// <param name="handle">The open directory's handle.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The names; empty at the end of the directory, and, as measured, for an answer of no names.</returns>
-    /// <exception cref="SshTransferException">Any status but <c>SSH_FX_EOF</c>: <see cref="SshTransferException.SftpReadDirectoryFailed" />.</exception>
+    /// <exception cref="SshTransferException">Any status but <c>SSH_FX_EOF</c>: <see cref="SftpStatusFailures.ReadDirectoryFailed" />.</exception>
     /// <exception cref="InvalidDataException">The answer is malformed or of another type.</exception>
     internal async ValueTask<IReadOnlyList<SftpDirectoryEntry>> ReadDirectoryAsync(byte[] handle, CancellationToken cancellationToken)
     {
@@ -367,7 +374,7 @@ internal sealed class SftpSession
         }
 
         uint status = ReadStatus(type, answer);
-        return status == SftpStatusCode.EndOfFile ? [] : throw SshTransferException.SftpReadDirectoryFailed(status);
+        return status == SftpStatusCode.EndOfFile ? [] : throw SftpStatusFailures.ReadDirectoryFailed(status);
     }
 
     /// <summary>
@@ -747,7 +754,7 @@ internal sealed class SftpSession
         request.WriteUInt32(id);
         writeFields(request);
         await SendPacketAsync(request.ToArray(), cancellationToken).ConfigureAwait(false);
-        channel.DiagnosticLog.SftpRequestSent(type, id);
+        log.SftpRequestSent(type, id);
         return id;
     }
 
@@ -761,7 +768,7 @@ internal sealed class SftpSession
     private async ValueTask<SshWireReader> ReadAnswerAsync(uint id, byte wantedType, CancellationToken cancellationToken)
     {
         (byte type, SshWireReader answer) = await ReadAnswerAsync(id, cancellationToken).ConfigureAwait(false);
-        return type == wantedType ? answer : throw SshTransferException.SftpRequestFailed(ReadStatus(type, answer));
+        return type == wantedType ? answer : throw SftpStatusFailures.RequestFailed(ReadStatus(type, answer));
     }
 
     // The answer numbered id: its type and a reader after the number. Answers to other
@@ -773,7 +780,7 @@ internal sealed class SftpSession
             byte[] packet = await ReadPacketAsync(cancellationToken).ConfigureAwait(false);
             if (packet.Length >= 5 && BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(1)) == id)
             {
-                channel.DiagnosticLog.SftpAnswerRead(packet);
+                log.SftpAnswerRead(packet);
                 return (packet[0], new SshWireReader(packet.AsMemory(5)));
             }
         }

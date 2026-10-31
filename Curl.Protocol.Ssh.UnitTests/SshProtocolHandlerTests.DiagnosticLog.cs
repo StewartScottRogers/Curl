@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
 
 namespace Curl.Protocol.Ssh;

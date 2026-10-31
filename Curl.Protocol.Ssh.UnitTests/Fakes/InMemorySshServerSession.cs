@@ -1,16 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Cryptography;
-using Curl.Protocol.Ssh.Authentication;
-using Curl.Protocol.Ssh.Compression;
-using Curl.Protocol.Ssh.Connection;
-using Curl.Protocol.Ssh.HostKeys;
-using Curl.Protocol.Ssh.KeyExchange;
-using Curl.Protocol.Ssh.Negotiation;
-using Curl.Protocol.Ssh.PacketProtection;
 using Curl.Protocol.Ssh.Sftp;
-using Curl.Protocol.Ssh.Transport;
-using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
+using static Curl.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Fakes;
 

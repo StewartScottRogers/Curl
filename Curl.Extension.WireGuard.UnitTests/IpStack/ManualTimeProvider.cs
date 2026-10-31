@@ -1,11 +1,24 @@
 namespace Curl.Extension.WireGuard.UnitTests.IpStack;
 
-/// <summary>A <see cref="TimeProvider" /> whose clock moves only when a test advances it, firing every timer that falls due on the way.</summary>
+/// <summary>A <see cref="TimeProvider" /> whose clock moves only when a test advances it (its wall clock also steps at each reading), firing every timer that falls due on the way.</summary>
 internal sealed class ManualTimeProvider : TimeProvider
 {
     private readonly Lock timersLock = new();
     private readonly List<ManualTimer> timers = [];
+    private static readonly TimeSpan WallClockStepPerReading = TimeSpan.FromMilliseconds(20);
     private TimeSpan elapsed;
+    private int wallClockReadings;
+
+    /// <inheritdoc />
+    /// <remarks>Starts at a fixed instant and moves with <see cref="Advance" />, and on by 20 ms at each reading, so successive handshake timestamps differ by more than their 16.8 ms granularity.</remarks>
+    public override DateTimeOffset GetUtcNow()
+    {
+        lock (timersLock)
+        {
+            wallClockReadings++;
+            return new DateTimeOffset(2026, 10, 30, 12, 0, 0, TimeSpan.Zero) + elapsed + (WallClockStepPerReading * wallClockReadings);
+        }
+    }
 
     /// <inheritdoc />
     public override long TimestampFrequency => TimeSpan.TicksPerSecond;

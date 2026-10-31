@@ -15,7 +15,9 @@ interfaces so it can be unit tested without a network.
 
 ## Toolchain and commands
 - .NET SDK 10 (`global.json` pins it). Target framework `net10.0` unless a project says
-  otherwise. Solution file `Curl.slnx` at the repository root. Shell is Windows.
+  otherwise. Solution file `Curl.slnx` at the repository root. The shell is the host's: Windows
+  PowerShell on Windows, PowerShell 7 (`pwsh`) on Linux and macOS; scripts build paths with
+  `Join-Path` or forward slashes (BL-3934).
 - Build: `dotnet build`
 - Fast tests (default): `dotnet test --filter "TestCategory!=Integration"`
 - Integration tests only: `dotnet test --filter "TestCategory=Integration"`
@@ -120,6 +122,18 @@ moving or editing a task, and move tasks only with its script
 (`.claude/skills/task-board/task-board.ps1`). A task's `touches` names files or narrow
 subfolders, never a whole project it only adds to. A registration table that tasks only
 add lines to is one entry per line and listed in `Tasks/SharedListFiles.txt`.
+A task is claimed at most twice (ADR-1155): a task split for size files every part of its
+work, the rest included, as tasks of their own and goes to `Deferred`, never back to
+`Backlog` to wait on its own subtasks; and the shift splits a task a run sends back to
+`Backlog` a second time rather than offer it a third claim.
+
+A CI fix (a task titled "Fix CI failure ...", "Fix CI build ..." or "Fix flaky CI test
+...") goes before all other work, because a red CI blocks the shift-end merge and hides the
+next failure (ADR-1158). The lane may have claimed it while another task in Doing holds a
+file it needs: change that file anyway, widening `touches` if needed; never send a CI fix
+back to Backlog to wait for a task in Doing to finish, since the other lane rebases over
+the fix. Only a change you cannot make yourself (another task's code that must land first)
+is a reason to wait, and then say which under Notes.
 
 ## Git
 Commit by logical unit with Conventional Commits once the build is clean and the fast

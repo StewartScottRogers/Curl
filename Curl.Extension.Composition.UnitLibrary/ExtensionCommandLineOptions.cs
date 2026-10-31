@@ -17,7 +17,7 @@ public static class ExtensionCommandLineOptions
     /// <param name="readEnvironmentVariable">Reads the run's environment.</param>
     /// <param name="isCurlLongOption">Reports whether a long name is one of curl's own options.</param>
     /// <returns>The options, in registration order.</returns>
-    /// <exception cref="InvalidOperationException">Two options share a name, or one has the name of a curl option.</exception>
+    /// <exception cref="InvalidOperationException">An option name is null, empty, starts with a dash or holds an equals sign; two options share a name; or one has the name of a curl option.</exception>
     public static IReadOnlyList<ExtensionOption> For(Func<string, string?> readEnvironmentVariable, Func<string, bool> isCurlLongOption)
     {
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
@@ -34,12 +34,17 @@ public static class ExtensionCommandLineOptions
     /// <param name="options">The extensions' options.</param>
     /// <param name="isCurlLongOption">Reports whether a long name is one of curl's own options.</param>
     /// <returns><paramref name="options" />.</returns>
-    /// <exception cref="InvalidOperationException">Two options share a name, or one has the name of a curl option.</exception>
+    /// <exception cref="InvalidOperationException">An option name is null, empty, starts with a dash or holds an equals sign; two options share a name; or one has the name of a curl option.</exception>
     internal static IReadOnlyList<ExtensionOption> Checked(IReadOnlyList<ExtensionOption> options, Func<string, bool> isCurlLongOption)
     {
         Dictionary<string, ExtensionOption> byName = new(StringComparer.Ordinal);
         foreach (ExtensionOption option in options)
         {
+            if (!IsSelectableName(option.Name))
+            {
+                throw new InvalidOperationException($"The extension option \"{option.Name}\" (\"{option.Help}\") has a name the command line can never select: a name is not empty, does not start with '-' and holds no '='.");
+            }
+
             if (isCurlLongOption(option.Name))
             {
                 throw new InvalidOperationException($"The extension option --{option.Name} (\"{option.Help}\") has the name of curl's option --{option.Name}.");
@@ -53,4 +58,10 @@ public static class ExtensionCommandLineOptions
 
         return options;
     }
+
+    /// <summary>Reports whether the command line can select <paramref name="name" /> as <c>--name</c>: it is not empty, does not start with a dash and holds no equals sign.</summary>
+    /// <param name="name">An extension option's name.</param>
+    /// <returns><c>true</c> when the parser can match the name.</returns>
+    private static bool IsSelectableName(string? name) =>
+        !string.IsNullOrEmpty(name) && name[0] != '-' && !name.Contains('=');
 }

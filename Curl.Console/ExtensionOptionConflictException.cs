@@ -2,7 +2,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Thrown while an option group's dispatch is built when two of its extension options each claim the
-/// transfer's connection (ADR-1010). The runner reports it as a command-line error: <c>curl: </c>,
+/// transfer's connection (ADR-1010), the curl schemes (ADR-1048) or the resolver (ADR-1012). The runner reports it as a command-line error: <c>curl: </c>,
 /// <see cref="Exception.Message" />, the try-help line, and exit 2.
 /// </summary>
 internal sealed class ExtensionOptionConflictException : Exception

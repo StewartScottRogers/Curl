@@ -58,8 +58,71 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     internal Func<X509Chain?, X509ChainStatus[]> ReadChainStatus { get; init; } = chain => chain?.ChainStatus ?? [];
 
     /// <summary>
+    /// The CA bundles curl's <c>configure</c> looks for, in its order, the first that exists
+    /// being the OpenSSL build's built-in bundle (ADR-1168).
+    /// </summary>
+    internal static readonly string[] ConfigureCaBundleCandidates =
+    [
+        "/etc/ssl/certs/ca-certificates.crt",
+        "/etc/pki/tls/certs/ca-bundle.crt",
+        "/usr/share/ssl/certs/ca-bundle.crt",
+        "/usr/local/share/certs/ca-root-nss.crt",
+        "/etc/ssl/cert.pem",
+    ];
+
+    /// <summary>
+    /// Reads a process environment variable, for <see cref="DefaultCaBundleFile" />. A test seam.
+    /// </summary>
+    internal Func<string, string?> ReadEnvironmentVariable { get; init; } = Environment.GetEnvironmentVariable;
+
+    /// <summary>
+    /// The bundles <see cref="DefaultCaBundleFile" /> looks for, in order. A test seam.
+    /// </summary>
+    internal IReadOnlyList<string> DefaultCaBundleCandidates { get; init; } = ConfigureCaBundleCandidates;
+
+    private string? _defaultCaBundleFile;
+
+    private bool _defaultCaBundleFileFound;
+
+    /// <summary>
+    /// The built-in CA bundle the OpenSSL build trusts in place of the system store, or
+    /// <see langword="null" /> to trust the system store (ADR-1168). .NET's OpenSSL store reads
+    /// <c>SSL_CERT_FILE</c> and <c>SSL_CERT_DIR</c> itself, and either set to the empty string
+    /// leaves it with nothing, where curl's built-in bundle does not depend on them: then, and
+    /// only in the OpenSSL build without <c>--cacert</c>, the first of
+    /// <see cref="DefaultCaBundleCandidates" /> that exists is read as curl reads its bundle.
+    /// </summary>
+    internal string? DefaultCaBundleFile
+    {
+        get
+        {
+            if (!_defaultCaBundleFileFound)
+            {
+                _defaultCaBundleFile = FindDefaultCaBundleFile();
+                _defaultCaBundleFileFound = true;
+            }
+
+            return _defaultCaBundleFile;
+        }
+    }
+
+    private string? FindDefaultCaBundleFile() =>
+        matchesSchannelBuild || options.HasCaCertificates || !EmptiesSystemStore()
+            ? null
+            : DefaultCaBundleCandidates.FirstOrDefault(File.Exists);
+
+    private bool EmptiesSystemStore() =>
+        ReadEnvironmentVariable("SSL_CERT_FILE") is "" || ReadEnvironmentVariable("SSL_CERT_DIR") is "";
+
+    // --cacert, or else the built-in bundle that stands in for an emptied system store.
+    private bool HasCaCertificates => options.HasCaCertificates || DefaultCaBundleFile is not null;
+
+    private string? CaCertificateFile => options.CaCertificateFile ?? DefaultCaBundleFile;
+
+    /// <summary>
     /// Reads the roots the chain may lead to. The chain policy replaces the system store,
-    /// from <c>--cacert</c>; without <c>--cacert</c> the chain is verified against the system
+    /// from <c>--cacert</c> or the OpenSSL build's <see cref="DefaultCaBundleFile" />; without
+    /// either the chain is verified against the system
     /// store, with the <c>--capath</c> roots trusted beside it, and the chain policy is the
     /// Schannel build's revocation check (online, every certificate but the root, ADR-0930),
     /// or <see langword="null" /> under <c>--ssl-no-revoke</c> and in the OpenSSL build. With
@@ -139,7 +202,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     private (X509ChainPolicy? ChainPolicy, X509Certificate2Collection AnchorsBesideSystemStore) ReadChainAnchors()
     {
         var directoryAnchors = ReadCaCertificateDirectory();
-        if (!options.HasCaCertificates)
+        if (!HasCaCertificates)
         {
             return (SystemStoreChainPolicy(), directoryAnchors);
         }
@@ -177,8 +240,8 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
     // The build's message for exit 77: the --cacert file cannot be used.
     private string CaCertificateFileUnusable() => matchesSchannelBuild
-        ? TlsFailureMessages.SchannelCaCertificateFileUnusable(options.CaCertificateFile!)
-        : TlsFailureMessages.OpenSslCaCertificateFileUnusable(options.CaCertificateFile!);
+        ? TlsFailureMessages.SchannelCaCertificateFileUnusable(CaCertificateFile!)
+        : TlsFailureMessages.OpenSslCaCertificateFileUnusable(CaCertificateFile!);
 
     /// <summary>
     /// Judges a certificate the server presented: what the handshake event reports about it,
@@ -279,7 +342,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     private (CurlExitCode ExitCode, string Message)? RevokedStapleRefusal(OcspStapleStatus? stapled) =>
         stapled != OcspStapleStatus.Revoked
             ? null
-            : options.HasCaCertificates
+            : HasCaCertificates
                 ? (CurlExitCode.PeerFailedVerification, TlsFailureMessages.SchannelChainRevoked)
                 : (CurlExitCode.SslConnectError, SchannelCertificateRevoked);
 
@@ -288,7 +351,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     // (measured with curl 8.21.0, BL-2270; upstream test2035, test2038, test2042). Without
     // --cacert Schannel validates inside the handshake, before the pin.
     private bool JudgesPinnedPublicKeyBeforeVerification =>
-        matchesSchannelBuild && options.HasCaCertificates;
+        matchesSchannelBuild && HasCaCertificates;
 
     // The pin is checked only once the certificate is accepted, and only then does curl print
     // the " public key hash:" line (ADR-0336, BL-877).
@@ -392,7 +455,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// <param name="chainStatus">The chain's <see cref="X509Chain.ChainStatus" />.</param>
     /// <returns>The exit code and message, or <see langword="null" /> when this is not the refusal.</returns>
     internal (CurlExitCode ExitCode, string Message)? SchannelRevocationRefusal(SslPolicyErrors errors, X509ChainStatus[] chainStatus) =>
-        !matchesSchannelBuild || options.HasCaCertificates || options.SkipRevocationCheck
+        !matchesSchannelBuild || HasCaCertificates || options.SkipRevocationCheck
             ? null
             : IsSchannelCertificateRevoked(errors, chainStatus)
                 ? (CurlExitCode.SslConnectError, SchannelCertificateRevoked)
@@ -421,7 +484,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         X509Chain? chain,
         string targetHost)
     {
-        var hasCaCertificateFile = options.HasCaCertificates;
+        var hasCaCertificateFile = HasCaCertificates;
         return !hasCaCertificateFile && TlsFailureMessages.IsSchannelCertificateExpired(errors, chain)
             ? (CurlExitCode.SslConnectError, TlsFailureMessages.SchannelCertificateExpired)
             : (CurlExitCode.PeerFailedVerification,
@@ -449,7 +512,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     // chain the file lists, leaf or intermediate, anchors it (measured with curl 8.18.0 and
     // OpenSSL 3.5.5, BL-3335).
     private bool CaCertificateFileAnchorsChain(X509Chain? chain) =>
-        options.HasCaCertificates
+        HasCaCertificates
         && chain is not null
         && chain.ChainElements.Count > 0
         && HasOnlyMissingRootStatus(ReadChainStatus(chain))
@@ -495,7 +558,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     // with no DNS subjectAltName, matches the common name, which .NET's check does not
     // (BL-415). Without --cacert Schannel's own check stands.
     private SslPolicyErrors WithoutNameMismatchSchannelAccepts(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
-        options.HasCaCertificates
+        HasCaCertificates
         && errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
         && SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
             ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
@@ -545,7 +608,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     {
         var pem = options.CaCertificateBlob is { } blob
             ? Encoding.ASCII.GetString(blob.Span)
-            : ReadCaCertificateFile(options.CaCertificateFile!);
+            : ReadCaCertificateFile(CaCertificateFile!);
         var certificates = new X509Certificate2Collection();
         if (matchesSchannelBuild)
         {

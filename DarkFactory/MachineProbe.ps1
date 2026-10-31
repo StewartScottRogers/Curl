@@ -5,6 +5,8 @@
 # How many concurrent solution builds this PC sustains (ADR-0130 item 7). The pass and cap
 # rule is pure, so -TestMachineProbe proves it on recorded steps; -ProbeMachine measures.
 
+# Each step's builds run with MSBuild node reuse off and any worker node still found under them is
+# stopped when the step ends, by parentage only (BL-4348).
 # Lanes build for minutes of each task and integrate one at a time, so k simultaneous
 # builds is a worst case, and how much slower they run swings with the one-build baseline
 # (13.6 s one probe, 9.0 s the next). Only memory running out stalls lanes, so memory alone
@@ -71,6 +73,10 @@ function Invoke-ProbeBuilds {
     $totalKB = (Get-FactoryTotalMemoryBytes) / 1KB
     $minFreeKB = (Get-FactoryFreeMemoryBytes) / 1KB
     $clock = [Diagnostics.Stopwatch]::StartNew()
+    # Node reuse off, so each build's MSBuild worker nodes exit with it; the nodes seen under a
+    # build are stopped when the step ends, so none is left to eat the next step's memory (BL-4348).
+    $savedNodeReuse = $env:MSBUILDDISABLENODEREUSE
+    $env:MSBUILDDISABLENODEREUSE = '1'
     $builds = foreach ($i in 1..$Count) {
         $artifacts = Join-Path $ProbeDir "$i"
         New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
@@ -82,12 +88,16 @@ function Invoke-ProbeBuilds {
         [void]$process.Handle
         $process
     }
+    $env:MSBUILDDISABLENODEREUSE = $savedNodeReuse
+    $nodeIds = [System.Collections.Generic.HashSet[int]]::new()
     while (@($builds | Where-Object { -not $_.HasExited }).Count) {
         Start-Sleep -Seconds 2
+        foreach ($id in @(Get-MsBuildNodeIdsUnder -Table @(Get-FactoryProcessTable) -RootIds @($builds | ForEach-Object { $_.Id }))) { [void]$nodeIds.Add($id) }
         $minFreeKB = [math]::Min($minFreeKB, (Get-FactoryFreeMemoryBytes) / 1KB)
     }
     $clock.Stop()
     $builds | ForEach-Object { $_.WaitForExit() }
+    foreach ($id in $nodeIds) { Stop-FactoryProcessTree -ProcessId $id }
     return [pscustomobject]@{
         Lanes = $Count; Seconds = [math]::Round($clock.Elapsed.TotalSeconds, 1)
         MinFreeMemoryPercent = [math]::Round(100 * $minFreeKB / $totalKB, 1)

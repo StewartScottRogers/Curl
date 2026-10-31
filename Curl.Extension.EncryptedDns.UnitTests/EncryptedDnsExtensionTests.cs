@@ -96,7 +96,7 @@ public sealed class EncryptedDnsExtensionTests
     {
         var values = new ExtensionOptionValues(new Dictionary<string, string> { ["dns-over-tls"] = "dot.example", ["dns-over-quic"] = "doq.example" });
 
-        ArgumentException error = Assert.ThrowsExactly<ArgumentException>(() => ResolverHooks.ActivatedBy(values, ExtensionResolverHookCatalogue.Entries, dohUrlGiven: false));
+        ExtensionHookConflictException error = Assert.ThrowsExactly<ExtensionHookConflictException>(() => ResolverHooks.ActivatedBy(values, ExtensionResolverHookCatalogue.Entries, dohUrlGiven: false));
 
         Assert.Contains("--dns-over-tls and --dns-over-quic", error.Message);
     }
@@ -104,7 +104,7 @@ public sealed class EncryptedDnsExtensionTests
     [TestMethod]
     public void ResolverHookCatalogue_BesideDohUrl_ThrowsNamingBoth()
     {
-        ArgumentException error = Assert.ThrowsExactly<ArgumentException>(() => ResolverHooks.ActivatedBy(ValuesOf("dns-over-tls", "dot.example"), ExtensionResolverHookCatalogue.Entries, dohUrlGiven: true));
+        ExtensionHookConflictException error = Assert.ThrowsExactly<ExtensionHookConflictException>(() => ResolverHooks.ActivatedBy(ValuesOf("dns-over-tls", "dot.example"), ExtensionResolverHookCatalogue.Entries, dohUrlGiven: true));
 
         Assert.Contains("--dns-over-tls and --doh-url", error.Message);
     }

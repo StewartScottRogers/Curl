@@ -116,6 +116,33 @@ function Test-TurnCapReached {
     return ($null -ne $r -and "$($r.subtype)" -eq 'error_max_turns')
 }
 
+function Open-RunLog {
+    # The run's .jsonl log, held open for the whole run and shared with readers. Written line
+    # by line with Add-Content, a write that met the file open elsewhere was dropped with only
+    # a console error, and BL-3895's log lost its last two minutes and its result (AF-0486).
+    # Held open, no later opener can deny the writes. $null when it cannot be opened: each
+    # line then falls back to Add-Content.
+    param([string]$Path)
+    try {
+        $stream = [System.IO.FileStream]::new($Path, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]'ReadWrite, Delete')
+        $writer = [System.IO.StreamWriter]::new($stream, [System.Text.UTF8Encoding]::new($false))
+        $writer.AutoFlush = $true
+        return $writer
+    } catch { return $null }
+}
+
+function Write-RunLogLine {
+    # One line of the run log, through the open -Writer, else appended. A line that still
+    # cannot be written is traced, once a run, instead of being lost silently (AF-0486).
+    param($Writer, [string]$Path, [string]$Line, [string]$Id)
+    try {
+        if ($Writer) { $Writer.WriteLine($Line) } else { Add-Content -Path $Path -Value $Line -Encoding UTF8 -ErrorAction Stop }
+    } catch {
+        if (-not $script:RunLogWriteFailed) { Write-Trace $Id 'trace' "run log $(Split-Path $Path -Leaf) missed a line: $(Get-Short $_.Exception.Message)" 'DarkYellow' }
+        $script:RunLogWriteFailed = $true
+    }
+}
+
 function Invoke-TaskRun {
     # One headless Claude run in this checkout. By default it is the task run; a lane
     # passes its own prompt and deny list, and a log suffix for the resolver's run.
@@ -156,47 +183,52 @@ function Invoke-TaskRun {
     # log's first line names it, so cost per model can be read back (Get-ModelCostSummary).
     if ($script:ModelChoice.Id -ne $Id) { Set-ModelChoice $Id }
     $runModel = $script:ModelChoice.Model
-    if (-not (Test-Path $raw)) { Add-Content -Path $raw -Value ([pscustomobject][ordered]@{ type = 'factory'; model = $runModel; why = $script:ModelChoice.Why } | ConvertTo-Json -Compress) -Encoding UTF8 }
-    $context = Get-LaneContextArguments $Root $LogDir
-    $psi = New-ClaudeRunStartInfo "claude -p --model $runModel --dangerously-skip-permissions --output-format stream-json --verbose $context$budget$turns --disallowedTools $denied 2>`"$err`""
-    # No claude.ai connectors and no auto memory either: the operator's memory is not a lane's.
-    $psi.EnvironmentVariables['ENABLE_CLAUDEAI_MCP_SERVERS'] = 'false'
-    $psi.EnvironmentVariables['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] = '1'
-    $p = [System.Diagnostics.Process]::Start($psi)
-    $p.StandardInput.Write($Text)
-    $p.StandardInput.Close()
+    $isNewLog = -not (Test-Path $raw)
+    $script:RunLogWriteFailed = $false
+    $log = Open-RunLog $raw
+    try {
+        if ($isNewLog) { Write-RunLogLine $log $raw ([pscustomobject][ordered]@{ type = 'factory'; model = $runModel; why = $script:ModelChoice.Why } | ConvertTo-Json -Compress) $Id }
+        $context = Get-LaneContextArguments $Root $LogDir
+        $psi = New-ClaudeRunStartInfo "claude -p --model $runModel --dangerously-skip-permissions --output-format stream-json --verbose $context$budget$turns --disallowedTools $denied 2>`"$err`""
+        # No claude.ai connectors and no auto memory either: the operator's memory is not a lane's.
+        $psi.EnvironmentVariables['ENABLE_CLAUDEAI_MCP_SERVERS'] = 'false'
+        $psi.EnvironmentVariables['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] = '1'
+        $p = [System.Diagnostics.Process]::Start($psi)
+        $p.StandardInput.Write($Text)
+        $p.StandardInput.Close()
 
-    $timedOut = $false
-    $pending = $p.StandardOutput.ReadLineAsync()
-    while ($true) {
-        Write-HeartbeatIfDue
-        if ($pending.Wait(1000)) {
-            $line = $pending.Result
-            if ($null -eq $line) { break }
-            Add-Content -Path $raw -Value $line -Encoding UTF8
-            try { $evt = $line | ConvertFrom-Json } catch { $evt = $null }
-            # Tracing a run's event never ends the run or the lane (BL-2036).
-            if ($evt) { try { Write-Event $Id $evt } catch { Write-Trace $Id 'trace' "could not trace an event: $(Get-Short $_.Exception.Message)" 'DarkYellow' } }
-            $pending = $p.StandardOutput.ReadLineAsync()
-        } elseif ((Get-Date) -gt $deadline) {
-            Stop-FactoryProcessTree -ProcessId $p.Id
-            $timedOut = $true
-            # A killed run sends no result event, so its end is traced here: without it the
-            # lane log's last line for the run is whatever step it was in (AF-0034).
-            Write-Trace $Id 'end' "killed: timed out after $Minutes min$(Format-ModelChoice)" 'Red'
-            break
+        $timedOut = $false
+        $pending = $p.StandardOutput.ReadLineAsync()
+        while ($true) {
+            Write-HeartbeatIfDue
+            if ($pending.Wait(1000)) {
+                $line = $pending.Result
+                if ($null -eq $line) { break }
+                Write-RunLogLine $log $raw $line $Id
+                try { $evt = $line | ConvertFrom-Json } catch { $evt = $null }
+                # Tracing a run's event never ends the run or the lane (BL-2036).
+                if ($evt) { try { Write-Event $Id $evt } catch { Write-Trace $Id 'trace' "could not trace an event: $(Get-Short $_.Exception.Message)" 'DarkYellow' } }
+                $pending = $p.StandardOutput.ReadLineAsync()
+            } elseif ((Get-Date) -gt $deadline) {
+                Stop-FactoryProcessTree -ProcessId $p.Id
+                $timedOut = $true
+                # A killed run sends no result event, so its end is traced here: without it the
+                # lane log's last line for the run is whatever step it was in (AF-0034).
+                Write-Trace $Id 'end' "killed: timed out after $Minutes min$(Format-ModelChoice)" 'Red'
+                break
+            }
         }
-    }
-    $p.WaitForExit()
-    # A run that ended with no result event (killed, crashed, stream cut) gets one written
-    # for it, so every run log ends with a result and the audit's unfinishedRuns stays empty
-    # for runs the factory itself saw end (AF-0151). RunResult stays null: the retry logic
-    # still sees "no result". total_cost_usd 0 keeps the cost readers' sums right.
-    if ($null -eq $script:RunResult) {
-        $why = if ($timedOut) { "killed: timed out after $Minutes min" } else { "ended with no result event, exit $($p.ExitCode)" }
-        Add-Content -Path $raw -Value ([pscustomobject][ordered]@{ type = 'result'; subtype = 'factory_no_result'; is_error = $true; exit_code = $p.ExitCode; timed_out = $timedOut; result = $why; total_cost_usd = 0 } | ConvertTo-Json -Compress) -Encoding UTF8
-    }
-    return @{ ExitCode = $p.ExitCode; TimedOut = $timedOut }
+        $p.WaitForExit()
+        # A run that ended with no result event (killed, crashed, stream cut) gets one written
+        # for it, so every run log ends with a result and the audit's unfinishedRuns stays empty
+        # for runs the factory itself saw end (AF-0151). RunResult stays null: the retry logic
+        # still sees "no result". total_cost_usd 0 keeps the cost readers' sums right.
+        if ($null -eq $script:RunResult) {
+            $why = if ($timedOut) { "killed: timed out after $Minutes min" } else { "ended with no result event, exit $($p.ExitCode)" }
+            Write-RunLogLine $log $raw ([pscustomobject][ordered]@{ type = 'result'; subtype = 'factory_no_result'; is_error = $true; exit_code = $p.ExitCode; timed_out = $timedOut; result = $why; total_cost_usd = 0 } | ConvertTo-Json -Compress) $Id
+        }
+        return @{ ExitCode = $p.ExitCode; TimedOut = $timedOut }
+    } finally { if ($log) { $log.Dispose() } }
 }
 
 if ($TestLaneFlags) {
@@ -230,6 +262,28 @@ if ($TestLaneFlags) {
         & $check 'a run stopped at the cost cap is not a turn-cap stop' 'False' "$(Test-TurnCapReached)"
         $script:RunResult = $null
         & $check 'a run with no result is not a turn-cap stop' 'False' "$(Test-TurnCapReached)"
+        # AF-0486: the run log is held open, so a reader that would deny writes cannot open it,
+        # every line lands, and readers sharing the file still read it while the run writes.
+        $runLog = Join-Path $folder 'BL-1-20261030-080000-L1.jsonl'
+        $writer = Open-RunLog $runLog
+        & $check 'the run log opens' 'True' "$($null -ne $writer)"
+        Write-RunLogLine $writer $runLog '{"type":"factory","model":"opus"}' 'BL-1'
+        $denied = try { [System.IO.File]::Open($runLog, 'Open', 'Read', 'Read').Dispose(); 'opened' } catch { 'refused' }
+        & $check 'a reader that denies writes cannot open the run log' 'refused' $denied
+        Write-RunLogLine $writer $runLog '{"type":"result","total_cost_usd":1.5}' 'BL-1'
+        & $check 'a sharing reader reads every line while the run writes' '2' "$(@(Get-Content $runLog).Count)"
+        $writer.Dispose()
+        & $check 'the run log has no byte-order mark' '123' "$([System.IO.File]::ReadAllBytes($runLog)[0])"
+        $script:traced = @()
+        function Write-Trace { param($Id, $Kind, $Text) $script:traced += "$Kind $Text" }
+        $script:RunLogWriteFailed = $false
+        $holder = [System.IO.File]::Open($runLog, 'Open', 'ReadWrite', 'None')
+        try {
+            Write-RunLogLine $null $runLog 'lost one' 'BL-1'
+            Write-RunLogLine $null $runLog 'lost two' 'BL-1'
+        } finally { $holder.Dispose() }
+        & $check 'a line that cannot be written is traced once' '1' "$(@($script:traced | Where-Object { $_ -like 'trace run log*missed a line*' }).Count)"
+        & $check 'the run notes a missed line' 'True' "$script:RunLogWriteFailed"
     } finally { Remove-Item -Recurse -Force $folder -ErrorAction SilentlyContinue }
     exit $(if ($failed) { 1 } else { 0 })
 }

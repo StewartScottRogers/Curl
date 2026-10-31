@@ -1194,3 +1194,26 @@ Each option and the specific reason it lost.
 | [1146](ADR-1146-har-writes-each-option-groups-http-transfers-as-a-har-1-2-archive.md) | --har writes each option group's HTTP transfers as a HAR 1.2 archive (BL-4155) | Accepted | 2026-10-29 |
 | [1147](ADR-1147-grpc-extension-calls-a-method-over-http2-with-a-grpc-proto-file.md) | The gRPC extension calls a method over HTTP/2 with a --grpc-proto file (BL-4341) | Accepted | 2026-10-29 |
 | [1148](ADR-1148-dns-query-adds-dns-over-https-as-dns-transport-https.md) | The DNS query extension adds DNS over HTTPS as --dns-transport https (BL-4339) | Accepted | 2026-10-30 |
+| [1149](ADR-1149-grpc-extension-describes-the-method-by-server-reflection-v1.md) | The gRPC extension describes the method by server reflection v1 without --grpc-proto (BL-4342) | Accepted | 2026-10-30 |
+| [1150](ADR-1150-quic-migrate-moves-a-quic-transfer-to-a-new-local-address-after-path-loss.md) | --quic-migrate moves a QUIC transfer to a new local address after path loss (BL-4146) | Accepted | 2026-10-30 |
+| [1151](ADR-1151-resumable-upload-is-a-flag-that-takes-over-http-uploads.md) | --resumable-upload is a flag that takes over an HTTP -T upload (BL-4129) | Accepted | 2026-10-30 |
+| [1152](ADR-1152-structured-fields-shows-known-rfc-9651-fields-in-verbose-and-write-out.md) | --structured-fields shows known RFC 9651 fields in -v and -w (BL-4140) | Accepted | 2026-10-30 |
+| [1153](ADR-1153-masque-runs-quic-and-http3-through-a-connect-udp-or-connect-ip-proxy.md) | --masque runs QUIC and HTTP/3 through a CONNECT-UDP or CONNECT-IP proxy (BL-4144) | Accepted | 2026-10-30 |
+| [1154](ADR-1154-compression-dictionary-stores-and-advertises-rfc-9842-dictionaries-in-a-transfer-hook.md) | --compression-dictionary stores and advertises RFC 9842 dictionaries in a transfer hook (BL-4132) | Accepted | 2026-10-30 |
+| [1155](ADR-1155-a-task-is-claimed-at-most-twice.md) | A task is claimed at most twice: splits defer, and a second requeue splits (AF-0465 to AF-0474) | Accepted | 2026-10-30 |
+| [1153](ADR-1153-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md) | The Dane extension checks TLSA records validated from the root with --dane (BL-4151) | Accepted | 2026-10-30 |
+| [1156](ADR-1156-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md) | The Dane extension checks TLSA records validated from the root with --dane (BL-4151) | Accepted | 2026-10-30 |
+| [1157](ADR-1157-oblivious-http-extension-sends-requests-through-a-relay.md) | The Oblivious HTTP extension sends requests through a relay with --ohttp-relay and --ohttp-keys (BL-4137) | Accepted | 2026-10-30 |
+| [1158](ADR-1158-a-ci-fix-goes-first-claim-lane-and-integrate-lock.md) | A CI fix goes first: claimed before other work, given a lane, and integrated ahead (AF-0475 to AF-0481) | Accepted | 2026-10-30 |
+| [1159](ADR-1159-wireguard-extension-tunnels-each-connection-through-a-user-space-wireguard-peer.md) | The WireGuard extension tunnels each connection through a user-space WireGuard peer (BL-4147) | Accepted | 2026-10-30 |
+| [1160](ADR-1160-a-hung-shift-coordinator-is-replaced-by-a-lane-without-stopping-the-lanes.md) | A hung shift coordinator is replaced by a lane, without stopping the lanes (BL-4353) | Accepted | 2026-10-30 |
+| [1161](ADR-1161-wireguard-extension-resolves-host-names-by-dns-over-tcp-through-the-tunnel.md) | The WireGuard extension resolves host names by DNS over TCP through the tunnel (BL-4354) | Accepted | 2026-10-30 |
+| [1162](ADR-1162-ssh-unit-tests-import-each-moving-namespace-once-in-a-global-using-file.md) | The SSH unit tests import each moving namespace once, in a global using file of its own (BL-4367) | Accepted | 2026-10-30 |
+| [1163](ADR-1163-wireguard-extension-carries-udp-and-quic-through-the-tunnel.md) | The WireGuard extension carries UDP, and so QUIC, through the tunnel (BL-4355) | Accepted | 2026-10-30 |
+| [1164](ADR-1164-webdav-tools-list-and-sync-a-collection-through-curls-http-stack.md) | --webdav-list and --webdav-sync list and sync a WebDAV collection through curl's HTTP stack (BL-4131) | Accepted | 2026-10-30 |
+| [1165](ADR-1165-the-ssh-transport-layer-is-a-shared-library.md) | The SSH transport layer is a shared library (BL-4362) | Accepted | 2026-10-30 |
+| [1166](ADR-1166-ssh-channels-are-a-shared-layer-with-direct-tcpip-as-a-connection.md) | SSH channels are a shared layer, with direct-tcpip as a connection (BL-4330) | Accepted | 2026-10-30 |
+| [1167](ADR-1167-ssh-jump-reaches-servers-through-a-direct-tcpip-channel.md) | --ssh-jump reaches servers through a direct-tcpip channel (BL-4145) | Accepted | 2026-10-30 |
+| [1168](ADR-1168-the-openssl-build-trusts-its-built-in-ca-bundle-when-the-environment-empties-the-system-store.md) | The OpenSSL build trusts its built-in CA bundle when the environment empties the system store (BL-4383) | Accepted | 2026-10-30 |
+| [1169](ADR-1169-the-ratchet-runs-lib670-over-a-clock-that-skips-its-pause.md) | The ratchet runs lib670 over a clock that skips its pause (BL-4378) | Accepted | 2026-10-31 |
+| [1170](ADR-1170-a-coordinator-whose-start-up-sync-brings-in-factory-code-runs-itself-again-in-the-same-process.md) | A coordinator whose start-up sync brings in factory code runs itself again in the same process (BL-4386) | Accepted | 2026-10-31 |

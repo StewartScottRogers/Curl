@@ -41,17 +41,17 @@ public sealed partial class TransferHookingProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_CancelledWhileWaitingToRepeat_EndsTheWaitAndGivesTheLastResult()
+    public async Task ExecuteAsync_CancelledWhileWaitingToRepeat_ThrowsOperationCanceledNotTheEarlierResult()
     {
         CountingHandler handler = new();
         using CancellationTokenSource cancellation = new();
         RecordingTimeProvider clock = new(fires: false, onTimerCreated: cancellation.Cancel);
 
-        TransferResult result = await new TransferHooks([new RepeatingHook([TimeSpan.FromHours(1)])]).Around(handler).ExecuteAsync(ContextOn(clock, cancellation.Token));
+        IProtocolHandler hooked = new TransferHooks([new RepeatingHook([TimeSpan.FromHours(1)])]).Around(handler);
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await hooked.ExecuteAsync(ContextOn(clock, cancellation.Token)));
 
         Assert.AreEqual(1, handler.Runs);
         CollectionAssert.AreEqual(new[] { TimeSpan.FromHours(1) }, clock.Delays.ToArray());
-        Assert.AreEqual(1, result.BytesTransferred);
     }
 
     private static TransferContext ContextOn(TimeProvider clock, CancellationToken cancellationToken, Stream? output = null) => new()

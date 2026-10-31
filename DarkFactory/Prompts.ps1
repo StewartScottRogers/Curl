@@ -46,7 +46,7 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    3 times, requeued twice and Blocked at $3.25 of $3.93, its fix stashed until BL-2041).
    For an umbrella task ("remove every reference to X"), count the whole remaining work
    in that first pass - search the repository for every file that still uses X, group them
-   into subtasks, file them all, and requeue once; never file only the layer you hit first
+   into subtasks, file them all at once (a split, below); never file only the layer you hit first
    (AF-0241: BL-2310 was requeued at 21 turns for 4 subtasks and at 26 turns for 4 more,
    $1.60 for two runs that produced only a requeue, before a third claim finished it).
    Size the task and check its engine hooks in that same pass: before the first edit,
@@ -59,11 +59,18 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    ported", and file the runner work with the split (AF-0263: BL-2529 was requeued for size
    and then for BL-2601, the runner skipping cases 520 to 537, $3.24 for two runs that
    produced only a requeue).
-   A split for size is itself a requeue, so it gets the same pass: before filing the
-   subtasks, run each of them through the checks above (files still using X, hooks, the
-   case runner) and file every missing prerequisite beside them, so the claim after the
-   split finds nothing new to wait on (AF-0242 re-audit: BL-2394 was again requeued
-   twice, for the split and then for BL-2601, the runner skipping cases 520 to 537).
+   A split for size never sends this task back to Backlog: file every part of its work as
+   a task of its own - what you would have left here included, as the last one, depending
+   on the others - each with this task's `depends-on` and its share of the acceptance
+   criteria; edit the `depends-on` line of every task outside Done that names this task
+   to name the new IDs instead; and move this task to Deferred with a -Reason "Split into
+   <the new IDs>". A task requeued to wait on its own subtasks is claimed again for what
+   is left, and a third time when that claim runs short (AF-0465 to AF-0474: BL-4124,
+   BL-4132 and BL-4137 on 2026-10-29 and 2026-10-30). Split before the first edit; once
+   code is written, finish it or hand it back as the deadline rule says. Run each subtask
+   through the checks above (files still using X, hooks, the case runner) and file every
+   missing prerequisite beside them, so no subtask finds anything new to wait on (AF-0242
+   re-audit: BL-2394 was requeued for the split and then for BL-2601).
    The board let this run claim the task only because every ID already in its
    `depends-on` is Done, so those never send it back. Before naming any other task as the
    blocker, check its folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does
@@ -112,10 +119,13 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
    read the report rather than running it again. If the task cannot be finished before
-   the deadline, file what is left as a task with the board script, add its ID to the
-   task's `depends-on`, record what you measured under Notes, and move it to Backlog
-   before then with a -Reason naming that task: the next lane then starts on the work
-   that is left, not on measuring the task again (AF-0094).{TURNCAP}
+   the deadline, record under Notes what is done, what you measured and what is left, and
+   move it to Backlog before then with a -Reason saying what is left: the shift stashes
+   the unfinished code and the next claim starts from it. Do not file the rest as a task
+   this one then waits on: that sends it back a second time, and the shift splits a task
+   sent back to Backlog a second time rather than offering it a third claim (AF-0465 to
+   AF-0474). The next lane then starts on the work that is left, not on measuring the
+   task again (AF-0094).{TURNCAP}
    Before committing a change to a library's production code, run Measure-CodeQuality.ps1
    for that library once and fix any method past the complexity gate, so the push does not
    turn the CI quality job red (AF-0213: BL-2177 pushed four methods past the gate with no
@@ -248,7 +258,7 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    3 times, requeued twice and Blocked at $3.25 of $3.93, its fix stashed until BL-2041).
    For an umbrella task ("remove every reference to X"), count the whole remaining work
    in that first pass - search the repository for every file that still uses X, group them
-   into subtasks, file them all, and requeue once; never file only the layer you hit first
+   into subtasks, file them all at once (a split, below); never file only the layer you hit first
    (AF-0241: BL-2310 was requeued at 21 turns for 4 subtasks and at 26 turns for 4 more,
    $1.60 for two runs that produced only a requeue, before a third claim finished it).
    Size the task and check its engine hooks in that same pass: before the first edit,
@@ -261,11 +271,18 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    ported", and file the runner work with the split (AF-0263: BL-2529 was requeued for size
    and then for BL-2601, the runner skipping cases 520 to 537, $3.24 for two runs that
    produced only a requeue).
-   A split for size is itself a requeue, so it gets the same pass: before filing the
-   subtasks, run each of them through the checks above (files still using X, hooks, the
-   case runner) and file every missing prerequisite beside them, so the claim after the
-   split finds nothing new to wait on (AF-0241 re-audit: BL-2529 was again requeued twice,
-   for the split and then for BL-2601, $4.20 over three claims).
+   A split for size never sends this task back to Backlog: file every part of its work as
+   a task of its own - what you would have left here included, as the last one, depending
+   on the others - each with this task's `depends-on` and its share of the acceptance
+   criteria; edit the `depends-on` line of every task outside Done that names this task
+   to name the new IDs instead; and move this task to Deferred with a -Reason "Split into
+   <the new IDs>". A task requeued to wait on its own subtasks is claimed again for what
+   is left, and a third time when that claim runs short (AF-0465 to AF-0474: BL-4124,
+   BL-4132 and BL-4137 on 2026-10-29 and 2026-10-30). Split before the first edit; once
+   code is written, finish it or hand it back as the deadline rule says. Run each subtask
+   through the checks above (files still using X, hooks, the case runner) and file every
+   missing prerequisite beside them, so no subtask finds anything new to wait on (AF-0241
+   re-audit: BL-2529 was requeued for the split and then for BL-2601, $4.20 over three claims).
    The shift claimed the task only because every ID already in its `depends-on` is Done,
    so those never send it back. Before naming any other task as the blocker, check its
    folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does not block. And
@@ -313,10 +330,13 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
    read the report rather than running it again. If the task cannot be finished before
-   the deadline, file what is left as a task with the board script, add its ID to the
-   task's `depends-on`, record what you measured under Notes, and move it to Backlog
-   before then with a -Reason naming that task: the next lane then starts on the work
-   that is left, not on measuring the task again (AF-0094).{TURNCAP}
+   the deadline, record under Notes what is done, what you measured and what is left, and
+   move it to Backlog before then with a -Reason saying what is left: the shift stashes
+   the unfinished code and the next claim starts from it. Do not file the rest as a task
+   this one then waits on: that sends it back a second time, and the shift splits a task
+   sent back to Backlog a second time rather than offering it a third claim (AF-0465 to
+   AF-0474). The next lane then starts on the work that is left, not on measuring the
+   task again (AF-0094).{TURNCAP}
    Before committing a change to a library's production code, run Measure-CodeQuality.ps1
    for that library once and fix any method past the complexity gate, so the push does not
    turn the CI quality job red (AF-0213: BL-2177 pushed four methods past the gate with no
@@ -452,12 +472,13 @@ $LaneForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase
 $SplitForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git commit',
     'git stash push', 'git stash save', 'git stash apply', 'git stash pop', 'git stash drop', 'git stash clear', 'git stash create', 'git stash branch', 'git stash store')
 
-# The split run's prompt (BL-3091): a task over its cost cap is split into smaller tasks.
+# The split run's prompt (BL-3091): a task over its cost cap, stopped at its turn cap, or sent
+# back to Backlog a second time ({CAUSE}) is split into smaller tasks.
 $SplitPrompt = @'
 DARK FACTORY TASK SPLIT. Stewart is away and cannot answer. Never ask a question and never
 wait for input; nobody will reply. Write no code and run no build or test.
 
-{ID} is over its cost cap: {WHY}. {STASH}
+{ID} is {CAUSE}: {WHY}. {STASH}
 Split it into smaller tasks, each sized for one run, exactly as an interactive session would:
 1. Read Tasks/*/{ID}-*.md and .claude/skills/task-board/SKILL.md. Decide the smaller tasks
    that together meet every acceptance criterion of {ID}, each with its own criteria and
