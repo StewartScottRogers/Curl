@@ -31,6 +31,8 @@ A job cancelled by its timeout can be told apart from one cancelled by a person 
 
 ## Notes
 
+- 2026-10-31 (interactive): not reproduced locally. `Curl.Console.UnitTests` at ad7f977c with `--blame-hang-timeout 3m`, three runs, each 3104 passed in 3 s (without coverage collection). The next CI run (bb37b9b3) passed every job, so the hang is intermittent; a filed hang task should say so.
+
 ## Log
 
 - 2026-10-31: Created.
