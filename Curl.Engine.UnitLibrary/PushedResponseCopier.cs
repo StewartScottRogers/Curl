@@ -1,7 +1,7 @@
 namespace Curl.Engine;
 
 /// <summary>
-/// Copies an HTTP/2 server push's response (<c>Curl.Protocol.Http</c>'s <c>IHttpPushedResponse.Content</c>: the
+/// Copies an HTTP/2 server push's response (<c>Curl.Original.Protocol.Http</c>'s <c>IHttpPushedResponse.Content</c>: the
 /// status line, the header lines, the empty line, then the body) to a pushed transfer's outputs, as curl 8.22.0
 /// hands a pushed stream's head to the duplicated handle's header callback and its DATA to its write callback
 /// (BL-2469, ADR-0605).

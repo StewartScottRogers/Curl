@@ -9,7 +9,7 @@
 
 ADR-0616 (BL-2443) built `curl_ws_recv`, `curl_ws_send` and `curl_ws_meta` over a `CURLOPT_CONNECT_ONLY` 2
 connection and answered `CURLE_BAD_FUNCTION_ARGUMENT` for `CURLWS_OFFSET` and `curl_ws_start_frame` (its point 8).
-`Curl.Protocol.Ws`'s `WsFrameEncoder` wrote only whole frames.
+`Curl.Original.Protocol.Ws`'s `WsFrameEncoder` wrote only whole frames.
 
 curl 8.22.0's `lib/ws.c` (read from the release's source; the curl tool sends no frame in parts, so it cannot be
 measured from the command line) does this:

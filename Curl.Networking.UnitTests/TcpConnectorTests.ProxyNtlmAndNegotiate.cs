@@ -4,7 +4,7 @@ using System.Text;
 using Curl.Authentication;
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Http.Fakes;
+using Curl.Original.Protocol.Http.Fakes;
 
 namespace Curl.Networking;
 

@@ -18,7 +18,7 @@ that release:
   (`data->req.bytecount`) and `CURLE_HTTP3` (95) before. No case for
   `H3_REQUEST_REJECTED`, no retry. BL-731 built this
   (`HttpTransferMessages.Http3StreamReset`, used by
-  `Curl.Protocol.Http.UnitLibrary/Http3StreamConnection.cs`).
+  `Curl.Original.Protocol.Http.UnitLibrary/Http3StreamConnection.cs`).
 - **`curl-8_19_0` and later**, including `curl-8_21_0`, where the HTTP/3 half of the old
   file is now `lib/vquic/cf-ngtcp2.c` and the QUIC half `lib/vquic/cf-ngtcp2-cmn.c`: a
   reset with `H3_REQUEST_REJECTED` is retried on a new connection, a reset after the

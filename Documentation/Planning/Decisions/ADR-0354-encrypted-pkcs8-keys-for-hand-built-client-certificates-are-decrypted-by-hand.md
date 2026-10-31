@@ -12,7 +12,7 @@ from the first unencrypted `PRIVATE KEY` PEM block only, so an `ENCRYPTED PRIVAT
 `--pass` gave exit 43 where OpenSSL-built curl decrypts it and presents the certificate. The
 BCL decrypts PKCS #8 only while importing it into a key type it holds itself, and
 `Pkcs8PrivateKeyInfo` lives in `System.Security.Cryptography.Pkcs`, a package.
-`Curl.Protocol.Ssh.UnitLibrary` has a decryptor, but Networking may not reference a protocol
+`Curl.Original.Protocol.Ssh.UnitLibrary` has a decryptor, but Networking may not reference a protocol
 library.
 
 ## Decision

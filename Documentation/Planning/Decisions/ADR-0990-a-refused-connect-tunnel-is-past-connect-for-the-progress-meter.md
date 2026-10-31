@@ -25,4 +25,4 @@ none there, and Curl matches the Windows build.
 
 ## Consequences
 
-`Cgr242Tests` in `Curl.Console.UnitTests` and `Curl.Protocol.Http.UnitTests` pin it.
+`Cgr242Tests` in `Curl.Console.UnitTests` and `Curl.Original.Protocol.Http.UnitTests` pin it.

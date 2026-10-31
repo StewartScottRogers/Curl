@@ -52,7 +52,7 @@
   </ItemGroup>
 
   <!--
-    Curl.Console.UnitTests references Curl.Protocol.Ssh.UnitTests, which shows it its
+    Curl.Console.UnitTests references Curl.Original.Protocol.Ssh.UnitTests, which shows it its
     internals, so it sees two copies of the linked TestDiagnostics types. CS0436 says the
     compiler uses the project's own copy - the right one - so it is not an error there.
   -->
@@ -156,7 +156,7 @@
     Three rules, checked on every project's ProjectReference items:
     1. Only the hosts (Curl.Console, Curl.Api, Curl.Mcp and their test projects) and the extensions
        themselves reference a Curl.Extension.* project; the engine, the core and every protocol never do.
-    2. An extension library references no Curl.Protocol.* project but Curl.Protocol.Abstractions,
+    2. An extension library references no Curl.Original.Protocol.* project, only Curl.Protocol.Abstractions,
        as protocols reference no other protocol.
     3. An extension library references no other extension but Curl.Extension.Abstractions; only
        Curl.Extension.Composition, which lists them all, references the extensions.
@@ -177,7 +177,7 @@
     <ItemGroup>
       <_ExtensionReference Include="@(ProjectReference)" Condition="$([System.String]::Copy('%(Filename)').StartsWith('Curl.Extension.'))" />
       <_ExtensionToExtensionReference Include="@(_ExtensionReference)" Condition="'%(Filename)' != 'Curl.Extension.Abstractions.UnitLibrary'" />
-      <_ExtensionToProtocolReference Include="@(ProjectReference)" Condition="$([System.String]::Copy('%(Filename)').StartsWith('Curl.Protocol.')) And '%(Filename)' != 'Curl.Protocol.Abstractions.UnitLibrary'" />
+      <_ExtensionToProtocolReference Include="@(ProjectReference)" Condition="$([System.String]::Copy('%(Filename)').StartsWith('Curl.Original.Protocol.'))" />
     </ItemGroup>
     <Error Condition="'$(_IsExtensionProject)' != 'True' And '$(_IsExtensionHost)' != 'true' And '@(_ExtensionReference)' != ''"
            Text="$(MSBuildProjectName) references @(_ExtensionReference->'%(Filename)'), but only the hosts (Curl.Console, Curl.Api, Curl.Mcp) and the extensions reference an extension (ADR-0999). Pass the extension in from a host instead." />

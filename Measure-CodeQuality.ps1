@@ -130,7 +130,7 @@
     .\Measure-CodeQuality.ps1
 
 .EXAMPLE
-    .\Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary -ReportPath report.md
+    .\Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.File.UnitLibrary -ReportPath report.md
 
 .EXAMPLE
     .\Measure-CodeQuality.ps1 -Shard 2 -ShardCount 3 -ResultsDirectory $env:TEMP\q\shard-2
@@ -306,9 +306,9 @@ function Get-GatedLibraries {
 # project not listed counts as $defaultTestProjectSeconds. Only the balance depends on
 # these numbers; every project lands in exactly one shard whatever they say.
 $measuredTestProjectSeconds = @{
-    'Curl.Protocol.Ssh.UnitTests' = 707; 'Curl.Conformance.UnitTests' = 72; 'Curl.Cryptography.UnitTests' = 58
+    'Curl.Original.Protocol.Ssh.UnitTests' = 707; 'Curl.Conformance.UnitTests' = 72; 'Curl.Cryptography.UnitTests' = 58
     'Curl.Tls.UnitTests' = 24; 'Curl.Networking.UnitTests' = 23; 'Curl.Console.UnitTests' = 17
-    'Curl.Conformance.LibTest.UnitTests' = 15; 'Curl.Engine.UnitTests' = 13; 'Curl.Protocol.Http.UnitTests' = 11
+    'Curl.Conformance.LibTest.UnitTests' = 15; 'Curl.Engine.UnitTests' = 13; 'Curl.Original.Protocol.Http.UnitTests' = 11
     'Curl.Cli.UnitTests' = 10; 'Libcurl.UnitTests' = 10; 'Curl.Mcp.UnitTests' = 9; 'Curl.Api.UnitTests' = 8
     'Curl.Kerberos.UnitTests' = 8; 'Curl.Conformance.Http3Server.UnitTests' = 7; 'Curl.Conformance.SshServer.UnitTests' = 7
 }

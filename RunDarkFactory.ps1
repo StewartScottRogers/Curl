@@ -115,7 +115,7 @@
          value is ignored with a "model" trace warning and the rule below applies.
       3. Otherwise opus when the task's touches name a hand-built security or crypto
          library (Curl.Cryptography, Curl.Tls, Curl.Quic, Curl.Kerberos, Curl.Ntlm,
-         Curl.Protocol.Ssh, or their .UnitTests or .IntegrationTests twin), its pipeline is
+         Curl.Original.Protocol.Ssh, or their .UnitTests or .IntegrationTests twin), its pipeline is
          protocol, or feature unless its title is routine and names no hard work (BL-3001:
          $RoutineFeatureTitles and $HardWorkMarkers in DarkFactory\ModelChoice.ps1, such as
          an upstream unit program port or a harness stand-in with no TLS, crypto, QUIC,

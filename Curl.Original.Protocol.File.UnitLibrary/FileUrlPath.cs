@@ -1,0 +1,443 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Text;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Original.Protocol.File;
+
+/// <summary>
+/// The path half of a <c>file://</c> URL, in both of the forms curl needs it: as written
+/// in the URL, and as handed to the operating system.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The path is read from <see cref="CurlUrl.AbsolutePath" />, where
+/// <see cref="CurlUrl" /> has already applied curl's <c>file://</c> rules to the text as
+/// typed. The measurements behind those rules are recorded in ADR-0003 and ADR-0010
+/// (<c>Documentation/Planning/Decisions</c>), taken against curl 8.21.0.
+/// </para>
+/// <para>
+/// A URL <see cref="CurlUrl.TryParse(string, bool, out CurlUrl)" /> rejects never
+/// reaches this type: the transfer ends with exit 3 before a handler runs.
+/// </para>
+/// </remarks>
+public sealed record FileUrlPath
+{
+    /// <summary>
+    /// Holds the two forms of an already parsed path.
+    /// </summary>
+    /// <param name="urlPath">The path as curl reports it; see <see cref="UrlPath" />.</param>
+    /// <param name="osPath">The path handed to the operating system; see <see cref="OsPath" />.</param>
+    private FileUrlPath(string urlPath, string osPath)
+    {
+        UrlPath = urlPath;
+        OsPath = osPath;
+    }
+
+    /// <summary>
+    /// The path as curl reports it, still percent-encoded: every <c>\</c> already turned into
+    /// <c>/</c> and, unless <c>--path-as-is</c> is in force, its dot segments removed. This is
+    /// the text curl echoes in its exit 37 message — <c>file:///C:/dir/../nosuch.txt</c> is
+    /// quoted as <c>C:/nosuch.txt</c> — so it is built from the encoded text rather than
+    /// reconstructed from the decoded form. Every well-formed <c>%xx</c> escape it keeps is
+    /// written with uppercase hexadecimal digits, as curl 8.21.0 quotes it:
+    /// <c>file:///C:/dir/a%2eb/x</c> is quoted as <c>C:/dir/a%2Eb/x</c>. A malformed escape
+    /// — <c>%2</c>, <c>%GG</c>, <c>%g2</c>, a trailing <c>%</c> — is kept exactly as written.
+    /// A non-ASCII character written unescaped is encoded as its UTF-8 bytes, so
+    /// <c>file:///C:/dir/é</c> is quoted as <c>C:/dir/%C3%A9</c>; printable ASCII is never
+    /// encoded.
+    /// </summary>
+    public string UrlPath { get; }
+
+    /// <summary>
+    /// The percent-decoded operating-system path handed to
+    /// <see cref="Curl.Protocol.Abstractions.IFileSystem" />: <c>UrlPath</c> decoded, with the platform's
+    /// directory separators. It holds a <c>.</c> or <c>..</c> segment only when the
+    /// <see cref="CurlUrl" /> was parsed with <c>pathAsIs</c>.
+    /// </summary>
+    public string OsPath { get; }
+
+    /// <summary>
+    /// The only scheme this type parses, compared ordinally and ignoring case.
+    /// </summary>
+    private const string FileScheme = "file";
+
+    /// <summary>
+    /// Extracts the URL path and the operating-system path from a <c>file://</c> URL.
+    /// </summary>
+    /// <param name="url">The URL to read. Its scheme must be <c>file</c>.</param>
+    /// <param name="path">
+    /// On success, the parsed pair; otherwise undefined and not to be read.
+    /// </param>
+    /// <returns>
+    /// <see langword="true" /> when <paramref name="url" /> is a <c>file://</c> URL;
+    /// <see langword="false" /> for any other scheme, which the caller reports as
+    /// <see cref="Curl.Protocol.Abstractions.CurlExitCode.UrlMalformat" />.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// The path comes from <see cref="CurlUrl.AbsolutePath" />, which has already applied
+    /// curl's <c>file://</c> rules to the text as typed, so nothing here re-reads
+    /// <see cref="CurlUrl.OriginalString" />. By then, as measured against curl 8.21.0
+    /// (ADR-0003, ADR-0010):
+    /// </para>
+    /// <list type="bullet">
+    /// <item>
+    /// <description>
+    /// the query and fragment are gone, and every <c>\</c> is a <c>/</c> —
+    /// <c>file:///C:/dir\..\secret.txt</c> opens <c>C:/secret.txt</c> — while an escaped
+    /// backslash, <c>%5C</c>, stays an escape;
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// the authority is dropped when it is empty, <c>localhost</c> or <c>127.0.0.1</c>,
+    /// and kept as the head of the path when it is a drive specification, so
+    /// <c>file://C:/dir/x</c> and <c>file:///C:/dir/x</c> are the same path and
+    /// <c>file://C:</c> is the path <c>C:</c>; <c>file:////server/share</c> keeps both
+    /// leading slashes of <c>//server/share</c>;
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// unless the URL was parsed with <c>pathAsIs</c> (<c>--path-as-is</c>), the dot
+    /// segments are removed, spelled plainly or as <c>%2e</c>, and a drive followed by
+    /// <c>/</c> or by nothing is a root they cannot climb above:
+    /// <c>file:///C:/../../nosuch.txt</c> is quoted as <c>C:/nosuch.txt</c>, while
+    /// <c>file:///Q:dir/../x</c> is quoted as <c>/x</c>.
+    /// </description>
+    /// </item>
+    /// </list>
+    /// <para>
+    /// This method then takes three steps. <strong>Drive letters:</strong> on Windows, a
+    /// path of the form <c>/X:…</c> or <c>/X|…</c>, where <c>X</c> is a single ASCII
+    /// letter, loses its leading slash, so <c>file:///c:/Windows/win.ini</c> becomes an
+    /// absolute Windows path and <c>file:///C:%2FWindows/win.ini</c> opens
+    /// <c>C:\Windows\win.ini</c>, as curl 8.21.0 does. The <c>|</c> is kept in both
+    /// <c>UrlPath</c> and <c>OsPath</c>, never rewritten to <c>:</c>: measured against the
+    /// curl 8.21.0 Schannel build, <c>file:///c|/Windows/win.ini</c> exits 37 with
+    /// <c>Could not open file c|/Windows/win.ini</c> even though that file exists, because
+    /// the <c>X|</c> to <c>X:</c> rewrite in <c>lib/file.c</c> only fires on a path that
+    /// still starts with <c>/</c>, and the slash is gone by then. On every other platform the slash stays, so
+    /// the same URL opens the absolute path <c>/C:/Windows/win.ini</c>, because curl
+    /// 8.21.0 strips it only inside <c>#ifdef DOS_FILESYSTEM</c> in <c>lib/file.c</c>.
+    /// <strong>Quote:</strong> <c>UrlPath</c> is that text with each unescaped non-ASCII
+    /// character encoded as its UTF-8 bytes and the hexadecimal digits of each well-formed
+    /// escape uppercased, a malformed one left as written. <strong>Decode:</strong>
+    /// <c>OsPath</c> is that text with each <c>%XX</c> escape decoded to the byte it names
+    /// and runs of escapes read as the host's curl reads them (CGR-114, ADR-0864): in the
+    /// system ANSI code page on Windows, so <c>caf%E9.txt</c> opens <c>café.txt</c> on a
+    /// Windows-1252 host, and as raw bytes elsewhere, so a byte that is not UTF-8 reaches
+    /// <c>open()</c> unchanged (<see cref="RawBytePath" />). <c>%2F</c> is included, a
+    /// malformed escape left as
+    /// written, and <c>/</c> turned into the platform's directory separator; no trailing
+    /// separator is trimmed and no case is changed.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="url" /> is <see langword="null" />.
+    /// </exception>
+    public static bool TryParse(CurlUrl url, [MaybeNullWhen(false)] out FileUrlPath path) =>
+        TryParse(url, OperatingSystem.IsWindows(), out path);
+
+    /// <summary>
+    /// The code page of Windows-1252, the ANSI code page of an English Windows system.
+    /// </summary>
+    private const int Windows1252CodePage = 1252;
+
+    /// <summary>
+    /// Reads the bytes of a run of escapes as the host's curl does (CGR-114, ADR-0864): in
+    /// the system ANSI code page on Windows, and as the raw bytes handed to <c>open()</c>
+    /// elsewhere.
+    /// </summary>
+    private static readonly Func<byte[], string> PlatformEscapedBytesReader = EscapedBytesReaderFor(
+        OperatingSystem.IsWindows(),
+        ReadSystemAnsiCodePage(() => CodePagesEncodingProvider.Instance.GetEncoding(0)));
+
+    /// <summary>
+    /// Reads the host's system ANSI code page, asking a second time when the first answer is
+    /// <see langword="null" />, because Windows can fail one of several first calls made at
+    /// once (BL-1200, BL-1203). On Linux and macOS both answers are <see langword="null" />.
+    /// </summary>
+    /// <param name="readCodePageZero">Asks the code page provider for code page 0.</param>
+    /// <returns>The system ANSI code page, or <see langword="null" /> when the host has none.</returns>
+    internal static Encoding? ReadSystemAnsiCodePage(Func<Encoding?> readCodePageZero) =>
+        readCodePageZero() ?? readCodePageZero();
+
+    /// <summary>
+    /// Chooses how a platform's curl reads the bytes of a run of <c>%XX</c> escapes in a
+    /// <c>file://</c> path (CGR-114, ADR-0864).
+    /// </summary>
+    /// <param name="isWindows"><see langword="true" /> for Windows behaviour.</param>
+    /// <param name="systemAnsiCodePage">
+    /// The host's system ANSI code page, or <see langword="null" /> on a host that has none.
+    /// </param>
+    /// <returns>
+    /// On Windows, the bytes read in <paramref name="systemAnsiCodePage" />, Windows-1252 when
+    /// that is <see langword="null" />, as the non-Unicode curl 8.22.0 hands them to the ANSI
+    /// file API: <c>caf%E9.txt</c> opens <c>café.txt</c>. Elsewhere, the bytes in
+    /// <see cref="RawBytePath" /> form, so a byte that is not UTF-8 reaches <c>open()</c>
+    /// unchanged, as curl 8.18.0 on Linux passes it.
+    /// </returns>
+    internal static Func<byte[], string> EscapedBytesReaderFor(bool isWindows, Encoding? systemAnsiCodePage) =>
+        isWindows
+            ? (systemAnsiCodePage ?? CodePagesEncodingProvider.Instance.GetEncoding(Windows1252CodePage)!).GetString
+            : bytes => RawBytePath.FromBytes(bytes);
+
+    /// <summary>
+    /// Extracts the URL path and the operating-system path from a <c>file://</c> URL with
+    /// the drive-letter rule of the chosen platform.
+    /// </summary>
+    /// <param name="url">The URL to read. Its scheme must be <c>file</c>.</param>
+    /// <param name="driveLetters">
+    /// <see langword="true" /> for the Windows rule, which drops the slash in front of a
+    /// <c>/X:…</c> or <c>/X|…</c> drive; <see langword="false" /> for every other
+    /// platform, which keeps it.
+    /// </param>
+    /// <param name="path">
+    /// On success, the parsed pair; otherwise undefined and not to be read.
+    /// </param>
+    /// <returns>
+    /// <see langword="true" /> when <paramref name="url" /> is a <c>file://</c> URL.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="url" /> is <see langword="null" />.
+    /// </exception>
+    internal static bool TryParse(
+        CurlUrl url,
+        bool driveLetters,
+        [MaybeNullWhen(false)] out FileUrlPath path) =>
+        TryParse(url, driveLetters, PlatformEscapedBytesReader, out path);
+
+    /// <summary>
+    /// Extracts the URL path and the operating-system path from a <c>file://</c> URL with
+    /// the drive-letter rule and the escape reading of the chosen platform.
+    /// </summary>
+    /// <param name="url">The URL to read. Its scheme must be <c>file</c>.</param>
+    /// <param name="driveLetters">
+    /// <see langword="true" /> for the Windows drive-letter rule; see
+    /// <see cref="TryParse(CurlUrl, bool, out FileUrlPath)" />.
+    /// </param>
+    /// <param name="readEscapedBytes">
+    /// Turns the bytes of each run of consecutive escapes into text; see
+    /// <see cref="EscapedBytesReaderFor" />.
+    /// </param>
+    /// <param name="path">
+    /// On success, the parsed pair; otherwise undefined and not to be read.
+    /// </param>
+    /// <returns>
+    /// <see langword="true" /> when <paramref name="url" /> is a <c>file://</c> URL.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="url" /> is <see langword="null" />.
+    /// </exception>
+    internal static bool TryParse(
+        CurlUrl url,
+        bool driveLetters,
+        Func<byte[], string> readEscapedBytes,
+        [MaybeNullWhen(false)] out FileUrlPath path)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+
+        path = null;
+
+        if (!string.Equals(url.Scheme, FileScheme, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // CurlUrl reads a scheme only before ":/", so the path is never empty here.
+        string urlPath = driveLetters
+            ? StripDriveLetterSlash(url.AbsolutePath)
+            : url.AbsolutePath;
+
+        path = new FileUrlPath(
+            UppercaseEscapes(EncodeNonAscii(urlPath)),
+            ToOperatingSystemPath(urlPath, readEscapedBytes));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Drops the slash in front of a <c>/X:…</c> or <c>/X|…</c> drive specification.
+    /// </summary>
+    /// <param name="urlPath">The still-encoded path.</param>
+    /// <returns>The path curl would hand on.</returns>
+    private static string StripDriveLetterSlash(string urlPath) =>
+        urlPath.Length >= 3
+        && urlPath[0] == '/'
+        && char.IsAsciiLetter(urlPath[1])
+        && IsDriveSeparator(urlPath.AsSpan(2))
+            ? urlPath[1..]
+            : urlPath;
+
+    /// <summary>
+    /// Tells whether the text starts with the <c>:</c> or <c>|</c> after a drive letter, or the escape <c>%3A</c> curl decodes to <c>:</c> first.
+    /// </summary>
+    /// <param name="rest">The path after the drive letter.</param>
+    /// <returns><see langword="true" /> for a drive separator.</returns>
+    private static bool IsDriveSeparator(ReadOnlySpan<char> rest) =>
+        rest[0] is ':' or '|' || rest.StartsWith("%3A", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Percent-encodes every non-ASCII character as its UTF-8 bytes, leaving ASCII,
+    /// escapes included, exactly as written.
+    /// </summary>
+    /// <param name="urlPath">The still-encoded path.</param>
+    /// <returns>The path with nothing but ASCII in it.</returns>
+    /// <remarks>
+    /// Measured against the Unicode build of curl 8.21.0, which receives its arguments as
+    /// UTF-16 as .NET does: <c>file:///C:/nodir/aéb</c> is quoted as
+    /// <c>C:/nodir/a%C3%A9b</c>, and a character outside code page 1252 such as
+    /// <c>日</c> as <c>%E6%97%A5</c>. A lone surrogate is encoded as U+FFFD.
+    /// </remarks>
+    private static string EncodeNonAscii(string urlPath)
+    {
+        var encoded = new StringBuilder(urlPath.Length);
+        Span<byte> utf8 = stackalloc byte[4];
+
+        foreach (Rune rune in urlPath.EnumerateRunes())
+        {
+            if (rune.IsAscii)
+            {
+                encoded.Append((char)rune.Value);
+                continue;
+            }
+
+            int length = rune.EncodeToUtf8(utf8);
+
+            foreach (byte value in utf8[..length])
+            {
+                encoded.Append('%').Append(value.ToString("X2", CultureInfo.InvariantCulture));
+            }
+        }
+
+        return encoded.ToString();
+    }
+
+    /// <summary>
+    /// Rewrites the hexadecimal digits of every well-formed <c>%xx</c> escape in uppercase,
+    /// leaving a malformed escape and every other character exactly as written.
+    /// </summary>
+    /// <param name="urlPath">The still-encoded path.</param>
+    /// <returns>The path as curl 8.21.0 quotes it in its exit 37 message.</returns>
+    private static string UppercaseEscapes(string urlPath)
+    {
+        var quoted = new StringBuilder(urlPath);
+
+        for (int index = 0; index < quoted.Length; index++)
+        {
+            if (TryReadEscape(urlPath, index, out _))
+            {
+                quoted[index + 1] = char.ToUpperInvariant(quoted[index + 1]);
+                quoted[index + 2] = char.ToUpperInvariant(quoted[index + 2]);
+                index += 2;
+            }
+        }
+
+        return quoted.ToString();
+    }
+
+    /// <summary>
+    /// Decodes the escapes and switches to the platform's directory separator.
+    /// </summary>
+    /// <param name="urlPath">The still-encoded path.</param>
+    /// <param name="readEscapedBytes">Turns the bytes of a run of escapes into text.</param>
+    /// <returns>The path to hand to <see cref="Curl.Protocol.Abstractions.IFileSystem" />.</returns>
+    private static string ToOperatingSystemPath(string urlPath, Func<byte[], string> readEscapedBytes) =>
+        Decode(urlPath, readEscapedBytes).Replace('/', Path.DirectorySeparatorChar);
+
+    /// <summary>
+    /// Percent-decodes <paramref name="encoded" />, reading each run of escapes with
+    /// <paramref name="readEscapedBytes" /> and leaving a malformed escape exactly as written.
+    /// </summary>
+    /// <param name="encoded">The still-encoded path.</param>
+    /// <param name="readEscapedBytes">Turns the bytes of a run of escapes into text.</param>
+    /// <returns>The decoded text.</returns>
+    private static string Decode(string encoded, Func<byte[], string> readEscapedBytes)
+    {
+        if (!encoded.Contains('%', StringComparison.Ordinal))
+        {
+            return encoded;
+        }
+
+        var decoded = new StringBuilder(encoded.Length);
+        var escaped = new List<byte>(4);
+        int index = 0;
+
+        while (index < encoded.Length)
+        {
+            if (TryReadEscape(encoded, index, out byte value))
+            {
+                escaped.Add(value);
+                index += 3;
+                continue;
+            }
+
+            Flush(escaped, decoded, readEscapedBytes);
+            decoded.Append(encoded[index]);
+            index++;
+        }
+
+        Flush(escaped, decoded, readEscapedBytes);
+
+        return decoded.ToString();
+    }
+
+    /// <summary>
+    /// Reads the <c>%XX</c> escape at <paramref name="index" />, if there is one.
+    /// </summary>
+    /// <param name="text">The still-encoded path.</param>
+    /// <param name="index">Where to look.</param>
+    /// <param name="value">On success, the byte the escape names.</param>
+    /// <returns>
+    /// <see langword="false" /> when the text at <paramref name="index" /> is not a
+    /// complete escape with two hexadecimal digits.
+    /// </returns>
+    private static bool TryReadEscape(string text, int index, out byte value)
+    {
+        value = 0;
+
+        if (text[index] != '%' || index + 2 >= text.Length)
+        {
+            return false;
+        }
+
+        char high = text[index + 1];
+        char low = text[index + 2];
+
+        if (!char.IsAsciiHexDigit(high) || !char.IsAsciiHexDigit(low))
+        {
+            return false;
+        }
+
+        value = (byte)((HexValue(high) << 4) | HexValue(low));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Converts one hexadecimal digit to its value.
+    /// </summary>
+    /// <param name="digit">An ASCII hexadecimal digit in either case.</param>
+    /// <returns>The value zero to fifteen.</returns>
+    private static int HexValue(char digit) =>
+        char.IsAsciiDigit(digit) ? digit - '0' : ((digit | 0x20) - 'a') + 10;
+
+    /// <summary>
+    /// Appends the bytes gathered so far as text and empties the buffer.
+    /// </summary>
+    /// <param name="escaped">The bytes from a run of consecutive escapes.</param>
+    /// <param name="decoded">The text being built.</param>
+    /// <param name="readEscapedBytes">Turns the bytes of a run of escapes into text.</param>
+    private static void Flush(List<byte> escaped, StringBuilder decoded, Func<byte[], string> readEscapedBytes)
+    {
+        if (escaped.Count == 0)
+        {
+            return;
+        }
+
+        decoded.Append(readEscapedBytes(escaped.ToArray()));
+        escaped.Clear();
+    }
+}

@@ -2,7 +2,7 @@
 
 The Azure Storage extension (ADR-0999), for the `az://` and `abfs://` schemes. Namespace
 `Curl.Extension.Protocol.AzureStorage`. It references the base class library and `Curl.Protocol.Abstractions`
-(for `IConnection`) and `Curl.Extension.Abstractions` (for its description), never `Curl.Protocol.Http`
+(for `IConnection`) and `Curl.Extension.Abstractions` (for its description), never `Curl.Original.Protocol.Http`
 or another extension. It is registered in `ExtensionCatalogue.cs` and `ExtensionDescriptionCatalogue.cs`.
 
 - `Client/` is the handler (ADR-1105). `AzureStorageExtension` gives the description and creates

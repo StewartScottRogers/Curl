@@ -1,0 +1,480 @@
+using System.Net;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Original.Protocol.Smtp;
+
+/// <summary>
+/// Authenticates an open SMTP session with <c>AUTH</c> through the injected
+/// <see cref="ISaslAuthenticator" />, as curl 8.21.0 does, each rule measured with
+/// <c>Record-CurlExchange.ps1 -Smtp</c> (BL-541, ADR-0133).
+/// </summary>
+/// <remarks>
+/// <list type="bullet">
+/// <item>The offered mechanisms are the words, split on spaces and tabs, after <c>AUTH </c>
+/// (in any case) on every line of the <c>EHLO</c> reply. No such line: no authentication.</item>
+/// <item>Nothing to authenticate with - no <c>-u</c>, no <c>--oauth2-bearer</c>, and not
+/// <c>AUTH=EXTERNAL</c> with <c>EXTERNAL</c> offered: no authentication.</item>
+/// <item>No usable mechanism among those offered: exit 67 <c>Login denied</c>, nothing sent,
+/// after the <c>-v</c> <c>SASL:</c> lines curl writes for it (BL-1061, BL-1242).</item>
+/// <item>Under <c>--sasl-ir</c> the initial response goes on the <c>AUTH</c> line while the
+/// mechanism's name and the base64 fit in 504 characters; otherwise it answers the first
+/// <c>334</c>. An empty message is sent as <c>=</c>.</item>
+/// <item>Each <c>334</c> is answered; <c>235</c> once a message has been sent is success.
+/// Anything else, <c>235</c> before any message, or a challenge the exchange cannot answer
+/// and gives no cancel reason for is exit 67 <c>Login denied</c> with nothing more sent.</item>
+/// <item>A <c>334</c> whose text is not base64 (empty text or text starting <c>=</c> is an
+/// empty challenge) is handed over empty to a mechanism that ignores it. A mechanism that
+/// reads it - every GSSAPI challenge, the first one a CRAM-MD5, DIGEST-MD5 or NTLM exchange
+/// answers - is cancelled with <c>*</c>: the reply is read whatever it is, the mechanism is
+/// dropped from the offered ones and the authenticator chooses again. None left is exit 67
+/// <c>Authentication cancelled</c> (BL-774).</item>
+/// <item>An exchange that cannot answer a challenge but gives a
+/// <see cref="ISaslExchange.CancelReason" /> has the reason written as a <c>-v</c> info line
+/// and is cancelled with <c>*</c> the same way (BL-1350).</item>
+/// </list>
+/// </remarks>
+internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAuthenticator authenticator, ITransferContext context)
+{
+    private const string AuthKeyword = "AUTH ";
+
+    private const string AuthOption = "AUTH=";
+
+    private const string External = "EXTERNAL";
+
+    private const string DefaultServiceName = "smtp";
+
+    private const int Continuation = 334;
+
+    private const int Authenticated = 235;
+
+    /// <summary>curl's longest <c>AUTH</c> argument with an initial response: 512 less <c>AUTH </c>, a space and CRLF.</summary>
+    private const int MaxInitialResponseLength = 504;
+
+    private static readonly char[] MechanismSeparators = [' ', '\t'];
+
+    /// <summary>The SASL mechanisms curl 8.21.0 knows by name, in any case.</summary>
+    private static readonly HashSet<string> KnownMechanisms = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "LOGIN", "PLAIN", "CRAM-MD5", "DIGEST-MD5", "GSSAPI", "EXTERNAL", "NTLM", "XOAUTH2", "OAUTHBEARER", "SCRAM-SHA-1", "SCRAM-SHA-256",
+    };
+
+    /// <summary>
+    /// The mechanisms curl 8.21.0's Schannel build knows but does not build in, in the order
+    /// its <c>-v</c> names them when one of them is all that could be used (BL-1061).
+    /// </summary>
+    private static readonly string[] NotBuiltInMechanisms = ["SCRAM-SHA-256", "SCRAM-SHA-1"];
+
+    /// <summary>
+    /// The mechanisms that need <c>--oauth2-bearer</c>, in the order curl 8.21.0's <c>-v</c>
+    /// names them when one of them was offered without it (BL-1242).
+    /// </summary>
+    private static readonly string[] BearerTokenMechanisms = ["OAUTHBEARER", "XOAUTH2"];
+
+    /// <summary>How many challenges the current exchange has been handed.</summary>
+    private int challengesHanded;
+
+    /// <summary>Whether the current exchange has been asked for its initial response.</summary>
+    private bool initialResponseAsked;
+
+    /// <summary>
+    /// Gets a value indicating whether <see cref="AuthenticateAsync" /> ran an <c>AUTH</c>
+    /// exchange the server accepted, which is when curl adds <c>--mail-auth</c>'s
+    /// <c>AUTH=</c> to <c>MAIL FROM</c> (BL-544).
+    /// </summary>
+    public bool IsAuthenticated { get; private set; }
+
+    /// <summary>
+    /// Authenticates when the <c>EHLO</c> reply offers <c>AUTH</c> and the transfer has
+    /// something to authenticate with.
+    /// </summary>
+    /// <param name="ehlo">The reply to the session's last <c>EHLO</c>.</param>
+    /// <returns><see langword="null" /> to carry on, or exit 67's failure.</returns>
+    /// <exception cref="SmtpReplyMissingException">The server closed before a reply was complete.</exception>
+    public async ValueTask<TransferResult?> AuthenticateAsync(SmtpReply ehlo)
+    {
+        if (OfferedMechanisms(ehlo) is not { } offered)
+        {
+            return null;
+        }
+
+        SaslRequest request = CreateRequest();
+        if (!CanAuthenticate(request, offered))
+        {
+            return null;
+        }
+
+        return await TryMechanismsAsync(request, offered).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads the mechanism named by <c>AUTH=</c> in the login options: <c>--login-options</c>
+    /// when given, otherwise the URL's <c>;</c> options.
+    /// </summary>
+    /// <param name="loginOptions">The login options, or <see langword="null" />.</param>
+    /// <returns>The first <c>AUTH=</c> value, or <see langword="null" /> when there is none.</returns>
+    internal static string? RequiredMechanism(string? loginOptions) =>
+        loginOptions?.Split(';')
+            .FirstOrDefault(option => option.StartsWith(AuthOption, StringComparison.OrdinalIgnoreCase))?[AuthOption.Length..];
+
+    /// <summary>
+    /// Tells whether curl 8.22.0's <c>smtp_parse_url_options</c> accepts
+    /// <paramref name="loginOptions" />: every option is <c>AUTH=</c> (in any case) naming
+    /// <c>*</c> or a mechanism curl knows, in any case. Anything else (<c>AUTH=BOGUS</c>,
+    /// <c>AUTH=</c>, <c>FOO=BAR</c>) is exit 3 once connected, before a byte is sent
+    /// (measured, CGR-104).
+    /// </summary>
+    /// <param name="loginOptions">The login options, or <see langword="null" /> for none.</param>
+    /// <returns><see langword="true" /> when curl accepts them.</returns>
+    internal static bool AreLoginOptionsValid(string? loginOptions) =>
+        (loginOptions ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .All(option => option.StartsWith(AuthOption, StringComparison.OrdinalIgnoreCase)
+                && option[AuthOption.Length..] is var mechanism
+                && (mechanism == "*" || KnownMechanisms.Contains(mechanism)));
+
+    /// <summary>
+    /// Collects the mechanisms every <c>AUTH</c> line of <paramref name="ehlo" /> offers.
+    /// </summary>
+    /// <returns>The mechanisms, empty for a bare <c>AUTH </c>; <see langword="null" /> without an <c>AUTH</c> line.</returns>
+    internal static List<string>? OfferedMechanisms(SmtpReply ehlo)
+    {
+        List<string>? offered = null;
+        foreach (string line in ehlo.Lines)
+        {
+            if (line.Length >= 4 + AuthKeyword.Length
+                && line.AsSpan(4, AuthKeyword.Length).Equals(AuthKeyword, StringComparison.OrdinalIgnoreCase))
+            {
+                offered ??= [];
+                offered.AddRange(line[(4 + AuthKeyword.Length)..].Split(MechanismSeparators, StringSplitOptions.RemoveEmptyEntries));
+            }
+        }
+
+        return offered;
+    }
+
+    private static bool CanAuthenticate(SaslRequest request, List<string> offered) =>
+        request.Credential is not null
+        || request.BearerToken is not null
+        || (External.Equals(request.RequiredMechanism, StringComparison.OrdinalIgnoreCase)
+            && offered.Contains(External, StringComparer.OrdinalIgnoreCase));
+
+    private static string Encode(byte[] message) => message.Length == 0 ? "=" : Convert.ToBase64String(message);
+
+    // An answer to a challenge: as Encode, except that an exchange whose empty answer is curl's
+    // "no message" (DIGEST-MD5's answer to rspauth) sends an empty line, as curl does.
+    private static string EncodeAnswer(ISaslExchange exchange, byte[] answer) =>
+        answer.Length == 0 && exchange.SendsLastAnswerAsEmptyLine ? string.Empty : Encode(answer);
+
+    /// <summary>
+    /// Encodes an initial response sent on its own line after a <c>334</c>: empty when the
+    /// response is, as curl 8.22.0 sends it (upstream test943), otherwise base64.
+    /// </summary>
+    private static string EncodeDeferredInitialResponse(byte[] message) => message.Length == 0 ? string.Empty : Convert.ToBase64String(message);
+
+    /// <summary>
+    /// Decodes a <c>334</c> challenge. One that is not base64 is empty when its text starts
+    /// with <c>=</c> or <paramref name="mechanism" /> ignores it (ADR-0133), and cancels the
+    /// exchange otherwise (BL-774).
+    /// </summary>
+    /// <param name="reply">The <c>334</c> reply.</param>
+    /// <param name="mechanism">The exchange's mechanism.</param>
+    /// <param name="index">How many challenges the exchange has been handed before this one.</param>
+    /// <returns>The challenge, or <see langword="null" /> to cancel with <c>*</c>.</returns>
+    private static byte[]? DecodeChallenge(SmtpReply reply, string mechanism, int index)
+    {
+        string line = reply.Lines[^1];
+        string text = line.Length > 4 ? line[4..] : string.Empty;
+        var buffer = new byte[text.Length];
+        if (Convert.TryFromBase64String(text, buffer, out int written))
+        {
+            return buffer[..written];
+        }
+
+        return text.StartsWith('=') || !ReadsChallenge(mechanism, index) ? [] : null;
+    }
+
+    /// <summary>
+    /// Whether curl decodes challenge <paramref name="index" /> of <paramref name="mechanism" />
+    /// (<c>get_server_message</c> in <c>lib/sasl.c</c>): every GSSAPI challenge, and the first
+    /// one a CRAM-MD5, DIGEST-MD5 or NTLM exchange answers (NTLM's Type 2).
+    /// </summary>
+    private static bool ReadsChallenge(string mechanism, int index) =>
+        mechanism.ToUpperInvariant() switch
+        {
+            "GSSAPI" => true,
+            "CRAM-MD5" or "DIGEST-MD5" or "NTLM" => index == 0,
+            _ => false,
+        };
+
+    private SaslRequest CreateRequest()
+    {
+        MailRequestOptions mail = context.Mail ?? new MailRequestOptions();
+        return new SaslRequest(
+            context.Credentials,
+            mail.SaslAuthorizationIdentity,
+            mail.BearerToken,
+            RequiredMechanism(mail.LoginOptions ?? context.Url.Options),
+            mail.ServiceName ?? DefaultServiceName,
+            context.Url.Host,
+            context.Url.Port);
+    }
+
+    /// <summary>
+    /// Encodes the initial response for the <c>AUTH</c> line: only under <c>--sasl-ir</c>, and
+    /// only while the mechanism's name and the base64 fit in 504 characters.
+    /// </summary>
+    /// <returns>The encoded response, or <see langword="null" /> to send it after the first <c>334</c>.</returns>
+    private static string? InlineInitialResponse(ISaslExchange exchange, byte[]? initialResponse)
+    {
+        if (initialResponse is null)
+        {
+            return null;
+        }
+
+        string encoded = Encode(initialResponse);
+        return exchange.Mechanism.Length + encoded.Length <= MaxInitialResponseLength ? encoded : null;
+    }
+
+    /// <summary>
+    /// Sends <c>AUTH</c> and answers each <c>334</c> until the server says <c>235</c>.
+    /// </summary>
+    /// <returns>Whether the server accepted or refused the exchange, or it was cancelled with <c>*</c>.</returns>
+    private async ValueTask<ExchangeOutcome> ExchangeAsync(ISaslExchange exchange)
+    {
+        initialResponseAsked = false;
+        (byte[]? pending, bool messageSent) = await SendAuthAsync(exchange).ConfigureAwait(false);
+        challengesHanded = 0;
+        while (true)
+        {
+            SmtpReply reply = await ReadReplyAsync().ConfigureAwait(false);
+            if (reply.Code != Continuation)
+            {
+                return Outcome(reply, messageSent);
+            }
+
+            if (await AnswerAsync(exchange, reply, pending).ConfigureAwait(false) is { } end)
+            {
+                return end;
+            }
+
+            pending = null;
+            messageSent = true;
+        }
+    }
+
+    /// <summary>
+    /// Tries the mechanism the authenticator chooses, and after each one cancelled the next,
+    /// until an exchange is accepted or refused or none is left.
+    /// </summary>
+    /// <returns><see langword="null" /> to carry on, or exit 67's failure.</returns>
+    private async ValueTask<TransferResult?> TryMechanismsAsync(SaslRequest request, List<string> offered)
+    {
+        string denial = SmtpSessionMessages.LoginDenied;
+        while (authenticator.ChooseMechanism(request, offered) is { } mechanism)
+        {
+            ExchangeOutcome outcome = await ExchangeAsync(authenticator.Begin(mechanism, request)).ConfigureAwait(false);
+            if (outcome != ExchangeOutcome.Cancelled)
+            {
+                return Finish(outcome, mechanism);
+            }
+
+            SmtpDiagnosticLogLines.MechanismCancelled(context.DiagnosticLog, mechanism);
+            denial = SmtpSessionMessages.AuthenticationCancelled;
+            if (offered.RemoveAll(offer => offer.Equals(mechanism, StringComparison.OrdinalIgnoreCase)) == 0)
+            {
+                break;
+            }
+        }
+
+        if (denial == SmtpSessionMessages.LoginDenied)
+        {
+            SmtpDiagnosticLogLines.NoUsableMechanism(context.DiagnosticLog, offered);
+            ReportNoWayToLogIn(request, offered);
+        }
+
+        return TransferResult.Failure(CurlExitCode.LoginDenied, denial);
+    }
+
+    /// <summary>
+    /// Writes the <c>-v</c> lines curl 8.21.0's <c>Curl_sasl_is_blocked</c> writes when no
+    /// mechanism can be used (BL-1061, BL-1242): when a user was given and a mechanism the
+    /// login options allow was offered but not chosen, that none could be selected and why
+    /// each was not; otherwise <c>no overlap</c> once a mechanism curl knows was offered, and
+    /// <c>no auth mechanism was offered or recognized</c> when none was.
+    /// </summary>
+    private void ReportNoWayToLogIn(SaslRequest request, List<string> offered)
+    {
+        List<string> reasons = ReasonsNoneWasChosen(request, offered);
+        if (reasons.Count > 0)
+        {
+            context.Events.ReportInfo(SmtpConnectionInfoLines.NoSaslMechanismSelectable);
+            foreach (string reason in reasons)
+            {
+                context.Events.ReportInfo(reason);
+            }
+        }
+        else
+        {
+            context.Events.ReportInfo(
+                offered.Any(KnownMechanisms.Contains) ? SmtpConnectionInfoLines.NoSaslMechanismOverlap : SmtpConnectionInfoLines.NoSaslMechanismOffered);
+        }
+    }
+
+    /// <summary>
+    /// Lists, in curl's order, why each offered mechanism the login options allow was not
+    /// chosen when a user was given without <c>--oauth2-bearer</c>: EXTERNAL named by
+    /// <c>AUTH=EXTERNAL</c> with a password, SCRAM not built in, and OAUTHBEARER and XOAUTH2
+    /// missing the token. curl offers nothing but the bearer mechanisms once a token is
+    /// given, so then there is no reason to list (measured 2026-10-02, BL-1242).
+    /// </summary>
+    /// <returns>The lines, empty without a user, with a token, or when none applies.</returns>
+    private static List<string> ReasonsNoneWasChosen(SaslRequest request, List<string> offered) =>
+        request is { Credential: { } credential, BearerToken: null }
+            ? [.. ExternalReason(request, credential, offered),
+                .. MechanismReasons(request, offered, NotBuiltInMechanisms, SmtpConnectionInfoLines.SaslMechanismNotBuiltIn),
+                .. MechanismReasons(request, offered, BearerTokenMechanisms, SmtpConnectionInfoLines.SaslMechanismMissingBearerToken)]
+            : [];
+
+    /// <summary>
+    /// curl passes over EXTERNAL, named by <c>AUTH=EXTERNAL</c> and offered, when <c>-u</c>
+    /// gave a password (<c>sasl_choose_external</c>).
+    /// </summary>
+    private static string[] ExternalReason(SaslRequest request, NetworkCredential credential, List<string> offered) =>
+        credential.Password.Length > 0 && External.Equals(request.RequiredMechanism, StringComparison.OrdinalIgnoreCase) && IsOffered(offered, External)
+            ? [SmtpConnectionInfoLines.SaslExternalNotChosenWithPassword]
+            : [];
+
+    private static IEnumerable<string> MechanismReasons(SaslRequest request, List<string> offered, string[] mechanisms, Func<string, string> line) =>
+        mechanisms.Where(mechanism => IsAllowedAndOffered(request, offered, mechanism)).Select(line);
+
+    private static bool IsAllowedAndOffered(SaslRequest request, List<string> offered, string mechanism) =>
+        Allows(request.RequiredMechanism, mechanism) && IsOffered(offered, mechanism);
+
+    private static bool IsOffered(List<string> offered, string mechanism) => offered.Contains(mechanism, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Whether <c>AUTH=</c> allows <paramref name="mechanism" />: absent, <c>*</c>, or naming it.</summary>
+    private static bool Allows(string? requiredMechanism, string mechanism) =>
+        requiredMechanism is null or "*" || mechanism.Equals(requiredMechanism, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Records whether the exchange was accepted, and fails a refused one with <c>Login denied</c>.</summary>
+    private TransferResult? Finish(ExchangeOutcome outcome, string mechanism)
+    {
+        IsAuthenticated = outcome == ExchangeOutcome.Accepted;
+        if (!IsAuthenticated)
+        {
+            return TransferResult.Failure(CurlExitCode.LoginDenied, SmtpSessionMessages.LoginDenied);
+        }
+
+        SmtpDiagnosticLogLines.LoggedIn(context.DiagnosticLog, mechanism);
+        return null;
+    }
+
+    private static ExchangeOutcome Outcome(SmtpReply reply, bool messageSent) =>
+        reply.Code == Authenticated && messageSent ? ExchangeOutcome.Accepted : ExchangeOutcome.Refused;
+
+    /// <summary>
+    /// Sends <c>AUTH</c>, with the initial response on the line when it goes there. curl makes
+    /// the initial response before <c>AUTH</c> only under <c>--sasl-ir</c>, and otherwise at
+    /// the first <c>334</c>, so a mechanism that cannot make one fails before <c>AUTH</c> only
+    /// under <c>--sasl-ir</c> (BL-856).
+    /// </summary>
+    /// <returns>The initial response still to send after the first <c>334</c>, and whether a message was sent.</returns>
+    private async ValueTask<(byte[]? Pending, bool MessageSent)> SendAuthAsync(ISaslExchange exchange)
+    {
+        byte[]? initialResponse = context.Mail is { SaslInitialResponse: true } ? await TakeInitialResponseAsync(exchange).ConfigureAwait(false) : null;
+        string? inline = InlineInitialResponse(exchange, initialResponse);
+        string command = AuthKeyword + exchange.Mechanism;
+        await (inline is null
+            ? channel.SendAsync(command)
+            : channel.SendAsync(command + " " + inline, command + " " + SmtpDiagnosticLogLines.SaslResponseNotLogged)).ConfigureAwait(false);
+        channel.Trace.Enter("AUTH");
+        return inline is null ? (initialResponse, false) : (null, true);
+    }
+
+    /// <summary>
+    /// Answers a <c>334</c> with the pending initial response, or with the exchange's answer to
+    /// the decoded challenge. An empty initial response is an empty line here, as curl 8.22.0
+    /// sends <c>AUTH=EXTERNAL</c>'s empty user name after the <c>334</c> (upstream test943),
+    /// while an empty answer to a challenge is <c>=</c>.
+    /// </summary>
+    /// <returns><see langword="null" /> once the answer is sent, or how the exchange ended.</returns>
+    private async ValueTask<ExchangeOutcome?> AnswerAsync(ISaslExchange exchange, SmtpReply reply, byte[]? pending)
+    {
+        if ((pending ?? await TakeInitialResponseAsync(exchange).ConfigureAwait(false)) is { } initialResponse)
+        {
+            await channel.SendAsync(EncodeDeferredInitialResponse(initialResponse), SmtpDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
+            return null;
+        }
+
+        if (DecodeChallenge(reply, exchange.Mechanism, challengesHanded++) is not { } challenge)
+        {
+            return await CancelAsync().ConfigureAwait(false);
+        }
+
+        byte[]? response = await exchange.RespondAsync(challenge, context.CancellationToken).ConfigureAwait(false);
+        if (response is null)
+        {
+            return await CancelOrRefuseAsync(exchange).ConfigureAwait(false);
+        }
+
+        await channel.SendAsync(EncodeAnswer(exchange, response), SmtpDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
+        return null;
+    }
+
+    /// <summary>Asks the exchange for its initial response the first time only.</summary>
+    /// <returns>The initial response; <see langword="null" /> when it has none or was already asked.</returns>
+    private async ValueTask<byte[]?> TakeInitialResponseAsync(ISaslExchange exchange)
+    {
+        if (initialResponseAsked)
+        {
+            return null;
+        }
+
+        initialResponseAsked = true;
+        return await exchange.GetInitialResponseAsync(context.CancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends an exchange that could not answer a challenge: with a
+    /// <see cref="ISaslExchange.CancelReason" />, writes it as a <c>-v</c> info line and cancels
+    /// with <c>*</c>, as curl 8.21.0 does for a mechanism step returning
+    /// <c>CURLE_BAD_CONTENT_ENCODING</c> (<c>lib/curl_sasl.c</c> lines 789-793, BL-1350);
+    /// without one, refuses it with nothing more sent.
+    /// </summary>
+    private async ValueTask<ExchangeOutcome> CancelOrRefuseAsync(ISaslExchange exchange)
+    {
+        if (exchange.CancelReason is not { } reason)
+        {
+            return ExchangeOutcome.Refused;
+        }
+
+        context.Events.ReportInfo(reason);
+        return await CancelAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Cancels the exchange with <c>*</c> and reads the server's reply, whatever it is, as
+    /// curl's <c>SASL_CANCEL</c> state does.
+    /// </summary>
+    private async ValueTask<ExchangeOutcome> CancelAsync()
+    {
+        await channel.SendAsync("*").ConfigureAwait(false);
+        await ReadReplyAsync().ConfigureAwait(false);
+        return ExchangeOutcome.Cancelled;
+    }
+
+    private async ValueTask<SmtpReply> ReadReplyAsync() =>
+        await channel.ReadReplyAsync().ConfigureAwait(false) ?? throw new SmtpReplyMissingException();
+
+    /// <summary>How one mechanism's exchange ended.</summary>
+    private enum ExchangeOutcome
+    {
+        /// <summary>The server said <c>235</c> after a message was sent.</summary>
+        Accepted,
+
+        /// <summary>The server refused, or the exchange could not answer a challenge.</summary>
+        Refused,
+
+        /// <summary>The exchange was cancelled with <c>*</c> over a challenge that was not base64, or one it gave a cancel reason for.</summary>
+        Cancelled,
+    }
+}

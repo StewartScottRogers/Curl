@@ -15,7 +15,7 @@
 
   <ItemGroup>
     <!-- The NTLM and Negotiate contexts the proxy tunnel tests script (BL-604), shared, not copied. -->
-    <Compile Include="..\Curl.Protocol.Http.UnitTests\Fakes\ScriptedTokenSource.cs" Link="Fakes\ScriptedTokenSource.cs" />
+    <Compile Include="..\Curl.Original.Protocol.Http.UnitTests\Fakes\ScriptedTokenSource.cs" Link="Fakes\ScriptedTokenSource.cs" />
   </ItemGroup>
 
 </Project>

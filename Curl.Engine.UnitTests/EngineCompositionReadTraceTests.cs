@@ -1,7 +1,7 @@
 using Curl.Console;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Http;
+using Curl.Original.Protocol.Http;
 using Curl.Testing;
 
 namespace Curl.Engine;
@@ -10,7 +10,7 @@ namespace Curl.Engine;
 /// Pins that the composition hands <c>--trace-config read</c> (<see cref="EngineComposition.TracesRead" />:
 /// <c>read</c> or <c>all</c>, so <c>-vvv</c> too) to the HTTP handler, which then writes an HTTP/1.x
 /// request body's upload reader lines (BL-1189). The lines themselves are pinned in
-/// <c>Curl.Protocol.Http.UnitTests</c>.
+/// <c>Curl.Original.Protocol.Http.UnitTests</c>.
 /// </summary>
 [TestClass]
 public sealed class EngineCompositionReadTraceTests

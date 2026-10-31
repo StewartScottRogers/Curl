@@ -1,0 +1,819 @@
+using System.Globalization;
+using System.Net;
+using System.Text;
+using Curl.Protocol.Abstractions;
+using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
+
+namespace Curl.Original.Protocol.Ws;
+
+/// <summary>
+/// Serves the <c>ws</c> and <c>wss</c> schemes: connects, sends curl's HTTP/1.1 upgrade request
+/// and reads the reply head, accepting the upgrade on a <c>101</c> (ADR-0128); after it, sends
+/// any <c>-T</c> upload as one frame and writes every frame's payload to the output until the
+/// server closes the connection (ADR-0131).
+/// </summary>
+/// <param name="connector">
+/// Supplies the connection to the URL's host and port, over TLS for <c>wss</c> and tunnelled
+/// through <see cref="ITransferContext.Proxy" /> when one is set. No
+/// <see cref="System.Net.Sockets.Socket" /> is ever constructed here.
+/// </param>
+/// <param name="authenticator">
+/// Builds the pre-emptive <c>Authorization</c> value for <c>-u</c>, <c>--basic</c>,
+/// <c>--oauth2-bearer</c> and <c>--negotiate</c>, with no challenges, through
+/// <see cref="IHttpAuthenticator.CreateAuthorizationAsync" /> (ADR-0227). It is asked once:
+/// a <c>401</c> is refused like any other status, and no continuation is asked for, because
+/// curl 8.21.0 sends the upgrade only once (ADR-0228). A 401 offering Negotiate to an upgrade
+/// sent without a value is still stepped, never answered, so its context's failure is written as
+/// curl writes it; that failure, or the upgrade's own, is the failed transfer's message (BL-955).
+/// </param>
+/// <param name="randomSource">Supplies the 16 bytes behind <c>Sec-WebSocket-Key</c>.</param>
+/// <remarks>
+/// Matches curl 8.21.0, measured against a loopback listener (ADR-0128, BL-580). Any status
+/// but <c>101</c> fails with exit 22, <c>Refused WebSocket upgrade: &lt;code&gt;</c>, and
+/// nothing written to the output; <c>Sec-WebSocket-Accept</c>, <c>Upgrade</c> and
+/// <c>Connection</c> in a <c>101</c> are not checked, because curl does not check them. A refusal's
+/// <c>Content-Length</c> is checked as curl's header code checks it (<see cref="WsContentLength" />,
+/// BL-1404): exit 8 for a bad or disagreeing value, exit 63 for one past 64 bits under
+/// <c>--max-filesize</c>, the failing header line neither written nor reported. Every head's
+/// header lines are checked as curl's header code checks them (<see cref="WsHeaderLines" />,
+/// BL-1405): exit 8 for a line with no colon, a NUL byte or a stray carriage return, or a second
+/// different <c>Location</c>, the refused line neither written nor reported. The
+/// reply head, <c>101</c> or not, is written to <see cref="ITransferContext.HeaderOutput" />
+/// (<c>-D</c>). A connect failure is returned as the connector reported it. The upgrade, each
+/// frame and the transfer's end are written to <see cref="ITransferContext.DiagnosticLog" />
+/// under the <c>ws</c> component (<see cref="WsTransferLog" />).
+/// </remarks>
+public sealed class WsProtocolHandler(
+    IConnector connector,
+    IHttpAuthenticator authenticator,
+    IWebSocketRandomSource randomSource) : IProtocolHandler
+{
+    /// <summary>The status code that accepts the upgrade.</summary>
+    internal const int SwitchingProtocols = 101;
+
+    /// <summary>
+    /// How many bytes one read of a read callback's upload asks for: libcurl's default <c>CURLOPT_UPLOAD_BUFFERSIZE</c>,
+    /// 64 KiB, the buffer <c>cr_ws_read</c> is handed (BL-2611).
+    /// </summary>
+    internal const int UploadReadSize = 64 * 1024;
+
+    /// <summary>How many random bytes <c>Sec-WebSocket-Key</c> encodes.</summary>
+    private const int KeyLength = 16;
+
+    /// <summary>
+    /// The two schemes this handler serves, as curl 8.21.0's <c>--version</c> protocol list
+    /// names them.
+    /// </summary>
+    private static readonly string[] Schemes = ["ws", "wss"];
+
+    private readonly IConnector connector =
+        connector ?? throw new ArgumentNullException(nameof(connector));
+
+    private readonly IHttpAuthenticator authenticator =
+        authenticator ?? throw new ArgumentNullException(nameof(authenticator));
+
+    private readonly IWebSocketRandomSource randomSource =
+        randomSource ?? throw new ArgumentNullException(nameof(randomSource));
+
+    /// <inheritdoc />
+    public IReadOnlyCollection<string> SupportedSchemes => Schemes;
+
+    /// <summary>
+    /// Gets a value indicating whether each transfer writes curl 8.21.0's <c>--trace-config ws</c>
+    /// lines, <c>[WS] ...</c>, as frames are decoded and sent, through the transfer's events
+    /// (<see cref="WsFrameTrace" />, BL-1164).
+    /// </summary>
+    public bool TracesFrames { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether each transfer that exchanges frames writes the bytes received
+    /// after the <c>101</c> to the output as they came, frame heads included, decoding nothing and
+    /// answering no ping: libcurl's <c>CURLWS_RAW_MODE</c> on a transfer that is not connect-only, as
+    /// curl 8.22.0's <c>ws_cw_write</c> passes the stream on under <c>ws_raw_mode</c> (BL-2494).
+    /// </summary>
+    public bool RawMode { get; init; }
+
+    /// <summary>
+    /// Gets where each transfer that exchanges frames shows its connection while the frames flow, so a
+    /// <c>curl_ws_send</c> from the transfer's write callback reaches the server (BL-2710), and the frame of each
+    /// payload write, written a frame's run at a time outside <see cref="RawMode" />, so a <c>curl_ws_meta</c> there
+    /// answers it (BL-2711); <see langword="null" /> shows neither and writes each read's payload at once.
+    /// </summary>
+    public WsPerformConnection? PerformConnection { get; init; }
+
+    /// <inheritdoc />
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="context" /> is <see langword="null" />.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// <see cref="ITransferContext.CancellationToken" /> was cancelled.
+    /// </exception>
+    public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        long startTimestamp = context.TimeProvider.GetTimestamp();
+        TransferResult result = (await ConnectAndUpgradeAsync(context, exchangesFrames: true).ConfigureAwait(false)).Result;
+        new WsTransferLog(context.DiagnosticLog).Ended(result, context.TimeProvider.GetElapsedTime(startTimestamp));
+        return result;
+    }
+
+    /// <summary>
+    /// Connects and runs the upgrade exactly as <see cref="ExecuteAsync" /> does - the same request
+    /// bytes, <c>-v</c> lines and refusals - but stops after an accepted <c>101</c> and hands back
+    /// the open connection instead of reading frames: libcurl's <c>CURLOPT_CONNECT_ONLY</c> 2 for a
+    /// WebSocket URL, after which <c>curl_ws_recv</c> and <c>curl_ws_send</c> carry the frames
+    /// (BL-2471).
+    /// </summary>
+    /// <param name="context">The transfer to upgrade.</param>
+    /// <returns>
+    /// The open connection and the bytes that came with the reply head, or the failure the tool's
+    /// transfer would end with; a failure is written to the diagnostic log as the transfer's end.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="context" /> is <see langword="null" />.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// <see cref="ITransferContext.CancellationToken" /> was cancelled.
+    /// </exception>
+    public async ValueTask<WsUpgradeOutcome> ConnectAndUpgradeOnlyAsync(ITransferContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        long startTimestamp = context.TimeProvider.GetTimestamp();
+        WsUpgradeOutcome outcome = await ConnectAndUpgradeAsync(context, exchangesFrames: false).ConfigureAwait(false);
+        if (outcome.Connection is null)
+        {
+            new WsTransferLog(context.DiagnosticLog).Ended(outcome.Result, context.TimeProvider.GetElapsedTime(startTimestamp));
+        }
+
+        return outcome;
+    }
+
+    // Connects and upgrades, then exchanges frames or hands the open connection back; the
+    // connection is closed unless the outcome hands it back.
+    private async ValueTask<WsUpgradeOutcome> ConnectAndUpgradeAsync(ITransferContext context, bool exchangesFrames)
+    {
+        CurlUrl url = context.Url;
+        var target = new ConnectTarget(url.IdnHost, url.Port, url.Scheme == "wss")
+        {
+            Proxy = context.Proxy,
+            Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
+        };
+        ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        if (connect.Connection is not { } connection)
+        {
+            return WithoutConnection(new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused });
+        }
+
+        context.Progress.ReportTransferStarted();
+        context.Events.ReportInfo(WsInfoLines.UsingHttp1);
+        var authLines = new WsInfoLineRecorder();
+        var lease = new WsConnectionLease(connection);
+        WsUpgradeOutcome outcome;
+        await using (lease.ConfigureAwait(false))
+        {
+            try
+            {
+                outcome = await UpgradeAsync(connection, context, connect.ConnectionNumber, authLines, exchangesFrames).ConfigureAwait(false);
+            }
+            catch (WsTransferException failure)
+            {
+                context.Events.ReportInfo(failure.Message);
+                context.Events.ReportInfo(WsInfoLines.Closing(connect.ConnectionNumber));
+                outcome = WithoutConnection(TransferResult.Failure(failure.ExitCode, failure.Message));
+            }
+
+            lease.IsHandedBack = outcome.Connection is not null;
+        }
+
+        return outcome with { Result = WithFirstAuthFailure(outcome.Result, authLines.Lines) };
+    }
+
+    /// <summary>An outcome that hands no connection back.</summary>
+    private static WsUpgradeOutcome WithoutConnection(TransferResult result) => new(result, null, ReadOnlyMemory<byte>.Empty);
+
+    /// <summary>
+    /// Gives a failed transfer the message of the first line the authenticator reported for the
+    /// upgrade request, a Negotiate context's failure, as curl 8.21.0 does: its <c>failf</c> for
+    /// the context fills the error buffer first, so <c>curl: (22)</c> after a refused upgrade and
+    /// <c>curl: (52)</c> after an empty one both carry it (measured, BL-955 Notes).
+    /// </summary>
+    private static TransferResult WithFirstAuthFailure(TransferResult result, IReadOnlyList<string> authLines) =>
+        result.ExitCode != CurlExitCode.Ok && authLines.Count > 0
+            ? result with { ErrorMessage = authLines[0] }
+            : result;
+
+    /// <summary>
+    /// Reports each line of the reply head as curl's <c>-v</c> does, with
+    /// <paramref name="refusal" />, when given, reported before the blank line that ends it, where
+    /// curl 8.21.0 writes <c>Refused WebSocket upgrade</c> (BL-584), and
+    /// <paramref name="challengeLines" /> just before the first <c>WWW-Authenticate</c> header
+    /// offering Negotiate, where curl writes a 401's Negotiate failure (BL-955), and, for
+    /// <paramref name="problemScheme" />, its problem line before each challenge offering it (BL-953),
+    /// and <c>Overflow Content-Length: value</c> before each line <paramref name="overflowLineStarts" />
+    /// names (<see cref="WsContentLength" />, BL-1404).
+    /// </summary>
+    private static void ReportHead(ITransferEvents events, byte[] head, string? refusal, IReadOnlyList<string> challengeLines, string? problemScheme, IReadOnlyList<int> overflowLineStarts)
+    {
+        bool challengeLinesPending = challengeLines.Count > 0;
+        int lineStart = 0;
+        while (lineStart < head.Length)
+        {
+            int lineEnd = Array.IndexOf(head, (byte)'\n', lineStart) + 1;
+            ReadOnlySpan<byte> line = head.AsSpan(lineStart, lineEnd - lineStart);
+            challengeLinesPending = ReportAuthLinesBefore(events, line, challengeLinesPending ? challengeLines : [], problemScheme);
+            if (lineEnd == head.Length && refusal is not null)
+            {
+                events.ReportInfo(refusal);
+            }
+
+            if (overflowLineStarts.Contains(lineStart))
+            {
+                events.ReportInfo(WsContentLength.OverflowValue);
+            }
+
+            events.ReportResponseHeader(line);
+            lineStart = lineEnd;
+        }
+    }
+
+    /// <summary>
+    /// Reports what curl writes just before <paramref name="line" /> of a reply head: the
+    /// Negotiate <paramref name="challengeLines" /> still pending, when the line is the first
+    /// <c>WWW-Authenticate</c> header offering Negotiate, and <paramref name="problemScheme" />'s
+    /// problem lines (<see cref="WsAuthProblemLines" />).
+    /// </summary>
+    /// <returns><see langword="true" /> while <paramref name="challengeLines" /> are still to be written.</returns>
+    private static bool ReportAuthLinesBefore(ITransferEvents events, ReadOnlySpan<byte> line, IReadOnlyList<string> challengeLines, string? problemScheme)
+    {
+        bool challengeLinesPending = challengeLines.Count > 0;
+        if (challengeLinesPending && WsNegotiateInfoLines.IsNegotiateChallenge(line))
+        {
+            ReportInfoLines(events, challengeLines);
+            challengeLinesPending = false;
+        }
+
+        if (problemScheme is not null)
+        {
+            ReportInfoLines(events, [.. WsAuthProblemLines.LinesBefore(line, problemScheme)]);
+        }
+
+        return challengeLinesPending;
+    }
+
+    /// <summary>Reports each of <paramref name="lines" /> to <paramref name="events" />, in order.</summary>
+    private static void ReportInfoLines(ITransferEvents events, IReadOnlyList<string> lines)
+    {
+        foreach (string line in lines)
+        {
+            events.ReportInfo(line);
+        }
+    }
+
+    /// <summary>
+    /// Asks for the upgrade request's pre-emptive <c>Authorization</c> value and writes what curl
+    /// 8.21.0 writes before the request: the Negotiate context's failure, reported into
+    /// <paramref name="authLines" /> (BL-955), then <c>Server auth using &lt;scheme&gt; with user
+    /// '...'</c> when a scheme is picked (<see cref="WsAuthUsingLines" />, BL-953).
+    /// </summary>
+    private async ValueTask<string?> CreateAuthorizationAsync(HttpAuthRequest request, HttpRequestOptions options, WsInfoLineRecorder authLines, ITransferEvents events, CancellationToken cancellationToken)
+    {
+        string? authorization = await authenticator.CreateAuthorizationAsync(request with { Events = authLines }, [], cancellationToken).ConfigureAwait(false);
+        ReportInfoLines(events, authLines.Lines);
+        if (WsAuthUsingLines.ServerAuthUsing(request, authorization, WsUpgradeRequestFormatter.HeadersName(options, "Authorization")) is { } line)
+        {
+            events.ReportInfo(line);
+        }
+
+        return authorization;
+    }
+
+    /// <summary>
+    /// Steps a Negotiate context for a 401 offering Negotiate to an upgrade sent without an
+    /// <c>Authorization</c> value, as curl 8.21.0's <c>Curl_input_negotiate</c> does while it
+    /// reads the head, and gives the lines it reports; the value is never sent, as curl sends
+    /// the upgrade only once (ADR-0228). Any other response steps nothing.
+    /// </summary>
+    private async ValueTask<IReadOnlyList<string>> StepNegotiateForChallengeAsync(
+        HttpAuthRequest request,
+        string? sentAuthorization,
+        WsUpgradeResponse response,
+        CancellationToken cancellationToken)
+    {
+        string[] challenges = WsNegotiateInfoLines.ChallengesOf(response.Head);
+        bool stepsNegotiate = response.StatusCode == 401
+            && sentAuthorization is null
+            && (request.AllowedSchemes & HttpAuthSchemes.Negotiate) != 0
+            && challenges.Any(WsNegotiateInfoLines.OffersNegotiate);
+        if (!stepsNegotiate)
+        {
+            return [];
+        }
+
+        var challengeLines = new WsInfoLineRecorder();
+        await authenticator.CreateAuthorizationAsync(request with { Events = challengeLines }, challenges, cancellationToken).ConfigureAwait(false);
+        return challengeLines.Lines;
+    }
+
+    /// <summary>
+    /// Sends the upgrade request and reads the reply head, reporting both for <c>-v</c> and
+    /// <c>--trace</c> as curl 8.21.0 does (BL-584): the request as one header event, the head
+    /// one line at a time, and on a refusal <c>closing connection #N</c>. An accepted upgrade goes
+    /// on to the frames, or, unless <paramref name="exchangesFrames" />, hands the connection back.
+    /// </summary>
+    private async Task<WsUpgradeOutcome> UpgradeAsync(IConnection connection, ITransferContext context, long connectionNumber, WsInfoLineRecorder authLines, bool exchangesFrames)
+    {
+        HttpRequestOptions options = context.Http ?? new HttpRequestOptions();
+        string method = options.CustomMethod ?? (context.NoBody ? "HEAD" : "GET");
+        var authRequest = new HttpAuthRequest(
+            method,
+            context.Url,
+            WsUpgradeRequestFormatter.RequestTarget(context.Url),
+            context.Credentials,
+            options.BearerToken,
+            options.AuthSchemes,
+            IsProxy: false);
+        string? authorization = await CreateAuthorizationAsync(authRequest, options, authLines, context.Events, context.CancellationToken).ConfigureAwait(false);
+        byte[] request = WsUpgradeRequestFormatter.Format(context.Url, options, method, NewKey(), authorization, WsUpgradeRequestFormatter.RangeValue(context.ResumeFrom, context.RangeText));
+        context.Events.ReportRequestHeader(request);
+        await SendAsync(connection, request, context.CancellationToken).ConfigureAwait(false);
+        context.Events.ReportInfo(WsInfoLines.RequestSent);
+        var log = new WsTransferLog(context.DiagnosticLog);
+        log.UpgradeRequested(method, WsUpgradeRequestFormatter.RequestTarget(context.Url));
+        WsUpgradeResponse response = await WsUpgradeResponseReader.ReadAsync(connection, context.CancellationToken).ConfigureAwait(false);
+        EndSentAuthorization(authorization);
+        WsContentLengthCheck lengths = CheckHead(response, options, context.MaxFileSize);
+        await WriteHeadAsync(context.HeaderOutput, response.Head[..lengths.AcceptedLength], context.CancellationToken).ConfigureAwait(false);
+        TransferReport report = new()
+        {
+            ResponseCode = response.StatusCode,
+            HttpVersion = HttpVersion.Version11,
+            Method = method,
+            HeaderSize = lengths.AcceptedLength,
+            RequestSize = request.Length,
+            PseudoHeaders = HeaderLines(response.Head[..lengths.AcceptedLength]),
+        };
+        if (response.StatusCode != SwitchingProtocols || lengths.FailureMessage is not null)
+        {
+            return WithoutConnection((await RefuseAsync(context, authRequest, authorization, response, lengths, connectionNumber).ConfigureAwait(false)) with { Report = report });
+        }
+
+        ReportHead(context.Events, response.Head, refusal: null, challengeLines: [], problemScheme: null, overflowLineStarts: []);
+        log.UpgradeAccepted();
+        return await AcceptAsync(connection, context, response.Remaining, report, connectionNumber, exchangesFrames).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Splits the reply head's header lines, after the status line and up to the blank line,
+    /// into name and value, for <c>%{num_headers}</c>. curl 8.22.0 counts them (3 for a 101
+    /// with <c>Upgrade</c>, <c>Connection</c> and <c>Sec-WebSocket-Accept</c>) but its
+    /// <c>%header{}</c> finds none of them, measured in BL-3960, so they are pseudo-headers.
+    /// </summary>
+    /// <param name="head">The reply head bytes accepted.</param>
+    /// <returns>Each header line's name and value, in the order received.</returns>
+    internal static KeyValuePair<string, string>[] HeaderLines(byte[] head) =>
+        [.. Encoding.Latin1.GetString(head).Split('\n').Skip(1).Select(line => line.TrimEnd('\r')).TakeWhile(line => line.Length > 0).Select(SplitHeaderLine)];
+
+    private static KeyValuePair<string, string> SplitHeaderLine(string line)
+    {
+        string name = line.Split(':', 2)[0];
+        return new(name, line[name.Length..].TrimStart(':').Trim());
+    }
+
+    /// <summary>
+    /// Takes an accepted upgrade on to the frames, or, unless <paramref name="exchangesFrames" />,
+    /// hands the open connection back.
+    /// </summary>
+    private async ValueTask<WsUpgradeOutcome> AcceptAsync(IConnection connection, ITransferContext context, byte[] alreadyReceived, TransferReport report, long connectionNumber, bool exchangesFrames) =>
+        exchangesFrames
+            ? WithoutConnection(await SwitchToWebSocketAsync(connection, context, alreadyReceived, report, connectionNumber).ConfigureAwait(false))
+            : HandBack(connection, context, alreadyReceived, report);
+
+    /// <summary>
+    /// Ends an upgrade-only transfer after the <c>101</c>: curl 8.21.0's <c>Received 101</c> lines
+    /// and chunk-size trace, as for any accepted upgrade, then the open connection handed back
+    /// with the bytes that came with the reply head, undecoded (BL-2471).
+    /// </summary>
+    private WsUpgradeOutcome HandBack(IConnection connection, ITransferContext context, byte[] alreadyReceived, TransferReport report)
+    {
+        var trace = new WsFrameTrace(context.Events, TracesFrames);
+        context.Events.ReportInfo(WsInfoLines.SwitchingToWebSocket);
+        trace.UsingChunkSize();
+        context.Events.ReportInfo(WsInfoLines.SwitchedToWebSocket);
+        return new WsUpgradeOutcome(TransferResult.Success(0) with { Report = report }, connection, alreadyReceived);
+    }
+
+    /// <summary>
+    /// Checks the reply head as curl 8.21.0's header code does, line by line: every head's header
+    /// lines (<see cref="WsHeaderLines" />, BL-1405), and, before the first refused line, a refused
+    /// reply's <c>Content-Length</c> headers (BL-1404), so whichever fails first is the failure.
+    /// </summary>
+    private static WsContentLengthCheck CheckHead(WsUpgradeResponse response, HttpRequestOptions options, long? maxFileSize)
+    {
+        int acceptedLength = WsHeaderLines.FindRefusedLine(response.Head, out string? refusal);
+        WsContentLengthCheck lengths = CheckContentLength(response.StatusCode, response.Head[..acceptedLength], options, maxFileSize);
+        return lengths.FailureMessage is null && refusal is not null
+            ? lengths with { FailureExitCode = CurlExitCode.WeirdServerReply, FailureMessage = refusal }
+            : lengths;
+    }
+
+    /// <summary>
+    /// Checks a refused reply's <c>Content-Length</c> headers as curl 8.21.0 does (BL-1404); a
+    /// <c>101</c> is bodyless and <c>--ignore-content-length</c> skips the header, so neither is checked.
+    /// </summary>
+    private static WsContentLengthCheck CheckContentLength(int statusCode, byte[] head, HttpRequestOptions options, long? maxFileSize) =>
+        statusCode == SwitchingProtocols || options.IgnoreContentLength
+            ? WsContentLengthCheck.Unchecked(head.Length)
+            : WsContentLength.Check(head, maxFileSize);
+
+    /// <summary>
+    /// Takes an accepted upgrade on to WebSocket as curl 8.21.0 does: its <c>Received 101</c>
+    /// lines, then the frames (or, for <c>-I</c>, none), then the transfer's closing line.
+    /// </summary>
+    private async ValueTask<TransferResult> SwitchToWebSocketAsync(IConnection connection, ITransferContext context, byte[] alreadyReceived, TransferReport report, long connectionNumber)
+    {
+        var trace = new WsFrameTrace(context.Events, TracesFrames);
+        context.Events.ReportInfo(WsInfoLines.SwitchingToWebSocket);
+        trace.UsingChunkSize();
+        context.Events.ReportInfo(WsInfoLines.SwitchedToWebSocket);
+        if (context.Upload is not null)
+        {
+            trace.UploadReaderAdded();
+        }
+
+        TransferResult result = context.NoBody
+            ? EndWithoutFrames(context, alreadyReceived, report, trace)
+            : await ExchangeFramesAsync(connection, context, alreadyReceived, report, trace).ConfigureAwait(false);
+        ReportTransferEnd(context.Events, result, connectionNumber);
+        return result;
+    }
+
+    /// <summary>
+    /// Ends the handshake that sent <paramref name="sentAuthorization" /> once the upgrade's
+    /// response has arrived, whatever its status, so a Negotiate context kept for its next leg
+    /// is disposed of unstepped (ADR-0248, BL-982): curl sends the upgrade only once
+    /// (ADR-0228), so no leg follows even a 401.
+    /// </summary>
+    private void EndSentAuthorization(string? sentAuthorization)
+    {
+        if (sentAuthorization is not null)
+        {
+            authenticator.EndAuthorization(sentAuthorization);
+        }
+    }
+
+    /// <summary>
+    /// Fails a reply that refuses the upgrade with exit 22 as curl 8.21.0 does (BL-584): the
+    /// head with <c>Refused WebSocket upgrade: &lt;code&gt;</c> before its blank line, then
+    /// <c>closing connection #N</c>. A 401 offering Negotiate is stepped first, its failure
+    /// written before the Negotiate header and made the message (BL-955). A 401 to an upgrade
+    /// sent with Basic or Bearer picked gets curl's problem line before each challenge offering
+    /// that scheme (<see cref="WsAuthProblemLines" />, BL-953).
+    /// </summary>
+    private async ValueTask<TransferResult> RefuseAsync(
+        ITransferContext context,
+        HttpAuthRequest authRequest,
+        string? authorization,
+        WsUpgradeResponse response,
+        WsContentLengthCheck lengths,
+        long connectionNumber)
+    {
+        string? problemScheme = WsAuthProblemLines.ProblemScheme(authRequest, response.StatusCode);
+        if (lengths.FailureMessage is { } failure)
+        {
+            ReportHead(context.Events, response.Head[..lengths.AcceptedLength], refusal: null, challengeLines: [], problemScheme, lengths.OverflowLineStarts);
+            context.Events.ReportInfo(failure);
+            context.Events.ReportInfo(WsInfoLines.Closing(connectionNumber));
+            return TransferResult.Failure(lengths.FailureExitCode, failure);
+        }
+
+        IReadOnlyList<string> challengeLines = await StepNegotiateForChallengeAsync(authRequest, authorization, response, context.CancellationToken).ConfigureAwait(false);
+        string message = string.Create(CultureInfo.InvariantCulture, $"Refused WebSocket upgrade: {response.StatusCode}");
+        ReportHead(context.Events, response.Head, message, challengeLines, problemScheme, lengths.OverflowLineStarts);
+        context.Events.ReportInfo(WsInfoLines.Closing(connectionNumber));
+        return TransferResult.Failure(CurlExitCode.HttpReturnedError, challengeLines.FirstOrDefault() ?? message);
+    }
+
+    /// <summary>
+    /// Writes the line curl 8.21.0's <c>-v</c> ends an upgraded transfer with (BL-584):
+    /// <c>shutting down connection #N</c> after the server closed the connection or for
+    /// <c>Empty reply from server</c>, and <c>closing connection #N</c> for any other failure.
+    /// </summary>
+    private static void ReportTransferEnd(ITransferEvents events, TransferResult result, long connectionNumber) =>
+        events.ReportInfo(result.ExitCode is CurlExitCode.Ok or CurlExitCode.GotNothing
+            ? WsInfoLines.ShuttingDown(connectionNumber)
+            : WsInfoLines.Closing(connectionNumber));
+
+    /// <summary>
+    /// Writes a failed exchange's message as curl 8.21.0's <c>-v</c> does, followed for a frame
+    /// violation by <c>[WS] decode frame error 56</c> and <c>[WS] decode payload error 56</c>
+    /// (BL-813).
+    /// </summary>
+    private static void ReportFailure(ITransferEvents events, TransferResult result, bool isFrameViolation)
+    {
+        if (result.ExitCode == CurlExitCode.Ok)
+        {
+            return;
+        }
+
+        events.ReportInfo(result.ErrorMessage!);
+        if (isFrameViolation)
+        {
+            events.ReportInfo(WsInfoLines.DecodeFrameError(result.ExitCode));
+            events.ReportInfo(WsInfoLines.DecodePayloadError(result.ExitCode));
+        }
+    }
+
+    /// <summary>
+    /// Ends a <c>-I</c> transfer after the <c>101</c> as curl 8.21.0 does (BL-788): the bytes that
+    /// came with the reply head are reported as one read but not decoded, nothing more is read
+    /// or written, and the transfer fails with 52 <c>Empty reply from server</c> and
+    /// <c>%{size_download}</c> 0.
+    /// </summary>
+    private static TransferResult EndWithoutFrames(ITransferContext context, byte[] alreadyReceived, TransferReport report, WsFrameTrace trace)
+    {
+        if (alreadyReceived.Length > 0)
+        {
+            context.Events.ReportDataReceived(alreadyReceived);
+        }
+
+        trace.Established();
+
+        TransferResult result = TransferResult.Failure(CurlExitCode.GotNothing, WsUpgradeResponseReader.EmptyReply);
+        ReportFailure(context.Events, result, isFrameViolation: false);
+        context.Progress.ReportTransferDone();
+        return result with { Report = report };
+    }
+
+    /// <summary>
+    /// Writes the payload of the frame bytes that came with the reply head, sends the <c>-T</c>
+    /// upload as one binary frame, then writes the payload of every frame received to the output
+    /// until the server closes the connection (ADR-0128, ADR-0131), in curl 8.21.0's order
+    /// (BL-813).
+    /// </summary>
+    /// <remarks>
+    /// Measured against curl 8.21.0 (BL-582): the transfer ends with exit 0 when the server
+    /// closes the connection after at least one frame byte, close frame or not, and with 52
+    /// <c>Empty reply from server</c> when none arrived. <c>%{size_download}</c> counts frame
+    /// bytes, heads included; <c>%{size_delivered}</c> the payload bytes written, close frame
+    /// payloads included (BL-777); <c>%{size_upload}</c> the upload frame; <c>%{size_request}</c>
+    /// the upgrade request, the upload frame and every pong. A failure keeps the report, so
+    /// <c>%{http_code}</c> is still <c>101</c>. <c>--max-filesize</c> counts the frame bytes and
+    /// cuts the transfer with exit 63 (BL-1294). <c>-m</c> cancels the reads, and the
+    /// cancellation escapes for the runner's exit 28 (ADR-0117).
+    /// </remarks>
+    private async Task<TransferResult> ExchangeFramesAsync(
+        IConnection connection,
+        ITransferContext context,
+        byte[] alreadyReceived,
+        TransferReport report,
+        WsFrameTrace trace)
+    {
+        var receiver = new WsFrameReceiver(connection, randomSource, context.Progress, context.Events, context.DiagnosticLog, trace, context.MaxFileSize, RawMode, PerformConnection);
+        Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> writePayload =
+            (payload, token) => WriteAsync(context.Output, payload, token);
+        long uploaded = 0;
+        bool isFrameViolation = false;
+        TransferResult result;
+        PerformConnection?.Open(connection);
+        try
+        {
+            await receiver.DeliverAlreadyReceivedAsync(alreadyReceived, writePayload, context.CancellationToken).ConfigureAwait(false);
+            trace.Established();
+            uploaded = await SendUploadAsync(connection, context, trace).ConfigureAwait(false);
+            await receiver.ReceiveUntilClosedAsync(writePayload, context.CancellationToken).ConfigureAwait(false);
+            result = receiver.BytesReceived == 0
+                ? TransferResult.Failure(CurlExitCode.GotNothing, WsUpgradeResponseReader.EmptyReply)
+                : TransferResult.Success(receiver.BytesReceived);
+        }
+        catch (WsTransferException failure)
+        {
+            result = TransferResult.Failure(failure.ExitCode, failure.Message, receiver.BytesReceived);
+            isFrameViolation = failure.IsFrameViolation;
+        }
+        finally
+        {
+            PerformConnection?.Close();
+        }
+
+        ReportFailure(context.Events, result, isFrameViolation);
+
+        context.Progress.ReportTransferDone();
+        return result with
+        {
+            Report = report with
+            {
+                RequestSize = report.RequestSize + uploaded + receiver.BytesSent,
+                DownloadSize = receiver.BytesReceived,
+                DeliveredSize = receiver.BytesDelivered,
+                UploadSize = uploaded,
+            },
+        };
+    }
+
+    /// <summary>
+    /// Sends <see cref="ITransferContext.Upload" /> read by read as curl 8.22.0's <c>cr_ws_read</c> does
+    /// (<see cref="SendFramedUploadAsync" />, BL-2611, BL-2683): a <c>-T</c> upload in one masked binary frame per
+    /// read of <see cref="UploadReadSize" /> bytes, so a 200 000-byte file goes out as frames of 65 536, 65 536,
+    /// 65 536 and 3 392 bytes, and an empty one in no frame at all. A failed read ends the upload, as curl takes a
+    /// file read that fails. Under <see cref="RawMode" /> the bytes go out as they are, with no frame, because
+    /// <c>Curl_ws_accept</c> adds the frame-encoding client reader only when <c>ws_raw_mode</c> is off (BL-2526).
+    /// </summary>
+    /// <remarks>
+    /// An upload a read callback feeds (<see cref="IWsUploadFrameSource" />) has each callback read framed as it came,
+    /// in the <see cref="WsUploadFrames" /> the callback may start frames through; any other upload fills each read, as
+    /// the tool's <c>fread</c> does.
+    /// </remarks>
+    /// <returns>The bytes sent, or 0 when there is no upload.</returns>
+    private async ValueTask<long> SendUploadAsync(IConnection connection, ITransferContext context, WsFrameTrace trace)
+    {
+        if (context.Upload is not { } upload)
+        {
+            return 0;
+        }
+
+        long sent = RawMode
+            ? await SendRawUploadAsync(connection, context, upload).ConfigureAwait(false)
+            : await SendFramedOrMessageUploadAsync(connection, context, upload, trace).ConfigureAwait(false);
+        context.Events.ReportInfo(sent == 0 ? WsInfoLines.UploadedNothing : WsInfoLines.UploadSent(sent));
+        context.Progress.ReportUploaded(sent, sent);
+        return sent;
+    }
+
+    /// <summary>
+    /// Sends the messages of an <see cref="IWsUploadMessageSource" /> upload one frame each
+    /// (<see cref="SendMessagesAsync" />, BL-4253), and any other upload read by read (<see cref="SendFramedUploadAsync" />).
+    /// </summary>
+    /// <returns>The bytes the upload counts as sent.</returns>
+    private async ValueTask<long> SendFramedOrMessageUploadAsync(IConnection connection, ITransferContext context, Stream upload, WsFrameTrace trace)
+    {
+        if (upload is IWsUploadMessageSource messageSource)
+        {
+            return await SendMessagesAsync(connection, context, messageSource.Messages, trace).ConfigureAwait(false);
+        }
+
+        WsUploadFrames? callbackFrames = (upload as IWsUploadFrameSource)?.UploadFrames;
+        return await SendFramedUploadAsync(connection, context, upload, callbackFrames ?? new WsUploadFrames(), fillsReads: callbackFrames is null, trace).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends each of <paramref name="messages" /> as one final masked frame of its own opcode, in order, so an
+    /// extension's subprotocol gets one text frame per message (BL-4253, ADR-1041). The stream's own bytes are not read.
+    /// </summary>
+    /// <returns>The sum of the message payloads.</returns>
+    private async ValueTask<long> SendMessagesAsync(IConnection connection, ITransferContext context, IReadOnlyList<WsUploadMessage> messages, WsFrameTrace trace)
+    {
+        long sent = 0;
+        foreach (WsUploadMessage message in messages)
+        {
+            byte[] bytes = WsFrameEncoder.Encode(message.Opcode, isFinal: true, message.Payload.Span, randomSource);
+            trace.FrameEncoded(message.Opcode, message.Payload.Length);
+            new WsTransferLog(context.DiagnosticLog).Frame("sent", message.Opcode, isFinal: true, message.Payload.Length);
+            context.Events.ReportDataSent(bytes);
+            await SendAsync(connection, bytes, context.CancellationToken).ConfigureAwait(false);
+            sent += message.Payload.Length;
+        }
+
+        return sent;
+    }
+
+    /// <summary>
+    /// Sends an upload as curl 8.22.0's <c>cr_ws_read</c> does (BL-2611, ADR-0669): each read of up to
+    /// <see cref="UploadReadSize" /> bytes goes out as one binary frame of its length, unless a read callback
+    /// started a frame through <paramref name="frames" />, whose payload the reads then fill; the upload ends at the
+    /// first read that gives nothing and starts no frame, or fails. Under <c>fillsReads</c> each read fills the buffer
+    /// before it is framed, as the tool's <c>fread</c> of a file or standard input does.
+    /// </summary>
+    /// <returns>The bytes sent.</returns>
+    private async ValueTask<long> SendFramedUploadAsync(IConnection connection, ITransferContext context, Stream upload, WsUploadFrames frames, bool fillsReads, WsFrameTrace trace)
+    {
+        byte[] buffer = new byte[UploadReadSize];
+        long sent = 0;
+        frames.Open();
+        try
+        {
+            byte[] bytes;
+            while ((bytes = await ReadFramesAsync(context, upload, frames, buffer, fillsReads, trace).ConfigureAwait(false)).Length > 0)
+            {
+                context.Events.ReportDataSent(bytes);
+                await SendAsync(connection, bytes, context.CancellationToken).ConfigureAwait(false);
+                sent += bytes.Length;
+            }
+        }
+        finally
+        {
+            frames.Close();
+        }
+
+        return sent;
+    }
+
+    /// <summary>Reads the upload once and encodes what it gave, tracing and logging a binary frame it starts.</summary>
+    /// <returns>The bytes to send, empty once the upload has ended.</returns>
+    private async ValueTask<byte[]> ReadFramesAsync(ITransferContext context, Stream upload, WsUploadFrames frames, byte[] buffer, bool fillsReads, WsFrameTrace trace)
+    {
+        int count = await ReadUploadAsync(upload, buffer.AsMemory(0, frames.ReadLength(buffer.Length)), fillsReads, context.CancellationToken).ConfigureAwait(false);
+        byte[] bytes = frames.Encode(buffer.AsSpan(0, count), randomSource, out bool startsBinaryFrame);
+        if (startsBinaryFrame)
+        {
+            trace.FrameEncoded(WsOpcode.Binary, count);
+            new WsTransferLog(context.DiagnosticLog).Frame("sent", WsOpcode.Binary, isFinal: true, count);
+        }
+
+        return bytes;
+    }
+
+    /// <summary>
+    /// Reads the upload once, or under <paramref name="fillsReads" /> until <paramref name="buffer" /> is full or the
+    /// upload ends; a failed read ends the upload, keeping the bytes read before it.
+    /// </summary>
+    /// <returns>The bytes read into <paramref name="buffer" />.</returns>
+    private static async ValueTask<int> ReadUploadAsync(Stream upload, Memory<byte> buffer, bool fillsReads, CancellationToken cancellationToken)
+    {
+        int count = 0;
+        try
+        {
+            int read;
+            do
+            {
+                read = await upload.ReadAsync(buffer[count..], cancellationToken).ConfigureAwait(false);
+                count += read;
+            }
+            while (fillsReads && read > 0 && count < buffer.Length);
+        }
+        catch (IOException)
+        {
+            // The bytes read before the failure are the last of the upload.
+        }
+
+        return count;
+    }
+
+    /// <summary>Sends the whole upload unframed, as <see cref="RawMode" /> sends it.</summary>
+    /// <returns>The bytes sent.</returns>
+    private static async ValueTask<long> SendRawUploadAsync(IConnection connection, ITransferContext context, Stream upload)
+    {
+        using var payload = new MemoryStream();
+        try
+        {
+            await upload.CopyToAsync(payload, context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The bytes read before the failure are the upload.
+        }
+
+        byte[] bytes = payload.ToArray();
+        context.Events.ReportDataSent(bytes);
+        await SendAsync(connection, bytes, context.CancellationToken).ConfigureAwait(false);
+        return bytes.Length;
+    }
+
+    /// <summary>Sends <paramref name="bytes" /> and flushes, turning a failure into curl's exit 55.</summary>
+    /// <param name="connection">The connection to send on.</param>
+    /// <param name="bytes">The request or frame to send.</param>
+    /// <param name="cancellationToken">Cancels the send.</param>
+    /// <returns>A task that completes once the bytes are flushed.</returns>
+    internal static async ValueTask SendAsync(IConnection connection, byte[] bytes, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException exception)
+        {
+            throw WsIoFailures.SendFailed(exception);
+        }
+    }
+
+    private static async ValueTask WriteHeadAsync(Stream? headerOutput, byte[] head, CancellationToken cancellationToken)
+    {
+        if (headerOutput is not null)
+        {
+            await WriteAsync(headerOutput, head, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Writes <paramref name="bytes" /> to <paramref name="destination" />, turning a failure into curl's exit 23.</summary>
+    private static async ValueTask WriteAsync(Stream destination, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await destination.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException exception)
+        {
+            throw WsIoFailures.WriteFailed(bytes.Length, exception);
+        }
+    }
+
+    private string NewKey()
+    {
+        Span<byte> key = stackalloc byte[KeyLength];
+        randomSource.Fill(key);
+        return Convert.ToBase64String(key);
+    }
+}

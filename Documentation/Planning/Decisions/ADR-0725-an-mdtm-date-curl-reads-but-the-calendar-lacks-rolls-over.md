@@ -44,7 +44,7 @@ server sends such a date and holding it would need a wider time type through eve
 consumer of `Of`; the simplest drop-in behaviour is to treat it as unknown, which is what
 curl does for any date it cannot read.
 
-`TryReadDate` is internal, and `Curl.Protocol.Ftp.UnitLibrary` grants
+`TryReadDate` is internal, and `Curl.Original.Protocol.Ftp.UnitLibrary` grants
 `InternalsVisibleTo` to `Curl.Conformance.UnitProgram.UnitLibrary`, so the unit1668 port
 (BL-2845) calls it without this library changing again.
 

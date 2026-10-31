@@ -391,7 +391,7 @@ Sorted by severity, then by primary area (in the order of the area table above).
 - **Related existing finding (GF/AF):** GF-0072, GF-0002
 - **Source findings:** `http-responses HR-1`, `http-responses HR-2`, `network-robustness NR-8`
 
-Same root cause in all three findings: `Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:1096` (`SettleConnection`) marks the connection reusable without checking for bytes read past the Content-Length body. curl prints `* Excess found ...` and closes the connection.
+Same root cause in all three findings: `Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:1096` (`SettleConnection`) marks the connection reusable without checking for bytes read past the Content-Length body. curl prints `* Excess found ...` and closes the connection.
 
 **Reproduction**
 
@@ -441,9 +441,9 @@ curl -s -w '[%{num_connects}]' "$H/raw?keep=1&b=$(b64 'HTTP/1.1 200 OK\r\nConten
 
 **Suspected location in source**
 
-- **[http-responses HR-1]** `Curl.Protocol.Http.UnitLibrary\HttpProtocolHandler.cs:1096` (`SettleConnection`) marks the connection reusable when the outcome is "left intact". Nothing checks for bytes already read past the Content-Length body. `HttpResponseBodyReader.cs` reports leftovers only for chunked bodies.
+- **[http-responses HR-1]** `Curl.Original.Protocol.Http.UnitLibrary\HttpProtocolHandler.cs:1096` (`SettleConnection`) marks the connection reusable when the outcome is "left intact". Nothing checks for bytes already read past the Content-Length body. `HttpResponseBodyReader.cs` reports leftovers only for chunked bodies.
 - **[http-responses HR-2]** same root cause as HR-1, `HttpProtocolHandler.cs:1096` `SettleConnection`. This is the observable symptom when the stale bytes happen to be harmless.
-- **[network-robustness NR-8]** `Curl.Protocol.Http.UnitLibrary` has no "Excess found" handling (grep finds nothing); the persistence decision is in HttpProtocolHandler
+- **[network-robustness NR-8]** `Curl.Original.Protocol.Http.UnitLibrary` has no "Excess found" handling (grep finds nothing); the persistence decision is in HttpProtocolHandler
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -501,7 +501,7 @@ curl -sS --retry 2 --retry-delay 1 -F f=value http://127.0.0.1:20500/p
 **Suspected location in source**
 
 - **[http-stateful HS-1]** `Curl.Core.UnitLibrary/TransferRetrier.cs:96-98`. The attempt loop calls `transfer(context)` again with the same context and never rewinds the upload source.
-- **[http-stateful HS-2]** `Curl.Core.UnitLibrary/TransferRetrier.cs:96-98` (no rewind between attempts). The message comes from `Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs`.
+- **[http-stateful HS-2]** `Curl.Core.UnitLibrary/TransferRetrier.cs:96-98` (no rewind between attempts). The message comes from `Curl.Original.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -541,7 +541,7 @@ curl -sS -w '%{exitcode}|%{errormsg}\n' pop3://127.0.0.1:20700/ --connect-timeou
 
 **Suspected location in source**
 
-- The greeting read in Curl.Protocol.Pop3/Imap/Smtp.UnitLibrary is not bounded by the connect deadline.
+- The greeting read in Curl.Original.Protocol.Pop3/Imap/Smtp.UnitLibrary is not bounded by the connect deadline.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -654,8 +654,8 @@ E\verify\vlin.sh
 
 **Suspected location in source**
 
-- **[ftp-file-tftp FTP-1]** `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs:1788-1808` `OpenPassiveDataConnectionAsync` calls `SecureDataConnectionAsync` (`:1757`) right after the passive connect, before the transfer command. curl only adds the SSL filter there and completes the handshake without blocking after RETR/STOR/LIST.
-- **[tls TLS-01]** `Curl.Protocol.Ftp.UnitLibrary\FtpSession.cs:1808`. On the EPSV path, `SecureDataConnectionAsync()` is awaited right after the dial. The same happens in `ConnectDataAsync` at about line 1900, where a comment says the handshake runs "at once, before TYPE". `SecureDataConnectionAsync` (line 1757) awaits the whole handshake.
+- **[ftp-file-tftp FTP-1]** `Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs:1788-1808` `OpenPassiveDataConnectionAsync` calls `SecureDataConnectionAsync` (`:1757`) right after the passive connect, before the transfer command. curl only adds the SSL filter there and completes the handshake without blocking after RETR/STOR/LIST.
+- **[tls TLS-01]** `Curl.Original.Protocol.Ftp.UnitLibrary\FtpSession.cs:1808`. On the EPSV path, `SecureDataConnectionAsync()` is awaited right after the dial. The same happens in `ConnectDataAsync` at about line 1900, where a comment says the handshake runs "at once, before TYPE". `SecureDataConnectionAsync` (line 1757) awaits the whole handshake.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -671,7 +671,7 @@ E\verify\vlin.sh
 - **Related existing finding (GF/AF):** none
 - **Source findings:** `ftp-file-tftp FTP-2`, `tls-protocols-revocation TPR-05`
 
-Both findings point at the same close path after `SecureDataConnectionAsync` (`Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs`, about line 1757). The likely cause is closing the socket with unread TLS 1.3 post-handshake data (NewSessionTicket) or without close_notify, which makes Windows send RST.
+Both findings point at the same close path after `SecureDataConnectionAsync` (`Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs`, about line 1757). The likely cause is closing the socket with unread TLS 1.3 post-handshake data (NewSessionTicket) or without close_notify, which makes Windows send RST.
 
 **Reproduction**
 
@@ -708,8 +708,8 @@ curl -sS -k --ssl-reqd -P 127.0.0.1 -T up.txt ftp://localhost:21900/new.txt
 
 **Suspected location in source**
 
-- **[ftp-file-tftp FTP-2]** `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs`, the upload data-connection close path after `SecureDataConnectionAsync` (`:1757`). Not narrowed further.
-- **[tls-protocols-revocation TPR-05]** `Curl.Protocol.Ftp.UnitLibrary\FtpSession.cs`, the upload data-connection close after `SecureDataConnectionAsync` (about line 1757). The likely cause is closing the socket with unread TLS 1.3 post-handshake data (NewSessionTicket), which makes Windows send RST. Not narrowed further.
+- **[ftp-file-tftp FTP-2]** `Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs`, the upload data-connection close path after `SecureDataConnectionAsync` (`:1757`). Not narrowed further.
+- **[tls-protocols-revocation TPR-05]** `Curl.Original.Protocol.Ftp.UnitLibrary\FtpSession.cs`, the upload data-connection close after `SecureDataConnectionAsync` (about line 1757). The likely cause is closing the socket with unread TLS 1.3 post-handshake data (NewSessionTicket), which makes Windows send RST. Not narrowed further.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
 
@@ -753,7 +753,7 @@ EV/verify-linux-tel.sh
 
 **Suspected location in source**
 
-- `Curl.Protocol.Telnet.UnitLibrary\TelnetProtocolHandler.cs:184-199`: the upload runs as its own task (`SendUploadAsync`, line ~404).
+- `Curl.Original.Protocol.Telnet.UnitLibrary\TelnetProtocolHandler.cs:184-199`: the upload runs as its own task (`SendUploadAsync`, line ~404).
 - `TelnetProtocolHandler.cs:446-488`: `SendReplyAsync` takes `sendLock` once per reply piece.
 - `TelnetReceiver.cs:433-439` (`AppendWindowSize`) queues `IAC SB NAWS`, the size bytes and `IAC SE` as three separate sends, so the upload task can win the lock between them.
 
@@ -887,7 +887,7 @@ timeout 70
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs:148-170`. The connect deadline covers only `connector.ConnectAsync`. `RunSessionAsync` (banner exchange and KEX) runs with no connect deadline.
+- `Curl.Original.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs:148-170`. The connect deadline covers only `connector.ConnectAsync`. `RunSessionAsync` (banner exchange and KEX) runs with no connect deadline.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -940,7 +940,7 @@ curl -sS --http2-prior-knowledge -c jar.txt -D - -o /dev/null http://127.0.0.1:2
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:52-53` (`HeaderLines` joins `name: value\r\n` for every non-pseudo field and does not check the field).
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:52-53` (`HeaderLines` joins `name: value\r\n` for every non-pseudo field and does not check the field).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match.
 
@@ -1028,7 +1028,7 @@ E\linux\lv.sh
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ldap.UnitLibrary\LdapProtocolHandler.cs:189-195` (`TargetOf`). `useTls` is set only for the `ldaps` scheme. The library has no StartTLS operation, and no UseSslFailed or "explicit TLS not supported" path.
+- `Curl.Original.Protocol.Ldap.UnitLibrary\LdapProtocolHandler.cs:189-195` (`TargetOf`). `useTls` is set only for the `ldaps` scheme. The library has no StartTLS operation, and no UseSslFailed or "explicit TLS not supported" path.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -1252,7 +1252,7 @@ curl -s -o NUL -w "[é]" http://127.0.0.1:21370/x
 - **[http-requests HR-4]** 
   - `Curl.Cli.UnitLibrary/CommandLineOptions.cs:2377` (`AppendPostData` uses `Encoding.UTF8`)
   - `Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:836`, `:972` and `:979`
-  - `Curl.Protocol.Http.UnitLibrary/HttpUrlText.cs:26`
+  - `Curl.Original.Protocol.Http.UnitLibrary/HttpUrlText.cs:26`
   - `HttpRequestHeadFormatter.cs:228`
 - **[writeout-verbose WV-19]** `Curl.Output.UnitLibrary/WriteOutTemplateRenderer.cs:101`
 - **[other-protocols OP-8]** the per-protocol conversion from argument to bytes: the MQTT payload, `GopherSelector`, the DICT request and the POP3 control channel.
@@ -1459,7 +1459,7 @@ curl -sS -L "http://127.0.0.1:20200/__loc=localhost:20200/x" -w "[%{url_effectiv
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:58-81` (`Resolve`/`HasScheme`) and `Curl.Core.UnitLibrary/RedirectFollower.cs:401` (`CurlUrl.TryParse(EncodedForFollow(target), ...)` guesses a scheme).
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:58-81` (`Resolve`/`HasScheme`) and `Curl.Core.UnitLibrary/RedirectFollower.cs:401` (`CurlUrl.TryParse(EncodedForFollow(target), ...)` guesses a scheme).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -1591,7 +1591,7 @@ curl -s -F "a=b;headers=@h.txt" http://127.0.0.1:21200/echo
 
 - **[http-requests HR-2]** 
   - `Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:1038` (`Encoding.UTF8.GetString(contents)` in the -H @file reader)
-  - `Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs:158` (`Encoding.Latin1.GetBytes(head)`)
+  - `Curl.Original.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs:158` (`Encoding.Latin1.GetBytes(head)`)
   - the method and cookie are appended raw (`HttpRequestHeadFormatter.cs:213` and `:150`)
 - **[environment ENV-02]** 
   - `Curl.Cli.UnitLibrary\CommandLineOptionTable.cs` (~1038) decodes the file to a string, which the HTTP formatter later encodes as ANSI.
@@ -1766,7 +1766,7 @@ EV\vl.sh
 
 **Suspected location in source**
 
-- Not implemented in `Curl.Protocol.Ftp.UnitLibrary` (there is no line-end conversion writer).
+- Not implemented in `Curl.Original.Protocol.Ftp.UnitLibrary` (there is no line-end conversion writer).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -1815,7 +1815,7 @@ curl -s -S -u "u€:p" "imap://127.0.0.1:21001/INBOX;UID=1"
 
 **Suspected location in source**
 
-- `Curl.Protocol.Imap.UnitLibrary\ImapControlChannel.cs:188`: `Encoding.Latin1.GetBytes(text + "\r\n")`.
+- `Curl.Original.Protocol.Imap.UnitLibrary\ImapControlChannel.cs:188`: `Encoding.Latin1.GetBytes(text + "\r\n")`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -1916,7 +1916,7 @@ curl -sSi "$H/raw?b=$(b64 'HTTP/1.1 200 OK\r\nContent-Length: 3\r\nX')"
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpResponseHeadReader.cs:546-579`. At EOF with a pending partial line, ReadHeaderLinesAsync calls `builder.EndHeadAtClose()`
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpResponseHeadReader.cs:546-579`. At EOF with a pending partial line, ReadHeaderLinesAsync calls `builder.EndHeadAtClose()`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -1971,8 +1971,8 @@ EV\vl.sh
 
 **Suspected location in source**
 
-- **[environment ENV-03]** `Curl.Protocol.File.UnitLibrary\FileProtocolHandler.cs:572`. `DownloadBodyAsync(context, source, opened.Length)` copies only `opened.Length` bytes.
-- **[ftp-file-tftp FILE-1]** `Curl.Protocol.File.UnitLibrary/FileProtocolHandler.cs:572` (`DownloadBodyAsync(context, source, opened.Length)`) and the copy loop at `:962` (`while (consumed < count)`).
+- **[environment ENV-03]** `Curl.Original.Protocol.File.UnitLibrary\FileProtocolHandler.cs:572`. `DownloadBodyAsync(context, source, opened.Length)` copies only `opened.Length` bytes.
+- **[ftp-file-tftp FILE-1]** `Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs:572` (`DownloadBodyAsync(context, source, opened.Length)`) and the copy loop at `:962` (`while (consumed < count)`).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -2053,7 +2053,7 @@ curl -sS AUTH -I -w "<%{size_download}>" U/hello.txt
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs:385-405`. `context.NoBody` is passed only to `SftpDirectoryListing.ListAsync`. `SftpFileDownload.DownloadAsync` and `ScpFileDownload.DownloadAsync` never receive it.
+- `Curl.Original.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs:385-405`. `context.NoBody` is passed only to `SftpDirectoryListing.ListAsync`. `SftpFileDownload.DownloadAsync` and `ScpFileDownload.DownloadAsync` never receive it.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -2099,7 +2099,7 @@ curl -sSk https://127.0.0.1:P/x
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2StreamConnection.cs:375` (every `Http2StreamResetException` becomes exit 92, and `Http2GoAwayException` becomes 56). `Http3StreamConnection.cs:300` has a request-rejected retry, but HTTP/2 does not.
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2StreamConnection.cs:375` (every `Http2StreamResetException` becomes exit 92, and `Http2GoAwayException` becomes 56). `Http3StreamConnection.cs:300` has a request-rejected retry, but HTTP/2 does not.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -2143,7 +2143,7 @@ curl -sSk -d hello https://127.0.0.1:P/x
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2StreamConnection.cs:375`
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2StreamConnection.cs:375`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -2788,7 +2788,7 @@ E\b_rt.ps1
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpLastModified.cs:31-36` returns null (meaning "unknown") when the parse fails.
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpLastModified.cs:31-36` returns null (meaning "unknown") when the parse fails.
 - `Curl.Protocol.Abstractions.UnitLibrary/CurlDateParser.cs` (around line 149) treats -1 as a real time.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
@@ -3487,7 +3487,7 @@ curl -sSL -w '%{http_code} %{num_redirects} %{url_effective} %{redirect_url}\n' 
 **Suspected location in source**
 
 - **[url-parsing UP-19]** `Curl.Core.UnitLibrary/RedirectFollower.cs:401` (`EncodedForFollow` does not encode bytes below 0x20).
-- **[http-stateful HS-8]** `Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs`: `Resolve` (line 58), `Encode` (line 197), `NormalizeAbsolute` (line 91).
+- **[http-stateful HS-8]** `Curl.Original.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs`: `Resolve` (line 58), `Encode` (line 197), `NormalizeAbsolute` (line 91).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -3547,7 +3547,7 @@ curl -sS[L] -w '%{http_code} %{num_redirects} %{url_effective} %{redirect_url}\n
 **Suspected location in source**
 
 - **[url-parsing UP-20]** `Curl.Core.UnitLibrary/RedirectFollower.cs` (url_effective comes from the target string, not from the parsed CurlUrl).
-- **[http-stateful HS-9]** `Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:91` (`NormalizeAbsolute`; the header is read as Latin-1).
+- **[http-stateful HS-9]** `Curl.Original.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:91` (`NormalizeAbsolute`; the header is read as Latin-1).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -3662,7 +3662,7 @@ E/vlinux.sh
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs:213` (the method is appended raw) and `:150` (the cookie), then `:158` (`Encoding.Latin1.GetBytes(head)`).
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs:213` (the method is appended raw) and `:150` (the cookie), then `:158` (`Encoding.Latin1.GetBytes(head)`).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -3700,7 +3700,7 @@ curl -sS -H " X-E;" http://127.0.0.1:20335/a
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpCustomHeader.cs:60-62`. The semicolon form uses `entry[..semicolon] + ":"` without trimming.
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpCustomHeader.cs:60-62`. The semicolon form uses `entry[..semicolon] + ":"` without trimming.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
 
@@ -3742,7 +3742,7 @@ curl -sS -H "Expect: 100-continue" -d abcde http://127.0.0.1:20335/a
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:64-74`. `WaitForContinueAsync` returns false when a final status arrives first, so the body is skipped. The same class's `StopsSending` (line 90) says that a 2xx should let the body go on.
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:64-74`. `WaitForContinueAsync` returns false when a final status arrives first, so the body is skipped. The same class's `StopsSending` (line 90) says that a 2xx should let the body go on.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -3780,7 +3780,7 @@ curl -sS -I -H "Transfer-Encoding: chunked" http://127.0.0.1:20335/a
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpRequestFraming.cs:236-238`. The no-body framing is built with chunked = false whatever the custom Transfer-Encoding header says.
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpRequestFraming.cs:236-238`. The no-body framing is built with chunked = false whatever the custom Transfer-Encoding header says.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -3877,7 +3877,7 @@ curl -sSi "$H/raw?b=$(b64 'HTTP/1.1 101 Switching\r\n\r\nabc')"
 
 **Suspected location in source**
 
-- **[http-responses HR-3]** `Curl.Protocol.Http.UnitLibrary\HttpResponseHeadReader.cs` around line 470-517: 101 is treated as an interim response (`SwitchedProtocols |= StatusCode == 101` at line 517).
+- **[http-responses HR-3]** `Curl.Original.Protocol.Http.UnitLibrary\HttpResponseHeadReader.cs` around line 470-517: 101 is treated as an interim response (`SwitchedProtocols |= StatusCode == 101` at line 517).
 - **[network-robustness NR-4]** `HttpResponseHeadReader.cs` treats 101 as informational and expects another status line
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
@@ -3919,7 +3919,7 @@ curl --compressed -s -S http://127.0.0.1:20400/z_gzip_badcrc
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\HttpContentCodingDecoder.cs` `ReadDecoded` (~379-388). .NET `GZipStream` throws `InvalidDataException` before the buffered output is delivered.
+- `Curl.Original.Protocol.Http.UnitLibrary\HttpContentCodingDecoder.cs` `ReadDecoded` (~379-388). .NET `GZipStream` throws `InvalidDataException` before the buffered output is delivered.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -4120,7 +4120,7 @@ curl -sSL -H 'Authorization: Bearer xyz' -H 'Cookie: c=1' -H 'X-Custom: 1' http:
 
 **Suspected location in source**
 
-- redirect credential handling in `Curl.Protocol.Http.UnitLibrary` (the follow logic). Not pinned to a line.
+- redirect credential handling in `Curl.Original.Protocol.Http.UnitLibrary` (the follow logic). Not pinned to a line.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -4440,7 +4440,7 @@ curl -s -x http://127.0.0.1:20600 -U u:p --proxy-header 'Proxy-Authorization: cu
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\HttpRequestHeadFormatter.cs` (Proxy-Authorization is always appended; compare `HttpProxyTunnel.cs:83` `AppendUnlessNamed`).
+- `Curl.Original.Protocol.Http.UnitLibrary\HttpRequestHeadFormatter.cs` (Proxy-Authorization is always appended; compare `HttpProxyTunnel.cs:83` `AppendUnlessNamed`).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -4714,7 +4714,7 @@ curl -sv -x socks4://127.0.0.1:20600 http://127.0.0.1:8080/x
 **Suspected location in source**
 
 - **[writeout-verbose WV-06]** There is no general failf-style verbose echo. `Curl.Console/CurlCommandRunner.cs` writes only the final line; only `SchannelFailureEcho.cs` exists, for TLS.
-- **[ftp-file-tftp FTP-12]** `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs` `QuitAndFailAsync` / `EndAndFailAsync` do not report the failure message as an info event.
+- **[ftp-file-tftp FTP-12]** `Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs` `QuitAndFailAsync` / `EndAndFailAsync` do not report the failure message as an info event.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -5101,7 +5101,7 @@ curl -sSv ftp://127.0.0.1:20960/file.txt
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs:1996-1999` `SizeOf` (`long.TryParse` with `AllowLeadingWhite` only).
+- `Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs:1996-1999` `SizeOf` (`long.TryParse` with `AllowLeadingWhite` only).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -5142,7 +5142,7 @@ curl -sS ftp://127.0.0.1:20960/file.txt
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs:2075-2085` `RetrieveAsync` does not parse the 150 text. curl does this in `ftp_state_get_resp`.
+- `Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs:2075-2085` `RetrieveAsync` does not parse the 150 text. curl does this in `ftp_state_get_resp`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -5180,7 +5180,7 @@ EV\v2.sh
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs:1690-1707`. It checks for a negative reply only before `AcceptAsync` and does not watch the control connection while accepting.
+- `Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs:1690-1707`. It checks for a negative reply only before `AcceptAsync` and does not watch the control connection while accepting.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -5218,7 +5218,7 @@ EV\v2.sh
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs:262` `announcedAddress`, set at `:1634` and used at `:1528`.
+- `Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs:262` `announcedAddress`, set at `:1634` and used at `:1528`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -5256,7 +5256,7 @@ EV\vl.sh
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs:1878-1898` `ConnectToPassiveAddressAsync` / `ConnectDataAsync`. Not narrowed.
+- `Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs:1878-1898` `ConnectToPassiveAddressAsync` / `ConnectDataAsync`. Not narrowed.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's on Linux (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -5301,7 +5301,7 @@ curl -s -S --mail-rcpt x smtp://127.0.0.1:21001/1 smtp://127.0.0.1:21001/2 smtp:
 
 **Suspected location in source**
 
-- `Curl.Protocol.Pop3.UnitLibrary\Pop3Session.cs:360-366` (`QuitOrKeepAsync`).
+- `Curl.Original.Protocol.Pop3.UnitLibrary\Pop3Session.cs:360-366` (`QuitOrKeepAsync`).
 - `Pop3KeptConnection.cs:53-63`: `TryKeep` returns false when `connection.TryHoldSession(this)` fails on a connection that was already reused.
 - SMTP follows the same pattern.
 
@@ -5345,8 +5345,8 @@ curl -s -S -u user: --login-options AUTH=LOGIN "imap://127.0.0.1:21001/INBOX;UID
 
 **Suspected location in source**
 
-- `Curl.Protocol.Smtp.UnitLibrary\SmtpSaslAuthentication.cs:145`: `Encode` maps an empty message to `"="`.
-- The same in `Curl.Protocol.Imap.UnitLibrary\ImapAuthentication.cs:245` and `Curl.Protocol.Pop3.UnitLibrary\Pop3Login.cs:67`.
+- `Curl.Original.Protocol.Smtp.UnitLibrary\SmtpSaslAuthentication.cs:145`: `Encode` maps an empty message to `"="`.
+- The same in `Curl.Original.Protocol.Imap.UnitLibrary\ImapAuthentication.cs:245` and `Curl.Original.Protocol.Pop3.UnitLibrary\Pop3Login.cs:67`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -5387,7 +5387,7 @@ curl -s -S -u u:p --login-options FOO=BAR smtp://127.0.0.1:21001 --mail-rcpt x
 
 **Suspected location in source**
 
-- `Curl.Protocol.Smtp.UnitLibrary\SmtpSaslAuthentication.cs:115-117`: `RequiredMechanism` only extracts `AUTH=` and never checks the option names or the mechanism.
+- `Curl.Original.Protocol.Smtp.UnitLibrary\SmtpSaslAuthentication.cs:115-117`: `RequiredMechanism` only extracts `AUTH=` and never checks the option names or the mechanism.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -5426,7 +5426,7 @@ curl -s -S --path-as-is "gopher://127.0.0.1:21001/0/a/../x"
 
 **Suspected location in source**
 
-- `Curl.Protocol.Gopher.UnitLibrary\GopherSelector.cs:44` (`FromUrl` uses the URL path after dot-segment normalisation).
+- `Curl.Original.Protocol.Gopher.UnitLibrary\GopherSelector.cs:44` (`FromUrl` uses the URL path after dot-segment normalisation).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -5463,7 +5463,7 @@ curl -s -S -u u:p --crlf -T EV\data\msg_lf.txt imap://127.0.0.1:21001/INBOX
 
 **Suspected location in source**
 
-- `Curl.Protocol.Imap.UnitLibrary\ImapAppend.cs`. It checks for a missing mailbox and an unknown size (`ImapSessionMessages.cs:78/81`) but has no `--crlf` check.
+- `Curl.Original.Protocol.Imap.UnitLibrary\ImapAppend.cs`. It checks for a missing mailbox and an unknown size (`ImapSessionMessages.cs:78/81`) but has no `--crlf` check.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -5545,9 +5545,9 @@ curl -sS ws://127.0.0.1:21802/x -w "%{num_connects}\n"
 
 - **[other-protocols OP-10]** `Curl.Output.UnitLibrary\TransferWriteOutVariables.cs:140`. These protocol handlers never set `info.NumConnects`.
 - **[ftp-file-tftp FTP-8]** `Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs:208` `NumConnectsOf` falls back to 0 because the FTP handler never sets a connection count.
-- **[ftp-file-tftp FTP-9]** The FTP handler does not populate the TransferReport timing fields (`Curl.Protocol.Ftp.UnitLibrary`). Not narrowed.
+- **[ftp-file-tftp FTP-9]** The FTP handler does not populate the TransferReport timing fields (`Curl.Original.Protocol.Ftp.UnitLibrary`). Not narrowed.
 - **[other-protocols OP-11]** `Curl.Output.UnitLibrary\TransferWriteOutVariables.cs:136,141`. `RequestSize` and the header counts are not filled in by these protocol handlers.
-- **[sftp-scp-ssh SSH-08]** the transfer results from `Curl.Protocol.Ssh.UnitLibrary` (SshProtocolHandler and the Sftp and Scp transfer classes) carry no timings and no connection count. See `Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs:208` (NumConnectsOf).
+- **[sftp-scp-ssh SSH-08]** the transfer results from `Curl.Original.Protocol.Ssh.UnitLibrary` (SshProtocolHandler and the Sftp and Scp transfer classes) carry no timings and no connection count. See `Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs:208` (NumConnectsOf).
 - **[doh-ipfs-resolution DOH-20]** `Curl.Output.UnitLibrary/TransferWriteOutVariables.cs` (num_connects).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
@@ -5586,7 +5586,7 @@ curl -sS "$H/raw?b=$(b64 'HTTP/1.1 2\r00 OK\r\n\r\n')"
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpLine.cs:49-56` (the CR check runs before the status-line/HTTP-0.9 checks)
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpLine.cs:49-56` (the CR check runs before the status-line/HTTP-0.9 checks)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -5794,8 +5794,8 @@ curl -s -S telnet://127.0.0.1:21373
 
 - **[environment ENV-05]** `Curl.Cli.UnitLibrary\CommandLineOptionTable.cs` `ReadAtFile` (~1051) reads stdin raw for every `@-` consumer.
 - **[cli-options CLIO-10]** `Curl.Cli.UnitLibrary/DiskDataFileReader.cs:100` (stdin always read as a binary stream).
-- **[other-protocols OP-9]** `Curl.Protocol.Telnet.UnitLibrary\TelnetProtocolHandler.cs`. The default stdin input is used with no text-mode translation.
-- **[upstream-cases UC-10]** `Curl.Protocol.Telnet.UnitLibrary` (stdin read loop).
+- **[other-protocols OP-9]** `Curl.Original.Protocol.Telnet.UnitLibrary\TelnetProtocolHandler.cs`. The default stdin input is used with no text-mode translation.
+- **[upstream-cases UC-10]** `Curl.Original.Protocol.Telnet.UnitLibrary` (stdin read loop).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
 
@@ -5921,7 +5921,7 @@ curl -s file:///<dir>/%E6%97%A5%E6%9C%AC.txt
 
 **Suspected location in source**
 
-- `Curl.Protocol.File.UnitLibrary\FileUrlPath.cs:270-300` (`Decode`/`Flush` decode `%XX` as UTF-8). The .NET wide-character file APIs are used for `-o`, `-T` and `-K`.
+- `Curl.Original.Protocol.File.UnitLibrary\FileUrlPath.cs:270-300` (`Decode`/`Flush` decode `%XX` as UTF-8). The .NET wide-character file APIs are used for `-o`, `-T` and `-K`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -6039,7 +6039,7 @@ curl -s -S http://127.0.0.1:20400/st_reason_nul
 
 **Suspected location in source**
 
-- **[upstream-cases UC-1]** `Curl.Protocol.Http.UnitLibrary\HttpResponseHeadBuilder.cs:54-58`. `StartHead()` passes the status line to `Append()` without the NUL check that `AddLine()` makes at lines 77-80.
+- **[upstream-cases UC-1]** `Curl.Original.Protocol.Http.UnitLibrary\HttpResponseHeadBuilder.cs:54-58`. `StartHead()` passes the status line to `Append()` without the NUL check that `AddLine()` makes at lines 77-80.
 - **[http-responses HR-4]** `HttpResponseHeadReader.cs` `ReadStatusLineAsync` (~511). The NUL check exists only in `HttpResponseHeadBuilder.AddLine`, which handles header lines, not the status line.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
@@ -6138,11 +6138,11 @@ curl -s -S -i http://127.0.0.1:20400/st_2000
 **Suspected location in source**
 
 - **[upstream-cases UC-2]** 
-  - `Curl.Protocol.Http.UnitLibrary\HttpStatusLine.cs:226-230`: a digit after the 3-digit code is refused.
+  - `Curl.Original.Protocol.Http.UnitLibrary\HttpStatusLine.cs:226-230`: a digit after the 3-digit code is refused.
   - `HttpStatusLine.cs:95-110`: `NamesHttp2OrHttp3` / `RefusalOverHttp1`. Its comment cites upstream test1704, but neither REF build refuses a plain `HTTP/2 200` reply.
-- **[writeout-verbose WV-07]** `Curl.Protocol.Http.UnitLibrary/HttpStatusLine.cs` `Parse` (around line 59) rejects four-digit codes and does not keep the code on failure.
-- **[http-responses HR-10]** `Curl.Protocol.Http.UnitLibrary\HttpStatusLine.cs:94` (`NamesHttp2OrHttp3`)
-- **[network-robustness NR-5]** `Curl.Protocol.Http.UnitLibrary/HttpStatusLine.cs:95-109` (NamesHttp2OrHttp3 / RefusalOverHttp1). The source comment cites upstream test1704, but neither REF build behaves that way here.
+- **[writeout-verbose WV-07]** `Curl.Original.Protocol.Http.UnitLibrary/HttpStatusLine.cs` `Parse` (around line 59) rejects four-digit codes and does not keep the code on failure.
+- **[http-responses HR-10]** `Curl.Original.Protocol.Http.UnitLibrary\HttpStatusLine.cs:94` (`NamesHttp2OrHttp3`)
+- **[network-robustness NR-5]** `Curl.Original.Protocol.Http.UnitLibrary/HttpStatusLine.cs:95-109` (NamesHttp2OrHttp3 / RefusalOverHttp1). The source comment cites upstream test1704, but neither REF build behaves that way here.
 - **[http-responses HR-12]** `HttpResponseHeadReader.cs` `ReadStatusLineAsync` (~509-527): the line is parsed before `builder.StartHead`/`ReportLine`, so a rejected line is never written. `HttpStatusLine.cs` `ParseHttp1` (~228) rejects a 4th digit.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
@@ -6192,8 +6192,8 @@ curl -s -S -i http://127.0.0.1:20400/fold_first
 
 **Suspected location in source**
 
-- **[upstream-cases UC-3]** `Curl.Protocol.Http.UnitLibrary\HttpResponseHeadBuilder.cs:89` (`line.Content.TrimStart([' ', '\t'])`; the trimmed text is what gets written out).
-- **[http-responses HR-13]** `Curl.Protocol.Http.UnitLibrary\HttpResponseHeadBuilder.cs:89` (`line.Content.TrimStart([' ', '\t'])`)
+- **[upstream-cases UC-3]** `Curl.Original.Protocol.Http.UnitLibrary\HttpResponseHeadBuilder.cs:89` (`line.Content.TrimStart([' ', '\t'])`; the trimmed text is what gets written out).
+- **[http-responses HR-13]** `Curl.Original.Protocol.Http.UnitLibrary\HttpResponseHeadBuilder.cs:89` (`line.Content.TrimStart([' ', '\t'])`)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -6334,8 +6334,8 @@ curl -sk --http2-prior-knowledge https://127.0.0.1:P/x
 
 **Suspected location in source**
 
-- **[upstream-cases UC-8]** `Curl.Protocol.Http.UnitLibrary\Http2Session.cs:426` (SendError=55).
-- **[http2-linux H2L-9]** `Curl.Protocol.Http.UnitLibrary\Http2Session.cs:426` (`new HttpTransferException(CurlExitCode.SendError, HttpTransferMessages.Http2SettingsExpected)`)
+- **[upstream-cases UC-8]** `Curl.Original.Protocol.Http.UnitLibrary\Http2Session.cs:426` (SendError=55).
+- **[http2-linux H2L-9]** `Curl.Original.Protocol.Http.UnitLibrary\Http2Session.cs:426` (`new HttpTransferException(CurlExitCode.SendError, HttpTransferMessages.Http2SettingsExpected)`)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -6410,7 +6410,7 @@ probe.exe ws send-ping-126 send-close-200 send-pong-126
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ws.UnitLibrary\WsFrameEncoder.cs` has no 125-byte limit for control opcodes. The call goes through `Curl.Engine.UnitLibrary\ManagedEasyWebSocket.cs`.
+- `Curl.Original.Protocol.Ws.UnitLibrary\WsFrameEncoder.cs` has no 125-byte limit for control opcodes. The call goes through `Curl.Engine.UnitLibrary\ManagedEasyWebSocket.cs`.
 
 **Acceptance criterion:** Running the probe case(s) in the repro gives PORT return codes, callback sequences, CURLINFO values and bytes on the wire equal to REF's on Windows and REF-LINUX's on Linux (Expected).
 
@@ -6695,7 +6695,7 @@ curl -sS AUTH -o NUL -o NUL -w "[%{num_connects} %{conn_id}]\n" U/hello.txt U/di
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs:148-197`. ExecuteAsync opens a new connection for every transfer and disposes of it at the end.
+- `Curl.Original.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs:148-197`. ExecuteAsync opens a new connection for every transfer and disposes of it at the end.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -6747,7 +6747,7 @@ curl -sS AUTH -r "<R>" -w "<%{size_download}>" U/digits.txt
 
 **Suspected location in source**
 
-- `Curl.Core.UnitLibrary/ByteRangeParser.cs:59`. TryParse never rejects trailing text. `Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs` uses that parsed range before it checks the raw range text.
+- `Curl.Core.UnitLibrary/ByteRangeParser.cs:59`. TryParse never rejects trailing text. `Curl.Original.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs` uses that parsed range before it checks the raw range text.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -6785,7 +6785,7 @@ curl -sS AUTH -i -Q "statvfs /home/stewart_rogers/sftpt21501" U/hello.txt
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpQuoteCommands.cs:263`. WriteHeaderAsync writes to `context.HeaderOutput`, and `Curl.Engine.UnitLibrary/HeaderLineTeeStream.cs` copies that to stdout for -i.
+- `Curl.Original.Protocol.Ssh.UnitLibrary/Sftp/SftpQuoteCommands.cs:263`. WriteHeaderAsync writes to `context.HeaderOutput`, and `Curl.Engine.UnitLibrary/HeaderLineTeeStream.cs` copies that to stdout for -i.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -6866,7 +6866,7 @@ curl -sS AUTH "UC/a%00b"
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ssh.UnitLibrary/Scp/ScpRemotePath.cs:22`. Resolve has no zero-byte check; `SftpRemotePath.ResolveUrlPath` has one.
+- `Curl.Original.Protocol.Ssh.UnitLibrary/Scp/ScpRemotePath.cs:22`. Resolve has no zero-byte check; `SftpRemotePath.ResolveUrlPath` has one.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -6926,7 +6926,7 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x -w '\n[%{http_version} 
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:23-53` (only `:status` is inspected, by `StatusOf`; no other field validation).
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:23-53` (only `:status` is inspected, by `StatusOf`; no other field validation).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match.
 
@@ -6963,7 +6963,7 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:52`. The field reaches the HTTP/1 header parser, which turns on chunked decoding.
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:52`. The field reaches the HTTP/1 header parser, which turns on chunked decoding.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match.
 
@@ -7002,7 +7002,7 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x -w '[%{size_header} %{n
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:52`
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:52`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match.
 
@@ -7062,7 +7062,7 @@ curl -sS --http2-prior-knowledge -X HEAD -m 5 http://127.0.0.1:P/x
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2StreamConnection.cs` (no RFC 9113 8.1.1 check of content-length against the DATA received)
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2StreamConnection.cs` (no RFC 9113 8.1.1 check of content-length against the DATA received)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match.
 
@@ -7099,7 +7099,7 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2Session.cs:400-430` (the first-frame check only covers a FRAME_SIZE_ERROR before SETTINGS)
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2Session.cs:400-430` (the first-frame check only covers a FRAME_SIZE_ERROR before SETTINGS)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match.
 
@@ -7138,7 +7138,7 @@ curl -sS --http2-prior-knowledge http://127.0.0.1:P/1 http://127.0.0.1:P/2 -w '[
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2StreamConnection.cs` (the reset path leaves the session unusable)
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2StreamConnection.cs` (the reset path leaves the session unusable)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -7175,7 +7175,7 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2StreamConnection.cs:375`
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2StreamConnection.cs:375`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -7217,7 +7217,7 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x
 
 **Suspected location in source**
 
-- `Curl.Http2.UnitLibrary\Http2Connection.cs:581` (`ReceivePushPromise`); `Curl.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:23` (`StatusOf`)
+- `Curl.Http2.UnitLibrary\Http2Connection.cs:581` (`ReceivePushPromise`); `Curl.Original.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:23` (`StatusOf`)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -7259,7 +7259,7 @@ curl -sS --http2 -T - http://127.0.0.1:P/echo < /dev/null
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\HttpRequestHeadFormatter.cs` / `HttpRequestFraming.cs` (Expect is not suppressed on the h2c-upgrade head)
+- `Curl.Original.Protocol.Http.UnitLibrary\HttpRequestHeadFormatter.cs` / `HttpRequestFraming.cs` (Expect is not suppressed on the h2c-upgrade head)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2) (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -8110,7 +8110,7 @@ curl -sS -k --ssl-reqd --ftp-ssl-ccc ftp://localhost:<p>/file.txt ftp://localhos
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ftp.UnitLibrary\FtpSession.cs:2510-2516` (`TryKeepControlConnection`). `!ReferenceEquals(control.Connection, originalControl)` refuses any connection that AUTH wrapped in TLS, and accepts a CCC-unwrapped one again.
+- `Curl.Original.Protocol.Ftp.UnitLibrary\FtpSession.cs:2510-2516` (`TryKeepControlConnection`). `!ReferenceEquals(control.Connection, originalControl)` refuses any connection that AUTH wrapped in TLS, and accepts a CCC-unwrapped one again.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -8148,7 +8148,7 @@ curl -sS -P 127.0.0.1 --disable-eprt ftp://localhost:21900/file.txt
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ftp.UnitLibrary\FtpSession.cs:1446-1447`. In `if ((context.FtpUseEprt && !eprtRefused) || ipv6)`, `ipv6` is the family of the data address.
+- `Curl.Original.Protocol.Ftp.UnitLibrary\FtpSession.cs:1446-1447`. In `if ((context.FtpUseEprt && !eprtRefused) || ipv6)`, `ipv6` is the family of the data address.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -9515,7 +9515,7 @@ curl -sS -H "Transfer-Encoding: chunked" --data-binary @b.bin http://127.0.0.1:2
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs` writes an in-memory body as a single chunk.
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs` writes an in-memory body as a single chunk.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -9723,8 +9723,8 @@ curl -s -S -i -o o.txt http://127.0.0.1:21360/497
 **Suspected location in source**
 
 - **[http-responses HR-16]** `HttpResponseHeadBuilder.cs:137` (`HeadBytesWithPendingHeader`) also writes the pending header after `Append` throws.
-- **[network-robustness NR-10]** `Curl.Protocol.Http.UnitLibrary/HttpResponseHeadBuilder.cs` (size accounting after the overflow).
-- **[upstream-cases UC-12]** `Curl.Protocol.Http.UnitLibrary\HttpResponseHeadBuilder.cs` (MaximumHeadSize check after the write).
+- **[network-robustness NR-10]** `Curl.Original.Protocol.Http.UnitLibrary/HttpResponseHeadBuilder.cs` (size accounting after the overflow).
+- **[upstream-cases UC-12]** `Curl.Original.Protocol.Http.UnitLibrary\HttpResponseHeadBuilder.cs` (MaximumHeadSize check after the write).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -9803,7 +9803,7 @@ curl -sS -z "31 Dec 1969 23:59:58 GMT" http://127.0.0.1:20500/f
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpConditionDate.cs`, `HttpTimeConditionLimit.cs`
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpConditionDate.cs`, `HttpTimeConditionLimit.cs`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
 
@@ -9840,7 +9840,7 @@ curl -sS -c jar.txt http://127.0.0.1:20500/x
 
 **Suspected location in source**
 
-- the response-head reader in `Curl.Protocol.Http.UnitLibrary`. It holds the header back to check for folding, then drops it on the error.
+- the response-head reader in `Curl.Original.Protocol.Http.UnitLibrary`. It holds the header back to check for folding, then drops it on the error.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -9877,7 +9877,7 @@ curl -sSL -w '%{num_redirects} %{redirect_url}' http://127.0.0.1:20500/a
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:46-49`. `Find` looks only at the final head.
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs:46-49`. `Find` looks only at the final head.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -10151,7 +10151,7 @@ curl --fail-with-body -o NUL http://127.0.0.1:20700/code/404
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary/HttpTransferMessages.cs` (the `-f` message is reused). The meter is not fed body bytes on this path.
+- `Curl.Original.Protocol.Http.UnitLibrary/HttpTransferMessages.cs` (the `-f` message is reused). The meter is not fed body bytes on this path.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -10316,8 +10316,8 @@ pwsh EV\vrun.ps1 prog -L --output x http://127.0.0.1:20500/a
 
 **Suspected location in source**
 
-- **[writeout-verbose WV-14]** `Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs` (the redirect body length is not reported).
-- **[http-stateful HS-11]** `Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs`, around lines 1968-1988. The ignored redirect body is not counted.
+- **[writeout-verbose WV-14]** `Curl.Original.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs` (the redirect body length is not reported).
+- **[http-stateful HS-11]** `Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs`, around lines 1968-1988. The ignored redirect body is not counted.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -10359,7 +10359,7 @@ curl -s -w '%{response_code}\n' -u weird:x ftp://127.0.0.1:20701/file.txt
 
 **Suspected location in source**
 
-- Curl.Protocol.Smtp.UnitLibrary and Curl.Protocol.Ftp.UnitLibrary (how the response code is reported).
+- Curl.Original.Protocol.Smtp.UnitLibrary and Curl.Original.Protocol.Ftp.UnitLibrary (how the response code is reported).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
 
@@ -10520,7 +10520,7 @@ curl -sv -I http://127.0.0.1:20700/redir/0
 
 **Suspected location in source**
 
-- The HEAD path in `Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs`
+- The HEAD path in `Curl.Original.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
 
@@ -10801,7 +10801,7 @@ curl -sS file:///C%3A/Windows/win.ini
 
 **Suspected location in source**
 
-- `Curl.Protocol.File.UnitLibrary/FileUrlPath.cs:174` and `:189-195`. `StripDriveLetterSlash` checks the still-encoded path for `:` or `|`.
+- `Curl.Original.Protocol.File.UnitLibrary/FileUrlPath.cs:174` and `:189-195`. `StripDriveLetterSlash` checks the still-encoded path for `:` or `|`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
 
@@ -10838,7 +10838,7 @@ curl -sS -T upload.txt file:///NUL
 
 **Suspected location in source**
 
-- `Curl.Protocol.File.UnitLibrary/FileProtocolHandler.cs`, upload target resolution (the message comes from `FileTransferMessages.cs:205`).
+- `Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs`, upload target resolution (the message comes from `FileTransferMessages.cs:205`).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
 
@@ -10875,7 +10875,7 @@ curl -sS -m 4 ftp://127.0.0.1:20960/file.txt
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ftp.UnitLibrary/FtpTransferMessages.cs:36` and `:51`; `FtpSession.cs:2682-2725`.
+- `Curl.Original.Protocol.Ftp.UnitLibrary/FtpTransferMessages.cs:36` and `:51`; `FtpSession.cs:2682-2725`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -10912,7 +10912,7 @@ curl -sSv -I ftp://127.0.0.1:20960/file.txt
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs`, the no-body path.
+- `Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs`, the no-body path.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -10949,7 +10949,7 @@ curl -s -S -u u:p -I "imap://127.0.0.1:21001/INBOX;UID=1"
 
 **Suspected location in source**
 
-- `Curl.Protocol.Imap.UnitLibrary\ImapSession.cs`.
+- `Curl.Original.Protocol.Imap.UnitLibrary\ImapSession.cs`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -10989,7 +10989,7 @@ curl -s -S "ldap://127.0.0.1:21001/dc=bench"
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ldap.UnitLibrary\WinLdapLogonBind.cs` (success before auth completes is mapped to LocalError).
+- `Curl.Original.Protocol.Ldap.UnitLibrary\WinLdapLogonBind.cs` (success before auth completes is mapped to LocalError).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
 
@@ -11178,7 +11178,7 @@ curl "imap://127.0.0.1:21356/836/;MAILINDEX=1" -u user.one:secret -: "imap://127
 
 **Suspected location in source**
 
-- `Curl.Protocol.Smtp.UnitLibrary\SmtpControlChannel.cs:221`, `SmtpKeptConnection.cs`; `Curl.Protocol.Imap.UnitLibrary\ImapSession.cs:895`.
+- `Curl.Original.Protocol.Smtp.UnitLibrary\SmtpControlChannel.cs:221`, `SmtpKeptConnection.cs`; `Curl.Original.Protocol.Imap.UnitLibrary\ImapSession.cs:895`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -11257,7 +11257,7 @@ curl ftp://127.0.0.1:21357/1211 -P -
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ftp.UnitLibrary` (425 handling).
+- `Curl.Original.Protocol.Ftp.UnitLibrary` (425 handling).
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -12043,7 +12043,7 @@ probe.exe repro
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary` (the upload reader's error text).
+- `Curl.Original.Protocol.Http.UnitLibrary` (the upload reader's error text).
 
 **Acceptance criterion:** Running the probe case(s) in the repro gives PORT return codes, callback sequences, CURLINFO values and bytes on the wire equal to REF's on Windows and REF-LINUX's on Linux (Expected).
 
@@ -12280,7 +12280,7 @@ curl -sS AUTH -o NUL -w "[%{ftp_entry_path}]\n" U/hello.txt
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpFileDownload.cs` and `SftpDirectoryListing.cs`. The home directory that RealPathAsync returns is never reported.
+- `Curl.Original.Protocol.Ssh.UnitLibrary/Sftp/SftpFileDownload.cs` and `SftpDirectoryListing.cs`. The home directory that RealPathAsync returns is never reported.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -12317,7 +12317,7 @@ curl -s -v AUTH -Q pwd U/hello.txt 2>&1 | grep -E "^[<>] "
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpQuoteCommands.cs:239`.
+- `Curl.Original.Protocol.Ssh.UnitLibrary/Sftp/SftpQuoteCommands.cs:239`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -12354,7 +12354,7 @@ curl -s -v -k -u stewart_rogers: --key E\keys\c_rsa_pem --pubkey E\keys\c_rsa_pe
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ssh.UnitLibrary/Authentication/SshUserAuthentication.cs:548-559`. DenyPublicKeyAsync does not have libssh2's "too short" check.
+- `Curl.Original.Protocol.Ssh.UnitLibrary/Authentication/SshUserAuthentication.cs:548-559`. DenyPublicKeyAsync does not have libssh2's "too short" check.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -12394,7 +12394,7 @@ curl -sS AUTH --speed-limit 100000000 --speed-time 2 --limit-rate 50K -o NUL U/b
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs:177-190` and the end of RunSessionAsync. DisconnectIgnoringFailureAsync runs only when the session reaches its normal end.
+- `Curl.Original.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs:177-190` and the end of RunSessionAsync. DisconnectIgnoringFailureAsync runs only when the session reaches its normal end.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 
@@ -12431,7 +12431,7 @@ curl -sS --http2-prior-knowledge -H "X-Big: $(head -c 70000 /dev/zero | tr '\0' 
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2RequestHeaders.cs`
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2RequestHeaders.cs`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2) (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -12472,7 +12472,7 @@ curl -sS --http2-prior-knowledge http://127.0.0.1:P/x
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\HttpTransferMessages.cs`
+- `Curl.Original.Protocol.Http.UnitLibrary\HttpTransferMessages.cs`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -12514,7 +12514,7 @@ curl -sv --http2-prior-knowledge http://127.0.0.1:P/x -o /dev/null
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:49` (`FormatTrailers`; trailers bypass the header counter and the verbose log)
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2ResponseHead.cs:49` (`FormatTrailers`; trailers bypass the header counter and the verbose log)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -12555,7 +12555,7 @@ curl -sSk -H 'Transfer-Encoding: chunked' -d hello https://127.0.0.1:P/echo -w '
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2RequestHeaders.cs`
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2RequestHeaders.cs`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -12592,7 +12592,7 @@ curl -sS --http2-prior-knowledge -H 'X-Ws:   spaced   ' http://127.0.0.1:P/x
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2RequestHeaders.cs`
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2RequestHeaders.cs`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2) (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -12629,7 +12629,7 @@ curl -sS --http2-prior-knowledge -d '' http://127.0.0.1:P/echo
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2StreamConnection.cs`
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2StreamConnection.cs`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2) (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -12666,7 +12666,7 @@ curl -sS --http2 http://127.0.0.1:P/1 http://127.0.0.1:P/2
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2Session.cs:36, 252-278` (`StreamReceiveWindowSize` minus the initial size in force after the upgrade)
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2Session.cs:36, 252-278` (`StreamReceiveWindowSize` minus the initial size in force after the upgrade)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2) (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -12703,7 +12703,7 @@ curl -sS --http2 http://127.0.0.1:P/x -w '[%{http_version} %{response_code} %{nu
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\HttpH2cUpgradeConnection.cs`
+- `Curl.Original.Protocol.Http.UnitLibrary\HttpH2cUpgradeConnection.cs`
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2), for both PORT-LINUX and PORT-WIN (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -12789,7 +12789,7 @@ z_post301
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2Session.cs` (shutdown path)
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2Session.cs` (shutdown path)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2) (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -12826,7 +12826,7 @@ curl -sS --http2-prior-knowledge --limit-rate 400k http://127.0.0.1:P/x -o out.b
 
 **Suspected location in source**
 
-- `Curl.Protocol.Http.UnitLibrary\Http2Session.cs:36` (fixed `StreamReceiveWindowSize`)
+- `Curl.Original.Protocol.Http.UnitLibrary\Http2Session.cs:36` (fixed `StreamReceiveWindowSize`)
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF-LINUX's (the Windows REF has no HTTP/2) (Expected); repro variants that already matched still match. Re-check the expected behaviour against a curl 8.22.0 build first (the evidence is from REF-LINUX 8.18.0).
 
@@ -13098,7 +13098,7 @@ curl -sS -k --ssl-reqd --ftp-ssl-ccc ftp://localhost:21900/file.txt ftp://localh
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ftp.UnitLibrary\FtpSession.cs:713-745` (`ClearControlTlsAsync`). Its comment says that CCC "never can" succeed on curl's Schannel build. Also `Connection.ClearTlsAsync`.
+- `Curl.Original.Protocol.Ftp.UnitLibrary\FtpSession.cs:713-745` (`ClearControlTlsAsync`). Its comment says that CCC "never can" succeed on curl's Schannel build. Also `Connection.ClearTlsAsync`.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
 
@@ -13137,7 +13137,7 @@ curl -sS --cacert TP\ca.crt --ssl-no-revoke ldaps://localhost:21900/dc=test
 
 **Suspected location in source**
 
-- `Curl.Protocol.Ldap.UnitLibrary\LdapProtocolHandler.cs` and `WinLdapResultText.cs`. The emulated WinLDAP path does not reproduce WinLDAP's own TLS connection or trust store.
+- `Curl.Original.Protocol.Ldap.UnitLibrary\LdapProtocolHandler.cs` and `WinLdapResultText.cs`. The emulated WinLDAP path does not reproduce WinLDAP's own TLS connection or trust store.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.
 

@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Protocol.Dict.UnitLibrary, Curl.Protocol.Dict.UnitTests, Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Protocol.Gopher.UnitLibrary, Curl.Protocol.Gopher.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Ldap.UnitLibrary, Curl.Protocol.Ldap.UnitTests, Curl.Protocol.Mqtt.UnitLibrary, Curl.Protocol.Mqtt.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Rtsp.UnitLibrary, Curl.Protocol.Rtsp.UnitTests, Curl.Protocol.Smb.UnitLibrary, Curl.Protocol.Smb.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Ssh.IntegrationTests, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests, Curl.Protocol.Telnet.UnitLibrary, Curl.Protocol.Telnet.UnitTests, Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests, Curl.Protocol.Ws.UnitLibrary, Curl.Protocol.Ws.UnitTests, Curl.Protocol.Abstractions.UnitTests/ProtocolIsolationTests.cs, Directory.Build.props, Curl.slnx]
+touches: [Curl.Original.Protocol.Dict.UnitLibrary, Curl.Original.Protocol.Dict.UnitTests, Curl.Original.Protocol.File.UnitLibrary, Curl.Original.Protocol.File.UnitTests, Curl.Original.Protocol.Ftp.UnitLibrary, Curl.Original.Protocol.Ftp.UnitTests, Curl.Original.Protocol.Gopher.UnitLibrary, Curl.Original.Protocol.Gopher.UnitTests, Curl.Original.Protocol.Http.UnitLibrary, Curl.Original.Protocol.Http.UnitTests, Curl.Original.Protocol.Imap.UnitLibrary, Curl.Original.Protocol.Imap.UnitTests, Curl.Original.Protocol.Ldap.UnitLibrary, Curl.Original.Protocol.Ldap.UnitTests, Curl.Original.Protocol.Mqtt.UnitLibrary, Curl.Original.Protocol.Mqtt.UnitTests, Curl.Original.Protocol.Pop3.UnitLibrary, Curl.Original.Protocol.Pop3.UnitTests, Curl.Original.Protocol.Rtsp.UnitLibrary, Curl.Original.Protocol.Rtsp.UnitTests, Curl.Original.Protocol.Smb.UnitLibrary, Curl.Original.Protocol.Smb.UnitTests, Curl.Original.Protocol.Smtp.UnitLibrary, Curl.Original.Protocol.Smtp.UnitTests, Curl.Original.Protocol.Ssh.IntegrationTests, Curl.Original.Protocol.Ssh.UnitLibrary, Curl.Original.Protocol.Ssh.UnitTests, Curl.Original.Protocol.Telnet.UnitLibrary, Curl.Original.Protocol.Telnet.UnitTests, Curl.Original.Protocol.Tftp.UnitLibrary, Curl.Original.Protocol.Tftp.UnitTests, Curl.Original.Protocol.Ws.UnitLibrary, Curl.Original.Protocol.Ws.UnitTests, Curl.Protocol.Abstractions.UnitTests/ProtocolIsolationTests.cs, Directory.Build.props, Curl.slnx]
 requirement: none
 lane: no
 created: 2026-10-31
@@ -23,14 +23,16 @@ Stewart, 2026-10-31: rename `Curl.Protocol.*` to `Curl.Original.Protocol.*`, kee
 
 ## Acceptance criteria
 
-- [ ] Each of the 33 projects is `Curl.Original.Protocol.<Name>.*` in folder, csproj, assembly and namespace; `Curl.Protocol.Abstractions` is unchanged.
-- [ ] `Curl.slnx` holds them under `/Original/Protocols/<Name>/`.
-- [ ] `Directory.Build.props` and `ProtocolIsolationTests` find protocols by the new name, and still fail an extension or protocol that references a protocol library.
-- [ ] No live file outside the audit and gap paths names an old project; `Tasks/Done` and findings keep history.
-- [ ] An ADR records the naming, and `CLAUDE.md`, `LaneRules.md` and the glossary state it.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Each of the 33 projects is `Curl.Original.Protocol.<Name>.*` in folder, csproj, assembly and namespace; `Curl.Protocol.Abstractions` is unchanged.
+- [x] `Curl.slnx` holds them under `/Original/Protocols/<Name>/`.
+- [x] `Directory.Build.props` and `ProtocolIsolationTests` find protocols by the new name, and still fail an extension or protocol that references a protocol library.
+- [x] No live file outside the audit and gap paths names an old project; `Tasks/Done` and findings keep history.
+- [x] An ADR records the naming, and `CLAUDE.md`, `LaneRules.md` and the glossary state it.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-31 (interactive): 33 folders moved, about 1,560 files changed. Build clean; fast tests 114 of 114 projects pass, ProtocolIsolationTests among them (it asserts Http is found). A Har extension given a reference to Curl.Original.Protocol.Http failed the build with VerifyExtensionIsolation's ADR-0999 error. Inside the new namespace partly qualified `Abstractions.X` crefs no longer resolved, so 9 files spell out `Curl.Protocol.Abstractions`. `Curl.slnx` also gains the parent folders `/Original/`, `/Original/Protocols/` and BL-4438's missing `/Extensions/Protocol/`. The guarded audit and gap files follow on their own branches.
 
 ## Log
 

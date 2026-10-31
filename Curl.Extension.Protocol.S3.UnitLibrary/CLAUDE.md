@@ -1,7 +1,7 @@
 # Curl.Extension.Protocol.S3.UnitLibrary
 
 The S3 extension (ADR-0999, ADR-1013, ADR-1018, ADR-1090). Namespace `Curl.Extension.Protocol.S3`. It references the
-base class library, `Curl.Protocol.Abstractions` and `Curl.Extension.Abstractions`, and never `Curl.Protocol.Http`
+base class library, `Curl.Protocol.Abstractions` and `Curl.Extension.Abstractions`, and never `Curl.Original.Protocol.Http`
 (whose `--aws-sigv4` code is curl's, not this extension's). It adds no options.
 
 - `Client/S3Extension` gives the description and handler factory, registered in `Curl.Extension.Composition`.

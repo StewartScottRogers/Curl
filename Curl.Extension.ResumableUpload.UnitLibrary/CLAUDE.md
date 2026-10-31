@@ -2,7 +2,7 @@
 
 The resumable upload extension (ADR-0999), for `--resumable-upload`. Namespace
 `Curl.Extension.ResumableUpload`. It references the base class library, `Curl.Protocol.Abstractions`
-(for `IConnection`) and `Curl.Extension.Abstractions` (for `ITransferHook`), never `Curl.Protocol.Http` or
+(for `IConnection`) and `Curl.Extension.Abstractions` (for `ITransferHook`), never `Curl.Original.Protocol.Http` or
 another extension.
 
 - `ResumableUploadExtension` holds the `--resumable-upload` flag, the description `curl --extensions`

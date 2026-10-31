@@ -14,7 +14,7 @@ URL does and cannot be handed its `IConnection` at construction. No contract tod
 turns a host, a port and "secure or not" into an `IConnection`.
 
 TFTP adds a second problem. `IConnection` is a byte stream. TFTP runs over UDP
-(`Curl.Protocol.Tftp.UnitLibrary/CLAUDE.md`: "The only UDP protocol in the set"), where
+(`Curl.Original.Protocol.Tftp.UnitLibrary/CLAUDE.md`: "The only UDP protocol in the set"), where
 datagram boundaries carry meaning and the server answers from a new port - its
 transfer identifier, RFC 1350 section 4 - which the client must then address. A stream
 can express neither. This is the same shape of argument ADR-0002 made for

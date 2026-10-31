@@ -7,7 +7,7 @@
 ## Context
 
 The `s3://` handler must send requests to S3, MinIO or R2 and read their responses. An extension may
-not reference `Curl.Protocol.Http` (ADR-0999), so the extension needs its own HTTP/1.1 exchange over
+not reference `Curl.Original.Protocol.Http` (ADR-0999), so the extension needs its own HTTP/1.1 exchange over
 the `IConnection` seam.
 
 ## Decision

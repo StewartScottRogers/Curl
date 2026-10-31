@@ -3,7 +3,7 @@
 Hand-built Zstandard (RFC 8878) for every platform, per ADR-0185: the frame decoder and
 the XXH64 hash its content checksums use. The base class library has no Zstandard
 decoder, and two layers need one - HTTP content decoding (`Content-Encoding: zstd` in
-`Curl.Protocol.Http.UnitLibrary`) and TLS certificate decompression (RFC 8879 in
+`Curl.Original.Protocol.Http.UnitLibrary`) and TLS certificate decompression (RFC 8879 in
 `Curl.Tls.UnitLibrary`) - so it lives in neither and both may reference it (ADR-0120's
 table, as amended by ADR-0185).
 

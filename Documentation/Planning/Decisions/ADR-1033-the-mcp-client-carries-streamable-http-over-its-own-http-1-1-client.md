@@ -8,7 +8,7 @@
 
 The McpClient extension sends MCP messages over the Streamable HTTP transport (Model Context Protocol
 2025-06-18, "Base Protocol > Transports > Streamable HTTP"). An extension may not reference
-`Curl.Protocol.Http` or another extension (ADR-0999), so it cannot borrow curl's HTTP stack or
+`Curl.Original.Protocol.Http` or another extension (ADR-0999), so it cannot borrow curl's HTTP stack or
 `Curl.Extension.Protocol.S3`'s small HTTP/1.1 client.
 
 ## Decision

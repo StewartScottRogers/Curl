@@ -1,6 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Fakes;
+using Curl.Original.Protocol.Ssh.Fakes;
 using Curl.Testing;
 
 namespace Curl.Console;

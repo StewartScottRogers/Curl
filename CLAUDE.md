@@ -325,7 +325,8 @@ Curl/
 ```
 
 ### Project naming
-- Production library: `Curl.<Area>.UnitLibrary`, protocols `Curl.Protocol.<Name>.UnitLibrary`,
+- Production library: `Curl.<Area>.UnitLibrary`, curl's own protocols `Curl.Original.Protocol.<Name>.UnitLibrary`
+  (ADR-1176; their shared contracts stay `Curl.Protocol.Abstractions`),
   extensions `Curl.Extension.<Name>.UnitLibrary`, or `Curl.Extension.Protocol.<Name>.UnitLibrary`
   for one that serves its own URL scheme (see "Extensions" below).
 - Tests: the same name with `.UnitTests` instead of `.UnitLibrary`.
@@ -355,7 +356,7 @@ under one folder for its group (ADR-0731):
 - `/Transfer/`: Cookies, Core, Engine, Networking.
 - `/Wire/`: Http2, Http3, HttpDatagram, Protobuf, Quic, Ssh, WebSocket, Zstandard - framing and encoding below the protocols.
 - `/Security/`: Authentication, Cryptography, HttpMessageSignatures, Kerberos, Ntlm, Tls.
-- `/Protocols/<Name>/`: each `Curl.Protocol.<Name>.*`, and `Curl.Protocol.Abstractions.*`
+- `/Original/Protocols/<Name>/`: each `Curl.Original.Protocol.<Name>.*`, and `Curl.Protocol.Abstractions.*`
   in `/Protocols/Abstractions/`.
 - `/Conformance/<Part>/`: each `Curl.Conformance.<Part>.*`, and the harness itself
   (`Curl.Conformance.UnitLibrary` and `.UnitTests`) in `/Conformance/Harness/`.
@@ -385,7 +386,7 @@ What Curl adds beyond upstream curl - a scheme or feature curl does not have - i
   is edited and `Curl.slnx` and that csproj need not be in the task's `touches`.
 - Only the hosts (`Curl.Console`, `Curl.Api`, `Curl.Mcp`) and the extensions reference an
   extension. An extension references `Curl.Protocol.Abstractions` and the shared layers, never a
-  `Curl.Protocol.*` library and never another extension but `Curl.Extension.Abstractions`.
+  `Curl.Original.Protocol.*` library and never another extension but `Curl.Extension.Abstractions`.
   `VerifyExtensionIsolation` in `Directory.Build.props` fails the build otherwise.
 - An extension never changes what curl does: it adds a scheme or option curl refuses, is put after
   curl's handlers (a clash fails composition), leaves `curl -V` and `Libcurl` alone, and

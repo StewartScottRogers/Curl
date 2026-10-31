@@ -62,7 +62,7 @@ branch, or closing an issue. A previous yes does not carry to the next one.
    - `type` is one of `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`,
      `chore`.
    - `scope` is the project folder the change lives in, lowercased with the `curl.` and
-     `.unitlibrary`/`.unittests` noise dropped: `Curl.Protocol.Http.UnitLibrary` →
+     `.unitlibrary`/`.unittests` noise dropped: `Curl.Original.Protocol.Http.UnitLibrary` →
      `protocol.http`, `Curl.Core.UnitLibrary` → `core`, `Curl.Console` → `console`,
      `Tasks/` → `tasks`, `Documentation/` → `docs`, root build files → `build`,
      `.claude/` → `claude`. A change spanning projects takes the scope of the one it is

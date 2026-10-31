@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Curl.Cryptography;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh;
+using Curl.Original.Protocol.Ssh;
 using Curl.Ssh;
 using Curl.Ssh.KeyExchange;
 using Curl.Ssh.Negotiation;

@@ -2,7 +2,7 @@ using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Engine;
-using Curl.Protocol.File;
+using Curl.Original.Protocol.File;
 
 namespace Curl.Console;
 

@@ -29,7 +29,7 @@ If you ever find yourself wanting a package, you have taken a wrong turn. Say so
 .\Measure-CodeQuality.ps1 -ReportPath "$env:TEMP\curl-quality.md"
 
 # One library, reusing the coverage already collected.
-.\Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary -SkipTestRun
+.\Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.File.UnitLibrary -SkipTestRun
 ```
 
 Coverage comes from the fast run only (`TestCategory!=Integration`). Integration tests live

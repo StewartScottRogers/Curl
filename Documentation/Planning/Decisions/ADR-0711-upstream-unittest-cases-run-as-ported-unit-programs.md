@@ -98,8 +98,8 @@ two noted, by its batch) with no port.
 | 1621 | port in BL-2845: `tool1621`, stripping credentials from a URL (`Curl.Cli.UnitLibrary`) |
 | 1622 | port in BL-2845: `tool1622`, time and size progress text (`Curl.Output.UnitLibrary`) |
 | 1623 | port in BL-2845: `tool1623`, the `--limit-rate` size parser (`Curl.Cli.UnitLibrary`) |
-| 1625 | port in BL-2846: `Curl_compareheader` (`Curl.Protocol.Http.UnitLibrary`) |
-| 1626 | port in BL-2846: `Curl_copy_header_value` (`Curl.Protocol.Http.UnitLibrary`) |
+| 1625 | port in BL-2846: `Curl_compareheader` (`Curl.Original.Protocol.Http.UnitLibrary`) |
+| 1626 | port in BL-2846: `Curl_copy_header_value` (`Curl.Original.Protocol.Http.UnitLibrary`) |
 | 1627 | port in BL-2844: `Curl_get_scheme` (`CurlUrlParser`) |
 | 1636 | port in BL-2845: `time2str` and `max6out` (`Curl.Output.UnitLibrary`) |
 | 1650 | port in BL-2847: DoH parsing (`DohResponseReader`) |
@@ -117,7 +117,7 @@ two noted, by its batch) with no port.
 | 1664 | port in BL-2844: `strparse.c` string parsing (`Curl.Core`/`Curl.Cli` parsers) |
 | 1666 | port in BL-2843: `encodeOID` (ASN.1) |
 | 1667 | port in BL-2843: `ASN1tostr` (ASN.1) |
-| 1668 | port in BL-2845: `ftp_213_date` (`Curl.Protocol.Ftp.UnitLibrary`) |
+| 1668 | port in BL-2845: `ftp_213_date` (`Curl.Original.Protocol.Ftp.UnitLibrary`) |
 | 1669 | port in BL-2846: alt-svc load of more than 5000 entries (`AltSvcCache`) |
 | 1674 | port in BL-2846: HSTS load of more than 10000 entries (`HstsCache`) |
 | 1675 | port in BL-2844: URL API (`CurlUrlParser`) |
@@ -131,8 +131,8 @@ two noted, by its batch) with no port.
 | 2601 | no counterpart (BL-2849): `bufq`, libcurl's chunked buffer queue |
 | 2602 | no counterpart (BL-2846 records it): `dynhds`, libcurl's growable array of header structs; the header behaviour is covered by 1625 and 1626 |
 | 2603 | no counterpart (BL-2893 records it): `h1_req_parser`, libcurl's incremental parser that rereads its own HTTP/1 request text, fed in chunks, into a request struct (method, scheme, authority, path, header count, unread bytes); Curl builds the HTTP/2 and HTTP/3 header list in one pass from the head it formats (`Http2RequestHeaders`), and the one observable behaviour, a custom method with a space (#19543), is BL-2915 |
-| 2604 | port in BL-2845: `Curl_get_pathname` (`Curl.Protocol.Ssh.UnitLibrary`) |
-| 2605 | port in BL-2845: `Curl_ssh_range` (`Curl.Protocol.Ssh.UnitLibrary`) |
+| 2604 | port in BL-2845: `Curl_get_pathname` (`Curl.Original.Protocol.Ssh.UnitLibrary`) |
+| 2605 | port in BL-2845: `Curl_ssh_range` (`Curl.Original.Protocol.Ssh.UnitLibrary`) |
 | 2606 | no counterpart (BL-2849): `Curl_conn_adjust_pollset`, adjusting a C `poll` set; Curl has no pollset |
 | 3200 | port in BL-2845: `curl_get_line` (line reader for file-backed stores) |
 | 3205 | port in BL-2843: cipher suite name lookup (TLS cipher names) |

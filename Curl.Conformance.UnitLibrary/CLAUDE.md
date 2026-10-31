@@ -386,7 +386,7 @@ Each stand-in that wraps, or adds variables or features beside, the runner's pla
 
 The stand-in for upstream's test `sshd` is not here but in its own library,
 `Curl.Conformance.SshServer.UnitLibrary` (ADR-0456, BL-1934, BL-1935), because it reuses
-the SSH client's internal wire code from `Curl.Protocol.Ssh.UnitLibrary`, which this library
+the SSH client's internal wire code from `Curl.Original.Protocol.Ssh.UnitLibrary`, which this library
 may not reference. Its `SshServerConnector` is an `IConnector` whose sessions run the SSH
 transport layer - identification exchange, `curve25519-sha256` key exchange with a fixed
 `ssh-ed25519` host key, the client's first implemented cipher and MAC, `NEWKEYS` and the

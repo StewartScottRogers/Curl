@@ -39,7 +39,7 @@ HTTP authentication would pick the next request.
   `IHttpAuthenticator.ContinueAuthorizationAsync`, and calls `CreateAuthorizationAsync` once,
   with no challenges, for the pre-emptive value (Basic, Bearer, NTLM's Type 1, Negotiate's
   first token).
-- `Curl.Protocol.Ws.UnitTests` pins it: a Digest `401` followed by a `101` on the same
+- `Curl.Original.Protocol.Ws.UnitTests` pins it: a Digest `401` followed by a `101` on the same
   connection sends one request and fails with 22; an NTLM Type 1 answered by a Type 2 `401`
   does the same and never asks for a continuation.
 

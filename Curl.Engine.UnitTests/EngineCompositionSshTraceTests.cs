@@ -1,7 +1,7 @@
 using Curl.Console;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh;
+using Curl.Original.Protocol.Ssh;
 using Curl.Testing;
 
 namespace Curl.Engine;
@@ -10,7 +10,7 @@ namespace Curl.Engine;
 /// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[SSH]</c> lines - <c>ssh</c>,
 /// <c>protocol</c> and <c>all</c>, so <c>-vv</c> too - and that the composition hands that choice
 /// to the SSH handler (BL-1166). The lines themselves are pinned in
-/// <c>Curl.Protocol.Ssh.UnitTests</c>; the console writes them only under <c>-v</c>, as it writes
+/// <c>Curl.Original.Protocol.Ssh.UnitTests</c>; the console writes them only under <c>-v</c>, as it writes
 /// every info line.
 /// </summary>
 [TestClass]

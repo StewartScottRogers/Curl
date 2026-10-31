@@ -3,7 +3,7 @@ using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
-using Curl.Protocol.Ssh.Fakes;
+using Curl.Original.Protocol.Ssh.Fakes;
 
 namespace Curl.Engine;
 

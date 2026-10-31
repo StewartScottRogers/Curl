@@ -17,7 +17,7 @@ below say where they are superseded.
 `--ssh-jump` (BL-4145) is an extension, and an extension references no `Curl.Protocol.*` library
 but `Curl.Protocol.Abstractions` (ADR-0999). It needs an SSH client transport: the binary packet
 protocol, key exchange, packet protection, compression, algorithm negotiation and host key
-signature verification (RFC 4253). All of that lived in `Curl.Protocol.Ssh.UnitLibrary`, beside
+signature verification (RFC 4253). All of that lived in `Curl.Original.Protocol.Ssh.UnitLibrary`, beside
 the SCP and SFTP layers, the user authentication, the private key files and `known_hosts`.
 
 ## Decision
@@ -42,8 +42,8 @@ the SCP and SFTP layers, the user authentication, the private key files and `kno
   rest of `HostKeys`), the private key files and user authentication were first to stay in the
   protocol library. They now live in `Curl.Ssh.UnitLibrary` (`HostKeys/`, `Keys/`,
   `Authentication/`), and the session channel with them (ADR-1166). Only SCP, SFTP,
-  `SshDiagnosticLog`, `SshProtocolHandler` and the like stay in `Curl.Protocol.Ssh.UnitLibrary`.
-- `SshWireDecoders` stays in `Curl.Protocol.Ssh`. It is the public entry point the fuzzer
+  `SshDiagnosticLog`, `SshProtocolHandler` and the like stay in `Curl.Original.Protocol.Ssh.UnitLibrary`.
+- `SshWireDecoders` stays in `Curl.Original.Protocol.Ssh`. It is the public entry point the fuzzer
   calls (ADR-0394), and it also decodes SFTP attributes, which are protocol-library types; moving
   it would split one fuzz surface across two libraries and break the fuzzer's `using` line, which
   a lane cannot change.
@@ -54,7 +54,7 @@ the SCP and SFTP layers, the user authentication, the private key files and `kno
   layer adds itself to that list.
 - The tests move with their types to `Curl.Ssh.UnitTests`. The fakes the protocol tests share
   (`Fakes/`, `SshAuthenticationDiagnostics`, `SshByteDiagnostics`) live there and are linked into
-  `Curl.Protocol.Ssh.UnitTests`.
+  `Curl.Original.Protocol.Ssh.UnitTests`.
 
 ## Consequences
 
@@ -63,7 +63,7 @@ the SCP and SFTP layers, the user authentication, the private key files and `kno
 
 ## Alternatives considered
 
-- **Keep the namespace `Curl.Protocol.Ssh.*` in the new library.** Breaks the rule that a
+- **Keep the namespace `Curl.Original.Protocol.Ssh.*` in the new library.** Breaks the rule that a
   namespace matches its folder.
 - **Move `SshDiagnosticLog` whole.** It names `SftpPacketType` and `KnownHostsFile`, so the
   shared layer would need the protocol library.

@@ -48,12 +48,12 @@ its `SupportedSchemes`:
 
 | Handler | Source | Schemes |
 | --- | --- | --- |
-| `FileProtocolHandler` | `Curl.Protocol.File.UnitLibrary/FileProtocolHandler.cs` | `file` |
-| `DictProtocolHandler` | `Curl.Protocol.Dict.UnitLibrary/DictProtocolHandler.cs` | `dict` |
-| `GopherProtocolHandler` | `Curl.Protocol.Gopher.UnitLibrary/GopherProtocolHandler.cs` | `gopher`, `gophers` (TLS when the scheme is `gophers`) |
-| `TelnetProtocolHandler` | `Curl.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs` | `telnet` |
-| `TftpProtocolHandler` | `Curl.Protocol.Tftp.UnitLibrary/TftpProtocolHandler.cs` | `tftp` |
-| `MqttProtocolHandler` | `Curl.Protocol.Mqtt.UnitLibrary/MqttProtocolHandler.cs` | `mqtt`, `mqtts` (TLS when the scheme is `mqtts`) |
+| `FileProtocolHandler` | `Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs` | `file` |
+| `DictProtocolHandler` | `Curl.Original.Protocol.Dict.UnitLibrary/DictProtocolHandler.cs` | `dict` |
+| `GopherProtocolHandler` | `Curl.Original.Protocol.Gopher.UnitLibrary/GopherProtocolHandler.cs` | `gopher`, `gophers` (TLS when the scheme is `gophers`) |
+| `TelnetProtocolHandler` | `Curl.Original.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs` | `telnet` |
+| `TftpProtocolHandler` | `Curl.Original.Protocol.Tftp.UnitLibrary/TftpProtocolHandler.cs` | `tftp` |
+| `MqttProtocolHandler` | `Curl.Original.Protocol.Mqtt.UnitLibrary/MqttProtocolHandler.cs` | `mqtt`, `mqtts` (TLS when the scheme is `mqtts`) |
 
 `HttpProtocolHandler` claims `http` and `https` but is not registered, so neither is
 served and neither is listed.
@@ -218,7 +218,7 @@ against the code. `FeaturesLine` lists exactly the "Yes" rows, in curl's order
 | `alt-svc` | Yes | `--alt-svc` and `AltSvcTransferCache` (`Curl.Console`). |
 | `AsynchDNS` | Yes | As in Context. |
 | `asyn-rr` | No | Names c-ares resolving HTTPS records beside the threaded resolver; Curl has no c-ares and fetches HTTPS records only over DoH (see `HTTPSRR`). |
-| `brotli` | Yes | `HttpContentDecoder` decodes `br` (`Curl.Protocol.Http.UnitLibrary`). |
+| `brotli` | Yes | `HttpContentDecoder` decodes `br` (`Curl.Original.Protocol.Http.UnitLibrary`). |
 | `CharConv` | No | EBCDIC host conversion; Curl runs only on ASCII hosts. |
 | `Debug` | No | A debug build of libcurl; Curl ships one release build. |
 | `ECH` | Yes | `--ech` reaches the hand-built `EchClientHello`, `EchConfigList` (`Curl.Tls.UnitLibrary`); `DohDnsResolver` fetches the ECH config from HTTPS records. |

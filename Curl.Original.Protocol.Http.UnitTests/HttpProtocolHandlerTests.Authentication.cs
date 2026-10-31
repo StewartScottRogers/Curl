@@ -1,0 +1,939 @@
+using System.Net;
+using System.Text;
+using Curl.Protocol.Abstractions;
+using Curl.Original.Protocol.Http.Fakes;
+using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
+
+namespace Curl.Original.Protocol.Http;
+
+/// <content>
+/// Drives <see cref="HttpProtocolHandler" />'s authentication through
+/// <see cref="ScriptedAuthenticator" />, <see cref="TurnTakingConnection" /> and
+/// <see cref="QueueConnector" />, never a socket. Every request, header output and report
+/// value is what curl 8.21.0 produced against a loopback server; the commands are in the
+/// BL-181 Notes. Each exchange is replayed with 1-byte reads and with one read.
+/// </content>
+public sealed partial class HttpProtocolHandlerTests
+{
+    private const string AuthUrl = "http://127.0.0.1:18183/a";
+
+    private const string DigestValue = "Digest username=\"u\",realm=\"r\",nonce=\"n\",uri=\"/a\",response=\"544c035f0f40d9ebf0295157d8041f8c\"";
+
+    private const string Challenge = "Digest realm=\"r\", nonce=\"n\"";
+
+    private const string PlainRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
+
+    private const string DigestRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + DigestValue + "\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
+
+    private const string BasicRequest = "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n\r\n";
+
+    private const string ChallengeHead = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: " + Challenge + "\r\nContent-Length: 4\r\n\r\n";
+
+    private const string ClosingChallengeHead = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: " + Challenge + "\r\nConnection: close\r\nContent-Length: 4\r\n\r\n";
+
+    private const string RefusedHead = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: " + Challenge + "\r\nContent-Length: 5\r\n\r\n";
+
+    private const string OkHead = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n";
+
+    private const string FormBody = "Content-Length: 5\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nhello";
+
+    /// <summary>
+    /// Measured: <c>curl -s -u u:p http://127.0.0.1:18181/a</c> sends Basic on the first
+    /// request, straight after <c>Host</c>.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_BasicUpFront_SendsItAfterHost()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection connection = new(chunkSize, OkHead + "ok");
+            ScriptedAuthenticator authenticator = new("Basic dTpw", null);
+            MemoryStream output = new();
+            NetworkCredential credential = new("u", "p");
+            TransferContext context = new() { Url = CurlUrl.Parse(AuthUrl), Output = output, Credentials = credential };
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
+
+            TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", BasicRequest, connection.Written);
+            Assert.AreEqual(BasicRequest, connection.Written, $"Chunk size {chunkSize}");
+            Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            (HttpAuthRequest request, IReadOnlyList<string> challenges) = authenticator.Calls.Single();
+            Assert.AreEqual(new HttpAuthRequest("GET", CurlUrl.Parse(AuthUrl), "/a", credential, null, HttpAuthSchemes.Basic, false), request with { Events = NoTransferEvents.Instance });
+            Assert.IsInstanceOfType<HttpInfoLineRecorder>(request.Events, $"Chunk size {chunkSize}");
+            Assert.IsEmpty(challenges, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured: <c>curl -s -i -u u:p</c> against a 401 with a Basic challenge sends no
+    /// second request and exits 0 with the 401 as the output.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_UpFrontCredentialRefused_ReturnsThe401WithoutRetrying()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            const string basicChallenge = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"x\"\r\nContent-Length: 4\r\n\r\n";
+            TurnTakingConnection connection = new(chunkSize, basicChallenge + "nope", OkHead + "ok");
+            ScriptedAuthenticator authenticator = new("Basic dTpw", "Basic dTpw");
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
+
+            TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator)
+                .ExecuteAsync(AuthContext(output, headerOutput));
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", BasicRequest, connection.Written);
+            Assert.AreEqual(BasicRequest, connection.Written, $"Chunk size {chunkSize}");
+            Assert.AreEqual(basicChallenge, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual("nope", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.HasCount(1, authenticator.Calls, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured: <c>curl -s -i --digest -u u:p -w "%{http_code} %{num_connects}
+    /// %{size_request} %{size_header} %{size_download}"</c> against a keep-alive 401 retries
+    /// on the same connection, writes both heads and only the 200's body, and reports
+    /// <c>200 1 269 133 2</c>.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeOnKeepAlive_RetriesOnTheSameConnection()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection connection = new(chunkSize, ChallengeHead + "nope", OkHead + "ok");
+            QueueConnector connector = QueueConnector.For(connection);
+            ScriptedAuthenticator authenticator = new(null, DigestValue);
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
+
+            TransferResult result = await new HttpProtocolHandler(connector, authenticator).ExecuteAsync(AuthContext(output, headerOutput));
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", PlainRequest + DigestRequest, connection.Written);
+            Assert.AreEqual(PlainRequest + DigestRequest, connection.Written, $"Chunk size {chunkSize}");
+            Assert.AreEqual(ChallengeHead + OkHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.HasCount(1, connector.Targets, $"Chunk size {chunkSize}");
+            CollectionAssert.AreEqual(new[] { Challenge }, authenticator.Calls[1].Challenges.ToArray(), $"Chunk size {chunkSize}");
+            AssertReport(result, 200, 1, 269, 133, 2);
+        }
+    }
+
+    /// <summary>
+    /// Measured: the same run against a 401 with <c>Connection: close</c> retries on a new
+    /// connection and reports <c>200 2 269 152 2</c>.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeWithConnectionClose_RetriesOnANewConnection()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection first = new(chunkSize, ClosingChallengeHead + "nope");
+            TurnTakingConnection second = new(chunkSize, OkHead + "ok");
+            QueueConnector connector = QueueConnector.For(first, second);
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
+
+            TransferResult result = await new HttpProtocolHandler(connector, new ScriptedAuthenticator(null, DigestValue))
+                .ExecuteAsync(AuthContext(output, headerOutput));
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("first written", PlainRequest, first.Written);
+            Assert.AreEqual(PlainRequest, first.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("second written", DigestRequest, second.Written);
+            Assert.AreEqual(DigestRequest, second.Written, $"Chunk size {chunkSize}");
+            Assert.IsTrue(first.IsDisposed, $"Chunk size {chunkSize}");
+            Assert.IsTrue(second.IsDisposed, $"Chunk size {chunkSize}");
+            Assert.AreEqual(ClosingChallengeHead + OkHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual(connector.Targets[0], connector.Targets[1], $"Chunk size {chunkSize}");
+            AssertReport(result, 200, 2, 269, 152, 2);
+        }
+    }
+
+    /// <summary>
+    /// Measured: when the retry draws a second 401, curl 8.21.0 sends nothing more and exits
+    /// 0 with that 401's body, reporting <c>401 1 269 190 5</c>.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_RetryRefused_ReturnsTheSecond401()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection connection = new(chunkSize, ChallengeHead + "nope", RefusedHead + "nope2", OkHead + "ok");
+            ScriptedAuthenticator authenticator = new(null, DigestValue);
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
+
+            TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator)
+                .ExecuteAsync(AuthContext(output, headerOutput));
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", PlainRequest + DigestRequest, connection.Written);
+            Assert.AreEqual(PlainRequest + DigestRequest, connection.Written, $"Chunk size {chunkSize}");
+            Assert.AreEqual(ChallengeHead + RefusedHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual("nope2", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.HasCount(2, authenticator.Calls, $"Chunk size {chunkSize}");
+            AssertReport(result, 401, 1, 269, 190, 5);
+        }
+    }
+
+    /// <summary>
+    /// Measured: under <c>-f</c> the 401 the retry answers does not fail the transfer; the
+    /// second one does, with <c>curl: (22) The requested URL returned error: 401</c> after
+    /// both heads are written.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_FailAndRetryRefused_FailsOnTheSecond401()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection connection = new(chunkSize, ChallengeHead + "nope", RefusedHead + "nope2");
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+            TransferContext context = AuthContext(output, headerOutput, new HttpRequestOptions { Fail = HttpFailMode.Fail });
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
+
+            TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue))
+                .ExecuteAsync(context);
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.HttpReturnedError, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual("The requested URL returned error: 401", result.ErrorMessage, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", PlainRequest + DigestRequest, connection.Written);
+            Assert.AreEqual(PlainRequest + DigestRequest, connection.Written, $"Chunk size {chunkSize}");
+            Assert.AreEqual(ChallengeHead + RefusedHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured: <c>curl -sS -f -u u:p</c> against a 401 exits 22 at once.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_FailAndUpFrontCredentialRefused_Fails()
+    {
+        TurnTakingConnection connection = new(65536, "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"x\"\r\nContent-Length: 4\r\n\r\nnope");
+        TransferContext context = AuthContext(new MemoryStream(), null, new HttpRequestOptions { Fail = HttpFailMode.Fail });
+        Diagnostics.Arrange("url, fail mode", $"{AuthUrl}, {HttpFailMode.Fail}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator("Basic dTpw", "Basic dTpw"))
+            .ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("The requested URL returned error: 401", result.ErrorMessage);
+        Diagnostics.Diff("connection written", BasicRequest, connection.Written);
+        Assert.AreEqual(BasicRequest, connection.Written);
+    }
+
+    /// <summary>
+    /// Measured: <c>curl --digest -u u:p</c> against a 401 with no <c>WWW-Authenticate</c>
+    /// sends nothing more and reports <c>401 1 80 48 4</c>. An authenticator that cannot
+    /// answer the challenge ends the transfer the same way.
+    /// </summary>
+    [TestMethod]
+    [DataRow("HTTP/1.1 401 Unauthorized\r\nContent-Length: 4\r\n\r\n", DigestValue, 1, DisplayName = "No challenge")]
+    [DataRow(ChallengeHead, null, 2, DisplayName = "Challenge the authenticator cannot answer")]
+    public async Task ExecuteAsync_NoAnswerToThe401_ReturnsIt(string head, string? answer, int calls)
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection connection = new(chunkSize, head + "nope", OkHead + "ok");
+            ScriptedAuthenticator authenticator = new(null, answer);
+            MemoryStream output = new();
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
+
+            TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(AuthContext(output));
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", PlainRequest, connection.Written);
+            Assert.AreEqual(PlainRequest, connection.Written, $"Chunk size {chunkSize}");
+            Assert.AreEqual("nope", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Assert.HasCount(calls, authenticator.Calls, $"Chunk size {chunkSize}");
+            Assert.AreEqual(401, result.Report!.ResponseCode, $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// Measured: <c>curl --anyauth -u u:p -d hello</c> against a Basic challenge sends the
+    /// body with both requests.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeToABytesBody_SendsTheBodyAgain()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            const string basicChallenge = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"x\"\r\nContent-Length: 4\r\n\r\n";
+            TurnTakingConnection connection = new(chunkSize, basicChallenge + "nope", OkHead + "ok");
+            MemoryStream output = new();
+            TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded") });
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
+
+            TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, "Basic dTpw"))
+                .ExecuteAsync(context);
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(
+                "POST /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n" + FormBody
+                + "POST /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: Basic dTpw\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n" + FormBody,
+                connection.Written,
+                $"Chunk size {chunkSize}");
+            Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
+    /// A seekable stream body, as a <c>-T</c> file or a <c>-F</c> form is, is rewound and sent
+    /// whole again with the answer to the 401, as upstream test1030 expects of curl 8.21.0.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeToASeekableStreamBody_SendsTheBodyAgain()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        MemoryStream output = new();
+        TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new MemoryStream("hello"u8.ToArray()), 5, "application/octet-stream") });
+        Diagnostics.Arrange("url, body", $"{AuthUrl}, a 5-byte seekable stream body");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Assert.AreEqual(2, connection.Written.Split("\r\n\r\nhello").Length - 1, connection.Written);
+        Assert.Contains("Authorization: " + DigestValue, connection.Written);
+    }
+
+    /// <summary>
+    /// The answer to a 401 from an HTTP/1.0 server that closes the connection goes out as
+    /// HTTP/1.0 on the new connection, body and all, as upstream test1071 expects of curl
+    /// 8.21.0 (BL-2086).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http10ChallengeToASeekableStreamBody_SendsTheRetryAsHttp10()
+    {
+        string http10Challenge = ClosingChallengeHead.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
+        TurnTakingConnection first = new(65536, http10Challenge + "nope");
+        TurnTakingConnection second = new(65536, OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        MemoryStream output = new();
+        TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new MemoryStream("hello"u8.ToArray()), 5, "application/octet-stream") });
+        Diagnostics.Arrange("scripted responses", OneLine(http10Challenge + "nope") + " then " + OneLine(OkHead + "ok"));
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first, second), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        string firstLine = first.Written[..first.Written.IndexOf("\r\n", StringComparison.Ordinal)];
+        string retryLine = second.Written[..second.Written.IndexOf("\r\n", StringComparison.Ordinal)];
+        Diagnostics.Assert("retry request line", firstLine.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal), retryLine);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.EndsWith(" HTTP/1.1", firstLine);
+        Assert.AreEqual(firstLine.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal), retryLine);
+        Assert.Contains("\r\nAuthorization: " + DigestValue + "\r\n", second.Written);
+        Assert.EndsWith("\r\nContent-Length: 5\r\nContent-Type: application/octet-stream\r\n\r\nhello", second.Written);
+    }
+
+    /// <summary>
+    /// The answer to a 401 from an HTTP/1.1 server that closes the connection still goes out
+    /// as HTTP/1.1 on the new connection (BL-2086).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http11ChallengeToASeekableStreamBody_SendsTheRetryAsHttp11()
+    {
+        TurnTakingConnection first = new(65536, ClosingChallengeHead + "nope");
+        TurnTakingConnection second = new(65536, OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        MemoryStream output = new();
+        TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new MemoryStream("hello"u8.ToArray()), 5, "application/octet-stream") });
+        Diagnostics.Arrange("scripted responses", OneLine(ClosingChallengeHead + "nope") + " then " + OneLine(OkHead + "ok"));
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first, second), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        string retryLine = second.Written[..second.Written.IndexOf("\r\n", StringComparison.Ordinal)];
+        Diagnostics.Assert("retry request line ends", " HTTP/1.1", retryLine);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.EndsWith(" HTTP/1.1", retryLine);
+        Assert.EndsWith("\r\n\r\nhello", second.Written);
+    }
+
+    /// <summary>
+    /// A stream body that cannot seek, as stdin cannot, has been read by the time the 401
+    /// arrives and cannot be sent again, so the 401 is the result (BL-181 Notes, ADR-0034).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeToAnUnseekableStreamBody_ReturnsThe401()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        MemoryStream output = new();
+        TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new UnseekableStream("hello"u8.ToArray()), 5, "application/octet-stream") });
+        Diagnostics.Arrange("url, body", $"{AuthUrl}, a 5-byte unseekable stream body");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("nope", Latin1(output.ToArray()));
+        Assert.HasCount(1, authenticator.Calls);
+    }
+
+    /// <summary>
+    /// A body chunked for its unknown length, as stdin's is, drawing a 401 from an HTTP/1.0
+    /// server: curl 8.21.0 says it needs to rewind the upload, closes the HTTP/1.0 connection,
+    /// connects again for the answer, which goes out as HTTP/1.0 and cannot carry the body, and
+    /// fails it with exit 25 before writing a byte to the new connection, where rewinding the body
+    /// does not fail, as on Windows (BL-2130, upstream test1072; BL-2337).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http10ChallengeToABodyOfUnknownLength_ReconnectsThenReturnsUploadFailed()
+    {
+        string http10Challenge = ChallengeHead.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
+        TurnTakingConnection first = new(65536, http10Challenge + "nope");
+        TurnTakingConnection second = new(65536, OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        MemoryStream output = new();
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = output,
+            Http = new HttpRequestOptions { Body = new StreamBody(new UnseekableStream("hello"u8.ToArray()), null, "application/octet-stream") },
+            Events = events,
+        };
+        Diagnostics.Arrange("url, body, response", $"{AuthUrl}, an unseekable stream body of unknown length, {OneLine(http10Challenge)}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first, second), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.UploadFailed, result.ExitCode);
+        Diagnostics.Assert("bytes written to the second connection", 0, second.Written.Length);
+        Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.AreEqual("Chunky upload is not supported by HTTP 1.0", result.ErrorMessage);
+        Assert.AreEqual(string.Empty, Latin1(output.ToArray()));
+        Assert.AreEqual(2, result.Report!.ConnectionCount);
+        Assert.AreEqual(string.Empty, second.Written);
+        CollectionAssert.IsSubsetOf(
+            new[] { "* Need to rewind upload for next request", "* Issue another request to this URL: 'http://127.0.0.1:18183/a'" },
+            events.Events);
+    }
+
+    /// <summary>
+    /// The same 401 from an HTTP/1.0 server where rewinding an upload that cannot seek fails, as
+    /// the OpenSSL build of curl 8.22.0 fails to <c>lseek</c> stdin read through a pipe on Linux
+    /// and macOS: the retry fails with exit 65 <c>seek callback returned error 2</c> before it
+    /// connects again (measured, BL-2337 Notes; upstream test1072 as GF-0082 runs it).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http10ChallengeToABodyOfUnknownLengthThatCannotRewind_ReturnsSendFailRewindWithoutReconnecting()
+    {
+        string http10Challenge = ChallengeHead.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
+        TurnTakingConnection first = new(65536, http10Challenge + "nope");
+        TurnTakingConnection second = new(65536, OkHead + "ok");
+        MemoryStream output = new();
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = output,
+            Http = new HttpRequestOptions { Body = new StreamBody(new UnrewindableStream("hello"u8.ToArray()), null, "application/octet-stream") },
+            Events = events,
+        };
+        HttpProtocolHandler handler = new(QueueConnector.For(first, second), new ScriptedAuthenticator(null, DigestValue));
+        Diagnostics.Arrange("url, body, response", $"{AuthUrl}, an unseekable stream body of unknown length, {OneLine(http10Challenge)}");
+
+        TransferResult result = await handler.ExecuteAsync(context);
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual("seek callback returned error 2", result.ErrorMessage);
+        Assert.AreEqual(string.Empty, Latin1(output.ToArray()));
+        Assert.AreEqual(1, result.Report!.ConnectionCount);
+        Assert.AreEqual(string.Empty, second.Written);
+        CollectionAssert.IsSubsetOf(
+            new[] { "* Need to rewind upload for next request", "* seek callback returned error 2", "* rewind of client reader 'cr-in' failed: 65" },
+            events.Events);
+    }
+
+    /// <summary>
+    /// A 401 answered for a body that cannot seek but rewinds through <see cref="IUploadRewinder" />,
+    /// as libcurl's read callback does through <c>CURLOPT_SEEKFUNCTION</c>: the body is rewound once
+    /// and the retry sends it again whole (BL-2463).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeToABodyThatRewindsThroughItsRewinder_RewindsAndResendsItWhole()
+    {
+        TurnTakingConnection first = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        RewinderStream body = new("hello"u8.ToArray());
+        MemoryStream output = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = output,
+            Http = new HttpRequestOptions { Body = new StreamBody(body, 5, "application/octet-stream") },
+        };
+        Diagnostics.Arrange("url, body, response", $"{AuthUrl}, a 5-byte rewinder stream body, {OneLine(ChallengeHead)}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("rewinds", 1, body.Rewinds);
+        Assert.AreEqual(1, body.Rewinds);
+        string[] requests = first.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, first.Written);
+        Assert.EndsWith("\r\n\r\nhello", requests[0]);
+        Assert.Contains("Authorization: " + DigestValue, requests[1]);
+        Assert.EndsWith("\r\n\r\nhello", requests[1]);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+    }
+
+    /// <summary>
+    /// A 401 that arrives while a rewinder body of unknown length still waits for
+    /// <c>100 Continue</c>: none of it was read, so it is not rewound, as curl 8.22.0's
+    /// <c>cr_in_rewind</c> rewinds nothing its read callback never gave (BL-2463).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeBeforeARewinderBodyIsRead_AsksForNoRewind()
+    {
+        TurnTakingConnection first = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        RewinderStream body = new("hello"u8.ToArray(), "seek callback returned error 1");
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { Body = new StreamBody(body, null, "application/octet-stream") },
+        };
+        Diagnostics.Arrange("url, body, response", $"{AuthUrl}, a rewinder stream body of unknown length, {OneLine(ChallengeHead)}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("rewinds", 0, body.Rewinds);
+        Assert.AreEqual(0, body.Rewinds);
+    }
+
+    /// <summary>
+    /// The same 401 where the rewinder fails: the retry fails before it is sent with exit 65 and
+    /// the rewinder's own message, after it and <c>rewind of client reader 'cr-in' failed: 65</c>
+    /// under <c>-v</c>, as curl 8.22.0's <c>cr_in_rewind</c> fails a seek callback that returns
+    /// an error (BL-2463).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeToABodyWhoseRewinderFails_ReturnsSendFailRewindWithTheRewindersMessage()
+    {
+        TurnTakingConnection first = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        RewinderStream body = new("hello"u8.ToArray(), "seek callback returned error 1");
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { Body = new StreamBody(body, 5, "application/octet-stream") },
+            Events = events,
+        };
+        Diagnostics.Arrange("url, body, response", $"{AuthUrl}, a rewinder stream body whose rewind fails, {OneLine(ChallengeHead)}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
+        Assert.AreEqual("seek callback returned error 1", result.ErrorMessage);
+        Assert.AreEqual(1, body.Rewinds);
+        Assert.HasCount(1, first.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries), first.Written);
+        Assert.AreEqual(401, result.Report!.ResponseCode);
+        CollectionAssert.IsSubsetOf(
+            new[] { "* seek callback returned error 1", "* rewind of client reader 'cr-in' failed: 65" },
+            events.Events);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReconnectFails_ReturnsTheConnectFailure()
+    {
+        TurnTakingConnection first = new(65536, ClosingChallengeHead + "nope");
+        QueueConnector connector = new(
+            ConnectResult.Connected(first),
+            ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect to 127.0.0.1 port 18183 after 0 ms: Could not connect to server"));
+        MemoryStream output = new();
+        Diagnostics.Arrange("url, reconnect", $"{AuthUrl}, fails with CouldntConnect");
+
+        TransferResult result = await new HttpProtocolHandler(connector, new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(AuthContext(output));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("Failed to connect to 127.0.0.1 port 18183 after 0 ms: Could not connect to server", result.ErrorMessage);
+        Assert.AreEqual(0L, output.Length);
+    }
+
+    private void AssertReport(TransferResult result, int responseCode, int connections, long requestSize, long headerSize, long downloadSize)
+    {
+        TransferReport report = result.Report!;
+        Diagnostics.Assert(
+            "report (code, connects, request, header, download)",
+            $"{responseCode} {connections} {requestSize} {headerSize} {downloadSize}",
+            $"{report.ResponseCode} {report.ConnectionCount} {report.RequestSize} {report.HeaderSize} {report.DownloadSize}");
+        Assert.AreEqual(responseCode, report.ResponseCode);
+        Assert.AreEqual(connections, report.ConnectionCount);
+        Assert.AreEqual(requestSize, report.RequestSize);
+        Assert.AreEqual(headerSize, report.HeaderSize);
+        Assert.AreEqual(downloadSize, report.DownloadSize);
+    }
+
+    /// <summary>
+    /// An <c>https</c> transfer asks the authenticator to answer a challenge with the DER of
+    /// the connection's TLS server certificate, the first of its peer certificates, so
+    /// hand-built Negotiate sends <c>tls-server-end-point</c> channel bindings (BL-966).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_HttpsChallenge_AsksWithTheServerCertificateDer()
+    {
+        byte[] serverCertificate = [0x30, 0x03, 0x02, 0x01, 0x07];
+        ReadOnlyMemory<byte>[] chain = [serverCertificate, new byte[] { 0x30, 0x01 }];
+        QueueConnector connector = new(
+            ConnectResult.Connected(new TurnTakingConnection(65536, ClosingChallengeHead + "nope"), null, peerCertificates: chain),
+            ConnectResult.Connected(new TurnTakingConnection(65536, OkHead + "ok"), null, peerCertificates: chain));
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        TransferContext context = new() { Url = CurlUrl.Parse("https://127.0.0.1:18183/a"), Output = new MemoryStream() };
+        Diagnostics.Arrange("url, server certificate", $"{context.Url}, {Convert.ToHexString(serverCertificate)}");
+
+        TransferResult result = await new HttpProtocolHandler(connector, authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(2, authenticator.Calls.Count);
+        CollectionAssert.AreEqual(serverCertificate, authenticator.Calls[1].Request.ServerCertificate.ToArray());
+    }
+
+    /// <summary>
+    /// A plain <c>http</c> transfer asks the authenticator with no server certificate, even
+    /// when the connection reports one, as an HTTPS proxy's own does (BL-966, ADR-0341).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_HttpChallenge_AsksWithNoServerCertificate()
+    {
+        ReadOnlyMemory<byte>[] chain = [new byte[] { 0x30, 0x01 }];
+        QueueConnector connector = new(
+            ConnectResult.Connected(new TurnTakingConnection(65536, ClosingChallengeHead + "nope"), null, peerCertificates: chain),
+            ConnectResult.Connected(new TurnTakingConnection(65536, OkHead + "ok"), null, peerCertificates: chain));
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        Diagnostics.Arrange("url, peer certificates", $"{AuthUrl}, {chain.Length}");
+
+        TransferResult result = await new HttpProtocolHandler(connector, authenticator).ExecuteAsync(AuthContext(new MemoryStream()));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(2, authenticator.Calls.Count);
+        Assert.IsTrue(authenticator.Calls[1].Request.ServerCertificate.IsEmpty);
+    }
+
+    /// <summary>
+    /// With <c>--digest</c> the first POST is a probe with an empty body and
+    /// <c>Content-Length: 0</c>; the body goes only with the answer to the challenge, as
+    /// upstream test1001 and test2058 expect of curl 8.21.0 (ADR-0441).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestPostBeforeAChallenge_SendsAnEmptyProbeFirst()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        MemoryStream output = new();
+        TransferContext context = DigestPostContext(output);
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --digest");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Content-Length: 0\r\n", requests[0]);
+        Assert.DoesNotContain("hello", requests[0]);
+        Assert.Contains("Authorization: " + DigestValue, requests[1]);
+        Assert.EndsWith("Content-Length: 5\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nhello", requests[1]);
+    }
+
+    /// <summary>
+    /// The probe of a <c>-T</c> upload resumed with <c>-C</c> keeps its <c>Content-Range</c>, as
+    /// curl 8.21.0 sends it (measured, BL-2002 Notes; upstream test1001).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeOfAResumedUpload_KeepsItsContentRange()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Credentials = new System.Net.NetworkCredential("u", "p"),
+            Upload = new MemoryStream("test\n"u8.ToArray()),
+            ResumeFrom = 2,
+            Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest },
+        };
+        Diagnostics.Arrange("url, upload, schemes", $"{AuthUrl}, -T 5-byte file -C 2, --digest");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("PUT ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Content-Range: bytes 2-4/5\r\n", requests[0]);
+        Assert.EndsWith("Content-Length: 0\r\n\r\n", requests[0]);
+        Assert.Contains("Content-Range: bytes 2-4/5\r\n", requests[1]);
+        Assert.EndsWith("Content-Length: 3\r\n\r\nst\n", requests[1]);
+    }
+
+    /// <summary>
+    /// A probe answered with a 2xx instead of a challenge is followed by the same POST with its
+    /// body and no credentials, as upstream test175 expects of curl 8.21.0 (ADR-0441).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeAnsweredWithoutAChallenge_SendsTheBodyNext()
+    {
+        TurnTakingConnection connection = new(65536, OkHead + "ok", OkHead + "ok");
+        MemoryStream output = new();
+        TransferContext context = DigestPostContext(output);
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --digest, a server asking for no auth");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, null)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Content-Length: 0\r\n", requests[0]);
+        Assert.EndsWith("\r\n\r\nhello", requests[1]);
+        Assert.DoesNotContain("Authorization:", requests[1]);
+    }
+
+    /// <summary>
+    /// A probe answered with a 500, neither a challenge nor a 2xx, is the transfer's result: the
+    /// body is never sent.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeAnsweredWithAServerError_EndsWithoutSendingTheBody()
+    {
+        TurnTakingConnection connection = new(65536, "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 2\r\n\r\nno");
+        TransferContext context = DigestPostContext(new MemoryStream());
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --digest, a server answering 500");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, null)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(1, connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries), connection.Written);
+        Assert.DoesNotContain("hello", connection.Written);
+    }
+
+    /// <summary>
+    /// The probe's <c>Content-Length: 0</c> replaces an <c>-H</c> <c>Content-Length</c> line,
+    /// which goes only with the answer to the challenge, as upstream test1284 expects of curl
+    /// 8.21.0 (BL-1835).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeWithACustomContentLength_SendsContentLengthZeroInItsPlace()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        TransferContext context = DigestPostContext(new MemoryStream(), ["Content-Length: 5"]);
+        Diagnostics.Arrange("url, body, schemes, headers", $"{AuthUrl}, -d hello, --digest, -H \"Content-Length: 5\"");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Content-Length: 0\r\n", requests[0]);
+        Assert.DoesNotContain("Content-Length: 5", requests[0]);
+        Assert.Contains("Content-Length: 5\r\n", requests[1]);
+        Assert.DoesNotContain("Content-Length: 0", requests[1]);
+    }
+
+    /// <summary>
+    /// A body an <c>-H</c> value asks to send chunked keeps its chunking in the probe, which sends
+    /// only the last chunk and no <c>Content-Length</c>, as libcurl 8.22.0 does (upstream test579,
+    /// BL-2621).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeOfAChunkedBody_SendsOnlyTheLastChunk()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        TransferContext context = DigestPostContext(new MemoryStream(), ["Transfer-Encoding: chunked"]);
+        Diagnostics.Arrange("url, body, schemes, headers", $"{AuthUrl}, -d hello, --digest, -H \"Transfer-Encoding: chunked\"");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.DoesNotContain("Content-Length", requests[0]);
+        Assert.Contains("Transfer-Encoding: chunked\r\n", requests[0]);
+        Assert.EndsWith("\r\n\r\n0\r\n\r\n", requests[0]);
+        Assert.EndsWith("\r\n\r\n5\r\nhello\r\n0\r\n\r\n", requests[1]);
+    }
+
+    /// <summary>
+    /// With <c>--ntlm</c> the POST that carries the Type 1 message sends <c>Content-Length: 0</c>
+    /// and no body; the body goes only with the Type 3 message, as upstream test176 and test267
+    /// expect of curl 8.21.0 (BL-2029).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmPostWithItsType1Message_SendsContentLengthZeroAndNoBody()
+    {
+        TurnTakingConnection connection = new(65536, NtlmChallengeHead + "nope", OkHead + "ok");
+        TransferContext context = NtlmPostContext(new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded"));
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --ntlm");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new HandshakeAuthenticator(NtlmType1, [NtlmType3])).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Authorization: " + NtlmType1 + "\r\n", requests[0]);
+        Assert.EndsWith("Content-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n", requests[0]);
+        Assert.Contains("Authorization: " + NtlmType3 + "\r\n", requests[1]);
+        Assert.EndsWith("Content-Length: 5\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nhello", requests[1]);
+    }
+
+    /// <summary>
+    /// The Type 1 request of a <c>-F</c> form leaves out the form's <c>Content-Type</c> with its
+    /// parts, as upstream test170 expects of curl 8.21.0 (BL-2029).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmFormPostWithItsType1Message_SendsNoContentType()
+    {
+        TurnTakingConnection connection = new(65536, NtlmChallengeHead + "nope", OkHead + "ok");
+        TransferContext context = NtlmPostContext(new BytesBody("part"u8.ToArray(), "multipart/form-data; boundary=xyz"));
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -F form, --ntlm");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new HandshakeAuthenticator(NtlmType1, [NtlmType3])).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.EndsWith("Content-Length: 0\r\n\r\n", requests[0]);
+        Assert.DoesNotContain("Content-Type", requests[0]);
+        Assert.EndsWith("Content-Length: 4\r\nContent-Type: multipart/form-data; boundary=xyz\r\n\r\npart", requests[1]);
+    }
+
+    /// <summary>
+    /// A Type 1 probe answered with a 2xx is followed by the same POST with its body and without
+    /// the Type 1 value, as upstream test176 expects of curl 8.21.0 (BL-2029).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmProbeAnsweredWithoutAChallenge_SendsTheBodyWithoutTheType1Value()
+    {
+        TurnTakingConnection connection = new(65536, OkHead + "ok", OkHead + "ok");
+        TransferContext context = NtlmPostContext(new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded"));
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --ntlm, a server asking for no auth");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new HandshakeAuthenticator(NtlmType1, [])).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Authorization: " + NtlmType1 + "\r\n", requests[0]);
+        Assert.DoesNotContain("Authorization:", requests[1]);
+        Assert.EndsWith("\r\n\r\nhello", requests[1]);
+    }
+
+    /// <summary>
+    /// A retry that answers a challenge with a Type 1 message, as <c>--anyauth</c> does after a
+    /// first request with the body, holds the body back too, as upstream test243 expects of
+    /// curl 8.21.0 (BL-2029).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_RetryAnsweringWithAType1Message_SendsContentLengthZeroAndNoBody()
+    {
+        TurnTakingConnection connection = new(65536, NtlmChallengeHead + "nope", OkHead + "ok", OkHead + "ok");
+        TransferContext context = NtlmPostContext(new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded"), HttpAuthSchemes.Ntlm | HttpAuthSchemes.Basic);
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --anyauth");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, NtlmType1)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(3, requests, connection.Written);
+        Assert.EndsWith("\r\n\r\nhello", requests[0]);
+        Assert.Contains("Authorization: " + NtlmType1 + "\r\n", requests[1]);
+        Assert.EndsWith("Content-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n", requests[1]);
+        Assert.EndsWith("\r\n\r\nhello", requests[2]);
+    }
+
+    private const string NtlmType1 = "NTLM TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=";
+
+    private const string NtlmType3 = "NTLM TlRMTVNTUAADAAAAGAAYAEAAAAA=";
+
+    private static TransferContext NtlmPostContext(BytesBody body, HttpAuthSchemes schemes = HttpAuthSchemes.Ntlm) =>
+        new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Credentials = new System.Net.NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions { Body = body, AuthSchemes = schemes },
+        };
+
+    private static TransferContext DigestPostContext(Stream output, IReadOnlyList<string>? headers = null) =>
+        new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = output,
+            Credentials = new System.Net.NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions { Body = new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded"), AuthSchemes = HttpAuthSchemes.Digest, Headers = headers ?? [] },
+        };
+
+    private static TransferContext AuthContext(Stream output, Stream? headerOutput = null, HttpRequestOptions? options = null) =>
+        new() { Url = CurlUrl.Parse(AuthUrl), Output = output, HeaderOutput = headerOutput, Http = options };
+}

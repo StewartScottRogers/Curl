@@ -85,22 +85,22 @@ difference between 16 libraries and 29 with duplicated TLS in each.
 
 | Library | Schemes covered |
 | --- | --- |
-| `Curl.Protocol.Http.UnitLibrary` | `http`, `https`, plus `ipfs`, `ipns` |
-| `Curl.Protocol.Ws.UnitLibrary` | `ws`, `wss` |
-| `Curl.Protocol.Ftp.UnitLibrary` | `ftp`, `ftps` |
-| `Curl.Protocol.Ssh.UnitLibrary` | `scp`, `sftp` |
-| `Curl.Protocol.Smtp.UnitLibrary` | `smtp`, `smtps` |
-| `Curl.Protocol.Imap.UnitLibrary` | `imap`, `imaps` |
-| `Curl.Protocol.Pop3.UnitLibrary` | `pop3`, `pop3s` |
-| `Curl.Protocol.Ldap.UnitLibrary` | `ldap`, `ldaps` |
-| `Curl.Protocol.Mqtt.UnitLibrary` | `mqtt`, `mqtts` |
-| `Curl.Protocol.Smb.UnitLibrary` | `smb`, `smbs` |
-| `Curl.Protocol.Gopher.UnitLibrary` | `gopher`, `gophers` |
-| `Curl.Protocol.Rtsp.UnitLibrary` | `rtsp` |
-| `Curl.Protocol.Tftp.UnitLibrary` | `tftp` |
-| `Curl.Protocol.Telnet.UnitLibrary` | `telnet` |
-| `Curl.Protocol.Dict.UnitLibrary` | `dict` |
-| `Curl.Protocol.File.UnitLibrary` | `file` |
+| `Curl.Original.Protocol.Http.UnitLibrary` | `http`, `https`, plus `ipfs`, `ipns` |
+| `Curl.Original.Protocol.Ws.UnitLibrary` | `ws`, `wss` |
+| `Curl.Original.Protocol.Ftp.UnitLibrary` | `ftp`, `ftps` |
+| `Curl.Original.Protocol.Ssh.UnitLibrary` | `scp`, `sftp` |
+| `Curl.Original.Protocol.Smtp.UnitLibrary` | `smtp`, `smtps` |
+| `Curl.Original.Protocol.Imap.UnitLibrary` | `imap`, `imaps` |
+| `Curl.Original.Protocol.Pop3.UnitLibrary` | `pop3`, `pop3s` |
+| `Curl.Original.Protocol.Ldap.UnitLibrary` | `ldap`, `ldaps` |
+| `Curl.Original.Protocol.Mqtt.UnitLibrary` | `mqtt`, `mqtts` |
+| `Curl.Original.Protocol.Smb.UnitLibrary` | `smb`, `smbs` |
+| `Curl.Original.Protocol.Gopher.UnitLibrary` | `gopher`, `gophers` |
+| `Curl.Original.Protocol.Rtsp.UnitLibrary` | `rtsp` |
+| `Curl.Original.Protocol.Tftp.UnitLibrary` | `tftp` |
+| `Curl.Original.Protocol.Telnet.UnitLibrary` | `telnet` |
+| `Curl.Original.Protocol.Dict.UnitLibrary` | `dict` |
+| `Curl.Original.Protocol.File.UnitLibrary` | `file` |
 
 Two findings from the research drive that table:
 

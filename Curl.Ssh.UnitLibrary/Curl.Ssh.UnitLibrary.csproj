@@ -14,9 +14,9 @@
     <InternalsVisibleTo Include="Curl.Conformance.SshServer.UnitLibrary" />
     <InternalsVisibleTo Include="Curl.Conformance.SshServer.UnitTests" />
     <InternalsVisibleTo Include="Curl.Conformance.UnitProgram.UnitLibrary" />
-    <InternalsVisibleTo Include="Curl.Protocol.Ssh.IntegrationTests" />
-    <InternalsVisibleTo Include="Curl.Protocol.Ssh.UnitLibrary" />
-    <InternalsVisibleTo Include="Curl.Protocol.Ssh.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Original.Protocol.Ssh.IntegrationTests" />
+    <InternalsVisibleTo Include="Curl.Original.Protocol.Ssh.UnitLibrary" />
+    <InternalsVisibleTo Include="Curl.Original.Protocol.Ssh.UnitTests" />
     <InternalsVisibleTo Include="Curl.Ssh.UnitTests" />
     <InternalsVisibleTo Include="Curl.Extension.SshJump.UnitLibrary" />
     <InternalsVisibleTo Include="Curl.Extension.SshJump.UnitTests" />

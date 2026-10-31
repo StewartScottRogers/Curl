@@ -10,7 +10,7 @@ namespace Curl.Engine;
 /// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[WS]</c> lines - <c>ws</c>,
 /// <c>protocol</c> and <c>all</c>, so <c>-vv</c> too - and that the composition hands that choice
 /// to the WebSocket handler (BL-1164). The lines themselves are pinned in
-/// <c>Curl.Protocol.Ws.UnitTests</c>.
+/// <c>Curl.Original.Protocol.Ws.UnitTests</c>.
 /// </summary>
 [TestClass]
 public sealed class EngineCompositionWsTraceTests

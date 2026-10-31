@@ -7,7 +7,7 @@
 
 ## Context
 
-`Curl.Protocol.Ftp.UnitLibrary` had no handler (BL-431). curl's FTP support is large:
+`Curl.Original.Protocol.Ftp.UnitLibrary` had no handler (BL-431). curl's FTP support is large:
 passive and active modes, uploads, `ftps`, `--ftp-method`, `-Q`, `-l`, ranges and resume.
 The first handler needs a scope that is a true drop-in for the common case, and a
 measured answer for every failure it can meet.

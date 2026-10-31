@@ -9,9 +9,9 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 In curl, WebSocket lives inside the HTTP code: a `ws://` transfer is an HTTP/1.1 `GET` with
 `Upgrade: websocket`, and after the `101` reply the connection carries RFC 6455 frames. Here
-`ws` and `wss` have their own library, `Curl.Protocol.Ws.UnitLibrary`, which may reference
+`ws` and `wss` have their own library, `Curl.Original.Protocol.Ws.UnitLibrary`, which may reference
 `Curl.Protocol.Abstractions.UnitLibrary` and the hand-built libraries (ADR-0120) and never
-`Curl.Protocol.Http.UnitLibrary`. The handler still has to send curl's upgrade request byte for
+`Curl.Original.Protocol.Http.UnitLibrary`. The handler still has to send curl's upgrade request byte for
 byte and read the reply head. This ADR fixes where that code lives, which HTTP options apply to
 a WebSocket transfer, what the curl tool does once the connection is upgraded, and how tests
 fix the random key and masks. BL-580 to BL-584 build on it.
@@ -121,7 +121,7 @@ What the table shows:
 
 ## Decision
 
-**1. The upgrade request writer and the `101` head reader live in `Curl.Protocol.Ws.UnitLibrary`.**
+**1. The upgrade request writer and the `101` head reader live in `Curl.Original.Protocol.Ws.UnitLibrary`.**
 The library gets a small `WsUpgradeRequestFormatter` that writes the head in the measured order
 from the transfer's `CurlUrl`, `HttpRequestOptions` and credentials, and a `WsUpgradeResponseReader`
 that reads the status line and header lines up to the blank line from `IConnection` (enough to
@@ -155,7 +155,7 @@ download size is the count of frame bytes read, headers included; the response c
 `Sec-WebSocket-Accept` and `Upgrade` in the reply are not checked, and any other status fails with
 22 `Refused WebSocket upgrade: <code>` without writing the body.
 
-**4. The randomness seam.** `Curl.Protocol.Ws.UnitLibrary` defines `IWebSocketRandomSource` with
+**4. The randomness seam.** `Curl.Original.Protocol.Ws.UnitLibrary` defines `IWebSocketRandomSource` with
 `void Fill(Span<byte> destination)`, and `SystemWebSocketRandomSource` fills it from
 `RandomNumberGenerator`, as `ISshRandomSource` does for SSH. The handler takes it by constructor
 injection and draws 16 bytes per upgrade for `Sec-WebSocket-Key` and 4 bytes per client frame
@@ -171,7 +171,7 @@ exactly.
 ## Consequences
 
 - BL-580 builds the formatter, the head reader, the random source and the `101`/refusal outcome
-  in `Curl.Protocol.Ws.UnitLibrary`, pinned with a fixed key; it does not verify
+  in `Curl.Original.Protocol.Ws.UnitLibrary`, pinned with a fixed key; it does not verify
   `Sec-WebSocket-Accept`, because curl does not (rows 21, 22), which replaces BL-580's goal of
   checking it.
 - BL-581 builds the frame reader and writer: every length form, fragments, the masked pong, no

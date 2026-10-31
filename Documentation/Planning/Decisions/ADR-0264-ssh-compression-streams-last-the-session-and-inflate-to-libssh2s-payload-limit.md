@@ -47,7 +47,7 @@ Three questions ADR-0122 left open:
 
 ## Consequences
 
-- `Curl.Protocol.Ssh.UnitLibrary` has a `Compression` folder: `SshCompressionMethods`,
+- `Curl.Original.Protocol.Ssh.UnitLibrary` has a `Compression` folder: `SshCompressionMethods`,
   `SshZlibCompressor`, `SshZlibDecompressor`. `SshPacketWriter.StartCompression` and
   `SshPacketReader.StartDecompression` switch a direction on; `SshTransport` does it at
   `NEWKEYS` for `zlib` and in `StartDelayedCompression` for `zlib@openssh.com`, which

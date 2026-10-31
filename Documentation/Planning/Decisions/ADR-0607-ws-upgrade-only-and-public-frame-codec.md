@@ -9,7 +9,7 @@
 
 Phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md` (ADR-0506) needs `curl_ws_recv`,
 `curl_ws_send` and `curl_ws_meta` over a transfer run with `CURLOPT_CONNECT_ONLY` 2. Until now
-`Curl.Protocol.Ws` only ran the whole tool transfer: `WsProtocolHandler.ExecuteAsync` read frames
+`Curl.Original.Protocol.Ws` only ran the whole tool transfer: `WsProtocolHandler.ExecuteAsync` read frames
 until the server closed, `WsFrameEncoder` wrote only FIN frames, and the decoder merged every payload
 into one run with no frame metadata, all `internal`. The Ws library may reference only
 `Curl.Protocol.Abstractions`, so it cannot use `Curl.Api`'s `CurlWebSocketFrame` or

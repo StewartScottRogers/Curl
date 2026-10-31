@@ -30,17 +30,17 @@ whole header block; the promised stream is reserved (counted in `PushedStreamCou
 is unchanged and a PUSH_PROMISE is a PROTOCOL_ERROR.
 Failures are typed: `Http2ProtocolException` (a connection error; GOAWAY already sent),
 `Http2StreamResetException` (the peer's RST_STREAM) and `Http2GoAwayException` (the
-peer's GOAWAY). The request and response on a stream are in `Curl.Protocol.Http.UnitLibrary`
+peer's GOAWAY). The request and response on a stream are in `Curl.Original.Protocol.Http.UnitLibrary`
 (`Http2Session`, `Http2StreamConnection`; BL-658, ADR-0159).
 
 ## Rules
 
 - **Base class library only.** It may reference `Curl.Protocol.Abstractions.UnitLibrary`;
-  nothing else. `Curl.Protocol.Http.UnitLibrary` references this library (ADR-0120) and
+  nothing else. `Curl.Original.Protocol.Http.UnitLibrary` references this library (ADR-0120) and
   `Curl.Http3.UnitLibrary` reuses its Huffman codec for QPACK, never the other way round.
 - **Never a `Socket` or `SslStream`**, and no `HttpClient`. Frames are read from and
   written to an injected stream, and the caller owns the transport (`IConnection` in
-  `Curl.Protocol.Http.UnitLibrary`), so tests replay recorded bytes.
+  `Curl.Original.Protocol.Http.UnitLibrary`), so tests replay recorded bytes.
 - **Time is injected.** Anything time-dependent (`PING` round trips, `SETTINGS`
   acknowledgement timeouts) takes a `TimeProvider`.
 - **The RFCs' examples are the reference tests.** RFC 7541 appendix C's header blocks

@@ -2,7 +2,7 @@
 
 The MQTT 5 client extension (ADR-0999), for `mqtt5://`, `mqtt5s://` and `mqtt5+ws://` (BL-4115). Namespace
 `Curl.Extension.Protocol.Mqtt5`. Tested against OASIS MQTT Version 5.0 (7 March 2019), not against curl. Never references
-`Curl.Protocol.Mqtt.UnitLibrary` (curl's own MQTT 3.1.1 `mqtt://`) or another extension.
+`Curl.Original.Protocol.Mqtt.UnitLibrary` (curl's own MQTT 3.1.1 `mqtt://`) or another extension.
 
 - `Encoding/`: the data types of section 1.5. `Mqtt5Writer` and `Mqtt5Reader` write and read Byte, Two and Four Byte
   Integer, Variable Byte Integer (`Mqtt5VariableByteInteger`), UTF-8 Encoded String (`Mqtt5Utf8String`, with the

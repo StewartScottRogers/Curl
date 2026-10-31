@@ -47,7 +47,7 @@ replaces the resolver a transfer looks host names up with, through a resolver ho
 - Discovering configs from the target's DNS HTTPS record (`odohconfig` SvcParam): it needs a lookup the resolver
   is replacing; the well-known path serves the same configs.
 - HTTP/2 and connection reuse: one lookup is two small requests, and HTTP/1.1 keeps the extension free of
-  `Curl.Protocol.Http`, which an extension may not reference.
+  `Curl.Original.Protocol.Http`, which an extension may not reference.
 - KDFs other than HKDF-SHA256: `Curl.Cryptography`'s HPKE implements only that one.
 
 ## Consequences

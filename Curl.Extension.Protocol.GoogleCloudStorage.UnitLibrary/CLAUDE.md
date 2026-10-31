@@ -2,7 +2,7 @@
 
 The Google Cloud Storage extension (ADR-0999), for `gs://` URLs over the Cloud Storage XML API.
 Namespace `Curl.Extension.Protocol.GoogleCloudStorage`. It references the base class library and
-`Curl.Protocol.Abstractions`, and never `Curl.Protocol.Http` or another extension, so the signer
+`Curl.Protocol.Abstractions`, and never `Curl.Original.Protocol.Http` or another extension, so the signer
 is written here rather than shared with the S3 extension. It is registered in
 `Curl.Extension.Composition` by `Client/GcsExtension` (ADR-1099).
 

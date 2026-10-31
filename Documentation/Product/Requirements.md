@@ -29,7 +29,7 @@ against, using the manpage, `docs/URL-SYNTAX.md` and `libcurl-errors` on
 [curl.se](https://curl.se). A requirement marked with an open task describes
 upstream behaviour this project has not yet built; it is not a claim that the
 behaviour works today. Source code for the current handler lives in
-`Curl.Protocol.File.UnitLibrary`.
+`Curl.Original.Protocol.File.UnitLibrary`.
 
 | ID | Requirement | Upstream reference | Priority | Status | Checked against |
 | --- | --- | --- | --- | --- | --- |
@@ -59,7 +59,7 @@ Every requirement below was checked against curl 8.21.0 (2026-06-24) on 2026-09-
 by pointing the curl binary at a loopback listener that recorded what curl sent and
 replied with canned bytes, and against the manpage, `docs/URL-SYNTAX.md` and
 `libcurl-errors` on [curl.se](https://curl.se). The default port is 2628.
-`DictProtocolHandler` in `Curl.Protocol.Dict.UnitLibrary` builds every row, and
+`DictProtocolHandler` in `Curl.Original.Protocol.Dict.UnitLibrary` builds every row, and
 `CurlComposition` in `Curl.Console` registers it; each row names the
 `DictProtocolHandlerTests` methods that show it.
 
@@ -78,7 +78,7 @@ by pointing the curl binary at a loopback listener that recorded what curl sent 
 replied with canned bytes, and against the manpage, `docs/URL-SYNTAX.md` and
 `libcurl-errors` on [curl.se](https://curl.se). The default port is 70 for both
 schemes; `gophers://` is gopher over TLS. `GopherProtocolHandler` in
-`Curl.Protocol.Gopher.UnitLibrary` builds every row, and `CurlComposition` in
+`Curl.Original.Protocol.Gopher.UnitLibrary` builds every row, and `CurlComposition` in
 `Curl.Console` registers it; each row names the `GopherProtocolHandlerTests` methods
 that show it.
 
@@ -93,7 +93,7 @@ Every requirement below was checked against curl 8.21.0 (2026-06-24) on 2026-09-
 by pointing the curl binary at a loopback listener that recorded what curl sent and
 replied with canned bytes, and against the manpage, `docs/URL-SYNTAX.md`,
 `CURLOPT_TELNETOPTIONS` and `libcurl-errors` on [curl.se](https://curl.se). The
-default port is 23. `TelnetProtocolHandler` in `Curl.Protocol.Telnet.UnitLibrary`
+default port is 23. `TelnetProtocolHandler` in `Curl.Original.Protocol.Telnet.UnitLibrary`
 builds every row, and `CurlComposition` in `Curl.Console` registers it; each row names
 the tests that show it.
 
@@ -112,7 +112,7 @@ by pointing the curl binary at a loopback listener that recorded what curl sent 
 replied with canned bytes, and against the manpage, `docs/URL-SYNTAX.md`,
 `CURLOPT_TFTP_BLKSIZE`, `CURLOPT_TFTP_NO_OPTIONS` and `libcurl-errors` on
 [curl.se](https://curl.se). The default port is 69. `TftpProtocolHandler` in
-`Curl.Protocol.Tftp.UnitLibrary` builds every row, and `CurlComposition` in
+`Curl.Original.Protocol.Tftp.UnitLibrary` builds every row, and `CurlComposition` in
 `Curl.Console` registers it; each row names the tests that show it.
 
 | ID | Requirement | Upstream reference | Priority | Status | Checked against |
@@ -131,7 +131,7 @@ by pointing the curl binary at a loopback listener that recorded what curl sent 
 replied with canned bytes, and against the manpage, `docs/URL-SYNTAX.md`,
 `docs/MQTT.md` and `libcurl-errors` on [curl.se](https://curl.se). The default port
 for `mqtt://` is 1883; `mqtts://` is MQTT over TLS. `MqttProtocolHandler` in
-`Curl.Protocol.Mqtt.UnitLibrary` builds every row, and `CurlComposition` in
+`Curl.Original.Protocol.Mqtt.UnitLibrary` builds every row, and `CurlComposition` in
 `Curl.Console` registers it; each row names the `MqttProtocolHandlerTests` methods
 that show it.
 
@@ -178,7 +178,7 @@ against the manpage on [curl.se](https://curl.se). Quoted bytes are what curl se
 with `\r\n` for CRLF and `…` for bytes left out of the quote; `<P>` is the listener's
 port, and `<B>` is a multipart boundary, which is random per run. The exact commands
 are in task BL-166's Notes. `HttpRequestHeadFormatter` in
-`Curl.Protocol.Http.UnitLibrary` formats the request head (task BL-172),
+`Curl.Original.Protocol.Http.UnitLibrary` formats the request head (task BL-172),
 `HttpProtocolHandler` sends it and the body over the connection `Curl.Console`
 composes, and `CurlCompositionHttpTests.RunAsync_HttpOption_SendsTheRequestCurlSends`
 pins the bytes the executable sends for most rows, one data row per option, named in

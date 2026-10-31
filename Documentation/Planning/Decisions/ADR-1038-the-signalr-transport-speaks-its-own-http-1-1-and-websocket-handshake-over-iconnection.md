@@ -8,7 +8,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 ## Context
 
 The SignalR extension (ADR-0999, ADR-1032) needs the negotiate request and the WebSocket transport
-(TransportProtocols.md). An extension may not reference `Curl.Protocol.Http` or `Curl.Protocol.Ws`, so it needs
+(TransportProtocols.md). An extension may not reference `Curl.Original.Protocol.Http` or `Curl.Original.Protocol.Ws`, so it needs
 its own HTTP/1.1 exchange and RFC 6455 client handshake. It may reference the shared frame codec
 `Curl.WebSocket.UnitLibrary`. The specification leaves some choices to the client.
 

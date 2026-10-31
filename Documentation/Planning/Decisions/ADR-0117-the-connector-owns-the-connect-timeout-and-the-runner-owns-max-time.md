@@ -94,8 +94,8 @@ The work, by task:
   `TftpTimeLimits`. In the four handlers, report `ReportTransferStarted` once connected and
   `ReportDownloaded` for every body byte written, and let `OperationCanceledException`
   escape; nothing else. Its `touches` gain `Curl.Core.UnitLibrary`, `Curl.Core.UnitTests`,
-  `Curl.Protocol.Http.UnitLibrary`, `Curl.Protocol.Http.UnitTests`,
-  `Curl.Protocol.Tftp.UnitLibrary` and `Curl.Protocol.Tftp.UnitTests`.
+  `Curl.Original.Protocol.Http.UnitLibrary`, `Curl.Original.Protocol.Http.UnitTests`,
+  `Curl.Original.Protocol.Tftp.UnitLibrary` and `Curl.Original.Protocol.Tftp.UnitTests`.
 - **BL-512 (ftp, ftps).** The control and data connections get the connect limit from the
   connector (BL-510) and `-m` from the runner (BL-511), so it depends on BL-511 as well.
   FTP already reports progress; what is left is to check that every wait lets the runner's

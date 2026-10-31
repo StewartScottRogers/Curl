@@ -10,7 +10,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 WebSocket over HTTP/2 and HTTP/3 (BL-4112), `--ws-repl` (BL-4111) and WebSocket subprotocols
 (BL-4114) are extensions, and an extension references no `Curl.Protocol.*` library but
 `Curl.Protocol.Abstractions` (ADR-0999). All three need the RFC 6455 frame codec, which lived in
-`Curl.Protocol.Ws.UnitLibrary`. Its decoder wrote the `ws` diagnostic log (`WsTransferLog`) and the
+`Curl.Original.Protocol.Ws.UnitLibrary`. Its decoder wrote the `ws` diagnostic log (`WsTransferLog`) and the
 `--trace-config ws` lines (`WsFrameTrace`) itself, and failed with `WsTransferException` carrying
 exit 56, all types tied to `Curl.Protocol.Abstractions`.
 
@@ -22,17 +22,17 @@ exit 56, all types tied to `Curl.Protocol.Abstractions`.
   `WsFrameMetadataDecoder`. It references no project at all, so any layer may use it. It joins
   ADR-0120's table of hand-built libraries a protocol library may reference, with nothing below it.
 - `WsFrameDecoder` tells an `IWsFrameDecodeObserver` what it decodes (frame opened, head ending a
-  read, payload passed, close payload). `Curl.Protocol.Ws`'s `WsFrameDecodeReporter` turns that into
+  read, payload passed, close payload). `Curl.Original.Protocol.Ws`'s `WsFrameDecodeReporter` turns that into
   exactly the log and trace lines the decoder wrote before.
 - A violation comes back as `WsDecodedBytes.ViolationMessage`, curl 8.21.0's `[WS]` text;
   `WsFrameReceiver` turns it into the same `WsTransferException` (exit 56, `IsFrameViolation`) as
   before. curl's behaviour does not change.
-- The projects that used the moved types (`Curl.Protocol.Ws` and its tests, `Curl.Engine` and its
+- The projects that used the moved types (`Curl.Original.Protocol.Ws` and its tests, `Curl.Engine` and its
   tests, `Curl.Console`, `Curl.Conformance.UnitTests`) import `Curl.WebSocket` with one `<Using>` in
   their project file, rather than a `using` line in each of some forty files, several of them
   held by other tasks at the time.
 - The test fakes `FixedRandomSource` and `ScriptedRandomSource` live in `Curl.WebSocket.UnitTests`
-  and are linked into `Curl.Protocol.Ws.UnitTests`.
+  and are linked into `Curl.Original.Protocol.Ws.UnitTests`.
 
 ## Consequences
 
@@ -41,7 +41,7 @@ exit 56, all types tied to `Curl.Protocol.Abstractions`.
 
 ## Alternatives considered
 
-- **Keep the namespace `Curl.Protocol.Ws` in the new library.** Breaks the rule that a namespace
+- **Keep the namespace `Curl.Original.Protocol.Ws` in the new library.** Breaks the rule that a namespace
   matches its folder.
 - **Let the shared layer reference `Curl.Protocol.Abstractions`** for `IDiagnosticLog` and
   `CurlExitCode`. BL-4196 asks for a layer that references no `Curl.Protocol.*` library, and the

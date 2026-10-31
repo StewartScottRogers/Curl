@@ -57,7 +57,7 @@ Measured 2026-09-29, `sftp://127.0.0.1:2281/…` with `-u <user>:wrong` against 
 
 ## Consequences
 
-- `Curl.Protocol.Ssh.UnitTests` hold the keys `ssh-keygen` wrote as throwaway test data
+- `Curl.Original.Protocol.Ssh.UnitTests` hold the keys `ssh-keygen` wrote as throwaway test data
   (`TestUserKeys`), pin the Ed25519 signature blob over a fixed session identifier, and drive
   an encrypted Ed25519 key end to end through `InMemorySshServer`.
 - BL-990 makes the unreadable key's `-v` reason follow the backend.

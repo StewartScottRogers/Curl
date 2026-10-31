@@ -2,7 +2,7 @@ using Curl.Console;
 using System.Text;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ftp;
+using Curl.Original.Protocol.Ftp;
 using Curl.Testing;
 
 namespace Curl.Engine;
@@ -11,7 +11,7 @@ namespace Curl.Engine;
 /// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[FTP]</c> lines - <c>ftp</c>,
 /// <c>protocol</c> and <c>all</c>, so <c>-vv</c> too - measured with <c>Record-CurlExchange.ps1 -Ftp</c>
 /// on 2026-10-02 (BL-1162 Notes), and that the composition hands that choice to the FTP handler.
-/// The lines themselves are pinned in <c>Curl.Protocol.Ftp.UnitTests</c>.
+/// The lines themselves are pinned in <c>Curl.Original.Protocol.Ftp.UnitTests</c>.
 /// </summary>
 [TestClass]
 public sealed class EngineCompositionFtpTraceTests
