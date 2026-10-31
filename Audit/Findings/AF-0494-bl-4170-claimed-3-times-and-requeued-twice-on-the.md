@@ -3,8 +3,8 @@ id: AF-0494
 title: BL-4170 claimed 3 times and requeued twice on the run budget with work stashed; its split's push was refused
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-4170:BL-4170:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Z:/repos/Curl.audit/20261031-035829/logs/DarkFactory-*-L*.lo
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
