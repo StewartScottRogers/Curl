@@ -31,3 +31,4 @@ Shift-end review 2026-10-31 (code-reviewer, silent-failure-hunter). Curl.Extensi
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 815246ea c69aaf5a f874b647.
