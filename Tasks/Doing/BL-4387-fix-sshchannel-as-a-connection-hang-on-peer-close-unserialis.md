@@ -35,3 +35,4 @@ Shift-end review 2026-10-31 (pr-review-toolkit code-reviewer and type-design-ana
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: e288b318 68e8b809 ffe6974b fb5ba35a.
