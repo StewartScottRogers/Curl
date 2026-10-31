@@ -22,12 +22,14 @@ Shift-end review 2026-10-31 (factory code-reviewer) of BL-4353 / ADR-1160. DarkF
 
 ## Acceptance criteria
 
-- [ ] -Restart removes coordinator.stamp or creates coordinator.replacing before stopping the coordinator, shown by a self-test.
-- [ ] Restart-StaleCoordinator kills child processes only of a coordinator pid that is alive, shown by a self-test.
-- [ ] A -TakeOverShift coordinator writes its stamp before any start-up step that can block (or skips the fresh-session wait and the probe), shown by a self-test.
-- [ ] The factory's -Test* self-tests pass under Windows PowerShell and pwsh.
+- [x] -Restart removes coordinator.stamp or creates coordinator.replacing before stopping the coordinator, shown by a self-test.
+- [x] Restart-StaleCoordinator kills child processes only of a coordinator pid that is alive, shown by a self-test.
+- [x] A -TakeOverShift coordinator writes its stamp before any start-up step that can block (or skips the fresh-session wait and the probe), shown by a self-test.
+- [x] The factory's -Test* self-tests pass under Windows PowerShell and pwsh.
 
 ## Notes
+
+- Takeover coordinator: stamp written before the machine probe; the fresh-session wait is skipped for -TakeOverShift (lanes already run on the session). No quality gate applies (PowerShell only).
 
 ## Log
 

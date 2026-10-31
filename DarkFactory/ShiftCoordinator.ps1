@@ -72,6 +72,14 @@ function Write-IdlePollHeartbeat {
     Write-Heartbeat 'idle' 'polling'
 }
 
+function Write-TakeOverStartStamp {
+    # A -TakeOverShift coordinator's first stamp, for -Hours from now; nothing for any other
+    # coordinator, whose loop writes the first. -Path is for the self-test.
+    param([double]$Hours, [string]$Path = (Get-CoordinatorStampPath))
+    if (-not $TakeOverShift) { return }
+    Write-CoordinatorStamp -Path $Path -End (Get-Date).AddHours($Hours)
+}
+
 if ($TestCoordinatorWatchdog) {
     # The stale-stamp decision, the stamp file, which processes a replacement stops, and a
     # timed external call, with no shift, lane or network.
@@ -122,6 +130,28 @@ if ($TestCoordinatorWatchdog) {
         [pscustomobject]@{ ProcessId = 13; ParentProcessId = 12; CommandLine = 'dotnet build' })
     $stop = (Get-CoordinatorOwnProcessIds -Table $table -CoordinatorId 10) -join ','
     & $check 'a replacement stops what the coordinator started, deepest first, and no lane' ($stop -ceq '14,11') $stop
+    $deadCoordinator = @{ pid = '10'; script = 'RunDarkFactory.ps1' }
+    $liveTable = $table | ForEach-Object { $_ }
+    $liveTable[0].CommandLine = 'powershell -File RunDarkFactory.ps1 -Lanes 2'
+    $aliveIds = (Get-StaleCoordinatorChildIds -Table $liveTable -Fields $deadCoordinator) -join ','
+    & $check 'a live coordinator has its children stopped' ($aliveIds -ceq '14,11') $aliveIds
+    $reusedTable = @([pscustomobject]@{ ProcessId = 10; ParentProcessId = 1; CommandLine = 'notepad.exe' }) + @($table | Select-Object -Skip 1)
+    $reusedIds = @(Get-StaleCoordinatorChildIds -Table $reusedTable -Fields $deadCoordinator)
+    & $check 'a dead coordinator pid reused by another program has no children stopped' ($reusedIds.Count -eq 0) ($reusedIds -join ',')
+    $goneIds = @(Get-StaleCoordinatorChildIds -Table @($table | Select-Object -Skip 1) -Fields $deadCoordinator)
+    & $check 'a coordinator pid that is gone has no children stopped' ($goneIds.Count -eq 0) ($goneIds -join ',')
+    $takeScratch = Join-Path ([IO.Path]::GetTempPath()) "takeover-stamp-$PID"
+    try {
+        $keepTakeOver = $TakeOverShift
+        $script:CoordinatorArguments = '-Lanes Auto'
+        $TakeOverShift = [switch]$false
+        Write-TakeOverStartStamp -Hours 2 -Path (Join-Path $takeScratch 'other.stamp')
+        $TakeOverShift = [switch]$true
+        Write-TakeOverStartStamp -Hours 2 -Path (Join-Path $takeScratch 'take.stamp')
+        $takeFields = Read-CoordinatorStamp (Join-Path $takeScratch 'take.stamp')
+        & $check 'a takeover coordinator writes its stamp at start-up, another does not' ($takeFields['pid'] -ceq "$PID" -and -not (Test-Path (Join-Path $takeScratch 'other.stamp'))) "pid=$($takeFields['pid'])"
+        $TakeOverShift = $keepTakeOver
+    } finally { Remove-Item $takeScratch -Recurse -Force -ErrorAction SilentlyContinue }
     & $check 'git push and gh calls are timed' ((Test-TimedExternalCall 'git' @('-C', 'x y', 'push', '-q')) -and (Test-TimedExternalCall 'gh' @('run', 'list')) -and (Test-TimedExternalCall 'git' @('fetch'))) 'timed'
     $native = (ConvertTo-NativeCallArguments @('run', 'list', '--json', @('databaseId', 'status'), '--limit', 1)) -join '|'
     & $check 'a timed call passes an unquoted a,b as "a,b", as to a native command (BL-4377)' ($native -ceq 'run|list|--json|databaseId,status|--limit|1') $native
@@ -252,6 +282,10 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         return $Fallback
     }
 
+    # A coordinator taking over writes its stamp before the machine probe and any wait below,
+    # which can block for hours: until it does, the lanes see the stamp of the coordinator it
+    # replaced, and kill this one too (BL-4396).
+    Write-TakeOverStartStamp -Hours $Hours
     if ($AutoLanes) {
         # Sized before any lane starts: the machine cap, probed now while nothing builds if
         # machine-lanes.json no longer describes this PC, then the start count from the last
@@ -280,7 +314,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # on a fresh session, and the wait does not count against -Hours.
     # Known from here, so the wait for a fresh session below keeps watching CI (BL-1031).
     $script:CiWatchBranch = $branch
-    $weekly = Wait-ForFreshSession
+    $weekly = if ($TakeOverShift) { $null } else { Wait-ForFreshSession }
     if ($weekly) { Write-Trace '-' 'shift' $weekly 'Red'; Set-OwnTabLabel 'ALARM, read'; Invoke-Alarm -Reasons @($weekly); exit 2 }
     $shiftEnd = (Get-Date).AddHours($Hours)
 

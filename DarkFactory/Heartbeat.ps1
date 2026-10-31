@@ -389,6 +389,24 @@ function Stop-FactoryProcessOnly {
     if (Test-FactoryOnWindows) { & taskkill /PID $ProcessId /F 2>&1 | Out-Null } else { & kill -9 $ProcessId 2>&1 | Out-Null }
 }
 
+function Test-CoordinatorProcessAlive {
+    # True when -Table (Get-FactoryProcessTable's rows) holds the coordinator named in a stamp
+    # (-Fields): its pid running that script, not a lane. A pid Windows reused does not match.
+    param([object[]]$Table, [hashtable]$Fields)
+    $mine = [regex]::Escape($Fields['script'])
+    $row = $Table | Where-Object { $_.ProcessId -eq [int]$Fields['pid'] -and "$($_.CommandLine)" -match "-File\s+`"?$mine`"?(\s|$)" -and "$($_.CommandLine)" -notmatch '\s-Lane\s' }
+    return [bool]$row
+}
+
+function Get-StaleCoordinatorChildIds {
+    # The processes to stop beside the coordinator named in a stamp: what it started, but only
+    # while that pid is still the coordinator, as a dead pid may be reused and its children
+    # belong to someone else (BL-4396). Empty when the coordinator is gone.
+    param([object[]]$Table, [hashtable]$Fields)
+    if (-not (Test-CoordinatorProcessAlive -Table $Table -Fields $Fields)) { return @() }
+    return @(Get-CoordinatorOwnProcessIds -Table $Table -CoordinatorId ([int]$Fields['pid']))
+}
+
 function Restart-StaleCoordinator {
     # Replaces the coordinator named in its stamp: stops it and what it started, but no lane,
     # then starts a coordinator with its arguments plus -TakeOverShift and this shift's stamp,
@@ -398,10 +416,8 @@ function Restart-StaleCoordinator {
     $lock.Dispose()
     $coordinatorId = [int]$Fields['pid']
     $table = @(Get-FactoryProcessTable)
-    $mine = [regex]::Escape($Fields['script'])
-    $alive = $table | Where-Object { $_.ProcessId -eq $coordinatorId -and "$($_.CommandLine)" -match "-File\s+`"?$mine`"?(\s|$)" -and "$($_.CommandLine)" -notmatch '\s-Lane\s' }
-    foreach ($id in (Get-CoordinatorOwnProcessIds -Table $table -CoordinatorId $coordinatorId)) { Stop-FactoryProcessOnly $id }
-    if ($alive) { Stop-FactoryProcessOnly $coordinatorId }
+    foreach ($id in (Get-StaleCoordinatorChildIds -Table $table -Fields $Fields)) { Stop-FactoryProcessOnly $id }
+    if (Test-CoordinatorProcessAlive -Table $table -Fields $Fields) { Stop-FactoryProcessOnly $coordinatorId }
     $hoursLeft = [math]::Max(0.01, ((ConvertFrom-UtcStamp $Fields['shiftEnd']) - (Get-Date).ToUniversalTime()).TotalHours).ToString([System.Globalization.CultureInfo]::InvariantCulture)
     $forward = @([regex]::Matches("$($Fields['args'])", '"[^"]*"|\S+') | ForEach-Object { $_.Value })
     $forward = Set-ForwardedArgument $forward @{ Hours = $hoursLeft; ShiftStamp = $Stamp; TakeOverShift = [switch]$true }
