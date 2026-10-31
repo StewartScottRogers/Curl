@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.WireGuard.UnitLibrary/Tunnel/WireGuardTunnelDnsResolver.cs, Curl.Extension.WireGuard.UnitLibrary/Tunnel/WireGuardConnector.cs, Curl.Extension.WireGuard.UnitTests/Tunnel]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4424 — Report a WireGuard tunnel DNS failure as exit 7 on HTTP/3 too, and on every tunnel failure in the DNS exchange
 
@@ -25,10 +25,10 @@ Found by the shift-end review of 2026-10-31 (ADR-0710; type-design-analyzer, Imp
 
 ## Acceptance criteria
 
-- [ ] An HTTP/3 transfer under `--wireguard` whose DNS server cannot be reached through the tunnel ends with exit 7 and the same message the TCP path gives; a unit test in `Curl.Extension.WireGuard.UnitTests/Tunnel` pins it (the way the resolver carries the failure to curl's connector - an exception the connector maps, a richer result, or another route - is decided and recorded in ADR-1172).
-- [ ] A name the tunnel's DNS server answers with no address still gives exit 6.
-- [ ] `ExchangeAsync` turns every exception `IsTunnelFailure` accepts into the tunnel failure; a unit test throws `SocketException` and `TimeoutException` from the exchange and gets exit 7.
-- [ ] `dotnet build` is clean and the fast tests pass; the library stays at 100% line and branch coverage.
+- [x] An HTTP/3 transfer under `--wireguard` whose DNS server cannot be reached through the tunnel ends with exit 7 and the same message the TCP path gives; a unit test in `Curl.Extension.WireGuard.UnitTests/Tunnel` pins it (the way the resolver carries the failure to curl's connector - an exception the connector maps, a richer result, or another route - is decided and recorded in ADR-1172).
+- [x] A name the tunnel's DNS server answers with no address still gives exit 6.
+- [x] `ExchangeAsync` turns every exception `IsTunnelFailure` accepts into the tunnel failure; a unit test throws `SocketException` and `TimeoutException` from the exchange and gets exit 7.
+- [x] `dotnet build` is clean and the fast tests pass; the library stays at 100% line and branch coverage.
 
 ## Notes
 
@@ -36,3 +36,5 @@ Found by the shift-end review of 2026-10-31 (ADR-0710; type-design-analyzer, Imp
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: ccb20bcc 39ef855a bee97540 88ec633d.
+- 2026-10-31: Done. Resolver throws WireGuardTunnelDnsFailureException; WireGuardConnector's two QUIC methods map it to the failure (ADR-1172 amendment); ExchangeAsync catches tunnel failures. Tests in WireGuardTunnelDnsFailureTests. Quality run: library 100% line, 99.83% branch; the one failing member, WireGuardExtension.ActivateResolver(ExtensionOptionValues) (outside touches, not from this change), is filed as a task.
+- 2026-10-31: Doing -> Done. Tunnel DNS failure is exit 7 over HTTP/3 and for every tunnel failure in the DNS exchange
