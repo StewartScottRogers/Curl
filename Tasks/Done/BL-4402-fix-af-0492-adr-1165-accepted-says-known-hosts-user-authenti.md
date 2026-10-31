@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4402 — Fix AF-0492: ADR-1165 (Accepted) says known_hosts, user authentication and key files stay in Curl.Protocol.Ssh, but they now live in Curl.Ssh.UnitLibrary
 
@@ -52,3 +52,4 @@ Docs-only: ADR-1165 amended with a superseded note and the public-types exceptio
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-31: Doing -> Done. ADR-1165 amended: superseded note for the moved known_hosts/auth/key files and the public-types exception; repro gives 0.
