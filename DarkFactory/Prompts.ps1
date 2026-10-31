@@ -89,9 +89,13 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    by logical unit (Conventional Commits, including the task file) and push the current
    branch yourself with git, per the standing authorization in CLAUDE.md. Never push to
    master, never force push, never merge.
-5. If the task ends Blocked or back in Backlog, commit only the task board change and
-   push it. Leave any unfinished code uncommitted; the shift stashes it and applies it
-   again when the task is next claimed.
+5. If the task ends Blocked or back in Backlog, commit the task board change and push it.
+   Commit with it, by logical unit as in rule 4, every code change that is complete in
+   itself: dotnet build clean, the fast tests green, and covered by its own tests so CI's
+   100% line and branch coverage gate stays green. Say under Notes which commits carry it.
+   Leave only unfinished or untested code uncommitted; the shift stashes it and applies it
+   again when the task is next claimed (AF-0496, AF-0498: BL-4377's built and tested change
+   was left to the stash, and a new task had to dig it out hours later).
 6. The task must not be left in Doing.
 7. This run ends the moment your reply ends, and anything still in the background - a
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
@@ -120,7 +124,8 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
    read the report rather than running it again. If the task cannot be finished before
    the deadline, record under Notes what is done, what you measured and what is left, and
-   move it to Backlog before then with a -Reason saying what is left: the shift stashes
+   move it to Backlog before then with a -Reason saying what is left, committing what is
+   complete in itself as the Blocked-or-Backlog rule above says: the shift stashes only
    the unfinished code and the next claim starts from it. Do not file the rest as a task
    this one then waits on: that sends it back a second time, and the shift splits a task
    sent back to Backlog a second time rather than offering it a third claim (AF-0465 to
@@ -300,9 +305,14 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
 5. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file). Do NOT push, pull,
    rebase, merge or switch branches: the shift integrates your commits.
-6. If the task ends Blocked or back in Backlog, commit only the task board change.
-   Leave any unfinished code uncommitted; the shift stashes it and applies it again
-   when the task is next claimed.
+6. If the task ends Blocked or back in Backlog, commit the task board change.
+   Commit with it, by logical unit as in rule 5, every code change that is complete in
+   itself: dotnet build clean, the fast tests green, and covered by its own tests so CI's
+   100% line and branch coverage gate stays green. Say under Notes which commits carry it;
+   the shift integrates them like a finished task's, after its own build and fast tests.
+   Leave only unfinished or untested code uncommitted; the shift stashes it and applies it
+   again when the task is next claimed (AF-0496, AF-0498: BL-4377's built and tested change
+   was left to the stash, and a new task had to dig it out hours later).
 7. The task must not be left in Doing.
 8. This run ends the moment your reply ends, and anything still in the background - a
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
@@ -331,7 +341,8 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
    read the report rather than running it again. If the task cannot be finished before
    the deadline, record under Notes what is done, what you measured and what is left, and
-   move it to Backlog before then with a -Reason saying what is left: the shift stashes
+   move it to Backlog before then with a -Reason saying what is left, committing what is
+   complete in itself as the Blocked-or-Backlog rule above says: the shift stashes only
    the unfinished code and the next claim starts from it. Do not file the rest as a task
    this one then waits on: that sends it back a second time, and the shift splits a task
    sent back to Backlog a second time rather than offering it a third claim (AF-0465 to

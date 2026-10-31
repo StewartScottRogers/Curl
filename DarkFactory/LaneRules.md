@@ -137,7 +137,10 @@ is a reason to wait, and then say which under Notes.
 
 ## Git
 Commit by logical unit with Conventional Commits once the build is clean and the fast
-tests are green. The lane prompt says what a lane may do beyond that (it never pushes,
+tests are green. That holds when the task goes back to `Backlog` or `Blocked` too: code
+complete in itself (built, fast tests green, covered by its own tests) is committed with
+the task file and the shift integrates it; only unfinished or untested code is left
+uncommitted for the shift to stash (AF-0496). The lane prompt says what a lane may do beyond that (it never pushes,
 pulls, rebases, merges or switches branches itself). Never force-push, tag, release,
 delete a branch or merge to `master`.
 
