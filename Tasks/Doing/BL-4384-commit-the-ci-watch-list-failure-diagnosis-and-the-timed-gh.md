@@ -36,3 +36,4 @@ Split from BL-4377, which went over its cost cap. Its lane finished criteria 1-3
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: a84be32d 9beed00c 937da613 25038682 3d836d5e.
