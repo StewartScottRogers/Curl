@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/CiWatch.ps1, DarkFactory/ShiftEnd.ps1, DarkFactory/Heartbeat.ps1, DarkFactory/ShiftCoordinator.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4384 — Commit the CI watch list-failure diagnosis and the timed gh wrapper fix
 
@@ -38,3 +38,4 @@ Split from BL-4377, which went over its cost cap. Its lane finished criteria 1-3
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: a84be32d 9beed00c 937da613 25038682 3d836d5e.
+- 2026-10-31: Doing -> Done. Code already committed in 8c14126f5; tests re-run, 0 FAIL
