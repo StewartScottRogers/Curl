@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-<!-- One sentence: the observable outcome once this task is done. -->
+Cover both branches of the public ActivateResolver overload.
 
 ## Context
 
@@ -22,7 +22,7 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] The public ActivateResolver is called twice so the compiler-cached File.ReadAllText delegate branch is taken both ways.
 
 ## Notes
 
