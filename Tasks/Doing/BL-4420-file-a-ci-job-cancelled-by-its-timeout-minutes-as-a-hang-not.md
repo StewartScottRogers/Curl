@@ -36,3 +36,4 @@ A job cancelled by its timeout can be told apart from one cancelled by a person 
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 258b24e8 3c8fb19c 6a9f3801 95af59d2.
