@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4417 — Fix AF-0507: BL-4342 cost $5.76: an 81-turn, 19-minute run hit the turn cap at $5.00 before a 19-turn rerun finished it
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: BL-4342 was a `feature` task (reflection client: protocol, wiring, tests, ADR, 100% coverage gate). Its first claim did the real work for 81 turns and reached the 80-turn cap (`MaxRunTurns`, ADR-1155) at $5.00 with the code mostly written; the shift stashed it and the second claim finished in 19 turns for $0.76 from that stash. The $5.76 total is the cost of the work itself, not repeated work: the 87% in the capped run produced the code the rerun completed. The trace line labelled DONE (a claim text) is a log labelling quirk, not a rerun. No avoidable waste found: the cap and stash hand-over behaved as designed, so the cost is recorded as unavoidable. A lane cannot read the finding or logs, so this rests on the task text.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-31: Doing -> Done. Cost cause named: the work itself, unavoidable; no fix needed
