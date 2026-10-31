@@ -810,6 +810,12 @@ internal sealed class CurlCommandRunner(
     private TransferEventOutput transferEventOutput = TransferEventOutput.None;
 
     /// <summary>
+    /// The first URL's <c>-T</c> file and its size before the run's trace file opened, or
+    /// <see langword="null" /> when none was sized (<see cref="SizeUploadBeforeTraceFileOpensAsync" />).
+    /// </summary>
+    private (string Path, long Length)? uploadSizedBeforeTrace;
+
+    /// <summary>
     /// The standard error <see cref="transferEventOutput" /> writes through, which each transfer's
     /// <see cref="RunningTransferState.Progress" /> holds once the handler reports the transfer done and
     /// <see cref="WriteProgressAsync" /> releases after the meter's end (task BL-411);
@@ -1678,6 +1684,7 @@ internal sealed class CurlCommandRunner(
                 return (refusedExitCode, true);
             }
 
+            await SizeUploadBeforeTraceFileOpensAsync(options, index).ConfigureAwait(false);
             await OpenTransferEventOutputOnceAsync(options).ConfigureAwait(false);
             (exitCode, bool runEnded) = await TransferEachMatchAsync(dispatch, options, index, uploadFiles, glob, exitCode)
                 .ConfigureAwait(false);
@@ -1761,6 +1768,45 @@ internal sealed class CurlCommandRunner(
             .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider, () => standardOutputSwitchedToBinary)
             .ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Sizes the first URL's <c>-T</c> file, taken as written, before the run's trace file opens and
+    /// truncates it, keeping the size as <see cref="uploadSizedBeforeTrace" />: curl 8.22.0 sizes the upload
+    /// before its first trace event opens the <c>--trace</c> file, so when both name one file it still
+    /// expects the bytes the file held (AF-0513, ADR-1174). Does nothing once the event output is open,
+    /// without a trace file, or for a URL with no <c>-T</c> file or one uploading standard input.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="index">The URL's position in the group.</param>
+    /// <returns>A task that completes when the file is sized.</returns>
+    private async Task SizeUploadBeforeTraceFileOpensAsync(CommandLineOptions options, int index)
+    {
+        if (eventStandardError is not null || options.TraceFile is null
+            || UploadFileOf(options, index) is not { } uploadFile || UploadUrl.IsStandardInput(uploadFile))
+        {
+            return;
+        }
+
+        FileOpenResult opened = await fileSystem.OpenForReadAsync(uploadFile, CancellationToken.None).ConfigureAwait(false);
+        if (opened.Content is { } content)
+        {
+            await content.DisposeAsync().ConfigureAwait(false);
+            uploadSizedBeforeTrace = (uploadFile, opened.Length);
+        }
+    }
+
+    /// <summary>
+    /// Wraps an opened <c>-T</c> file in an <see cref="UploadSizedBeforeTraceStream" /> when
+    /// <see cref="SizeUploadBeforeTraceFileOpensAsync" /> sized the same path larger than it is now.
+    /// </summary>
+    /// <param name="uploadFile">The <c>-T</c> file's path.</param>
+    /// <param name="opened">The file's open.</param>
+    /// <param name="upload">The opened file's stream.</param>
+    /// <returns>The stream to upload and the size it reports.</returns>
+    private (Stream Upload, long Length) UploadSizedAtOpen(string uploadFile, FileOpenResult opened, Stream upload) =>
+        uploadSizedBeforeTrace is { } sized && sized.Path == uploadFile && sized.Length > opened.Length
+            ? (new UploadSizedBeforeTraceStream(upload, sized.Length), sized.Length)
+            : (upload, opened.Length);
 
     /// <summary>
     /// Refuses the URL at <paramref name="index" /> at its transfer's setup, as curl does: its
@@ -4034,10 +4080,11 @@ internal sealed class CurlCommandRunner(
             return CannotOpenUploadFileResult();
         }
 
-        UpdateLibcurlTransfer(entry => entry with { UploadFileSize = opened.Length });
-        await using (upload.ConfigureAwait(false))
+        (Stream sizedUpload, long uploadLength) = UploadSizedAtOpen(uploadFile, opened, upload);
+        UpdateLibcurlTransfer(entry => entry with { UploadFileSize = uploadLength });
+        await using (sizedUpload.ConfigureAwait(false))
         {
-            return await TransferUploadingAsync(dispatch, options, url, upload, transfer, headerOutput)
+            return await TransferUploadingAsync(dispatch, options, url, sizedUpload, transfer, headerOutput)
                 .ConfigureAwait(false);
         }
     }

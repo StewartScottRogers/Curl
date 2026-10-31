@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4435 — Fix AF-0513: -T with a --trace/--trace-ascii file of the same name uploads 0 bytes and exits 0 where curl exits 26
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The runner now sizes the first URL's `-T` file before the trace file opens, and uploads a file the trace then truncated through `UploadSizedBeforeTraceStream`, which reports the earlier size and reads synchronously as curl's `fread` does (ADR-1174). The synchronous read matters: an async read of a real file does not complete at once on Windows, so the HTTP writer raced it and sent the head first.
+- I measured the reproduction with the Debug build: `--trace` and `--trace-ascii` both give exit 26, `curl: (26) client read function EOF fail, only 0/9 of needed bytes read`, and an empty request.bin.
+- Curl.Console quality: 0 failing members. Curl.Console.UnitTests: 3117 passed. The whole fast suite is green. The tests are platform-neutral (in-memory file system, relative paths).
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-31: Doing -> Done. A -T file is sized before the trace file truncates it, so -T f --trace f exits 26 with curl's message and sends nothing (ADR-1174).
