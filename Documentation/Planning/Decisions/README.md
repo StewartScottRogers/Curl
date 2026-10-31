@@ -1216,3 +1216,4 @@ Each option and the specific reason it lost.
 | [1167](ADR-1167-ssh-jump-reaches-servers-through-a-direct-tcpip-channel.md) | --ssh-jump reaches servers through a direct-tcpip channel (BL-4145) | Accepted | 2026-10-30 |
 | [1168](ADR-1168-the-openssl-build-trusts-its-built-in-ca-bundle-when-the-environment-empties-the-system-store.md) | The OpenSSL build trusts its built-in CA bundle when the environment empties the system store (BL-4383) | Accepted | 2026-10-30 |
 | [1169](ADR-1169-the-ratchet-runs-lib670-over-a-clock-that-skips-its-pause.md) | The ratchet runs lib670 over a clock that skips its pause (BL-4378) | Accepted | 2026-10-31 |
+| [1170](ADR-1170-a-coordinator-whose-start-up-sync-brings-in-factory-code-runs-itself-again-in-the-same-process.md) | A coordinator whose start-up sync brings in factory code runs itself again in the same process (BL-4386) | Accepted | 2026-10-31 |

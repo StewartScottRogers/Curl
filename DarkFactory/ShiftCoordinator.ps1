@@ -44,6 +44,26 @@ function Start-NextShiftDetached {
     return @{ Started = (-not $failure); Tab = $(if ($next) { $next.Tab }); Process = $(if ($next) { $next.Process }); Failure = $failure }
 }
 
+function Invoke-ShiftStartSync {
+    # The shift-start sync (-Sync, Sync-CheckoutWithOrigin unless a self-test stands in for
+    # it) and whether the commits it brought in change the factory's own code,
+    # RunDarkFactory.ps1 or a file under DarkFactory\ (BL-4386): this process dot-sourced the
+    # old code before the sync, so a -Restart straight after a push ran the code from before
+    # it (2026-10-31, BL-4384's CI-watch fix). Refusal is the sync's refusal text or $null;
+    # Restart is the trace text for a restart on the new code, or $null when the sync left
+    # HEAD where it was or brought in no factory code.
+    param([string]$Repo, [string]$Branch, [scriptblock]$Sync = { param($r, $b) Sync-CheckoutWithOrigin -Repo $r -Branch $b })
+    $before = "$(git -C $Repo rev-parse HEAD)".Trim()
+    $refusal = & $Sync $Repo $Branch
+    $after = "$(git -C $Repo rev-parse HEAD)".Trim()
+    $restart = $null
+    if (-not $refusal -and $before -ne $after) {
+        $changed = @(git -C $Repo diff --name-only $before $after -- RunDarkFactory.ps1 DarkFactory | Where-Object { $_ })
+        if ($changed.Count) { $restart = "factory code changed $($before.Substring(0, 9))..$($after.Substring(0, 9)); restarting on it" }
+    }
+    return [pscustomobject]@{ Refusal = $refusal; Restart = $restart }
+}
+
 function Write-IdlePollHeartbeat {
     # The heartbeat of a coordinator polling an idle board: phase 'idle', step 'polling'. A
     # coordinator writes none while it has lanes; once they have ended it writes this one, as
@@ -104,6 +124,27 @@ if ($TestCoordinatorWatchdog) {
     $watch = [System.Diagnostics.Stopwatch]::StartNew()
     $slow = Invoke-ExternalWithTimeout -FilePath $shell -CallArgs @('-NoProfile', '-Command', 'Start-Sleep 60') -Seconds 2
     & $check 'a call that never answers is stopped at the timeout' ($slow.TimedOut -and $slow.ExitCode -eq 124 -and $watch.Elapsed.TotalSeconds -lt 30) "timed out=$($slow.TimedOut) after $([int]$watch.Elapsed.TotalSeconds)s"
+    # The shift-start sync, on a throwaway repository, with a stand-in for the fetch and
+    # fast-forward that commits what a push would have brought in (BL-4386).
+    $repo = Join-Path ([IO.Path]::GetTempPath()) "coordinator-sync-$PID"
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'DarkFactory') | Out-Null
+    try {
+        $commit = { param([string]$Path) Set-Content (Join-Path $repo $Path) "$(Get-Random)" -Encoding UTF8; git -C $repo add -A 2>&1 | Out-Null; git -C $repo -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q -m $Path 2>&1 | Out-Null }
+        git -C $repo init -q 2>&1 | Out-Null
+        & $commit 'README.md'
+        $none = Invoke-ShiftStartSync -Repo $repo -Branch 'x' -Sync { param($r, $b) $null }
+        & $check 'a sync that moves nothing starts the shift as it is' (-not $none.Refusal -and -not $none.Restart) "restart=$($none.Restart)"
+        $other = Invoke-ShiftStartSync -Repo $repo -Branch 'x' -Sync { param($r, $b) & $commit 'README.md'; $null }
+        & $check 'a sync that brings in no factory code starts the shift as it is' (-not $other.Refusal -and -not $other.Restart) "restart=$($other.Restart)"
+        $from = "$(git -C $repo rev-parse HEAD)".Trim()
+        $area = Invoke-ShiftStartSync -Repo $repo -Branch 'x' -Sync { param($r, $b) & $commit 'DarkFactory/CiWatch.ps1'; $null }
+        $to = "$(git -C $repo rev-parse HEAD)".Trim()
+        & $check 'a sync that brings in a DarkFactory file restarts on it, naming both commits' ($area.Restart -ceq "factory code changed $($from.Substring(0, 9))..$($to.Substring(0, 9)); restarting on it") "$($area.Restart)"
+        $main = Invoke-ShiftStartSync -Repo $repo -Branch 'x' -Sync { param($r, $b) & $commit 'RunDarkFactory.ps1'; $null }
+        & $check 'a sync that brings in RunDarkFactory.ps1 restarts on it' ($main.Restart -match '^factory code changed \w{9}\.\.\w{9}; restarting on it$') "$($main.Restart)"
+        $refused = Invoke-ShiftStartSync -Repo $repo -Branch 'x' -Sync { param($r, $b) 'x has diverged from origin/x; push or reconcile first' }
+        & $check 'a refused sync is refused, not restarted' ($refused.Refusal -ceq 'x has diverged from origin/x; push or reconcile first' -and -not $refused.Restart) "$($refused.Refusal)"
+    } finally { Remove-Item $repo -Recurse -Force -ErrorAction SilentlyContinue }
     exit $(if ($results -contains $false) { 1 } else { 0 })
 }
 
@@ -116,8 +157,22 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     if ($branch -in 'master', 'main') { Stop-ShiftStart "on $branch; switch to a feature branch"; exit 1 }
     if (Wait-ForCleanTree) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
     git -C $Root fetch -q origin $branch
-    $syncRefusal = Sync-CheckoutWithOrigin -Repo $Root -Branch $branch
-    if ($syncRefusal) { Stop-ShiftStart $syncRefusal; exit 1 }
+    $sync = Invoke-ShiftStartSync -Repo $Root -Branch $branch
+    if ($sync.Refusal) { Stop-ShiftStart $sync.Refusal; exit 1 }
+    if ($sync.Restart) {
+        # Before anything is claimed, merged or watched, this same process and console run
+        # the script again, which dot-sources the new code; its own sync then finds nothing
+        # to bring in. It keeps this shift's -ShiftStamp, so it goes on in this trace log. The
+        # git and gh wrappers go first: they would outlive this scope and read the new run's
+        # tool table before it fills it.
+        Write-Trace '-' 'sync' $sync.Restart
+        $again = @{}
+        foreach ($name in $FactoryParameters.Keys) { $again[$name] = $FactoryParameters[$name] }
+        $again['ShiftStamp'] = $Stamp
+        Remove-Item function:git, function:gh -ErrorAction SilentlyContinue
+        & $FactoryScript @again
+        exit $LASTEXITCODE
+    }
     # Tasks in Doing are only allowed when a previous shift's lane holds each of them and that
     # lane is dead - a shift stopped mid-task, or killed while waiting for tokens. Those lanes
     # are adopted: their worktrees are left as they are and they resume the task. An orphan,
