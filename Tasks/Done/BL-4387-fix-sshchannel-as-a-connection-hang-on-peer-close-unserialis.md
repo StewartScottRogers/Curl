@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Ssh.UnitLibrary/Connection, Curl.Ssh.UnitTests/Connection]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4387 — Fix SshChannel as a connection: hang on peer close, unserialised read and write, close that never ends
 
@@ -25,14 +25,17 @@ Shift-end review 2026-10-31 (pr-review-toolkit code-reviewer and type-design-ana
 
 ## Acceptance criteria
 
-- [ ] SendAsync throws EndOfStreamException when the peer sent EOF or CLOSE while the remote window is 0, proven by a new test in Curl.Ssh.UnitTests/Connection.
-- [ ] Concurrent ReadAsync and WriteAsync on SshDirectTcpipChannel never run two packet reads or two packet writes at once, proven by a test that writes past the remote window while a read is pending.
-- [ ] Disposing SshDirectTcpipChannel completes when the server never sends CLOSE (sends EOF and CLOSE together, or bounds the wait), proven by a test.
-- [ ] dotnet build is clean and the fast tests of Curl.Ssh.UnitTests and Curl.Extension.SshJump.UnitTests pass; Curl.Ssh.UnitLibrary keeps 100% line and branch coverage.
+- [x] SendAsync throws EndOfStreamException when the peer sent EOF or CLOSE while the remote window is 0, proven by a new test in Curl.Ssh.UnitTests/Connection.
+- [x] Concurrent ReadAsync and WriteAsync on SshDirectTcpipChannel never run two packet reads or two packet writes at once, proven by a test that writes past the remote window while a read is pending.
+- [x] Disposing SshDirectTcpipChannel completes when the server never sends CLOSE (sends EOF and CLOSE together, or bounds the wait), proven by a test.
+- [x] dotnet build is clean and the fast tests of Curl.Ssh.UnitTests and Curl.Extension.SshJump.UnitTests pass; Curl.Ssh.UnitLibrary keeps 100% line and branch coverage.
 
 ## Notes
+
+Disposal now uses CloseAtOnceAsync (EOF and CLOSE together, then waits for the server's CLOSE, which RFC 4254 5.3 obliges it to send). Packet reads and writes are serialised by two semaphores in SshChannel; key re-exchange holds the write gate.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: e288b318 68e8b809 ffe6974b fb5ba35a.
+- 2026-10-31: Doing -> Done. SshChannel fails fast on peer close, serialises packet reads and writes, dispose closes at once; tests and quality gate green
