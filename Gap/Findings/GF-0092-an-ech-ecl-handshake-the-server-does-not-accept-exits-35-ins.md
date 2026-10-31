@@ -5,12 +5,12 @@ area: behaviour
 platform: macos
 key: behaviour:ech-config-list-against-macos-tls12-only-server
 severity: High
-status: closed
+status: open
 scope: target
 introduced-in:
 opened: 2026-10-15_0751
-closed: 2026-10-15_1657
-regression: false
+closed:
+regression: true
 items: [behaviour:test4001]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 task: BL-2335
@@ -40,9 +40,11 @@ Platform-specific (macOS). The likely cause is the harness, not Curl's ECH clien
 - 2026-10-22_0148: 0 of 1 items are gaps.
 - 2026-10-23_1637: 0 of 1 items are gaps.
 - 2026-10-25_1542: 0 of 1 items are gaps.
+- 2026-10-30_2103: 1 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-15_0751: Opened by gap-behaviour.
 - 2026-10-15_0900: Filed BL-2335.
 - 2026-10-15_1657: Closed: run 2026-10-15_1657 measured every item as match or excluded on macos.
+- 2026-10-30_2103: Reopened as a regression: run 2026-10-30_2103 measured behaviour:test4001 as gap again on macos.

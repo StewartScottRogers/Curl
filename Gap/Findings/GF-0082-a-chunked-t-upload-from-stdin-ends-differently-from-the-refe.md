@@ -40,6 +40,7 @@ Make Curl's chunked upload of an unseekable stdin finish on Linux and macOS the 
 - 2026-10-22_0148: 0 of 3 items are gaps.
 - 2026-10-23_1637: 0 of 3 items are gaps.
 - 2026-10-25_1542: 0 of 3 items are gaps.
+- 2026-10-30_2103: 0 of 3 items are gaps.
 
 ## Log
 
