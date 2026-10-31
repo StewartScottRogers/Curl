@@ -3,8 +3,8 @@ id: AF-0511
 title: EasyTransferHost.Library's AltSvcUsesOverHttp: false can become true with no test failing, so Curl.Api and Libcurl handles would honour Alt-Svc received over plain http
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/EasyTransferHost.cs:PhysicalFileSystem-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EasyTransferHost.cs:41:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
