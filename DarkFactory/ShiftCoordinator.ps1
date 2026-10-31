@@ -126,6 +126,10 @@ if ($TestCoordinatorWatchdog) {
         & $check 'a failed stamp write is traced once' ($script:CoordinatorStampFailing -eq $true) "failing=$($script:CoordinatorStampFailing)"
         Write-CoordinatorStamp -Path $stampFile -End $end
         & $check 'a stamp write that works again clears the failure' ($script:CoordinatorStampFailing -eq $false) "failing=$($script:CoordinatorStampFailing)"
+        $retiredFile = Join-Path $scratch 'retired.stamp'
+        $script:CoordinatorStampRetired = $true
+        try { Write-CoordinatorStamp -Path $retiredFile -End $end } finally { $script:CoordinatorStampRetired = $false }
+        & $check 'a retired stamp is not written again' (-not (Test-Path $retiredFile)) 'no file'
         & $check 'a missing stamp reads as empty' ((Read-CoordinatorStamp (Join-Path $scratch 'none')).Count -eq 0) 'empty'
     } finally { Remove-Item $scratch -Recurse -Force -ErrorAction SilentlyContinue }
     $table = @(
@@ -655,6 +659,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if ($running -eq 0 -and -not $TakeOverShift) { break }
         Start-Sleep -Seconds 5
     }
+    # Retired first: the pull and CI polling below write the stamp around each timed call.
+    $script:CoordinatorStampRetired = $true
     Remove-Item (Get-CoordinatorStampPath) -ErrorAction SilentlyContinue
 
     # Something may have checked out another branch here during the shift; pulling into it

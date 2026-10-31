@@ -26,12 +26,14 @@ Found by the shift-end review of 2026-10-31 (ADR-0710; silent-failure-hunter, Im
 
 ## Acceptance criteria
 
-- [ ] `-Restart` stops the coordinator's process tree before it removes the stamp, and traces a removal that fails.
-- [ ] After the shift-end removal, `Write-CoordinatorStamp` writes nothing (for example a `$script:CoordinatorStampRetired` flag set at the removal).
-- [ ] A self-test pins each: after the retire flag is set, a timed external call leaves no stamp file; and `-Restart`'s order is stop, then remove.
-- [ ] `RunDarkFactory.ps1 -TestRestart` and the heartbeat self-tests pass under Windows PowerShell and `pwsh`.
+- [x] `-Restart` stops the coordinator's process tree before it removes the stamp, and traces a removal that fails.
+- [x] After the shift-end removal, `Write-CoordinatorStamp` writes nothing (for example a `$script:CoordinatorStampRetired` flag set at the removal).
+- [x] A self-test pins each: after the retire flag is set, a timed external call leaves no stamp file; and `-Restart`'s order is stop, then remove.
+- [x] `RunDarkFactory.ps1 -TestRestart` and the heartbeat self-tests pass under Windows PowerShell and `pwsh`.
 
 ## Notes
+
+- Restart.ps1: new Stop-CoordinatorThenRemoveStamp (stop, then remove; removal failure traced). Write-CoordinatorStamp returns at once once $script:CoordinatorStampRetired is set at the shift-end removal. Self-tests pass under powershell and pwsh.
 
 ## Log
 
