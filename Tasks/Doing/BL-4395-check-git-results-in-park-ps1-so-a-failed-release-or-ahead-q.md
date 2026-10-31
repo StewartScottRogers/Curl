@@ -31,3 +31,4 @@ Shift-end review 2026-10-31 (silent-failure-hunter). DarkFactory/Park.ps1:78-96:
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 083e959f c94a812f caed2003.
