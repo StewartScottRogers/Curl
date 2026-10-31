@@ -34,3 +34,4 @@ On linux and macOS, with `CURL_CA_BUNDLE`, `SSL_CERT_DIR` and `SSL_CERT_FILE` al
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 79bbee99 7ac22caa.
