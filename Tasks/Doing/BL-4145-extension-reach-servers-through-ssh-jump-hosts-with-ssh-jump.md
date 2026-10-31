@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 1a58a3c5 2feb1157 41e8e2fd e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4328, BL-4329 and BL-4330, which move the SSH client into a shared Curl.Ssh.UnitLibrary an extension may reference
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 1a58a3c5 2feb1157 41e8e2fd e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
