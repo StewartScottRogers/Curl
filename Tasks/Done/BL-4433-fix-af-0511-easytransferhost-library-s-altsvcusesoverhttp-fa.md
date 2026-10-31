@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4433 — Fix AF-0511: EasyTransferHost.Library's AltSvcUsesOverHttp: false can become true with no test failing, so Curl.Api and Libcurl handles would honour Alt-Svc received over plain http
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added `Library_Host_IgnoresAltSvcReceivedOverPlainHttp` and an assertion in `CreateEasy_ProductionEngine_GivesAHandleWithDefaultOptions` (ManagedCurlEngineTests.cs) pinning `EasyTransferHost.Library.AltSvcUsesOverHttp` false. The mutation tool was not run (Audit paths are off limits to a lane); the mutant flips exactly that value, which the new tests now assert. Fast tests of the class pass; production code unchanged.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-31: Doing -> Done. Pinned Library host AltSvcUsesOverHttp false in Engine tests
