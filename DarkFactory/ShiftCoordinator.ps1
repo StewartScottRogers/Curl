@@ -8,9 +8,15 @@ function Get-IdlePollDecision {
     # when -ClaimableId names a task claimable now, else 'wait' - also when only cost-capped
     # tasks (-CappedIds) are ready. Why is the trace text. Pure: the clock, the usage and the
     # board are its arguments, so -TestHeartbeat drives it.
-    param([datetime]$Now, [datetime]$Deadline, [string]$UsageStop, [string]$ClaimableId, [string[]]$CappedIds = @())
-    if ($Now -ge $Deadline) { return [pscustomobject]@{ Action = 'stop'; Why = "the -Hours deadline $($Deadline.ToString('HH:mm', [System.Globalization.CultureInfo]::InvariantCulture)) has passed" } }
+    # -CiFixId (Get-ReadyCiFixTaskId) names a ready CI fix, which the -Hours deadline does not
+    # hold (ADR-1158, BL-4412): lanes run to the shift's time and past it, so the merge's CI
+    # wait always polls after the deadline, and BL-4369 and BL-4370, filed while the lanes of
+    # shift 20261030-060635 finished, waited the whole 37-minute merge wait for the next shift.
+    param([datetime]$Now, [datetime]$Deadline, [string]$UsageStop, [string]$ClaimableId, [string[]]$CappedIds = @(), [string]$CiFixId = '')
+    $deadlineText = $Deadline.ToString('HH:mm', [System.Globalization.CultureInfo]::InvariantCulture)
+    if ($Now -ge $Deadline -and -not $CiFixId) { return [pscustomobject]@{ Action = 'stop'; Why = "the -Hours deadline $deadlineText has passed" } }
     if ($UsageStop) { return [pscustomobject]@{ Action = 'stop'; Why = $UsageStop } }
+    if ($Now -ge $Deadline) { return [pscustomobject]@{ Action = 'start'; Why = "$CiFixId is a ready CI fix, which the -Hours deadline $deadlineText does not hold (ADR-1158)" } }
     if ($ClaimableId) { return [pscustomobject]@{ Action = 'start'; Why = "$ClaimableId is claimable" } }
     $why = if ($CappedIds.Count) { "only cost-capped tasks ready ($($CappedIds -join ', '))" } else { 'nothing claimable' }
     return [pscustomobject]@{ Action = 'wait'; Why = $why }
@@ -717,14 +723,16 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     git -C $Root fetch -q origin master 2>&1 | Out-Null
     $masterBefore = "$(git -C $Root rev-parse origin/master 2>$null)".Trim()
     # Under -Continuous the merge's CI wait polls the board like the idle poll below (BL-3142):
-    # a task claimable during the wait starts the next shift beside the merge, once.
+    # a task claimable during the wait starts the next shift beside the merge, once. The wait
+    # always comes after the -Hours deadline (lanes finish their last task past it), so only a
+    # ready CI fix starts one then (BL-4412); other work waits for the merge's own hand-over.
     $handOver = @{ Done = $false }
     $pollDuringMerge = if ($Continuous) {
         {
             if ($handOver.Done) { return }
             if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
             $claimable = Get-MergeWaitClaimableTaskId
-            $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $claimable.Id -CappedIds $claimable.Capped
+            $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $claimable.Id -CappedIds $claimable.Capped -CiFixId (Get-ReadyCiFixTaskId)
             if ($poll.Action -eq 'start' -and @(& $startNextShift "$($poll.Why) during the merge's CI wait" -Beside)[-1]) { $handOver.Done = $true }
         }
     }

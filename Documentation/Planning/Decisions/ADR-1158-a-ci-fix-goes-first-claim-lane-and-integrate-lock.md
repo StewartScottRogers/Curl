@@ -76,3 +76,21 @@ A CI fix is a task titled "Fix CI failure ...", "Fix CI build ..." or "Fix flaky
 - A CI fix that overlaps a task in Doing can give that task's lane a rebase conflict. The lane
   resolves it with the lock released (BL-2967), as it would any other conflict.
 - Adding a lane can briefly run one build more than the machine probe's cap.
+
+## Amendment (BL-4412, AF-0502, 2026-10-31)
+
+Decided by Claude under Stewart's delegation. Rule 3 cannot serve a CI fix filed after the
+shift's `-Hours` deadline: lanes claim nothing once their time is up, so no lane is added then.
+The next shift has to take it. The poll during the shift-end merge's CI wait (BL-3142) was
+meant to start that shift, but it asked `Get-IdlePollDecision`, which says `stop` past the
+deadline - and that poll always runs past it, because the lanes finish their last task after
+the deadline. Shift 20261030-060635 (deadline 14:07) filed BL-4369 at 14:24 and BL-4370 at
+14:27 while its last lanes finished. Its lanes ended at 14:44. Its merge then waited for CI
+until 15:21, and the next shift started at 15:22.
+
+Now a ready CI fix (`Get-ReadyCiFixTaskId`) is not held by the deadline: the merge-wait poll
+starts the next shift for it beside the merge, at the first poll after the lanes end (every
+`-IdlePollMinutes`). The trace line is "BL-#### is a ready CI fix, which the -Hours deadline
+HH:mm does not hold (ADR-1158) during the merge's CI wait; next shift started (...)". Other
+ready work still waits for the hand-over after the merge. A CI fix filed while the last lanes
+run past the deadline still waits for them to end.
