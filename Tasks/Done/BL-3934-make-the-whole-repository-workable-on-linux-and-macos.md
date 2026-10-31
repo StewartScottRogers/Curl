@@ -8,7 +8,7 @@ depends-on: [BL-3919, BL-3920, BL-3921, BL-3922, BL-3923, BL-3924, BL-3925, BL-3
 touches: [CLAUDE.md]
 requirement: none
 created: 2026-10-27
-completed:
+completed: 2026-10-30
 ---
 # BL-3934 — Make the whole repository workable on Linux and macOS
 
@@ -42,7 +42,7 @@ This is the tracking task: its work is the tasks in `depends-on`.
 - [x] Every task in `depends-on` is in `Done` or its archive.
 - [x] `git ls-files '*.cmd'` lists no `.cmd` file without a `.sh` sibling in the same folder.
 - [x] `CLAUDE.md`'s "Toolchain" section says the repository is worked on Windows, Linux and macOS (PowerShell 7 required off Windows) instead of "Shell is Windows", and names the `.sh` launchers.
-- [ ] `dotnet build` and the fast tests are green.
+- [x] `dotnet build` and the fast tests are green.
 
 ## Notes
 
@@ -51,3 +51,5 @@ This is the tracking task: its work is the tasks in `depends-on`.
 - 2026-10-27: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: 782fe427 00d01702 461a34c2 d265299d.
 - 2026-10-30: All 15 depends-on tasks are in Done (BL-3928 today, the rest in Done/2026-10-28 and Done/2026-10-29). Every file from `git ls-files '*.cmd'` has a `.sh` beside it (the check printed none missing). CLAUDE.md's Toolchain now says the repository is worked on Windows, Linux and macOS with pwsh required off Windows and names the 13 .sh launchers; DarkFactory/LaneRules.md's "Shell is Windows" now names the host's shell too.
+- 2026-10-30: At 2b5b4064e: `dotnet build` 0 warnings, 0 errors; fast tests 112 assemblies passed, exit 0.
+- 2026-10-30: Doing -> Done. Every script runs on Windows, Linux and macOS; all 15 sub-tasks Done; CLAUDE.md says so
