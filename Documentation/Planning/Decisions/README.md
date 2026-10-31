@@ -1224,3 +1224,4 @@ Each option and the specific reason it lost.
 | [1175](ADR-1175-a-t-file-is-sized-before-the-trace-file-opens.md) | A `-T` file is sized before the trace file opens (BL-4435) | Accepted | 2026-10-31 |
 | [1176](ADR-1176-curls-own-protocols-are-curl-original-protocol.md) | Curl's own protocols are named `Curl.Original.Protocol.<Name>` (BL-4439) | Accepted | 2026-10-31 |
 | [1177](ADR-1177-extensions-that-serve-their-own-scheme-are-curl-extended-protocol.md) | Extensions that serve their own URL scheme are named `Curl.Extended.Protocol.<Name>` (BL-4440) | Accepted | 2026-10-31 |
+| [1178](ADR-1178-solution-folders-group-original-and-extended.md) | `Curl.slnx` groups curl's own protocols under `/Original/` and everything Curl adds under `/Extended/` (BL-4441) | Accepted | 2026-10-31 |

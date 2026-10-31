@@ -348,7 +348,7 @@ Curl/
   folder for its area, and the folders follow one another in the file.
 
 In `Curl.slnx`, every project sits with its tests in a solution folder for its area,
-under one folder for its group (ADR-0731):
+under one folder for its group (ADR-0731, ADR-1178):
 
 - `/Hosts/`: Api, Curl (the `Curl.Console` projects, which build `curl.exe`), Libcurl,
   Mcp - the ways Curl is used.
@@ -356,12 +356,15 @@ under one folder for its group (ADR-0731):
 - `/Transfer/`: Cookies, Core, Engine, Networking.
 - `/Wire/`: Http2, Http3, HttpDatagram, Protobuf, Quic, Ssh, WebSocket, Zstandard - framing and encoding below the protocols.
 - `/Security/`: Authentication, Cryptography, HttpMessageSignatures, Kerberos, Ntlm, Tls.
-- `/Original/Protocols/<Name>/`: each `Curl.Original.Protocol.<Name>.*`, and `Curl.Protocol.Abstractions.*`
-  in `/Protocols/Abstractions/`.
+- `/Original/Protocols/<Name>/`: each of curl's own protocols, `Curl.Original.Protocol.<Name>.*`.
+- `/Protocols/Abstractions/`: `Curl.Protocol.Abstractions.*`, the contracts the original and the
+  extended protocols share.
 - `/Conformance/<Part>/`: each `Curl.Conformance.<Part>.*`, and the harness itself
   (`Curl.Conformance.UnitLibrary` and `.UnitTests`) in `/Conformance/Harness/`.
-- `/Extensions/<Name>/`: each `Curl.Extension.<Name>.*`, `/Extended/Protocols/<Name>/`: each
-  `Curl.Extended.Protocol.<Name>.*`, with the registry in `/Extensions/Composition/`.
+- `/Extended/`: what Curl adds beyond upstream curl. `/Extended/Protocols/<Name>/`: each extension
+  that serves its own URL scheme, `Curl.Extended.Protocol.<Name>.*`; `/Extended/Features/<Name>/`: each
+  option extension, `Curl.Extension.<Name>.*`; `Curl.Extension.Abstractions.*` in
+  `/Extended/Abstractions/` and the registry, `Curl.Extension.Composition.*`, in `/Extended/Composition/`.
 - `/Shared/`: the shared projects (Audit, Claude, Documentation, Gap, Tasks).
 
 A new area goes in the group it belongs to, in a folder named for the area. Solution
@@ -380,7 +383,7 @@ What Curl adds beyond upstream curl - a scheme or feature curl does not have - i
   `Curl.Extended.Protocol.<Name>.UnitLibrary` (ADR-1177). Each is registered by one line in
   `Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs` (a shared list file).
 - It joins the solution with exactly one line in `Curl.slnx`, directly under the marker comment in the
-  Extensions section: a single-line `<Folder Name="/Extensions/<Name>/">` (`/Extended/Protocols/<Name>/`
+  Extended section: a single-line `<Folder Name="/Extended/Features/<Name>/">` (`/Extended/Protocols/<Name>/`
   for an extended protocol) holding both `<Project/>`
   elements (`merge=union`, ADR-1003). Composition references every extension by wildcard, so no csproj
   is edited and `Curl.slnx` and that csproj need not be in the task's `touches`.

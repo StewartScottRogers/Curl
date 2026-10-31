@@ -63,8 +63,8 @@ no `tests/`. `Documentation/` and `Tasks/` are shared projects; `data/` is never
 modified; never edit anything under `bin/`, `obj/` or `.vs/`.
 - Production library `Curl.<Area>.UnitLibrary`, curl's own protocols `Curl.Original.Protocol.<Name>.UnitLibrary` in `/Original/Protocols/<Name>/` (ADR-1176); their contracts stay `Curl.Protocol.Abstractions`.
 - Extensions (what Curl adds beyond upstream curl, ADR-0999): `Curl.Extension.<Name>.UnitLibrary`,
-  in `/Extensions/<Name>/` in `Curl.slnx`, or for one that serves its own URL scheme
-  `Curl.Extended.Protocol.<Name>.UnitLibrary` in `/Extended/Protocols/<Name>/` (ADR-1177) (one single-line `<Folder>` holding both projects, added directly
+  in `/Extended/Features/<Name>/` in `Curl.slnx`, or for one that serves its own URL scheme
+  `Curl.Extended.Protocol.<Name>.UnitLibrary` in `/Extended/Protocols/<Name>/` (ADR-1177, ADR-1178) (one single-line `<Folder>` holding both projects, added directly
   under the marker comment there; Composition references extensions by wildcard, ADR-1003), registered by one line in
   `Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs`. It references only
   `Curl.Protocol.Abstractions`, the shared layers and `Curl.Extension.Abstractions`; nothing but the
