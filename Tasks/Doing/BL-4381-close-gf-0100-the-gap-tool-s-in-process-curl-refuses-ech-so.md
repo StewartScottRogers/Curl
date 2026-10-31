@@ -46,3 +46,4 @@ In Curl.Console/InProcessCurl.cs, make CreateDialingRunner (and the IConnector o
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 840ea224 5c327db7 1fd5de8c 28346828.
