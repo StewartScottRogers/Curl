@@ -22,16 +22,17 @@ Split from BL-4377, which went over its cost cap. Its lane finished criteria 1-3
 
 ## Acceptance criteria
 
-- [ ] The `cannot list` line in `DarkFactory/CiWatch.ps1` includes gh's exit code and the first line of its stderr.
-- [ ] While listing keeps failing the line is written again at most every 30 minutes with how long the watch has been unable to list; the first successful list after a failure writes one `listing CI runs again` line.
-- [ ] `RunDarkFactory.ps1 -TestCiWatch` covers the three cases with stand-in `-ListRuns` blocks and reports 0 FAIL.
-- [ ] `ConvertTo-NativeCallArguments` in `DarkFactory/Heartbeat.ps1` joins an array argument with commas, the shift-end merge wait's `not merged: CI did not finish` line carries gh's failure, and `-TestCoordinatorWatchdog` and `-TestHeartbeat` report 0 FAIL.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The `cannot list` line in `DarkFactory/CiWatch.ps1` includes gh's exit code and the first line of its stderr.
+- [x] While listing keeps failing the line is written again at most every 30 minutes with how long the watch has been unable to list; the first successful list after a failure writes one `listing CI runs again` line.
+- [x] `RunDarkFactory.ps1 -TestCiWatch` covers the three cases with stand-in `-ListRuns` blocks and reports 0 FAIL.
+- [x] `ConvertTo-NativeCallArguments` in `DarkFactory/Heartbeat.ps1` joins an array argument with commas, the shift-end merge wait's `not merged: CI did not finish` line carries gh's failure, and `-TestCoordinatorWatchdog` and `-TestHeartbeat` report 0 FAIL.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 - Split from BL-4377.
 - Continues the stashed work of BL-4377.
+- The stashed code was already in master via 8c14126f5; this run re-ran -TestCiWatch, -TestCoordinatorWatchdog and -TestHeartbeat (no FAIL). Only PowerShell changed, so no C# build or fast-test change.
 
 ## Log
 
