@@ -73,7 +73,6 @@ public sealed class WireGuardConnectorTests
     [TestMethod]
     [DataRow("", "example.com", DisplayName = "no DNS line")]
     [DataRow("DNS = corp.example", "example.com", DisplayName = "a search domain only")]
-    [DataRow("DNS = 192.168.1.1", "example.com", DisplayName = "a DNS server no peer routes")]
     [DataRow("DNS = 10.0.0.53", "a..b", DisplayName = "an invalid host name")]
     public async Task ConnectAsync_HostNameWithNoDnsServerToAsk_CannotBeResolvedAndOpensNothing(string dnsLine, string host)
     {
@@ -163,7 +162,7 @@ public sealed class WireGuardConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_DnsServerResetsTheConnection_CannotBeResolved()
+    public async Task ConnectAsync_DnsServerResetsTheConnection_CouldNotConnectThroughTheTunnel()
     {
         TunnelTestPeer peer = new();
         WireGuardConnector connector = new(TunnelTestPeer.Configuration(extraInterfaceLine: "DNS = 10.0.0.53"), peer, new ManualTimeProvider(), RandomNumberGenerator.Create());
@@ -173,7 +172,8 @@ public sealed class WireGuardConnectorTests
         peer.Reply(dnsPacket, new TcpSegment(dnsSyn.DestinationPort, dnsSyn.SourcePort, TunnelTestPeer.ServerInitialSequenceNumber + 1, dnsSyn.SequenceNumber + 1 + (uint)query.Length, TcpFlags.Rst | TcpFlags.Ack, 0, null, []));
         ConnectResult result = await connecting;
 
-        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.StartsWith("Failed to connect to 10.0.0.53 port 53 through the WireGuard tunnel: ", result.ErrorMessage);
     }
 
     private static ushort IdOf(byte[] query) => (ushort)((query[2] << 8) | query[3]);
@@ -222,6 +222,63 @@ public sealed class WireGuardConnectorTests
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.StartsWith("Failed to connect to 10.0.0.1 port 80 through the WireGuard tunnel: ", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_DnsServerNoPeerRoutes_CouldNotConnectAndOpensNothing()
+    {
+        TunnelTestPeer peer = new();
+        WireGuardConnector connector = new(TunnelTestPeer.Configuration(extraInterfaceLine: "DNS = 192.168.1.1"), peer, TimeProvider.System, RandomNumberGenerator.Create());
+
+        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("example.com", 80, false), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsNull(peer.OpenedEndpoint);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_HostNameWithAnUnreachablePeer_CouldNotConnectNotUnresolved()
+    {
+        TunnelTestPeer peer = new() { OpenFailure = new SocketException((int)SocketError.NetworkUnreachable) };
+        WireGuardConnector connector = new(TunnelTestPeer.Configuration(extraInterfaceLine: "DNS = 10.0.0.53"), peer, TimeProvider.System, RandomNumberGenerator.Create());
+
+        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("example.com", 80, false), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.StartsWith("Failed to connect to 10.0.0.53 port 53 through the WireGuard tunnel: ", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_SocketFailsDuringTheHandshake_CouldNotConnectAndClosesTheSocket()
+    {
+        SocketBreakingUdp udp = new();
+        WireGuardConnector connector = new(TunnelTestPeer.Configuration(), udp, new ManualTimeProvider(), RandomNumberGenerator.Create());
+
+        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("10.0.0.1", 80, false), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.StartsWith("Failed to connect to 10.0.0.1 port 80 through the WireGuard tunnel: ", result.ErrorMessage);
+        Assert.IsTrue(udp.IsDisposed);
+    }
+
+    /// <summary>A UDP socket whose every receive fails as Windows does after an ICMP port unreachable.</summary>
+    private sealed class SocketBreakingUdp : IWireGuardUdpOpener, IWireGuardUdpChannel
+    {
+        public bool IsDisposed { get; private set; }
+
+        public ValueTask<IWireGuardUdpChannel> OpenAsync(WireGuardEndpoint endpoint, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IWireGuardUdpChannel>(this);
+
+        public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromException<ReadOnlyMemory<byte>>(new SocketException((int)SocketError.ConnectionReset));
+
+        public ValueTask DisposeAsync()
+        {
+            IsDisposed = true;
+            return ValueTask.CompletedTask;
+        }
     }
 
     [TestMethod]

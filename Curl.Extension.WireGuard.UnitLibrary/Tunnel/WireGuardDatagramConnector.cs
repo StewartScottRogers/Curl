@@ -30,13 +30,18 @@ internal sealed class WireGuardDatagramConnector(
     public async ValueTask<DatagramOpenResult> OpenAsync(string host, int port, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(host);
-        IPAddress? destination = IPAddress.TryParse(host.Trim('[', ']'), out IPAddress? literal)
-            ? literal
+        TunnelResolution resolution = IPAddress.TryParse(host.Trim('[', ']'), out IPAddress? literal)
+            ? new TunnelResolution(literal, null)
             : await resolver.ResolveThroughTunnelAsync(host, cancellationToken).ConfigureAwait(false);
-        return destination is null
-            ? DatagramOpenResult.Failed(CurlExitCode.CouldntResolveHost, $"Could not resolve host: {host}")
-            : await OpenToAsync(new IPEndPoint(destination, port), host, cancellationToken).ConfigureAwait(false);
+        return resolution.Address is null
+            ? NotResolved(host, resolution.Failure)
+            : await OpenToAsync(new IPEndPoint(resolution.Address, port), host, cancellationToken).ConfigureAwait(false);
     }
+
+    private static DatagramOpenResult NotResolved(string host, ConnectResult? failure) =>
+        failure is null
+            ? DatagramOpenResult.Failed(CurlExitCode.CouldntResolveHost, $"Could not resolve host: {host}")
+            : DatagramOpenResult.Failed(failure.ExitCode, failure.ErrorMessage!);
 
     private static DatagramOpenResult Unreachable(string host, int port, string reason) =>
         DatagramOpenResult.Failed(CurlExitCode.CouldntConnect, $"Failed to connect to {host} port {port}{reason}");
@@ -73,7 +78,7 @@ internal sealed class WireGuardDatagramConnector(
         }
 
         await udp.DisposeAsync().ConfigureAwait(false);
-        return failure is TimeoutException or IOException
+        return WireGuardConnector.IsTunnelFailure(failure)
             ? Unreachable(host, server.Port, $" through the WireGuard tunnel: {failure.Message}")
             : throw failure;
     }

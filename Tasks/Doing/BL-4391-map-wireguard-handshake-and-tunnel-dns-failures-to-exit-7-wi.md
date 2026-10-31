@@ -22,11 +22,13 @@ Shift-end review 2026-10-31 (code-reviewer, silent-failure-hunter). Curl.Extensi
 
 ## Acceptance criteria
 
-- [ ] A SocketException from the UDP socket during the handshake gives exit 7 with the "through the WireGuard tunnel" message, for both the TCP and the datagram connector, proven by tests in Curl.Extension.WireGuard.UnitTests/Tunnel.
-- [ ] With an unreachable peer, `--wireguard wg.conf https://example.com` (a host name) exits 7 with the tunnel failure, not 6, proven by a test.
-- [ ] dotnet build is clean, the fast tests pass and the library keeps 100% line and branch coverage.
+- [x] A SocketException from the UDP socket during the handshake gives exit 7 with the "through the WireGuard tunnel" message, for both the TCP and the datagram connector, proven by tests in Curl.Extension.WireGuard.UnitTests/Tunnel.
+- [x] With an unreachable peer, `--wireguard wg.conf https://example.com` (a host name) exits 7 with the tunnel failure, not 6, proven by a test.
+- [x] dotnet build is clean, the fast tests pass and the library keeps 100% line and branch coverage.
 
 ## Notes
+
+- DNS through the tunnel now gives a `TunnelResolution` (address, or the tunnel failure): a dead peer, no peer routing the DNS server, or an IOException during the exchange is exit 7; no DNS server, an unencodable name or no answer stays exit 6. SocketException counts as a tunnel failure in both connectors (`IsTunnelFailure`). Quality run: 100% line and branch, complexity within gate.
 
 ## Log
 
