@@ -32,3 +32,4 @@ The coordinator dot-sources `RunDarkFactory.ps1` and the `DarkFactory/` area fil
 ## Log
 
 - 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 7ed38ace c7955563 b38f9a13 fd932272.
