@@ -3,8 +3,8 @@ id: AF-0508
 title: BL-4137 cost $5.65 over 3 claims; a 106-minute, 83-turn run ($3.91) ran out of time with its code stashed
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-4137:BL-4137:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
