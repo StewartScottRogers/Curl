@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.McpClient.UnitTests]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4400 — Fix AF-0490: UseProtocolVersion_OnStdio_DoesNothing asserts only that the session it just made is not null
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Pipeline `feature` run as a direct test-only change: the test now keeps the InMemoryMcpServerProcess and asserts nothing was written to its standard input and it was not closed, killed or disposed. The reproduction now shows `Assert.AreEqual(string.Empty, process.WrittenInput);` within its 7 context lines. Platform-neutral (in-memory streams only).
+- dotnet build clean (0 warnings); fast tests green (0 failed); Curl.Extension.McpClient.UnitTests 184 passed. No production code changed, so no Measure-CodeQuality run.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-31: Doing -> Done. UseProtocolVersion_OnStdio_DoesNothing asserts the stdio server process saw no input and was not closed, killed or disposed

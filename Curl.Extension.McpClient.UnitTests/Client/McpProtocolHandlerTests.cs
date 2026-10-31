@@ -180,11 +180,15 @@ public sealed class McpProtocolHandlerTests
     [TestMethod]
     public void UseProtocolVersion_OnStdio_DoesNothing()
     {
-        var session = new McpStdioClientSession(new McpStdioSession(new InMemoryMcpServerProcess(string.Empty), TimeProvider.System));
+        var process = new InMemoryMcpServerProcess(string.Empty);
+        var session = new McpStdioClientSession(new McpStdioSession(process, TimeProvider.System));
 
         session.UseProtocolVersion("2025-06-18");
 
-        Assert.IsNotNull(session);
+        Assert.AreEqual(string.Empty, process.WrittenInput);
+        Assert.IsFalse(process.InputClosed);
+        Assert.IsFalse(process.Killed);
+        Assert.IsFalse(process.Disposed);
     }
 
     [TestMethod]
