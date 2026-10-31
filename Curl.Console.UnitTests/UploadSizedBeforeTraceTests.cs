@@ -9,7 +9,7 @@ namespace Curl.Console;
 /// <summary>
 /// Pins AF-0513: curl 8.22.0 sizes the first URL's <c>-T</c> file before its trace file opens, so
 /// <c>-T f --trace f</c> expects the 9 bytes <c>f</c> held before the trace truncated it, reads none and
-/// fails with exit 26, <c>client read function EOF fail, only 0/9 of needed bytes read</c> (ADR-1174).
+/// fails with exit 26, <c>client read function EOF fail, only 0/9 of needed bytes read</c> (ADR-1175).
 /// The handler here records the upload's size and what it reads, as the HTTP handler would size it.
 /// </summary>
 [TestClass]

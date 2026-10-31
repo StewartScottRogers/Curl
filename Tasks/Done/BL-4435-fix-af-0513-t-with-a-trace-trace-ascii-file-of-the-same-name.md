@@ -46,7 +46,7 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
-- The runner now sizes the first URL's `-T` file before the trace file opens, and uploads a file the trace then truncated through `UploadSizedBeforeTraceStream`, which reports the earlier size and reads synchronously as curl's `fread` does (ADR-1174). The synchronous read matters: an async read of a real file does not complete at once on Windows, so the HTTP writer raced it and sent the head first.
+- The runner now sizes the first URL's `-T` file before the trace file opens, and uploads a file the trace then truncated through `UploadSizedBeforeTraceStream`, which reports the earlier size and reads synchronously as curl's `fread` does (ADR-1175). The synchronous read matters: an async read of a real file does not complete at once on Windows, so the HTTP writer raced it and sent the head first.
 - I measured the reproduction with the Debug build: `--trace` and `--trace-ascii` both give exit 26, `curl: (26) client read function EOF fail, only 0/9 of needed bytes read`, and an empty request.bin.
 - Curl.Console quality: 0 failing members. Curl.Console.UnitTests: 3117 passed. The whole fast suite is green. The tests are platform-neutral (in-memory file system, relative paths).
 
@@ -54,4 +54,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
-- 2026-10-31: Doing -> Done. A -T file is sized before the trace file truncates it, so -T f --trace f exits 26 with curl's message and sends nothing (ADR-1174).
+- 2026-10-31: Doing -> Done. A -T file is sized before the trace file truncates it, so -T f --trace f exits 26 with curl's message and sends nothing (ADR-1175).

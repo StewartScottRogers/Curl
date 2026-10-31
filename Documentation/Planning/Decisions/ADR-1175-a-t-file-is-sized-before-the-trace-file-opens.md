@@ -1,4 +1,4 @@
-# ADR-1174: A `-T` file is sized before the trace file opens
+# ADR-1175: A `-T` file is sized before the trace file opens
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-4435, AF-0513).
 Date: 2026-10-31

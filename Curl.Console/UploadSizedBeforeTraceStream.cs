@@ -5,7 +5,7 @@ namespace Curl.Console;
 /// file opened, rather than its size now. curl 8.22.0 sizes the upload before its first trace event
 /// opens (and truncates) the <c>--trace</c> file, so when the two name the same file it sends nothing
 /// and fails with exit 26, <c>client read function EOF fail, only 0/9 of needed bytes read</c>
-/// (AF-0513, ADR-1174). The bytes and seeks pass through unchanged, each read synchronously; the
+/// (AF-0513, ADR-1175). The bytes and seeks pass through unchanged, each read synchronously; the
 /// wrapped stream is owned.
 /// </summary>
 /// <param name="inner">The opened <c>-T</c> file.</param>

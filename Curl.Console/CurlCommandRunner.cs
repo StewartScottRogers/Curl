@@ -1773,7 +1773,7 @@ internal sealed class CurlCommandRunner(
     /// Sizes the first URL's <c>-T</c> file, taken as written, before the run's trace file opens and
     /// truncates it, keeping the size as <see cref="uploadSizedBeforeTrace" />: curl 8.22.0 sizes the upload
     /// before its first trace event opens the <c>--trace</c> file, so when both name one file it still
-    /// expects the bytes the file held (AF-0513, ADR-1174). Does nothing once the event output is open,
+    /// expects the bytes the file held (AF-0513, ADR-1175). Does nothing once the event output is open,
     /// without a trace file, or for a URL with no <c>-T</c> file or one uploading standard input.
     /// </summary>
     /// <param name="options">The option group.</param>

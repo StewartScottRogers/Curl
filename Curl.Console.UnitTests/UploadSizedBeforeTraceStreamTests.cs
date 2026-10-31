@@ -3,7 +3,7 @@ namespace Curl.Console;
 /// <summary>
 /// Pins the stream a <c>-T</c> file truncated by the run's trace file is uploaded through: it reports
 /// the size the file had before the trace opened, reads synchronously and passes bytes and seeks
-/// through unchanged (AF-0513, ADR-1174).
+/// through unchanged (AF-0513, ADR-1175).
 /// </summary>
 [TestClass]
 public sealed class UploadSizedBeforeTraceStreamTests
