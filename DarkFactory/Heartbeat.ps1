@@ -258,7 +258,11 @@ function Invoke-TimedExternalCall {
     # errors, $LASTEXITCODE set. A timeout is traced, and exits 124, instead of hanging the loop.
     param([string]$Tool, [object[]]$CallArgs)
     $CallArgs = ConvertTo-NativeCallArguments $CallArgs
+    # A pass can make several calls of up to ExternalCallSeconds each: the stamp is refreshed
+    # either side of each, so waiting on a slow network never ages it past the threshold (ADR-1160).
+    Write-CoordinatorStamp
     $result = Invoke-ExternalWithTimeout -FilePath $script:ExternalTools[$Tool] -CallArgs $CallArgs -Seconds $script:ExternalCallSeconds
+    Write-CoordinatorStamp
     if ($result.TimedOut) { Write-Trace '-' 'timeout' "$Tool $(Get-Short ($CallArgs -join ' ') 70) gave no answer in $($script:ExternalCallSeconds)s; stopped" 'Red' }
     $global:LASTEXITCODE = $result.ExitCode
     foreach ($line in $result.Errors) { Write-Error $line -ErrorAction Continue }
@@ -319,10 +323,18 @@ function Write-CoordinatorStamp {
             $script:CoordinatorArguments = if ($own -and "$($own.CommandLine)" -match "$leaf`"?\s*(.*)$") { $Matches[1].Trim() } else { '' }
         }
         New-Item -ItemType Directory -Force -Path (Split-Path $Path) -ErrorAction Stop | Out-Null
-        $text = "pid=$PID`nat=$(Get-UtcStamp)`nshiftEnd=$(Get-UtcStamp $End)`nscript=$FactoryScript`ndir=$FactoryScriptDir`nargs=$($script:CoordinatorArguments)`n"
+        $text = "pid=$PID`nheartbeat=$HeartbeatMinutes`nat=$(Get-UtcStamp)`nshiftEnd=$(Get-UtcStamp $End)`nscript=$FactoryScript`ndir=$FactoryScriptDir`nargs=$($script:CoordinatorArguments)`n"
         [System.IO.File]::WriteAllText("$Path.tmp", $text)
         Move-Item -LiteralPath "$Path.tmp" -Destination $Path -Force -ErrorAction Stop
-    } catch { }
+        $script:CoordinatorStampFailing = $false
+    } catch {
+        # Traced on the first failure only: a stamp that cannot be written gets a healthy
+        # coordinator replaced within 3 heartbeats, so the reason must be in the log.
+        if (-not $script:CoordinatorStampFailing) {
+            Write-Trace '-' 'watchdog' "coordinator.stamp not written (lanes will replace this coordinator): $(Get-Short $_.Exception.Message 80)" 'Red'
+        }
+        $script:CoordinatorStampFailing = $true
+    }
 }
 
 function Read-CoordinatorStamp {
@@ -412,7 +424,7 @@ function Invoke-CoordinatorWatchdogIfDue {
         $replacing = Get-CoordinatorReplacingPath
         $since = $null
         if (Test-Path -LiteralPath $replacing) { $since = (Get-Item -LiteralPath $replacing).LastWriteTimeUtc }
-        $decision = Get-CoordinatorWatchdogDecision -Now (Get-Date).ToUniversalTime() -StampAt (ConvertFrom-UtcStamp $fields['at']) -ShiftEnd (ConvertFrom-UtcStamp $fields['shiftEnd']) -HeartbeatMinutes $HeartbeatMinutes -ReplacingSince $since
+        $decision = Get-CoordinatorWatchdogDecision -Now (Get-Date).ToUniversalTime() -StampAt (ConvertFrom-UtcStamp $fields['at']) -ShiftEnd (ConvertFrom-UtcStamp $fields['shiftEnd']) -HeartbeatMinutes $(if ($fields.ContainsKey('heartbeat')) { [int]$fields['heartbeat'] } else { $HeartbeatMinutes }) -ReplacingSince $since
         if ($decision.Action -ne 'replace') { return }
         # A replacement begun over 10 minutes ago never came up: its lock is cleared first.
         if ($null -ne $since) { Remove-Item -LiteralPath $replacing -ErrorAction SilentlyContinue }

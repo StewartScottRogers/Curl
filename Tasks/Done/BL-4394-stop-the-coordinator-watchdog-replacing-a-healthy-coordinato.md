@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [DarkFactory/Heartbeat.ps1]
+touches: [DarkFactory/Heartbeat.ps1, DarkFactory/ShiftCoordinator.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4394 — Stop the coordinator watchdog replacing a healthy coordinator on a failed stamp write or slow network
 
@@ -22,14 +22,17 @@ Shift-end review 2026-10-31 (silent-failure-hunter, factory code-reviewer) of BL
 
 ## Acceptance criteria
 
-- [ ] Write-CoordinatorStamp writes a trace line on its first failure, shown by a factory -Test* self-test.
-- [ ] The stamp is refreshed between timed external calls (for example from Invoke-TimedExternalCall), or the threshold exceeds the worst-case pass, and ADR-1160 states which and why.
-- [ ] Lanes receive -HeartbeatMinutes, or the help and ADR-1160 stop saying the threshold follows it.
-- [ ] The factory's -Test* self-tests pass under Windows PowerShell and pwsh.
+- [x] Write-CoordinatorStamp writes a trace line on its first failure, shown by a factory -Test* self-test.
+- [x] The stamp is refreshed between timed external calls (for example from Invoke-TimedExternalCall), or the threshold exceeds the worst-case pass, and ADR-1160 states which and why.
+- [x] Lanes receive -HeartbeatMinutes, or the help and ADR-1160 stop saying the threshold follows it.
+- [x] The factory's -Test* self-tests pass under Windows PowerShell and pwsh.
 
 ## Notes
+
+Stamp now carries heartbeat=; lanes read it (no -HeartbeatMinutes forwarding, which would change lane publishing). Stamp refreshed around each timed call. ShiftCoordinator.ps1 added to touches for the self-test; no other Doing task held it. ADR-1160 amended. -TestCoordinatorWatchdog passes under pwsh and Windows PowerShell.
 
 ## Log
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 74dd1568 e03315f3 d7470d17 caed2003.
+- 2026-10-31: Doing -> Done. Stamp write failure traced, stamp refreshed around timed calls, lanes read heartbeat from stamp

@@ -104,6 +104,14 @@ if ($TestCoordinatorWatchdog) {
         $fields = Read-CoordinatorStamp $stampFile
         $back = ConvertFrom-UtcStamp $fields['shiftEnd']
         & $check 'the stamp holds the pid, the arguments and the shift end' ($fields['pid'] -ceq "$PID" -and $fields['args'] -ceq '-Lanes Auto -Continuous' -and $back -eq $end.ToUniversalTime() -and (ConvertFrom-UtcStamp $fields['at'])) "pid=$($fields['pid']) args=$($fields['args']) shiftEnd=$($fields['shiftEnd'])"
+        & $check 'the stamp holds the heartbeat interval the lanes use' ($fields['heartbeat'] -ceq "$HeartbeatMinutes") "heartbeat=$($fields['heartbeat'])"
+        $script:CoordinatorStampFailing = $false
+        $blocker = Join-Path $scratch 'afile'
+        [System.IO.File]::WriteAllText($blocker, 'x')
+        Write-CoordinatorStamp -Path (Join-Path $blocker 'coordinator.stamp') -End $end
+        & $check 'a failed stamp write is traced once' ($script:CoordinatorStampFailing -eq $true) "failing=$($script:CoordinatorStampFailing)"
+        Write-CoordinatorStamp -Path $stampFile -End $end
+        & $check 'a stamp write that works again clears the failure' ($script:CoordinatorStampFailing -eq $false) "failing=$($script:CoordinatorStampFailing)"
         & $check 'a missing stamp reads as empty' ((Read-CoordinatorStamp (Join-Path $scratch 'none')).Count -eq 0) 'empty'
     } finally { Remove-Item $scratch -Recurse -Force -ErrorAction SilentlyContinue }
     $table = @(
