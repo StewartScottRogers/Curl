@@ -47,6 +47,7 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Notes
 
+- 2026-10-31 (interactive): same cause and fix as BL-4406 (692da47a4). Waits for a shift on the fix before its measurement can be taken.
 - 2026-10-31 (interactive): measured with Measure-FactoryProcess.ps1 over a snapshot of Z:/repos/Curl.logs (files written since 2026-10-30 12:00; the one live run BL-4420-L1 left out as running) with a fresh 500-run CI list, at about 11:10 Arizona 2026-10-31. No task split twice since eb3e574f6, but a near-finished run still stashed its work: BL-4377 (lane 2, 10-31 03:16) left built-and-tested code uncommitted, which cost a split (BL-4384, BL-4385) to recover. Stays open with BL-4406.
 
 ## Log
