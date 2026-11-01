@@ -13,6 +13,13 @@ on:
 permissions:
   contents: read
 
+# One run per ref at a time, as ci.yml on work/dark-factory: the running run finishes and only
+# the newest waiting push runs next, rather than one Linux runner per lane push (BL-3512).
+# Nothing reads this workflow's result for an exact commit.
+concurrency:
+  group: dark-factory-unix-shift-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   one-task-shift:
     runs-on: ubuntu-latest

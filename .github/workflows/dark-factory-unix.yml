@@ -12,6 +12,14 @@ on:
 permissions:
   contents: read
 
+# One run per ref at a time, as ci.yml on work/dark-factory: the running run finishes and only
+# the newest waiting push runs next. Lanes push every minute or two, and a run per push held
+# up to a dozen macOS jobs at once, which took the macOS runners CI's jobs wait for (BL-3512).
+# Nothing reads this workflow's result for an exact commit.
+concurrency:
+  group: dark-factory-unix-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   self-tests:
     strategy:
