@@ -3,8 +3,8 @@ id: AF-0520
 title: Lib1965_OnARefusedScheme_WritesRejected passes on empty output
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-11-01 ("accept all").
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1964To1977Tests.cs:Lib1965_OnARefusedScheme_WritesRejected:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1964To1977Tests.cs -Pa
 ## Log
 
 - 2026-11-01: filed proposed.
+- 2026-11-01: proposed -> accepted. Stewart: accept all.

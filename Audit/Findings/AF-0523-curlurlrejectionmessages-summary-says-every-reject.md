@@ -3,8 +3,8 @@ id: AF-0523
 title: CurlUrlRejectionMessages' summary says every rejection prints 'curl: (3) URL rejected: ' (exit 67 aside), but three rejections print bare text, two with exits 43 and 27
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-11-01 ("accept all").
 key: truthfulness:Curl.Protocol.Abstractions.UnitLibrary/CurlUrlRejectionMessages.cs:CurlUrlRejectionMessages:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs -Pattern 
 ## Log
 
 - 2026-11-01: filed proposed.
+- 2026-11-01: proposed -> accepted. Stewart: accept all.

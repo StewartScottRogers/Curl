@@ -3,8 +3,8 @@ id: AF-0521
 title: SshKeptSession.Serves compares a login key that holds the password and pass phrase with string ==
 auditor: security
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-11-01 ("accept all").
 key: security:Curl.Original.Protocol.Ssh.UnitLibrary/SshKeptSession.cs:SshKeptSession.Serves:timing-leak
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Original.Protocol.Ssh.UnitLibrary/SshKeptSession.cs -Pa
 ## Log
 
 - 2026-11-01: filed proposed.
+- 2026-11-01: proposed -> accepted. Stewart: accept all.
