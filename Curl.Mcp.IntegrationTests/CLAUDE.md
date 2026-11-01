@@ -12,9 +12,11 @@ It holds:
   `CURL_MCP_ROOT` set to a temporary folder, driven over stdio by `McpStdioClient` - `initialize`,
   `tools/list`, `resources/list`, `version`, `curl` against a loopback listener, and `-o` refused
   outside the root and written inside it (BL-2390).
-- `CurlMcpPackIntegrationTests`: `dotnet pack Curl.Mcp -p:PublishAot=true`, in the configuration the
-  test assembly was built in, into a temporary folder; the tool package holds `.mcp/server.json` and the
-  McpServer package type (BL-2390, BL-2561).
+- `CurlMcpPackIntegrationTests`: `dotnet pack Curl.Mcp`, in the configuration the test assembly was
+  built in, into a temporary folder; the tool package holds `.mcp/server.json` and the McpServer package
+  type (BL-2390, BL-2561). `Curl.Mcp.csproj` sets `PublishAot`, so the pack makes only the tool package;
+  the test passes no `-p:PublishAot=true`, a global property that recompiled every referenced project
+  and took minutes on a CI runner (BL-3512).
 - `CurlMcpNativeAotIntegrationTests`: `dotnet publish Curl.Mcp -r <this machine's runtime>
   -p:PublishAot=true` once for the class, then the native binary over stdio - `initialize`,
   `tools/list` and a `transfer` call with one request header against a loopback listener (BL-2486,

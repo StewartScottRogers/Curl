@@ -34,12 +34,18 @@ concurrency:
 # runs none of those jobs either: tested-tree finds that run and every other job's if reads
 # its answer. Run in full, it only repeated that test while it took runners from the next
 # work/dark-factory run (BL-3512: master's run 40844580348 left run 40845247630 at 15m01s).
-# On every other push and pull request tested-tree is skipped and adds no wait.
+#
+# The same holds for a merge pushed to work/dark-factory (a head commit whose message starts
+# "Merge "): master merged into it, often the very merge commit master's push run has just
+# skipped. Run in full, run 41277259284 tested commit 688110d6f a second time for 23 minutes
+# while master's release, Integration and Gource runs held the runners (BL-3512). There, as
+# on master, tested-tree also accepts a passed CI push run on the head commit itself, on any
+# branch. On every other push and pull request tested-tree is skipped and adds no wait.
 
 jobs:
   tested-tree:
     name: Tree already tested
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || (github.ref == 'refs/heads/work/dark-factory' && startsWith(github.event.head_commit.message, 'Merge ')))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -52,23 +58,25 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Find a passed CI push run on a parent with the same tree
+      # The head commit itself first (a passed push run on another branch; this run has not
+      # passed yet), then each parent.
+      - name: Find a passed CI push run on the head commit or a parent with the same tree
         id: find
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tree=$(git rev-parse 'HEAD^{tree}')
           tested=false
-          for parent in $(git rev-list --parents -n 1 HEAD | cut -d' ' -f2-); do
-            [ "$(git rev-parse "$parent^{tree}")" = "$tree" ] || continue
-            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$parent&event=push&status=success" --jq '.total_count')
+          for commit in $(git rev-list --parents -n 1 HEAD); do
+            [ "$(git rev-parse "$commit^{tree}")" = "$tree" ] || continue
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$commit&event=push&status=success" --jq '.total_count')
             if [ "${passed:-0}" -gt 0 ]; then
-              echo "Tree $tree is $parent's, whose CI push run passed; skipping the build, test, pack and quality jobs."
+              echo "Tree $tree is $commit's, whose CI push run passed; skipping the build, test, pack and quality jobs."
               tested=true
               break
             fi
           done
-          [ "$tested" = true ] || echo "No parent with tree $tree has a passed CI push run; running every job."
+          [ "$tested" = true ] || echo "Neither the head commit nor a parent with tree $tree has a passed CI push run; running every job."
           echo "tested=$tested" >> "$GITHUB_OUTPUT"
 
   # Audit guard layer 3 (ADR-0267): fails when work/dark-factory, pushed or as a pull
@@ -223,7 +231,9 @@ jobs:
       # second time (the runtime package below publishes it once) and made this step 5 to 12
       # minutes, the run's longest job (BL-3512, ADR-1179). The package check below drives the
       # packed native binary through initialize and tools/list instead, and integration.yml
-      # still runs that class on every operating system.
+      # still runs that class on every operating system. CurlMcpPackIntegrationTests packs
+      # without a global PublishAot, which recompiled every project Curl.Mcp references and
+      # made the step 4 to 6 minutes (BL-3512, ADR-1179 amendment).
       - name: Curl.Mcp Integration tests
         run: dotnet test Curl.Mcp.IntegrationTests -c Release --filter "TestCategory=Integration&FullyQualifiedName!~CurlMcpNativeAotIntegrationTests"
 

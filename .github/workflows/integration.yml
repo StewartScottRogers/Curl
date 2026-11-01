@@ -49,9 +49,18 @@ jobs:
   # Run in full, it repeated three 15 to 35 minute jobs, a macOS one among them, while the
   # next work/dark-factory CI run waited for those runners. On every other push and pull
   # request this job is skipped and adds no wait.
+  #
+  # It also runs for a merge pushed to work/dark-factory (head commit message "Merge "), and
+  # on both branches it accepts an earlier Integration tests push run on the head commit itself
+  # that has passed or is still going (master merged into work/dark-factory is often the very
+  # commit master's push run is testing: runs 41277251373 and 41277259411 both ran commit
+  # 688110d6f's six jobs, two of them macOS, beside its CI run, BL-3512), and a parent's run
+  # still in progress, since these runs never fail and a running one is never cancelled. Only
+  # an earlier run counts, so of two runs on one commit the first always runs. A skipped
+  # work/dark-factory run publishes no badge results; the next one does.
   tested-tree:
     name: Tree already tested
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || (github.ref == 'refs/heads/work/dark-factory' && startsWith(github.event.head_commit.message, 'Merge ')))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -64,23 +73,32 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Find a finished Integration tests push run on a parent with the same tree
+      - name: Find an Integration tests push run on the head commit or a parent with the same tree
         id: find
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          head=$(git rev-parse HEAD)
           tree=$(git rev-parse 'HEAD^{tree}')
           tested=false
-          for parent in $(git rev-list --parents -n 1 HEAD | cut -d' ' -f2-); do
-            [ "$(git rev-parse "$parent^{tree}")" = "$tree" ] || continue
-            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/integration.yml/runs?head_sha=$parent&event=push&status=success" --jq '.total_count')
-            if [ "${passed:-0}" -gt 0 ]; then
-              echo "Tree $tree is $parent's, whose Integration tests push run passed; skipping the Integration jobs."
+          for commit in $(git rev-list --parents -n 1 HEAD); do
+            [ "$(git rev-parse "$commit^{tree}")" = "$tree" ] || continue
+            # Earlier runs only. On the head commit: passed, or queued or running. On a parent:
+            # passed or running (a queued one may yet be replaced by a newer push).
+            if [ "$commit" = "$head" ]; then
+              filter='.conclusion == "success" or .status != "completed"'
+            else
+              filter='.conclusion == "success" or .status == "in_progress"'
+            fi
+            found=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/integration.yml/runs?head_sha=$commit&event=push" \
+              --jq "[.workflow_runs[] | select(.id < $GITHUB_RUN_ID) | select($filter)] | length")
+            if [ "${found:-0}" -gt 0 ]; then
+              echo "Tree $tree is $commit's, whose Integration tests push run has passed or is running; skipping the Integration jobs."
               tested=true
               break
             fi
           done
-          [ "$tested" = true ] || echo "No parent with tree $tree has a passed Integration tests push run; running every job."
+          [ "$tested" = true ] || echo "Neither the head commit nor a parent with tree $tree has such an Integration tests push run; running every job."
           echo "tested=$tested" >> "$GITHUB_OUTPUT"
 
   integration:

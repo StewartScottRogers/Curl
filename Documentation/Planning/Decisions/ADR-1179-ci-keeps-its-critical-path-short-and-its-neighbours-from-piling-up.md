@@ -71,3 +71,49 @@ jobs and names are as before.
   remeasure then, and `-SelfTest` still proves every shard count partitions the projects.
 - On `work/dark-factory` the Linux and macOS self-tests and the one-task shift proof report on the newest pushed
   commit rather than on every commit, as CI does.
+
+## Amendment 1 (2026-11-01): the pack test's global property, and merges pushed to work/dark-factory
+
+Decided by Claude under Stewart's delegation.
+
+### Context
+
+On 2026-11-01 the `work/dark-factory` runs beside two `master` merges took 49 minutes (run 41273928474) and
+20.4 minutes (run 41277259284). In 41277259284 the last job was `Pack Curl.Mcp (windows-latest)`, 13.3 minutes
+(05:41:26 to 05:54:43 UTC; ubuntu 9.3, macOS 9.4), each leg starting up to 7 minutes late. Its steps on Windows:
+restore and build 3.0 minutes, the 39 Integration tests 5 minutes 34 seconds (ubuntu 4:20, macOS 4:14), the
+runtime pack 3.8 minutes (1.8 of them restoring and building again, 1.7 generating native code).
+
+1. **The pack test recompiled everything.** `CurlMcpPackIntegrationTests` ran `dotnet pack Curl.Mcp
+   -p:PublishAot=true --disable-build-servers`. `Curl.Mcp.csproj` has set `PublishAot` since BL-2517, so the
+   switch changed nothing in the package, but as a global property it reached every one of the ~107 projects
+   Curl.Mcp references and put each in a configuration the build had not compiled: all of them compiled again,
+   without the compiler server. Locally, after a Release build, that pack took 54 seconds against 12.7 without
+   the switch (106 of 107 `CoreCompile` targets then skip), the test was 51 of the 72 seconds the 39 tests took,
+   and the next ordinary build compiled everything back (16.7 against 4.9 seconds), which the job's runtime pack
+   then paid for too. On a 4-core runner with no compiler server this was most of the step.
+2. **The same commit tested twice.** Commit 688110d6f, PR #264's merge, went to `master` and, fast-forwarded,
+   to `work/dark-factory` 7 seconds apart. `master`'s CI run skipped it in 13 seconds (its tree is its parent
+   52843efc9's, whose CI passed), but the `work/dark-factory` CI run tested it in full, and both branches'
+   Integration tests runs ran their three 15 to 43 minute jobs, beside `master`'s 14 release jobs and Gource's
+   render and coverage jobs.
+
+### Decision
+
+1. The pack test passes no `-p:PublishAot=true`; it checks the same package. It stays in `Pack Curl.Mcp`, so the
+   merge-blocking set of tests is unchanged.
+2. `ci.yml`'s `tested-tree` also runs for a push to `work/dark-factory` whose head commit message starts
+   `Merge `, and on both branches it accepts a passed CI push run on the head commit itself as well as on a
+   parent with the same tree. Lane pushes are never merges, so they still start their jobs at once.
+3. `integration.yml`'s `tested-tree` runs on the same pushes, and accepts an earlier Integration tests push run
+   on the head commit that has passed or is still queued or running, or a parent's that has passed or is
+   running: those runs never fail, and a running one is never cancelled. Only an earlier run (a lower run id)
+   counts, so of two runs on one commit the first always runs.
+
+### Consequences
+
+- A merge of `master` into `work/dark-factory` whose tree is already tested starts no build, test, pack or quality
+  job, and no second set of Integration jobs. The shift-end merge reads only the CI run's conclusion, which is
+  success when the jobs are skipped, and with `work/dark-factory` equal to `master` it has nothing to merge.
+- When the `work/dark-factory` Integration run is the one skipped, the README's Integration badge (published only
+  from `work/dark-factory`) keeps the previous run's results until the next push with code.
