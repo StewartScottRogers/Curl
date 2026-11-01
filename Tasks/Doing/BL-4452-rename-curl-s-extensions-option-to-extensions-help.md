@@ -35,3 +35,4 @@ The option is Curl's own (ADR-1008): `CommandLineOptionTable.cs` line ~327 (`Com
 ## Log
 
 - 2026-11-01: Created.
+- 2026-11-01: Backlog -> Doing. Criteria at claim: 70bad6f4 a2f70ce1 526a7679 b744a640 91fd3925.
