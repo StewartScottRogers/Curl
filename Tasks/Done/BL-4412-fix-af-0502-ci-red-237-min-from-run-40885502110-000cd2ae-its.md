@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-11-01
 ---
 # BL-4412 — Fix AF-0502: CI red 237 min from run 40885502110 (000cd2ae): its quality-gate fix BL-4083 was requeued behind BL-4082 for 3 h 22 min
 
@@ -42,10 +42,11 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Acceptance criteria
 
-- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+- 2026-11-01 08:45 Arizona (interactive session): measured after ec555bb52 (landed 2026-10-31 18:45:22 Arizona). Window 18:45 to 08:45 Arizona: one shift, 20261101-072514 (coordinator and lanes L1-L4 in `Z:/repos/Curl.logs/DarkFactory-20261101-072514*.log`), and the 16 work/dark-factory CI runs created since (41267244579 to 41320132766, from a fresh `gh run list`). Red spells: 0 (every run success, or cancelled when superseded by a newer push: 41267244579, 41316890757, 41317208860, 41317362391). CI fixes filed: 0, so none waited or was requeued; requeued=0 on every lane. The CI watch ran inside the merge wait as ec555bb52 intends: coordinator line 08:25 `ci run 41318615482 success on 1f344d9a: nothing to file`, and the merge (PR #272) went through at 08:34. The finding's expected result holds for this window. Not exercised: a CI failure arriving during a merge wait, the case ec555bb52 adds (-TestHeartbeat covers it). Criterion 2: CI run 41320132766 on 61a5b2d97, which holds ec555bb52, built and ran the fast tests green on Windows, Linux and macOS. AF-0502 closes only on the process auditor's re-audit.
 
 - 2026-10-31 (interactive): fix c3f18a294 pushed 11:04 Arizona. Cause: shift 20261030-060635's -Hours deadline passed at 14:07; its lanes finished past it (14:44), and the merge's CI-wait poll (Get-IdlePollDecision with the shift's end as deadline) always answered stop, silently, so BL-4369 and BL-4370 waited for the 15:22 hand-over. Now a ready CI fix (Get-ReadyCiFixTaskId) is not held by the deadline there (the usage stop still holds), and the next shift starts beside the merge at the first poll. Remaining: a CI fix filed while the last lanes run past the deadline still waits for them to end (on 10-30 that would be about 26 min). -TestHeartbeat 29 PASS 0 FAIL under both shells. Waits for a shift on the fix before its measurement can be taken.
 - 2026-10-31 (interactive): measured with Measure-FactoryProcess.ps1 over a snapshot of Z:/repos/Curl.logs (files written since 2026-10-30 12:00; the one live run BL-4420-L1 left out as running) with a fresh 500-run CI list, at about 11:10 Arizona 2026-10-31. Since f54935070, filed CI fixes: BL-4359 filed 11:39, done 11:41; BL-4368 filed 14:02, done 14:07; BL-4378 claimed 03:02, done 03:12; but BL-4369 and BL-4370, filed 14:24 and 14:27 on 10-30 by the coordinator after its lanes had ended, were claimed only at 15:22 when the next shift started (58 min). None was requeued behind another task. Stays open: a CI fix filed with no lane running waits for the next shift.
@@ -56,3 +57,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
 - 2026-10-31: Doing -> Backlog. Fix ec555bb52 (CI watch runs during the merge's CI wait) waits for a shift before the measurement is taken again
+- 2026-11-01: Backlog -> Doing. Interactive session: measure the window after ec555bb52 Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-01: Doing -> Done. Window after ec555bb52: 0 red spells, 0 CI fixes waiting; CI watch ran in the merge wait
