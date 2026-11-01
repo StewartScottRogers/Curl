@@ -21,7 +21,7 @@ public sealed class ParseUrlMcpTool(McpUrlTool tool) : IMcpTool
     public string Description =>
         "Parses a URL with libcurl's URL API (curl_url_set and curl_url_get) and returns the URL as the parser rebuilt it and its "
         + "parts: scheme, user, password, options, host, port, path, query, fragment and zoneId. A part the URL does not have is "
-        + "null, never an empty string. A URL the parser refuses is a tool error naming the CURLUcode.";
+        + "null, never an empty string. The schemes of Curl's extended protocols (the version tool's extendedProtocols) parse with no flag, as curl's own do. A URL the parser refuses is a tool error naming the CURLUcode.";
 
     /// <inheritdoc />
     public string InputSchemaJson =>

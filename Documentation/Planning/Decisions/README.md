@@ -1227,3 +1227,4 @@ Each option and the specific reason it lost.
 | [1178](ADR-1178-solution-folders-group-original-and-extended.md) | `Curl.slnx` groups curl's own protocols under `/Original/` and everything Curl adds under `/Extended/` (BL-4441) | Accepted | 2026-10-31 |
 | [1179](ADR-1179-ci-keeps-its-critical-path-short-and-its-neighbours-from-piling-up.md) | CI keeps its critical path short and its neighbouring workflows from piling up (BL-3512) | Accepted | 2026-10-31 |
 | [1180](ADR-1180-mcp-serves-ai-help-extensions-through-a-host-supplied-reader.md) | The MCP server serves `curl://ai-help/extensions` through a reader the host supplies (BL-4450) | Accepted | 2026-11-01 |
+| [1181](ADR-1181-mcp-tools-serve-extended-protocols-as-curls-own.md) | The MCP tools serve Curl's extended protocols as they serve curl's own (BL-4451) | Accepted | 2026-11-01 |

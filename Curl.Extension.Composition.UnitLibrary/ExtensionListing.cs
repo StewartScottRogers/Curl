@@ -31,6 +31,21 @@ public static class ExtensionListing
     public static string Markdown(Func<string, string?> readEnvironmentVariable) =>
         MarkdownOf(ExtensionDescriptionCatalogue.Entries, AreOff(readEnvironmentVariable));
 
+    /// <summary>
+    /// The URL schemes Curl's extensions serve, in the order <c>--extensions</c> lists their extensions, each once;
+    /// empty when extensions are off. What the MCP host's <c>version</c> and URL tools offer beside curl's own (BL-4451).
+    /// </summary>
+    /// <param name="readEnvironmentVariable">Reads the run's environment.</param>
+    /// <returns>The schemes, without <c>://</c>.</returns>
+    public static IReadOnlyList<string> Schemes(Func<string, string?> readEnvironmentVariable) =>
+        AreOff(readEnvironmentVariable) ? [] : SchemesOf(ExtensionDescriptionCatalogue.Entries);
+
+    /// <summary>Every description's schemes, in order, each once.</summary>
+    /// <param name="descriptions">The extensions' descriptions.</param>
+    /// <returns>The schemes.</returns>
+    internal static IReadOnlyList<string> SchemesOf(IEnumerable<ExtensionDescription> descriptions) =>
+        [.. descriptions.SelectMany(description => description.Schemes).Distinct(StringComparer.OrdinalIgnoreCase)];
+
     /// <summary>One line per description: its name, summary, schemes and options.</summary>
     /// <param name="descriptions">The extensions' descriptions.</param>
     /// <returns>The lines, in order.</returns>

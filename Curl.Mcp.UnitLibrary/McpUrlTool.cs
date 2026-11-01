@@ -10,9 +10,24 @@ namespace Curl.Mcp;
 /// as not set (a <c>CURLUE_NO_*</c> code) is absent; any other <see cref="CurlUrlCode" /> but
 /// <see cref="CurlUrlCode.Ok" /> is a tool error naming the code.
 /// </summary>
+/// <remarks>
+/// A URL or <c>scheme</c> part whose scheme is one of the extended schemes is set with
+/// <see cref="CurlUrlFlags.NonSupportScheme" /> added, so Curl's extended protocols parse and build with no flag as
+/// curl's own do (BL-4451); with none given, only curl's own schemes are accepted without that flag.
+/// </remarks>
 /// <param name="createHandle">Makes an empty URL handle, as <c>curl_url</c> does.</param>
-public sealed class McpUrlTool(Func<ICurlUrlHandle> createHandle)
+/// <param name="extendedSchemes">The schemes Curl's extensions serve, matched without regard to case.</param>
+public sealed class McpUrlTool(Func<ICurlUrlHandle> createHandle, IEnumerable<string> extendedSchemes)
 {
+    private readonly HashSet<string> extended = new(extendedSchemes, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Makes the tool over curl's own schemes alone.</summary>
+    /// <param name="createHandle">Makes an empty URL handle, as <c>curl_url</c> does.</param>
+    public McpUrlTool(Func<ICurlUrlHandle> createHandle)
+        : this(createHandle, [])
+    {
+    }
+
     /// <summary>
     /// The names <c>flags</c> accepts: every <see cref="CurlUrlFlags" /> but <see cref="CurlUrlFlags.None" />,
     /// matched without regard to case.
@@ -35,7 +50,7 @@ public sealed class McpUrlTool(Func<ICurlUrlHandle> createHandle)
         }
 
         using ICurlUrlHandle handle = createHandle();
-        CurlUrlCode code = handle.Set(CurlUrlPart.Url, url, urlFlags);
+        CurlUrlCode code = handle.Set(CurlUrlPart.Url, url, urlFlags | FlagFor(SchemeOf(url)));
         if (code != CurlUrlCode.Ok)
         {
             return McpParseUrlToolResult.Failed(McpToolFailure.UrlRefused("url", code));
@@ -74,7 +89,7 @@ public sealed class McpUrlTool(Func<ICurlUrlHandle> createHandle)
         for (int index = 0; index < values.Length; index++)
         {
             (CurlUrlPart part, string name) = McpUrlParts.InOrder[index];
-            CurlUrlCode set = values[index] is null ? CurlUrlCode.Ok : handle.Set(part, values[index], urlFlags);
+            CurlUrlCode set = values[index] is null ? CurlUrlCode.Ok : handle.Set(part, values[index], urlFlags | FlagFor(parts.Scheme));
             if (set != CurlUrlCode.Ok)
             {
                 return McpBuildUrlToolResult.Failed(McpToolFailure.UrlRefused(name, set));
@@ -86,6 +101,13 @@ public sealed class McpUrlTool(Func<ICurlUrlHandle> createHandle)
             ? new McpBuildUrlToolResult(url, null)
             : McpBuildUrlToolResult.Failed(McpToolFailure.UrlRefused("url", code));
     }
+
+    /// <summary>The text before a URL's first colon, its scheme when it has one.</summary>
+    private static string SchemeOf(string url) => url[..Math.Max(url.IndexOf(':'), 0)];
+
+    /// <summary><see cref="CurlUrlFlags.NonSupportScheme" /> when <paramref name="scheme" /> is an extended scheme, else none.</summary>
+    private CurlUrlFlags FlagFor(string? scheme) =>
+        scheme is not null && extended.Contains(scheme) ? CurlUrlFlags.NonSupportScheme : CurlUrlFlags.None;
 
     /// <summary>Whether <paramref name="code" /> is one of the <c>CURLUE_NO_*</c> codes, which say a part is absent rather than that anything failed.</summary>
     private static bool IsNotSet(CurlUrlCode code) => code is >= CurlUrlCode.NoScheme and <= CurlUrlCode.NoZoneId;

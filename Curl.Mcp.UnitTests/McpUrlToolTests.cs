@@ -171,6 +171,61 @@ public sealed class McpUrlToolTests
     }
 
     [TestMethod]
+    [DataRow("coap://example.com/sensors?x=1")]
+    [DataRow("https://example.com/sensors?x=1")]
+    public void Parse_RealHandleWithExtendedSchemes_AcceptsExtendedAndOriginalSchemesWithNoFlag(string url)
+    {
+        McpParseUrlToolResult result = new McpUrlTool(new ManagedCurlEngine().CreateUrl, ["COAP"]).Parse(url, null);
+
+        Assert.IsFalse(result.IsError, result.Failure?.Text);
+        Assert.AreEqual(url, result.Url);
+        Assert.AreEqual("example.com", result.Parts!.Host);
+    }
+
+    [TestMethod]
+    public void Parse_RealHandleWithoutExtendedSchemes_RefusesAnExtendedSchemeAsUnsupported()
+    {
+        McpParseUrlToolResult parsed = new McpUrlTool(new ManagedCurlEngine().CreateUrl, []).Parse("coap://example.com/", null);
+        McpParseUrlToolResult original = new McpUrlTool(new ManagedCurlEngine().CreateUrl, []).Parse("https://example.com/", null);
+
+        Assert.AreEqual(McpToolFailure.UrlRefused("url", CurlUrlCode.UnsupportedScheme), parsed.Failure);
+        Assert.IsFalse(original.IsError);
+    }
+
+    [TestMethod]
+    public void Parse_UrlWithNoColon_IsNotTakenForAnExtendedScheme()
+    {
+        McpParseUrlToolResult result = new McpUrlTool(new ManagedCurlEngine().CreateUrl, [""]).Parse("example.com", null);
+        McpParseUrlToolResult plain = new McpUrlTool(new ManagedCurlEngine().CreateUrl, []).Parse("example.com", null);
+
+        Assert.AreEqual(plain, result);
+    }
+
+    [TestMethod]
+    [DataRow("coap")]
+    [DataRow("https")]
+    public void Build_RealHandleWithExtendedSchemes_BuildsExtendedAndOriginalSchemesWithNoFlag(string scheme)
+    {
+        McpBuildUrlToolResult result = new McpUrlTool(new ManagedCurlEngine().CreateUrl, ["coap"])
+            .Build(new McpUrlParts(Scheme: scheme, Host: "example.com", Path: "/a"), null);
+
+        Assert.IsFalse(result.IsError, result.Failure?.Text);
+        Assert.AreEqual(scheme + "://example.com/a", result.Url);
+    }
+
+    [TestMethod]
+    public void Build_RealHandleWithoutExtendedSchemes_RefusesAnExtendedSchemeAsUnsupported()
+    {
+        McpUrlTool tool = new(new ManagedCurlEngine().CreateUrl, []);
+
+        McpBuildUrlToolResult extended = tool.Build(new McpUrlParts(Scheme: "coap", Host: "example.com"), null);
+        McpBuildUrlToolResult original = tool.Build(new McpUrlParts(Scheme: "https", Host: "example.com"), null);
+
+        Assert.AreEqual(McpToolFailure.UrlRefused("scheme", CurlUrlCode.UnsupportedScheme), extended.Failure);
+        Assert.IsFalse(original.IsError);
+    }
+
+    [TestMethod]
     public void Build_RealHandle_RebuildsTheUrlFromItsParts()
     {
         McpUrlTool tool = new(new ManagedCurlEngine().CreateUrl);

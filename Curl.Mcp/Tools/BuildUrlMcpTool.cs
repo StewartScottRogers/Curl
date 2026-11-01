@@ -22,7 +22,7 @@ public sealed class BuildUrlMcpTool(McpUrlTool tool) : IMcpTool
     /// <inheritdoc />
     public string Description =>
         "Builds a URL from its parts with libcurl's URL API: sets only the parts supplied (curl_url_set), in libcurl's order, and "
-        + "returns the whole URL (curl_url_get). A part or URL the parser refuses, such as a bad port or no host, is a tool error "
+        + "returns the whole URL (curl_url_get). The schemes of Curl's extended protocols (the version tool's extendedProtocols) build with no flag, as curl's own do. A part or URL the parser refuses, such as a bad port or no host, is a tool error "
         + "naming the part and the CURLUcode.";
 
     /// <inheritdoc />
