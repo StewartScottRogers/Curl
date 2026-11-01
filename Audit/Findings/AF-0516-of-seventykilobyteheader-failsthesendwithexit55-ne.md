@@ -7,8 +7,8 @@ status: accepted
 reason: Stewart accepted it on 2026-11-01 ("accept all").
 key: quality:Curl.Original.Protocol.Http.UnitTests/Cgr271Tests.cs:Of_SeventyKilobyteHeader_FailsTheSendWithExit55:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-4445
+tasks: BL-4445
 found: 2026-11-01
 found-at: 8dd012a88d26bb19a4e7d95f0be5a3371e3d2b15
 scorecard: 2026-11-01_0144.md
