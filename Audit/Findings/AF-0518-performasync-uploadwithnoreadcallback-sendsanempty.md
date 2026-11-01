@@ -3,8 +3,8 @@ id: AF-0518
 title: PerformAsync_UploadWithNoReadCallback_SendsAnEmptyBody checks only the request line, not the empty body
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-11-01 ("accept all").
 key: quality:Curl.Engine.UnitTests/ManagedEasyTransferTests.cs:PerformAsync_UploadWithNoReadCallback_SendsAnEmptyBody:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitTests/ManagedEasyTransferTests.cs -Pattern '
 ## Log
 
 - 2026-11-01: filed proposed.
+- 2026-11-01: proposed -> accepted. Stewart: accept all.

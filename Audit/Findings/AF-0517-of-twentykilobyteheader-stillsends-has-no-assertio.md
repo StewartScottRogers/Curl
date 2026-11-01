@@ -3,8 +3,8 @@ id: AF-0517
 title: Of_TwentyKilobyteHeader_StillSends has no assertion; its field count goes only to the diagnostics log
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-11-01 ("accept all").
 key: quality:Curl.Original.Protocol.Http.UnitTests/Cgr271Tests.cs:Of_TwentyKilobyteHeader_StillSends:no-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Original.Protocol.Http.UnitTests/Cgr271Tests.cs -Patter
 ## Log
 
 - 2026-11-01: filed proposed.
+- 2026-11-01: proposed -> accepted. Stewart: accept all.

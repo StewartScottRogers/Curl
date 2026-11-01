@@ -3,8 +3,8 @@ id: AF-0516
 title: Of_SeventyKilobyteHeader_FailsTheSendWithExit55 never asserts exit 55 or the message
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-11-01 ("accept all").
 key: quality:Curl.Original.Protocol.Http.UnitTests/Cgr271Tests.cs:Of_SeventyKilobyteHeader_FailsTheSendWithExit55:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Original.Protocol.Http.UnitTests/Cgr271Tests.cs -Patter
 ## Log
 
 - 2026-11-01: filed proposed.
+- 2026-11-01: proposed -> accepted. Stewart: accept all.
