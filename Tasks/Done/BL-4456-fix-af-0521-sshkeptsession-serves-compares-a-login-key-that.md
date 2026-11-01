@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ssh.UnitLibrary]
 requirement: none
 created: 2026-11-01
-completed:
+completed: 2026-11-01
 ---
 # BL-4456 — Fix AF-0521: SshKeptSession.Serves compares a login key that holds the password and pass phrase with string ==
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Decision: `Serves` compares the SHA-256 digests of both keys' UTF-8 bytes with `CryptographicOperations.FixedTimeEquals`, not `FixedTimeEquals` over the raw bytes. `FixedTimeEquals` returns at once when the lengths differ, so raw bytes would reveal the key's length. Digests are always 32 bytes. This matches the aim of curl's `Curl_timestrcmp`: no early exit on the secret's content.
+- The reproduction now gives no match. `SshKeptSessionTests` pins an equal key, keys whose content differs and keys whose length differs.
+- Measure-CodeQuality for Curl.Original.Protocol.Ssh.UnitLibrary: 0 failing members. Full build clean, fast tests green on Windows. The change is platform-neutral (no path, OS error or certificate).
 
 ## Log
 
 - 2026-11-01: Created.
 - 2026-11-01: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-01: Doing -> Done. Serves compares the login key in constant time

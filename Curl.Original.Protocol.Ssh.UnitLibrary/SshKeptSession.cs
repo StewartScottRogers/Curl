@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ssh.Sftp;
 using Curl.Ssh;
@@ -38,7 +40,17 @@ internal sealed class SshKeptSession(SshTransport transport, SshSessionConnectio
     /// <summary>Tells whether the session was authenticated with <paramref name="key" />.</summary>
     /// <param name="key">A transfer's <see cref="LoginKeyOf" />.</param>
     /// <returns><see langword="true" /> when the session may serve the transfer.</returns>
-    internal bool Serves(string key) => key == loginKey;
+    /// <remarks>
+    /// The key holds the password and the pass phrase, so it is compared in constant time, as
+    /// curl compares reuse credentials with <c>Curl_timestrcmp</c> (AF-0521): the SHA-256
+    /// digests of both keys UTF-8 bytes are compared with
+    /// <see cref="CryptographicOperations.FixedTimeEquals" />, so the time taken reveals neither
+    /// where the keys first differ nor their lengths.
+    /// </remarks>
+    internal bool Serves(string key) =>
+        CryptographicOperations.FixedTimeEquals(DigestOf(key), DigestOf(loginKey));
+
+    private static byte[] DigestOf(string key) => SHA256.HashData(Encoding.UTF8.GetBytes(key));
 
     /// <summary>Points the transport at the connection of the transfer reusing the session.</summary>
     /// <param name="current">That transfer's connection.</param>
