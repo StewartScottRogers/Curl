@@ -3,8 +3,8 @@ id: AF-0514
 title: RunDarkFactory.ps1 help says the CI watch ignores cancelled runs, but it now reads them for hangs and files Fix CI hang tasks
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.
 key: truthfulness:RunDarkFactory.ps1:CI-WATCH-help:false-help
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-31
 found-at: 23bacbc6c04b8e06a4eecb79636da4891dca4c01
 scorecard: 2026-10-31_1149.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-01
+closed-how: reliable-reaudit
+closed-by: 2026-11-01_0144.md
 ---
 # AF-0514 - RunDarkFactory.ps1 help says the CI watch ignores cancelled runs, but it now reads them for hangs and files Fix CI hang tasks
 
@@ -42,6 +42,9 @@ Select-String -Path RunDarkFactory.ps1, DarkFactory/CiWatch.ps1 -Pattern 'cancel
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_0144.md | reproduces: no | Ran the reproduction: only DarkFactory/CiWatch.ps1:503 matches; RunDarkFactory.ps1 no longer contains 'cancelled ones prove nothing'. Its help (lines 221-225) now says 'a cancelled run is read only when a job ran into its timeout-minutes, whose hang is its failure, filed as a High "Fix CI hang in <job> (<assembly>)" task (ADR-1173)', which matches Get-CiRuns and the hang code in CiWatch.ps1 (lines 352-400).
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-11-01: proposed -> closed. Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.

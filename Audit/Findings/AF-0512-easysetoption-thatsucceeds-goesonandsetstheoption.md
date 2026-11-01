@@ -3,8 +3,8 @@ id: AF-0512
 title: EasySetOption_ThatSucceeds_GoesOnAndSetsTheOption never checks that the option was set
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/LibTestStepsTests.cs:EasySetOption_ThatSucceeds_GoesOnAndSetsTheOption:name-lies
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-31
 found-at: 23bacbc6c04b8e06a4eecb79636da4891dca4c01
 scorecard: 2026-10-31_1149.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-01
+closed-how: reliable-reaudit
+closed-by: 2026-11-01_0144.md
 ---
 # AF-0512 - EasySetOption_ThatSucceeds_GoesOnAndSetsTheOption never checks that the option was set
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/LibTestStepsTests.cs -Pat
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_0144.md | reproduces: no | Ran the Select-String reproduction and read the whole test: EasySetOption_ThatSucceeds_GoesOnAndSetsTheOption (LibTestStepsTests.cs:104-119) has the fake engine capture o.Network.Url during PerformAsync, and line 116 asserts Assert.AreEqual("http://127.0.0.1/500", url), so the option being set is checked. The reproduction's -Context 0,11 window ends at line 115, one line before that assertion.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-11-01: proposed -> closed. Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.

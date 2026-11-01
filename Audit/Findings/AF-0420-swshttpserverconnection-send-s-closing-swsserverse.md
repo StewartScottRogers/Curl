@@ -49,6 +49,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 - 2026-10-29 | 2026-10-29_0606.md | not re-audited | Ran the reproduction (-Site Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs:441:true -Member Send). outcome: site-missing, resolvedLine null. Send (line 424) now marks a close with `pendingSends.Add(new SwsServerSend([], serverBusyUntil));` (line 445) and has no `true` literal to mutate. No mutant could run, so the finding was not re-audited.
 - 2026-10-31 | 2026-10-31_0358.md | not re-audited | Ran the -Site reproduction: outcome site-missing (resolvedLine null). SwsHttpServerConnection.Send no longer passes a literal true to SwsServerSend at or near line 441; the closing reply is now driven by the closes parameter (Send(..., reply.ClosesConnection) at line 413). No mutant ran, so not re-audited.
 - 2026-10-31 | 2026-10-31_1149.md | not re-audited | Ran the -Site command: 'site-missing Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs:441:true', resolvedLine null. Send (line 424) now takes a 'bool closes' parameter, and line 441 is 'if (closes)'; the closing SwsServerSend no longer carries a true literal inside Send. Site missing, so not re-audited.
+- 2026-11-01 | 2026-11-01_0144.md | not re-audited | Ran the -Site command: outcome site-missing, resolvedLine null. Send no longer passes a true literal: the closing send is pendingSends.Add(new SwsServerSend([], serverBusyUntil)) under if (closes) (SwsHttpServerConnection.cs:442-447), so the true site does not exist. Not re-audited.
 
 ## Log
 
