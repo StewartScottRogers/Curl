@@ -42,6 +42,7 @@ public sealed class Cgr109Tests
         await http.WhenStartedAsync("/stall");
         await clock.WhenTimersDueAsync(2000, 2);
         clock.Advance(2000);
+        await clock.FireLateTimersUntilAsync(run);
 
         int exitCode = await run;
         string[] timedOutLines = Lf(standardError.Text).Split('\n').Where(line => line.StartsWith("curl: (28) ", StringComparison.Ordinal)).ToArray();
@@ -66,6 +67,7 @@ public sealed class Cgr109Tests
         await standardOutput.WhenEndsWithAsync("aaaaa[0]");
         await clock.WhenTimersDueAsync(2000, 1);
         clock.Advance(2000);
+        await clock.FireLateTimersUntilAsync(run);
 
         int exitCode = await run;
         Diagnostics.Assert("exit code", 28, exitCode);
@@ -182,6 +184,31 @@ public sealed class Cgr109Tests
             while (Due(dueMilliseconds) < count)
             {
                 await Task.Delay(5, giveUp.Token);
+            }
+        }
+
+        /// <summary>
+        /// Fires every live timer, without moving the clock, until <paramref name="run" /> ends, so a timer the run
+        /// creates or re-arms after <see cref="Advance" /> took its snapshot (a host waiter's <c>-m</c> timer, a poll
+        /// timer) cannot leave it waiting on a clock nobody moves again (BL-4442).
+        /// </summary>
+        public async Task FireLateTimersUntilAsync(Task run)
+        {
+            using CancellationTokenSource giveUp = new(TimeSpan.FromSeconds(30));
+            while (!run.IsCompleted && !giveUp.IsCancellationRequested)
+            {
+                FiringTimer[] live;
+                lock (timers)
+                {
+                    live = [.. timers.Where(timer => timer.DueAt is not null)];
+                }
+
+                foreach (FiringTimer timer in live)
+                {
+                    timer.Fire();
+                }
+
+                await Task.WhenAny(run, Task.Delay(5, giveUp.Token));
             }
         }
 
