@@ -95,7 +95,9 @@ public sealed class Lib1964To1977Tests
         LibTestResult result = await new Lib1965().RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual(0, result.ExitCode);
-        Assert.IsTrue(run.OutputText.Split('\n', StringSplitOptions.RemoveEmptyEntries).All(line => line.EndsWith(" REJECTED", StringComparison.Ordinal)));
+        string[] lines = run.OutputText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(Lib1965.Schemes.Count, lines);
+        Assert.IsTrue(lines.All(line => line.EndsWith(" REJECTED", StringComparison.Ordinal)));
     }
 
     [TestMethod]
