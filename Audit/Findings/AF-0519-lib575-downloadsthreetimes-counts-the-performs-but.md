@@ -3,12 +3,12 @@ id: AF-0519
 title: Lib575_DownloadsThreeTimes counts the performs but never asserts the count
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-11-01 ("accept all").
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib567To576Tests.cs:Lib575_DownloadsThreeTimes:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-4454
+tasks: BL-4454
 found: 2026-11-01
 found-at: 4c39311e3e4524ac6950cb2cba36f5b3f2a6ff2e
 scorecard: 2026-11-01_1016.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib567To576Tests.cs -Patt
 ## Log
 
 - 2026-11-01: filed proposed.
+- 2026-11-01: proposed -> accepted. Stewart: accept all.

@@ -3,12 +3,12 @@ id: AF-0522
 title: --digest --sasl-authzid with a body and no -u sends the body at once where curl sends the empty Digest probe POST first
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-11-01 ("accept all").
 key: conformance:--sasl-authzid:HttpProtocolHandler.SendsDigestProbe:request
 reproduction: none
-task: none
-tasks:
+task: BL-4457
+tasks: BL-4457
 found: 2026-11-01
 found-at: 4c39311e3e4524ac6950cb2cba36f5b3f2a6ff2e
 scorecard: 2026-11-01_1016.md
@@ -45,3 +45,4 @@ $d=(New-Item -ItemType Directory -Force (Join-Path $env:TEMP 'af-digest-authzid'
 ## Log
 
 - 2026-11-01: filed proposed.
+- 2026-11-01: proposed -> accepted. Stewart: accept all.
