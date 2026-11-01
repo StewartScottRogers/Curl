@@ -3,8 +3,8 @@ id: AF-0491
 title: OAuth2TokenCacheLocation's summary says it searches curl's own .curlrc variables, but its order and platforms differ from curl's
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Extension.OAuth2.UnitLibrary/Cache/OAuth2TokenCacheLocation.cs:OAuth2TokenCacheLocation:false-doc-comment
 reproduction: none
 task: BL-4401
@@ -13,9 +13,9 @@ found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-01
+closed-how: reliable-reaudit
+closed-by: 2026-11-01_0144.md
 ---
 # AF-0491 - OAuth2TokenCacheLocation's summary says it searches curl's own .curlrc variables, but its order and platforms differ from curl's
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Extension.OAuth2.UnitLibrary/Cache/OAuth2TokenCacheLoca
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the reproduction. OAuth2TokenCacheLocation.SearchedVariables is CURL_HOME, XDG_CONFIG_HOME, HOME, USERPROFILE, APPDATA, with the last two Windows-only (WindowsOnlyFrom = 3). DefaultConfigFileSearch.cs:52-56 has the same order, with USERPROFILE and APPDATA marked WindowsOnly true. The summary's claim to follow curl's .curlrc order and platforms is now true.
+- 2026-11-01 | 2026-11-01_0144.md | reproduces: no | Ran the reproduction. SearchedVariables is [CURL_HOME, XDG_CONFIG_HOME, HOME, USERPROFILE, APPDATA] (OAuth2TokenCacheLocation.cs:13), and DefaultConfigFileSearch.cs:52-56 searches CURL_HOME, XDG_CONFIG_HOME, HOME, then USERPROFILE and APPDATA as WindowsOnly=true. The summary now says 'on Windows only as in curl', and FindDefaultDirectory searches the last two only on Windows (WindowsOnlyFrom = 3). Order and platforms now match curl's first five directories.
 
 ## Log
 
 - 2026-10-31: filed proposed.
 - 2026-10-31: proposed -> accepted.
+- 2026-11-01: accepted -> closed. Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.

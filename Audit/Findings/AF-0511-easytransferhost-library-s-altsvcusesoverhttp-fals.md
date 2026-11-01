@@ -3,19 +3,19 @@ id: AF-0511
 title: EasyTransferHost.Library's AltSvcUsesOverHttp: false can become true with no test failing, so Curl.Api and Libcurl handles would honour Alt-Svc received over plain http
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/EasyTransferHost.cs:PhysicalFileSystem-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EasyTransferHost.cs:41:false
-task: none
-tasks:
+task: BL-4433
+tasks: BL-4433
 found: 2026-10-31
 found-at: 23bacbc6c04b8e06a4eecb79636da4891dca4c01
 scorecard: 2026-10-31_1149.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-01
+closed-how: mechanical
+closed-by: 2026-11-01_0144.md
 ---
 # AF-0511 - EasyTransferHost.Library's AltSvcUsesOverHttp: false can become true with no test failing, so Curl.Api and Libcurl handles would honour Alt-Svc received over plain http
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_0144.md | reproduces: no | Ran the -Site command: the mutant AltSvcUsesOverHttp: true at EasyTransferHost.cs:41 was killed; ManagedCurlEngineTests.CreateEasy_ProductionEngine_GivesAHandleWithDefaultOptions now asserts Assert.IsFalse(Host.AltSvcUsesOverHttp). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
+- 2026-11-01: accepted -> closed. Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
