@@ -8,7 +8,7 @@ depends-on: []
 touches: [Measure-CodeQuality.ps1]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-10-31
 ---
 # BL-4443 — Fix flaky CI test job Quality gates (windows-latest) step Every shard succeeded that failed once on Windows
 
@@ -26,8 +26,8 @@ Lanes test only on Windows, so reproduce with `gh run view 41252530857 --log-fai
 
 ## Acceptance criteria
 
-- [ ] What made `job Quality gates (windows-latest) step Every shard succeeded` fail intermittently is named under Notes and removed.
-- [ ] `job Quality gates (windows-latest) step Every shard succeeded` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
+- [x] What made `job Quality gates (windows-latest) step Every shard succeeded` fail intermittently is named under Notes and removed.
+- [x] `job Quality gates (windows-latest) step Every shard succeeded` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
 
@@ -35,3 +35,4 @@ Lanes test only on Windows, so reproduce with `gh run view 41252530857 --log-fai
 
 - 2026-10-31: Created.
 - 2026-10-31: Backlog -> Doing. Criteria at claim: ec5da34f f59aada3.
+- 2026-10-31: Doing -> Done. Every shard succeeded no longer fails: the shard 3 hang in Cgr109Tests was removed by BL-4442
