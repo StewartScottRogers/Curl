@@ -24,6 +24,8 @@ public sealed class Cgr271Tests
 
         Diagnostics.Assert("exit code", CurlExitCode.SendError, exception.ExitCode);
         Diagnostics.Assert("message", "Failed sending data to the peer", exception.Message);
+        Assert.AreEqual(CurlExitCode.SendError, exception.ExitCode);
+        Assert.AreEqual("Failed sending data to the peer", exception.Message);
     }
 
     [TestMethod]
@@ -32,6 +34,8 @@ public sealed class Cgr271Tests
         string head = "GET /x HTTP/1.1\r\nHost: h\r\nX-Big: " + new string('b', 20000) + "\r\n\r\n";
         Diagnostics.Arrange("header value length", 20000);
 
-        Diagnostics.Assert("field count", 5, Http2RequestHeaders.Of(System.Text.Encoding.Latin1.GetBytes(head), "http").Count);
+        int fieldCount = Http2RequestHeaders.Of(System.Text.Encoding.Latin1.GetBytes(head), "http").Count;
+        Diagnostics.Assert("field count", 5, fieldCount);
+        Assert.AreEqual(5, fieldCount);
     }
 }

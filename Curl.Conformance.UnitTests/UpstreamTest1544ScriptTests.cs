@@ -67,6 +67,35 @@ public sealed class UpstreamTest1544ScriptTests
     }
 
     [TestMethod]
+    public void Check_HashLineAndOptionLineWithNoFoldPending_DropsTheHashLineAndFindsTheOptionAsWritten()
+    {
+        WriteHeader(
+            "# CURLOPT(CURLOPT_IN_HASH_LINE, CURLOPTTYPE_STRINGPOINT, 1),\n"
+            + "CURLOPT(CURLOPT_URL, CURLOPTTYPE_STRINGPOINT, 2),\n");
+        WriteWrapper("/* BEGIN TRANSLATABLE STRING OPTIONS */\ncase CURLOPT_URL:\n/* END TRANSLATABLE STRING OPTIONS */\n");
+
+        (string output, int errors) = UpstreamTest1544Script.Check(root);
+
+        Assert.AreEqual(string.Empty, output);
+        Assert.AreEqual(0, errors);
+    }
+
+    [TestMethod]
+    public void Check_HashLineRightAfterAContinuedLine_JoinsTheOptionAndStillDropsTheHashLine()
+    {
+        WriteHeader(
+            "CURLOPT(CURLOPT_PROXY, \\\n"
+            + "        CURLOPTTYPE_STRINGPOINT, 1),\n"
+            + "# CURLOPT(CURLOPT_IN_HASH_LINE, CURLOPTTYPE_STRINGPOINT, 2),\n");
+        WriteWrapper("/* BEGIN TRANSLATABLE STRING OPTIONS */\ncase CURLOPT_PROXY:\n/* END TRANSLATABLE STRING OPTIONS */\n");
+
+        (string output, int errors) = UpstreamTest1544Script.Check(root);
+
+        Assert.AreEqual(string.Empty, output);
+        Assert.AreEqual(0, errors);
+    }
+
+    [TestMethod]
     public void Check_HeaderAndWrapperAgree_ReportsNothing()
     {
         WriteHeader("CURLOPT(CURLOPT_URL, CURLOPTTYPE_STRINGPOINT, 4),\n");

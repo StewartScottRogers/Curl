@@ -548,8 +548,11 @@ public sealed partial class ManagedEasyTransferTests
 
         (byte[] easyBytes, CurlCode easyCode) = await PerformThroughEasyAsync(options, null, Response);
 
+        string request = Encoding.ASCII.GetString(easyBytes);
         Assert.AreEqual(CurlCode.Ok, easyCode);
-        StringAssert.StartsWith(Encoding.ASCII.GetString(easyBytes), "PUT /up HTTP/1.1\r\n");
+        StringAssert.StartsWith(request, "PUT /up HTTP/1.1\r\n");
+        StringAssert.Contains(request, "\r\nContent-Length: 0\r\n");
+        Assert.AreEqual(request.Length, request.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4, "Bytes followed the request head, so the body was not empty.");
     }
 
     [TestMethod]
