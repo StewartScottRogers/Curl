@@ -50,6 +50,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 - 2026-10-31 | 2026-10-31_0358.md | not re-audited | Ran the -Site reproduction: outcome site-missing (resolvedLine null). SwsHttpServerConnection.Send no longer passes a literal true to SwsServerSend at or near line 441; the closing reply is now driven by the closes parameter (Send(..., reply.ClosesConnection) at line 413). No mutant ran, so not re-audited.
 - 2026-10-31 | 2026-10-31_1149.md | not re-audited | Ran the -Site command: 'site-missing Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs:441:true', resolvedLine null. Send (line 424) now takes a 'bool closes' parameter, and line 441 is 'if (closes)'; the closing SwsServerSend no longer carries a true literal inside Send. Site missing, so not re-audited.
 - 2026-11-01 | 2026-11-01_0144.md | not re-audited | Ran the -Site command: outcome site-missing, resolvedLine null. Send no longer passes a true literal: the closing send is pendingSends.Add(new SwsServerSend([], serverBusyUntil)) under if (closes) (SwsHttpServerConnection.cs:442-447), so the true site does not exist. Not re-audited.
+- 2026-11-01 | 2026-11-01_1016.md | not re-audited | Ran the -Site reproduction: outcome site-missing, resolvedLine null. Send now takes a 'bool closes' parameter and has no 'true' literal (lines 424-447); callers pass true at line 400 and reply.ClosesConnection at 413. The baseline left out UpstreamConformanceTests.UpstreamCase_RunThroughCurl_HoldsTheRatchet, which fails unmutated. Not re-audited.
 
 ## Log
 
