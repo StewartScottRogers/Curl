@@ -72,3 +72,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-11-01: Created.
 - 2026-11-01: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-11-01: Doing -> Backlog. Needs Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs, which BL-4458 holds; waits on BL-4458
+- 2026-11-01: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
