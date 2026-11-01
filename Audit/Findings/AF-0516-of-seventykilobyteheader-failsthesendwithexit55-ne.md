@@ -42,6 +42,8 @@ Select-String -Path Curl.Original.Protocol.Http.UnitTests/Cgr271Tests.cs -Patter
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_1016.md | reproduces: no | Select-String found Assert.AreEqual(CurlExitCode.SendError, exception.ExitCode) and Assert.AreEqual("Failed sending data to the peer", exception.Message) at Cgr271Tests.cs:27-28 in Of_SeventyKilobyteHeader_FailsTheSendWithExit55.
+
 ## Log
 
 - 2026-11-01: filed proposed.

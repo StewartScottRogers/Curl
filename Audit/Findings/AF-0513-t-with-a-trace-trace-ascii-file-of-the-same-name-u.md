@@ -3,8 +3,8 @@ id: AF-0513
 title: -T with a --trace/--trace-ascii file of the same name uploads 0 bytes and exits 0 where curl exits 26
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-01_1016.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-01_0144.md, 2026-11-01_1016.md).
 key: conformance:Curl.Console/CurlCommandRunner.cs:--upload-file:exit-code
 reproduction: none
 task: BL-4435
@@ -13,9 +13,9 @@ found: 2026-10-31
 found-at: 23bacbc6c04b8e06a4eecb79636da4891dca4c01
 scorecard: 2026-10-31_1149.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-01
+closed-how: consecutive
+closed-by: 2026-11-01_0144.md, 2026-11-01_1016.md
 ---
 # AF-0513 - -T with a --trace/--trace-ascii file of the same name uploads 0 bytes and exits 0 where curl exits 26
 
@@ -43,8 +43,10 @@ dotnet build Curl.Console -c Release -v q; $d=(New-Item -ItemType Directory -For
 ## Re-audits
 
 - 2026-11-01 | 2026-11-01_0144.md | reproduces: no | Ran the reproduction as given: port 50411 is blocked on this machine (Record-CurlExchange.ps1: 'An attempt was made to access a socket in a way forbidden by its access permissions'), so no out/ folder was written. Reran it unchanged except for port 60213: Curl exits 26 with 'curl: (26) client read function EOF fail, only 0/9 of needed bytes read'. The same script with the reference curl 8.22.0 (Schannel) gives the same curl: (26) line. Curl now matches curl's exit 26 instead of exiting 0.
+- 2026-11-01 | 2026-11-01_1016.md | reproduces: no | Ran the reproduction against the Release build of the audited tree. Port 50411 is in a Windows-reserved range on this host (SocketException 'access forbidden'), so I reran it unchanged except for port 58801. Curl: exitcode.txt 26, stderr `curl: (26) client read function EOF fail, only 0/9 of needed bytes read`. Reference curl 8.22.0 Schannel, same command on port 58802: exit 26, identical message. Curl no longer uploads 0 bytes and exits 0.
 
 ## Log
 
 - 2026-10-31: filed proposed.
 - 2026-10-31: proposed -> accepted.
+- 2026-11-01: accepted -> closed. Re-audit 2026-11-01_1016.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-01_0144.md, 2026-11-01_1016.md).

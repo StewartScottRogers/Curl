@@ -42,6 +42,8 @@ Select-String -Path Curl.Original.Protocol.Http.UnitTests/Cgr271Tests.cs -Patter
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_1016.md | reproduces: no | Context shows Of_TwentyKilobyteHeader_StillSends now ends with Assert.AreEqual(5, fieldCount) (Cgr271Tests.cs:39) after the diagnostics line.
+
 ## Log
 
 - 2026-11-01: filed proposed.

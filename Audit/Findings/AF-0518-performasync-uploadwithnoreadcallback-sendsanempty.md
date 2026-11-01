@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.UnitTests/ManagedEasyTransferTests.cs -Pattern '
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_1016.md | reproduces: no | PerformAsync_UploadWithNoReadCallback_SendsAnEmptyBody now asserts StringAssert.Contains(request, "\r\nContent-Length: 0\r\n") and Assert.AreEqual(request.Length, request.IndexOf("\r\n\r\n") + 4, ...), so bytes after the head fail it (ManagedEasyTransferTests.cs:554-555).
+
 ## Log
 
 - 2026-11-01: filed proposed.
