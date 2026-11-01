@@ -38,7 +38,7 @@ internal sealed class CommandLineGlobalState
 
     public string? AiHelpSubject { get; set; }
 
-    public bool ExtensionsRequested { get; set; }
+    public bool ExtensionsHelpRequested { get; set; }
 
     public bool EngineListRequested { get; set; }
 

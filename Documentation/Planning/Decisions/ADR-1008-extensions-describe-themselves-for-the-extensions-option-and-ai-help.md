@@ -25,3 +25,13 @@ ADR-0999 keeps `curl -V` byte for byte upstream's, so the extensions Curl adds n
 ## Consequences
 
 Every later extension task adds a description line and is listed automatically.
+
+## Amendment (2026-11-01, BL-4452)
+
+Decided by Claude under Stewart's delegation, at Stewart's request ("In curl.Console change --extensions
+to --extensions-help"). The option is now `--extensions-help`; `--extensions` is gone, and curl answers it
+as any unknown option (exit 2). No alias is kept: the option is Curl's own, so no upstream script names it,
+and a `-help` suffix says it prints help rather than changes a transfer, beside `--help` and `--ai-help`.
+The `--ai-help extensions` subject and the `curl://ai-help/extensions` MCP resource keep their names: they
+name a help subject, not the option. `--help` still leaves the option out, so curl's help pages stay byte
+for byte; `--ai-help` lists it under the Curl category.

@@ -211,7 +211,7 @@ public sealed class CommandLineOptions
     /// <see cref="HelpRequested"/>, <see cref="ManualRequested"/>, <see cref="EngineListRequested"/> or
     /// <see cref="CaEmbedDumpRequested"/>), which ends parsing where it stands.
     /// </summary>
-    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested || AiHelpRequested || ExtensionsRequested || BuildInformationRequested;
+    internal bool InformationRequested => VersionRequested || HelpRequested || ManualRequested || AiHelpRequested || ExtensionsHelpRequested || BuildInformationRequested;
 
     /// <summary>Whether <see cref="EngineListRequested"/> or <see cref="CaEmbedDumpRequested"/> asked for the TLS build's information.</summary>
     private bool BuildInformationRequested => EngineListRequested || CaEmbedDumpRequested;
@@ -239,11 +239,11 @@ public sealed class CommandLineOptions
     }
 
     /// <summary>
-    /// <see langword="true"/> when <c>--extensions</c>, Curl's own option (ADR-1008), was given on the command
+    /// <see langword="true"/> when <c>--extensions-help</c>, Curl's own option (ADR-1008), was given on the command
     /// line. Parsing stops there, as it does for <c>--help</c>; the console lists Curl's extensions and exits 0
     /// instead of transferring. An <c>extensions</c> line in a <c>-K</c> file does not set it.
     /// </summary>
-    public bool ExtensionsRequested { get => globals.ExtensionsRequested; internal set => globals.ExtensionsRequested = value; }
+    public bool ExtensionsHelpRequested { get => globals.ExtensionsHelpRequested; internal set => globals.ExtensionsHelpRequested = value; }
 
     /// <summary>Records <c>--help</c> and its subject, an empty one read as none.</summary>
     /// <param name="subject">The subject as given, empty when there was none.</param>
@@ -278,7 +278,7 @@ public sealed class CommandLineOptions
         ManualRequested = false;
         AiHelpRequested = false;
         AiHelpSubject = null;
-        ExtensionsRequested = false;
+        ExtensionsHelpRequested = false;
         EngineListRequested = false;
         CaEmbedDumpRequested = false;
     }

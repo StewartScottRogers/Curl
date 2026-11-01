@@ -55,7 +55,7 @@ public static class McpOptionPathTable
         "curves", "data-raw", "delegation", "digest", "disable", "disable-eprt", "disable-epsv",
         "disallow-username-in-url", "dns-interface", "dns-ipv4-addr", "dns-ipv6-addr", "dns-servers",
         "doh-cert-status", "doh-insecure", "doh-url", "dump-ca-embed", "ech", "egd-file", "engine",
-        "eprt", "epsv", "expect100-timeout", "extensions", "fail", "fail-early", "fail-with-body", "false-start",
+        "eprt", "epsv", "expect100-timeout", "extensions-help", "fail", "fail-early", "fail-with-body", "false-start",
         "follow", "form-escape", "form-string", "ftp-account", "ftp-alternative-to-user",
         "ftp-create-dirs", "ftp-method", "ftp-pasv", "ftp-port", "ftp-pret", "ftp-skip-pasv-ip",
         "ftp-ssl", "ftp-ssl-ccc", "ftp-ssl-ccc-mode", "ftp-ssl-control", "ftp-ssl-reqd", "get",
