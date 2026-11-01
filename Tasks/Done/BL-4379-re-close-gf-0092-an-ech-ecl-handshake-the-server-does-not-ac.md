@@ -9,7 +9,7 @@ touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 lane: no
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-31
 ---
 # BL-4379 — Re-close GF-0092: An --ech ecl: handshake the server does not accept exits 35 instead of 101 (ECH required) on macOS (on macos)
 
@@ -40,19 +40,22 @@ Platform-specific (macOS). The likely cause is the harness, not Curl's ECH clien
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test4001`: Curl answers what curl 8.22.0 answers on macos, `upstream test4001 passes`, so the item measures `match`.
-- [ ] The gap-platforms workflow run on the branch (or the CI job on macos) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test4001`: Curl answers what curl 8.22.0 answers on macos, `upstream test4001 passes`, so the item measures `match`.
+- [x] The gap-platforms workflow run on the branch (or the CI job on macos) passes for the named items; lanes test only on Windows, so a green Windows run alone does not close this task.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
 - 2026-10-30 (lane 1): BL-2335's fix (ADR-0522) is in place. `TlsServerStream.AcceptAsync` with `PlatformServesTls13` false on macOS hands a TLS 1.3-only hello to `Tls13ServerStream`. Measured on Windows with the macOS path forced (`PlatformServesTls13 = false`, temporary, reverted): `CURL_UPSTREAM_CASE=4001`, the Manual test, passes (exit 101). With the SslStream fallback made to throw, it still passes, so Curl's real `--ech ecl:` hello is detected as TLS 1.3-only and served by the hand-built server. A new test, `Tls13ServerStreamTests.AcceptAsync_OpenSslProfileEchOfferedToHandBuiltServer_ClientAbortsWithEchRequired`, drives the server with the OpenSSL-profile hello that macOS sends (X25519MLKEM768 + X25519 shares, padding, compress_certificate, ECH). It passes too, so neither the server path nor the macOS client profile explains exit 35. It is left uncommitted for the next claim.
 - macOS CI does not show the failure, because `UpstreamConformanceTests.NeedsTls13ServerCases` (BL-1949) keeps 4001 off the ratchet there, and a lane can neither run on macOS nor start gap-platforms. The cause is macOS-only and not reachable from Windows. Candidates: macOS's `GetECDsaPrivateKey`/signing of the PKCS#12-reloaded `test-localhost.pem`, or how the gap tool `Gap/Tools/Measure-UpstreamCases.cs` (an audit path a lane may not read) builds its runner.
 - Interactive only. Remove lane: no once someone has run test4001 on macOS and recorded the failing step here: either `CURL_UPSTREAM_CASE=4001 CURL_UPSTREAM_KEEP_LOGS=1 dotnet test Curl.Conformance.UnitTests --filter TestCategory=Manual` on a Mac, or a gap-platforms run on a branch, with the case's `trace4001` / stderr (the curl error text and which server path answered).
+- 2026-10-31 (interactive): Already fixed; no code change. The macOS measurements of the last 15 successful gap-platforms runs show test4001 as `match` from 2026-10-22 to 2026-10-26, then `expected exit code 101, got 2` (with test4000 failing beside it) in runs 41082409555, 41166983573 and 41171010544 (10-30 15:37 to 10-31 05:03 UTC), then `match` again in runs 41219522943 (master `f2336a60b`, an ancestor of `work/dark-factory`), 41219775656 and 41250025213. The exit 2 was `InProcessCurl` refusing `--ech` as unsupported, fixed by BL-4381 (`fbc3495ca`); the exit 35 the finding names no longer appears in any run. CI on `f2336a60b` (run 41207646668) passed on Windows, Linux and macOS, so the build and fast-test criterion holds; no option changed, so `--ai-help` is untouched. GF-0092 itself closes when the next gap analysis re-measures the item as `match` (ADR-0433), not because this task is Done.
 
 ## Log
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: 45ea446b 5e325fc7 1fd5de8c 28346828.
 - 2026-10-30: Doing -> Backlog. Interactive only: the exit 35 does not reproduce on Windows with the macOS server path or the OpenSSL-profile ECH hello; it needs a macOS run of test4001 (Manual test or gap-platforms) to find the failing step
+- 2026-10-31: Backlog -> Doing. Criteria at claim: 45ea446b 5e325fc7 1fd5de8c 28346828.
+- 2026-10-31: Doing -> Done. test4001 measures match on macOS in gap-platforms runs 41219522943, 41219775656, 41250025213; fixed by BL-4381
