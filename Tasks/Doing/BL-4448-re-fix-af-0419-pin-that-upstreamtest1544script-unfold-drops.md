@@ -32,3 +32,4 @@ Audit finding AF-0419 (accepted 2026-10-24, quality auditor, Medium): `Unfold`'s
 ## Log
 
 - 2026-11-01: Created.
+- 2026-11-01: Backlog -> Doing. Criteria at claim: 09013feb 1187be88 73f7312e 861d05b4.
