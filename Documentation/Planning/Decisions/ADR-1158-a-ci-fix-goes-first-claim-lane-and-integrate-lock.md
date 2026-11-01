@@ -94,3 +94,11 @@ starts the next shift for it beside the merge, at the first poll after the lanes
 HH:mm does not hold (ADR-1158) during the merge's CI wait; next shift started (...)". Other
 ready work still waits for the hand-over after the merge. A CI fix filed while the last lanes
 run past the deadline still waits for them to end.
+
+Second amendment (BL-4412, 2026-10-31), decided by Claude under Stewart's delegation: the
+merge-wait poll could start a shift only for a CI fix already filed, and nothing filed one
+during the wait, because the coordinator's CI watch runs in the lane loop, which has ended by
+then. Shift 20261031-132053's merge waited from 14:06 to 15:06; run 41239901600 failed at 14:31,
+and its fix, BL-4431, was filed only at 15:07 when the wait gave up. Each merge-wait poll
+(`Invoke-MergeWaitPoll`) now runs the CI watch first (at most once a heartbeat), so a failure
+that ends during the wait is filed and starts the next shift at the next poll.

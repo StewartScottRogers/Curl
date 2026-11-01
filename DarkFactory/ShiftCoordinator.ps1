@@ -36,6 +36,24 @@ function Get-MergeWaitClaimableTaskId {
     return Get-ClaimableTaskId @ask
 }
 
+function Invoke-MergeWaitPoll {
+    # One poll of a -Continuous coordinator during the shift-end merge's CI wait (BL-3142):
+    # runs the CI watch (Invoke-CiWatch, at most once a heartbeat), pulls -Branch when -Pull,
+    # and starts the next shift beside the merge (-StartShift, given the trace text) when the
+    # board has a claimable task or a ready CI fix (Get-IdlePollDecision against -Deadline).
+    # Does nothing once -HandOver.Done; sets it when -StartShift reports a start.
+    # The watch runs here because the loop that ran it has ended (BL-4412): shift 20261031-132053's
+    # merge waited 14:06-15:06 while run 41239901600 failed at 14:31, and nothing filed its CI fix
+    # (BL-4431) until the merge gave up, so CI stayed red 36 minutes with no task to fix it.
+    param([string]$Branch, [datetime]$Deadline, [hashtable]$HandOver, [bool]$Pull, [scriptblock]$StartShift)
+    if ($HandOver.Done) { return }
+    Invoke-CiWatch -Branch $Branch
+    if ($Pull) { git -C $Root pull -q --ff-only origin $Branch 2>&1 | Out-Null }
+    $claimable = Get-MergeWaitClaimableTaskId
+    $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $Deadline -UsageStop (Get-UsageStop) -ClaimableId $claimable.Id -CappedIds $claimable.Capped -CiFixId (Get-ReadyCiFixTaskId)
+    if ($poll.Action -eq 'start' -and @(& $StartShift "$($poll.Why) during the merge's CI wait")[-1]) { $HandOver.Done = $true }
+}
+
 function Start-NextShiftDetached {
     # Starts the next shift with Start-Detached and says whether it really started: Started is
     # true only when a herdr tab or a process came back. A start that throws, or returns neither,
@@ -732,14 +750,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # a task claimable during the wait starts the next shift beside the merge, once. The wait
     # always comes after the -Hours deadline (lanes finish their last task past it), so only a
     # ready CI fix starts one then (BL-4412); other work waits for the merge's own hand-over.
+    # Each poll also runs the CI watch, so a failure that ends during the wait is filed then.
     $handOver = @{ Done = $false }
     $pollDuringMerge = if ($Continuous) {
         {
-            if ($handOver.Done) { return }
-            if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
-            $claimable = Get-MergeWaitClaimableTaskId
-            $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $claimable.Id -CappedIds $claimable.Capped -CiFixId (Get-ReadyCiFixTaskId)
-            if ($poll.Action -eq 'start' -and @(& $startNextShift "$($poll.Why) during the merge's CI wait" -Beside)[-1]) { $handOver.Done = $true }
+            Invoke-MergeWaitPoll -Branch $branch -Deadline $shiftEnd -HandOver $handOver -Pull (-not $moved) -StartShift { param([string]$Why) & $startNextShift $Why -Beside }
         }
     }
     $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch -OnPoll $pollDuringMerge -PollMinutes $IdlePollMinutes -HandOver $handOver }
