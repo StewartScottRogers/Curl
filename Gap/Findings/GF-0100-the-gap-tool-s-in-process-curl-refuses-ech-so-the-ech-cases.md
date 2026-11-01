@@ -5,11 +5,11 @@ area: behaviour
 platform: windows
 key: behaviour:in-process-runner-refuses-ech-option
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-30_2103
-closed:
+closed: 2026-10-31_1828
 regression: false
 items: [behaviour:test4000, behaviour:test4001]
 touches: [Curl.Console, Curl.Console.UnitTests]
@@ -33,8 +33,10 @@ In Curl.Console/InProcessCurl.cs, make CreateDialingRunner (and the IConnector o
 ## Measurements
 
 - 2026-10-30_2103: 2 of 2 items are gaps.
+- 2026-10-31_1828: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-30_2103: Opened by gap-behaviour.
 - 2026-10-30_2202: Filed BL-4381.
+- 2026-10-31_1828: Closed: run 2026-10-31_1828 measured every item as match or excluded on windows.
