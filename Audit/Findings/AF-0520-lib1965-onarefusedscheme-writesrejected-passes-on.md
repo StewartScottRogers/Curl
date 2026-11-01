@@ -7,8 +7,8 @@ status: accepted
 reason: Stewart accepted it on 2026-11-01 ("accept all").
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1964To1977Tests.cs:Lib1965_OnARefusedScheme_WritesRejected:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-4455
+tasks: BL-4455
 found: 2026-11-01
 found-at: 4c39311e3e4524ac6950cb2cba36f5b3f2a6ff2e
 scorecard: 2026-11-01_1016.md
