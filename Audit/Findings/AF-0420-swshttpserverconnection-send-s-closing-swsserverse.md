@@ -6,9 +6,9 @@ severity: Medium
 status: accepted
 reason: Stewart accepted it on 2026-10-24.
 key: quality:Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs:Send-true:surviving-mutant
-reproduction: mutation Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs:441:true
-task: BL-3469
-tasks: BL-3469
+reproduction: none
+task: BL-4449
+tasks: BL-3469, BL-4449
 found: 2026-10-24
 found-at: d3ee244c64c5cb56d3fe0ca2ed9728e9383eb8ea
 scorecard: 2026-10-24_0845.md
@@ -55,3 +55,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 - 2026-10-24: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-11-01: re-fix task BL-4449 filed (Stewart: re-fix them). The mutation site was removed by BL-3469's rewrite, so every re-audit since reported site-missing; reproduction set to none, so the next re-audit judges by reading the code and BL-4449's tests.
