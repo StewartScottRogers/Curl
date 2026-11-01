@@ -1012,15 +1012,15 @@ if ($TestCiWatch) {
         "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.0746696Z   Failed FromComponents_ZeroCoefficient_Throws [54 ms]"
         "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.0765938Z   Error Message:"
         "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.0856851Z    Assertion failed. Expected exception of exact type CryptographicException but caught OpenSslCryptographicException."
-        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.1238521Z                      at Curl.Protocol.Ssh.Keys.RsaSshPrivateKey.FromPkcs1(ReadOnlySpan``1 der) in /home/runner/work/Curl/Curl/Curl.Protocol.Ssh.UnitLibrary/Keys/RsaSshPrivateKey.cs"
-        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.1352234Z                      at Curl.Protocol.Ssh.Keys.RsaSshPrivateKeyTests.<>c.b__5_0() in /home/runner/work/Curl/Curl/Curl.Protocol.Ssh.UnitTests/Keys/RsaSshPrivateKeyTests.cs:line 90"
-        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:07.6024310Z Failed!  - Failed:     1, Passed:   873, Skipped:     0, Total:   874, Duration: 16 s - Curl.Protocol.Ssh.UnitTests.dll (net10.0)"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.1238521Z                      at Curl.Original.Protocol.Ssh.Keys.RsaSshPrivateKey.FromPkcs1(ReadOnlySpan``1 der) in /home/runner/work/Curl/Curl/Curl.Original.Protocol.Ssh.UnitLibrary/Keys/RsaSshPrivateKey.cs"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.1352234Z                      at Curl.Original.Protocol.Ssh.Keys.RsaSshPrivateKeyTests.<>c.b__5_0() in /home/runner/work/Curl/Curl/Curl.Original.Protocol.Ssh.UnitTests/Keys/RsaSshPrivateKeyTests.cs:line 90"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:07.6024310Z Failed!  - Failed:     1, Passed:   873, Skipped:     0, Total:   874, Duration: 16 s - Curl.Original.Protocol.Ssh.UnitTests.dll (net10.0)"
         "Build and test (macos-latest)${t}Fast tests${t}2026-09-29T22:10:05.3235560Z   Failed FromComponents_ZeroCoefficient_Throws [73 ms]"
         "Build and test (macos-latest)${t}Fast tests${t}2026-09-29T22:10:05.3240640Z   Error Message:"
         "Build and test (macos-latest)${t}Fast tests${t}2026-09-29T22:10:05.3240641Z    Assertion failed. Expected exception of exact type CryptographicException but caught AppleCFErrorCryptographicException."
-        "Build and test (macos-latest)${t}Fast tests${t}2026-09-29T22:10:07.6442400Z Failed!  - Failed:     1, Passed:   873 - Curl.Protocol.Ssh.UnitTests.dll (net10.0)")
+        "Build and test (macos-latest)${t}Fast tests${t}2026-09-29T22:10:07.6442400Z Failed!  - Failed:     1, Passed:   873 - Curl.Original.Protocol.Ssh.UnitTests.dll (net10.0)")
     $parsed = @(Get-CiFailures $log)
-    & $check 'test failure parsed' 'FromComponents_ZeroCoefficient_Throws|test|Linux,macOS|Curl.Protocol.Ssh.UnitTests|Assertion failed. Expected exception of exact type CryptographicException but caught OpenSslCryptographicException.' `
+    & $check 'test failure parsed' 'FromComponents_ZeroCoefficient_Throws|test|Linux,macOS|Curl.Original.Protocol.Ssh.UnitTests|Assertion failed. Expected exception of exact type CryptographicException but caught OpenSslCryptographicException.' `
         (($parsed | ForEach-Object { "$($_.Key)|$($_.Kind)|$($_.Platforms -join ',')|$($_.Project)|$($_.Message)" }) -join ';')
     $buildLog = @(
         "Build and test (macos-latest)${t}Build${t}2026-09-29T22:00:00.0000000Z /Users/runner/work/Curl/Curl/Curl.Cli.UnitLibrary/Options/Parser.cs(12,5): error CS1002: ; expected [/Users/runner/work/Curl/Curl/Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj]"
@@ -1050,7 +1050,7 @@ if ($TestCiWatch) {
     & $check 'flaky title' 'Fix flaky CI test A that failed once on Linux' (Get-CiTaskTitle ([pscustomobject]@{ Key = 'A'; Kind = 'test'; Verdict = 'flaky'; Platforms = @('Linux') }))
     & $check 'CI fix title is claimable past the usage stop' 'True True True False' ("$(Test-CiFixTitle 'Fix CI failure A on Linux') $(Test-CiFixTitle 'Fix flaky CI test A') $(Test-CiFixTitle 'Fix CI build CS1002 on macOS') $(Test-CiFixTitle 'Add --foo option')")
     & $check 'a CI fix task file is told by its name' 'True True True False' ("$(Test-CiFixFileName 'BL-4052-fix-ci-failure-a.md') $(Test-CiFixFileName 'BL-4083-fix-flaky-ci-test-b.md') $(Test-CiFixFileName 'BL-9-fix-ci-build-c.md') $(Test-CiFixFileName 'BL-4093-add-extensions.md')")
-    & $check 'touches' 'Curl.Protocol.Ssh.UnitTests,Curl.Protocol.Ssh.UnitLibrary' ((Get-CiTouches -Project 'Curl.Protocol.Ssh.UnitTests' -Repo $Root) -join ',')
+    & $check 'touches' 'Curl.Original.Protocol.Ssh.UnitTests,Curl.Original.Protocol.Ssh.UnitLibrary' ((Get-CiTouches -Project 'Curl.Original.Protocol.Ssh.UnitTests' -Repo $Root) -join ',')
     & $check 'integration touches' 'Curl.Networking.IntegrationTests,Curl.Networking.UnitLibrary' ((Get-CiTouches -Project 'Curl.Networking.IntegrationTests' -Repo $Root) -join ',')
     & $check 'console integration touches' 'Curl.Console.IntegrationTests,Curl.Console' ((Get-CiTouches -Project 'Curl.Console.IntegrationTests' -Repo $Root) -join ',')
     $integrationLog = @(
@@ -1147,7 +1147,7 @@ if ($TestCiWatch) {
             "${ubuntu}2026-09-30T05:46:09.4333071Z    Assertion failed. Expected values to be equal."
             "${ubuntu}2026-09-30T05:46:09.4382540Z   Stack Trace:"
             "${ubuntu}2026-09-30T05:46:09.4412190Z      at Curl.Networking.TcpDialerTests.BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext() in /home/runner/work/Curl/Curl/Curl.Networking.UnitTests/TcpDialerTests.cs:line 219"
-            "${ubuntu}2026-09-30T05:46:09.4992460Z Passed!  - Failed:     0, Passed:    98, Skipped:     0, Total:    98, Duration: 531 ms - Curl.Protocol.Mqtt.UnitTests.dll (net10.0)"
+            "${ubuntu}2026-09-30T05:46:09.4992460Z Passed!  - Failed:     0, Passed:    98, Skipped:     0, Total:    98, Duration: 531 ms - Curl.Original.Protocol.Mqtt.UnitTests.dll (net10.0)"
             "${ubuntu}2026-09-30T05:46:17.9032566Z Failed!  - Failed:     2, Passed:  1666, Skipped:    16, Total:  1684, Duration: 35 s - Curl.Networking.UnitTests.dll (net10.0)")
         '36690174792' = @(
             "${macos}2026-09-30T08:34:39.6519410Z   Failed BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext [9 ms]"

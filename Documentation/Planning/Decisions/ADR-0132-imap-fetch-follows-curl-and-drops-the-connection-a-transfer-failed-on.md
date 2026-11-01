@@ -10,7 +10,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 BL-555 fetches the message an IMAP URL names (`imap://host/INBOX;UID=1`, RFC 5092) with
 `SELECT` and `FETCH`. Every case in the task was measured on curl 8.21.0 (Schannel build)
 with `Record-CurlExchange.ps1 -Imap` and is pinned in
-`Curl.Protocol.Imap.UnitTests\ImapProtocolHandlerFetchTests.cs`; the recordings are in
+`Curl.Original.Protocol.Imap.UnitTests\ImapProtocolHandlerFetchTests.cs`; the recordings are in
 the task's Notes. A few behaviours cannot be driven through the recorder, and one has no
 seam in the IMAP library yet, so they are decided here.
 

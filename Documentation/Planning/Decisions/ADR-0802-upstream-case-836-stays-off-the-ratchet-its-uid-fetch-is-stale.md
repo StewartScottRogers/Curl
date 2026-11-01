@@ -38,7 +38,7 @@ UID FETCH.
 Case 836 stays off `PassingUpstreamCases.txt`. Its expected `<protocol>` (`FETCH 2 BODY[]`)
 does not match what curl 8.22.0 itself sends (`UID FETCH 2 BODY[]`), which is why upstream
 lists it in `tests/data/DISABLED`. Curl already sends curl's bytes, so nothing in
-`Curl.Protocol.Imap.UnitLibrary` changes; changing it to pass the stale case would make Curl
+`Curl.Original.Protocol.Imap.UnitLibrary` changes; changing it to pass the stale case would make Curl
 differ from curl.
 
 ## Consequences

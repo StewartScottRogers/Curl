@@ -12,7 +12,7 @@ Linux): with a file named by the raw bytes `63 61 66 E9 2E 74 78 74`,
 `curl -sS file://$PWD/caf%E9.txt` prints it and exits 0, because curl hands the decoded bytes to
 `open()` unchanged. Curl exits 37: `FileUrlPath` decodes escapes as UTF-8 into a .NET string, and
 .NET's file APIs encode a name as UTF-8, so no string they take names that file.
-`Curl.Protocol.File.UnitLibrary` reaches the disk only through `IFileSystem`, which takes a `string`.
+`Curl.Original.Protocol.File.UnitLibrary` reaches the disk only through `IFileSystem`, which takes a `string`.
 
 ## Decision
 

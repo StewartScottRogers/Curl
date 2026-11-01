@@ -1,4 +1,4 @@
-using Curl.Protocol.Ws;
+using Curl.Original.Protocol.Ws;
 
 namespace Curl.Conformance;
 

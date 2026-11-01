@@ -34,7 +34,7 @@ without its option.
 ## Left out
 
 - HTTP/2 and HTTP/3 extended CONNECT to the proxy (RFC 9298 §3.3, §3.4): the proxy is reached over HTTP/1.1 Upgrade,
-  as ADR-1115 records, since the extension may not reference `Curl.Protocol.Http`.
+  as ADR-1115 records, since the extension may not reference `Curl.Original.Protocol.Http`.
 - CONNECT-IP routes and several assigned addresses: the tunnel asks for one address and carries UDP to one target,
   which is all QUIC needs (ADR-1122).
 - A separate option per tunnel kind: the template already says which tunnel the proxy offers.

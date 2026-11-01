@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-ADR-0122 gives `Curl.Protocol.Ssh.UnitLibrary` a `KnownHostsFile` and an
+ADR-0122 gives `Curl.Original.Protocol.Ssh.UnitLibrary` a `KnownHostsFile` and an
 `SshHostKeyChecker` in `HostKeys`, and leaves to BL-566 how they behave: which of
 `--hostpubsha256`, `--hostpubmd5` and the known-hosts file decides, what `-k` changes,
 how hashed `|1|` names, `[host]:port` names and the `@revoked` and `@cert-authority`

@@ -13,7 +13,7 @@ reference the shared layer `Curl.Tls.UnitLibrary` (ADR-0999). The RFC leaves som
 
 ## Decision
 
-- `Curl.Extension.Coap.UnitLibrary` references `Curl.Tls.UnitLibrary` and reuses its
+- `Curl.Extended.Protocol.Coap.UnitLibrary` references `Curl.Tls.UnitLibrary` and reuses its
   `TlsContentType` and `HandshakeType`. hello_verify_request (type 3), which TLS never sends, is
   `DtlsHelloVerifyRequest.MessageType`, a cast rather than a new member of Curl.Tls's enum, so
   Curl.Tls is unchanged.

@@ -9,7 +9,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 `-T file scp://host/path` uploads one file. What curl 8.21.0 sends to `scp -t`, which mode it
 sends, when it waits, and what each refusal reports had to be measured before
-`Curl.Protocol.Ssh.UnitLibrary` could do the same.
+`Curl.Original.Protocol.Ssh.UnitLibrary` could do the same.
 
 The Windows reference build (curl 8.21.0, libssh2 1.11.1, Schannel) ran as `curl -sS -k --key
 <rsa key> --pubkey <pub> -u <user>: -w '%{size_upload}' -T <source>

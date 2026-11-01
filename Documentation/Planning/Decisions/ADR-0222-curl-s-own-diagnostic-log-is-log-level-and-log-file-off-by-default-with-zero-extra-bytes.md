@@ -89,7 +89,7 @@ curl 8.21.0 refuses them: `curl: option --log-level: is unknown`, curl's
 9. **Libraries that do not reference the abstractions** - `Curl.Tls`, `Curl.Http2`,
    `Curl.Http3`, `Curl.Ntlm`, `Curl.Kerberos`, `Curl.Cryptography`, `Curl.Zstandard` - get
    no new project reference. Their steps are logged at the call site in the library that
-   uses them (`Curl.Networking`, `Curl.Protocol.Http`, `Curl.Authentication`).
+   uses them (`Curl.Networking`, `Curl.Original.Protocol.Http`, `Curl.Authentication`).
 10. **Not in `--help` or `--manual`**, which stay byte-identical to curl 8.21.0. Both
     options are listed in `--ai-help` (BL-911, BL-918).
 

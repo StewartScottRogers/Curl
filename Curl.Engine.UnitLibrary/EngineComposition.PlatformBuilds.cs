@@ -1,4 +1,4 @@
-using Curl.Protocol.Ldap;
+using Curl.Original.Protocol.Ldap;
 using Curl.Ssh.Negotiation;
 
 namespace Curl.Engine;

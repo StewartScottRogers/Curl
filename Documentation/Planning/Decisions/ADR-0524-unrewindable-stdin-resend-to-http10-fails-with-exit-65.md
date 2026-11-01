@@ -28,7 +28,7 @@ and Curl already matched it there.
 
 ## Decision
 
-- `Curl.Protocol.Http` gains `IRewindableUpload`: an upload stream that cannot seek says whether
+- `Curl.Original.Protocol.Http` gains `IRewindableUpload`: an upload stream that cannot seek says whether
   curl could still rewind it (`CanRewind`). A stream that does not implement it counts as one that can.
 - `HttpProtocolHandler` fails a chunked resend to an HTTP/1.0 server (`IsChunkedResendToHttp10`)
   whose body is a stream that cannot be rewound before it connects, through the existing

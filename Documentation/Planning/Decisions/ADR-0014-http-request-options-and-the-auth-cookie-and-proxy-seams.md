@@ -28,7 +28,7 @@ that pin it). None of these reach a protocol handler today:
 
 Three dependency facts constrain where the new types can live:
 
-- `Curl.Protocol.Http.UnitLibrary` may reference only
+- `Curl.Original.Protocol.Http.UnitLibrary` may reference only
   `Curl.Protocol.Abstractions.UnitLibrary`. Its `CLAUDE.md` says so, and
   `Curl.Protocol.Abstractions.UnitTests/ProtocolIsolationTests.cs`
   (`ProtocolLibrary_References_OnlyAbstractions`) fails the fast suite if a protocol
@@ -68,7 +68,7 @@ public HttpRequestOptions? Http { get; init; }   // defaults to null
   grows by one, not by sixteen.
 - Existing handlers compile unchanged: none reads the new member, and `TransferContext`
   defaults it. The one other implementer of `ITransferContext`,
-  `Curl.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs`, is replaced by
+  `Curl.Original.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs`, is replaced by
   `TransferContext` in BL-159, as ADR-0006 expects.
 - `PostData` and `Credentials` stay where ADR-0006 put them. MQTT keeps reading
   `PostData`; the HTTP handler never reads it and sends `Http.Body` instead.
@@ -352,7 +352,7 @@ public interface ICookieStore
   HTTP: it composes a multipart mail message
   (<https://curl.se/docs/manpage.html#-F>, as referenced by the Phase 1 HTTP plan for
   curl 8.21.0). Those handlers will need the same MIME, and a protocol library may not
-  reference another, so the builder cannot live in `Curl.Protocol.Http.UnitLibrary`.
+  reference another, so the builder cannot live in `Curl.Original.Protocol.Http.UnitLibrary`.
 
 ## Consequences
 
@@ -387,7 +387,7 @@ Costs and caveats:
 
 ## Alternatives considered
 
-- **Put the types in `Curl.Protocol.Http.UnitLibrary` and have it reference
+- **Put the types in `Curl.Original.Protocol.Http.UnitLibrary` and have it reference
   `Curl.Authentication` and `Curl.Cookies`.** Rejected: a protocol library may reference
   only `Curl.Protocol.Abstractions.UnitLibrary`, and `ProtocolIsolationTests` fails the
   fast test suite otherwise. Reversing that rule for one protocol would undo the
@@ -404,7 +404,7 @@ Costs and caveats:
 - **Put `-T` into `Body` as a `StreamBody`.** Rejected: `Upload` already carries it for
   every scheme (ADR-0003), and a `StreamBody` from `-T` would be indistinguishable from
   one from `-F`, yet curl sends the first as PUT and the second as POST.
-- **Build multipart bodies in `Curl.Protocol.Http.UnitLibrary`.** Rejected: SMTP and
+- **Build multipart bodies in `Curl.Original.Protocol.Http.UnitLibrary`.** Rejected: SMTP and
   IMAP `-F` need the same MIME, and they cannot reference the HTTP library.
 - **Let the authenticator write the header itself, or return a name and value.**
   Rejected: the handler already knows which header, from `IsProxy`, and owns header

@@ -7,7 +7,7 @@
 
 ## Context
 
-BL-4336 gave `Curl.Extension.DnsQuery` its RFC 1035 codec and its text and JSON writers (ADR-1124). BL-4337 makes it
+BL-4336 gave `Curl.Extended.Protocol.DnsQuery` its RFC 1035 codec and its text and JSON writers (ADR-1124). BL-4337 makes it
 a registered extension: a `dns:` URL sends a query and writes the answer. Upstream curl has no `dns:` scheme, so this
 is tested against RFC 1035 (November 1987) and RFC 4501 (May 2006), not against curl, and never changes what curl does
 with any other URL. Several choices had no specification to settle them: the option names, how a handler that the

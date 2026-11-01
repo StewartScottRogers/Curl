@@ -10,7 +10,7 @@
     <ProjectReference Include="..\Curl.Conformance.UnitLibrary\Curl.Conformance.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Cryptography.UnitLibrary\Curl.Cryptography.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
-    <ProjectReference Include="..\Curl.Protocol.Ssh.UnitLibrary\Curl.Protocol.Ssh.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Original.Protocol.Ssh.UnitLibrary\Curl.Original.Protocol.Ssh.UnitLibrary.csproj" />
   </ItemGroup>
 
 </Project>

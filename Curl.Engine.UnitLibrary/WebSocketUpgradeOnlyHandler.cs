@@ -1,5 +1,5 @@
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ws;
+using Curl.Original.Protocol.Ws;
 
 namespace Curl.Engine;
 

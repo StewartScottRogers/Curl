@@ -1,6 +1,6 @@
 # Curl.WebSocket.UnitLibrary
 
-The RFC 6455 section 5 frame codec, shared by `Curl.Protocol.Ws.UnitLibrary`, the engine and
+The RFC 6455 section 5 frame codec, shared by `Curl.Original.Protocol.Ws.UnitLibrary`, the engine and
 extensions (ADR-0999 lets an extension reference a shared layer, never a protocol library):
 `WsOpcode`, `WsFrameEncoder` (masked client frames from an `IWebSocketRandomSource`),
 `WsFrameDecoder` (server frames read incrementally into `WsDecodedBytes`, each violation as curl

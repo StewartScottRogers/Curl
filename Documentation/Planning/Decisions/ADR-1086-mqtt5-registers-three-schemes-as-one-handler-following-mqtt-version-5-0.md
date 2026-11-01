@@ -16,7 +16,7 @@ transport (ADR-1054); this task names the schemes, registers them and records wh
 - **Schemes** `mqtt5` (port 1883), `mqtt5s` (TLS from curl's connector, port 8883) and `mqtt5+ws` (WebSocket to
   `/mqtt`, port 80), the ports the specification's section 4.2 and IANA register for MQTT and secure MQTT and RFC 6455
   gives `ws://`. A `5` suffix keeps them apart from curl's `mqtt://` and `mqtts://`, which the extension never touches:
-  with extensions on, `mqtt://` is still curl's 3.1.1 handler. The library is `Curl.Extension.Mqtt5.UnitLibrary`; it
+  with extensions on, `mqtt://` is still curl's 3.1.1 handler. The library is `Curl.Extended.Protocol.Mqtt5.UnitLibrary`; it
   adds no command-line option.
 - **One handler, one catalogue line.** `Mqtt5Extension.CreateHandler` returns `Mqtt5SchemeHandler`, which serves all
   three schemes and hands each transfer to a `Mqtt5WebSocketProtocolHandler` for `mqtt5+ws` and to a

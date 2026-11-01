@@ -77,7 +77,7 @@ Up to nine lanes run on this machine at once, each in its own worktree:
   library the task changed in one call: it runs only the test projects that reach them,
   once. Never measure the whole solution for a task's coverage criterion (BL-1318), and
   never one library at a time: Curl.Console, Curl.Networking.UnitLibrary,
-  Curl.Protocol.Abstractions.UnitLibrary and Curl.Protocol.Http.UnitLibrary each reach
+  Curl.Protocol.Abstractions.UnitLibrary and Curl.Original.Protocol.Http.UnitLibrary each reach
   nearly every test project, so four separate runs cost BL-1360 its whole time limit.
   Quote any path you pass (`-ResultsDirectory "C:\Users\Stewart Rogers\..."`): an
   unquoted space split one run's path and left coverage files in the worktree.

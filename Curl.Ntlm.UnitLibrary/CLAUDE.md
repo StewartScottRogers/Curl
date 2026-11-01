@@ -4,7 +4,7 @@ Hand-built NTLM for every platform, per MS-NLMP: encoding and decoding the `NEGO
 `CHALLENGE` and `AUTHENTICATE` messages, and computing the NTLMv1, NTLMv2 and session
 keys that answer a challenge. It is shared by HTTP and proxy NTLM
 (`Curl.Authentication.UnitLibrary`), SASL `NTLM`, SPNEGO (BL-692) and SMB
-(`Curl.Protocol.Smb.UnitLibrary`), so it lives in none of them. When SSPI on Windows
+(`Curl.Original.Protocol.Smb.UnitLibrary`), so it lives in none of them. When SSPI on Windows
 answers instead of this library is ADR-0142's routing, not this library's.
 
 Namespace `Curl.Ntlm`. The messages are here (BL-683), written and read as curl 8.21.0's

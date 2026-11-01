@@ -42,6 +42,7 @@ public sealed class Cgr109Tests
         await http.WhenStartedAsync("/stall");
         await clock.WhenTimersDueAsync(2000, 2);
         clock.Advance(2000);
+        await clock.FireLateTimersUntilAsync(run);
 
         int exitCode = await run;
         string[] timedOutLines = Lf(standardError.Text).Split('\n').Where(line => line.StartsWith("curl: (28) ", StringComparison.Ordinal)).ToArray();
@@ -66,6 +67,7 @@ public sealed class Cgr109Tests
         await standardOutput.WhenEndsWithAsync("aaaaa[0]");
         await clock.WhenTimersDueAsync(2000, 1);
         clock.Advance(2000);
+        await clock.FireLateTimersUntilAsync(run);
 
         int exitCode = await run;
         Diagnostics.Assert("exit code", 28, exitCode);
@@ -109,6 +111,12 @@ public sealed class Cgr109Tests
         await clock.WhenTimersDueAsync(2000, 2);
         clock.MoveWithoutFiring(2500);
         http.Fail("/stall", CurlExitCode.OperationTimedOut, "Operation timed out after 2500 milliseconds with 0 bytes received");
+
+        // Wake only the -Z loop's polls (due within one poll of now), never the -m timers due at 2000 or a
+        // later connect timeout, so the waiter still finds -m passed when the host frees it (BL-4444).
+        await clock.FireLateTimersUntilAsync(
+            run,
+            due => due != 2000 && due <= clock.GetTimestamp() + ParallelTransferMulti.PollTimeoutMilliseconds);
 
         int exitCode = await run;
         string expectedStandardError =
@@ -182,6 +190,38 @@ public sealed class Cgr109Tests
             while (Due(dueMilliseconds) < count)
             {
                 await Task.Delay(5, giveUp.Token);
+            }
+        }
+
+        /// <summary>
+        /// Fires every live timer, without moving the clock, until <paramref name="run" /> ends, so a timer the run
+        /// creates or re-arms after <see cref="Advance" /> took its snapshot (a host waiter's <c>-m</c> timer, a poll
+        /// timer) cannot leave it waiting on a clock nobody moves again (BL-4442).
+        /// </summary>
+        public Task FireLateTimersUntilAsync(Task run) => FireLateTimersUntilAsync(run, static _ => true);
+
+        /// <summary>
+        /// Fires, without moving the clock, every live timer whose due time <paramref name="fires" /> accepts, until
+        /// <paramref name="run" /> ends (BL-4444): a test that must not fire a <c>-m</c> timer can still wake a
+        /// <c>-Z</c> poll that missed its wakeup and would otherwise wait on a clock nobody moves.
+        /// </summary>
+        public async Task FireLateTimersUntilAsync(Task run, Func<long, bool> fires)
+        {
+            using CancellationTokenSource giveUp = new(TimeSpan.FromSeconds(30));
+            while (!run.IsCompleted && !giveUp.IsCancellationRequested)
+            {
+                FiringTimer[] live;
+                lock (timers)
+                {
+                    live = [.. timers.Where(timer => timer.DueAt is { } due && fires(due))];
+                }
+
+                foreach (FiringTimer timer in live)
+                {
+                    timer.Fire();
+                }
+
+                await Task.WhenAny(run, Task.Delay(5, giveUp.Token));
             }
         }
 

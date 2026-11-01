@@ -1,6 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Fakes;
+using Curl.Original.Protocol.Ssh.Fakes;
 using Curl.Ssh.Fakes;
 using Curl.Testing;
 
@@ -9,7 +9,7 @@ namespace Curl.Console;
 /// <summary>
 /// Pins <c>-v</c> and <c>--trace-ascii</c> for <c>sftp://</c> and <c>scp://</c> end to end
 /// through the production composition against the <see cref="InMemorySshServer" />, with the
-/// fixed test keys of <c>Curl.Protocol.Ssh.UnitTests</c>. The lines are those curl 8.21.0
+/// fixed test keys of <c>Curl.Original.Protocol.Ssh.UnitTests</c>. The lines are those curl 8.21.0
 /// wrote against OpenSSH 10.2 on 2026-09-29 (BL-578, ADR-0262), normalised as the other
 /// <c>-v</c> tests are: the in-memory connector writes no <c>Trying</c> or
 /// <c>Established connection</c> line, new lines are <c>\n</c>, and the key files, the

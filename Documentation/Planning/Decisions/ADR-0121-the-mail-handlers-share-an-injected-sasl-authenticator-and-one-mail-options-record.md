@@ -8,8 +8,8 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 ## Context
 
 The conformance audit of 2026-09-28 (row 34, Blocker) found `smtp`, `smtps`, `pop3`,
-`pop3s`, `imap` and `imaps` unsupported: `Curl.Protocol.Smtp.UnitLibrary`,
-`Curl.Protocol.Pop3.UnitLibrary` and `Curl.Protocol.Imap.UnitLibrary` are empty. Row 31
+`pop3s`, `imap` and `imaps` unsupported: `Curl.Original.Protocol.Smtp.UnitLibrary`,
+`Curl.Original.Protocol.Pop3.UnitLibrary` and `Curl.Original.Protocol.Imap.UnitLibrary` are empty. Row 31
 lists the mail options (`--mail-from`, `--mail-rcpt`, `--mail-auth`,
 `--mail-rcpt-allowfails`, `--upload-flags`) and row 23 the SASL ones (`--sasl-authzid`,
 `--sasl-ir`, `--login-options`). Before any of the three handlers is written, their shape

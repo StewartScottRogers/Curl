@@ -10,9 +10,9 @@ using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Http;
-using Curl.Protocol.Imap;
-using Curl.Protocol.Ws;
+using Curl.Original.Protocol.Http;
+using Curl.Original.Protocol.Imap;
+using Curl.Original.Protocol.Ws;
 
 namespace Curl.Engine;
 

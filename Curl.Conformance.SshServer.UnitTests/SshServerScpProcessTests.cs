@@ -1,5 +1,5 @@
 using System.Text;
-using Curl.Protocol.Ssh;
+using Curl.Original.Protocol.Ssh;
 using Curl.Ssh;
 using Curl.Ssh.Connection;
 using Curl.Ssh.Transport;

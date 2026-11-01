@@ -5,7 +5,7 @@ namespace Curl.Ssh.Transport;
 
 /// <summary>
 /// An <see cref="IConnection" /> whose peer sends the given bytes and then closes, and
-/// which discards what is written to it: the connection <c>Curl.Protocol.Ssh.SshWireDecoders</c> reads
+/// which discards what is written to it: the connection <c>Curl.Original.Protocol.Ssh.SshWireDecoders</c> reads
 /// hostile packet bytes through, so the packet reader runs as it does against a server.
 /// </summary>
 /// <param name="received">The bytes the peer sends.</param>

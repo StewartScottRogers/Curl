@@ -14,7 +14,7 @@ tested against the specification (ADR-0999).
 
 ## Decision
 
-- `Curl.Extension.McpClient.UnitLibrary/Stdio` sees the server only through `IMcpServerProcess` (stdin and stdout
+- `Curl.Extended.Protocol.McpClient.UnitLibrary/Stdio` sees the server only through `IMcpServerProcess` (stdin and stdout
   streams, wait for exit, kill) and starts it through `IMcpServerProcessStarter`. The one implementation,
   `McpServerProcessStarter`, wraps `System.Diagnostics.Process` with stdin and stdout redirected, stderr inherited
   (the server's log reaches the user's terminal) and stdin written as UTF-8 without a byte order mark. Every line of

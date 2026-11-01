@@ -119,14 +119,124 @@ public sealed class SshDirectTcpipChannelTests
     }
 
     [TestMethod]
-    public async Task WriteAsync_Rfc4254Section5_3_PeerSentEofWhileWindowIsUsedUp_ThrowsEndOfStream()
+    public async Task WriteAsync_Rfc4254Section5_3_PeerSentEofWhileWindowIsUsedUp_WaitsForAndUsesALaterWindowAdjust()
     {
         Peer peer = Connect(new SshServerScript()
             .Packet(Confirmation(window: 2, maximumPacketSize: 100))
-            .Packet([SshConnectionMessageNumber.ChannelEof, .. UInt32(0)]));
+            .Packet([SshConnectionMessageNumber.ChannelEof, .. UInt32(0)])
+            .Packet(Join([SshConnectionMessageNumber.ChannelWindowAdjust], UInt32(0), UInt32(100))));
+        await peer.Channel.OpenAsync("127.0.0.1", 50000, CancellationToken.None);
+
+        await peer.Channel.WriteAsync(new byte[] { 1, 2, 3, 4 }, CancellationToken.None);
+
+        Assert.AreEqual(2, Payloads(peer).Count(payload => payload[0] == SshConnectionMessageNumber.ChannelData));
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_PeerClosedWhileWindowIsUsedUp_ThrowsEndOfStream()
+    {
+        Peer peer = Connect(new SshServerScript()
+            .Packet(Confirmation(window: 2, maximumPacketSize: 100))
+            .Packet([SshConnectionMessageNumber.ChannelClose, .. UInt32(0)]));
         await peer.Channel.OpenAsync("127.0.0.1", 50000, CancellationToken.None);
 
         await Assert.ThrowsExactlyAsync<EndOfStreamException>(async () => await peer.Channel.WriteAsync(new byte[] { 1, 2, 3, 4 }, CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task ReadAsyncAndWriteAsync_ReaderReceivesTheWindowAdjustTheWriterWaitsFor_SendCompletesWithoutAnotherPacket()
+    {
+        Held held = ConnectHeld(new SshServerScript()
+            .Packet(Confirmation(window: 0, maximumPacketSize: 100))
+            .Packet(Join([SshConnectionMessageNumber.ChannelWindowAdjust], UInt32(0), UInt32(100)))
+            .Packet([SshConnectionMessageNumber.ChannelEof, .. UInt32(0)]));
+        await held.Channel.OpenAsync("127.0.0.1", 50000, CancellationToken.None);
+        held.Connection.HoldNextRead();
+
+        Task<int> read = held.Channel.ReadAsync(new byte[8], CancellationToken.None).AsTask();
+        await held.Connection.HeldReadStarted;
+        Task write = held.Channel.WriteAsync(new byte[] { 1 }, CancellationToken.None).AsTask();
+        held.Connection.ReleaseHeldRead();
+        await Task.WhenAll(read, write);
+
+        Assert.AreEqual(0, read.Result);
+        Assert.AreEqual(1, Payloads(held.Inner).Count(payload => payload[0] == SshConnectionMessageNumber.ChannelData));
+    }
+
+    [TestMethod]
+    public async Task ReadAsyncAndWriteAsync_WriterQueuesTheOnlyChannelData_ReadReturnsItWithoutAnotherPacket()
+    {
+        Held held = ConnectHeld(new SshServerScript()
+            .Packet(Confirmation(window: 0, maximumPacketSize: 100))
+            .Packet(Join([SshConnectionMessageNumber.ChannelData], UInt32(0), String([9])))
+            .Packet(Join([SshConnectionMessageNumber.ChannelWindowAdjust], UInt32(0), UInt32(100))));
+        await held.Channel.OpenAsync("127.0.0.1", 50000, CancellationToken.None);
+        held.Connection.HoldNextRead();
+
+        Task write = held.Channel.WriteAsync(new byte[] { 1 }, CancellationToken.None).AsTask();
+        await held.Connection.HeldReadStarted;
+        byte[] buffer = new byte[8];
+        Task<int> read = held.Channel.ReadAsync(buffer, CancellationToken.None).AsTask();
+        held.Connection.ReleaseHeldRead();
+        await Task.WhenAll(read, write);
+
+        Assert.AreEqual(1, read.Result);
+        Assert.AreEqual(9, buffer[0]);
+    }
+
+    [TestMethod]
+    public async Task ReadAsyncAndWriteAsync_WriterReadsTheServersEof_ReadReturnsZeroWithoutAnotherPacket()
+    {
+        Held held = ConnectHeld(new SshServerScript()
+            .Packet(Confirmation(window: 0, maximumPacketSize: 100))
+            .Packet([SshConnectionMessageNumber.ChannelEof, .. UInt32(0)])
+            .Packet(Join([SshConnectionMessageNumber.ChannelWindowAdjust], UInt32(0), UInt32(100))));
+        await held.Channel.OpenAsync("127.0.0.1", 50000, CancellationToken.None);
+        held.Connection.HoldNextRead();
+
+        Task write = held.Channel.WriteAsync(new byte[] { 1 }, CancellationToken.None).AsTask();
+        await held.Connection.HeldReadStarted;
+        Task<int> read = held.Channel.ReadAsync(new byte[8], CancellationToken.None).AsTask();
+        held.Connection.ReleaseHeldRead();
+        await Task.WhenAll(read, write);
+
+        Assert.AreEqual(0, read.Result);
+    }
+
+    [TestMethod]
+    public async Task ReadAsyncAndWriteAsync_WriterReadsTheServersClose_ReadReturnsZeroAndWriteThrows()
+    {
+        Held held = ConnectHeld(new SshServerScript()
+            .Packet(Confirmation(window: 0, maximumPacketSize: 100))
+            .Packet([SshConnectionMessageNumber.ChannelClose, .. UInt32(0)]));
+        await held.Channel.OpenAsync("127.0.0.1", 50000, CancellationToken.None);
+        held.Connection.HoldNextRead();
+
+        Task write = held.Channel.WriteAsync(new byte[] { 1 }, CancellationToken.None).AsTask();
+        await held.Connection.HeldReadStarted;
+        Task<int> read = held.Channel.ReadAsync(new byte[8], CancellationToken.None).AsTask();
+        held.Connection.ReleaseHeldRead();
+
+        Assert.AreEqual(0, await read);
+        await Assert.ThrowsExactlyAsync<EndOfStreamException>(async () => await write);
+    }
+
+    [TestMethod]
+    public async Task ReadAsyncAndWriteAsync_ReaderReadsTheServersClose_WriteThrowsWithoutAnotherPacket()
+    {
+        Held held = ConnectHeld(new SshServerScript()
+            .Packet(Confirmation(window: 0, maximumPacketSize: 100))
+            .Packet([SshConnectionMessageNumber.ChannelClose, .. UInt32(0)]));
+        await held.Channel.OpenAsync("127.0.0.1", 50000, CancellationToken.None);
+        held.Connection.HoldNextRead();
+
+        Task<int> read = held.Channel.ReadAsync(new byte[8], CancellationToken.None).AsTask();
+        await held.Connection.HeldReadStarted;
+        Task write = held.Channel.WriteAsync(new byte[] { 1 }, CancellationToken.None).AsTask();
+        held.Connection.ReleaseHeldRead();
+
+        Assert.AreEqual(0, await read);
+        await Assert.ThrowsExactlyAsync<EndOfStreamException>(async () => await write);
     }
 
     [TestMethod]
@@ -189,6 +299,64 @@ public sealed class SshDirectTcpipChannelTests
     }
 
     private sealed record Peer(SshDirectTcpipChannel Channel, ScriptedConnection Connection);
+
+    private static Held ConnectHeld(SshServerScript script)
+    {
+        // One read per packet, so a held read is the next packet's and the transport has not buffered it already.
+        List<byte[]> packets = [];
+        byte[] bytes = script.Bytes;
+        for (int position = 0; position < bytes.Length;)
+        {
+            int length = 4 + BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(position));
+            packets.Add(bytes[position..(position + length)]);
+            position += length;
+        }
+
+        ScriptedConnection inner = new([.. packets]);
+        HoldingConnection connection = new(inner);
+        SshTransport transport = new(connection, SshAlgorithmPreferences.Full, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0x33), new TestEphemeralKeys());
+        return new Held(new SshDirectTcpipChannel(transport, "target.example", 443), connection, new Peer(null!, inner));
+    }
+
+    private sealed record Held(SshDirectTcpipChannel Channel, HoldingConnection Connection, Peer Inner);
+
+    // Holds the next read until released, so a second call can queue behind the first before it gets its packet.
+    private sealed class HoldingConnection(ScriptedConnection inner) : IConnection
+    {
+        private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private bool holding;
+
+        public Task HeldReadStarted => started.Task;
+
+        public bool IsSecure => false;
+
+        public EndPoint? RemoteEndPoint => null;
+
+        public void HoldNextRead() => holding = true;
+
+        public void ReleaseHeldRead() => release.SetResult();
+
+        public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            if (holding)
+            {
+                holding = false;
+                started.SetResult();
+                await release.Task;
+            }
+
+            return await inner.ReadAsync(buffer, cancellationToken);
+        }
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => inner.WriteAsync(buffer, cancellationToken);
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
 
     // Yields inside every read and write so that two of them running at once overlap, and records the most seen.
     private sealed class OverlapProbeConnection(ScriptedConnection inner) : IConnection

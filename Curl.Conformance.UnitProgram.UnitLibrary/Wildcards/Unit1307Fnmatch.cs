@@ -1,6 +1,6 @@
 using System.Globalization;
 using Curl.Conformance.UnitProgram.Hashes;
-using Curl.Protocol.Ftp;
+using Curl.Original.Protocol.Ftp;
 
 namespace Curl.Conformance.UnitProgram.Wildcards;
 

@@ -130,7 +130,7 @@
     .\Measure-CodeQuality.ps1
 
 .EXAMPLE
-    .\Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary -ReportPath report.md
+    .\Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.File.UnitLibrary -ReportPath report.md
 
 .EXAMPLE
     .\Measure-CodeQuality.ps1 -Shard 2 -ShardCount 3 -ResultsDirectory $env:TEMP\q\shard-2

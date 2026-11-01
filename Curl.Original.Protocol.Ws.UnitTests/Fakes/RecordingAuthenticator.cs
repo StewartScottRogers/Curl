@@ -1,0 +1,41 @@
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Original.Protocol.Ws.Fakes;
+
+/// <summary>
+/// An <see cref="IHttpAuthenticator" /> that returns a fixed <c>Authorization</c> value and
+/// records every request and challenge list it is asked about.
+/// </summary>
+/// <param name="authorization">The value returned, or <see langword="null" /> for no header.</param>
+public sealed class RecordingAuthenticator(string? authorization = null) : IHttpAuthenticator
+{
+    /// <summary>Gets the requests asked about, in order.</summary>
+    public List<HttpAuthRequest> Requests { get; } = [];
+
+    /// <summary>Gets the challenge lists passed, in order.</summary>
+    public List<IReadOnlyList<string>> Challenges { get; } = [];
+
+    /// <inheritdoc />
+    public string? CreateAuthorization(HttpAuthRequest request, IReadOnlyList<string> challenges)
+    {
+        Requests.Add(request);
+        Challenges.Add(challenges);
+        return authorization;
+    }
+
+    /// <summary>Gets how many times a continuation was asked for.</summary>
+    public int ContinuationCount { get; private set; }
+
+    /// <inheritdoc />
+    public ValueTask<string?> ContinueAuthorizationAsync(HttpAuthRequest request, string sentAuthorization, bool sentBeforeAnyChallenge, IReadOnlyList<string> challenges, CancellationToken cancellationToken)
+    {
+        ContinuationCount++;
+        return ValueTask.FromResult(authorization);
+    }
+
+    /// <summary>Gets the sent values whose handshakes were ended, in order.</summary>
+    public List<string> EndedAuthorizations { get; } = [];
+
+    /// <inheritdoc />
+    public void EndAuthorization(string sentAuthorization) => EndedAuthorizations.Add(sentAuthorization);
+}

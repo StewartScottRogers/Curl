@@ -1,7 +1,7 @@
 using Curl.Console;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Http;
+using Curl.Original.Protocol.Http;
 
 using Curl.Testing;
 
@@ -11,7 +11,7 @@ namespace Curl.Engine;
 /// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[HTTP/2]</c> frame lines -
 /// <c>http/2</c>, <c>protocol</c> and <c>all</c>, so <c>-vv</c> too - and that the composition hands
 /// that choice to the HTTP handler (BL-1167). The lines themselves are pinned in
-/// <c>Curl.Protocol.Http.UnitTests</c>; the console writes them only under <c>-v</c>, as it writes
+/// <c>Curl.Original.Protocol.Http.UnitTests</c>; the console writes them only under <c>-v</c>, as it writes
 /// every info line.
 /// </summary>
 [TestClass]

@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4256 adds the transport of OASIS AMQP Version 1.0 to `Curl.Extension.Amqp1.UnitLibrary`, on the type system of
+BL-4256 adds the transport of OASIS AMQP Version 1.0 to `Curl.Extended.Protocol.Amqp1.UnitLibrary`, on the type system of
 ADR-1053: the protocol headers, the frame layout, nine performatives, the error type, five delivery states, five SASL
 frame bodies and the message sections. Every one of these but the non-list sections is a composite type: a described
 list whose fields are positional, some mandatory. Upstream curl has no AMQP, so the specification decides.

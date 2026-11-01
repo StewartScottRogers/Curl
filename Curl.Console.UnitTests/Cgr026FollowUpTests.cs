@@ -5,7 +5,7 @@ using Curl.Core;
 using Curl.Engine;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.File;
+using Curl.Original.Protocol.File;
 
 namespace Curl.Console;
 

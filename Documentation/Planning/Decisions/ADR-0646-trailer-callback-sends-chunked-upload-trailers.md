@@ -8,7 +8,7 @@
 ## Context
 
 ADR-0611 (BL-2419) wired the prerequest and resolver-start callbacks and left `CURLOPT_TRAILERFUNCTION`
-answering `NotBuiltIn`: `Curl.Protocol.Http`'s `HttpRequestBodyWriter` wrote a fixed `0\r\n\r\n` closing chunk
+answering `NotBuiltIn`: `Curl.Original.Protocol.Http`'s `HttpRequestBodyWriter` wrote a fixed `0\r\n\r\n` closing chunk
 and had no way to ask anyone for trailers.
 
 curl 8.22.0's `add_last_chunk` (`lib/http_chunks.c`, read from the release's source; the curl tool has no option

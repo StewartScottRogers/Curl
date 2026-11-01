@@ -154,7 +154,7 @@
 #
 # EXAMPLES
 #     ./Measure-CodeQuality.sh
-#     ./Measure-CodeQuality.sh -Library Curl.Protocol.File.UnitLibrary -ReportPath report.md
+#     ./Measure-CodeQuality.sh -Library Curl.Original.Protocol.File.UnitLibrary -ReportPath report.md
 #     ./Measure-CodeQuality.sh -Shard 2 -ShardCount 3 -ResultsDirectory "$TMPDIR/q/shard-2"
 #     ./Measure-CodeQuality.sh -FromShards -ResultsDirectory "$TMPDIR/q" -JsonPath q.json
 #
@@ -539,9 +539,9 @@ run_coverage_tests() {
 # 40108510840 (the job that took 25 minutes): what shard_test_projects balances. A
 # project not listed counts as default_test_project_seconds. Only the balance depends on
 # these numbers; every project lands in exactly one shard whatever they say.
-measured_test_project_seconds='Curl.Protocol.Ssh.UnitTests=707 Curl.Conformance.UnitTests=72 Curl.Cryptography.UnitTests=58
+measured_test_project_seconds='Curl.Original.Protocol.Ssh.UnitTests=707 Curl.Conformance.UnitTests=72 Curl.Cryptography.UnitTests=58
 Curl.Tls.UnitTests=24 Curl.Networking.UnitTests=23 Curl.Console.UnitTests=17
-Curl.Conformance.LibTest.UnitTests=15 Curl.Engine.UnitTests=13 Curl.Protocol.Http.UnitTests=11
+Curl.Conformance.LibTest.UnitTests=15 Curl.Engine.UnitTests=13 Curl.Original.Protocol.Http.UnitTests=11
 Curl.Cli.UnitTests=10 Libcurl.UnitTests=10 Curl.Mcp.UnitTests=9 Curl.Api.UnitTests=8
 Curl.Kerberos.UnitTests=8 Curl.Conformance.Http3Server.UnitTests=7 Curl.Conformance.SshServer.UnitTests=7'
 default_test_project_seconds=5

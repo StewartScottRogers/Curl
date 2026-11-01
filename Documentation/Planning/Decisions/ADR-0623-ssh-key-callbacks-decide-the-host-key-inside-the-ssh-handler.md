@@ -12,7 +12,7 @@ key and an `SshKeyMatch`, answering an `SshKeyStatus`), `CURLOPT_SSH_HOSTKEYFUNC
 key type and bytes, answering an `SshKeyMatch`) and `CURLOPT_SSL_CTX_FUNCTION` (`SslContextCallback`). Nothing called
 them, and `Libcurl` answered `CURLE_NOT_BUILT_IN` for all three and their `*DATA` options.
 
-The host key is checked inside `Curl.Protocol.Ssh`'s `SshHostKeyChecker`, which sees only the transfer's
+The host key is checked inside `Curl.Original.Protocol.Ssh`'s `SshHostKeyChecker`, which sees only the transfer's
 `SshOptions` (in `Curl.Protocol.Abstractions`, which cannot reference `Curl.Api`). A library handle's perform passed no
 `SshOptions` at all (`ManagedEasyTransfer.OwnInputsOf`), so `CURLOPT_SSH_KNOWNHOSTS`, the fingerprints and the key
 files never reached the handler either.

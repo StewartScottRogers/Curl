@@ -8,7 +8,7 @@
 
 The OAuth2 extension must POST a form to a token or device authorization endpoint and read the JSON
 response, including a 400 or 401 that carries the error response (RFC 6749 §5.2). An extension may
-reference neither `Curl.Protocol.Http` nor another extension (ADR-0999), so it cannot use curl's
+reference neither `Curl.Original.Protocol.Http` nor another extension (ADR-0999), so it cannot use curl's
 HTTP code or the S3 extension's client (ADR-1018).
 
 ## Decision

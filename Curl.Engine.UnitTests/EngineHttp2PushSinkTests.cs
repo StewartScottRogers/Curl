@@ -4,7 +4,7 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Multi;
 using Curl.Api.Options;
-using Curl.Protocol.Http;
+using Curl.Original.Protocol.Http;
 
 namespace Curl.Engine;
 

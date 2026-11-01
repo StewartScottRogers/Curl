@@ -12,7 +12,7 @@ BL-4123 adds XMPP as an extension (ADR-0999), tested against RFC 6120 (core), RF
 ## Decision
 
 - Schemes `xmpp` (port 5222, RFC 6120 3.2.1) and `xmpps` (port 5223, direct TLS, XEP-0368), in RFC 5122's authority
-  form: `xmpp://[user@]domain[:port]/[target-jid][?query]`. The library is `Curl.Extension.Xmpp.UnitLibrary`; it adds
+  form: `xmpp://[user@]domain[:port]/[target-jid][?query]`. The library is `Curl.Extended.Protocol.Xmpp.UnitLibrary`; it adds
   no command-line option. The URL's domain is the stream's `to`; the URL-decoded path is the target JID, or the domain
   itself when the path is empty.
 - Query (RFC 5122 2.2 and the XMPP URI query registry): `?message;subject=..;type=..;body=..` sends a `<message/>`

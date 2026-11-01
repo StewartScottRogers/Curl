@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4046]
-touches: [Curl.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Protocol.Ldap.UnitLibrary/WinLdapLogonBind.cs, Curl.Protocol.Ldap.UnitTests/Cgr289Tests.cs, Record-CurlExchange.ps1, Curl.Networking.UnitLibrary/ISystemStoreTrustTlsProvider.cs, Curl.Networking.UnitTests/ConnectTargetTlsOverrideTests.cs]
+touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitLibrary/WinLdapLogonBind.cs, Curl.Original.Protocol.Ldap.UnitTests/Cgr289Tests.cs, Record-CurlExchange.ps1, Curl.Networking.UnitLibrary/ISystemStoreTrustTlsProvider.cs, Curl.Networking.UnitTests/ConnectTargetTlsOverrideTests.cs]
 requirement: none
 created: 2026-10-28
 completed:
@@ -32,7 +32,7 @@ BL-3818 made LdapProtocolHandler open WinLDAP's second ldaps connection with Tls
 - Measured real curl 8.22.0 (`-sS -k ldaps://localhost:21909/dc=test`, script answering 3 rootDSE searches with SearchResultDone IDs 1-3, then silent): 2 TLS connections, 3 searches (supportedCapabilities, supportedSASLMechanisms, supportedCapabilities) on the second, sicilyNegotiate bind with NTLM flags `07 b2 08 a2`, exit 38 `curl: (38) LDAP local: bind via ldap_win_bind Unavailable`.
 - Curl before this run: exit 60 `SEC_E_UNTRUSTED_ROOT` - the system-store-only provider also dropped `-k`. Fixed: `ISystemStoreTrustTlsProvider.SystemStoreOnly` keeps `Insecure` (ADR-0983). Curl after: same 2 connections and the same 3 search messages byte for byte, then the bind with flags `b7 b2 08 e2` and exit 38 `... Timeout`. Filed BL-4046 for the flags and the text.
 - `--cacert` with a CA that does not issue the server certificate (Curl.Output.UnitTests/Fixtures/LoopbackChain.pem): both exit 60 with the same stderr on the first connection. The trusted-`--cacert` variant (gap report: Server Down) still needs measuring once BL-4046 is in; Record-CurlExchange's -TlsRootCertificateFile wrote no file in my hashtable-splatted run, so pass it directly next time.
-- Networking and Ldap fast tests pass (3814 and 638); Measure-CodeQuality for Curl.Networking.UnitLibrary and Curl.Protocol.Ldap.UnitLibrary: 0 failing members.
+- Networking and Ldap fast tests pass (3814 and 638); Measure-CodeQuality for Curl.Networking.UnitLibrary and Curl.Original.Protocol.Ldap.UnitLibrary: 0 failing members.
 
 ## Log
 

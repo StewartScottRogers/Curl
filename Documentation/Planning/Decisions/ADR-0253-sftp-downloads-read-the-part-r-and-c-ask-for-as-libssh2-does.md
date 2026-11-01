@@ -9,7 +9,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 `-r`/`--range` and `-C`/`--continue-at` on an `sftp://` download ask for part of the file.
 Which bytes curl reads, where its reads start, and what a range or offset past the end
-reports had to be measured before `Curl.Protocol.Ssh.UnitLibrary` could honour them.
+reports had to be measured before `Curl.Original.Protocol.Ssh.UnitLibrary` could honour them.
 
 The Windows reference build (curl 8.21.0, libssh2 1.11.1, Schannel) ran as `curl -sS -k --key
 <rsa key> --pubkey <pub> -u <user>: <option> sftp://localhost:2235/~/bl573/files/a.txt`
@@ -63,5 +63,5 @@ handler runs.
 - The `READ` offsets and lengths of the small cases match byte for byte. Over a large range
   ADR-0220's read-ahead sends 19 reads where libssh2 sent 17; the extra reads fall past the
   range, their answers are dropped either way, and nothing curl prints differs.
-- `Curl.Protocol.Ssh.UnitTests` pins every row above but the tool's own refusal of `-C`
+- `Curl.Original.Protocol.Ssh.UnitTests` pins every row above but the tool's own refusal of `-C`
   with `-r`, which never reaches a handler.

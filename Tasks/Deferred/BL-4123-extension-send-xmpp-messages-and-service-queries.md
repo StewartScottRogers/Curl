@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4091, BL-4093, BL-4092]
-touches: [Curl.Extension.Xmpp.UnitLibrary, Curl.Extension.Xmpp.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Console.UnitTests/CurlCompositionTests.cs]
+touches: [Curl.Extended.Protocol.Xmpp.UnitLibrary, Curl.Extended.Protocol.Xmpp.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Console.UnitTests/CurlCompositionTests.cs]
 requirement: none
 created: 2026-10-29
 completed:
@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-Curl provides `xmpp:` URIs: send a message, disco#info query, as the extension `Curl.Extension.Xmpp.UnitLibrary`.
+Curl provides `xmpp:` URIs: send a message, disco#info query, as the extension `Curl.Extended.Protocol.Xmpp.UnitLibrary`.
 
 ## Context
 
@@ -22,7 +22,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 ## Acceptance criteria
 
-- [x] `Curl.Extension.Xmpp.UnitLibrary` and `Curl.Extension.Xmpp.UnitTests` exist in `/Extensions/Xmpp/` in `Curl.slnx`, registered by one line in `ExtensionCatalogue.cs`, and the build's `VerifyExtensionIsolation` passes.
+- [x] `Curl.Extended.Protocol.Xmpp.UnitLibrary` and `Curl.Extended.Protocol.Xmpp.UnitTests` exist in `/Extended/Protocols/Xmpp/` in `Curl.slnx`, registered by one line in `ExtensionCatalogue.cs`, and the build's `VerifyExtensionIsolation` passes.
 - [x] It provides `xmpp:` URIs: send a message, disco#info query.
 - [x] Unit tests check its wire behaviour against named sections of RFC 6120, RFC 6121, RFC 5122, XEP-0030, with no network (fake connections or recorded bytes).
 - [x] With `CURL_EXTENSIONS=0` a URL with its scheme fails exactly as curl fails an unsupported scheme (exit 1, same stderr bytes); unit test.
@@ -37,7 +37,7 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 
 - ExtensionDescriptionCatalogue.cs added to touches: it lists each extension's description for --extensions and --ai-help extensions. CurlCompositionTests.cs added: its list of TCP handlers names each handler, so XmppProtocolHandler joins it.
 - SCRAM-SHA-1/256 is not yet done (ADR-1068); PLAIN over STARTTLS and ANONYMOUS are. Tests are platform-neutral (no paths, output written without indentation so no platform newline), so CI on Linux and macOS holds.
-- Quality: Measure-CodeQuality.ps1 reports Curl.Extension.Xmpp.UnitLibrary at 100% line and branch, 0 failing members.
+- Quality: Measure-CodeQuality.ps1 reports Curl.Extended.Protocol.Xmpp.UnitLibrary at 100% line and branch, 0 failing members.
 
 ## Log
 

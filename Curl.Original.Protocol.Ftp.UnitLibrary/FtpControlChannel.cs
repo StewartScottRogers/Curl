@@ -1,0 +1,274 @@
+using System.Globalization;
+using System.Text;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Original.Protocol.Ftp;
+
+/// <summary>
+/// Sends commands on an FTP control connection and reads its replies, a line at a time.
+/// </summary>
+/// <param name="connection">The control connection; the caller owns and disposes it.</param>
+/// <param name="events">
+/// Where <c>-v</c> and <c>--trace</c> learn of each command sent, as a request header, and
+/// each reply line read, as a response header.
+/// </param>
+/// <param name="cancellationToken">Cancels every send and read, until <see cref="CancellationToken" /> is set.</param>
+/// <param name="diagnostics">
+/// Where the diagnostic log learns of each command sent and each reply read, at
+/// <c>verbose</c>, <c>QUIT</c> included (BL-924).
+/// </param>
+/// <param name="dumpHeaderOutput">
+/// The <c>-D</c> stream alone, <see cref="ITransferContext.DumpHeaderOutput" />, or
+/// <see langword="null" /> without <c>-D</c>: each reply line reported is also written there,
+/// as curl 8.21.0 passes it as <c>CLIENTWRITE_INFO</c> (BL-1131).
+/// </param>
+/// <param name="connectEvents">
+/// The events the connector writes the control connection's <c>[TCP]</c> trace lines to, whose info
+/// lines <see cref="StopReporting" /> stops too (BL-1259).
+/// </param>
+/// <remarks>
+/// Commands and replies are Latin-1, so every byte of a percent-decoded path reaches the
+/// server unchanged, as curl sends it. A reply ends at the first line that starts with
+/// three digits and a space; the lines before it, such as the <c>220-</c> lines of a
+/// multi-line greeting or a bare <c>331</c>, are skipped, as curl skips them. A line ends
+/// at LF, with a CR before it dropped. As measured on curl 8.21.0 (BL-930), every command
+/// sent is reported with its CRLF, <c>PASS</c>'s password in clear, and every complete line
+/// read with its line end, skipped or not, until <see cref="StopReporting" />.
+/// </remarks>
+internal sealed class FtpControlChannel(IConnection connection, ITransferEvents events, CancellationToken cancellationToken, FtpDiagnosticLog diagnostics, Stream? dumpHeaderOutput, InfoLineStoppingTransferEvents connectEvents)
+{
+    /// <summary>Where lines are reported: <c>events</c> until <see cref="StopReporting" />, nowhere after.</summary>
+    private ITransferEvents reporting = events;
+
+    /// <summary>Where reply lines are written: <c>dumpHeaderOutput</c> until <see cref="StopReporting" />, nowhere after.</summary>
+    private Stream? dumping = dumpHeaderOutput;
+
+    /// <summary>
+    /// Reports and writes nothing more: curl sends <c>QUIT</c> as it closes the connection,
+    /// where neither <c>-v</c>, its <c>[TCP]</c> trace lines, nor the <c>-D</c> file sees it or its reply.
+    /// </summary>
+    public void StopReporting()
+    {
+        reporting = NoTransferEvents.Instance;
+        connectEvents.StopInfoLines();
+        dumping = null;
+    }
+
+    private const int ReadBufferSize = 4096;
+
+    /// <summary>
+    /// Gets the connection commands are sent on and replies read from: the one the channel
+    /// was built with until <see cref="SwitchTo(IConnection)" />.
+    /// </summary>
+    public IConnection Connection => connection;
+
+    /// <summary>
+    /// Carries on over <paramref name="secured" />, the control connection after
+    /// <c>AUTH</c> upgraded it to TLS.
+    /// </summary>
+    /// <param name="secured">The upgraded connection; the caller owns it.</param>
+    public void SwitchTo(IConnection secured) => connection = secured;
+
+    /// <summary>
+    /// Gets or sets the token that cancels every send and read: the connect phase's limit
+    /// while the session logs in, the transfer's afterwards (BL-512).
+    /// </summary>
+    public CancellationToken CancellationToken { get; set; } = cancellationToken;
+
+    /// <summary>
+    /// The most bytes a reply line may hold before its LF, so that the line with its LF is
+    /// at most 65535 bytes: measured on curl 8.21.0, one byte more fails with exit 100.
+    /// </summary>
+    private const int MaxLineBytes = 65535;
+
+    private readonly byte[] buffer = new byte[ReadBufferSize];
+
+    private int bufferStart;
+
+    private int bufferEnd;
+
+    /// <summary>The read <see cref="WaitForBytesAsync" /> started, which the next reply takes over.</summary>
+    private Task<bool>? pendingFill;
+
+    /// <summary>The bytes the reply being read has taken so far, line ends included.</summary>
+    private int replyByteCount;
+
+    /// <summary>
+    /// Sends <paramref name="command" /> followed by CRLF.
+    /// </summary>
+    /// <param name="command">The command line without its line end, such as <c>TYPE I</c>.</param>
+    /// <returns>
+    /// <see langword="null" /> when it was sent; the <see cref="IOException" /> the
+    /// connection failed with otherwise, so a reset can be told from any other failure.
+    /// </returns>
+    public async ValueTask<IOException?> SendAsync(string command)
+    {
+        byte[] line = Encoding.Latin1.GetBytes(command + "\r\n");
+        try
+        {
+            await connection.WriteAsync(line, CancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException failure)
+        {
+            return failure;
+        }
+
+        reporting.ReportRequestHeader(line);
+        diagnostics.CommandSent(command);
+        return null;
+    }
+
+    /// <summary>
+    /// Whether the bytes already read past the last reply start a 4xx or 5xx reply, as curl
+    /// 8.21.0's <c>ReceivedServerConnect</c> checks its cached response while it waits for an
+    /// active-mode data connection (BL-1978).
+    /// </summary>
+    public bool HasBufferedNegativeReply => bufferStart < bufferEnd && buffer[bufferStart] > (byte)'3';
+
+    /// <summary>
+    /// Gets the bytes read from the connection past the last reply, which the next transfer on a
+    /// kept connection reads first (BL-1981).
+    /// </summary>
+    public byte[] UnreadBytes => buffer[bufferStart..bufferEnd];
+
+    /// <summary>
+    /// Whether bytes past the last reply have already been read: a reply the server pipelined
+    /// behind it, which curl 8.21.0 refuses after <c>AUTH</c> (BL-1985).
+    /// </summary>
+    public bool HasBufferedBytes => bufferStart < bufferEnd;
+
+    /// <summary>
+    /// Reads <paramref name="unread" /> before anything more from the connection: the bytes a
+    /// previous transfer on the kept connection read past its last reply. Called before any read.
+    /// </summary>
+    /// <param name="unread">The bytes, at most a buffer's worth.</param>
+    public void ReadFirst(byte[] unread)
+    {
+        unread.CopyTo(buffer, 0);
+        bufferStart = 0;
+        bufferEnd = unread.Length;
+    }
+
+    /// <summary>
+    /// Reads the next complete reply.
+    /// </summary>
+    /// <returns>
+    /// The reply, or <see langword="null" /> when the server closed the connection or a
+    /// read failed with an <see cref="IOException" /> before the reply was complete.
+    /// </returns>
+    /// <exception cref="InvalidDataException">
+    /// A line reached 65536 bytes, its CR and LF included, as curl refuses with exit 100.
+    /// </exception>
+    /// <exception cref="FtpReplyNulByteException">
+    /// A complete line held a NUL byte, as curl refuses with exit 8; the line is not reported.
+    /// </exception>
+    /// <exception cref="FtpReplyLineWriteException">
+    /// The <c>-D</c> stream refused a line, as curl ends with exit 23.
+    /// </exception>
+    public async ValueTask<FtpReply?> ReadReplyAsync()
+    {
+        string? firstLine = null;
+        replyByteCount = 0;
+        while (await ReadLineAsync().ConfigureAwait(false) is { } line)
+        {
+            firstLine ??= line;
+            if (TryParseLastLine(line, out int code))
+            {
+                diagnostics.ReplyRead(code, firstLine);
+                return new FtpReply(code, line) { ByteCount = replyByteCount };
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryParseLastLine(string line, out int code)
+    {
+        code = 0;
+        return line.Length >= 4
+            && line[3] == ' '
+            && int.TryParse(line.AsSpan(0, 3), NumberStyles.None, CultureInfo.InvariantCulture, out code);
+    }
+
+    private async ValueTask<string?> ReadLineAsync()
+    {
+        var line = new List<byte>();
+        while (bufferStart < bufferEnd || await TryFillAsync().ConfigureAwait(false))
+        {
+            if (line.Count >= MaxLineBytes)
+            {
+                throw new InvalidDataException("An FTP reply line reached 65536 bytes.");
+            }
+
+            byte next = buffer[bufferStart++];
+            if (next == (byte)'\n')
+            {
+                line.Add(next);
+                byte[] bytes = [.. line];
+                if (Array.IndexOf(bytes, (byte)0) >= 0)
+                {
+                    throw new FtpReplyNulByteException();
+                }
+
+                replyByteCount += bytes.Length;
+                reporting.ReportResponseHeader(bytes);
+                await WriteToDumpHeaderOutputAsync(bytes).ConfigureAwait(false);
+                return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1).TrimEnd('\r');
+            }
+
+            line.Add(next);
+        }
+
+        return null;
+    }
+
+    private async ValueTask WriteToDumpHeaderOutputAsync(byte[] line)
+    {
+        if (dumping is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await dumping.WriteAsync(line, CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException refused)
+        {
+            throw new FtpReplyLineWriteException(line.Length, refused);
+        }
+    }
+
+    /// <summary>
+    /// Starts reading the next bytes from the connection, which the next reply then reads
+    /// first, so the server's control connection can be watched while the active-mode data
+    /// connection is awaited, as curl 8.22.0's <c>ReceivedServerConnect</c> polls it (CGR-099).
+    /// Called only with no bytes buffered and no such read pending.
+    /// </summary>
+    /// <returns>A task whose result says whether any bytes arrived.</returns>
+    public Task<bool> WaitForBytesAsync() => pendingFill = FillAsync();
+
+    private async ValueTask<bool> TryFillAsync()
+    {
+        Task<bool> fill = pendingFill ?? FillAsync();
+        pendingFill = null;
+        return await fill.ConfigureAwait(false);
+    }
+
+    private async Task<bool> FillAsync()
+    {
+        bufferStart = 0;
+        bufferEnd = 0;
+        try
+        {
+            bufferEnd = await connection.ReadAsync(buffer, CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            bufferEnd = 0;
+        }
+
+        return bufferEnd > 0;
+    }
+}

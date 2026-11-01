@@ -35,12 +35,12 @@ The `Uri` members read in production code, by project:
 | --- | --- | --- |
 | `Curl.Console` | `CurlCommandRunner.cs` | `Uri.TryCreate`, `Scheme` |
 | `Curl.Core.UnitLibrary` | `ProtocolDispatcher.cs` | `Scheme` |
-| `Curl.Protocol.Dict.UnitLibrary` | `DictProtocolHandler.cs` | `IdnHost`, `IsDefaultPort`, `Port`, `AbsolutePath` |
-| `Curl.Protocol.File.UnitLibrary` | `FileUrlPath.cs` | `Scheme`, `OriginalString` |
-| `Curl.Protocol.Gopher.UnitLibrary` | `GopherProtocolHandler.cs`, `GopherSelector.cs` | `IdnHost`, `IsDefaultPort`, `Port`, `Scheme`, `OriginalString` |
-| `Curl.Protocol.Mqtt.UnitLibrary` | `MqttProtocolHandler.cs`, `MqttSession.cs`, `MqttTopic.cs` | `IdnHost`, `IsDefaultPort`, `Port`, `Scheme`, `AbsolutePath` |
-| `Curl.Protocol.Telnet.UnitLibrary` | `TelnetProtocolHandler.cs` | `IdnHost`, `IsDefaultPort`, `Port` |
-| `Curl.Protocol.Tftp.UnitLibrary` | `TftpProtocolHandler.cs` | `AbsolutePath`, `Port`, `IdnHost` |
+| `Curl.Original.Protocol.Dict.UnitLibrary` | `DictProtocolHandler.cs` | `IdnHost`, `IsDefaultPort`, `Port`, `AbsolutePath` |
+| `Curl.Original.Protocol.File.UnitLibrary` | `FileUrlPath.cs` | `Scheme`, `OriginalString` |
+| `Curl.Original.Protocol.Gopher.UnitLibrary` | `GopherProtocolHandler.cs`, `GopherSelector.cs` | `IdnHost`, `IsDefaultPort`, `Port`, `Scheme`, `OriginalString` |
+| `Curl.Original.Protocol.Mqtt.UnitLibrary` | `MqttProtocolHandler.cs`, `MqttSession.cs`, `MqttTopic.cs` | `IdnHost`, `IsDefaultPort`, `Port`, `Scheme`, `AbsolutePath` |
+| `Curl.Original.Protocol.Telnet.UnitLibrary` | `TelnetProtocolHandler.cs` | `IdnHost`, `IsDefaultPort`, `Port` |
+| `Curl.Original.Protocol.Tftp.UnitLibrary` | `TftpProtocolHandler.cs` | `AbsolutePath`, `Port`, `IdnHost` |
 
 `Curl.Cli.UnitLibrary` calls only `Uri.EscapeDataString` (ADR-0004) and never holds a
 `Uri`. The other ten protocol libraries (`Ftp`, `Http`, `Imap`, `Ldap`, `Pop3`, `Rtsp`,
@@ -48,9 +48,9 @@ The `Uri` members read in production code, by project:
 `Url` today.
 
 In the tests, `new Uri(` appears 77 times across eight projects, 55 of them in
-`Curl.Protocol.File.UnitTests`, and 175 lines assign a `Url`. The only implementations
+`Curl.Original.Protocol.File.UnitTests`, and 175 lines assign a `Url`. The only implementations
 of `ITransferContext` are `TransferContext` and the test fake
-`Curl.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs`.
+`Curl.Original.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs`.
 
 ### What the `file` handler already works around
 
@@ -87,7 +87,7 @@ Run on .NET 10.0.12 on Windows on 2026-09-26, with `new Uri(text)` and
 
 BL-010 records "A Dos path must be rooted" for `file://ab:/x` as well; on .NET 10.0.12
 the message for that spelling is "The hostname could not be parsed", as the comment in
-`Curl.Protocol.File.UnitTests/FileUrlPathTests.cs` also says. Both are
+`Curl.Original.Protocol.File.UnitTests/FileUrlPathTests.cs` also says. Both are
 `UriFormatException`, so the conclusion is the same.
 
 ## Decision
@@ -135,7 +135,7 @@ BL-030 now depends on BL-292, and BL-186 on BL-293 and BL-294.
 
 Read from the source on 2026-09-26, when this ADR was accepted:
 
-- `Curl.Protocol.Http.UnitLibrary` is no longer empty: `HttpProtocolHandler`,
+- `Curl.Original.Protocol.Http.UnitLibrary` is no longer empty: `HttpProtocolHandler`,
   `HttpRedirectLocation` and `HttpRequestHeadFormatter` read the `Uri`.
 - `Curl.Core.UnitLibrary`'s `ProxySelector` and `RedirectFollower`, and
   `Curl.Cookies.UnitLibrary`'s `CookieOrigin`, `CookieStore` and `SetCookieParser`,
@@ -265,7 +265,7 @@ the `Uri` and answer exit 3 when it is `null`.
 
 Projects that would change: `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Console`,
 `Curl.Core.UnitLibrary` (the scheme has to come from the text when there is no `Uri`),
-`Curl.Protocol.File.UnitLibrary`, and, lightly, the other five handler libraries (a
+`Curl.Original.Protocol.File.UnitLibrary`, and, lightly, the other five handler libraries (a
 `null` check each), with their test projects.
 
 Rough effort: three to four tasks, about two to three days.

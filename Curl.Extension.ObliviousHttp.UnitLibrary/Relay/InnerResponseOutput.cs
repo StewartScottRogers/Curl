@@ -16,17 +16,28 @@ internal static class InnerResponseOutput
     /// <param name="context">The transfer.</param>
     public static async Task<TransferResult> WriteAsync(BinaryHttpResponse response, string method, ITransferContext context)
     {
-        if (FailsOnStatus(response.StatusCode, context))
+        if (response.StatusCode >= 400 && context.Http!.Fail == HttpFailMode.Fail)
         {
-            return TransferResult.Failure(CurlExitCode.HttpReturnedError, $"The requested URL returned error: {response.StatusCode}");
+            return TransferResult.Failure(CurlExitCode.HttpReturnedError, ErrorMessageOf(response.StatusCode));
         }
 
-        byte[] head = Encoding.Latin1.GetBytes($"HTTP/1.1 {response.StatusCode} \r\n" + string.Concat(response.Headers.Select(field => $"{field.Name}: {field.Value}\r\n")) + "\r\n");
+        byte[] head = HeadOf(response);
         await WriteIfGivenAsync(context.HeaderOutput, head, context.CancellationToken);
         await WriteIfGivenAsync(context.DumpHeaderOutput, head, context.CancellationToken);
         await context.Output.WriteAsync(response.Content, context.CancellationToken);
+        return ResultOf(response, method, context);
+    }
+
+    private static byte[] HeadOf(BinaryHttpResponse response) =>
+        Encoding.Latin1.GetBytes($"HTTP/1.1 {response.StatusCode} \r\n" + string.Concat(response.Headers.Select(field => $"{field.Name}: {field.Value}\r\n")) + "\r\n");
+
+    private static TransferResult ResultOf(BinaryHttpResponse response, string method, ITransferContext context)
+    {
         IReadOnlyList<KeyValuePair<string, string>> headers = [.. response.Headers.Select(field => new KeyValuePair<string, string>(field.Name, field.Value))];
-        return TransferResult.Success(response.Content.Length) with
+        TransferResult result = response.StatusCode >= 400 && context.Http!.Fail == HttpFailMode.FailWithBody
+            ? TransferResult.Failure(CurlExitCode.HttpReturnedError, ErrorMessageOf(response.StatusCode), response.Content.Length)
+            : TransferResult.Success(response.Content.Length);
+        return result with
         {
             Report = new TransferReport
             {
@@ -39,7 +50,7 @@ internal static class InnerResponseOutput
         };
     }
 
-    private static bool FailsOnStatus(int statusCode, ITransferContext context) => statusCode >= 400 && context.Http!.Fail == HttpFailMode.Fail;
+    private static string ErrorMessageOf(int statusCode) => $"The requested URL returned error: {statusCode}";
 
     private static async Task WriteIfGivenAsync(Stream? output, byte[] bytes, CancellationToken cancellationToken)
     {

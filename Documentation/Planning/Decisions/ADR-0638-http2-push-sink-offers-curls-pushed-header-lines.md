@@ -16,7 +16,7 @@ goal text describes the header lines as `name: value`; curl's own list, read by
 
 ## Decision
 
-- `Curl.Protocol.Http` gains two public interfaces: `IHttp2PushSink.TryAcceptPush(headers, response)`,
+- `Curl.Original.Protocol.Http` gains two public interfaces: `IHttp2PushSink.TryAcceptPush(headers, response)`,
   synchronous, answering take or refuse, and `IHttpPushedResponse` (`StreamId`, and `Content`, a
   read-only, asynchronous-only `Stream` giving `HTTP/2 200 \r\n`, the headers, the empty line, then
   the DATA, as `Http2StreamConnection` presents any response). `Curl.Protocol.Abstractions` does not

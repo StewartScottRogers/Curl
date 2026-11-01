@@ -17,7 +17,7 @@ full.
 
 ## Decision
 
-1. `Curl.Protocol.Http`'s `HttpRequestBodyWriter` writes the body lines
+1. `Curl.Original.Protocol.Http`'s `HttpRequestBodyWriter` writes the body lines
    (`HttpClientReaderTraceLines`) when `HttpProtocolHandler.TracesClientReaders` is on, which
    `Curl.Console` sets from `CurlComposition.TracesRead` through `CurlTransports.TracesRead`: for a
    non-empty `-d` body `add buf reader`, then `cr_buf_read` and `client_read` per read; for a `-T`

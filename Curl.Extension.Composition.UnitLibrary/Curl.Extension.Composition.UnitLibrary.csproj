@@ -7,12 +7,14 @@
   <ItemGroup>
     <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Extension.Abstractions.UnitLibrary\Curl.Extension.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Extended.Protocol.*.UnitLibrary\Curl.Extended.Protocol.*.UnitLibrary.csproj" />
   </ItemGroup>
 
   <!-- Every extension library is referenced by wildcard, so adding an extension edits no line here (ADR-1003). -->
   <ItemGroup>
     <ProjectReference Include="..\Curl.Extension.*.UnitLibrary\Curl.Extension.*.UnitLibrary.csproj"
                       Exclude="..\Curl.Extension.Composition.UnitLibrary\Curl.Extension.Composition.UnitLibrary.csproj;..\Curl.Extension.Abstractions.UnitLibrary\Curl.Extension.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Extended.Protocol.*.UnitLibrary\Curl.Extended.Protocol.*.UnitLibrary.csproj" />
   </ItemGroup>
 
 </Project>

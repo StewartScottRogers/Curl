@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4117 adds an AMQP 0-9-1 client (`amqp://`, `amqps://`) as the extension `Curl.Extension.Amqp0.UnitLibrary`
+BL-4117 adds an AMQP 0-9-1 client (`amqp://`, `amqps://`) as the extension `Curl.Extended.Protocol.Amqp0.UnitLibrary`
 (ADR-0999). Upstream curl has no AMQP, so the AMQP 0-9-1 specification (2008-11-13) with RabbitMQ's errata decides.
 BL-4259 is its wire format: protocol header, frames, data types, field tables, content header and body frames, and the
 methods a publish, get and queue-declare client sends or receives. The task asks that every malformed frame or method

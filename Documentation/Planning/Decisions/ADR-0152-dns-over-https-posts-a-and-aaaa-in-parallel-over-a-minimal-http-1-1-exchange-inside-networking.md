@@ -11,7 +11,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 DNS-over-HTTPS server. The resolver belongs beside `SystemDnsResolver` in
 `Curl.Networking.UnitLibrary`, behind `IDnsResolver`, but the DoH query is itself an
 HTTPS request: `Curl.Networking.UnitLibrary` cannot reference
-`Curl.Protocol.Http.UnitLibrary` (it is not a protocol, and protocols are referenced by
+`Curl.Original.Protocol.Http.UnitLibrary` (it is not a protocol, and protocols are referenced by
 nothing but `Curl.Console`), and `HttpClient` is barred from the solution's protocol code
 and is a trim risk under native AOT.
 
@@ -56,7 +56,7 @@ Two places could own the HTTP exchange:
 1. A minimal HTTP/1.1 POST writer and response reader in `Curl.Networking.UnitLibrary`,
    next to `HttpProxyTunnel`, which already writes an HTTP request (CONNECT) and reads a
    reply's head there for the same reason.
-2. A resolver in `Curl.Console` that composes `Curl.Protocol.Http.UnitLibrary`'s handler.
+2. A resolver in `Curl.Console` that composes `Curl.Original.Protocol.Http.UnitLibrary`'s handler.
 
 ## Decision
 
@@ -170,7 +170,7 @@ Decided by Claude under Stewart's delegation. BL-642 measured the rest of the de
 
 ## Alternatives considered
 
-- **Compose `Curl.Protocol.Http.UnitLibrary`'s handler in `Curl.Console`.** Reuses the full
+- **Compose `Curl.Original.Protocol.Http.UnitLibrary`'s handler in `Curl.Console`.** Reuses the full
   HTTP stack, but puts a resolver in the executable, drags every transfer option (`-A`,
   `-H`, `-b`, `--proxy`, `-k`) into a request curl builds from none of them, and makes the
   resolver untestable without the composition root. The measured POST is five fixed

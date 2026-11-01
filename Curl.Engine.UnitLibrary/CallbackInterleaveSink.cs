@@ -1,5 +1,5 @@
 using Curl.Api.Callbacks;
-using Curl.Protocol.Rtsp;
+using Curl.Original.Protocol.Rtsp;
 
 namespace Curl.Engine;
 

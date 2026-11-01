@@ -1,5 +1,5 @@
 using Curl.Api.EngineContracts.Multi;
-using Curl.Protocol.Http;
+using Curl.Original.Protocol.Http;
 
 namespace Curl.Engine;
 

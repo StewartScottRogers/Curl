@@ -22,7 +22,7 @@ whether they wait:
 - ADR-0014 already defines the auth and cookie seams the HTTP handler calls, so the
   HTTP handler can be built against them whether or not the libraries are filled.
 - `Curl.Authentication.UnitLibrary` and `Curl.Cookies.UnitLibrary` are empty today and
-  share no project with `Curl.Protocol.Http.UnitLibrary`, so their tasks do not
+  share no project with `Curl.Original.Protocol.Http.UnitLibrary`, so their tasks do not
   overlap the HTTP tasks' `touches` and can run in parallel dark factory lanes.
 
 ## Decision
@@ -59,7 +59,7 @@ Costs:
 - **Keep both in Phase 2.** Rejected: Phase 1 would ship an HTTP that fails on `-u`
   and `-b`, and the HTTP handler's auth and cookie paths would be untested against
   real implementations until Phase 2.
-- **Implement auth and cookies inside `Curl.Protocol.Http.UnitLibrary` for now.**
+- **Implement auth and cookies inside `Curl.Original.Protocol.Http.UnitLibrary` for now.**
   Rejected: FTP, IMAP, SMTP and others authenticate too, and the Product Overview
   gives both concerns their own libraries injected as services. Moving the code out
   later would be rework, and would serialise it behind the HTTP tasks.

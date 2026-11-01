@@ -24,7 +24,7 @@ line. ADR-0045's `ITransferProgress` has no member that says the data is complet
   handler is about to report what became of its connection. It has an empty default body,
   so a handler that never calls it and a sink that ignores it need no change.
   `NoTransferProgress` implements it as nothing; `Curl.Core`'s `LowSpeedWatchdog` wrapper
-  and `Curl.Protocol.Http`'s `HttpTransferProgress` pass it on.
+  and `Curl.Original.Protocol.Http`'s `HttpTransferProgress` pass it on.
 - **`HttpProtocolHandler` calls it once per run, for the final exchange only**, after the
   connection is disposed and before `ReportConnectionEnd`: not for a 401 or 417 answered
   with a retry, nor for a pooled connection that died before its response and is sent

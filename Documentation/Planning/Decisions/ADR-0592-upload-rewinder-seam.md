@@ -18,7 +18,7 @@ retry after a refused HTTP/3 stream - rewound only a stream that could seek, thr
 
 1. `Curl.Protocol.Abstractions` gains `IUploadRewinder`: `bool HasBeenRead` and
    `string? RewindToStart()`, which gives `null` on success or the message the transfer fails with.
-   It is named apart from `Curl.Protocol.Http`'s `IRewindableUpload.CanRewind`, which only says
+   It is named apart from `Curl.Original.Protocol.Http`'s `IRewindableUpload.CanRewind`, which only says
    whether a stdin rewind would fail (ADR-0524).
 2. Only an upload that cannot seek is rewound through it; a seekable stream keeps its `Position`
    path even when it implements the interface.

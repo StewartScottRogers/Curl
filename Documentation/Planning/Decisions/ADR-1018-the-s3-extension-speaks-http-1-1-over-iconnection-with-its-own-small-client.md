@@ -7,12 +7,12 @@
 ## Context
 
 The `s3://` handler must send requests to S3, MinIO or R2 and read their responses. An extension may
-not reference `Curl.Protocol.Http` (ADR-0999), so the extension needs its own HTTP/1.1 exchange over
+not reference `Curl.Original.Protocol.Http` (ADR-0999), so the extension needs its own HTTP/1.1 exchange over
 the `IConnection` seam.
 
 ## Decision
 
-`Curl.Extension.S3.UnitLibrary/Http/S3HttpClientConnection` sends one request at a time over one
+`Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpClientConnection` sends one request at a time over one
 `IConnection` (RFC 9112 §3, §5), streaming a request body of a declared length with `Content-Length`,
 and reads the status line (§4) and fields (§5), exposing the body as a forward-only asynchronous
 stream framed by `Content-Length`, the chunked coding (§7.1) or the close (§6.3).

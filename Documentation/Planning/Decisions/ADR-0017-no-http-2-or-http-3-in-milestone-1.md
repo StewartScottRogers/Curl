@@ -52,7 +52,7 @@ The forces:
 
 ## Decision
 
-1. Milestone 1 has no HTTP/2 and no HTTP/3. `Curl.Protocol.Http.UnitLibrary` speaks
+1. Milestone 1 has no HTTP/2 and no HTTP/3. `Curl.Original.Protocol.Http.UnitLibrary` speaks
    HTTP/1.0 and HTTP/1.1 only, and offers only `http/1.1` in ALPN.
 2. On every platform, `--http2`, `--http2-prior-knowledge`, `--http3` and
    `--http3-only` are refused exactly as the Windows reference build refuses them:

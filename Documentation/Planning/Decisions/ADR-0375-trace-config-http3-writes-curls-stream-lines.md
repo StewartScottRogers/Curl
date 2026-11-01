@@ -28,7 +28,7 @@ measure on this machine; 8.18.0 is the reference ADR-0144 names for HTTP/3.
 
 ## Decision
 
-1. `Http3StreamTrace` (in `Curl.Protocol.Http`) writes the stream lines through
+1. `Http3StreamTrace` (in `Curl.Original.Protocol.Http`) writes the stream lines through
    `ITransferEvents.ReportInfo`. `Http3StreamConnection` tells it of each response head (interim
    heads too, as nghttp3's `end_headers` callback fires for each), each piece of `DATA` it
    reads and the stream's end.
@@ -49,7 +49,7 @@ measure on this machine; 8.18.0 is the reference ADR-0144 names for HTTP/3.
   connection lines and header echoes until BL-1208, and the I/O loop lines for good.
 - The task asked for the lines from `Curl.Http3.UnitLibrary`; that library holds only the
   HTTP/3 frames and QPACK, and the stream the lines describe is `Http3StreamConnection` in
-  `Curl.Protocol.Http.UnitLibrary`, so the trace lives there, beside `Http2FrameTrace`.
+  `Curl.Original.Protocol.Http.UnitLibrary`, so the trace lives there, beside `Http2FrameTrace`.
 
 ## Alternatives considered
 

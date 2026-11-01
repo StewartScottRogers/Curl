@@ -5,11 +5,11 @@ upstream's `tests/data` can run in memory (BL-1899). Read ADR-0456 before changi
 
 ## Rules
 
-- It references `Curl.Protocol.Ssh.UnitLibrary` and reuses the SSH client's wire code
+- It references `Curl.Original.Protocol.Ssh.UnitLibrary` and reuses the SSH client's wire code
   (`SshConnectionReader`, `SshPacketReader`, `SshPacketWriter`, `SshIdentificationExchange`,
   and later key exchange and packet protection) through `InternalsVisibleTo`. Never copy
   that code here, and never reference test code such as
-  `Curl.Protocol.Ssh.UnitTests\Fakes\InMemorySshServerSession.cs`; port from it instead.
+  `Curl.Original.Protocol.Ssh.UnitTests\Fakes\InMemorySshServerSession.cs`; port from it instead.
 - BCL only, no socket: connections are in-memory pipes (`SshServerDuplexConnection`).
 - Held to the `*.UnitLibrary` gates: 100% line and branch coverage, complexity at most 10.
 

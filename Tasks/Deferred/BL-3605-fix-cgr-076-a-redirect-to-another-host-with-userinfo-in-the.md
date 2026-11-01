@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3723]
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests/Cgr076Tests.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.Cgr076.cs, Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/Cgr076RedirectFollowerTests.cs, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary, Curl.Original.Protocol.Http.UnitTests/Cgr076Tests.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.Cgr076.cs, Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/Cgr076RedirectFollowerTests.cs, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -52,7 +52,7 @@ curl -sSL -H 'Authorization: Bearer xyz' -H 'Cookie: c=1' -H 'X-Custom: 1' http:
 
 **Suspected location in source**
 
-- redirect credential handling in `Curl.Protocol.Http.UnitLibrary` (the follow logic). Not pinned to a line.
+- redirect credential handling in `Curl.Original.Protocol.Http.UnitLibrary` (the follow logic). Not pinned to a line.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 

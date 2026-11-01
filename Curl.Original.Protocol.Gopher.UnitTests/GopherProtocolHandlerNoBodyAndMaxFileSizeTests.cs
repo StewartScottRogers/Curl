@@ -1,0 +1,128 @@
+using System.Text;
+using Curl.Protocol.Abstractions;
+using Curl.Original.Protocol.Gopher.Fakes;
+using Curl.Testing;
+
+namespace Curl.Original.Protocol.Gopher;
+
+/// <summary>
+/// Pins how a <c>gopher://</c> transfer honours <c>-I</c> and <c>--max-filesize</c>,
+/// against curl 8.21.0 measured on 2026-10-02 with the reply <c>hello\r\n.\r\n</c>
+/// (BL-1308): <c>-I</c> sends the selector and exits 0 without reading, and
+/// <c>--max-filesize 3</c> writes <c>hel</c> and exits 63.
+/// </summary>
+[TestClass]
+public sealed class GopherProtocolHandlerNoBodyAndMaxFileSizeTests
+{
+    private const string Reply = "hello\r\n.\r\n";
+
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    [TestMethod]
+    public async Task ExecuteAsync_NoBody_SendsTheSelectorAndEndsWithoutReading()
+    {
+        // Measured: -sv -I wrote request "/x\r\n", nothing to stdout, no data line, then
+        // "* shutting down connection #0", exit 0.
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes(Reply));
+        TranscriptTransferEvents events = new();
+        MemoryStream output = new();
+        TransferContext context = new() { Url = CurlUrl.Parse("gopher://h/0/x"), Output = output, Events = events, NoBody = true };
+        Diagnostics.Arrange("url", "gopher://h/0/x with NoBody (-I)");
+        Diagnostics.Arrange("scripted reads", DiagnosticText.Lines([Reply]));
+
+        TransferResult result = await new GopherProtocolHandler(Connector(connection)).ExecuteAsync(context);
+        Report(result, output, events);
+
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
+        Diagnostics.Diff("selector sent", "/x\r\n"u8, connection.Written);
+        Diagnostics.Assert("read count", 0, connection.ReadCount);
+        Diagnostics.Diff("transcript", DiagnosticText.Lines(["* shutting down connection #0"]), DiagnosticText.Lines(events.Transcript));
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
+        CollectionAssert.AreEqual("/x\r\n"u8.ToArray(), connection.Written);
+        Assert.AreEqual(0, connection.ReadCount);
+        Assert.AreEqual(0, output.Length);
+        CollectionAssert.AreEqual(new[] { "* shutting down connection #0" }, events.Transcript);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReplyPastMaxFileSize_WritesTheAllowedBytesAndFailsWith63()
+    {
+        // Measured: -sv --max-filesize 3 wrote "hel", traced "{ [10 bytes data]", then
+        // "* Exceeded the maximum allowed file size (3) with 3 bytes", "* closing connection #0", exit 63.
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes(Reply));
+        TranscriptTransferEvents events = new();
+        MemoryStream output = new();
+        Diagnostics.Arrange("max file size", 3);
+        Diagnostics.Arrange("scripted reads", DiagnosticText.Lines([Reply]));
+
+        TransferResult result = await new GopherProtocolHandler(Connector(connection)).ExecuteAsync(Context(output, events, 3));
+        Report(result, output, events);
+
+        const string Message = "Exceeded the maximum allowed file size (3) with 3 bytes";
+        Diagnostics.Assert("result", new TransferResult(CurlExitCode.FilesizeExceeded, 3, Message), result);
+        Diagnostics.Diff("output", "hel", Encoding.Latin1.GetString(output.ToArray()));
+        Diagnostics.Diff("transcript", DiagnosticText.Lines(["<= " + Reply, "* " + Message, "* closing connection #0"]), DiagnosticText.Lines(events.Transcript));
+        Assert.AreEqual(new TransferResult(CurlExitCode.FilesizeExceeded, 3, Message), result with { Report = null });
+        Assert.AreEqual("hel", Encoding.Latin1.GetString(output.ToArray()));
+        CollectionAssert.AreEqual(new[] { "<= " + Reply, "* " + Message, "* closing connection #0" }, events.Transcript);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MaxFileSizeCrossedOnTheSecondRead_CountsAcrossReads()
+    {
+        ScriptedConnection connection = new("he"u8.ToArray(), "llo"u8.ToArray());
+        MemoryStream output = new();
+        TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("max file size", 4);
+        Diagnostics.Arrange("scripted reads", DiagnosticText.Lines(["he", "llo"]));
+
+        TransferResult result = await new GopherProtocolHandler(Connector(connection))
+            .ExecuteAsync(Context(output, events, 4));
+        Report(result, output, events);
+
+        Diagnostics.Assert("result", new TransferResult(CurlExitCode.FilesizeExceeded, 4, "Exceeded the maximum allowed file size (4) with 4 bytes"), result);
+        Diagnostics.Diff("output", "hell", Encoding.Latin1.GetString(output.ToArray()));
+        Assert.AreEqual(
+            new TransferResult(CurlExitCode.FilesizeExceeded, 4, "Exceeded the maximum allowed file size (4) with 4 bytes"),
+            result with { Report = null });
+        Assert.AreEqual("hell", Encoding.Latin1.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
+    [DataRow(0L, DisplayName = "0 is no limit")]
+    [DataRow(null, DisplayName = "no limit")]
+    [DataRow(10L, DisplayName = "exactly the reply's length")]
+    public async Task ExecuteAsync_ReplyWithinMaxFileSize_WritesTheWholeReplyAndSucceeds(long? maxFileSize)
+    {
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes(Reply));
+        MemoryStream output = new();
+        TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("max file size", maxFileSize?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null");
+        Diagnostics.Arrange("scripted reads", DiagnosticText.Lines([Reply]));
+
+        TransferResult result = await new GopherProtocolHandler(Connector(connection))
+            .ExecuteAsync(Context(output, events, maxFileSize));
+        Report(result, output, events);
+
+        Diagnostics.Assert("result", TransferResult.Success(10), result);
+        Diagnostics.Diff("output", Reply, Encoding.Latin1.GetString(output.ToArray()));
+        Assert.AreEqual(TransferResult.Success(10), result with { Report = null });
+        Assert.AreEqual(Reply, Encoding.Latin1.GetString(output.ToArray()));
+    }
+
+    private static FakeConnector Connector(IConnection connection) =>
+        new(ConnectResult.Connected(connection, null, connectionNumber: 0));
+
+    private static TransferContext Context(MemoryStream output, ITransferEvents events, long? maxFileSize) =>
+        new() { Url = CurlUrl.Parse("gopher://h/0/x"), Output = output, Events = events, MaxFileSize = maxFileSize };
+
+    private void Report(TransferResult result, MemoryStream output, TranscriptTransferEvents events)
+    {
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Act("transcript", DiagnosticText.Lines(events.Transcript));
+        Diagnostics.Bytes("output", output.ToArray());
+    }
+}

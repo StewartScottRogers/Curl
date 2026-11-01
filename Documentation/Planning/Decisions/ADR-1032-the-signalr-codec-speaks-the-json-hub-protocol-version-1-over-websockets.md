@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 ## Context
 
-BL-4108 adds a SignalR client as the extension `Curl.Extension.SignalR.UnitLibrary` (ADR-0999). Upstream
+BL-4108 adds a SignalR client as the extension `Curl.Extended.Protocol.SignalR.UnitLibrary` (ADR-0999). Upstream
 curl has no SignalR support, so ASP.NET Core's own specifications decide: `src/SignalR/docs/specs/HubProtocol.md`
 and `src/SignalR/docs/specs/TransportProtocols.md` in dotnet/aspnetcore. BL-4218 is the first of its three
 parts: the projects and a pure codec of the wire format, with no handler and no registration.

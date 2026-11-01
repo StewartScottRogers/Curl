@@ -9,7 +9,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 
 curl lists a directory when an `sftp://` URL's path ends with a slash. What it sends,
 what it prints for each entry, and what each failure reports had to be measured before
-`Curl.Protocol.Ssh.UnitLibrary` could list one.
+`Curl.Original.Protocol.Ssh.UnitLibrary` could list one.
 
 The Windows reference build (curl 8.21.0, libssh2 1.11.1, Schannel) was run with `-sS -k
 --key <rsa key> -u <user>:` against OpenSSH 10.2 in WSL, the setup ADR-0220 describes:

@@ -44,18 +44,38 @@ internal sealed class WireGuardConnector(
     /// <param name="target">The target.</param>
     /// <param name="cancellationToken">Cancels the connect.</param>
     /// <returns>Curl's connector's result, or a refusal without one.</returns>
-    public ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-        quicConnector?.ConnectMultiplexedAsync(target, cancellationToken)
-            ?? ValueTask.FromResult(MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC through the WireGuard tunnel needs curl's connector"));
+    public async ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return quicConnector is null
+                ? MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC through the WireGuard tunnel needs curl's connector")
+                : await quicConnector.ConnectMultiplexedAsync(target, cancellationToken).ConfigureAwait(false);
+        }
+        catch (WireGuardTunnelDnsFailureException exception)
+        {
+            return MultiplexedConnectResult.Failed(exception.Failure.ExitCode, exception.Failure.ErrorMessage!);
+        }
+    }
 
     /// <summary>Opens a session on a QUIC connection through curl's connector, so its pool shares the connection (ADR-1163).</summary>
     /// <param name="target">The target.</param>
     /// <param name="openSession">Opens the session on the connection.</param>
     /// <param name="cancellationToken">Cancels the connect.</param>
     /// <returns>Curl's connector's result, or a refusal without one.</returns>
-    public ValueTask<ConnectResult> ConnectMultiplexedSessionAsync(ConnectTarget target, Func<IMultiplexedConnection, IConnection> openSession, CancellationToken cancellationToken) =>
-        quicConnector?.ConnectMultiplexedSessionAsync(target, openSession, cancellationToken)
-            ?? ValueTask.FromResult(ConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC through the WireGuard tunnel needs curl's connector"));
+    public async ValueTask<ConnectResult> ConnectMultiplexedSessionAsync(ConnectTarget target, Func<IMultiplexedConnection, IConnection> openSession, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return quicConnector is null
+                ? ConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC through the WireGuard tunnel needs curl's connector")
+                : await quicConnector.ConnectMultiplexedSessionAsync(target, openSession, cancellationToken).ConfigureAwait(false);
+        }
+        catch (WireGuardTunnelDnsFailureException exception)
+        {
+            return exception.Failure;
+        }
+    }
 
     /// <inheritdoc />
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
@@ -158,7 +178,7 @@ internal sealed class WireGuardConnector(
             : new TunnelResolution(null, opened);
     }
 
-    private static async ValueTask<TunnelResolution> ExchangeAsync(IConnection connection, ConnectTarget dnsTarget, byte[] query, ushort id, ushort type, CancellationToken cancellationToken)
+    internal static async ValueTask<TunnelResolution> ExchangeAsync(IConnection connection, ConnectTarget dnsTarget, byte[] query, ushort id, ushort type, CancellationToken cancellationToken)
     {
         await using (connection.ConfigureAwait(false))
         {
@@ -170,7 +190,7 @@ internal sealed class WireGuardConnector(
                 byte[]? response = length is null ? null : await ReadExactlyAsync(connection, (length[0] << 8) | length[1], cancellationToken).ConfigureAwait(false);
                 return new TunnelResolution(response is null ? null : WireGuardDnsMessage.AddressesIn(response, id, type).FirstOrDefault(), null);
             }
-            catch (IOException exception)
+            catch (Exception exception) when (IsTunnelFailure(exception))
             {
                 return new TunnelResolution(null, Unreachable(dnsTarget, exception));
             }

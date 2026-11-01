@@ -115,7 +115,7 @@
          value is ignored with a "model" trace warning and the rule below applies.
       3. Otherwise opus when the task's touches name a hand-built security or crypto
          library (Curl.Cryptography, Curl.Tls, Curl.Quic, Curl.Kerberos, Curl.Ntlm,
-         Curl.Protocol.Ssh, or their .UnitTests or .IntegrationTests twin), its pipeline is
+         Curl.Original.Protocol.Ssh, or their .UnitTests or .IntegrationTests twin), its pipeline is
          protocol, or feature unless its title is routine and names no hard work (BL-3001:
          $RoutineFeatureTitles and $HardWorkMarkers in DarkFactory\ModelChoice.ps1, such as
          an upstream unit program port or a harness stand-in with no TLS, crypto, QUIC,
@@ -219,8 +219,10 @@
 
     Lanes test only on Windows, so a lane shift's coordinator watches CI for them (BL-987).
     Every -HeartbeatMinutes (3 when publishing is off) it reads the newest finished CI runs
-    on the shift's branch that passed or failed - cancelled ones prove nothing, and with
-    several lanes pushing most are cancelled - and reads each failed run's failures once
+    on the shift's branch that passed or failed - a cancelled run is read only when a job
+    ran into its timeout-minutes, whose hang is its failure, filed as a High "Fix CI hang
+    in <job> (<assembly>)" task (ADR-1173); with several lanes pushing most cancelled
+    runs prove nothing - and reads each failed run's failures once
     from `gh run view <id> --log-failed`: every "Failed <TestName>" line, or every compiler
     "error" line when the build broke. Over the last six such runs, newest first, a failure
     is a regression when it fails in the newest run and broke the build, failed on two

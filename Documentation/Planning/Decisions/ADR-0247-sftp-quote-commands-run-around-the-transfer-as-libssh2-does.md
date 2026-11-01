@@ -11,7 +11,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 `chgrp`, `chmod`, `chown`, `atime`, `mtime`, `ln`, `symlink`, `mkdir`, `rename`, `rmdir`,
 `rm`, `statvfs` and `pwd`. A leading `-` runs a command after the transfer, and a leading `*`
 lets it fail. What curl sends for each, where, and what each failure reports had to be
-measured before `Curl.Protocol.Ssh.UnitLibrary` could run them.
+measured before `Curl.Original.Protocol.Ssh.UnitLibrary` could run them.
 
 The Windows reference build (curl 8.21.0, libssh2 1.11.1, Schannel) ran as `curl -sS -k --key
 <rsa key> --pubkey <pub> -u <user>: -Q <command> sftp://localhost:2233/~/bl572/files/a.txt`

@@ -25,7 +25,7 @@ RFC 9114 section 6.2 allows, and `IMultiplexedConnection` had no way to accept a
   streams are stopped as before, and the session never asks the connection for a bidirectional stream.
 - **`Http3PeerUnidirectionalStreams.ReadTypeAsync`** gives a stream's type as its number, with the same checks as
   `AcceptAsync` (a second critical stream, a push stream), so the session can hand the unknown type on;
-  `AcceptAsync` keeps its contract for `Curl.Protocol.Http`'s `Http3Session`.
+  `AcceptAsync` keeps its contract for `Curl.Original.Protocol.Http`'s `Http3Session`.
 - **The QUIC transport parameters do not change.** The client keeps declaring curl's ngtcp2
   `initial_max_streams_bidi` of 262144 (ADR-0144 section 5), so the Initial stays byte for byte curl's. The opt-in is
   at the HTTP/3 layer: without the callback no peer bidirectional stream is accepted or read, as before, and with it

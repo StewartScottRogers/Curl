@@ -29,7 +29,7 @@ Windows build to measure; Curl speaks HTTP/2 everywhere (ADR-0141).
 
 1. `Curl.Http2`'s `Http2Connection` takes an optional `IHttp2FrameObserver`, told of each frame
    after it is written and of each frame read before it is acted on.
-2. `Http2FrameTrace` (in `Curl.Protocol.Http`) is that observer for a transfer and writes the
+2. `Http2FrameTrace` (in `Curl.Original.Protocol.Http`) is that observer for a transfer and writes the
    framing lines through `ITransferEvents.ReportInfo`, in curl's text: `fr_print`'s description
    of each frame type, the server's concurrency and push settings after each SETTINGS, the
    session's creation before the preface, and `CLOSED` when a response ends. CONTINUATION

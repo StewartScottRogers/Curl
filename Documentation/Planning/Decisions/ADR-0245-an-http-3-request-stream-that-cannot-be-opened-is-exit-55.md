@@ -23,7 +23,7 @@ reported every failure to open a request stream that way.
    but the stream cannot be opened. `Http3Session` reports it as exit 55 with
    `cannot open bidi streams`.
 2. `MultiplexedConnectionFailedException` keeps its own exit code and message, as before.
-3. The distinction is made inside `Curl.Protocol.Http.UnitLibrary`, with no change to the
+3. The distinction is made inside `Curl.Original.Protocol.Http.UnitLibrary`, with no change to the
    `Curl.Protocol.Abstractions` contract: the exception type already tells the two cases
    apart.
 4. `Curl.Quic`'s `QuicConnection` waits for stream credit rather than failing, as ngtcp2

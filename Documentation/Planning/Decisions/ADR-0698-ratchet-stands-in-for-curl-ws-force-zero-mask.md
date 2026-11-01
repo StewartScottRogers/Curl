@@ -29,4 +29,4 @@ it. Curl has no debug build, so the ratchet skipped all 24 as `Curl lacks the fe
   with the in-memory `sws` only, so nothing in them depends on the platform. 2708 (automatic PONG) differs and is
   BL-2782.
 - If a later WebSocket fill of four bytes were not a mask, the stand-in would zero it too; it would then need a
-  mask-specific seam in `Curl.Protocol.Ws.UnitLibrary`.
+  mask-specific seam in `Curl.Original.Protocol.Ws.UnitLibrary`.
