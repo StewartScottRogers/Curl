@@ -3,8 +3,8 @@ id: AF-0486
 title: Run log BL-3895-20261028-111517-L7.jsonl stops about 2 minutes before its run ended, losing the result record and its cost
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.
 key: process:logs:BL-3895:unfinished-run
 reproduction: none
 task: BL-4239
@@ -13,9 +13,9 @@ found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-01
+closed-how: reliable-reaudit
+closed-by: 2026-11-01_0144.md
 ---
 # AF-0486 - Run log BL-3895-20261028-111517-L7.jsonl stops about 2 minutes before its run ended, losing the result record and its cost
 
@@ -44,8 +44,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-31 | 2026-10-31_0358.md | not re-audited | overlaps planted defect PD-503 in BL-4999-20261030-235500-L9.jsonl, so the auditor's verdict (reproduces yes) is set aside: unfinishedRuns = ['BL-4999-20261030-235500-L9.jsonl']. The run log stops after three assistant lines ('Running the fast tests.') with no result record, so its cost is lost. Select-String '"type":"result"' finds no match. No lane trace or coordinator line names BL-4999.
 - 2026-10-31 | 2026-10-31_1149.md | not re-audited | overlaps planted defect PD-503 in BL-4999-20261031-090000-L9.jsonl, so the auditor's verdict (reproduces no) is set aside: By mechanism over this window: unfinishedRuns lists one file, BL-4999-20261031-090000-L9.jsonl, but its cause is different. No lane claimed BL-4999 and there was no lane 9 (filed as process:logs:BL-4999:unfinished-run). All 30 run logs written by real lane claims hold their type=result record, so no run log stopped before its run ended.
+- 2026-11-01 | 2026-11-01_0144.md | reproduces: no | Re-audited by mechanism over this window (Process.md, Re-audits), with -LogRoot and -CiRunsJson set to this audit's log folder Z:/repos/Curl.audit/20261101-014435/logs, because the 20261029 folder is outside the log folder this audit names. Measure-FactoryProcess.ps1 -Since 2026-10-31 gives unfinishedRuns [] and runningRuns []; Select-String '"type":"result"' finds one result record in each of the 20 task and split run logs (BL-4421 .. BL-4444, including BL-4442-...-L1-resumed.jsonl). The window holds shifts that finished 16 tasks, so no run log stopped without its result.
 
 ## Log
 
 - 2026-10-29: filed proposed.
 - 2026-10-29: proposed -> accepted.
+- 2026-11-01: accepted -> closed. Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0493
 title: Root CLAUDE.md lists the /Wire/ solution group as Http2, Http3, Quic, Zstandard; Curl.slnx also has HttpDatagram, Protobuf, Ssh and WebSocket there
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.
 key: truthfulness:CLAUDE.md:Wire-solution-folder-list:false-statement
 reproduction: none
 task: BL-4403
@@ -13,9 +13,9 @@ found: 2026-10-31
 found-at: bfe08061f844163d0f86f77dc0af8971b7b1b179
 scorecard: 2026-10-31_0358.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-01
+closed-how: reliable-reaudit
+closed-by: 2026-11-01_0144.md
 ---
 # AF-0493 - Root CLAUDE.md lists the /Wire/ solution group as Http2, Http3, Quic, Zstandard; Curl.slnx also has HttpDatagram, Protobuf, Ssh and WebSocket there
 
@@ -43,8 +43,10 @@ Select-String -Path CLAUDE.md -Pattern '/Wire/.: Http2, Http3, Quic, Zstandard -
 ## Re-audits
 
 - 2026-10-31 | 2026-10-31_1149.md | reproduces: no | Ran the reproduction: the old pattern '/Wire/.: Http2, Http3, Quic, Zstandard -' no longer matches CLAUDE.md. CLAUDE.md now lists 'Http2, Http3, HttpDatagram, Protobuf, Quic, Ssh, WebSocket, Zstandard', which covers the Curl.slnx lines 261, 265, 273 and 277.
+- 2026-11-01 | 2026-11-01_0144.md | reproduces: no | Ran the reproduction: CLAUDE.md no longer matches '/Wire/: Http2, Http3, Quic, Zstandard -'. It now reads '/Wire/: Http2, Http3, HttpDatagram, Protobuf, Quic, Ssh, WebSocket, Zstandard', matching Curl.slnx's /Wire/ folders (lines 292, 296, 304, 308 among them).
 
 ## Log
 
 - 2026-10-31: filed proposed.
 - 2026-10-31: proposed -> accepted.
+- 2026-11-01: accepted -> closed. Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.

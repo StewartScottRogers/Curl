@@ -3,12 +3,12 @@ id: AF-0513
 title: -T with a --trace/--trace-ascii file of the same name uploads 0 bytes and exits 0 where curl exits 26
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Console/CurlCommandRunner.cs:--upload-file:exit-code
 reproduction: none
-task: none
-tasks:
+task: BL-4435
+tasks: BL-4435
 found: 2026-10-31
 found-at: 23bacbc6c04b8e06a4eecb79636da4891dca4c01
 scorecard: 2026-10-31_1149.md
@@ -42,6 +42,9 @@ dotnet build Curl.Console -c Release -v q; $d=(New-Item -ItemType Directory -For
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_0144.md | reproduces: no | Ran the reproduction as given: port 50411 is blocked on this machine (Record-CurlExchange.ps1: 'An attempt was made to access a socket in a way forbidden by its access permissions'), so no out/ folder was written. Reran it unchanged except for port 60213: Curl exits 26 with 'curl: (26) client read function EOF fail, only 0/9 of needed bytes read'. The same script with the reference curl 8.22.0 (Schannel) gives the same curl: (26) line. Curl now matches curl's exit 26 instead of exiting 0.
+
 ## Log
 
 - 2026-10-31: filed proposed.
+- 2026-10-31: proposed -> accepted.
