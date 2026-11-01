@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:NetrcControlCodeFailure-or:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:230:||
-task: none
-tasks:
+task: BL-4432
+tasks: BL-4432
 found: 2026-10-31
 found-at: 23bacbc6c04b8e06a4eecb79636da4891dca4c01
 scorecard: 2026-10-31_1149.md
@@ -47,4 +47,5 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-31: filed proposed.
-- 2026-11-01: proposed -> closed. Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
+- 2026-10-31: proposed -> accepted.
+- 2026-11-01: accepted -> closed. Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

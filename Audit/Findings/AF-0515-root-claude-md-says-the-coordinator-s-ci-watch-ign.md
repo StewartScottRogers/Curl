@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.
 key: truthfulness:CLAUDE.md:Dark-factory-CI-watch:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-4437
+tasks: BL-4437
 found: 2026-10-31
 found-at: 23bacbc6c04b8e06a4eecb79636da4891dca4c01
 scorecard: 2026-10-31_1149.md
@@ -47,4 +47,5 @@ Select-String -Path CLAUDE.md, DarkFactory/CiWatch.ps1 -Pattern '\(cancelled one
 ## Log
 
 - 2026-10-31: filed proposed.
-- 2026-11-01: proposed -> closed. Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.
+- 2026-10-31: proposed -> accepted.
+- 2026-11-01: accepted -> closed. Re-audit 2026-11-01_0144.md: the reproduction no longer reproduces.
