@@ -41,3 +41,4 @@ Rules that hold: `Libcurl`, `curl -V` and `CurlVersionInfo.Protocols` stay curl'
 ## Log
 
 - 2026-11-01: Created.
+- 2026-11-01: Backlog -> Doing. Criteria at claim: f0953fa5 857c3931 edc51a46 729e7cc8 e93fb10a.
