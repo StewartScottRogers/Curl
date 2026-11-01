@@ -301,16 +301,20 @@ function Get-GatedLibraries {
 
 # --- Shards (BL-3464) -------------------------------------------------------------
 
-# Seconds each test project's coverage run took on CI's slow Windows runner, CI run
-# 40108510840 (the job that took 25 minutes): what Get-ShardTestProjects balances. A
-# project not listed counts as $defaultTestProjectSeconds. Only the balance depends on
+# Seconds from one test project's coverage run finishing to the next one's, in CI run
+# 41239174672's shard jobs on CI's Windows runner: what Get-ShardTestProjects balances. Each
+# includes the 4 to 6 seconds every project's run costs before its first test, which is why
+# a project not listed counts as $defaultTestProjectSeconds. Remeasure when a shard runs
+# minutes longer than the others: the 707 seconds the SSH protocol's tests once took (run
+# 40108510840) kept them alone in shard 1 long after they fell to 25, and shard 1 finished
+# in 2 minutes while shards 2 and 3 took 10 and 13 (BL-3512). Only the balance depends on
 # these numbers; every project lands in exactly one shard whatever they say.
 $measuredTestProjectSeconds = @{
-    'Curl.Protocol.Ssh.UnitTests' = 707; 'Curl.Conformance.UnitTests' = 72; 'Curl.Cryptography.UnitTests' = 58
-    'Curl.Tls.UnitTests' = 24; 'Curl.Networking.UnitTests' = 23; 'Curl.Console.UnitTests' = 17
-    'Curl.Conformance.LibTest.UnitTests' = 15; 'Curl.Engine.UnitTests' = 13; 'Curl.Protocol.Http.UnitTests' = 11
-    'Curl.Cli.UnitTests' = 10; 'Libcurl.UnitTests' = 10; 'Curl.Mcp.UnitTests' = 9; 'Curl.Api.UnitTests' = 8
-    'Curl.Kerberos.UnitTests' = 8; 'Curl.Conformance.Http3Server.UnitTests' = 7; 'Curl.Conformance.SshServer.UnitTests' = 7
+    'Curl.Conformance.UnitTests' = 75; 'Curl.Ssh.UnitTests' = 67; 'Curl.Cryptography.UnitTests' = 57
+    'Curl.Tls.UnitTests' = 25; 'Curl.Console.UnitTests' = 21; 'Curl.Networking.UnitTests' = 17
+    'Curl.Engine.UnitTests' = 17; 'Curl.Cli.UnitTests' = 12; 'Curl.Mcp.UnitTests' = 11
+    'Curl.Extension.WireGuard.UnitTests' = 10; 'Curl.Output.UnitTests' = 8; 'Curl.Conformance.LibTest.UnitTests' = 8
+    'Curl.Conformance.SshServer.UnitTests' = 8
 }
 $defaultTestProjectSeconds = 5
 
@@ -477,7 +481,164 @@ function Get-ReportedAssemblyName {
     return $PackageName
 }
 
-$methods = @{}
+# The merge is C#, compiled by Add-Type, because a whole-solution run's reports are about
+# 1.5 GB of XML: every test project's report lists every production assembly it loaded.
+# Walked node by node in PowerShell they took CI's quality job 5 minutes 40 seconds (run
+# 41239174672), which kept work/dark-factory's CI over 15 minutes (BL-3512). C# 5 only, so
+# Windows PowerShell's compiler takes it as well as PowerShell 7's.
+if (-not ('CurlCoverage.CoberturaMerge' -as [type])) {
+    # Windows PowerShell compiles against System.dll alone unless told; PowerShell 7 already
+    # references the whole runtime, and naming an assembly there replaces that set.
+    $mergeReferences = @{}
+    if ($PSVersionTable.PSEdition -ne 'Core') { $mergeReferences['ReferencedAssemblies'] = @('System.Xml') }
+    Add-Type @mergeReferences -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
+using System.Xml;
+
+namespace CurlCoverage
+{
+    public sealed class MergedLine
+    {
+        public int Hits;
+        public int ConditionsCovered;
+        public int ConditionsTotal;
+    }
+
+    public sealed class MergedMethod
+    {
+        public string Assembly;
+        public string Class;
+        public string Member;
+        public string SourceFile;
+        public int Complexity;
+        public Dictionary<int, MergedLine> Lines = new Dictionary<int, MergedLine>();
+    }
+
+    public static class CoberturaMerge
+    {
+        private static readonly Regex ConditionCoverage = new Regex(@"\((\d+)/(\d+)\)", RegexOptions.CultureInvariant);
+
+        // Merges one Cobertura file into methods, keeping the best hit and condition counts
+        // seen for each line. reportedName maps a package name to the assembly name to report
+        // (curl becomes Curl.Console); isProduction says which assemblies to keep.
+        public static void AddReport(string path, Dictionary<string, MergedMethod> methods, Func<string, string> reportedName, Func<string, bool> isProduction)
+        {
+            XmlReaderSettings settings = new XmlReaderSettings();
+            settings.DtdProcessing = DtdProcessing.Ignore;
+            settings.IgnoreComments = true;
+            settings.IgnoreWhitespace = true;
+            using (XmlReader reader = XmlReader.Create(path, settings))
+            {
+                string assembly = null;
+                bool keepPackage = false;
+                string className = null;
+                string sourceFile = null;
+                MergedMethod method = null;
+                while (reader.Read())
+                {
+                    if (reader.NodeType == XmlNodeType.EndElement)
+                    {
+                        if (reader.LocalName == "method") { method = null; }
+                        continue;
+                    }
+                    if (reader.NodeType != XmlNodeType.Element) { continue; }
+                    switch (reader.LocalName)
+                    {
+                        case "package":
+                            assembly = reportedName(reader.GetAttribute("name") ?? string.Empty);
+                            keepPackage = isProduction(assembly);
+                            method = null;
+                            break;
+                        case "class":
+                            className = reader.GetAttribute("name");
+                            sourceFile = reader.GetAttribute("filename");
+                            method = null;
+                            break;
+                        case "method":
+                            method = keepPackage ? FindOrAddMethod(reader, methods, assembly, className, sourceFile) : null;
+                            if (reader.IsEmptyElement) { method = null; }
+                            break;
+                        case "line":
+                            // Lines outside a method (a class's own lines list) repeat the
+                            // methods' lines, so only a method's lines are merged.
+                            if (method != null) { MergeLine(reader, method); }
+                            break;
+                    }
+                }
+            }
+        }
+
+        private static MergedMethod FindOrAddMethod(XmlReader reader, Dictionary<string, MergedMethod> methods, string assembly, string className, string sourceFile)
+        {
+            string member = reader.GetAttribute("name") + reader.GetAttribute("signature");
+            string key = assembly + "|" + className + "|" + member;
+            MergedMethod entry;
+            if (!methods.TryGetValue(key, out entry))
+            {
+                entry = new MergedMethod();
+                entry.Assembly = assembly;
+                entry.Class = className;
+                entry.Member = member;
+                entry.SourceFile = sourceFile;
+                methods.Add(key, entry);
+            }
+            // Complexity is a property of the code, not of the run, so every report that saw
+            // this method agrees on it and the maximum is simply the value.
+            int complexity = ParseInt(reader.GetAttribute("complexity"));
+            if (complexity > entry.Complexity) { entry.Complexity = complexity; }
+            return entry;
+        }
+
+        private static void MergeLine(XmlReader reader, MergedMethod method)
+        {
+            int number = ParseInt(reader.GetAttribute("number"));
+            int hits = ParseInt(reader.GetAttribute("hits"));
+            int covered = 0;
+            int total = 0;
+            string condition = reader.GetAttribute("condition-coverage");
+            if (condition != null)
+            {
+                Match match = ConditionCoverage.Match(condition);
+                if (match.Success)
+                {
+                    covered = ParseInt(match.Groups[1].Value);
+                    total = ParseInt(match.Groups[2].Value);
+                }
+            }
+            MergedLine line;
+            if (!method.Lines.TryGetValue(number, out line))
+            {
+                line = new MergedLine();
+                line.Hits = hits;
+                line.ConditionsCovered = covered;
+                line.ConditionsTotal = total;
+                method.Lines.Add(number, line);
+                return;
+            }
+            if (hits > line.Hits) { line.Hits = hits; }
+            if (covered > line.ConditionsCovered) { line.ConditionsCovered = covered; }
+            if (total > line.ConditionsTotal) { line.ConditionsTotal = total; }
+        }
+
+        // As PowerShell's [int] cast: a missing attribute is 0. A hit count past Int32 is
+        // capped rather than thrown on, since only zero against nonzero matters.
+        private static int ParseInt(string text)
+        {
+            if (string.IsNullOrEmpty(text)) { return 0; }
+            long value;
+            if (!long.TryParse(text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out value)) { return 0; }
+            return value > int.MaxValue ? int.MaxValue : (int)value;
+        }
+    }
+}
+'@
+}
+
+$methods = New-Object 'System.Collections.Generic.Dictionary[string,CurlCoverage.MergedMethod]'
+$reportedAssemblyName = [Func[string, string]] { param($name) Get-ReportedAssemblyName $name }
+$isProductionAssembly = [Func[string, bool]] { param($name) Test-IsProductionAssembly $name }
 
 function Add-CoberturaReports {
     # Merges each Cobertura file into $methods, keeping the best hit and condition counts
@@ -485,67 +646,7 @@ function Add-CoberturaReports {
     param([System.IO.FileInfo[]] $Files)
 
     foreach ($file in $Files) {
-        $document = New-Object System.Xml.XmlDocument
-        $document.Load($file.FullName)
-
-        foreach ($package in $document.SelectNodes('/coverage/packages/package')) {
-            $assembly = Get-ReportedAssemblyName $package.GetAttribute('name')
-            if (-not (Test-IsProductionAssembly $assembly)) { continue }
-
-            foreach ($class in $package.SelectNodes('classes/class')) {
-                $className = $class.GetAttribute('name')
-                $sourceFile = $class.GetAttribute('filename')
-
-                foreach ($method in $class.SelectNodes('methods/method')) {
-                    $member = $method.GetAttribute('name') + $method.GetAttribute('signature')
-                    $key = $assembly + '|' + $className + '|' + $member
-
-                    if (-not $methods.ContainsKey($key)) {
-                        $methods[$key] = [pscustomobject]@{
-                            Assembly   = $assembly
-                            Class      = $className
-                            Member     = $member
-                            SourceFile = $sourceFile
-                            Complexity = 0
-                            Lines      = @{}
-                        }
-                    }
-                    $entry = $methods[$key]
-
-                    # Complexity is a property of the code, not of the run, so every report
-                    # that saw this method agrees on it and the maximum is simply the value.
-                    $complexity = [int] $method.GetAttribute('complexity')
-                    if ($complexity -gt $entry.Complexity) { $entry.Complexity = $complexity }
-
-                    foreach ($line in $method.SelectNodes('lines/line')) {
-                        $number = [int] $line.GetAttribute('number')
-                        $hits = [int] $line.GetAttribute('hits')
-
-                        $conditionsCovered = 0
-                        $conditionsTotal = 0
-                        $condition = $line.GetAttribute('condition-coverage')
-                        if ($condition -match '\((\d+)/(\d+)\)') {
-                            $conditionsCovered = [int] $Matches[1]
-                            $conditionsTotal = [int] $Matches[2]
-                        }
-
-                        if (-not $entry.Lines.ContainsKey($number)) {
-                            $entry.Lines[$number] = [pscustomobject]@{
-                                Hits              = $hits
-                                ConditionsCovered = $conditionsCovered
-                                ConditionsTotal   = $conditionsTotal
-                            }
-                        }
-                        else {
-                            $existing = $entry.Lines[$number]
-                            if ($hits -gt $existing.Hits) { $existing.Hits = $hits }
-                            if ($conditionsCovered -gt $existing.ConditionsCovered) { $existing.ConditionsCovered = $conditionsCovered }
-                            if ($conditionsTotal -gt $existing.ConditionsTotal) { $existing.ConditionsTotal = $conditionsTotal }
-                        }
-                    }
-                }
-            }
-        }
+        [CurlCoverage.CoberturaMerge]::AddReport($file.FullName, $methods, $reportedAssemblyName, $isProductionAssembly)
     }
 }
 

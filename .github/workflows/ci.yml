@@ -185,8 +185,8 @@ jobs:
       - name: Fast tests
         run: dotnet test -c Release --no-build --filter "TestCategory!=Integration"
 
-  # Packs the Curl.Mcp MCP server and runs its Integration tests on every operating system
-  # (BL-2391). Curl.Mcp is native AOT (ADR-0621, BL-2517), and AOT cannot cross-compile between
+  # Packs the Curl.Mcp MCP server and runs its Integration tests, all but the native AOT class
+  # the package check stands in for, on every operating system (BL-2391, BL-3512). Curl.Mcp is native AOT (ADR-0621, BL-2517), and AOT cannot cross-compile between
   # operating systems, so each runner packs the runtime package of its own runtime, as
   # release.yml's pack-mcp does, and the Linux runner also packs the Curl.Mcp tool package with
   # .mcp/server.json. The packages are uploaded, never published.
@@ -219,8 +219,13 @@ jobs:
         shell: bash
         run: echo "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer" >> "$GITHUB_PATH"
 
+      # All but CurlMcpNativeAotIntegrationTests, whose class publishes Curl.Mcp native AOT a
+      # second time (the runtime package below publishes it once) and made this step 5 to 12
+      # minutes, the run's longest job (BL-3512, ADR-1179). The package check below drives the
+      # packed native binary through initialize and tools/list instead, and integration.yml
+      # still runs that class on every operating system.
       - name: Curl.Mcp Integration tests
-        run: dotnet test Curl.Mcp.IntegrationTests -c Release --filter "TestCategory=Integration"
+        run: dotnet test Curl.Mcp.IntegrationTests -c Release --filter "TestCategory=Integration&FullyQualifiedName!~CurlMcpNativeAotIntegrationTests"
 
       - name: Pack the tool package
         if: matrix.tool
@@ -232,7 +237,8 @@ jobs:
         run: dotnet pack Curl.Mcp -c Release -r "$RID" -o "$PACKAGES/runtime"
 
       # The tool package carries .mcp/server.json; the runtime package carries its native binary,
-      # never Curl.Mcp.dll, and that binary answers initialize over standard input and output.
+      # never Curl.Mcp.dll, and that binary answers initialize and lists its five tools over
+      # standard input and output.
       - name: Check the packages
         shell: pwsh
         run: |
@@ -271,10 +277,25 @@ jobs:
           $server.StandardInput.Flush()
           $read = $server.StandardOutput.ReadLineAsync()
           $answer = if ($read.Wait(60000)) { $read.Result } else { '' }
+          $tools = @()
+          if ("$answer" -like '*"serverInfo"*') {
+            $server.StandardInput.WriteLine('{"jsonrpc":"2.0","method":"notifications/initialized"}')
+            $server.StandardInput.WriteLine('{"jsonrpc":"2.0","id":2,"method":"tools/list"}')
+            $server.StandardInput.Flush()
+            $deadline = [DateTime]::UtcNow.AddSeconds(60)
+            while ([DateTime]::UtcNow -lt $deadline) {
+              $read = $server.StandardOutput.ReadLineAsync()
+              if (-not $read.Wait(60000) -or $null -eq $read.Result) { break }
+              $message = $read.Result | ConvertFrom-Json
+              if ($message.id -eq 2) { $tools = @($message.result.tools | ForEach-Object { $_.name } | Sort-Object); break }
+            }
+          }
           $server.StandardInput.Close()
           if (-not $server.WaitForExit(10000)) { $server.Kill($true) }
           Write-Host $answer
+          Write-Host "tools: $($tools -join ', ')"
           if ("$answer" -notlike '*"serverInfo"*') { throw "$binary did not answer initialize" }
+          if (($tools -join ',') -cne 'build_url,curl,parse_url,transfer,version') { throw "$binary did not list its five tools" }
 
       - uses: actions/upload-artifact@v4
         with:
