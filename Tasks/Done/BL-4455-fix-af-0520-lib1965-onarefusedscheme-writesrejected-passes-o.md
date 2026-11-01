@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-11-01
-completed:
+completed: 2026-11-01
 ---
 # BL-4455 — Fix AF-0520: Lib1965_OnARefusedScheme_WritesRejected passes on empty output
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Assert.HasCount(Lib1965.Schemes.Count, lines)` before the All(...) check, so empty output now fails the test. The reproduction now shows the line-count assertion. dotnet build is clean and the fast tests are green (no Failed! line in the run).
 
 ## Log
 
 - 2026-11-01: Created.
 - 2026-11-01: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-01: Doing -> Done. Lib1965_OnARefusedScheme_WritesRejected asserts the line count, so empty output fails
