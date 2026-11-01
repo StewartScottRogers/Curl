@@ -34,3 +34,4 @@ Found 2026-11-01 checking how the hosts expose the extensions. `Curl.Console` an
 ## Log
 
 - 2026-11-01: Created.
+- 2026-11-01: Backlog -> Doing. Criteria at claim: b631938b d0a97b81 16730235 d1aada98.
