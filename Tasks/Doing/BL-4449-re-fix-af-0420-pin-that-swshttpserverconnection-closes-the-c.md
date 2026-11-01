@@ -32,3 +32,4 @@ Audit finding AF-0420 (accepted 2026-10-24, quality auditor, Medium): `Send`'s c
 ## Log
 
 - 2026-11-01: Created.
+- 2026-11-01: Backlog -> Doing. Criteria at claim: d21bcb31 faa39c5a 877223ce 861d05b4.
