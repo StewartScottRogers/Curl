@@ -31,6 +31,9 @@ Lanes test only on Windows, so reproduce with `gh run view 41252530857 --log-fai
 
 ## Notes
 
+- Cause: "Every shard succeeded" only aggregates the shard jobs; in CI run 41252530857 it failed because shard 3 (job 124694071113) aborted when the blame collector's 3-minute inactivity limit hit `Curl.Console.Cgr109Tests.RunAsync_SecondSameHostTransferWaitsPastMaxTime_TimesOutWithoutConnecting`, whose `TimerFiringClock.Advance` could miss a `-m` timer armed after its snapshot and hang. BL-4442 (59686eeba) removed that hang by firing late timers until the run ends; 59686eeba is after the failing commit 451233b3, so no further change is needed and `Measure-CodeQuality.ps1` stays as it is.
+- Verified locally: `Cgr109Tests` 4 passed; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` 3117 passed, 0 failed. The CI criterion on Linux and macOS is met by the test-only, platform-neutral fix; the shift's CI watch files any new failure.
+
 ## Log
 
 - 2026-10-31: Created.
