@@ -32,7 +32,7 @@ public static class ExtensionListing
         MarkdownOf(ExtensionDescriptionCatalogue.Entries, AreOff(readEnvironmentVariable));
 
     /// <summary>
-    /// The URL schemes Curl's extensions serve, in the order <c>--extensions</c> lists their extensions, each once;
+    /// The URL schemes Curl's extensions serve, in the order <c>--extensions-help</c> lists their extensions, each once;
     /// empty when extensions are off. What the MCP host's <c>version</c> and URL tools offer beside curl's own (BL-4451).
     /// </summary>
     /// <param name="readEnvironmentVariable">Reads the run's environment.</param>
