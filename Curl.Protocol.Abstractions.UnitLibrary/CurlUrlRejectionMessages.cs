@@ -1,9 +1,13 @@
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
-/// The text curl 8.21.0's <c>curl_url_strerror</c> gives each <see cref="CurlUrlRejection" />,
-/// which curl prints as <c>curl: (3) URL rejected: </c> and the text (exit 67 for
-/// <see cref="CurlUrlRejection.UserNotAllowed" />).
+/// The text curl gives each <see cref="CurlUrlRejection" />: <c>curl_url_strerror</c>'s text for a
+/// <c>CURLUE_*</c> rejection, and the <c>CURLE_*</c> code's own text (<c>curl_easy_strerror</c>) for
+/// <see cref="CurlUrlRejection.IdnConversionFailed" />, <see cref="CurlUrlRejection.UrlTooLong" /> and
+/// <see cref="CurlUrlRejection.UrlAtLengthLimit" />. This class gives only the text; the engine
+/// decides how it is printed and the exit code: <c>URL rejected: </c> and the text with exit 3 for
+/// most rejections, exit 67 for <see cref="CurlUrlRejection.UserNotAllowed" />, and the bare text
+/// with no prefix for those three, with exit 3, 43 and 27 respectively.
 /// </summary>
 public static class CurlUrlRejectionMessages
 {
