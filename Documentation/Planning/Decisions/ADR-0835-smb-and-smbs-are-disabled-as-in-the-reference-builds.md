@@ -32,7 +32,7 @@ Curl connected and failed with exit 7 for all three.
 2. `CommandLineProtocolSet` reads `--proto` and `--proto-redir` against `KnownSchemes` less `smb` and
    `smbs`, so both refuse them as unrecognized and `all` leaves them out (BL-3888); `--proto-default`
    is to refuse them as unsupported (BL-3889).
-3. `Curl.Protocol.Smb.UnitLibrary` stays, with its tests, as the SMBv1 client a build with SMB would
+3. `Curl.Original.Protocol.Smb.UnitLibrary` stays, with its tests, as the SMBv1 client a build with SMB would
    use; the conformance harness's smbserver stand-in still serves it, driven by that handler.
    Upstream's smb cases (1451, 1850) leave the ratchet: the harness no longer reports the `smb`
    feature, so they are skipped, as upstream's runtests skips them for the reference build.

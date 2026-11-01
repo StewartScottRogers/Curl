@@ -27,7 +27,7 @@ The mingw build receives its arguments in the system ANSI code page, with Window
 for characters the code page lacks, and sends those bytes unchanged. curl on Linux and macOS
 receives the argument's bytes as the shell passed them, which in a UTF-8 locale are UTF-8.
 
-`HttpRequestHeadFormatter` (`Curl.Protocol.Http.UnitLibrary`) builds the head as a `string` and
+`HttpRequestHeadFormatter` (`Curl.Original.Protocol.Http.UnitLibrary`) builds the head as a `string` and
 turns it into bytes with `Encoding.Latin1`, one byte per character. That matches `é`, U+0100
 (Latin-1's encoder best-fits it to `A`) and `中`, but sends `?` for `€`, because Windows-1252's
 `0x80`-`0x9F` characters are not Latin-1's. The head also holds text that is already one
@@ -61,7 +61,7 @@ beyond what ADR-0022 already ships.
   exactly the four measured bytes above.
 - **Linux and macOS:** UTF-8, the bytes curl receives in a UTF-8 locale:
   `CredentialEncoding.ForPlatform(isWindows: false)`.
-- **Which layer owns it:** the HTTP formatter in `Curl.Protocol.Http.UnitLibrary`, not
+- **Which layer owns it:** the HTTP formatter in `Curl.Original.Protocol.Http.UnitLibrary`, not
   `Curl.Cli.UnitLibrary`. `Curl.Cli` keeps every option value as a .NET `string` (as ADR-0064
   records), and a `string` is what crosses the boundary in `HttpRequestOptions.Headers` and
   `ProxyHeaders`. `Curl.Console`, the composition root that already knows the platform, puts the
@@ -82,7 +82,7 @@ This decision changes code; the implementation is follow-up task BL-373 (see BL-
   system, including the `0x80`-`0x9F` characters such as `€`, and match curl on Linux and
   macOS in a UTF-8 locale, where Latin-1 today sends `?` for anything above U+00FF.
 - A Windows system with another ANSI code page gets that code page, as the reference does.
-- `Curl.Protocol.Http.UnitLibrary` gains no reference: `System.Text.Encoding` is in the base
+- `Curl.Original.Protocol.Http.UnitLibrary` gains no reference: `System.Text.Encoding` is in the base
   class library, and the formatter still never learns which platform it runs on.
 - Scope: this ADR decides request-head text. Request bodies (`-d`, `-F` literal values) and URLs
   are not decided here; they are UTF-8 today, and a change for them needs its own measurement.

@@ -1,7 +1,7 @@
 using System.Text;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ftp;
+using Curl.Original.Protocol.Ftp;
 using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 using Curl.Engine;

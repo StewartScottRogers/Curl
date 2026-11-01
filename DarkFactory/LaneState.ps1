@@ -235,6 +235,30 @@ if ($TestHeartbeat) {
             Wait-MergeCiRun -Branch 'factory/test' -Head ('a' * 40) -OnPoll $ciFixPoll -PollMinutes 5 -HandOver $ciHandOver | Out-Null
         } finally { Remove-Item function:gh, function:git, function:Get-Date, function:Start-Sleep }
         $cases += ,@('a CI fix ready past the deadline starts the next shift at the merge wait''s first poll, once', '14:49', "$($script:ciStartedAt -join ',')")
+        # Shift 20261031-132053's merge wait again (BL-4412): it began at 14:06, before the 21:21
+        # deadline, and run 41239901600 failed at 14:31. Each poll (Invoke-MergeWaitPoll) runs
+        # the CI watch, which files BL-4431 at the first poll after the failure, 14:36; the next
+        # shift starts for it at that poll, and no poll runs the watch after the hand-over.
+        $script:fakeNow = [datetime]'2026-10-31 14:06'
+        $script:watchedAt = @()
+        $script:filedFix = ''
+        $script:watchStartedAt = @()
+        $watchHandOver = @{ Done = $false }
+        function gh { '[{"status":"in_progress","conclusion":null}]' }
+        function git { '' }
+        function Get-Date { param($Format) $script:fakeNow }
+        function Start-Sleep { param($Seconds) $script:fakeNow = $script:fakeNow.AddSeconds($Seconds) }
+        function Invoke-CiWatch { param($Branch, [switch]$Final) $script:watchedAt += $script:fakeNow.ToString('HH:mm'); if ($script:fakeNow -gt [datetime]'2026-10-31 14:31') { $script:filedFix = 'BL-4431' } }
+        function Get-MergeWaitClaimableTaskId { @{ Id = $script:filedFix; Capped = @() } }
+        function Get-ReadyCiFixTaskId { param($Skip) $script:filedFix }
+        function Get-UsageStop { '' }
+        try {
+            $watchPoll = { Invoke-MergeWaitPoll -Branch 'factory/test' -Deadline ([datetime]'2026-10-31 21:21') -HandOver $watchHandOver -Pull $true -StartShift { param([string]$Why) $script:watchStartedAt += "$((Get-Date).ToString('HH:mm')) $Why"; $true } }
+            Wait-MergeCiRun -Branch 'factory/test' -Head ('a' * 40) -OnPoll $watchPoll -PollMinutes 5 -HandOver $watchHandOver | Out-Null
+        } finally { Remove-Item function:gh, function:git, function:Get-Date, function:Start-Sleep, function:Invoke-CiWatch, function:Get-MergeWaitClaimableTaskId, function:Get-ReadyCiFixTaskId, function:Get-UsageStop }
+        $cases += ,@('each merge-wait poll runs the CI watch until the hand-over', '14:11,14:16,14:21,14:26,14:31,14:36', "$($script:watchedAt -join ',')")
+        $cases += ,@('the CI fix the watch filed during the merge wait starts the next shift at once, once', '14:36 BL-4431 is claimable during the merge''s CI wait', "$($script:watchStartedAt -join ' | ')")
+        $cases += ,@('the merge-wait poll marks the hand-over', 'True', "$($watchHandOver.Done)")
         # A poll that throws, or writes output, leaves the wait and its result intact (BL-3150).
         $script:fakeNow = [datetime]'2026-10-22 14:20'
         $script:throwPolls = 0

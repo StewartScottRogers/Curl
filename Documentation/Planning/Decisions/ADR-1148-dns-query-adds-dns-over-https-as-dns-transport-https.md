@@ -9,7 +9,7 @@
 
 ADR-1140 gave `dns:` URLs a transport selection and ADR-1143 added DNS over TLS and DNS over QUIC to it. BL-4339 adds
 DNS over HTTPS (RFC 8484, October 2018). Upstream curl has no `dns:` scheme, so DoH here is tested against its RFC, not
-against curl. The extension may not reference `Curl.Protocol.Http` (or any `Curl.Protocol.*` library), so it cannot use
+against curl. The extension may not reference `Curl.Original.Protocol.Http` (or any `Curl.Protocol.*` library), so it cannot use
 curl's HTTP stack, and must say how the DoH URI is given when the `dns:` URL only names a server (RFC 4501).
 
 ## Decision

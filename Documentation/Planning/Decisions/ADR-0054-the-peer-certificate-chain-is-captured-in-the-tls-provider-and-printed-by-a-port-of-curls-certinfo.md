@@ -43,7 +43,7 @@ remote certificate's store), not the chain Windows builds.
    (`IReadOnlyList<ReadOnlyMemory<byte>>`, empty without TLS), carried through by
    `TcpConnector`, and `TransferReport.PeerCertificates`, which each handler copies from
    the `ConnectResult` it connected with, as it copies `LocalEndPoint`. The HTTP handler's
-   copy is BL-331; this task could not touch `Curl.Protocol.Http.UnitLibrary`, which another task
+   copy is BL-331; this task could not touch `Curl.Original.Protocol.Http.UnitLibrary`, which another task
    held. Every later TLS handler copies it the same way.
 3. **How it is printed.** `Curl.Output.PeerCertificateText` is a port of
    `Curl_extract_certinfo` and the parser under it (`DerReader` for `getASN1Element`,

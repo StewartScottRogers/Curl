@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
-using Curl.Protocol.Ws;
+using Curl.Original.Protocol.Ws;
 
 namespace Curl.Conformance;
 

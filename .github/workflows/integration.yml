@@ -43,13 +43,54 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # As ci.yml's tested-tree (ADR-0814, BL-3512): a push to master whose merge commit holds the
+  # very tree of a parent that an Integration tests push run already finished green on (the
+  # shift-end merge, an audit or gap merge that had master merged in) runs no Integration job.
+  # Run in full, it repeated three 15 to 35 minute jobs, a macOS one among them, while the
+  # next work/dark-factory CI run waited for those runners. On every other push and pull
+  # request this job is skipped and adds no wait.
+  tested-tree:
+    name: Tree already tested
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tested: ${{ steps.find.outputs.tested }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Find a finished Integration tests push run on a parent with the same tree
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tree=$(git rev-parse 'HEAD^{tree}')
+          tested=false
+          for parent in $(git rev-list --parents -n 1 HEAD | cut -d' ' -f2-); do
+            [ "$(git rev-parse "$parent^{tree}")" = "$tree" ] || continue
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/integration.yml/runs?head_sha=$parent&event=push&status=success" --jq '.total_count')
+            if [ "${passed:-0}" -gt 0 ]; then
+              echo "Tree $tree is $parent's, whose Integration tests push run passed; skipping the Integration jobs."
+              tested=true
+              break
+            fi
+          done
+          [ "$tested" = true ] || echo "No parent with tree $tree has a passed Integration tests push run; running every job."
+          echo "tested=$tested" >> "$GITHUB_OUTPUT"
+
   integration:
     name: Integration tests (${{ matrix.os }})
+    needs: tested-tree
     # Not on the shift-end merge's pull request (head factory/merge-<stamp>, ADR-0814): its head
     # commit's push run on work/dark-factory has run these tests, master's push run runs them on
     # the merge commit, and three 15 to 25 minute jobs here only took runners from the next
-    # work/dark-factory CI run (BL-3512).
-    if: ${{ !startsWith(github.head_ref, 'factory/merge-') }}
+    # work/dark-factory CI run (BL-3512). Nor when tested-tree found the tree already tested.
+    if: ${{ !cancelled() && needs.tested-tree.outputs.tested != 'true' && !startsWith(github.head_ref, 'factory/merge-') }}
     strategy:
       fail-fast: false
       matrix:

@@ -50,7 +50,7 @@ the Linux build; only the TLS lines differ, and those belong to the TLS backend.
 1. **HTTP/2 is hand-built.** HPACK (RFC 7541) and the frame layer, connection preface,
    `SETTINGS`, flow control and stream state (RFC 9113) live in
    `Curl.Http2.UnitLibrary` with `Curl.Http2.UnitTests`, under the same quality gates.
-   `Curl.Protocol.Http.UnitLibrary` references it (ADR-0120) and drives it over
+   `Curl.Original.Protocol.Http.UnitLibrary` references it (ADR-0120) and drives it over
    `IConnection`; nothing uses `HttpClient` or the BCL's internal HTTP/2.
 2. **`--http2`, `--http2-prior-knowledge`, `--http1.1` and `--http1.0` are accepted on
    every platform**, and each does what the measured nghttp2 builds do:

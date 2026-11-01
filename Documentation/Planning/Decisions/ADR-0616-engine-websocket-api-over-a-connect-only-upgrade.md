@@ -8,7 +8,7 @@
 ## Context
 
 `IEasyWebSocket` (`curl_ws_recv`, `curl_ws_send`, `curl_ws_meta`, `curl_ws_start_frame`) threw
-`NotSupportedException` on `ManagedEasyTransfer`. BL-2471 gave `Curl.Protocol.Ws` an upgrade that stops after the
+`NotSupportedException` on `ManagedEasyTransfer`. BL-2471 gave `Curl.Original.Protocol.Ws` an upgrade that stops after the
 `101` and hands the connection back (`WsProtocolHandler.ConnectAndUpgradeOnlyAsync`), a public frame encoder and a
 decoder that reports each run of payload with its opcode, FIN bit, offset and bytes left. BL-2423 gave the engine a
 `CURLOPT_CONNECT_ONLY` 1 connection of its own. What was left: how a `CONNECT_ONLY` 2 perform reaches the upgrade,
@@ -45,7 +45,7 @@ below is read from curl 8.22.0's `lib/ws.c`, not measured.
 7. **Codes outside a WebSocket**: with the options no longer connect-only, `CURLE_UNSUPPORTED_PROTOCOL` (libcurl's
    "CONNECT_ONLY is required"); connect-only with no upgraded connection, `CURLE_BAD_FUNCTION_ARGUMENT`.
 8. **`CURLWS_OFFSET` and `curl_ws_start_frame` answer `CURLE_BAD_FUNCTION_ARGUMENT` until BL-2481**, which needs a
-   partial-frame encoder in `Curl.Protocol.Ws` first. Every perform and cleanup close the upgraded connection;
+   partial-frame encoder in `Curl.Original.Protocol.Ws` first. Every perform and cleanup close the upgraded connection;
    `Reset` keeps it, as for ADR-0608.
 
 ## Consequences

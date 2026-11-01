@@ -52,7 +52,7 @@ is. The alphabetical run already keeps the three projects of an area together.
 ### 2. CI needs no change
 
 Measured on 2026-10-07 with .NET SDK 10.0.401 and MSTest 4.4.1, `dotnet test` in VSTest
-mode: `dotnet test Curl.Protocol.Dict.UnitTests --no-build --filter "TestCategory=NoSuchCategoryXyz"`
+mode: `dotnet test Curl.Original.Protocol.Dict.UnitTests --no-build --filter "TestCategory=NoSuchCategoryXyz"`
 prints `No test matches the given testcase filter` and exits 0. So:
 
 - `.github/workflows/ci.yml`'s `dotnet test -c Release --no-build --filter "TestCategory!=Integration"`
@@ -140,7 +140,7 @@ BL-1603 checks the rule at build time rather than in a test.
   project never changes a library's measured coverage, and a line only an Integration test
   reaches is uncovered unless ADR-0083's exclusion names it.
 - The moves, each its own task: BL-1599 (`Curl.Cli`), BL-1600 (`Curl.Console`), BL-1601
-  (`Curl.Core`), BL-1602 (`Curl.Protocol.Ssh`). `Curl.Networking` was moved by Stewart in
+  (`Curl.Core`), BL-1602 (`Curl.Original.Protocol.Ssh`). `Curl.Networking` was moved by Stewart in
   `6ecb2781f` and made buildable by BL-1597. BL-1600 moves `CurlCompositionTests`' two
   temp-directory `-w %output{}` tests as filed, already tagged Integration; by decision 4
   they could return to the fast run untagged, which is a later choice, not a requirement.

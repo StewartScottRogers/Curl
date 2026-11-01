@@ -10,7 +10,7 @@ using Curl.Api.Options.Protocols;
 using Curl.Authentication;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ws;
+using Curl.Original.Protocol.Ws;
 
 namespace Curl.Engine;
 

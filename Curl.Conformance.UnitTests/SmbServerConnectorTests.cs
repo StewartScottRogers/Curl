@@ -1,13 +1,13 @@
 using System.Buffers.Binary;
 using System.Text;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Smb;
+using Curl.Original.Protocol.Smb;
 
 namespace Curl.Conformance;
 
 /// <summary>
 /// Pins <see cref="SmbServerConnector"/> and its <see cref="SmbServerConnection"/>, driven by Curl's own SMB client
-/// (<c>Curl.Protocol.Smb.UnitLibrary</c>'s handler) and by hand-made messages for what curl never sends.
+/// (<c>Curl.Original.Protocol.Smb.UnitLibrary</c>'s handler) and by hand-made messages for what curl never sends.
 /// </summary>
 [TestClass]
 public sealed class SmbServerConnectorTests

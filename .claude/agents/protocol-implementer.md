@@ -11,7 +11,7 @@ You write production C# in exactly one project per invocation.
 - `TreatWarningsAsErrors` and `Nullable` are on. No suppressions, no `#pragma warning disable`.
 - `GenerateDocumentationFile` is on for every non-test project: an XML doc comment on every public member, or CS1591 stops you.
 - `IsAotCompatible` is on: no reflection, no `Activator.CreateInstance`, no expression compilation, no DI assembly scanning.
-- `RootNamespace` strips the `.UnitLibrary` suffix, so the directory `Curl.Protocol.Http.UnitLibrary` holds `namespace Curl.Protocol.Http;`. File-scoped namespaces.
+- `RootNamespace` strips the `.UnitLibrary` suffix, so the directory `Curl.Original.Protocol.Http.UnitLibrary` holds `namespace Curl.Original.Protocol.Http;`. File-scoped namespaces.
 - No `Version` attribute on a `PackageReference` — versions live in `Directory.Packages.props`.
 - Base class library only. The four test-harness packages are the only approved
   third-party components; anything else needs the user's approval before you add it.

@@ -7,8 +7,8 @@ description: Add a new C# project (and its matching test project) to the Curl so
 Layout is flat: every project is a directory immediately under the repository root.
 There is no `src/` and no `tests/` — do not create them.
 
-1. Confirm the name and template. Libraries are `Curl.<Area>.UnitLibrary` (protocols
-   `Curl.Protocol.<Name>.UnitLibrary`); the template is `classlib` unless it is the
+1. Confirm the name and template. Libraries are `Curl.<Area>.UnitLibrary` (curl's own protocols
+   `Curl.Original.Protocol.<Name>.UnitLibrary`, ADR-1176); the template is `classlib` unless it is the
    `Curl.Console` executable. Ask if unclear.
 2. If no solution file exists at the repository root, create one:
    `dotnet new sln --name Curl --format slnx`
@@ -19,14 +19,14 @@ There is no `src/` and no `tests/` — do not create them.
 5. Add both to the solution in a folder for the area, under the group it belongs to
    (Hosts, CommandLine, Transfer, Wire or Security; see CLAUDE.md, ADR-0731):
    `dotnet sln Curl.slnx add --solution-folder <Group>/<Area> Curl.<Area>.UnitLibrary Curl.<Area>.UnitTests`.
-   A protocol goes in its own folder under `Protocols`:
-   `dotnet sln Curl.slnx add --solution-folder Protocols/<Name> Curl.Protocol.<Name>.UnitLibrary Curl.Protocol.<Name>.UnitTests`.
+   A protocol goes in its own folder under `Original/Protocols`:
+   `dotnet sln Curl.slnx add --solution-folder Original/Protocols/<Name> Curl.Original.Protocol.<Name>.UnitLibrary Curl.Original.Protocol.<Name>.UnitTests`.
    A conformance part goes in its folder under `Conformance` the same way:
    `dotnet sln Curl.slnx add --solution-folder Conformance/<Part> Curl.Conformance.<Part>.UnitLibrary Curl.Conformance.<Part>.UnitTests`
 6. Reference production from test:
    `dotnet add Curl.<Area>.UnitTests reference Curl.<Area>.UnitLibrary`
 7. For a protocol library, also reference the contracts, and nothing else horizontal:
-   `dotnet add Curl.Protocol.<Name>.UnitLibrary reference Curl.Protocol.Abstractions.UnitLibrary`
+   `dotnet add Curl.Original.Protocol.<Name>.UnitLibrary reference Curl.Protocol.Abstractions.UnitLibrary`
 8. Strip any `Version` attributes and settings duplicated by `Directory.Build.props` /
    `Directory.Packages.props` (create those at the root if missing).
 9. Add `Curl.<Area>.UnitLibrary/CLAUDE.md` with a short purpose statement and any
@@ -58,6 +58,6 @@ agent - live only in `Curl.<Area>.IntegrationTests`, never in `Curl.<Area>.UnitT
 4. Add it to `Curl.slnx` in the area's own solution folder, before the library there:
    `dotnet sln Curl.slnx add --solution-folder <Group>/<Area> Curl.<Area>.IntegrationTests`.
    It sorts immediately before `Curl.<Area>.UnitLibrary` (for `Curl.Console`, before
-   `Curl.Console.UnitTests`). A protocol's goes in its `Protocols/<Name>` folder:
-   `dotnet sln Curl.slnx add --solution-folder Protocols/<Name> Curl.Protocol.<Name>.IntegrationTests`.
+   `Curl.Console.UnitTests`). A protocol's goes in its `Original/Protocols/<Name>` folder:
+   `dotnet sln Curl.slnx add --solution-folder Original/Protocols/<Name> Curl.Original.Protocol.<Name>.IntegrationTests`.
 5. Run `dotnet build` and `dotnet test Curl.<Area>.IntegrationTests --filter "TestCategory=Integration"`.

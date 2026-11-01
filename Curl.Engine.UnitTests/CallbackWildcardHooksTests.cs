@@ -1,7 +1,7 @@
 using Curl.Api.Callbacks;
 using Curl.Api.Options;
 using Curl.Api.Options.Behaviour;
-using Curl.Protocol.Ftp;
+using Curl.Original.Protocol.Ftp;
 
 namespace Curl.Engine;
 

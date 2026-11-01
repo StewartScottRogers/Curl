@@ -160,7 +160,7 @@ flag. Built on Curl's existing `CurlUrl` parser.
 
 `curl_ws_recv`, `curl_ws_send`, `curl_ws_meta`, `curl_ws_start_frame`; `CURLWS_TEXT`, `BINARY`,
 `CONT`, `CLOSE`, `PING`, `PONG`, `OFFSET`, `RAW_MODE`, `NOAUTOPONG`. Built on
-`Curl.Protocol.Ws`.
+`Curl.Original.Protocol.Ws`.
 
 ### Header API (`header.h`)
 

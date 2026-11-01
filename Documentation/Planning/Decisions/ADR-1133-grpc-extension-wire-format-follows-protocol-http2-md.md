@@ -14,7 +14,7 @@ http-grpc-status-mapping.md, not against curl. Those documents leave a few choic
 
 ## Decision
 
-- `Curl.Extension.Grpc.UnitLibrary` references only `Curl.Protocol.Abstractions` and
+- `Curl.Extended.Protocol.Grpc.UnitLibrary` references only `Curl.Protocol.Abstractions` and
   `Curl.Extension.Abstractions` for now; `Wire/` works on header lists
   (`KeyValuePair<string, string>`) and bytes, so it needs neither HPACK nor protobuf. The client
   flow adds `Curl.Http2` and `Curl.Protobuf` when it needs them. Its types are internal.

@@ -6,7 +6,7 @@
 
 function Invoke-Board {
     param([string[]]$BoardArgs)
-    $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $Board @BoardArgs 2>&1
+    $out = & (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $Board @BoardArgs 2>&1
     return ($out | ForEach-Object { "$_" })
 }
 

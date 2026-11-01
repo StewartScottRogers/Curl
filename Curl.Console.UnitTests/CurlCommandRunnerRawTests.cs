@@ -2,7 +2,7 @@ using System.Text;
 using Curl.Authentication;
 using Curl.Core;
 using Curl.Engine;
-using Curl.Protocol.Http;
+using Curl.Original.Protocol.Http;
 using Curl.Testing;
 
 namespace Curl.Console;

@@ -1,7 +1,7 @@
 using System.Globalization;
 using Curl.Conformance.UnitProgram.Hashes;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Sftp;
+using Curl.Original.Protocol.Ssh.Sftp;
 
 namespace Curl.Conformance.UnitProgram.ToolParsers;
 

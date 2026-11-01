@@ -7,7 +7,7 @@
 
 ## Context
 
-`Curl.Protocol.Http`'s `HttpRequestHeadFormatter` sends `User-Agent: curl/8.22.0` when
+`Curl.Original.Protocol.Http`'s `HttpRequestHeadFormatter` sends `User-Agent: curl/8.22.0` when
 `HttpRequestOptions.UserAgent` is `null`, and `EngineComposition.CreateProxyTunnelOptions` gives a `CONNECT` the
 same default. That default is the curl tool's: `tool_operate.c` sets `CURLOPT_USERAGENT` to `curl/<version>` when
 `-A` is not given. libcurl 8.22.0 itself sends no `User-Agent` line without `CURLOPT_USERAGENT` (`lib/http.c` adds
@@ -23,7 +23,7 @@ A perform from the options with no `ToolSettings` - a `Libcurl` or `Curl.Api` ha
 `EasyHttpOptions.UserAgent` `null` turned into the empty string (`ManagedEasyTransfer.WithoutDefaultUserAgent`).
 The formatter and the proxy tunnel already send no `User-Agent` for an empty one, as libcurl does for
 `CURLOPT_USERAGENT ""`, so libcurl's "no line" needs no new option on `HttpRequestOptions` and no change in
-`Curl.Protocol.Http`. A perform with `ToolSettings` keeps `null`, and with it the tool's `curl/8.22.0`.
+`Curl.Original.Protocol.Http`. A perform with `ToolSettings` keeps `null`, and with it the tool's `curl/8.22.0`.
 
 ## Consequences
 

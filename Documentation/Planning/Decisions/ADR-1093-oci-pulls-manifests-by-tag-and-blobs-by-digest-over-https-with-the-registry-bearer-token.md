@@ -13,7 +13,7 @@ which has no such scheme. It needs a URL form, a transport, an authentication fl
 
 ## Decision
 
-- Scheme `oci`, served by `Curl.Extension.OciRegistry.UnitLibrary`'s `OciRegistryProtocolHandler`; it adds no
+- Scheme `oci`, served by `Curl.Extended.Protocol.OciRegistry.UnitLibrary`'s `OciRegistryProtocolHandler`; it adds no
   command-line option. The URL is `oci://registry[:port]/name[:tag]` for a manifest, the tag `latest` when none is
   given (as `docker pull` does), and `oci://registry[:port]/name@digest` for a blob. Name, tag and digest follow the
   specification's grammar; a path that breaks it fails with exit 3 before any connection.

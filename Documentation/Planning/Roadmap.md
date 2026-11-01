@@ -60,7 +60,7 @@ built alongside it.
     authentication, cookie and proxy contracts in `Curl.Protocol.Abstractions` (BL-159 to
     BL-162), the exchange recording script (BL-165) and requirements FR-052 to FR-106
     (BL-166 to BL-168).
-  - The HTTP handler, `Curl.Protocol.Http`: the response head reader (BL-169), body
+  - The HTTP handler, `Curl.Original.Protocol.Http`: the response head reader (BL-169), body
     framing by length, close and chunks (BL-170, BL-171), the request writer (BL-172),
     GET and HTTPS over `IConnector` (BL-173), timeouts and send and receive failures
     (BL-174), request bodies (BL-175), `-I` and `-f` (BL-176), `--compressed` (BL-177),
@@ -105,7 +105,7 @@ built alongside it.
 
 ## Milestone 2 — Phase 2: FTP and SSH
 
-`Curl.Protocol.Ftp` and `Curl.Protocol.Ssh`: a second transport shape, a control
+`Curl.Original.Protocol.Ftp` and `Curl.Original.Protocol.Ssh`: a second transport shape, a control
 channel beside data channels, without distorting the design.
 
 - **Status:** Done. FTP, SCP and SFTP are built and registered in `Curl.Console`
@@ -115,7 +115,7 @@ channel beside data channels, without distorting the design.
   algorithms), ADR-0206 (key exchange failures), ADR-0212 (packet protection), ADR-0213
   (host key checks) and ADR-0215 (user authentication).
 - **Delivers:**
-  - FTP, `Curl.Protocol.Ftp`: download with login, passive mode and RETR (BL-431),
+  - FTP, `Curl.Original.Protocol.Ftp`: download with login, passive mode and RETR (BL-431),
     registration in `Curl.Console` (BL-434), the control options (BL-435, BL-436),
     active mode and FTPS (BL-437, BL-456 to BL-459, BL-463 to BL-466, BL-474), `-r`,
     `-C` and `-I` (BL-438), `-T` uploads (BL-439), `ftp://` through an HTTP proxy
@@ -126,7 +126,7 @@ channel beside data channels, without distorting the design.
     alternative USER and PRET (BL-634, BL-635), CCC (BL-636), `-R` into the transfer
     context (BL-854), the passive data connect under `--connect-timeout` (BL-797), EPSV
     over IPv6 (BL-903) and the data connection's failure message (BL-904).
-  - SSH, `Curl.Protocol.Ssh`: the build decision (BL-560), the transfer options and
+  - SSH, `Curl.Original.Protocol.Ssh`: the build decision (BL-560), the transfer options and
     their parsing (BL-561, BL-562), the transport, key exchange and packet protection
     (BL-563 to BL-565, BL-678), host key checks (BL-566), password, keyboard-interactive
     and public key authentication (BL-567, BL-568, BL-681), SFTP download, listing,
@@ -146,7 +146,7 @@ channel beside data channels, without distorting the design.
 
 ## Milestone 3 — Phase 3: SMTP, IMAP and POP3
 
-`Curl.Protocol.Smtp`, `Curl.Protocol.Imap` and `Curl.Protocol.Pop3`: line-oriented
+`Curl.Original.Protocol.Smtp`, `Curl.Original.Protocol.Imap` and `Curl.Original.Protocol.Pop3`: line-oriented
 protocols sharing one SASL authenticator and one mail options record.
 
 - **Status:** In progress. All three handlers are built and registered; follow-ups
@@ -175,7 +175,7 @@ protocols sharing one SASL authenticator and one mail options record.
 
 ## Milestone 4 — Phase 4: WebSocket
 
-`Curl.Protocol.Ws`. The rest of Phase 4 (`Mqtt`, `Tftp`, `Dict`, `Gopher`, `Telnet`)
+`Curl.Original.Protocol.Ws`. The rest of Phase 4 (`Mqtt`, `Tftp`, `Dict`, `Gopher`, `Telnet`)
 shipped in Milestone 1.
 
 - **Status:** In progress. The handler is built and registered for `ws` and `wss`;
@@ -192,7 +192,7 @@ shipped in Milestone 1.
 
 ## Milestone 5 — Phase 5: LDAP, SMB and RTSP
 
-`Curl.Protocol.Ldap`, `Curl.Protocol.Smb` and `Curl.Protocol.Rtsp`: the awkward
+`Curl.Original.Protocol.Ldap`, `Curl.Original.Protocol.Smb` and `Curl.Original.Protocol.Rtsp`: the awkward
 remainder.
 
 - **Status:** Done. LDAP, RTSP and SMB (`smb`, `smbs`) are built and registered in

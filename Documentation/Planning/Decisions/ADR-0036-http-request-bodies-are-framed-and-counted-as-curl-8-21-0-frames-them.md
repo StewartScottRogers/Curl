@@ -7,7 +7,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions").
 
 ## Context
 
-BL-175 taught `Curl.Protocol.Http.UnitLibrary` to send request bodies from `BytesBody`
+BL-175 taught `Curl.Original.Protocol.Http.UnitLibrary` to send request bodies from `BytesBody`
 and `StreamBody`: body headers, chunked framing, `Expect: 100-continue` and its wait. Four
 points had more than one reasonable answer. Each was settled by measuring the reference
 build (curl 8.21.0, mingw, Schannel) on 2026-09-26 against loopback servers on 127.0.0.1;

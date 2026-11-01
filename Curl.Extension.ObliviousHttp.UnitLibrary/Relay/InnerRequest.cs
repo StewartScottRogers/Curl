@@ -1,4 +1,4 @@
-using System.Text;
+using Curl.Authentication;
 using Curl.Extension.ObliviousHttp.BinaryHttp;
 
 namespace Curl.Extension.ObliviousHttp.Relay;
@@ -27,11 +27,12 @@ internal static class InnerRequest
     {
         HttpRequestOptions http = context.Http!;
         List<BinaryHttpField> headers = [.. http.Headers.Select(FieldOf).OfType<BinaryHttpField>()];
-        AddUnlessGiven(headers, "user-agent", http.UserAgent);
-        AddUnlessGiven(headers, "content-type", context.PostData is null ? null : FormContentType);
-        AddUnlessGiven(headers, "authorization", AuthorizationOf(context));
-        AddUnlessGiven(headers, "referer", http.Referer);
-        AddUnlessGiven(headers, "cookie", http.CookieStrings);
+        HashSet<string> named = [.. http.Headers.Select(NameOf).OfType<string>().Select(name => name.ToLowerInvariant())];
+        AddUnlessGiven(headers, named, "user-agent", http.UserAgent);
+        AddUnlessGiven(headers, named, "content-type", context.PostData is null ? null : FormContentType);
+        AddUnlessGiven(headers, named, "authorization", AuthorizationOf(context));
+        AddUnlessGiven(headers, named, "referer", http.Referer);
+        AddUnlessGiven(headers, named, "cookie", http.CookieStrings);
         return new BinaryHttpRequest(MethodOf(context), context.Url.Scheme, AuthorityOf(context.Url), PathOf(context.Url, http), headers, context.PostData ?? ReadOnlyMemory<byte>.Empty);
     }
 
@@ -48,15 +49,18 @@ internal static class InnerRequest
         (context => context.Http!.Body is not null, "a form (-F)"),
         (context => context.Http!.Compressed, "a compressed response (--compressed)"),
         (context => context.Http!.HasCookieFiles, "a cookie file (-b)"),
+        (context => context.Credentials is not null && context.Http!.BearerToken is null && context.Http.AuthSchemes != HttpAuthSchemes.Basic, "-u credentials for a scheme other than Basic (--digest, --ntlm, --negotiate, --anyauth)"),
     ];
 
     /// <summary>Bearer token (<c>--oauth2-bearer</c>) first, else Basic credentials (<c>-u</c>), as the <c>Authorization</c> value.</summary>
     private static string? AuthorizationOf(ITransferContext context) =>
-        context.Http!.BearerToken is { } token
-            ? "Bearer " + token
-            : context.Credentials is { } credentials
-                ? "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(credentials.UserName + ":" + credentials.Password))
-                : null;
+        context.Http!.AuthorizationHeaderWithheld
+            ? null
+            : context.Http.BearerToken is { } token
+                ? "Bearer " + token
+                : context.Credentials is { } credentials
+                    ? "Basic " + Convert.ToBase64String(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()).GetBytes(credentials.UserName + ":" + credentials.Password))
+                    : null;
 
     private static string? RefusalOf(ITransferContext context) =>
         Array.Find(Refusals, refusal => refusal.Applies(context)).Refused;
@@ -71,6 +75,12 @@ internal static class InnerRequest
     /// The field a <c>-H</c> line sends: <c>Name: value</c>, or <c>Name;</c> for an empty value. A line
     /// <c>Name:</c> with no value removes curl's own header and sends none, as curl does.
     /// </summary>
+    private static string? NameOf(string line)
+    {
+        int colon = line.IndexOf(':', StringComparison.Ordinal);
+        return colon > 0 ? line[..colon].Trim() : line.EndsWith(';') && line.Length > 1 ? line[..^1].Trim() : null;
+    }
+
     private static BinaryHttpField? FieldOf(string line)
     {
         int colon = line.IndexOf(':', StringComparison.Ordinal);
@@ -83,9 +93,9 @@ internal static class InnerRequest
         return line.EndsWith(';') && line.Length > 1 ? new BinaryHttpField(line[..^1].Trim(), string.Empty) : null;
     }
 
-    private static void AddUnlessGiven(List<BinaryHttpField> headers, string name, string? value)
+    private static void AddUnlessGiven(List<BinaryHttpField> headers, HashSet<string> named, string name, string? value)
     {
-        if (value is not null && !headers.Exists(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)))
+        if (value is not null && !named.Contains(name))
         {
             headers.Add(new BinaryHttpField(name, value));
         }

@@ -55,12 +55,12 @@ just as it reads such a `Last-Modified`.
    `Curl.Protocol.Abstractions.UnitLibrary` change is one small, additive task: no handler
    and no caller breaks, and FTP and SFTP, which never exceed 9999, keep setting the
    `DateTimeOffset` view unchanged.
-2. **HTTP.** `Curl.Protocol.Http.UnitLibrary`'s `HttpLastModified` reads the three HTTP-date
+2. **HTTP.** `Curl.Original.Protocol.Http.UnitLibrary`'s `HttpLastModified` reads the three HTTP-date
    forms with any year of four or more digits into Unix seconds and sets
    `SourceLastWriteUnixSeconds`; `HttpDownloadConditions` compares `-z` in Unix seconds, so
    a document from year 40000 is newer than any `-z` date. Sending an `If-Modified-Since`
    for a `-z` date past 9999 formats the year as curl does, measured first.
-3. **`file://`.** `Curl.Protocol.File.UnitLibrary` reads a source file's time as Unix seconds
+3. **`file://`.** `Curl.Original.Protocol.File.UnitLibrary` reads a source file's time as Unix seconds
    where .NET's `DateTime`-based `FileSystemInfo.LastWriteTimeUtc` cannot hold it, and
    compares `-z` the same way. On Windows, `Win32SourceLastWriteReader` reads the raw Win32
    `FILETIME` with `GetFileTime` through `LibraryImport`, which is AOT-safe and in the base
@@ -88,7 +88,7 @@ just as it reads such a `Last-Modified`.
 ## Consequences
 
 - Projects that change, all already in `Curl.slnx`: `Curl.Protocol.Abstractions.UnitLibrary`,
-  `Curl.Protocol.Http.UnitLibrary`, `Curl.Protocol.File.UnitLibrary`, `Curl.Core.UnitLibrary`,
+  `Curl.Original.Protocol.Http.UnitLibrary`, `Curl.Original.Protocol.File.UnitLibrary`, `Curl.Core.UnitLibrary`,
   `Curl.Console`, `Curl.Cli.UnitLibrary`, each with its `.UnitTests` twin.
 - The Abstractions task lands first; the HTTP, file and Cli tasks then fan out in parallel;
   the `-R` task waits for the HTTP one so its end-to-end test can pin the measured output.

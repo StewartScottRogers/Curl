@@ -3,7 +3,7 @@ using System.Text;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.File;
+using Curl.Original.Protocol.File;
 using Curl.Testing;
 
 namespace Curl.Console;

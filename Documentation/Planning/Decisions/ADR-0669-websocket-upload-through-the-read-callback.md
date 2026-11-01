@@ -28,7 +28,7 @@ with no WebSocket state it is `CURLE_SEND_ERROR`, as is a frame still unfinished
 
 ## Decision
 
-1. `Curl.Protocol.Ws` gains `WsUploadFrames` (the upload's `ws->enc` and `ws->sendbuf`) and `IWsUploadFrameSource`.
+1. `Curl.Original.Protocol.Ws` gains `WsUploadFrames` (the upload's `ws->enc` and `ws->sendbuf`) and `IWsUploadFrameSource`.
    `WsProtocolHandler` sends an upload stream that implements it with non-null frames read by read, as `cr_ws_read`
    does above, each read asking for up to 64 KiB (`UploadReadSize`, libcurl's default `CURLOPT_UPLOAD_BUFFERSIZE`).
    The frames are open only while the upload is sent. Under `RawMode` the upload still goes out unframed (BL-2526).

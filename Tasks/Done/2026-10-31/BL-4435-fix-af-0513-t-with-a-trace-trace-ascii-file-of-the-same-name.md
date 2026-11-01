@@ -1,0 +1,57 @@
+---
+id: BL-4435
+title: Fix AF-0513: -T with a --trace/--trace-ascii file of the same name uploads 0 bytes and exits 0 where curl exits 26
+priority: High
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Console]
+requirement: none
+created: 2026-10-31
+completed: 2026-10-31
+---
+# BL-4435 — Fix AF-0513: -T with a --trace/--trace-ascii file of the same name uploads 0 bytes and exits 0 where curl exits 26
+
+## Goal
+
+The defect the audit office reported as AF-0513 is fixed: its reproduction no longer reproduces, so a re-audit can close the finding.
+
+## Context
+
+Filed from audit finding AF-0513 (High, conformance auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0513-t-with-a-trace-trace-ascii-file-of-the-same-name-u.md`.
+
+Location: `Curl.Console/CurlCommandRunner.cs:4023`
+
+Location: `Curl.Console/CurlCommandRunner.cs:4023`
+
+Reference: curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel zlib/1.3.2 brotli/1.2.0 zstd/1.5.7 libidn2/2.3.8 libpsl/0.21.5 libssh2/1.11.1 WinLDAP. Differential seed 599444422, case 5: '--mail-from - -T sub/f.txt --delegation 99999999999999999999 --trace sub/f.txt http://127.0.0.1:PORT/' differs in exitcode, stderr and request. Reduced by dropping one option at a time (the difference stays) to '-T sub/f.txt --trace sub/f.txt URL'. '--trace-ascii sub/f.txt' differs the same way, and '-T sub/f.txt' alone matches (both exit 0, 112 request bytes). sub/f.txt holds the 9 bytes 'sub body\n'. curl sizes the upload at 9 bytes before the trace file truncates it, sends no request, prints 'curl: (26) client read function EOF fail, only 0/9 of needed bytes read' and exits 26. Curl opens the -T file only at transfer time (TransferOpeningUploadFileAsync, fileSystem.OpenForReadAsync at line 4023), after TransferEventOutput has already opened and truncated the trace file. It therefore sees an empty file, sends 'PUT /f.txt HTTP/1.1 ... Content-Length: 0' (103 request bytes) and exits 0. A script can tell the two apart by the exit code. Phase 2: ADR-0051 decides that the -T file is opened after the transfer's warning lines, but it does not cover the upload being sized after the trace file is truncated, so it does not explain this difference.
+
+Reproduction, from the finding:
+
+Run from the repository root:
+
+```powershell
+dotnet build Curl.Console -c Release -v q; $d=(New-Item -ItemType Directory -Force (Join-Path $env:TEMP 'af-trace-upload')).FullName; New-Item -ItemType Directory -Force (Join-Path $d 'sub') | Out-Null; [IO.File]::WriteAllText((Join-Path $d 'sub/f.txt'), 'sub body'+[char]10); $exe=(Resolve-Path Curl.Console/bin/Release/net10.0/curl.exe).Path; $rec=(Resolve-Path Record-CurlExchange.ps1).Path; Push-Location $d; [Environment]::CurrentDirectory=$d; & $rec -Port 50411 -Curl $exe -OutDirectory (Join-Path $d 'out') -CurlArgs '-T','sub/f.txt','--trace','sub/f.txt','http://127.0.0.1:50411/' *> $null; Pop-Location; Get-Content (Join-Path $d 'out/exitcode.txt'); Get-Content (Join-Path $d 'out/stderr.txt') | Select-String '^curl:'
+```
+
+- Expected: 26 and 'curl: (26) client read function EOF fail, only 0/9 of needed bytes read', with an empty request.bin (curl 8.22.0 Schannel gives this with -Curl set to Git's ucrt64 curl.exe)
+- Actual: 0, no curl: line, and request.bin holds 'PUT /f.txt HTTP/1.1' with 'Content-Length: 0' (103 bytes)
+
+The finding closes only when a later re-audit by the conformance auditor confirms the fix, never because this task reaches Done.
+
+## Acceptance criteria
+
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+- The runner now sizes the first URL's `-T` file before the trace file opens, and uploads a file the trace then truncated through `UploadSizedBeforeTraceStream`, which reports the earlier size and reads synchronously as curl's `fread` does (ADR-1175). The synchronous read matters: an async read of a real file does not complete at once on Windows, so the HTTP writer raced it and sent the head first.
+- I measured the reproduction with the Debug build: `--trace` and `--trace-ascii` both give exit 26, `curl: (26) client read function EOF fail, only 0/9 of needed bytes read`, and an empty request.bin.
+- Curl.Console quality: 0 failing members. Curl.Console.UnitTests: 3117 passed. The whole fast suite is green. The tests are platform-neutral (in-memory file system, relative paths).
+
+## Log
+
+- 2026-10-31: Created.
+- 2026-10-31: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-31: Doing -> Done. A -T file is sized before the trace file truncates it, so -T f --trace f exits 26 with curl's message and sends nothing (ADR-1175).

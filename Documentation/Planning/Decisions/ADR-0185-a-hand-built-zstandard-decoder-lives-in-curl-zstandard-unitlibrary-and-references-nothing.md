@@ -15,7 +15,7 @@ decoder for it:
   `Accept-Encoding: deflate, gzip, br, zstd` for `--compressed` and decodes a
   `Content-Encoding: zstd` body. ADR-0020 drops the `zstd` token "until a zstd decoder
   exists", and FR-073 already states the full header. Decoding lives in
-  `Curl.Protocol.Http.UnitLibrary`'s `HttpContentCodingDecoder`, which drives Brotli through
+  `Curl.Original.Protocol.Http.UnitLibrary`'s `HttpContentCodingDecoder`, which drives Brotli through
   the BCL's `BrotliDecoder` push API (`OperationStatus Decompress(source, destination, out
   consumed, out written)`) so that it knows where the coded stream ends.
 - **TLS certificate decompression (RFC 8879).** The OpenSSL 3.5.5 ClientHello that the
@@ -24,7 +24,7 @@ decoder for it:
   where the whole compressed message is in hand and its `uncompressed_length` (at most
   2^24) is declared up front.
 
-The two consumers sit in different layers. `Curl.Protocol.Http.UnitLibrary` may reference
+The two consumers sit in different layers. `Curl.Original.Protocol.Http.UnitLibrary` may reference
 only Abstractions and ADR-0120's hand-built libraries, and a hand-built library may never
 reference a protocol library, so the decoder cannot live in either consumer and be shared.
 The standing rule (root `CLAUDE.md`, "Decisions", 2026-09-28) is that a piece the BCL lacks
@@ -48,7 +48,7 @@ ADR-0120's table gains this row:
 | --- | --- | --- |
 | `Curl.Zstandard.UnitLibrary` | The Zstandard (RFC 8878) decoder and XXH64 | nothing |
 
-It sits at the bottom of the graph beside `Curl.Cryptography`. `Curl.Protocol.Http.UnitLibrary`
+It sits at the bottom of the graph beside `Curl.Cryptography`. `Curl.Original.Protocol.Http.UnitLibrary`
 and `Curl.Tls.UnitLibrary` may reference it; `Curl.Tls.UnitLibrary`'s row in ADR-0120 gains
 `Curl.Zstandard.UnitLibrary` in its "May reference" column, which keeps the graph acyclic
 because `Curl.Zstandard` references nothing. `ProtocolIsolationTests` in
@@ -131,7 +131,7 @@ already drives Brotli, and TLS gets the one-shot form it needs:
 
 ### Who uses it
 
-- `Curl.Protocol.Http.UnitLibrary` references it for `Content-Encoding: zstd`, and
+- `Curl.Original.Protocol.Http.UnitLibrary` references it for `Content-Encoding: zstd`, and
   `--compressed` then advertises `deflate, gzip, br, zstd` as the measured reference does.
   That task supersedes ADR-0020 with a new ADR, measuring first what the Linux and macOS
   OpenSSL builds of curl advertise (a build without libzstd sends no `zstd` token) and what
@@ -158,7 +158,7 @@ already drives Brotli, and TLS gets the one-shot form it needs:
 - **Put it in `Curl.Tls.UnitLibrary`** and let HTTP reference TLS. HTTP would compile
   against a TLS client to decode a body, and HTTP's content decoding would change whenever
   TLS did. Rejected.
-- **Put it in `Curl.Protocol.Http.UnitLibrary`.** A hand-built library may never reference
+- **Put it in `Curl.Original.Protocol.Http.UnitLibrary`.** A hand-built library may never reference
   a protocol library, so TLS could not use it. Rejected.
 - **A general `Curl.Compression.UnitLibrary`.** Zlib and Brotli are in the BCL already; the
   only compression Curl hand-builds is Zstandard, so the broader name would promise more

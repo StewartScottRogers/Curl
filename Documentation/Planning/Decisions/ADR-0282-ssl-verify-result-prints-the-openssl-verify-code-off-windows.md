@@ -56,7 +56,7 @@ Recording only under `-w` keeps every other transfer's event sink as it was.
 
 ## Left as it is
 
-- An FTPS data connection's handshake goes through `Curl.Protocol.Ftp`'s `FtpDataConnectEvents`,
+- An FTPS data connection's handshake goes through `Curl.Original.Protocol.Ftp`'s `FtpDataConnectEvents`,
   which does not forward the new event, so the control connection's code is printed.
 - `--crlfile` refusals report the chain's code, not the revocation list's (for example 23).
 - A QUIC handshake refused by verification reports no code.

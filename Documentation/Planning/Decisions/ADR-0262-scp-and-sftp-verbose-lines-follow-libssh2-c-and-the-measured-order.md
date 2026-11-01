@@ -8,7 +8,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 ## Context
 
 `-v` and `--trace` on an `scp://` or `sftp://` transfer wrote only the connector's `Trying`
-and `Established connection` lines: `Curl.Protocol.Ssh.UnitLibrary` reported nothing through
+and `Established connection` lines: `Curl.Original.Protocol.Ssh.UnitLibrary` reported nothing through
 `ITransferEvents` (ADR-0046). curl 8.21.0 writes a line for every step of libssh2's session,
 the received data, and how the connection ends.
 

@@ -123,8 +123,8 @@ public sealed class ProtocolIsolationTests
     }
 
     [TestMethod]
-    [DataRow("Curl.Protocol.Http.UnitLibrary")]
-    [DataRow("Curl.Protocol.Ftp.UnitLibrary")]
+    [DataRow("Curl.Original.Protocol.Http.UnitLibrary")]
+    [DataRow("Curl.Original.Protocol.Ftp.UnitLibrary")]
     [DataRow("Curl.Networking.UnitLibrary")]
     [DataRow("Curl.Core.UnitLibrary")]
     [DataRow("Curl.Console")]
@@ -171,7 +171,7 @@ public sealed class ProtocolIsolationTests
     [DataRow("Curl.Ntlm.UnitLibrary", Abstractions)]
     [DataRow("Curl.Http2.UnitLibrary", "Curl.Cryptography.UnitLibrary")]
     [DataRow("Curl.Http3.UnitLibrary", "Curl.Quic.UnitLibrary")]
-    [DataRow("Curl.Tls.UnitLibrary", "Curl.Protocol.Http.UnitLibrary")]
+    [DataRow("Curl.Tls.UnitLibrary", "Curl.Original.Protocol.Http.UnitLibrary")]
     [DataRow("Curl.Quic.UnitLibrary", "Curl.Networking.UnitLibrary")]
     [DataRow("Curl.Kerberos.UnitLibrary", "Curl.Core.UnitLibrary")]
     [DataRow("Curl.Tls.UnitLibrary", "Curl.Console")]
@@ -212,7 +212,7 @@ public sealed class ProtocolIsolationTests
     public void ProtocolLibraries_FindsTheProjectsUnderTheRepositoryRoot()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("expected present", "Curl.Protocol.Http.UnitLibrary");
+        diagnostics.Arrange("expected present", "Curl.Original.Protocol.Http.UnitLibrary");
         diagnostics.Arrange("expected absent", Abstractions);
 
         List<string> names;
@@ -222,9 +222,9 @@ public sealed class ProtocolIsolationTests
         }
 
         diagnostics.Act("protocol library count", names.Count);
-        diagnostics.Assert("contains Http", true, names.Contains("Curl.Protocol.Http.UnitLibrary"));
+        diagnostics.Assert("contains Http", true, names.Contains("Curl.Original.Protocol.Http.UnitLibrary"));
         diagnostics.Assert("contains Abstractions", false, names.Contains(Abstractions));
-        CollectionAssert.Contains(names, "Curl.Protocol.Http.UnitLibrary");
+        CollectionAssert.Contains(names, "Curl.Original.Protocol.Http.UnitLibrary");
         CollectionAssert.DoesNotContain(names, Abstractions);
     }
 
@@ -288,7 +288,7 @@ public sealed class ProtocolIsolationTests
     /// create and delete files there.
     /// </summary>
     private static IEnumerable<string> ProtocolLibraries() =>
-        Directory.EnumerateDirectories(RepositoryRoot(), "Curl.Protocol.*.UnitLibrary",
+        Directory.EnumerateDirectories(RepositoryRoot(), "Curl.Original.Protocol.*.UnitLibrary",
                 SearchOption.TopDirectoryOnly)
             .Select(folder => Path.Combine(folder, Path.GetFileName(folder) + ".csproj"))
             .Where(path => File.Exists(path) && ProjectName(path) != Abstractions);

@@ -31,6 +31,7 @@ public sealed class WireGuardExtensionTests
     public void ActivateResolver_WithoutTheOption_GivesNoHook()
     {
         Assert.IsNull(WireGuardExtension.ActivateResolver(ExtensionOptionValues.None));
+        Assert.IsNull(WireGuardExtension.ActivateResolver(ExtensionOptionValues.None));
         Assert.IsNull(WireGuardExtension.ActivateResolver(ExtensionOptionValues.None, _ => throw new AssertFailedException("nothing to read"), new TunnelTestPeer(), TimeProvider.System, RandomNumberGenerator.Create()));
     }
 

@@ -45,7 +45,7 @@ proxies, and a file system is not a network. Core already owns local-disk concer
 (`-o`, `--output-dir`, `--create-dirs`). `PhysicalFileSystem`'s one disk-touching
 test lands in `Curl.Core.UnitTests` tagged `[TestCategory("Integration")]`, which is
 permitted there and forbidden in a protocol's own tests — that placement is what
-keeps `Curl.Protocol.File.UnitTests` entirely in the fast run.
+keeps `Curl.Original.Protocol.File.UnitTests` entirely in the fast run.
 
 ## Consequences
 
@@ -54,7 +54,7 @@ Good:
 - `file://` behaviour — length, timestamp, seek, the 37/23 split — is expressible
   directly, against an interface shaped for a file rather than forced through one
   shaped for a wire.
-- `Curl.Protocol.File.UnitTests` needs no recorded byte stream and no server; it
+- `Curl.Original.Protocol.File.UnitTests` needs no recorded byte stream and no server; it
   drives `FileProtocolHandler` against a fake `IFileSystem` entirely in memory.
 - Local-disk responsibility stays in one place (`Curl.Core.UnitLibrary`), alongside
   the other local-disk options it already owns.
@@ -68,7 +68,7 @@ Costs and caveats:
   or `HttpClient` here. Take `IConnection` so the tests in the matching
   `.UnitTests` project can drive this code from a recorded byte stream with no
   network." — is currently identical across all 16 protocol `CLAUDE.md` files. It
-  remains correct for the other 15; only `Curl.Protocol.File.UnitLibrary/CLAUDE.md`
+  remains correct for the other 15; only `Curl.Original.Protocol.File.UnitLibrary/CLAUDE.md`
   is amended by this ADR.
 - **Added 2026-09-26 (BL-026):** every `IFileSystem` implementation, starting with
   `PhysicalFileSystem` (BL-009), must return `FileOpenResult.Failed` with a
@@ -102,7 +102,7 @@ Costs and caveats:
 
 ## Amendments carried by this ADR
 
-1. `Curl.Protocol.File.UnitLibrary/CLAUDE.md` — the boilerplate `IConnection`
+1. `Curl.Original.Protocol.File.UnitLibrary/CLAUDE.md` — the boilerplate `IConnection`
    paragraph is replaced with the `IFileSystem` seam.
 2. `Documentation/Product/Product-Overview.md` — Rule 2 is amended to state that the
    transport is an injected seam: `IConnection` for the wire protocols, `IFileSystem`

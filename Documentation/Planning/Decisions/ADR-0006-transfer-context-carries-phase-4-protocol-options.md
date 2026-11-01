@@ -29,7 +29,7 @@ against curl 8.21.0 on 2026-09-26:
 
 A second, structural problem: every protocol test project would otherwise declare its
 own `ITransferContext` implementation, as
-`Curl.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs` does. Tasks on the board
+`Curl.Original.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs` does. Tasks on the board
 add members to `ITransferContext` (BL-013, BL-020), and each addition would then break
 every protocol test project - which parallel dark factory lanes cannot see coming,
 because those projects sit outside the adding task's `touches`.

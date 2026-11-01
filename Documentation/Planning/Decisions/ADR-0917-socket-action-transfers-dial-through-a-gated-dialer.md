@@ -30,7 +30,7 @@ options and its `ManagedEngineSharedState`, and the `TcpConnector` dials through
 - The connect deadline ends when the TCP dial connects, not after the TLS handshake: the handshake's reads and
   writes are gated and wait `IN`/`OUT` like any other, and the transfer's own connect timeout still bounds it.
 - The HTTP handler's expect-100 wait feeding `BeginExpectContinueWait`/`EndExpectContinueWait` needs a hook
-  in `Curl.Protocol.Http.UnitLibrary`, which BL-3859's `touches` does not name; it is its own task.
+  in `Curl.Original.Protocol.Http.UnitLibrary`, which BL-3859's `touches` does not name; it is its own task.
 
 ## Consequences
 

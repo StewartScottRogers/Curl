@@ -225,7 +225,7 @@ connection per origin for reuse by later transfers and by `-Z` streams (BL-735).
 
 ### 4. Racing and fallback
 
-The HTTP handler (`Curl.Protocol.Http.UnitLibrary`, BL-731 and BL-732) chooses, per
+The HTTP handler (`Curl.Original.Protocol.Http.UnitLibrary`, BL-731 and BL-732) chooses, per
 transfer, from `HttpVersionPreference` and the URL:
 
 - **`Http3Only`** on `https://`: QUIC only, through `ConnectMultiplexedAsync`. Its

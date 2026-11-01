@@ -10,7 +10,7 @@ Extends ADR-1165: `Curl.Ssh.UnitLibrary` gains the connection protocol (RFC 4254
 ## Context
 
 `--ssh-jump` (BL-4145) is an extension: it may reference `Curl.Ssh.UnitLibrary` but not
-`Curl.Protocol.Ssh.UnitLibrary` (ADR-0999). BL-4362 and BL-4329 moved the transport, the host
+`Curl.Original.Protocol.Ssh.UnitLibrary` (ADR-0999). BL-4362 and BL-4329 moved the transport, the host
 keys, the private keys and the user authentication there. The jump extension also needs a
 channel, and a different one from SFTP's and SCP's: a `direct-tcpip` channel (RFC 4254
 section 7.2) whose bytes are the transfer's connection to the target host.
@@ -45,4 +45,4 @@ section 7.2) whose bytes are the transfer's connection to the target host.
 
 - The jump extension can return a `direct-tcpip` channel as the transfer's `IConnection`.
 - A channel's tests that need no SFTP or SCP server script live in `Curl.Ssh.UnitTests`;
-  `SshSessionChannelTests` stays in `Curl.Protocol.Ssh.UnitTests`, whose `SftpServerScript` it uses.
+  `SshSessionChannelTests` stays in `Curl.Original.Protocol.Ssh.UnitTests`, whose `SftpServerScript` it uses.

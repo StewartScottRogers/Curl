@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests/Cgr003Tests.cs, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests/Cgr003Tests.cs, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests/Cgr003Tests.cs]
+touches: [Curl.Original.Protocol.Imap.UnitLibrary, Curl.Original.Protocol.Imap.UnitTests/Cgr003Tests.cs, Curl.Original.Protocol.Pop3.UnitLibrary, Curl.Original.Protocol.Pop3.UnitTests/Cgr003Tests.cs, Curl.Original.Protocol.Smtp.UnitLibrary, Curl.Original.Protocol.Smtp.UnitTests/Cgr003Tests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -55,7 +55,7 @@ curl -sS -w '%{exitcode}|%{errormsg}\n' pop3://127.0.0.1:20700/ --connect-timeou
 
 **Suspected location in source**
 
-- The greeting read in Curl.Protocol.Pop3/Imap/Smtp.UnitLibrary is not bounded by the connect deadline.
+- The greeting read in Curl.Original.Protocol.Pop3/Imap/Smtp.UnitLibrary is not bounded by the connect deadline.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
 

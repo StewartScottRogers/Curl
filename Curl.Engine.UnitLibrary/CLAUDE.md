@@ -146,7 +146,7 @@ hand-built client (a `--tls-max` of 1.0 or 1.1 today) and `SslStreamTlsProvider`
 `CreateProtocolHandlers` builds the handlers behind the engine's end-point recorders and `LazyProtocolHandler` (ADR-0119, BL-515, BL-1715, AF-0063).
 
 Their tests are `EngineComposition*Tests` in `Curl.Engine.UnitTests` (with their own copies of the
-`LoopbackDnsResolver` and `ScriptedTcpDialer` fakes, and a reference to `Curl.Protocol.Ssh.UnitTests`
+`LoopbackDnsResolver` and `ScriptedTcpDialer` fakes, and a reference to `Curl.Original.Protocol.Ssh.UnitTests`
 for its in-memory SSH server) and `EngineCompositionDnsServersIntegrationTests` in
 `Curl.Engine.IntegrationTests`. Tests that run a transfer through `CurlComposition.CreateRunner`,
 `CreateTransferDispatch` or `CreateDispatcher` stay in `Curl.Console.UnitTests` as
@@ -417,7 +417,7 @@ While `EasyHttpOptions.HstsControl` has `Enable` or `Hsts` is set (`CallbackHsts
 
 ## The SSH key callbacks (BL-2422)
 
-A perform from the options of an `scp` or `sftp` URL with no `ToolInputs` gives the handler `SshOptionsMapping.OfHandle`'s `SshOptions`: the `EasySshOptions` keys, fingerprints and compression, `CURLOPT_KEYPASSWD`, the known-hosts file only when `CURLOPT_SSH_KNOWNHOSTS` names one (libcurl looks for no default), and the handle's host-key callbacks through `CallbackSshHostKeys`: `EasyCallbackOptions.SshHostKey` as `HostKeyAcceptance` (true only for `SshKeyMatch.Ok`) and `SshKey` as `KnownHostDecision`, the match and the answer passed by number, the key type name mapped to `SshKeyType` as `convert_ssh2_keytype` does and the file's key given as its base64 text. `Curl.Protocol.Ssh`'s `SshHostKeyChecker` asks them where curl 8.22.0's `libssh2.c` does; the known-hosts file is not written for `FINE_ADD_TO_FILE` or `FINE_REPLACE` until BL-2489 (ADR-0623). Their tests are `CallbackSshHostKeysTests` and `ManagedEasyTransferTests.SshKeys.cs`, over `Curl.Protocol.Ssh.UnitTests`' `InMemorySshServer`.
+A perform from the options of an `scp` or `sftp` URL with no `ToolInputs` gives the handler `SshOptionsMapping.OfHandle`'s `SshOptions`: the `EasySshOptions` keys, fingerprints and compression, `CURLOPT_KEYPASSWD`, the known-hosts file only when `CURLOPT_SSH_KNOWNHOSTS` names one (libcurl looks for no default), and the handle's host-key callbacks through `CallbackSshHostKeys`: `EasyCallbackOptions.SshHostKey` as `HostKeyAcceptance` (true only for `SshKeyMatch.Ok`) and `SshKey` as `KnownHostDecision`, the match and the answer passed by number, the key type name mapped to `SshKeyType` as `convert_ssh2_keytype` does and the file's key given as its base64 text. `Curl.Original.Protocol.Ssh`'s `SshHostKeyChecker` asks them where curl 8.22.0's `libssh2.c` does; the known-hosts file is not written for `FINE_ADD_TO_FILE` or `FINE_REPLACE` until BL-2489 (ADR-0623). Their tests are `CallbackSshHostKeysTests` and `ManagedEasyTransferTests.SshKeys.cs`, over `Curl.Original.Protocol.Ssh.UnitTests`' `InMemorySshServer`.
 
 ## The version information (BL-2465)
 
@@ -533,7 +533,7 @@ Before each perform it starts, `ManagedMultiTransfer` gives a `ManagedEasyTransf
 
 ## smb and smbs disabled (BL-3887)
 
-`CreateProtocolHandlers` serves `smb` and `smbs` with a `DisabledProtocolHandler`, which fails every transfer with exit 1 and `Protocol "<scheme>" is disabled` before connecting, as curl 8.22.0's reference builds, which have no SMB, do (ADR-0835). `Curl.Protocol.Smb.UnitLibrary` stays as the client a build with SMB would use. Its tests are `DisabledProtocolHandlerTests`.
+`CreateProtocolHandlers` serves `smb` and `smbs` with a `DisabledProtocolHandler`, which fails every transfer with exit 1 and `Protocol "<scheme>" is disabled` before connecting, as curl 8.22.0's reference builds, which have no SMB, do (ADR-0835). `Curl.Original.Protocol.Smb.UnitLibrary` stays as the client a build with SMB would use. Its tests are `DisabledProtocolHandlerTests`.
 
 ## CURLINFO_SIZE_DELIVERED (BL-3655)
 

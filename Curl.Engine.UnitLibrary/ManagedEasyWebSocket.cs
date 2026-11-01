@@ -2,7 +2,7 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Options.Protocols;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ws;
+using Curl.Original.Protocol.Ws;
 
 namespace Curl.Engine;
 

@@ -21,7 +21,7 @@ existing pairs alone.
 
 ## Decision
 
-1. `FtpUploadLineEndings.AreConverted` in `Curl.Protocol.Ftp.UnitLibrary` decides: under
+1. `FtpUploadLineEndings.AreConverted` in `Curl.Original.Protocol.Ftp.UnitLibrary` decides: under
    `--crlf` on every platform, and for an ASCII transfer (`-B` or `;type=a`) when not on
    Windows. `FtpSession` asks it with `OperatingSystem.IsWindows()` and reuses the existing
    `CrlfUploadConverter`.

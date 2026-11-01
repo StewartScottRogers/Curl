@@ -71,7 +71,9 @@ function Get-DetachedStartCommand {
     $quote = { param([string]$s) "'" + ($s -replace "'", "'\''") + "'" }
     $words = @('pwsh', '-NoProfile', '-File', $ScriptPath) + @($ScriptArgs | ForEach-Object { "$_".Trim('"') })
     $command = 'exec nohup ' + ((@($words) | ForEach-Object { & $quote $_ }) -join ' ') + ' >> ' + (& $quote $log) + ' 2>&1 < /dev/null'
-    return @{ FilePath = 'sh'; LogPath = $log; ArgumentList = @('-c', $command) }
+    # Start-Process joins ArgumentList into one string that .NET splits again at spaces, so the
+    # -c script goes in double quotes or sh would get only 'exec' as its script (BL-4430).
+    return @{ FilePath = 'sh'; LogPath = $log; ArgumentList = @('-c', ('"' + $command.Replace('"', '\"') + '"')) }
 }
 
 function Get-FactoryDescendantIds {
@@ -311,7 +313,7 @@ if ($TestLaneMarker) {
         @('a herdr tab on Windows runs powershell', (Get-HerdrTabCommandLine -ScriptPath 'C:\r\RunDarkFactory.ps1' -ScriptArgs @('-Lane', '2') -OnWindows $true), 'powershell -NoProfile -ExecutionPolicy Bypass -File "C:\r\RunDarkFactory.ps1" -Lane 2'),
         @('a herdr tab off Windows runs pwsh', (Get-HerdrTabCommandLine -ScriptPath '/r/RunDarkFactory.ps1' -ScriptArgs @('-Lane', '2') -OnWindows $false), 'pwsh -NoProfile -ExecutionPolicy Bypass -File "/r/RunDarkFactory.ps1" -Lane 2'),
         @('a Windows window start is powershell.exe with no log', ((Get-DetachedStartCommand -ScriptPath 'C:\r\x.ps1' -ScriptArgs @('-Lane', '2') -LogDir 'L' -Stamp 'S' -OnWindows $true) | ForEach-Object { "$($_.FilePath)|$($_.LogPath)|$($_.ArgumentList -join ' ')" }), 'powershell.exe||-NoProfile -ExecutionPolicy Bypass -File "C:\r\x.ps1" -Lane 2'),
-        @('a lane off Windows without herdr is a detached pwsh logging to its lane log', ((Get-DetachedStartCommand -ScriptPath '/r/x.ps1' -ScriptArgs @('-Lane', '2', '-LaneDir', '"/r/l 2"') -LogDir '/r.logs' -Stamp '20261028-0000' -OnWindows $false) | ForEach-Object { "$($_.FilePath)|$($_.LogPath)|$($_.ArgumentList -join ' ')" }), "sh|$(Join-Path '/r.logs' 'DarkFactory-20261028-0000-L2.log')|-c exec nohup 'pwsh' '-NoProfile' '-File' '/r/x.ps1' '-Lane' '2' '-LaneDir' '/r/l 2' >> '$(Join-Path '/r.logs' 'DarkFactory-20261028-0000-L2.log')' 2>&1 < /dev/null"),
+        @('a lane off Windows without herdr is a detached pwsh logging to its lane log', ((Get-DetachedStartCommand -ScriptPath '/r/x.ps1' -ScriptArgs @('-Lane', '2', '-LaneDir', '"/r/l 2"') -LogDir '/r.logs' -Stamp '20261028-0000' -OnWindows $false) | ForEach-Object { "$($_.FilePath)|$($_.LogPath)|$($_.ArgumentList -join ' ')" }), "sh|$(Join-Path '/r.logs' 'DarkFactory-20261028-0000-L2.log')|-c `"exec nohup 'pwsh' '-NoProfile' '-File' '/r/x.ps1' '-Lane' '2' '-LaneDir' '/r/l 2' >> '$(Join-Path '/r.logs' 'DarkFactory-20261028-0000-L2.log')' 2>&1 < /dev/null`""),
         @('a shift launcher off Windows logs to the -start log', ((Get-DetachedStartCommand -ScriptPath '/r/x.ps1' -ScriptArgs @() -LogDir '/l' -Stamp 'S' -OnWindows $false).LogPath), (Join-Path '/l' 'DarkFactory-S-start.log')),
         @('lane 3 is marked 3', (Get-LaneMarker -ForLane 3), '3'),
         @('a coordinator or single-lane shift is marked 0', (Get-LaneMarker -ForLane 0), '0'),

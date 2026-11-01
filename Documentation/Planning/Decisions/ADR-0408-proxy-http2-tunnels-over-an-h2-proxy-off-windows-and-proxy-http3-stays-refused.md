@@ -58,7 +58,7 @@ distribution builds do not set. Without `HTTP3` an 8.21.0 build would refuse
    with `Curl.Http2.UnitLibrary`'s hand-built codec, which `Curl.Networking.UnitLibrary`
    gains a reference to (neither is a protocol library, so the protocol-isolation rule is
    kept). The tunnel stream is presented to the transfer as an `IConnection`, so
-   `Curl.Protocol.Http.UnitLibrary` and every other protocol run over it unchanged.
+   `Curl.Original.Protocol.Http.UnitLibrary` and every other protocol run over it unchanged.
    `Curl.Cli.UnitLibrary` parses the option and `Curl.Console` carries it to the connector.
 6. **Output is measured before it is pinned.** Before any test pins them, real curl
    8.21.0 (or the newest OpenSSL build with nghttp2 at hand, 8.18.0 under WSL) is measured
@@ -85,5 +85,5 @@ distribution builds do not set. Without `HTTP3` an 8.21.0 build would refuse
   a drop-in replacement must fail where the platform's curl fails.
 - **Build `--proxy-http3` now.** Lost: no reference build accepts it, so Curl accepting
   it would differ from every platform's curl.
-- **Put the tunnel in `Curl.Protocol.Http.UnitLibrary`.** Lost: the connector, not the
+- **Put the tunnel in `Curl.Original.Protocol.Http.UnitLibrary`.** Lost: the connector, not the
   protocol, owns proxy tunnels, and protocol handlers never dial or wrap connections.

@@ -1,5 +1,5 @@
 using Curl.Conformance.UnitProgram.Wildcards;
-using Curl.Protocol.Ftp;
+using Curl.Original.Protocol.Ftp;
 
 namespace Curl.Conformance.UnitProgram.UnitTests.Wildcards;
 

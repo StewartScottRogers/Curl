@@ -11,7 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Curl.Cli.UnitLibrary\Curl.Cli.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Engine.UnitLibrary\Curl.Engine.UnitLibrary.csproj" />
-    <ProjectReference Include="..\Curl.Protocol.Ssh.UnitTests\Curl.Protocol.Ssh.UnitTests.csproj" />
+    <ProjectReference Include="..\Curl.Original.Protocol.Ssh.UnitTests\Curl.Original.Protocol.Ssh.UnitTests.csproj" />
   </ItemGroup>
 
   <ItemGroup>

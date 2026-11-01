@@ -13,10 +13,10 @@
     <ProjectReference Include="..\Curl.Networking.UnitLibrary\Curl.Networking.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Ntlm.UnitLibrary\Curl.Ntlm.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Output.UnitLibrary\Curl.Output.UnitLibrary.csproj" />
-    <ProjectReference Include="..\Curl.Protocol.Ftp.UnitLibrary\Curl.Protocol.Ftp.UnitLibrary.csproj" />
-    <ProjectReference Include="..\Curl.Protocol.Http.UnitLibrary\Curl.Protocol.Http.UnitLibrary.csproj" />
-    <ProjectReference Include="..\Curl.Protocol.Smtp.UnitLibrary\Curl.Protocol.Smtp.UnitLibrary.csproj" />
-    <ProjectReference Include="..\Curl.Protocol.Ssh.UnitLibrary\Curl.Protocol.Ssh.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Original.Protocol.Ftp.UnitLibrary\Curl.Original.Protocol.Ftp.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Original.Protocol.Http.UnitLibrary\Curl.Original.Protocol.Http.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Original.Protocol.Smtp.UnitLibrary\Curl.Original.Protocol.Smtp.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Original.Protocol.Ssh.UnitLibrary\Curl.Original.Protocol.Ssh.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Tls.UnitLibrary\Curl.Tls.UnitLibrary.csproj" />
     <ProjectReference Include="..\Libcurl\Libcurl.csproj" />
   </ItemGroup>

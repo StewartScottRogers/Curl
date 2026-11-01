@@ -9,7 +9,7 @@
 
 ADR-0917 put a socket-action transfer's `TransferSocketWait` on `ManagedEngineSharedState.SocketWait`, but its
 expect-100 deadline (`BeginExpectContinueWait`, `EndExpectContinueWait`) was not fed: the wait for `100 Continue`
-is `HttpContinueWaitConnection.WaitForContinueAsync` in `Curl.Protocol.Http.UnitLibrary`, which cannot reference
+is `HttpContinueWaitConnection.WaitForContinueAsync` in `Curl.Original.Protocol.Http.UnitLibrary`, which cannot reference
 the engine. BL-3864 suggested an observer on `HttpRequestOptions`, but that record lives in
 `Curl.Protocol.Abstractions.UnitLibrary` and is built per URL by `TransferContextFactory`, which never sees the
 transfer's wait, while `ManagedCurlEngine.CreateDispatcher` builds the HTTP handler per perform from the state that

@@ -75,7 +75,7 @@ The OpenSSL build could not be measured the same day (the Docker engine was down
   and matches every case measured.
 - The client refuses a server's 8192-bit group on every platform. If BL-888 finds the
   OpenSSL build asks for 8192, the Linux and macOS presets widen.
-- `Curl.Protocol.Ssh.UnitLibrary` now references `Curl.Cryptography.UnitLibrary`, as
+- `Curl.Original.Protocol.Ssh.UnitLibrary` now references `Curl.Cryptography.UnitLibrary`, as
   ADR-0120 allows, for `FiniteFieldDiffieHellman` and `DsaSignature`.
 
 ## Alternatives considered

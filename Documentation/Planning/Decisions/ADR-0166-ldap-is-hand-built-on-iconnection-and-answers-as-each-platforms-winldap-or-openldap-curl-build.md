@@ -8,7 +8,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 ## Context
 
 `curl` speaks `ldap://` and `ldaps://`; this tool does not yet (conformance audit
-2026-09-28, row 37: exits 38 and 39 are never produced). `Curl.Protocol.Ldap.UnitLibrary`
+2026-09-28, row 37: exits 38 and 39 are never produced). `Curl.Original.Protocol.Ldap.UnitLibrary`
 may reference only `Curl.Protocol.Abstractions.UnitLibrary` and must speak through
 `IConnection`. `System.DirectoryServices.Protocols` is a NuGet package, not part of the
 base class library, and wraps the platform's LDAP library rather than a stream, so it is
@@ -47,7 +47,7 @@ with exit 39, `LDAP remote: Server Down`.
 
 ## Decision
 
-- **Hand-built on `IConnection`, one library.** `Curl.Protocol.Ldap.UnitLibrary` holds the
+- **Hand-built on `IConnection`, one library.** `Curl.Original.Protocol.Ldap.UnitLibrary` holds the
   BER codec, the LDAP messages curl uses (BindRequest/Response, SearchRequest,
   SearchResultEntry, SearchResultReference, SearchResultDone, UnbindRequest), the URL
   reader, the filter encoder and the output writer. `LdapProtocolHandler` connects through
@@ -322,7 +322,7 @@ recordings on 2026-09-29 (the same two builds), each with `-sS -u cn=u:p`; the s
 ## Measured by BL-589
 
 BL-589 registered the handler and wrote the `-v` lines (`LdapVerboseLines` in
-`Curl.Protocol.Ldap.UnitLibrary`), from `Record-CurlExchange.ps1 -Script` recordings on
+`Curl.Original.Protocol.Ldap.UnitLibrary`), from `Record-CurlExchange.ps1 -Script` recordings on
 2026-09-29 of `-sv -u cn=u,dc=x:secret ldap://127.0.0.1:18389/dc=example`: the bind answered
 `success`, one entry `dc=example` with `ou: x`, then SearchResultDone `success`. W is curl
 8.21.0 WinLDAP (Windows), L is curl 8.18.0 OpenLDAP 2.6.10 (WSL). `<port>` marks the varying

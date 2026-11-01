@@ -15,4 +15,4 @@ the earlier non-blocking connect: curl formats whatever `errno` holds, it is not
 
 Curl keeps printing `errno: 0` on every platform. The Linux value depends on the C library's stale `errno`,
 the report marks it only Probable and only seen on 8.18, and the 8.22.0 reference prints 0. No code changes.
-Existing tests in `Curl.Protocol.Smtp.UnitTests` pin the text; `Cgr235Tests` pins the shared constant.
+Existing tests in `Curl.Original.Protocol.Smtp.UnitTests` pin the text; `Cgr235Tests` pins the shared constant.

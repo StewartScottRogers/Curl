@@ -1,5 +1,5 @@
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Imap;
+using Curl.Original.Protocol.Imap;
 
 namespace Curl.Engine;
 

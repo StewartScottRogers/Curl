@@ -44,7 +44,7 @@ Good:
 Costs and caveats:
 
 - `ITransferContext` grows by two more members that most schemes do not read yet.
-- `Curl.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs` still implements the
+- `Curl.Original.Protocol.File.UnitTests/Fakes/FakeTransferContext.cs` still implements the
   interface directly, so it gains both members too (ADR-0006 expects it to move to
   `TransferContext`).
 

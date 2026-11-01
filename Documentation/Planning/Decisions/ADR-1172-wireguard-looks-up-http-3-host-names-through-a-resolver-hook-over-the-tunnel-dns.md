@@ -25,3 +25,13 @@ passed down to the opener, and TCP and IP-literal QUIC are unchanged.
   unreachable DNS server.
 - `--wireguard` now claims the resolver, so it conflicts with `--doh-url` and the other resolver extensions, as
   they conflict with each other.
+
+## Amendment (BL-4424): a tunnel failure is exit 7 over HTTP/3 too
+
+The resolver cannot hand curl's connector a failure (`IDnsResolver` returns addresses), so a DNS server that cannot be
+reached through the tunnel (or any tunnel failure in the DNS exchange: `IOException`, `SocketException`,
+`TimeoutException`) makes `WireGuardTunnelDnsResolver` throw `WireGuardTunnelDnsFailureException` carrying the
+connect failure. `WireGuardConnector.ConnectMultiplexedAsync` and `ConnectMultiplexedSessionAsync`, which wrap curl's
+QUIC connector, catch it and return that failure: exit 7 with the TCP path's message. A name the DNS server answers
+with no address, or no `DNS` line, still gives no address and exit 6. The earlier Consequences bullet about exit 6
+no longer holds for an unreachable DNS server.

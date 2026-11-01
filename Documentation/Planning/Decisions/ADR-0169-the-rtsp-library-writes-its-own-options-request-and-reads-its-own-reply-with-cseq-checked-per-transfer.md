@@ -8,8 +8,8 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 ## Context
 
 RTSP/1.0 (RFC 2326) borrows HTTP/1.1's message syntax: a request line, header lines, a blank
-line, an optional body sized by `Content-Length`. `Curl.Protocol.Rtsp.UnitLibrary` may reference
-`Curl.Protocol.Abstractions.UnitLibrary` and never `Curl.Protocol.Http.UnitLibrary`, and takes an
+line, an optional body sized by `Content-Length`. `Curl.Original.Protocol.Rtsp.UnitLibrary` may reference
+`Curl.Protocol.Abstractions.UnitLibrary` and never `Curl.Original.Protocol.Http.UnitLibrary`, and takes an
 `IConnection`. The conformance audit of 2026-09-28 (row 38) found that `rtsp://` does nothing and
 that exits 85 (`CURLE_RTSP_CSEQ_ERROR`) and 86 (`CURLE_RTSP_SESSION_ERROR`) are never produced.
 This ADR fixes where the request and reply code lives, which requests the curl tool makes and
@@ -105,7 +105,7 @@ What the table shows:
 
 ## Decision
 
-**1. The request writer and the reply reader live in `Curl.Protocol.Rtsp.UnitLibrary`.**
+**1. The request writer and the reply reader live in `Curl.Original.Protocol.Rtsp.UnitLibrary`.**
 `RtspRequestFormatter` writes a request head from the method, the target, the `CSeq`, an optional
 session ID and the transfer's `HttpRequestOptions` (`Referer`, `UserAgent`, `Headers`,
 `CommandLineTextEncoding`) and credentials, in libcurl's order above. `RtspReplyReader` reads the

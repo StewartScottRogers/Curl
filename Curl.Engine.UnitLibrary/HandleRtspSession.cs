@@ -1,6 +1,6 @@
 using Curl.Api.Options;
 using Curl.Api.Options.Protocols;
-using Curl.Protocol.Rtsp;
+using Curl.Original.Protocol.Rtsp;
 
 namespace Curl.Engine;
 

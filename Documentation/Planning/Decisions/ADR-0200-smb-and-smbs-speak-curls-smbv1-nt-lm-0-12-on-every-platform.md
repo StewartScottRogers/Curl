@@ -52,7 +52,7 @@ not whether. Measured on 2026-09-29:
   `0x18` and flags2 `0x0041`, and the seven messages above in curl's order. No SMB2/3 and
   no signing, because curl offers neither; a server that refuses SMBv1 fails as it does
   with curl.
-- **NTLM route.** `Curl.Protocol.Smb.UnitLibrary` references `Curl.Ntlm.UnitLibrary`
+- **NTLM route.** `Curl.Original.Protocol.Smb.UnitLibrary` references `Curl.Ntlm.UnitLibrary`
   (ADR-0120) and computes the LM and NT responses with
   `NtlmResponseComputation.ComputeV1` over the NEGOTIATE response's challenge. The NTLMSSP
   message types are not used: SMBv1 without extended security carries the raw responses.
@@ -78,7 +78,7 @@ not whether. Measured on 2026-09-29:
 - **BL-597** uploads with `-T` through WRITE_ANDX.
 - **BL-598** registers the handler for `smb` and `smbs` in `Curl.Console`, lists both in
   `-V` on every platform and prints curl's `-v` lines.
-- `Curl.Protocol.Smb.UnitLibrary/CLAUDE.md` still says it references only the
+- `Curl.Original.Protocol.Smb.UnitLibrary/CLAUDE.md` still says it references only the
   abstractions; BL-595 adds the `Curl.Ntlm.UnitLibrary` reference and updates that line.
 - SMBv1 is weak and off by default in modern Windows and Samba; Curl inherits that, as
   curl does. Matching curl, not bettering it, is what a drop-in replacement owes.

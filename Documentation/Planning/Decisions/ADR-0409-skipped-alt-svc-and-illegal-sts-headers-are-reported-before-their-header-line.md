@@ -50,7 +50,7 @@ written in its place during header reading.
    out-of-range port) and `AltSvcCache` returns it in the outcome list. `HstsTransferPolicy`
    implements `IHstsStore`, applying one header at a time; `LearnFrom` is removed once the console
    uses the per-header seam.
-3. **`Curl.Protocol.Http.UnitLibrary`.** `StoreAltSvc` writes `Added alt-svc: ...` or the skip
+3. **`Curl.Original.Protocol.Http.UnitLibrary`.** `StoreAltSvc` writes `Added alt-svc: ...` or the skip
    reason's text for each outcome, in order, before the header line. A new per-header HSTS step
    calls `options.HstsStore` for each `Strict-Transport-Security` header of an `https` response and
    writes `Illegal STS header skipped` on `false`, before the header line.

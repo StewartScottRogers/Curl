@@ -201,7 +201,7 @@ for the live board page.
 Lanes test only on Windows, so the coordinator of a lane shift watches CI for them
 (BL-987): on each heartbeat it reads the finished `CI` runs on the shift's branch (and the
 failed jobs of the one still running, ADR-0811)
-(cancelled ones ignored) and, for every new failing test or build error in
+(a cancelled one is read only for a job that ran into its timeout-minutes, whose hang is filed, ADR-1173) and, for every new failing test or build error in
 `gh run view <id> --log-failed`, files and pushes a High task - "Fix CI failure <test> on
 Linux and macOS", or "Fix flaky CI test <test> ..." for one that failed once between
 passing runs - with the run, platforms, first failing commit, error message and the test's
@@ -325,8 +325,10 @@ Curl/
 ```
 
 ### Project naming
-- Production library: `Curl.<Area>.UnitLibrary`, protocols `Curl.Protocol.<Name>.UnitLibrary`,
-  extensions `Curl.Extension.<Name>.UnitLibrary` (see "Extensions" below).
+- Production library: `Curl.<Area>.UnitLibrary`, curl's own protocols `Curl.Original.Protocol.<Name>.UnitLibrary`
+  (ADR-1176; their shared contracts stay `Curl.Protocol.Abstractions`),
+  extensions `Curl.Extension.<Name>.UnitLibrary`, or `Curl.Extended.Protocol.<Name>.UnitLibrary`
+  for one that serves its own URL scheme (see "Extensions" below).
 - Tests: the same name with `.UnitTests` instead of `.UnitLibrary`.
 - Integration tests, once an area has any: the same name with `.IntegrationTests`
   instead of `.UnitLibrary` (ADR-0421).
@@ -346,7 +348,7 @@ Curl/
   folder for its area, and the folders follow one another in the file.
 
 In `Curl.slnx`, every project sits with its tests in a solution folder for its area,
-under one folder for its group (ADR-0731):
+under one folder for its group (ADR-0731, ADR-1178):
 
 - `/Hosts/`: Api, Curl (the `Curl.Console` projects, which build `curl.exe`), Libcurl,
   Mcp - the ways Curl is used.
@@ -354,12 +356,15 @@ under one folder for its group (ADR-0731):
 - `/Transfer/`: Cookies, Core, Engine, Networking.
 - `/Wire/`: Http2, Http3, HttpDatagram, Protobuf, Quic, Ssh, WebSocket, Zstandard - framing and encoding below the protocols.
 - `/Security/`: Authentication, Cryptography, HttpMessageSignatures, Kerberos, Ntlm, Tls.
-- `/Protocols/<Name>/`: each `Curl.Protocol.<Name>.*`, and `Curl.Protocol.Abstractions.*`
-  in `/Protocols/Abstractions/`.
+- `/Original/Protocols/<Name>/`: each of curl's own protocols, `Curl.Original.Protocol.<Name>.*`.
+- `/Protocols/Abstractions/`: `Curl.Protocol.Abstractions.*`, the contracts the original and the
+  extended protocols share.
 - `/Conformance/<Part>/`: each `Curl.Conformance.<Part>.*`, and the harness itself
   (`Curl.Conformance.UnitLibrary` and `.UnitTests`) in `/Conformance/Harness/`.
-- `/Extensions/<Name>/`: each `Curl.Extension.<Name>.*`, with the registry in
-  `/Extensions/Composition/`.
+- `/Extended/`: what Curl adds beyond upstream curl. `/Extended/Protocols/<Name>/`: each extension
+  that serves its own URL scheme, `Curl.Extended.Protocol.<Name>.*`; `/Extended/Features/<Name>/`: each
+  option extension, `Curl.Extension.<Name>.*`; `Curl.Extension.Abstractions.*` in
+  `/Extended/Abstractions/` and the registry, `Curl.Extension.Composition.*`, in `/Extended/Composition/`.
 - `/Shared/`: the shared projects (Audit, Claude, Documentation, Gap, Tasks).
 
 A new area goes in the group it belongs to, in a folder named for the area. Solution
@@ -373,15 +378,18 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
 What Curl adds beyond upstream curl - a scheme or feature curl does not have - is an
 *extension*, kept apart from curl's own protocols (ADR-0999):
 
-- Each is `Curl.Extension.<Name>.UnitLibrary` with its `.UnitTests`, registered by one line in
+- Each is `Curl.Extension.<Name>.UnitLibrary` with its `.UnitTests`; one that serves its own URL
+  scheme (an `ExtensionCatalogue.cs` handler) is an *extended protocol*,
+  `Curl.Extended.Protocol.<Name>.UnitLibrary` (ADR-1177). Each is registered by one line in
   `Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs` (a shared list file).
 - It joins the solution with exactly one line in `Curl.slnx`, directly under the marker comment in the
-  Extensions section: a single-line `<Folder Name="/Extensions/<Name>/">` holding both `<Project/>`
+  Extended section: a single-line `<Folder Name="/Extended/Features/<Name>/">` (`/Extended/Protocols/<Name>/`
+  for an extended protocol) holding both `<Project/>`
   elements (`merge=union`, ADR-1003). Composition references every extension by wildcard, so no csproj
   is edited and `Curl.slnx` and that csproj need not be in the task's `touches`.
 - Only the hosts (`Curl.Console`, `Curl.Api`, `Curl.Mcp`) and the extensions reference an
   extension. An extension references `Curl.Protocol.Abstractions` and the shared layers, never a
-  `Curl.Protocol.*` library and never another extension but `Curl.Extension.Abstractions`.
+  `Curl.Original.Protocol.*` library and never another extension but `Curl.Extension.Abstractions`.
   `VerifyExtensionIsolation` in `Directory.Build.props` fails the build otherwise.
 - An extension never changes what curl does: it adds a scheme or option curl refuses, is put after
   curl's handlers (a clash fails composition), leaves `curl -V` and `Libcurl` alone, and

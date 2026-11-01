@@ -17,7 +17,7 @@ memory once. curl 8.21.0 (`lib/mime.c`, `encoder_base64_read`, `encoder_qp_read`
 Two things stood in the way of simply streaming every encoder:
 
 - A `7bit` byte above 127 met while sending reaches `HttpRequestBodyWriter` in
-  `Curl.Protocol.Http.UnitLibrary` as a failed read, which it takes as the end of the body:
+  `Curl.Original.Protocol.Http.UnitLibrary` as a failed read, which it takes as the end of the body:
   a body of known length then fails with `client mime read EOF fail`, not curl's
   `read error getting mime data`, and a chunked one (a file that cannot seek) is sent short
   with no error at all.
@@ -67,7 +67,7 @@ Two things stood in the way of simply streaming every encoder:
 ## Alternatives considered
 
 - **Stream `7bit` too and let the send fail.** Loses curl's message for a seekable file and
-  sends a short body silently for an unseekable one until `Curl.Protocol.Http.UnitLibrary`
+  sends a short body silently for an unseekable one until `Curl.Original.Protocol.Http.UnitLibrary`
   reports a failed read as a failure; that project is outside this task.
 - **Pre-read every encoded file while building to check it can be read.** Keeps read failures
   before the connection, but reads every file twice, and contradicts the goal that a

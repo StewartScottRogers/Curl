@@ -128,7 +128,7 @@ Decided by Claude under Stewart's delegation, 2026-10-02.
 BL-1187 delivers the `[WRITE]` lines of a transfer's response in `Curl.Console`, as
 `ClientWriterTraceEvents`, a wrapper over the transfer's events that `CurlCommandRunner.WithTraceLineEvents`
 puts outermost under `CurlComposition.TracesWrite` (`write` or `all`, so `-vvv` and `-vvvv`; not
-`network`). No change to `Curl.Protocol.Http` was needed: its handler already reports each response
+`network`). No change to `Curl.Original.Protocol.Http` was needed: its handler already reports each response
 header line and each body block as an event, which is where curl's client writers take them.
 
 - Measured (BL-1187 Notes): after each `< ` header line, four lines of type `c` for the status line
@@ -284,7 +284,7 @@ Decided by Claude under Stewart's delegation. Measured with curl 8.21.0 (mingw, 
   - FTP: the control connection reads as `recv(len=900)` and the data connection writes
     `[TCP-1]` lines whose `len=` is the bytes still expected. The FTP control and data targets
     look alike to `TcpConnector` (no `PoolScheme`), so the FTP handler has to say which is which
-    and what length to report, a change to `Curl.Protocol.Ftp.UnitLibrary` and `ConnectTarget`.
+    and what length to report, a change to `Curl.Original.Protocol.Ftp.UnitLibrary` and `ConnectTarget`.
 
 ## Amendment, 2026-10-02 (BL-1254): `[HTTPS-CONNECT]` through a proxy and over a Unix socket
 

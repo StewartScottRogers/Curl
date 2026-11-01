@@ -6,7 +6,7 @@ namespace Curl.Ssh.Authentication;
 /// Pins where <see cref="SystemSshAgentConnector" /> looks for the agent, as libssh2 1.11.1
 /// does (ADR-0271): a pipe on Windows, <c>SSH_AUTH_SOCK</c>'s Unix socket elsewhere. The
 /// connections themselves run in <c>SystemSshAgentConnectorIntegrationTests</c> in
-/// Curl.Protocol.Ssh.IntegrationTests, against a pipe and a socket served there.
+/// Curl.Original.Protocol.Ssh.IntegrationTests, against a pipe and a socket served there.
 /// </summary>
 [TestClass]
 public sealed class SystemSshAgentConnectorTests

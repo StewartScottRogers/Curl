@@ -1,5 +1,5 @@
 using Curl.Conformance.UnitProgram.Hashes;
-using Curl.Protocol.Http;
+using Curl.Original.Protocol.Http;
 
 namespace Curl.Conformance.UnitProgram.Headers.HeaderValues;
 

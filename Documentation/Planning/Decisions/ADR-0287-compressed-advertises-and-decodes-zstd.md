@@ -11,7 +11,7 @@ Supersedes ADR-0020.
 ADR-0020 left `zstd` out of `--compressed`'s `Accept-Encoding` until Curl could decode it.
 The hand-built Zstandard decoder now exists: `ZstandardDecoder` in
 `Curl.Zstandard.UnitLibrary` (BL-857 to BL-860, ADR-0185), a push decoder shaped after
-the BCL's `BrotliDecoder`, which ADR-0120 (as amended) lets `Curl.Protocol.Http.UnitLibrary`
+the BCL's `BrotliDecoder`, which ADR-0120 (as amended) lets `Curl.Original.Protocol.Http.UnitLibrary`
 reference.
 
 Measured with `Record-CurlExchange.ps1` (BL-861 Notes), curl 8.21.0 Schannel (mingw64),
@@ -41,7 +41,7 @@ trailing-bytes case:
 
 ## Consequences
 
-- `Curl.Protocol.Http.UnitLibrary` references `Curl.Zstandard.UnitLibrary`.
+- `Curl.Original.Protocol.Http.UnitLibrary` references `Curl.Zstandard.UnitLibrary`.
 - Every test that pins the `--compressed` request header pins the four-token value.
 - Fewer than four bytes after the last frame are held as the start of a magic number and
   dropped when the body ends, as libzstd waits for more input.

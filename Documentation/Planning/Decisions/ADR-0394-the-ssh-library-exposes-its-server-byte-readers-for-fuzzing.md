@@ -8,8 +8,8 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 ## Context
 
 Audit finding AF-0011: the audit office's fuzzer (`--target ssh`) found no public reader
-of raw bytes in `Curl.Protocol.Ssh.UnitLibrary`. Its packet, key-exchange, host-key and
-SFTP readers are all internal, visible only to `Curl.Protocol.Ssh.UnitTests`, so hostile
+of raw bytes in `Curl.Original.Protocol.Ssh.UnitLibrary`. Its packet, key-exchange, host-key and
+SFTP readers are all internal, visible only to `Curl.Original.Protocol.Ssh.UnitTests`, so hostile
 server bytes reached them untested by the fuzzer, which exited 2.
 
 ## Decision

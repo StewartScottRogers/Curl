@@ -6,7 +6,7 @@
 
 $ModelNames = 'haiku', 'sonnet', 'opus'
 # The hand-built security and crypto libraries; a task touching one, or its test twin, runs on opus.
-$OpusLibraries = 'Curl.Cryptography', 'Curl.Tls', 'Curl.Quic', 'Curl.Kerberos', 'Curl.Ntlm', 'Curl.Protocol.Ssh'
+$OpusLibraries = 'Curl.Cryptography', 'Curl.Tls', 'Curl.Quic', 'Curl.Kerberos', 'Curl.Ntlm', 'Curl.Original.Protocol.Ssh'
 $OpusLibraryPattern = '^(' + (($OpusLibraries | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')(\.(UnitLibrary|UnitTests|IntegrationTests))?([\\/].*)?$'
 $script:ModelChoice = @{ Id = ''; Model = ''; Why = '' }
 

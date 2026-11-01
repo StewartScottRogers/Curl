@@ -228,10 +228,10 @@ while ($true) {
     if ($Lane -and $state -in 'Done', 'Blocked', 'Deferred', 'Backlog') {
         $problem = Invoke-Integrate -Id $id -State $state
         if ($problem) {
-            $unpushed = Invoke-Park -Id $id -Why $problem
-            if ($unpushed) { $parkLines += $unpushed; Write-Trace $id 'PARKED' "$problem; the move to Backlog was not pushed either" 'Red' }
-            else { Write-Trace $id 'PARKED' "$problem; back to Backlog" 'Yellow' }
-            $state = 'Parked'
+            $unpushed = Invoke-Park -Id $id -Why $problem -State $state
+            if ($unpushed) { $parkLines += $unpushed; Write-Trace $id 'PARKED' "$problem; the move to $(if ($state -in 'Blocked', 'Deferred') { $state } else { 'Backlog' }) was not pushed either" 'Red' }
+            else { Write-Trace $id 'PARKED' "$problem; $(if ($state -in 'Blocked', 'Deferred') { "code parked, task stays $state" } else { 'back to Backlog' })" 'Yellow' }
+            if ($state -notin 'Blocked', 'Deferred') { $state = 'Parked' }
         } else {
             Write-Trace $id 'push' "integrated into $branch"
         }

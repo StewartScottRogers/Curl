@@ -43,7 +43,7 @@ reach CONNECT, and a `-H` value naming one of curl's CONNECT headers changes not
   every URL on the command line shares them, as `--proxy-header` is global in curl. A
   future per-URL `--next` group with its own `--proxy-header` would need them to move onto
   the connect target.
-- `Curl.Networking` holds a second header reader beside `Curl.Protocol.Http`'s
+- `Curl.Networking` holds a second header reader beside `Curl.Original.Protocol.Http`'s
   `HttpCustomHeader`; they differ on purpose, as the measured bytes do (`X-E;` sends
   `X-E: ` on CONNECT and `X-E:` on a request).
 

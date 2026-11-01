@@ -22,7 +22,7 @@ mutable state with another. MSTest 4.4.1 has `[GlobalTestInitialize]` and
 2. `TestDiagnosticsHooks` holds the global hooks. It is `public`, because MSTest's
    MSTEST0002 and MSTEST0050 analyzers reject an internal test class and its global
    fixture methods. `TestDiagnostics`, the helper, is `internal`, so each assembly's copy
-   stays its own. `Curl.Console.UnitTests` references `Curl.Protocol.Ssh.UnitTests`, which
+   stays its own. `Curl.Console.UnitTests` references `Curl.Original.Protocol.Ssh.UnitTests`, which
    shows it its internals, so it sees both copies; `Directory.Build.props` suppresses
    CS0436 for that one project, since the compiler picks the project's own copy.
 3. Every line goes through `TestContext.WriteLine`. Per-test state - the start time and

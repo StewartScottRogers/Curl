@@ -24,6 +24,13 @@ public sealed partial class ManagedCurlEngineTests
         Assert.AreEqual(new EasyOptions(), easy.Options);
         Assert.IsInstanceOfType<ManagedEasyTransfer>(easy);
         Assert.AreSame(EasyTransferHost.Library, ((ManagedEasyTransfer)easy).Host);
+        Assert.IsFalse(((ManagedEasyTransfer)easy).Host.AltSvcUsesOverHttp);
+    }
+
+    [TestMethod]
+    public void Library_Host_IgnoresAltSvcReceivedOverPlainHttp()
+    {
+        Assert.IsFalse(EasyTransferHost.Library.AltSvcUsesOverHttp);
     }
 
     [TestMethod]

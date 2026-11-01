@@ -67,7 +67,7 @@ function Test-Green {
     # at once, and then park every finished task in the window (AF-0092: BL-1647 and eight
     # more, on EveryMember_ManyConcurrentCallers_...; AF-0101: BL-1627, red on Curl.Http2 and
     # then on that cookie test, and redone by another lane; AF-0103: BL-1632, red on
-    # Curl.Protocol.Smtp.UnitTests and then with no test named, and redone by another lane). So the projects that failed are run
+    # Curl.Original.Protocol.Smtp.UnitTests and then with no test named, and redone by another lane). So the projects that failed are run
     # once more on their own: green alone means the red came from the machine's load, not
     # from this task's change, which red alone would still show.
     # A project counts as failed when the run names it so or never reports it passed (AF-0093:

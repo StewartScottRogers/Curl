@@ -8,7 +8,7 @@ Amends ADR-0118's list of hand-built primitives (one row added, sntrup761).
 
 ## Context
 
-`Curl.Protocol.Ssh.UnitLibrary` is empty (conformance audit 2026-09-28, row 35) and
+`Curl.Original.Protocol.Ssh.UnitLibrary` is empty (conformance audit 2026-09-28, row 35) and
 `--pubkey`, `--knownhosts`, `--hostpubmd5`, `--hostpubsha256` and `--compressed-ssh`
 are unknown options (row 31). Before the SSH tasks (BL-561 to BL-578, BL-678 to BL-681)
 can start, they need one answer to: which algorithms, in which order, from which
@@ -18,7 +18,7 @@ The standing rules are: match the platform's curl (the Schannel build on Windows
 OpenSSL build on Linux and macOS, ADR-0009), measure it before pinning anything, base
 class library only, and leave nothing out because it is hard (root `CLAUDE.md`,
 "Decisions", 2026-09-28). What the BCL lacks on any CI platform is hand-built once in
-`Curl.Cryptography.UnitLibrary` (ADR-0118), which `Curl.Protocol.Ssh.UnitLibrary` may
+`Curl.Cryptography.UnitLibrary` (ADR-0118), which `Curl.Original.Protocol.Ssh.UnitLibrary` may
 reference (ADR-0120).
 
 ### The reference builds, measured 2026-09-28
@@ -94,7 +94,7 @@ currently supported`. An entry for another host leaves the list unchanged.
 
 ### Two default sets, one full set
 
-`Curl.Protocol.Ssh.UnitLibrary` implements **every** algorithm in the full set below.
+`Curl.Original.Protocol.Ssh.UnitLibrary` implements **every** algorithm in the full set below.
 What its `KEXINIT` offers is an injected `SshAlgorithmPreferences`:
 
 - **`SshAlgorithmPreferences.WindowsReference`**: the Windows reference lists above,
@@ -204,7 +204,7 @@ measures them from the reference build's `SSH_MSG_KEX_DH_GEX_REQUEST` before pin
 | 14 | `cast128-cbc` | | 14 | libssh2 | `Cast128` (BL-676), CBC | BL-680 |
 | 15 | `3des-cbc` | 11 | 15 | libssh2, libssh | `TripleDES` CBC | BL-680 |
 
-CBC over Blowfish and CAST-128 is chained in `Curl.Protocol.Ssh.UnitLibrary` over the
+CBC over Blowfish and CAST-128 is chained in `Curl.Original.Protocol.Ssh.UnitLibrary` over the
 block operation the primitive exposes; CBC over AES and 3DES uses the BCL's own CBC.
 With an AEAD cipher (1 to 3) the MAC list is not consulted, as RFC 5647 and OpenSSH
 specify.
@@ -285,7 +285,7 @@ progress.
 
 ### Structure
 
-Namespace `Curl.Protocol.Ssh` with one sub-namespace per folder. The handler takes an
+Namespace `Curl.Original.Protocol.Ssh` with one sub-namespace per folder. The handler takes an
 `IConnector` (ADR-0005) and never a socket.
 
 | Folder | Types | Role |
@@ -305,7 +305,7 @@ Namespace `Curl.Protocol.Ssh` with one sub-namespace per folder. The handler tak
 
 ### Tests
 
-`Curl.Protocol.Ssh.UnitTests` drives the handler with no network through an in-memory
+`Curl.Original.Protocol.Ssh.UnitTests` drives the handler with no network through an in-memory
 SSH peer, `InMemorySshServer`, built from the library's own transport, key-exchange,
 packet-protection and connection classes in the server role and from the same
 `Curl.Cryptography` and BCL primitives, over an in-memory duplex `IConnection`. The peer

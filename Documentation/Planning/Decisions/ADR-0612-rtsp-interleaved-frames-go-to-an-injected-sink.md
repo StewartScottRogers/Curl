@@ -14,7 +14,7 @@ and `rtp_client_write` hands it whole, header included, to the interleave functi
 when none is set; a function taking fewer bytes than the frame fails with `CURLE_WRITE_ERROR` (23),
 `Failed writing RTP data`. Only channels set up by a `SETUP` reply's `Transport: ...;interleaved=a-b` count;
 other frames are skipped. An `RTSPREQ_RECEIVE` sends nothing and reads frames until the server closes, with no
-`CSeq` check. `Curl.Protocol.Rtsp.UnitLibrary` made only the curl tool's `OPTIONS` request and skipped every
+`CSeq` check. `Curl.Original.Protocol.Rtsp.UnitLibrary` made only the curl tool's `OPTIONS` request and skipped every
 frame (BL-1663).
 
 Measured on curl 8.22.0 with `Record-CurlExchange.ps1` (BL-2477): `curl -s -i rtsp://127.0.0.1:47791/` against

@@ -51,7 +51,18 @@ function Remove-StoppedCoordinatorStamp {
     # -Restart stops the coordinator on purpose, so its stamp must not read as a coordinator
     # whose loop stopped: the lanes would replace it 9 minutes on, beside the new shift (BL-4396).
     param([string]$StampPath)
-    Remove-Item -LiteralPath $StampPath -Force -ErrorAction SilentlyContinue
+    if (-not (Test-Path -LiteralPath $StampPath)) { return }
+    try { Remove-Item -LiteralPath $StampPath -Force -ErrorAction Stop }
+    catch { Write-Trace '-' 'restart' "coordinator.stamp not removed (lanes will replace the stopped coordinator): $($_.Exception.Message)" 'Red' }
+}
+
+function Stop-CoordinatorThenRemoveStamp {
+    # Stops first, removes after: a coordinator still alive rewrites the stamp around each
+    # timed git or gh call, so a stamp removed before it died came back (BL-4426).
+    # -Stop receives the coordinator's process id.
+    param([int]$CoordinatorId, [string]$StampPath, [scriptblock]$Stop = { param($id) Stop-FactoryProcessTree $id })
+    & $Stop $CoordinatorId
+    if ($StampPath) { Remove-StoppedCoordinatorStamp $StampPath }
 }
 
 if ($TestRestart) {
@@ -61,6 +72,11 @@ if ($TestRestart) {
     Remove-StoppedCoordinatorStamp $stampScratch
     $ok8 = -not (Test-Path $stampScratch)
     Write-Host "$(if ($ok8) { 'PASS' } else { 'FAIL' }) -Restart removes the coordinator stamp, present or not, so no lane replaces the stopped coordinator: $ok8" -ForegroundColor $(if ($ok8) { 'Green' } else { 'Red' })
+    Set-Content $stampScratch 'pid=1' -Encoding UTF8
+    $order = [Collections.Generic.List[string]]::new()
+    Stop-CoordinatorThenRemoveStamp -CoordinatorId 7 -StampPath $stampScratch -Stop { param($id) $order.Add("stop$id|stamp=$(Test-Path $stampScratch)") }
+    $ok9 = ($order -join ',') -ceq 'stop7|stamp=True' -and -not (Test-Path $stampScratch)
+    Write-Host "$(if ($ok9) { 'PASS' } else { 'FAIL' }) -Restart stops the coordinator, then removes the stamp: $($order -join ',')" -ForegroundColor $(if ($ok9) { 'Green' } else { 'Red' })
     $phases = @{ 1 = 'run'; 2 = 'integrate'; 3 = 'claim'; 4 = 'tokens'; 5 = 'wait'; 6 = 'finished'; 7 = '' }
     $got = (Select-LanesToStop $phases) -join ','
     $ok = $got -ceq '1,4,5,6,7'
@@ -114,8 +130,7 @@ if ($Restart) {
     $lanesDir = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
     $stamp = if ($lanesDir) { $lanesDir.Name.Substring(6) } else { '' }
     Write-Host "Stopping the shift's coordinator (pid $($coordinator.ProcessId)) first, so it restarts no lane."
-    if ($stamp) { Remove-StoppedCoordinatorStamp (Get-CoordinatorStampPath -ForStamp $stamp) }
-    Stop-FactoryProcessTree $coordinator.ProcessId
+    Stop-CoordinatorThenRemoveStamp -CoordinatorId $coordinator.ProcessId -StampPath $(if ($stamp) { Get-CoordinatorStampPath -ForStamp $stamp } else { '' })
     while ($stamp) {
         $phases = @{}
         foreach ($n in 1..16) {

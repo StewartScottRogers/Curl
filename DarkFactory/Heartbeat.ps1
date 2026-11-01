@@ -315,7 +315,9 @@ function Write-CoordinatorStamp {
     # The coordinator's loop calls this each pass: key=value lines - its pid, when the loop
     # last completed a pass, when the shift ends, its script and the arguments to start it
     # again with. Written beside the target and renamed over it. Never stops the loop.
+    # Writes nothing once the stamp is retired (the shift's end removed it on purpose).
     param([string]$Path = (Get-CoordinatorStampPath), [datetime]$End = $shiftEnd)
+    if ($script:CoordinatorStampRetired) { return }
     try {
         if ($null -eq $script:CoordinatorArguments) {
             $own = Get-FactoryProcessTable | Where-Object { $_.ProcessId -eq $PID } | Select-Object -First 1

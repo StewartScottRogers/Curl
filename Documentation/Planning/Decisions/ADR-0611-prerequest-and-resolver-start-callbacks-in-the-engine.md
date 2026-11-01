@@ -38,7 +38,7 @@ entries) misses. The HTTP handler has no way to send request trailers.
    and the failure reason `DnsLookupFailure.AbortedByCallback`, so `TcpConnector` fails with exit 42 and the plain `Could not resolve host: <h>`
    (`proxy` for a proxy) and caches nothing (BL-2627 amendment: this said exit 6, which test655 refutes). A resolver's failure reason passes through.
 3. **Trailers are split off.** Sending request trailers needs a seam in `Curl.Protocol.Abstractions` and work in
-   `Curl.Protocol.Http`, outside this task; BL-2475 does it and adds the `TRAILERFUNCTION` rows. Until then
+   `Curl.Original.Protocol.Http`, outside this task; BL-2475 does it and adds the `TRAILERFUNCTION` rows. Until then
    `TRAILERFUNCTION` and `TRAILERDATA` keep answering `CURLE_NOT_BUILT_IN`, so no option is accepted and ignored.
 4. `Libcurl/Callbacks/Phases` sets `PREREQFUNCTION` and `RESOLVER_START_FUNCTION` (their delegate or `null`, else
    `CURLE_BAD_FUNCTION_ARGUMENT`); `PREREQDATA` and `RESOLVER_START_DATA` take any value and change nothing, the

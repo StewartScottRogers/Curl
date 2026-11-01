@@ -10,7 +10,7 @@ Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in
 `WsProtocolHandler` frames any upload that is not an `IWsUploadFrameSource` into binary frames of up to 64 KiB, as
 curl 8.22.0's `cr_ws_read` does, so several messages written to the upload become one binary frame.
 graphql-transport-ws, WAMP's `wamp.2.json` and STOMP over WebSocket (BL-4114) need one text frame per message. The
-per-frame seam `IWsUploadFrameSource` lives in `Curl.Protocol.Ws`, which an extension may not reference (ADR-0999),
+per-frame seam `IWsUploadFrameSource` lives in `Curl.Original.Protocol.Ws`, which an extension may not reference (ADR-0999),
 and the engine uses it for `curl_ws_start_frame`.
 
 ## Decision

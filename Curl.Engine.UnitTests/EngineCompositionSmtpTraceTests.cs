@@ -10,7 +10,7 @@ namespace Curl.Engine;
 /// Pins which <c>--trace-config</c> components turn on curl 8.21.0's <c>[SMTP]</c> lines - <c>smtp</c>,
 /// <c>protocol</c> and <c>all</c>, so <c>-vv</c> too - measured with <c>Record-CurlExchange.ps1 -Smtp</c>
 /// on 2026-10-02 (BL-1163 Notes), and that the composition hands that choice to the SMTP handler.
-/// The lines themselves are pinned in <c>Curl.Protocol.Smtp.UnitTests</c>.
+/// The lines themselves are pinned in <c>Curl.Original.Protocol.Smtp.UnitTests</c>.
 /// </summary>
 [TestClass]
 public sealed class EngineCompositionSmtpTraceTests

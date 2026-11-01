@@ -190,7 +190,7 @@ if ($TestAffectedTests) {
 if ($TestFlakyTests) {
     $cases = @(
         ,@('one named failure', 'Curl.Quic.UnitTests: Loop_ServerGoesSilent_SendsKeepAlivesThenFailsWithTheIdleTimeout', (Get-FailedTestNames @(
-            'Passed!  - Failed:     0, Passed:    44, Skipped:     0, Total:    44, Duration: 140 ms - Curl.Protocol.Dict.UnitTests.dll (net10.0)',
+            'Passed!  - Failed:     0, Passed:    44, Skipped:     0, Total:    44, Duration: 140 ms - Curl.Original.Protocol.Dict.UnitTests.dll (net10.0)',
             '  Failed Loop_ServerGoesSilent_SendsKeepAlivesThenFailsWithTheIdleTimeout [484 ms]',
             'Failed!  - Failed:     1, Passed:   398, Skipped:     0, Total:   399, Duration: 1 s - Curl.Quic.UnitTests.dll (net10.0)')))
         ,@('many named failures', 'Curl.Cli.UnitTests, Curl.Core.UnitTests: A, B, C, D and 1 more', (Get-FailedTestNames @(

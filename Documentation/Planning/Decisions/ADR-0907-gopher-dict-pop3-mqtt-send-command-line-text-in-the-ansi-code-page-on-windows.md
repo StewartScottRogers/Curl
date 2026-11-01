@@ -25,7 +25,7 @@ Measured on 2026-10-26 with `Record-CurlExchange.ps1` (code page 1252):
 
 ## Decision
 
-1. `Curl.Protocol.Gopher`, `.Dict`, `.Pop3` and `.Mqtt` each get a `<Protocol>CommandLineText`, the same
+1. `Curl.Original.Protocol.Gopher`, `.Dict`, `.Pop3` and `.Mqtt` each get a `<Protocol>CommandLineText`, the same
    shape as `SmtpCommandLineText` (protocol libraries never reference each other): the system ANSI code
    page on Windows (Windows-1252 when the host reports none), UTF-8 elsewhere.
 2. The gopher selector, the dict path, the POP3 `-X` command and the MQTT topic are turned into bytes with
