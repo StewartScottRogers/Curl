@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-11-01
-completed:
+completed: 2026-11-01
 ---
 # BL-4446 — Fix AF-0517: Of_TwentyKilobyteHeader_StillSends has no assertion; its field count goes only to the diagnostics log
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-11-01: Already fixed by 2a9ab9df6 (AF-0516's task), which added `Assert.AreEqual(5, fieldCount)` after the `Diagnostics.Assert` line in Of_TwentyKilobyteHeader_StillSends; no code change was needed here. Ran the reproduction: the body now holds an Assert.AreEqual on the field count. dotnet build clean (0 errors) and the fast tests green (0 failed projects). The test change is platform-neutral (string bytes only).
 
 ## Log
 
 - 2026-11-01: Created.
 - 2026-11-01: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-01: Doing -> Done. Of_TwentyKilobyteHeader_StillSends asserts its field count with Assert.AreEqual (landed in 2a9ab9df6)
