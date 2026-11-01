@@ -76,7 +76,8 @@ internal static class CurlMcpHost
     /// <see cref="InProcessCurlCommandRunner" />, the <c>transfer</c> tool over a production
     /// <see cref="ManagedCurlEngine" /> that lives as long as the process, as <c>Libcurl</c>'s does, the
     /// <c>version</c> tool over that same engine, the <c>parse_url</c> and <c>build_url</c> tools over that engine's
-    /// URL handles, and the <c>--ai-help</c> resources through <see cref="AiHelpMcpResourceProvider" /> (ADR-0589).
+    /// URL handles, and the <c>--ai-help</c> resources through <see cref="AiHelpMcpResourceProvider" /> (ADR-0589), whose
+    /// <c>curl://ai-help/extensions</c> reads <see cref="ExtensionListing.Markdown" /> in that environment (BL-4450).
     /// The engine's transfers reach the handlers <paramref name="extensionHandlers" /> builds, as the <c>curl</c>
     /// tool's reach Curl's extensions, unless <paramref name="readEnvironmentVariable" /> sets
     /// <c>CURL_EXTENSIONS</c> to <c>0</c> (ADR-0999, ADR-1071, BL-4098).
@@ -102,7 +103,7 @@ internal static class CurlMcpHost
         registry.Add(new CurlCommandMcpTool(new McpCurlTool(new InProcessCurlCommandRunner(), root, cap)));
         registry.Add(new BuildUrlMcpTool(urlTool));
         registry.Add(new VersionMcpTool(new McpVersionTool(engine)));
-        registry.Add(new AiHelpMcpResourceProvider());
+        registry.Add(new AiHelpMcpResourceProvider(() => ExtensionListing.Markdown(readEnvironmentVariable)));
         return registry;
     }
 }

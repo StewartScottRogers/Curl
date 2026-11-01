@@ -63,7 +63,8 @@ public sealed class CurlMcpServerIntegrationTests
         string[] uris = [.. result.GetProperty("resources").EnumerateArray().Select(resource => resource.GetProperty("uri").GetString()!)];
         CollectionAssert.Contains(uris, McpAiHelpResourceCatalogue.IndexUri);
         CollectionAssert.Contains(uris, $"{McpAiHelpResourceCatalogue.IndexUri}/all");
-        Assert.HasCount(McpAiHelpResourceCatalogue.Resources.Count, uris);
+        CollectionAssert.Contains(uris, McpAiHelpResourceCatalogue.ExtensionsUri);
+        Assert.HasCount(McpAiHelpResourceCatalogue.Resources.Count + 1, uris);
     }
 
     [TestMethod]

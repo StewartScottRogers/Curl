@@ -1226,3 +1226,4 @@ Each option and the specific reason it lost.
 | [1177](ADR-1177-extensions-that-serve-their-own-scheme-are-curl-extended-protocol.md) | Extensions that serve their own URL scheme are named `Curl.Extended.Protocol.<Name>` (BL-4440) | Accepted | 2026-10-31 |
 | [1178](ADR-1178-solution-folders-group-original-and-extended.md) | `Curl.slnx` groups curl's own protocols under `/Original/` and everything Curl adds under `/Extended/` (BL-4441) | Accepted | 2026-10-31 |
 | [1179](ADR-1179-ci-keeps-its-critical-path-short-and-its-neighbours-from-piling-up.md) | CI keeps its critical path short and its neighbouring workflows from piling up (BL-3512) | Accepted | 2026-10-31 |
+| [1180](ADR-1180-mcp-serves-ai-help-extensions-through-a-host-supplied-reader.md) | The MCP server serves `curl://ai-help/extensions` through a reader the host supplies (BL-4450) | Accepted | 2026-11-01 |
