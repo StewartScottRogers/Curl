@@ -49,6 +49,22 @@ public sealed class McpAiHelpResourceCatalogueTests
     }
 
     [TestMethod]
+    public void ResourcesWithExtensions_AreTheResourcesThenTheExtensionsReadingTheGivenMarkdown()
+    {
+        IReadOnlyList<McpAiHelpResource> resources = McpAiHelpResourceCatalogue.ResourcesWithExtensions(() => "# Extensions\n");
+
+        CollectionAssert.AreEqual(
+            McpAiHelpResourceCatalogue.Resources.Select(resource => resource.Uri).Append("curl://ai-help/extensions").ToArray(),
+            resources.Select(resource => resource.Uri).ToArray());
+        McpAiHelpResource extensions = McpAiHelpResourceCatalogue.Find(resources, "curl://ai-help/extensions")!;
+        Assert.AreEqual("extensions", extensions.Subject);
+        Assert.AreEqual("ai-help-extensions", extensions.Name);
+        StringAssert.Contains(extensions.Description, "(curl --ai-help extensions)");
+        Assert.AreEqual("# Extensions\n", extensions.ReadMarkdown());
+        Assert.IsNull(McpAiHelpResourceCatalogue.Find("curl://ai-help/extensions"));
+    }
+
+    [TestMethod]
     public void Find_ACategoryUri_GivesThatCategory()
     {
         Assert.AreEqual("http", McpAiHelpResourceCatalogue.Find("curl://ai-help/http")!.Subject);

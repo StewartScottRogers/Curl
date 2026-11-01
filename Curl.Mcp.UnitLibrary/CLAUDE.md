@@ -13,7 +13,8 @@ answering with an `McpArgumentCheck`. `McpCurlTool` (ADR-0569) is the `curl` too
 arguments, runs them through the injected `ICurlCommandRunner` with the root as working directory,
 captures standard output and error in `McpCappedCaptureStream`, and answers with an
 `McpCurlToolResult`. `McpAiHelpResourceCatalogue` (ADR-0589) lists the `--ai-help` resources, one
-`McpAiHelpResource` per subject, from `CurlHelpText.Categories`. `McpTransferTool` (ADR-0593) is
+`McpAiHelpResource` per subject, from `CurlHelpText.Categories`, and `ResourcesWithExtensions` adds
+`curl://ai-help/extensions`, whose Markdown the host supplies. `McpTransferTool` (ADR-0593) is
 the `transfer` tool's logic: `McpTransferRequestCheck` checks an `McpTransferRequest`,
 `McpTransferOptions` turns it into `EasyOptions`, one easy handle of the injected `ICurlEngine` runs
 it, `McpResponseHeaderCollector` keeps the last response's headers, and it answers with an

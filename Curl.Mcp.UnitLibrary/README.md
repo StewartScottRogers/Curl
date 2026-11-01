@@ -36,7 +36,7 @@ Namespace `Curl.Mcp`. The library has no subfolders.
 | `transfer` tool | `McpTransferTool`, `McpTransferRequest` (with `McpTransferHeader` and `McpTransferBody`), `McpTransferRequestCheck`, `McpTransferOptions` (request to `EasyOptions`), `McpResponseHeaderCollector`, `McpTransferInfo`, `McpTransferToolResult`. |
 | `version` tool | `McpVersionTool`, `McpVersionToolResult`. |
 | `parse_url`, `build_url` tools | `McpUrlTool`, `McpUrlParts`, `McpParseUrlToolResult`, `McpBuildUrlToolResult`. |
-| `--ai-help` resources | `McpAiHelpResourceCatalogue` lists one `McpAiHelpResource` per subject (the index, `all`, and each category of `CurlHelpText.Categories`) under `curl://ai-help`. |
+| `--ai-help` resources | `McpAiHelpResourceCatalogue` lists one `McpAiHelpResource` per subject (the index, `all`, and each category of `CurlHelpText.Categories`) under `curl://ai-help`; `ResourcesWithExtensions` adds `curl://ai-help/extensions`, whose Markdown the host supplies. |
 
 ## Quality gates and sibling projects
 

@@ -198,6 +198,12 @@
               "uri": "curl://ai-help/verbose",
               "description": "Tracing, logging etc: every option in curl's verbose category (curl --ai-help verbose).",
               "mimeType": "text/markdown"
+            },
+            {
+              "name": "ai-help-extensions",
+              "uri": "curl://ai-help/extensions",
+              "description": "Curl's extensions: what each adds beyond curl and how to turn them off, or that they are off (curl --ai-help extensions).",
+              "mimeType": "text/markdown"
             }
           ]
         },

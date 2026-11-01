@@ -33,7 +33,7 @@ public sealed class CurlMcpHostTests
         McpServerRegistry registry = CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, Cap, _ => null, _ => []);
 
         CollectionAssert.AreEqual(
-            McpAiHelpResourceCatalogue.Resources.Select(resource => resource.Uri).ToArray(),
+            McpAiHelpResourceCatalogue.Resources.Select(resource => resource.Uri).Append("curl://ai-help/extensions").ToArray(),
             registry.Resources.Select(resource => resource.Uri).ToArray());
     }
 
