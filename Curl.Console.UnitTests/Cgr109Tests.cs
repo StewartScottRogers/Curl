@@ -112,6 +112,12 @@ public sealed class Cgr109Tests
         clock.MoveWithoutFiring(2500);
         http.Fail("/stall", CurlExitCode.OperationTimedOut, "Operation timed out after 2500 milliseconds with 0 bytes received");
 
+        // Wake only the -Z loop's polls (due within one poll of now), never the -m timers due at 2000 or a
+        // later connect timeout, so the waiter still finds -m passed when the host frees it (BL-4444).
+        await clock.FireLateTimersUntilAsync(
+            run,
+            due => due != 2000 && due <= clock.GetTimestamp() + ParallelTransferMulti.PollTimeoutMilliseconds);
+
         int exitCode = await run;
         string expectedStandardError =
             "curl: (28) Operation timed out after 2500 milliseconds with 0 bytes received\n"
@@ -192,7 +198,14 @@ public sealed class Cgr109Tests
         /// creates or re-arms after <see cref="Advance" /> took its snapshot (a host waiter's <c>-m</c> timer, a poll
         /// timer) cannot leave it waiting on a clock nobody moves again (BL-4442).
         /// </summary>
-        public async Task FireLateTimersUntilAsync(Task run)
+        public Task FireLateTimersUntilAsync(Task run) => FireLateTimersUntilAsync(run, static _ => true);
+
+        /// <summary>
+        /// Fires, without moving the clock, every live timer whose due time <paramref name="fires" /> accepts, until
+        /// <paramref name="run" /> ends (BL-4444): a test that must not fire a <c>-m</c> timer can still wake a
+        /// <c>-Z</c> poll that missed its wakeup and would otherwise wait on a clock nobody moves.
+        /// </summary>
+        public async Task FireLateTimersUntilAsync(Task run, Func<long, bool> fires)
         {
             using CancellationTokenSource giveUp = new(TimeSpan.FromSeconds(30));
             while (!run.IsCompleted && !giveUp.IsCancellationRequested)
@@ -200,7 +213,7 @@ public sealed class Cgr109Tests
                 FiringTimer[] live;
                 lock (timers)
                 {
-                    live = [.. timers.Where(timer => timer.DueAt is not null)];
+                    live = [.. timers.Where(timer => timer.DueAt is { } due && fires(due))];
                 }
 
                 foreach (FiringTimer timer in live)
