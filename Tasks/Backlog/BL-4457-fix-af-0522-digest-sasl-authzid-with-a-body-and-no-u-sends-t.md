@@ -4,8 +4,8 @@ title: Fix AF-0522: --digest --sasl-authzid with a body and no -u sends the body
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Original.Protocol.Http.UnitLibrary]
+depends-on: [BL-4458]
+touches: [Curl.Original.Protocol.Http.UnitLibrary, Curl.Original.Protocol.Http.UnitTests, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs, Curl.Protocol.Abstractions.UnitTests/HttpRequestOptionsTests.cs, Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs, Curl.Engine.UnitTests/HttpRequestOptionsMappingTests.cs]
 requirement: none
 created: 2026-11-01
 completed:
@@ -46,7 +46,29 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
+- 2026-11-01 (lane 3, first claim, no code edited): measured real curl 8.22.0 with
+  Record-CurlExchange.ps1. `--digest --sasl-authzid 1 -d x` sends `POST` with
+  `Content-Length: 0` and logs `* Server auth using Digest with user ''`; `--digest
+  --sasl-authzid 1` (GET) logs the same line and sends no Authorization header;
+  `--sasl-authzid 1` and `--basic --sasl-authzid 1` send no Authorization header and no
+  auth line. So curl treats --sasl-authzid as an empty user for Digest only; giving the
+  Engine an empty `NetworkCredential` for every scheme would wrongly send `Basic Og==`.
+- The HTTP handler cannot see --sasl-authzid: it reaches only `MailRequestOptions`, which
+  `MailRequestOptionsMapping` builds for mail schemes alone. Plan: add
+  `SaslAuthorizationIdentity` (string?) to `HttpRequestOptions`
+  (Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs), set it from
+  `EasyAuthenticationOptions.SaslAuthorizationIdentity` in
+  Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs, and in
+  `HttpProtocolHandler.SendsDigestProbe` (line 397) accept `request.Credential is not null
+  || options.SaslAuthorizationIdentity is not null` for the origin, answering the Digest
+  challenge with an empty user (`new NetworkCredential("", "")`) when only the authzid is
+  set; then an ADR extending ADR-0441 and focused unit tests in each project.
+- Touches widened to those Abstractions and Engine files for that reason. BL-4458 holds
+  the whole Curl.Protocol.Abstractions.UnitLibrary, so this task depends on it and goes
+  back to Backlog until it is Done (lane rule 3). No commits carry code for this task yet.
+
 ## Log
 
 - 2026-11-01: Created.
 - 2026-11-01: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-01: Doing -> Backlog. Needs Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs, which BL-4458 holds; waits on BL-4458
