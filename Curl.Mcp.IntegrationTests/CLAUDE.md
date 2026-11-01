@@ -25,7 +25,7 @@ It holds:
 Both tests that run the SDK pass `--disable-build-servers`. Otherwise the MSBuild nodes and compiler
 server the child starts inherit its redirected output and hold it open for about 15 minutes (BL-2561).
 
-- `CurlMcpGoldenConversationIntegrationTests`: replays the 28 recorded conversations in `Golden/` (recorded from the SDK-based server, `CURL_MCP_RECORD_GOLDEN=1` re-records; `tools-call-transfer-missing-url` holds the hand-written server's deliberate answer, BL-3384) against the built server (BL-3374).
+- `CurlMcpGoldenConversationIntegrationTests`: replays the 28 recorded conversations in `Golden/` (recorded from the SDK-based server, `CURL_MCP_RECORD_GOLDEN=1` re-records; `tools-call-transfer-missing-url` holds the hand-written server's deliberate answer, BL-3384) against the built server (BL-3374). The `version` tool's `extendedProtocols` list is normalised to `<EXTENSION-SCHEMES>`, since it grows with every extension; `Curl.Mcp.UnitTests` pins it against `ExtensionListing.Schemes` (BL-4453).
 
 `McpStdioClient` is a hand-written newline-delimited JSON-RPC client (`System.Text.Json`; the SDK
 stays in `Curl.Mcp`, ADR-0548). It runs `Curl.Mcp.dll` from this project's output through

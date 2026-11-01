@@ -4,6 +4,8 @@
     {
       "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"golden\",\"version\":\"1.0\"}}}",
       "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
         "result": {
           "protocolVersion": "2025-06-18",
           "capabilities": {
@@ -17,9 +19,7 @@
             "name": "Curl.Mcp",
             "version": "0.1.0.0"
           }
-        },
-        "id": 1,
-        "jsonrpc": "2.0"
+        }
       }
     },
     {
@@ -29,11 +29,13 @@
     {
       "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}",
       "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
         "result": {
           "tools": [
             {
               "name": "parse_url",
-              "description": "Parses a URL with libcurl's URL API (curl_url_set and curl_url_get) and returns the URL as the parser rebuilt it and its parts: scheme, user, password, options, host, port, path, query, fragment and zoneId. A part the URL does not have is null, never an empty string. A URL the parser refuses is a tool error naming the CURLUcode.",
+              "description": "Parses a URL with libcurl's URL API (curl_url_set and curl_url_get) and returns the URL as the parser rebuilt it and its parts: scheme, user, password, options, host, port, path, query, fragment and zoneId. A part the URL does not have is null, never an empty string. The schemes of Curl's extended protocols (the version tool's extendedProtocols) parse with no flag, as curl's own do. A URL the parser refuses is a tool error naming the CURLUcode.",
               "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -67,7 +69,7 @@
             },
             {
               "name": "transfer",
-              "description": "Makes one request, described by fields rather than a command line, through Curl's transfer engine, and returns a structured result: the status code, the response headers, the body (text, or base64 when it is not UTF-8) and timing and size information. Prefer it to the `curl` tool for a single HTTP request whose response you want to read; use `curl` for anything else, such as files, other protocols or any curl option this tool has no field for. A failed transfer is a tool error carrying libcurl's error code.",
+              "description": "Makes one request, described by fields rather than a command line, through Curl's transfer engine, and returns a structured result: the status code, the response headers, the body (text, or base64 when it is not UTF-8) and timing and size information. Prefer it to the `curl` tool for a single HTTP request whose response you want to read; use `curl` for anything else, such as files, other protocols or any curl option this tool has no field for. A URL of one of Curl's extended protocols (the version tool's extendedProtocols) runs through its extension, as curl's own schemes run through theirs. A failed transfer is a tool error carrying libcurl's error code.",
               "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -204,7 +206,7 @@
             },
             {
               "name": "build_url",
-              "description": "Builds a URL from its parts with libcurl's URL API: sets only the parts supplied (curl_url_set), in libcurl's order, and returns the whole URL (curl_url_get). A part or URL the parser refuses, such as a bad port or no host, is a tool error naming the part and the CURLUcode.",
+              "description": "Builds a URL from its parts with libcurl's URL API: sets only the parts supplied (curl_url_set), in libcurl's order, and returns the whole URL (curl_url_get). The schemes of Curl's extended protocols (the version tool's extendedProtocols) build with no flag, as curl's own do. A part or URL the parser refuses, such as a bad port or no host, is a tool error naming the part and the CURLUcode.",
               "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -311,7 +313,7 @@
             },
             {
               "name": "version",
-              "description": "Reports what `curl -V` reports about Curl's transfer engine: the version, the protocols it supports, the features it has built in and its TLS backend, each as its own field, and `curl -V`'s first line as `versionLine`. Takes no arguments.",
+              "description": "Reports what `curl -V` reports about Curl's transfer engine: the version, the protocols it supports, the features it has built in and its TLS backend, each as its own field, the schemes of Curl's extended protocols as `extendedProtocols` (empty when CURL_EXTENSIONS is 0), and `curl -V`'s first line as `versionLine`. Takes no arguments.",
               "inputSchema": {
                 "type": "object",
                 "properties": {}
@@ -322,9 +324,7 @@
               }
             }
           ]
-        },
-        "id": 2,
-        "jsonrpc": "2.0"
+        }
       }
     }
   ]

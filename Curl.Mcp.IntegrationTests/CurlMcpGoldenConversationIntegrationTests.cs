@@ -220,7 +220,9 @@ public sealed class CurlMcpGoldenConversationIntegrationTests
                         ? "<TIMING>"
                         : PlatformNames.Contains(property.Key)
                             ? "<PLATFORM>"
-                            : Normalise(property.Value, root, outside, port);
+                            : property.Key == ExtensionSchemesName
+                                ? "<EXTENSION-SCHEMES>"
+                                : Normalise(property.Value, root, outside, port);
                 }
 
                 if (result["content"] is JsonValue { } content && content.TryGetValue(out string? contentText) && contentText.Contains("<OS-ERROR>", StringComparison.Ordinal))
@@ -258,6 +260,10 @@ public sealed class CurlMcpGoldenConversationIntegrationTests
     }
 
     private static readonly HashSet<string> PlatformNames = ["features", "tlsBackend", "versionLine", "primaryPort"];
+
+    // The version tool's extension schemes grow with every extension that lands, so the golden holds a placeholder;
+    // Curl.Mcp.UnitTests pins the list against ExtensionListing.Schemes (BL-4451, BL-4453).
+    private const string ExtensionSchemesName = "extendedProtocols";
 
     private static bool IsTimingName(string name) =>
         name.StartsWith("elapsed", StringComparison.OrdinalIgnoreCase)
