@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-11-01
-completed:
+completed: 2026-11-01
 ---
 # BL-4454 — Fix AF-0519: Lib575_DownloadsThreeTimes counts the performs but never asserts the count
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Lib575_DownloadsThreeTimes now takes a performCount column and asserts `Assert.AreEqual(performCount, performs)`: 3 on the success row, 1 and 2 when the first or second easy perform fails, 2 when the multi add fails. The fake multi handle's PerformAsync does not run the easy handle's Performing callback, so the test also counts `engine.Multi.Performing` toward performs. The third download is the multi-driven one, and with the default PerformResult (Ok, 0) it takes one multi perform.
+- Checked: the reproduction now shows the performs assertion; `dotnet build` is clean; the fast tests are green across all 114 test projects. Only a test changed and no production library, so there was no quality run.
 
 ## Log
 
 - 2026-11-01: Created.
 - 2026-11-01: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-01: Doing -> Done. Lib575_DownloadsThreeTimes asserts the perform count (3 on success)

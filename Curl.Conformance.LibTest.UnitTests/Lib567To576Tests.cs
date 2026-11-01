@@ -410,20 +410,22 @@ public sealed class Lib573To576Tests
     }
 
     [TestMethod]
-    [DataRow(0, 0, 0)]
-    [DataRow(1, (int)CurlCode.LoginDenied, 0)]
-    [DataRow(2, (int)CurlCode.LoginDenied, 0)]
-    [DataRow(0, (int)LibTestErrorCodes.Multi, 1)]
-    public async Task Lib575_DownloadsThreeTimes(int failingPerform, int exitCode, int addFails)
+    [DataRow(0, 0, 0, 3)]
+    [DataRow(1, (int)CurlCode.LoginDenied, 0, 1)]
+    [DataRow(2, (int)CurlCode.LoginDenied, 0, 2)]
+    [DataRow(0, (int)LibTestErrorCodes.Multi, 1, 2)]
+    public async Task Lib575_DownloadsThreeTimes(int failingPerform, int exitCode, int addFails, int performCount)
     {
         int performs = 0;
         var engine = new FakeCurlEngine { Performing = _ => ++performs == failingPerform ? CurlCode.LoginDenied : CurlCode.Ok };
         engine.Multi.AddResult = addFails == 1 ? CurlMultiCode.BadHandle : CurlMultiCode.Ok;
+        engine.Multi.Performing = () => ++performs;
         var run = new PortRun(engine, 575, "ftp://x/*");
 
         LibTestResult result = await new Lib575(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual(exitCode, result.ExitCode);
+        Assert.AreEqual(performCount, performs);
         Assert.AreEqual("lib575", new Lib575(TimeProvider.System).ProgramName);
         Assert.ThrowsExactly<ArgumentNullException>(() => new Lib575(null!));
     }
