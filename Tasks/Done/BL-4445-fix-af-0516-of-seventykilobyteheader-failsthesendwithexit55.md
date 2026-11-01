@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-11-01
-completed:
+completed: 2026-11-01
 ---
 # BL-4445 — Fix AF-0516: Of_SeventyKilobyteHeader_FailsTheSendWithExit55 never asserts exit 55 or the message
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Kept the Diagnostics.Assert log lines and added real `Assert.AreEqual` checks after them for exit 55 (SendError) and the message. Did the same for Of_TwentyKilobyteHeader_StillSends in the same file, which had the same flaw (its field count was only logged). The change is test-only and platform-neutral, so no quality run was needed: no production code changed.
+- Verified: the reproduction's Select-String now matches lines 27, 28 and 39; `dotnet build` gives 0 errors; the fast tests had no failing project.
 
 ## Log
 
 - 2026-11-01: Created.
 - 2026-11-01: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-01: Doing -> Done. Cgr271Tests now asserts exit 55 and the send-failure message with Assert.AreEqual
