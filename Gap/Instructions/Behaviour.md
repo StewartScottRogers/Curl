@@ -125,8 +125,8 @@ A group takes the highest severity of its cases.
       "introducedIn": null,
       "items": ["behaviour:test9"],
       "evidence": "behaviour:test9 expected 'upstream test9 passes', actual 'stdout differs at byte 4'. Reproduce: dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- <release>/tests/data $env:TEMP/raw.json 9",
-      "suggestion": "In Curl.Protocol.Http.UnitLibrary, stop the response reader from writing a body after a HEAD request's headers, as upstream's tests/data/test9 <verify><stdout> expects.",
-      "touches": ["Curl.Protocol.Http.UnitLibrary", "Curl.Protocol.Http.UnitTests"]
+      "suggestion": "In Curl.Original.Protocol.Http.UnitLibrary, stop the response reader from writing a body after a HEAD request's headers, as upstream's tests/data/test9 <verify><stdout> expects.",
+      "touches": ["Curl.Original.Protocol.Http.UnitLibrary", "Curl.Original.Protocol.Http.UnitTests"]
     }
   ],
   "notes": "Unmeasured by reason: unknown-variable 3, harness-unsupported 1, needs-server:ftp 1, needs-server:https 1. Extensions that would measure most: an HTTPS server in the harness (1 case), an FTP server emulation (1 case). reference-diverges: 0."

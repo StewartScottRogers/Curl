@@ -58,7 +58,7 @@
     longer stops the run. A baseline that does not build still stops it.
 
 .PARAMETER Library
-    The library to mutate, e.g. Curl.Protocol.Dict.UnitLibrary. Its tests are the same name
+    The library to mutate, e.g. Curl.Original.Protocol.Dict.UnitLibrary. Its tests are the same name
     with .UnitTests.
 
 .PARAMETER Commit
@@ -97,7 +97,7 @@
     and on a failed baseline also baselineError; with -Site also site, resolvedLine, outcome.
 
 .EXAMPLE
-    powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Protocol.Dict.UnitLibrary -MaxMutants 5 -Seed 1 -OutFile $env:TEMP\dict.json
+    powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Original.Protocol.Dict.UnitLibrary -MaxMutants 5 -Seed 1 -OutFile $env:TEMP\dict.json
 .EXAMPLE
     powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/TcpPendingConnection.cs:77:true -ExcludeBaselineFailures -TimeoutSeconds 300
 #>
@@ -474,7 +474,7 @@ if ($Site) {
     $target = ConvertFrom-SiteArgument $Site $Library
     $Library = $target.Library
 }
-if (-not $Library) { throw 'Give the library to mutate with -Library, e.g. -Library Curl.Protocol.Dict.UnitLibrary, or a -Site.' }
+if (-not $Library) { throw 'Give the library to mutate with -Library, e.g. -Library Curl.Original.Protocol.Dict.UnitLibrary, or a -Site.' }
 if ($Library -notmatch '^Curl(\.[A-Za-z0-9]+)+\.UnitLibrary$') { throw "$Library is not a Curl.<Area>.UnitLibrary name." }
 $twin = $Library -replace '\.UnitLibrary$', '.UnitTests'
 $repo = "$(git -C $PSScriptRoot rev-parse --show-toplevel)".Trim()

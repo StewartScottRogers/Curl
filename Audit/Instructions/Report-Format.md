@@ -184,7 +184,7 @@ IDs and numbers in it are not real findings.
   ],
   "metrics": {
     "mutationScore.Curl.Cli.UnitLibrary": 0.82,
-    "mutationScore.Curl.Protocol.Dict.UnitLibrary": 0.94
+    "mutationScore.Curl.Original.Protocol.Dict.UnitLibrary": 0.94
   }
 }
 ```

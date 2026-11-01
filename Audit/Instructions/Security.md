@@ -9,7 +9,7 @@ The code in scope is these six libraries:
 
 - `Curl.Cryptography.UnitLibrary`
 - `Curl.Tls.UnitLibrary`
-- `Curl.Protocol.Ssh.UnitLibrary`
+- `Curl.Original.Protocol.Ssh.UnitLibrary`
 - `Curl.Quic.UnitLibrary`
 - `Curl.Kerberos.UnitLibrary`
 - `Curl.Ntlm.UnitLibrary`
@@ -39,7 +39,7 @@ holds the exception and stack. Its reproduction is:
 dotnet run Audit/Tools/Fuzz/Fuzz.cs -- --replay <saved .bin> --target <target>
 ```
 
-The `ssh` target fuzzes `Curl.Protocol.Ssh.UnitLibrary`'s readers of server bytes through
+The `ssh` target fuzzes `Curl.Original.Protocol.Ssh.UnitLibrary`'s readers of server bytes through
 its public `SshWireDecoders` (ADR-0394): the packet reader, zlib inflation, `KEXINIT`, SFTP
 attributes and host-key signatures, every method on every input.
 

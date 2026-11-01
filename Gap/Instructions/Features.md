@@ -30,7 +30,7 @@ Put every `gap` item in exactly one group:
    (`features:http2-missing`).
 
 The suggestion names the library that would supply the capability (for example
-`Curl.Protocol.Http.UnitLibrary` for `HTTP2`, a hand-built `Curl.<Area>.UnitLibrary` for
+`Curl.Original.Protocol.Http.UnitLibrary` for `HTTP2`, a hand-built `Curl.<Area>.UnitLibrary` for
 one Curl does not have yet) and `Curl.Cli.UnitLibrary`'s `CurlVersionText.FeaturesLine`,
 which must list the feature only once Curl serves it.
 
