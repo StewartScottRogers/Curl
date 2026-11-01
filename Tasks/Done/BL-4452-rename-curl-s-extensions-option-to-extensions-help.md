@@ -1,0 +1,39 @@
+---
+id: BL-4452
+title: Rename Curl's --extensions option to --extensions-help
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CommandLineGlobalState.cs, Curl.Cli.UnitLibrary/CurlAiHelpText.cs, Curl.Mcp.UnitLibrary/McpOptionPathTable.cs, Curl.Extension.Composition.UnitLibrary/ExtensionListing.cs, Curl.Cli.UnitTests/LibcurlSourceCodeOptionCoverageTests.cs, Curl.Console.UnitTests/CurlCommandRunnerExtensionsTests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0Extension.cs, Curl.Extended.Protocol.Amqp1.UnitLibrary/Client/Amqp1Extension.cs, Curl.Extended.Protocol.AzureStorage.UnitLibrary/Client/AzureStorageExtension.cs, Curl.Extended.Protocol.Coap.UnitLibrary/CLAUDE.md, Curl.Extended.Protocol.Coap.UnitLibrary/Client/CoapExtension.cs, Curl.Extended.Protocol.DnsQuery.UnitLibrary/Client/DnsQueryExtension.cs, Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Client/GcsExtension.cs, Curl.Extended.Protocol.Grpc.UnitLibrary/CLAUDE.md, Curl.Extended.Protocol.Grpc.UnitLibrary/Client/GrpcExtension.cs, Curl.Extended.Protocol.Kafka.UnitLibrary/CLAUDE.md, Curl.Extended.Protocol.Kafka.UnitLibrary/Client/KafkaExtension.cs, Curl.Extended.Protocol.McpClient.UnitLibrary/Client/McpClientExtension.cs, Curl.Extended.Protocol.Mqtt5.UnitLibrary/Mqtt5Extension.cs, Curl.Extended.Protocol.Nats.UnitLibrary/NatsExtension.cs, Curl.Extended.Protocol.OciRegistry.UnitLibrary/Client/OciRegistryExtension.cs, Curl.Extended.Protocol.Plugin.UnitLibrary/PluginProtocolExtension.cs, Curl.Extended.Protocol.Redis.UnitLibrary/CLAUDE.md, Curl.Extended.Protocol.Redis.UnitLibrary/Client/RedisExtension.cs, Curl.Extended.Protocol.S3.UnitLibrary/Client/S3Extension.cs, Curl.Extended.Protocol.SignalR.UnitLibrary/SignalRExtension.cs, Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoExtension.cs, Curl.Extended.Protocol.Stomp.UnitLibrary/CLAUDE.md, Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompExtension.cs, Curl.Extended.Protocol.WebTransport.UnitLibrary/WebTransportExtension.cs, Curl.Extended.Protocol.Xmpp.UnitLibrary/Client/XmppExtension.cs, Curl.Extension.Abstractions.UnitLibrary/Arguments/IArgumentExpander.cs, Curl.Extension.Abstractions.UnitLibrary/Description/ExtensionDescription.cs, Curl.Extension.CertificateTransparency.UnitLibrary/CertificateTransparencyExtension.cs, Curl.Extension.Checksum.UnitLibrary/ChecksumExtension.cs, Curl.Extension.ClientHints.UnitLibrary/ClientHintsExtension.cs, Curl.Extension.CodeGeneration.UnitLibrary/CodeGenerationExtension.cs, Curl.Extension.Composition.UnitLibrary/CLAUDE.md, Curl.Extension.Composition.UnitLibrary/ExtensionArgumentExpanderCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.CompressionDictionary.UnitLibrary/CompressionDictionaryExtension.cs, Curl.Extension.ConnectRpc.UnitLibrary/ConnectRpcExtension.cs, Curl.Extension.ContentDigest.UnitLibrary/ContentDigestExtension.cs, Curl.Extension.Dane.UnitLibrary/DaneExtension.cs, Curl.Extension.DeltaDownload.UnitLibrary/DeltaDownloadExtension.cs, Curl.Extension.Dpop.UnitLibrary/DpopExtension.cs, Curl.Extension.EncryptedDns.UnitLibrary/EncryptedDnsExtension.cs, Curl.Extension.GraphQl.UnitLibrary/GraphQlOptions.cs, Curl.Extension.GrpcWeb.UnitLibrary/GrpcWebExtension.cs, Curl.Extension.Har.UnitLibrary/HarExtension.cs, Curl.Extension.HttpCache.UnitLibrary/HttpCacheExtension.cs, Curl.Extension.HttpFile.UnitLibrary/HttpFileOptions.cs, Curl.Extension.JsonRpc.UnitLibrary/JsonRpcExtension.cs, Curl.Extension.Masque.UnitLibrary/MasqueExtension.cs, Curl.Extension.MlDsaCertificates.UnitLibrary/MlDsaCertificatesExtension.cs, Curl.Extension.NamedPipe.UnitLibrary/NamedPipeExtension.cs, Curl.Extension.OAuth2.UnitLibrary/Options/OAuth2Options.cs, Curl.Extension.ObliviousDoh.UnitLibrary/ObliviousDohExtension.cs, Curl.Extension.ObliviousHttp.UnitLibrary/ObliviousHttpExtension.cs, Curl.Extension.OpenApi.UnitLibrary/OpenApiOptions.cs, Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryExtension.cs, Curl.Extension.OsCredentialStore.UnitLibrary/OsCredentialStoreExtension.cs, Curl.Extension.QuicMigration.UnitLibrary/QuicMigrationExtension.cs, Curl.Extension.RateLimit.UnitLibrary/RateLimitExtension.cs, Curl.Extension.RecordReplay.UnitLibrary/RecordReplayExtension.cs, Curl.Extension.ResumableUpload.UnitLibrary/CLAUDE.md, Curl.Extension.ResumableUpload.UnitLibrary/ResumableUploadExtension.cs, Curl.Extension.SegmentedDownload.UnitLibrary/SegmentedDownloadExtension.cs, Curl.Extension.ServerSentEvents.UnitLibrary/CLAUDE.md, Curl.Extension.ServerSentEvents.UnitLibrary/ServerSentEventsExtension.cs, Curl.Extension.Sigstore.UnitLibrary/SigstoreExtension.cs, Curl.Extension.SshJump.UnitLibrary/SshJumpExtension.cs, Curl.Extension.StructuredFields.UnitLibrary/StructuredFieldsExtension.cs, Curl.Extension.VirtualMachineSocket.UnitLibrary/VirtualMachineSocketExtension.cs, Curl.Extension.WebDavTools.UnitLibrary/WebDavToolsExtension.cs, Curl.Extension.WebSocketExtendedConnect.UnitLibrary/Option/WebSocketExtendedConnectExtension.cs, Curl.Extension.WebSocketRepl.UnitLibrary/WebSocketReplExtension.cs, Curl.Extension.WebSocketSubprotocols.UnitLibrary/WebSocketSubprotocolsExtension.cs, Curl.Extension.WireGuard.UnitLibrary/WireGuardExtension.cs, Curl.Mcp.IntegrationTests/Golden/resources-read.json, Documentation/Planning/Decisions/ADR-1008-extensions-describe-themselves-for-the-extensions-option-and-ai-help.md]
+requirement: none
+created: 2026-11-01
+completed: 2026-11-01
+---
+# BL-4452 — Rename Curl's --extensions option to --extensions-help
+
+## Goal
+
+`curl --extensions-help` prints the extension listing that `curl --extensions` prints today, and `--extensions` is gone: curl answers it as any unknown option (exit 2).
+
+## Context
+
+Stewart, 2026-11-01: "In curl.Console change --extensions to --extensions-help."
+
+The option is Curl's own (ADR-1008): `CommandLineOptionTable.cs` line ~327 (`CommandLineOption.Flag("extensions", ...)`) and the name list at line ~473, `CommandLineOptions.ExtensionsRequested` / `CommandLineGlobalState.ExtensionsRequested` (rename to `ExtensionsHelpRequested`), `CurlCommandRunner.ExtensionsOrBuildInformationLines` in `Curl.Console`, the `--ai-help` row in `CurlAiHelpText.cs` line ~53 and its index line ~159, `McpOptionPathTable.cs` line ~58 (the MCP curl tool's option list), `ExtensionListing`'s text, and every test, document, CLAUDE.md, wiki and ADR that names `--extensions`. The `--ai-help extensions` subject and the `curl://ai-help/extensions` MCP resource keep their names: they are a help subject, not the option. Check `ExtensionCommandLineOptions`' clash rule still passes (no curl option is named `extensions-help`). `--help` still leaves it out (ADR-1008). Amend ADR-1008 with the rename.
+
+## Acceptance criteria
+
+- [x] `curl --extensions-help` prints exactly what `curl --extensions` printed before (and the off line under `CURL_EXTENSIONS=0`); `curl --extensions` now fails as an unknown option with exit 2; unit tests pin both.
+- [x] `--ai-help` (index and its Curl category) names `--extensions-help`, and no `.cs`, `.md` or script outside history (ADR log lines, Done tasks) still names the `--extensions` option.
+- [x] The MCP `curl` tool accepts `--extensions-help` and no longer lists `--extensions` (`McpOptionPathTable`).
+- [x] ADR-1008 carries an amendment for the rename.
+- [x] `dotnet build` and the fast tests pass; the touched libraries stay at 100% line and branch coverage.
+
+## Notes
+
+## Log
+
+- 2026-11-01: Created.
+- 2026-11-01: Backlog -> Doing. Criteria at claim: 70bad6f4 a2f70ce1 526a7679 b744a640 91fd3925.
+- 2026-11-01: Doing -> Done. curl --extensions-help prints the extension listing; --extensions is unknown (exit 2); ai-help, MCP option list and docs follow; ADR-1008 amended

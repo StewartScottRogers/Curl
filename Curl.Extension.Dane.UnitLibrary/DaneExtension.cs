@@ -23,7 +23,7 @@ public static class DaneExtension
         ExtensionOptionArgument.Value,
         "Check the server certificate against its DNSSEC-validated TLSA records, queried through this resolver host[:port]");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "dane",
         "Validates the server's TLSA records with DNSSEC from the root trust anchors and refuses a certificate chain they do not match (exit 60) (RFC 4033-4035, RFC 6698, RFC 7671).",

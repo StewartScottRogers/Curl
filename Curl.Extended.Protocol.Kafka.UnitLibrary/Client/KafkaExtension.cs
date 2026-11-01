@@ -6,7 +6,7 @@ namespace Curl.Extended.Protocol.Kafka.Client;
 /// <summary>The <c>kafka://</c> and <c>kafkas://</c> extension's description and handler factory (ADR-1076).</summary>
 public static class KafkaExtension
 {
-    /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "kafka",
         "Produces and consumes Kafka records: kafka://host/topic[/partition] with -d produces one record whose value is the data, otherwise it consumes the partition from ?offset=N (default 0) to its end and writes each record value and a newline; kafkas:// adds TLS.",

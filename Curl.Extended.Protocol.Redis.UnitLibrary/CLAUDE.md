@@ -7,7 +7,7 @@ the base class library. The handler is registered by one line in `ExtensionCatal
 
 `Client/` (namespace `Curl.Extended.Protocol.Redis.Client`):
 
-- `RedisExtension` is the description `curl --extensions` lists and the handler factory, over
+- `RedisExtension` is the description `curl --extensions-help` lists and the handler factory, over
   `ProtocolHandlerServices.Connector`.
 - `RedisProtocolHandler` serves `redis://` and `rediss://` (TLS), both on port 6379.
 - `RedisUrlCommand` reads the URL path `/[db]/command/argument/...`; `-d` appends one more argument.

@@ -1,7 +1,7 @@
 namespace Curl.Extension.Abstractions.Description;
 
 /// <summary>
-/// What one extension tells a user about itself (ADR-1008): <c>curl --extensions</c> prints it as one
+/// What one extension tells a user about itself (ADR-1008): <c>curl --extensions-help</c> prints it as one
 /// line and <c>curl --ai-help extensions</c> as a Markdown section. An extension declares it in one file and
 /// registers it with one line in <c>Curl.Extension.Composition</c>'s <c>ExtensionDescriptionCatalogue</c>.
 /// </summary>

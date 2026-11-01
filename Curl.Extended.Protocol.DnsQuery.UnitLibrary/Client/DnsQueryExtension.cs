@@ -23,7 +23,7 @@ public static class DnsQueryExtension
         ExtensionOptionArgument.None,
         "Write a dns:// answer as one line of JSON in place of dig-like text");
 
-    /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "dns",
         "Queries a DNS server with a dns:// URL (RFC 4501): dns://server[:port]/name?type=A;class=IN sends an RFC 1035 query over UDP, retried over TCP when the answer is truncated, or over TCP with --dns-transport tcp, and writes the answer as dig-like text, or as JSON with --dns-json.",

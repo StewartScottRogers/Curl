@@ -23,7 +23,7 @@ public static class RecordReplayExtension
         ExtensionOptionArgument.Value,
         "Answer HTTP requests from the exchanges --record wrote to <dir>, without the network");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "record-replay",
         "Records HTTP exchanges to a directory and replays them later without the network (Curl exchange record format 1, ADR-1135).",

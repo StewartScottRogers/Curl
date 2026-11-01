@@ -19,7 +19,7 @@ public sealed class McpVersionToolTests
             Features = ["alt-svc", "AsynchDNS", "IPv6", "SSL"],
             TlsBackend = "Schannel",
         };
-        McpVersionTool tool = new(new FakeTransferEngine(new FakeEasyTransfer()) { VersionInfoToReport = info });
+        McpVersionTool tool = new(new FakeTransferEngine(new FakeEasyTransfer()) { VersionInfoToReport = info }, []);
 
         McpVersionToolResult result = tool.Report();
 
@@ -32,7 +32,7 @@ public sealed class McpVersionToolTests
     [TestMethod]
     public void Report_FakeEngineWithNoTls_ReportsNoTlsBackend()
     {
-        McpVersionTool tool = new(new FakeTransferEngine(new FakeEasyTransfer()) { VersionInfoToReport = new CurlVersionInfo() });
+        McpVersionTool tool = new(new FakeTransferEngine(new FakeEasyTransfer()) { VersionInfoToReport = new CurlVersionInfo() }, []);
 
         Assert.IsNull(tool.Report().TlsBackend);
     }
@@ -40,7 +40,7 @@ public sealed class McpVersionToolTests
     [TestMethod]
     public void Report_VersionLine_IsThePlatformsFirstCurlVersionLine()
     {
-        McpVersionTool tool = new(new FakeTransferEngine(new FakeEasyTransfer()) { VersionInfoToReport = new CurlVersionInfo() });
+        McpVersionTool tool = new(new FakeTransferEngine(new FakeEasyTransfer()) { VersionInfoToReport = new CurlVersionInfo() }, []);
 
         Assert.AreEqual(CurlVersionText.Lines(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS())[0], tool.Report().VersionLine);
     }
@@ -53,7 +53,7 @@ public sealed class McpVersionToolTests
         string firstLine = Encoding.UTF8.GetString(standardOutput.ToArray()).Split('\n')[0].TrimEnd('\r');
         await using ManagedCurlEngine engine = new();
 
-        McpVersionToolResult result = new McpVersionTool(engine).Report();
+        McpVersionToolResult result = new McpVersionTool(engine, []).Report();
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(firstLine.Split(' ')[1], result.Version);

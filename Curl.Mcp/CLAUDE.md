@@ -13,6 +13,8 @@ compatible: the `Tools/` classes `ParseUrlMcpTool`, `TransferMcpTool`, `CurlComm
 does, and `AiHelpMcpResourceProvider` for the `--ai-help` resources (ADR-0589), including `curl://ai-help/extensions`,
 which reads `ExtensionListing.Markdown` in the host's environment, as `curl --ai-help extensions` does (BL-4450). That engine's transfers reach
 Curl's extensions through `Curl.Extension.Composition.UnitLibrary` unless `CURL_EXTENSIONS` is `0` (ADR-1071).
+The URL tools accept, and the `version` tool lists as `extendedProtocols`, the schemes `ExtensionListing.Schemes`
+gives in the host's environment, so the extended protocols are served as curl's own are (ADR-1181).
 `LoggingSetLevelMcpHandler` advertises the `logging` capability the SDK host advertised. The runner
 adapter over `Curl.Console` is `InProcessCurlCommandRunner`. Tool logic - checking, capping, turning
 a result into an error - lives in `Curl.Mcp.UnitLibrary`, never here; a branch added here is a sign

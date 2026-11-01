@@ -10,7 +10,7 @@ public static class SshJumpExtension
     /// <summary>Gets <c>--ssh-jump &lt;user[:password]@host[:port]&gt;</c>.</summary>
     public static ExtensionOption Option { get; } = new("ssh-jump", ExtensionOptionArgument.Value, "Connect through this SSH jump host, user[:password]@host[:port]");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "ssh-jump",
         "Reaches every server through an SSH jump host's direct-tcpip channel: SFTP and SCP run their own session over it, every other scheme is tunnelled.",

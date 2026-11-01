@@ -17,7 +17,7 @@ public static class GrpcExtension
         ExtensionOptionArgument.Value,
         "The .proto file declaring the service a grpc:// or grpcs:// URL calls; files it imports are read from its directory. Without it, the server describes the method by gRPC server reflection v1");
 
-    /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "grpc",
         "Calls a gRPC method over HTTP/2 (grpc.io PROTOCOL-HTTP2.md): grpc://host:port/package.Service/Method over cleartext HTTP/2, grpcs:// over TLS with ALPN h2; --grpc-proto names the .proto file (without it, the method's types come from the server by gRPC server reflection v1), -d the request message as proto3 JSON, and each response message is written as JSON. A grpc-status other than 0 fails with exit 22 and the grpc-message.",

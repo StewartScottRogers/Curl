@@ -6,7 +6,7 @@ namespace Curl.Extension.Abstractions.Arguments;
 /// and its value with <see cref="ArgumentsFor" />'s arguments before it parses the command line
 /// (<see cref="ArgumentExpansion.Expand" />). An extension declares it in one file and registers it with one line in
 /// <c>Curl.Extension.Composition</c>'s <c>ExtensionArgumentExpanderCatalogue</c>; its <see cref="Option" /> stays
-/// registered in <c>ExtensionOptionCatalogue</c> too, so <c>--extensions</c> lists it.
+/// registered in <c>ExtensionOptionCatalogue</c> too, so <c>--extensions-help</c> lists it.
 /// </summary>
 public interface IArgumentExpander
 {

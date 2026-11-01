@@ -10,7 +10,7 @@ public static class VirtualMachineSocketExtension
     /// <summary>Gets <c>--vm-socket &lt;cid:port | vm:service&gt;</c>.</summary>
     public static ExtensionOption Option { get; } = new("vm-socket", ExtensionOptionArgument.Value, "Connect through this vsock CID:port or Hyper-V socket VM:service GUID pair");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "vm-socket",
         "Runs every transfer over a vsock (CID:port) or Hyper-V socket (VM:service GUID), between a virtual machine and its host.",

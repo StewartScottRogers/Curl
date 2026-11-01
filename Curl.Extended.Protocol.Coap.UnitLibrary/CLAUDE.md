@@ -8,7 +8,7 @@ registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDes
 
 `Client/` (namespace `Curl.Extended.Protocol.Coap.Client`, ADR-1047) makes requests over UDP:
 
-- `CoapExtension` is the description `curl --extensions` lists and the handler factory, over
+- `CoapExtension` is the description `curl --extensions-help` lists and the handler factory, over
   `ProtocolHandlerServices.DatagramConnector` and `ProtocolHandlerServices.TlsProvider`, for `coap` and `coaps`.
 - `CoapProtocolHandler` sends a confirmable request (block-wise through `Blockwise/` when the payload or response needs it) to port 5683, 5684 for `coaps` (or the URL's port), over `Secure/` for `coaps`, and writes the
   response payload. A 4.xx or 5.xx response ends with exit 0, or exit 22 under `-f` and

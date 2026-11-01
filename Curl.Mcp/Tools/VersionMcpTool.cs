@@ -16,7 +16,7 @@ public sealed class VersionMcpTool(McpVersionTool tool) : IMcpTool
     /// <inheritdoc />
     public string Description =>
         "Reports what `curl -V` reports about Curl's transfer engine: the version, the protocols it supports, the features it has "
-        + "built in and its TLS backend, each as its own field, and `curl -V`'s first line as `versionLine`. Takes no arguments.";
+        + "built in and its TLS backend, each as its own field, the schemes of Curl's extended protocols as `extendedProtocols` (empty when CURL_EXTENSIONS is 0), and `curl -V`'s first line as `versionLine`. Takes no arguments.";
 
     /// <inheritdoc />
     public string InputSchemaJson => """{"type":"object","properties":{}}""";

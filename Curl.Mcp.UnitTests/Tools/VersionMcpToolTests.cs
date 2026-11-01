@@ -17,6 +17,7 @@ public sealed class VersionMcpToolTests
         Assert.AreEqual("version", tool.Name);
         StringAssert.StartsWith(tool.Description, "Reports what `curl -V` reports about Curl's transfer engine");
         StringAssert.EndsWith(tool.Description, "Takes no arguments.");
+        StringAssert.Contains(tool.Description, "`extendedProtocols`");
         Assert.AreEqual(true, tool.Annotations!.IdempotentHint);
         Assert.AreEqual(true, tool.Annotations.ReadOnlyHint);
         using JsonDocument schema = JsonDocument.Parse(tool.InputSchemaJson);
@@ -33,6 +34,7 @@ public sealed class VersionMcpToolTests
         using JsonDocument json = JsonDocument.Parse(result.Content.Single().Text);
         Assert.AreEqual("9.1.2", json.RootElement.GetProperty("version").GetString());
         CollectionAssert.AreEqual(new[] { "file", "http" }, json.RootElement.GetProperty("protocols").EnumerateArray().Select(item => item.GetString()).ToArray());
+        CollectionAssert.AreEqual(new[] { "coap", "redis" }, json.RootElement.GetProperty("extendedProtocols").EnumerateArray().Select(item => item.GetString()).ToArray());
         CollectionAssert.AreEqual(new[] { "IPv6", "SSL" }, json.RootElement.GetProperty("features").EnumerateArray().Select(item => item.GetString()).ToArray());
         Assert.AreEqual("OpenSSL/3.5.0", json.RootElement.GetProperty("tlsBackend").GetString());
         StringAssert.StartsWith(json.RootElement.GetProperty("versionLine").GetString(), "curl ");
@@ -49,7 +51,7 @@ public sealed class VersionMcpToolTests
 
     private static FakeTransferEngine Engine() => new(new FakeEasyTransfer()) { VersionInfoToReport = Info };
 
-    private static VersionMcpTool Tool() => new(new McpVersionTool(Engine()));
+    private static VersionMcpTool Tool() => new(new McpVersionTool(Engine(), ["coap", "redis"]));
 
     private static JsonElement Arguments(string arguments)
     {

@@ -17,7 +17,7 @@ public static class OsCredentialStoreExtension
         ExtensionOptionArgument.Value,
         "Use the user name and password stored under <name> in the OS credential store");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "os-credential-store",
         "Takes the user name and password from Windows Credential Manager, the macOS keychain or libsecret (ADR-1144).",

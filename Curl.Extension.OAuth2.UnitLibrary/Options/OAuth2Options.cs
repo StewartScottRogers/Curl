@@ -58,7 +58,7 @@ public static class OAuth2Options
         ExtensionOptionArgument.Value,
         "The directory OAuth 2.0 tokens are cached and refreshed in, \"\" for no cache");
 
-    /// <summary>Gets every option, in the order <c>--extensions</c> lists them.</summary>
+    /// <summary>Gets every option, in the order <c>--extensions-help</c> lists them.</summary>
     public static IReadOnlyList<ExtensionOption> All { get; } =
         [ClientCredentials, Device, Pkce, ClientId, ClientSecret, Scope, DeviceUrl, AuthorizeUrl, RedirectPort, TokenCache];
 

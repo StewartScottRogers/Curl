@@ -22,7 +22,7 @@ stream or connection.
 
 `Client/` (namespace `Curl.Extended.Protocol.Grpc.Client`, ADR-1147) makes the call:
 
-- `GrpcExtension` is the description `curl --extensions` lists, the `--grpc-proto` option, its hook
+- `GrpcExtension` is the description `curl --extensions-help` lists, the `--grpc-proto` option, its hook
   and the handler factory, registered by one line each in `ExtensionCatalogue.cs`,
   `ExtensionDescriptionCatalogue.cs`, `ExtensionOptionCatalogue.cs` and
   `ExtensionTransferHookCatalogue.cs`.

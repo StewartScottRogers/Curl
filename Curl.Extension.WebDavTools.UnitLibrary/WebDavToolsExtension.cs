@@ -31,7 +31,7 @@ public static class WebDavToolsExtension
         ExtensionOptionArgument.Value,
         "Download a WebDAV collection and its sub-collections into <dir>, skipping current files");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "webdav-tools",
         "Lists a WebDAV collection from a PROPFIND and syncs a collection tree into a local folder (RFC 4918).",

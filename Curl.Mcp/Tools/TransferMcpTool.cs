@@ -20,7 +20,7 @@ public sealed class TransferMcpTool(McpTransferTool tool) : IMcpTool
         "Makes one request, described by fields rather than a command line, through Curl's transfer engine, and returns a structured result: "
         + "the status code, the response headers, the body (text, or base64 when it is not UTF-8) and timing and size information. "
         + "Prefer it to the `curl` tool for a single HTTP request whose response you want to read; use `curl` for anything else, "
-        + "such as files, other protocols or any curl option this tool has no field for. A failed transfer is a tool error carrying "
+        + "such as files, other protocols or any curl option this tool has no field for. A URL of one of Curl's extended protocols (the version tool's extendedProtocols) runs through its extension, as curl's own schemes run through theirs. A failed transfer is a tool error carrying "
         + "libcurl's error code.";
 
     /// <inheritdoc />

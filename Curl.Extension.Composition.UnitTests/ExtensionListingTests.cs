@@ -16,6 +16,27 @@ public sealed class ExtensionListingTests
     private static readonly ExtensionDescription Plain = new("plain", "Adds nothing.", [], [], new Uri("https://example.com/plain"));
 
     [TestMethod]
+    public void SchemesOf_GivesEverySchemeInOrderEachOnce()
+    {
+        ExtensionDescription again = new("again", "Repeats a scheme.", ["CACHE", "again"], [], new Uri("https://example.com/again"));
+
+        CollectionAssert.AreEqual(new[] { "cache", "caches", "again" }, ExtensionListing.SchemesOf([Cache, Plain, again]).ToArray());
+    }
+
+    [TestMethod]
+    public void Schemes_WithExtensionsOn_AreTheCatalogues()
+    {
+        CollectionAssert.AreEqual(ExtensionListing.SchemesOf(ExtensionDescriptionCatalogue.Entries).ToArray(), ExtensionListing.Schemes(_ => null).ToArray());
+        CollectionAssert.Contains(ExtensionListing.Schemes(_ => null).ToArray(), "coap");
+    }
+
+    [TestMethod]
+    public void Schemes_WithCurlExtensionsZero_AreNone()
+    {
+        Assert.AreEqual(0, ExtensionListing.Schemes(name => name == "CURL_EXTENSIONS" ? "0" : null).Count);
+    }
+
+    [TestMethod]
     public void LinesOf_GivesOneLinePerExtension()
     {
         CollectionAssert.AreEqual(

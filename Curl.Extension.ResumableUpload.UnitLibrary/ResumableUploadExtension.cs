@@ -18,7 +18,7 @@ public static class ResumableUploadExtension
         ExtensionOptionArgument.None,
         "Upload -T's body resumably: tus 1.0 when the server offers it, otherwise the IETF resumable upload draft");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "resumable-upload",
         "Uploads an HTTP -T body resumably, by tus 1.0 when the server's OPTIONS offers it and otherwise by draft-ietf-httpbis-resumable-upload, resuming from the server's offset after a broken connection.",

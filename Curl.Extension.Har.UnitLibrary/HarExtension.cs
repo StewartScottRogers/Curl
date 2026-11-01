@@ -16,7 +16,7 @@ public static class HarExtension
         ExtensionOptionArgument.Value,
         "Write the HTTP transfers to <file> as an HTTP Archive (HAR 1.2)");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "har",
         "Records each HTTP request and response, with headers, bodies and timings, to a HAR 1.2 HTTP Archive file.",

@@ -17,7 +17,7 @@ public static class GrpcWebExtension
         ExtensionOptionArgument.None,
         "Call a gRPC-Web method: send the -d data as one application/grpc-web+proto message, write the reply's messages and fail on a non-zero grpc-status");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "grpc-web",
         "Calls gRPC-Web services over HTTP/1.1 or HTTP/2, framing the request message and checking the reply's grpc-status.",

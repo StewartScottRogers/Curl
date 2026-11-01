@@ -45,12 +45,12 @@ public static class CurlAiHelpText
 
     /// <summary>
     /// The rows <c>--ai-help</c> documents that curl's <c>--help</c> does not: Curl's own diagnostic-log
-    /// options and <c>--extensions</c>, which <c>--help</c> leaves out so curl's help pages stay byte for byte (ADR-1008). <c>--ai-help</c> itself is in <see cref="CurlHelpTable"/>, so <c>--help</c> names it (BL-2985).
+    /// options and <c>--extensions-help</c>, which <c>--help</c> leaves out so curl's help pages stay byte for byte (ADR-1008). <c>--ai-help</c> itself is in <see cref="CurlHelpTable"/>, so <c>--help</c> names it (BL-2985).
     /// </summary>
     private static readonly CurlHelpEntry[] CurlOnlyEntries =
     [
         new("    --log-level <level>", "Curl's own diagnostic log, not curl's -v: none (the default), error, warning, info or verbose, to standard error or the --log-file", CurlHelpCategories.Curl),
-        new("    --extensions", "List Curl's own extensions beyond upstream curl, one per line: each one's schemes and options (ADR-1008); `--ai-help extensions` documents them", CurlHelpCategories.Curl),
+        new("    --extensions-help", "List Curl's own extensions beyond upstream curl, one per line: each one's schemes and options (ADR-1008); `--ai-help extensions` documents them", CurlHelpCategories.Curl),
         new("    --log-file <file>", "Write Curl's own diagnostic log, not curl's -v, to this file instead of standard error; at info level unless --log-level says otherwise", CurlHelpCategories.Curl),
     ];
 
@@ -156,7 +156,7 @@ public static class CurlAiHelpText
             string.Empty,
         ];
         lines.AddRange(CurlHelpText.Categories.Select(category => $"- `{category.Name}`: {category.Description}. Run `curl --ai-help {category.Name}`"));
-        lines.Add($"- `{ExtensionsSubject}`: Curl's own extensions beyond upstream curl, which `curl --extensions` lists. Run `curl --ai-help {ExtensionsSubject}`");
+        lines.Add($"- `{ExtensionsSubject}`: Curl's own extensions beyond upstream curl, which `curl --extensions-help` lists. Run `curl --ai-help {ExtensionsSubject}`");
         lines.AddRange([string.Empty, "## Most-used options", string.Empty]);
         lines.AddRange(MostUsedLongNames.Select(name => MostUsedLine(Entries.First(entry => LongName(entry) == name))));
         lines.AddRange(

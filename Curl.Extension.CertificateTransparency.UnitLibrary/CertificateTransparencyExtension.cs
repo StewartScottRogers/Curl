@@ -18,7 +18,7 @@ public static class CertificateTransparencyExtension
         ExtensionOptionArgument.Value,
         "Require a valid Certificate Transparency SCT from a log in this v3 JSON log list on the server certificate");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "certificate-transparency",
         "Refuses a server certificate (exit 60) unless it carries a valid embedded Signed Certificate Timestamp from a log in a v3 JSON log list (RFC 6962, RFC 9162).",

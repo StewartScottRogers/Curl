@@ -24,7 +24,7 @@ public static class CodeGenerationExtension
         ExtensionOptionArgument.Value,
         "Write a PowerShell script using Invoke-RestMethod that sends this command line's requests to <file>");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "code-generation",
         "Writes the HTTP requests of a command line as C# using HttpClient (--csharp) or as a PowerShell script using Invoke-RestMethod (--powershell), the way --libcurl writes C.",

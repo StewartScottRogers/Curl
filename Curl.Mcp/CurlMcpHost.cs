@@ -80,7 +80,8 @@ internal static class CurlMcpHost
     /// <c>curl://ai-help/extensions</c> reads <see cref="ExtensionListing.Markdown" /> in that environment (BL-4450).
     /// The engine's transfers reach the handlers <paramref name="extensionHandlers" /> builds, as the <c>curl</c>
     /// tool's reach Curl's extensions, unless <paramref name="readEnvironmentVariable" /> sets
-    /// <c>CURL_EXTENSIONS</c> to <c>0</c> (ADR-0999, ADR-1071, BL-4098).
+    /// <c>CURL_EXTENSIONS</c> to <c>0</c> (ADR-0999, ADR-1071, BL-4098); the URL tools accept, and the <c>version</c> tool
+    /// lists, <see cref="ExtensionListing.Schemes" /> in that environment, as they do curl's own schemes (BL-4451).
     /// </summary>
     /// <param name="root">The folder every file the <c>curl</c> tool touches must lie in.</param>
     /// <param name="cap">The most bytes a tool returns.</param>
@@ -95,14 +96,15 @@ internal static class CurlMcpHost
     {
         // One engine for the process, shared by the transfer, version and URL tools.
         ManagedCurlEngine engine = new(ExtensionProtocolHandlers.For(readEnvironmentVariable) is null ? null : extensionHandlers);
-        McpUrlTool urlTool = new(engine.CreateUrl);
+        IReadOnlyList<string> extendedSchemes = ExtensionListing.Schemes(readEnvironmentVariable);
+        McpUrlTool urlTool = new(engine.CreateUrl, extendedSchemes);
         McpServerRegistry registry = new();
         // tools/list answers in registration order; this is the order the SDK host listed them in (the golden tools-list).
         registry.Add(new ParseUrlMcpTool(urlTool));
         registry.Add(new TransferMcpTool(new McpTransferTool(engine, cap)));
         registry.Add(new CurlCommandMcpTool(new McpCurlTool(new InProcessCurlCommandRunner(), root, cap)));
         registry.Add(new BuildUrlMcpTool(urlTool));
-        registry.Add(new VersionMcpTool(new McpVersionTool(engine)));
+        registry.Add(new VersionMcpTool(new McpVersionTool(engine, extendedSchemes)));
         registry.Add(new AiHelpMcpResourceProvider(() => ExtensionListing.Markdown(readEnvironmentVariable)));
         return registry;
     }

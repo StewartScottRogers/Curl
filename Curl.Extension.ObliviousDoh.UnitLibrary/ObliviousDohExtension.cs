@@ -17,7 +17,7 @@ public static class ObliviousDohExtension
     /// <summary>Gets <c>--odoh-target &lt;URL&gt;</c>.</summary>
     public static ExtensionOption TargetOption { get; } = new("odoh-target", ExtensionOptionArgument.Value, "Encrypt host name lookups to this Oblivious DoH target URL (RFC 9230), with --odoh-proxy");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "oblivious-doh",
         "Looks every transfer's host names up over Oblivious DoH (RFC 9230): encrypted to a target, relayed by a proxy.",

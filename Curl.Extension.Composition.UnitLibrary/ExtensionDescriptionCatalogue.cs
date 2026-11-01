@@ -9,7 +9,7 @@ namespace Curl.Extension.Composition;
 /// </summary>
 internal static class ExtensionDescriptionCatalogue
 {
-    /// <summary>Gets the descriptions, in the order <c>--extensions</c> lists them.</summary>
+    /// <summary>Gets the descriptions, in the order <c>--extensions-help</c> lists them.</summary>
     internal static IReadOnlyList<ExtensionDescription> Entries { get; } =
     [
         Curl.Extension.NamedPipe.NamedPipeExtension.Description,

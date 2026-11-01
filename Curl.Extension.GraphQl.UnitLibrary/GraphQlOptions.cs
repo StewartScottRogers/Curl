@@ -30,7 +30,7 @@ public static class GraphQlOptions
         ExtensionOptionArgument.None,
         "Send the GraphQL introspection query for the server's schema");
 
-    /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> say about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "graphql",
         "Sends GraphQL queries over HTTP, with variables and introspection, and lists the errors a response reports on stderr.",

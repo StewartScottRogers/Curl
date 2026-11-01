@@ -6,7 +6,7 @@ namespace Curl.Extended.Protocol.Nats;
 /// <summary>The <c>nats://</c> and <c>natss://</c> extension's description and handler factory (ADR-1065).</summary>
 public static class NatsExtension
 {
-    /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "nats",
         "Talks to NATS servers (port 4222; natss:// is TLS from the first byte): without -d subscribes to the URL path's subject and writes each message's payload and a newline until the server closes or ?count=N messages arrived; with -d publishes the data; with ?request publishes it with a reply subject and writes the one reply. -u gives a user and password, or a token alone.",
