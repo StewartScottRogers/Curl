@@ -18,7 +18,7 @@ public static class WebSocketExtendedConnectExtension
         ExtensionOptionArgument.Value,
         "Open ws:// or wss:// with extended CONNECT over HTTP/2 (h2) or HTTP/3 (h3, wss only)");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "ws-extended-connect",
         "Opens a ws:// or wss:// WebSocket with extended CONNECT over HTTP/2 (RFC 8441) or HTTP/3 (RFC 9220) instead of the HTTP/1.1 upgrade, sends any -d data as one text message and writes each data message received, answering pings, until the server closes.",

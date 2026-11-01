@@ -17,7 +17,7 @@ public static class StructuredFieldsExtension
         ExtensionOptionArgument.None,
         "Show known Structured Field response headers readably in -v and as -w %{structured_fields} and %{structured_field.<name>}");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "structured-fields",
         "Parses the response's known Structured Fields (Cache-Status, Priority, Content-Digest and others) and shows each typed and readable in verbose output and -w variables (RFC 9651).",

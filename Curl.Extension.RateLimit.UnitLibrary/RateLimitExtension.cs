@@ -19,7 +19,7 @@ public static class RateLimitExtension
         ExtensionOptionArgument.None,
         "Wait before the next request to an origin whose RateLimit field says its quota is used up, until the quota resets");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "ratelimit-pace",
         "Reads RateLimit and RateLimit-Policy response fields and waits, before retries and later or parallel transfers to the same origin, until a used-up quota resets (draft-ietf-httpapi-ratelimit-headers-11).",

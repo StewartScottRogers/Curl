@@ -8,7 +8,7 @@ namespace Curl.Extension.Composition;
 /// extension task adds its own line and nothing else here; the file is marked <c>merge=union</c> in
 /// <c>.gitattributes</c> and listed in <c>Tasks/SharedListFiles.txt</c>, so lanes adding different extensions do not
 /// overlap. An expander's option is also registered in <see cref="ExtensionOptionCatalogue" />, so
-/// <c>--extensions</c> lists it. Plain instances, no reflection, so native AOT sees every type.
+/// <c>--extensions-help</c> lists it. Plain instances, no reflection, so native AOT sees every type.
 /// </summary>
 public static class ExtensionArgumentExpanderCatalogue
 {

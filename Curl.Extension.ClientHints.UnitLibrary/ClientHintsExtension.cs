@@ -19,7 +19,7 @@ public static class ClientHintsExtension
         ExtensionOptionArgument.None,
         "Send the Sec-CH-UA, Sec-CH-UA-Mobile and Sec-CH-UA-Platform client hints to https and loopback URLs");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "client-hints",
         "Sends the browser low-entropy User-Agent Client Hints (Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform) to https and loopback URLs (RFC 8942, WICG UA-CH).",

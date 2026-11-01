@@ -21,7 +21,7 @@ public static class SegmentedDownloadExtension
         ExtensionOptionArgument.Value,
         "Download an HTTP GET as <n> byte ranges fetched in parallel (1 to 64)");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "segments",
         "Downloads one HTTP resource as several byte ranges fetched in parallel and joins them in order (RFC 9110 range requests).",

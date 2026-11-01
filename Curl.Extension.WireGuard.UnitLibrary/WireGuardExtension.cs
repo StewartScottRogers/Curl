@@ -14,7 +14,7 @@ public static class WireGuardExtension
     /// <summary>Gets <c>--wireguard &lt;conf&gt;</c>.</summary>
     public static ExtensionOption Option { get; } = new("wireguard", ExtensionOptionArgument.Value, "Run every connection through a WireGuard tunnel set up from this wg-quick configuration file");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "wireguard",
         "Runs every transfer through a user-space WireGuard tunnel and TCP/IP stack set up from a wg-quick configuration file, with no system interface or administrator rights.",

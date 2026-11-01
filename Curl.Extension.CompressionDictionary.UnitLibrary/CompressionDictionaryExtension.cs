@@ -18,7 +18,7 @@ public static class CompressionDictionaryExtension
         ExtensionOptionArgument.Value,
         "Keep shared dictionaries in <dir>: store Use-As-Dictionary responses, advertise them and decode dcb and dcz bodies");
 
-    /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "compression-dictionary",
         "Stores shared dictionaries a server offers with Use-As-Dictionary and uses them to receive dcb (Brotli) and dcz (Zstandard) responses (RFC 9842).",
