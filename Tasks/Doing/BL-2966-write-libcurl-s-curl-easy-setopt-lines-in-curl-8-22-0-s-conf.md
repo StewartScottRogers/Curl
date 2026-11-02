@@ -45,3 +45,4 @@ The other nine `--libcurl` cases (1400 to 1404, 1406, 1420, 1465, 1481) already 
 - 2026-10-21: Doing -> Backlog. Run hit its cost cap: generator reordered and Cli tests pass (stashed); left one Curl.Console.UnitTests order expectation, the fast suite and the quality run
 - 2026-10-21: Backlog -> Deferred. Split for the cost cap into BL-3022 (land the 8.22.0 order, fix the Console test) and BL-3023 (quality and CI); nothing left here
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 0b924be1 61dab663 782ca8e4 7eaf8a6e.
