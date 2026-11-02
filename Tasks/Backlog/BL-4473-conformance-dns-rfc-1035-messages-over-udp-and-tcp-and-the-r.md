@@ -4,7 +4,7 @@ title: Conformance: DNS RFC 1035 messages over UDP and TCP and the RFC 4501 URL 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4501, BL-4502, BL-4503]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/DnsQuery, Curl.Conformance.Extended.UnitTests/DnsQuery, Documentation/Conformance/Extended/DnsQuery.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

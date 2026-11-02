@@ -4,7 +4,7 @@ title: Add SpecRequirementAttribute, the requirement-matrix check and the KnownF
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4501]
+depends-on: [BL-4505, BL-4506, BL-4507]
 touches: [Curl.Conformance.Extended.UnitLibrary/Harness/SpecRequirementAttribute.cs, Curl.Conformance.Extended.UnitLibrary/Harness/RequirementMatrix.cs, Curl.Conformance.Extended.UnitLibrary/Harness/KnownFailures.cs, Curl.Conformance.Extended.UnitTests/Harness/RequirementMatrixTests.cs, Curl.Conformance.Extended.UnitTests/Harness/KnownFailuresTests.cs, Curl.Conformance.Extended.UnitTests/KnownFailures.txt, .gitattributes, Tasks/SharedListFiles.txt]
 requirement: none
 created: 2026-11-02

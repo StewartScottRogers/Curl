@@ -4,7 +4,7 @@ title: Conformance: Azure Data Lake Storage Gen2 path API for abfs:// and abfss:
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4501, BL-4502, BL-4503, BL-4468]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4468]
 touches: [Curl.Conformance.Extended.UnitLibrary/AzureStorage/DataLake, Curl.Conformance.Extended.UnitTests/AzureStorage/DataLake, Documentation/Conformance/Extended/AzureStorage-DataLake.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

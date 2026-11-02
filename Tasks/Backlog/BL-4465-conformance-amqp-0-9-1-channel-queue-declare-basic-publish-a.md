@@ -4,7 +4,7 @@ title: Conformance: AMQP 0-9-1 channel, queue.declare, basic.publish and basic.g
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4501, BL-4502, BL-4503, BL-4464]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4464]
 touches: [Curl.Conformance.Extended.UnitLibrary/Amqp0/Messaging, Curl.Conformance.Extended.UnitTests/Amqp0/Messaging, Documentation/Conformance/Extended/Amqp0-Messaging.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

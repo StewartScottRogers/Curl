@@ -4,7 +4,7 @@ title: Conformance: WebTransport over HTTP/3 (draft-ietf-webtrans-http3-16) for 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4501, BL-4502, BL-4503]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/WebTransport, Curl.Conformance.Extended.UnitTests/WebTransport, Documentation/Conformance/Extended/WebTransport.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

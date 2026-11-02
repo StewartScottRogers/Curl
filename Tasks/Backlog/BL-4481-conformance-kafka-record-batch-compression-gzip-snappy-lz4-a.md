@@ -4,7 +4,7 @@ title: Conformance: Kafka record batch compression - gzip, Snappy, LZ4 and zstd 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4501, BL-4502, BL-4503, BL-4479]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4479]
 touches: [Curl.Conformance.Extended.UnitLibrary/Kafka/Compression, Curl.Conformance.Extended.UnitTests/Kafka/Compression, Documentation/Conformance/Extended/Kafka-Compression.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

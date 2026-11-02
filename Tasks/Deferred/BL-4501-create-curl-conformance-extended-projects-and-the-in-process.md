@@ -55,3 +55,4 @@ Start from `Curl.Console/InProcessCurl.cs` (`RunAsync` with `ITcpDialer`, `IDnsR
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 94bce983 a163e683 ff67eeb1 07a99046 34c192a5 cc077f22 5306de6c.
 - 2026-11-02: Doing -> Backlog. Cost cap: harness, projects and TCP/UDP routes written (uncommitted, stashed); TLS route test hangs, quality run and ADR left
+- 2026-11-02: Backlog -> Deferred. Split at the cost cap into BL-4505, BL-4506 and BL-4507

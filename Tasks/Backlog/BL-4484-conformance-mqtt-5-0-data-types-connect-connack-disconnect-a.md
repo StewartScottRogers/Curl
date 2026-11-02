@@ -4,7 +4,7 @@ title: Conformance: MQTT 5.0 data types, CONNECT, CONNACK, DISCONNECT and AUTH f
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4501, BL-4502, BL-4503]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Mqtt5, Curl.Conformance.Extended.UnitTests/Mqtt5, Documentation/Conformance/Extended/Mqtt5.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

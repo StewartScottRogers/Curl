@@ -4,7 +4,7 @@ title: Finish the extended-protocol conformance harness: -m timeout on an inject
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4501, BL-4502]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502]
 touches: [Curl.Conformance.Extended.UnitLibrary/Harness/ExtendedCurlRun.cs, Curl.Conformance.Extended.UnitTests/Harness/ExtendedCurlRunTimeoutTests.cs, Documentation/Conformance/Extended/README.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-11-02

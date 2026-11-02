@@ -4,7 +4,7 @@ title: Conformance: S3 REST API operations for s3:// (S3 part 1 of 2)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4501, BL-4502, BL-4503]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/S3, Curl.Conformance.Extended.UnitTests/S3, Documentation/Conformance/Extended/S3.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
