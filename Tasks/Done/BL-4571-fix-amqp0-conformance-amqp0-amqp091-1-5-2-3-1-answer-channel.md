@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ClientFlow.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Methods, Curl.Extended.Protocol.Amqp0.UnitTests, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4571 — Fix Amqp0 conformance: Amqp0:AMQP091-1.5.2.3-1 (answer channel.flow with flow-ok)
 
@@ -24,14 +24,21 @@ Library: `Curl.Extended.Protocol.Amqp0.UnitLibrary` (its CLAUDE.md, ADR-1056, AD
 
 ## Acceptance criteria
 
-- [ ] The case Flow_FromTheBroker_IsAnsweredWithFlowOk passes as a plain case.
-- [ ] A focused unit test in `Curl.Extended.Protocol.Amqp0.UnitTests` pins the fix (ADR-0482).
-- [ ] The `Amqp0:AMQP091-1.5.2.3-1` line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests are green and the library stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30.
+- [x] The case Flow_FromTheBroker_IsAnsweredWithFlowOk passes as a plain case.
+- [x] A focused unit test in `Curl.Extended.Protocol.Amqp0.UnitTests` pins the fix (ADR-0482).
+- [x] The `Amqp0:AMQP091-1.5.2.3-1` line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests are green and the library stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30.
 
 ## Notes
+
+- Done directly rather than through the full /feature subagent stages: a small change in one library, and the run's cost cap is tight.
+- Decision (ADR-1199): channel.flow is answered at once with flow-ok carrying the same active bit, wherever the client waits for a method; after active 0 the publish waits, answering further flows, until a channel.flow with active 1, rather than failing. A close meanwhile ends it as a server close; any other method as unexpected (exit 8). basic.get is not held by flow.
+- Added Amqp0ChannelFlow and Amqp0ChannelFlowOk (both read by Amqp0MethodReader), and four Amqp0ProtocolHandlerTests plus reader round-trip rows.
+- Measured: Measure-CodeQuality for Curl.Extended.Protocol.Amqp0.UnitLibrary at 100% line and 100% branch, 0 failing members; the Amqp0 conformance cases (30) pass with the KnownFailures line removed; dotnet build Curl.slnx -warnaserror clean, fast tests green (115 test projects).
+- CI on Linux and macOS: the change is platform-neutral (in-memory scripted connection, no paths or OS text).
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 20572201 d78c25d3 1c7fa6c3 e97c1b31.
+- 2026-11-02: Doing -> Done. The amqp:// client answers channel.flow with flow-ok and holds a publish while flow is inactive
