@@ -44,3 +44,4 @@ restarting from block 0 is RFC-allowed but adds a loop with no bound, so failing
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 46047db2 554638a2 6ed7562a.
