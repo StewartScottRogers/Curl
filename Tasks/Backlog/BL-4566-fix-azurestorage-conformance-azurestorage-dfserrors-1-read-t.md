@@ -1,5 +1,5 @@
 ---
-id: BL-4563
+id: BL-4566
 title: Fix AzureStorage conformance: AzureStorage:DfsErrors-1 (read the DFS JSON error body)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4563 — Fix AzureStorage conformance: AzureStorage:DfsErrors-1 (read the DFS JSON error body)
+# BL-4566 — Fix AzureStorage conformance: AzureStorage:DfsErrors-1 (read the DFS JSON error body)
 
 ## Goal
 
