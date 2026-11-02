@@ -85,6 +85,29 @@ public sealed class GrpcProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Grpcs_TargetsHttpsPoolSchemeSoTheHandshakeOffersAlpnH2()
+    {
+        using var proto = new ProtoFixture();
+        var call = new Call(GrpcServerReply.Of(GrpcServerReply.Headers(false, GrpcServerReply.OkHeaders), GrpcServerReply.Message(ReplyHi), GrpcServerReply.Trailers(0)), "h2");
+
+        await call.RunAsync("grpcs://example.com/helloworld.Greeter/SayHello", proto.GreeterPath, "{}");
+
+        Assert.AreEqual("https", call.Connector.Target!.PoolScheme);
+        CollectionAssert.AreEqual(new[] { "h2" }, call.Connector.Target.ApplicationProtocols!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Grpc_TargetsNoPoolScheme()
+    {
+        using var proto = new ProtoFixture();
+        var call = new Call(GrpcServerReply.Of(GrpcServerReply.Headers(false, GrpcServerReply.OkHeaders), GrpcServerReply.Message(ReplyHi), GrpcServerReply.Trailers(0)));
+
+        await call.RunAsync(GreeterUrl, proto.GreeterPath, "{}");
+
+        Assert.IsNull(call.Connector.Target!.PoolScheme);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_GrpcsWithoutH2_FailsWithExit16()
     {
         using var proto = new ProtoFixture();
