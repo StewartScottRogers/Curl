@@ -1,8 +1,6 @@
 # Extended conformance cases known to fail (BL-4502): one '<requirement id> BL-####' per line, any order.
 # A listed case passes while it still fails and fails once it passes: then remove its line.
 # A listed ID that no test carries fails RequirementChecks. Lines merge by union, so add or remove only whole lines.
-S3:Endpoints-1 BL-4514
-S3:Regions-1 BL-4514
 Mqtt5:MQTT-3.2.2-4 BL-4560
 Mqtt5:MQTT-3.2.2-15 BL-4561
 Grpc:Http2-Tls-1 BL-4545
@@ -13,9 +11,3 @@ Mqtt5:MQTT5-4.13.1-1 BL-4562
 Coap:RFC7252-5.4.1-1 BL-4543
 Coap:RFC7252-5.4.1-2 BL-4543
 AzureStorage:DfsErrors-1 BL-4563
-GoogleCloudStorage:V4Signing-Scope-2 BL-4538
-Coap:RFC7252-4.2-5 BL-4527
-McpClient:MCP20250618-StreamableHttp-8 BL-4516
-Mqtt5:MQTT-3.2.2-4 BL-4560
-Mqtt5:MQTT-3.2.2-15 BL-4561
-Grpc:Http2-Tls-1 BL-4545
