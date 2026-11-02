@@ -65,3 +65,4 @@ library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 02a9beb4 743ad980 28fcee0c d8e3fb0e eadcd4e4 17248609.
