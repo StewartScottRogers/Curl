@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/Program.cs, Curl.Console/AnsiCodePageArguments.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/Cgr015ArgumentTests.cs, Curl.Cli.UnitLibrary/CommandLineRefusal.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-11-02
 ---
 # BL-3843 — CGR-015 part 1: on Windows, read argv through the ANSI code page with best fit, and echo argv text to stderr in it
 # CGR-015 part 1: on Windows, read argv through the ANSI code page with best fit, and echo argv text to stderr in it
@@ -25,13 +25,15 @@ Add `AnsiCodePageArguments` (Curl.Console) applied in `Program.Main` on Windows 
 
 ## Acceptance criteria
 
-- [ ] On Windows `curl -s -o "中.txt" http://127.0.0.1:<port>/` creates `_.txt`, `curl -sS "http://中文.localhost:<port>/"` exits 3 with `URL rejected: No host present`, `curl -sS "http://127.0.0.1:2020＀/a"` connects to port 20200, and `curl --sílent <url>` writes the unknown-option line with byte E9, each as real curl does (commands and both results in Notes).
-- [ ] An ADR records the ANSI-code-page decision, marked "Decided by Claude under Stewart's delegation".
-- [ ] A focused unit test in the changed library's own `.UnitTests` project (the `Cgr015` file named in `touches`) fails before the change and passes after it, with the encoding injected so it passes on Linux and macOS too.
-- [ ] Off Windows (UTF-8) the same commands send the same bytes as before.
-- [ ] `dotnet build` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Measure-CodeQuality.ps1` for the changed libraries shows no member outside a gate.
+- [x] On Windows `curl -s -o "中.txt" http://127.0.0.1:<port>/` creates `_.txt`, `curl -sS "http://中文.localhost:<port>/"` exits 3 with `URL rejected: No host present`, `curl -sS "http://127.0.0.1:2020＀/a"` connects to port 20200, and `curl --sílent <url>` writes the unknown-option line with byte E9, each as real curl does (commands and both results in Notes).
+- [x] An ADR records the ANSI-code-page decision, marked "Decided by Claude under Stewart's delegation".
+- [x] A focused unit test in the changed library's own `.UnitTests` project (the `Cgr015` file named in `touches`) fails before the change and passes after it, with the encoding injected so it passes on Linux and macOS too.
+- [x] Off Windows (UTF-8) the same commands send the same bytes as before.
+- [x] `dotnet build` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Measure-CodeQuality.ps1` for the changed libraries shows no member outside a gate.
 
 ## Notes
+
+- 2026-11-02 (this claim): every criterion already holds on this branch, delivered by BL-3843's split parts, both Done: BL-3892 (`AnsiCodePageArguments` applied in `Program.Main` on Windows, `Cgr015ArgumentTests`, ADR-0838; measured `-o "中.txt"` -> `_.txt`, `http://中文.localhost` -> exit 3 "URL rejected: No host present", `2020０` -> port 20200, identical to the reference ucrt64 curl 8.22.0) and BL-3893 (refused command line echoed in the ANSI code page, `Cgr015StderrEchoTests`, ADR-0840; `--sélent` writes byte E9 as real curl). Their Notes hold the commands, results, fast-test runs and the clean `Measure-CodeQuality.ps1` runs for Curl.Console and Curl.Cli.UnitLibrary. The shift's stash 8258c7e1 is an older copy of the same work, superseded, so nothing was carried over and no code changed in this run.
 
 ## Log
 
@@ -41,3 +43,4 @@ Add `AnsiCodePageArguments` (Curl.Console) applied in `Program.Main` on Windows 
 - 2026-10-26: Backlog -> Deferred. Split into BL-3892 and BL-3893 after hitting its cost cap
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b8bb145c c458aac4 a9b9a7ee f4912012 326de9ca.
+- 2026-11-02: Doing -> Done. ANSI-code-page argv and stderr echo on Windows, delivered by BL-3892 and BL-3893
