@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Conformance.Extended.Harness;
 using Curl.Console;
@@ -74,6 +76,55 @@ public sealed class ExtendedConformanceHarnessTests
 
         Assert.AreEqual(7, result.ExitCode);
         Assert.AreEqual(0, result.Exchanges.Count);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RedisPingOverTls_RecordsThePlaintextBehindTheHandshake()
+    {
+        using X509Certificate2 certificate = ReferenceCertificate.CreateSelfSigned("localhost");
+        ReferenceRoute route = ReferenceRoute.Tls(RedisPort, RedisScript(), certificate);
+
+        CurlRunResult result = await ExtendedConformanceHarness.RunAsync(Curl, [route], ["-s", "-k", "-m", "10", "rediss://localhost/PING"]);
+
+        Assert.AreEqual(0, result.ExitCode, Encoding.UTF8.GetString(result.StandardError));
+        Assert.AreEqual("PONG\n", Encoding.Latin1.GetString(result.StandardOutput));
+        Assert.AreEqual(string.Empty, Encoding.Latin1.GetString(result.StandardError));
+        WireExchange exchange = result.Exchanges.Single();
+        Assert.AreEqual(RedisPort, exchange.Port);
+        Assert.AreEqual(ReferenceTransport.Tls, exchange.Transport);
+        Assert.AreEqual(RedisClientBytes, Encoding.Latin1.GetString(exchange.ClientBytes));
+        Assert.AreEqual("%0\r\n+PONG\r\n", Encoding.Latin1.GetString(exchange.ServerBytes));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PlaintextToATlsRoute_FailsTheRunWithTheFailedAccept()
+    {
+        using X509Certificate2 certificate = ReferenceCertificate.CreateSelfSigned("localhost");
+        ReferenceRoute route = ReferenceRoute.Tls(RedisPort, RedisScript(), certificate);
+
+        AuthenticationException failure = await Assert.ThrowsExactlyAsync<AuthenticationException>(
+            async () => await ExtendedConformanceHarness.RunAsync(Curl, [route], ["-s", "-m", "10", "redis://localhost/PING"]));
+
+        StringAssert.Contains(failure.StackTrace, nameof(TlsServerStream.AcceptAsync));
+    }
+
+    [TestMethod]
+    public void Tls_NullServerOrCertificate_Throws()
+    {
+        using X509Certificate2 certificate = ReferenceCertificate.CreateSelfSigned("localhost");
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => ReferenceRoute.Tls(RedisPort, null!, certificate));
+        Assert.ThrowsExactly<ArgumentNullException>(() => ReferenceRoute.Tls(RedisPort, RedisScript(), null!));
+    }
+
+    [TestMethod]
+    public void CreateSelfSigned_NamesTheHostWithItsPrivateKey()
+    {
+        using X509Certificate2 certificate = ReferenceCertificate.CreateSelfSigned("example.test");
+
+        Assert.AreEqual("CN=example.test", certificate.Subject);
+        Assert.IsTrue(certificate.HasPrivateKey);
+        Assert.ThrowsExactly<ArgumentException>(() => ReferenceCertificate.CreateSelfSigned(" "));
     }
 
     [TestMethod]

@@ -6,6 +6,9 @@ public enum ReferenceTransport
     /// <summary>A plaintext TCP connection.</summary>
     Tcp,
 
+    /// <summary>A TCP connection carrying TLS; the exchange records the plaintext behind it.</summary>
+    Tls,
+
     /// <summary>A UDP channel.</summary>
     Udp,
 }
