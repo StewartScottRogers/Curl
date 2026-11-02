@@ -42,6 +42,8 @@ dotnet build Curl.Console -c Release -v q; & ./Record-CurlExchange.ps1 -Port 506
 
 ## Re-audits
 
+- 2026-11-02 | 2026-11-02_0645.md | reproduces: yes | Ran the reproduction as given, with the output folders in the scratch folder instead of $env:TEMP, against curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel. Select-String matched only the reference: sn-curl/request.bin:3 `Authorization: NTLM TlRMTVNTUAABAAAAB7IIogkACQA3AAAADwAPACgAAAAKAPRlAAAAD1NURVdBUlQtUk9HRVJTLVdPUktHUk9VUA==`. sn-cand/request.bin has no Authorization: NTLM line. Both exited 0.
+
 ## Log
 
 - 2026-11-01: filed proposed.
