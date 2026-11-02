@@ -124,3 +124,4 @@ matrix and known-failures rules.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 94bce983 ff67eeb1 9db82948 e9fc1ee0 32b5ab0c 074d54e3 bcfa9865 d8e3fb0e cc077f22 7111045e.
 - 2026-11-02: Doing -> Deferred. Split into BL-4500, BL-4501, BL-4502, BL-4503
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 94bce983 ff67eeb1 9db82948 e9fc1ee0 32b5ab0c 074d54e3 bcfa9865 d8e3fb0e cc077f22 7111045e.
