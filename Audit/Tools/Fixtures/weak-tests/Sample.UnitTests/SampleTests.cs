@@ -1,7 +1,7 @@
 namespace Sample.UnitTests;
 
-// Fixture for Find-WeakTests.ps1 -SelfTest (BL-1368). Nothing here is real: six weak tests, one
-// of each kind the audit seeder plants, and five sound ones the scan must leave alone.
+// Fixture for Find-WeakTests.ps1 -SelfTest (BL-1368). Nothing here is real: nine weak tests, of
+// each kind the audit seeder plants, and six sound ones the scan must leave alone.
 [TestClass]
 public sealed class SampleTests
 {
@@ -86,6 +86,46 @@ public sealed class SampleTests
     public void Write_Line_WritesIt()
     {
         AssertWrites("line");
+    }
+
+    // Weak: the exact bytes' AreEqual became IsNotNull beside a kept exit-code check (PD-001 in a
+    // test with other assertions).
+    [TestMethod]
+    public void Encode_Header_WritesTheBytes()
+    {
+        var exit = 0;
+        var bytes = new byte[] { 1, 2 };
+        Assert.AreEqual(0, exit);
+        Assert.IsNotNull(bytes);
+    }
+
+    // Sound: IsNotNull guards a value the next assertion checks exactly.
+    [TestMethod]
+    public void Parse_Header_ReadsTheName()
+    {
+        var header = new System.Collections.Generic.KeyValuePair<string, string>("Host", "h");
+        Assert.IsNotNull(header.Key);
+        Assert.AreEqual("Host", header.Key);
+    }
+
+    // Weak: IsNotNull of a ToString call, which is never null, beside an exact check.
+    [TestMethod]
+    public void Format_Count_WritesTheDigits()
+    {
+        var count = 3;
+        Assert.AreEqual(3, count);
+        Assert.IsNotNull(count.ToString());
+    }
+
+    // Weak: the exit code's assertion is commented out while another assertion remains (PD-003).
+    [TestMethod]
+    public void Transfer_Timeout_SetsTheCode()
+    {
+        var code = 28;
+        var tries = 2;
+        Assert.AreEqual(2, tries);
+        // Assert.AreEqual(28, code);
+        _ = code;
     }
 
     private static void AssertWrites(string expected) => Assert.AreEqual(expected, expected);

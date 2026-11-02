@@ -19,6 +19,22 @@
     its reason. File values are relative names, and each run's working directory is its own
     case folder, so every file an option reads or writes stays in -OutDirectory.
 
+    Error-path sweep. Random cases reach a given failure only by chance: a plant on the missing
+    upload file's message was caught only when the generator happened to draw -T missing.txt
+    (PD-302), and --config is excluded from the generator outright, so a plant behind -K could
+    never be reached (PD-301). So after the random cases every run adds the same fixed sweep,
+    numbered on from them and marked "sweep": true:
+      - every option of the grammar that takes a file, not excluded, given a file that does not
+        exist: missing.txt for a file, path or directory placeholder, @missing.txt for a
+        header, write-out format or data placeholder, and both f=@missing.txt and
+        a=<missing.txt for a form field;
+      - the fixed lines -T missing.txt, -K missing.txt, --netrc-file missing.txt (the config and
+        credentials files are excluded from the random cases only because a real one could hold
+        anything; a missing one reads nothing), -v, -v -T missing.txt, -v -d a=1, -v -I, -v -L
+        and -v -u user:pw, each against the loopback server.
+    The sweep depends only on the reference curl's grammar, never on -Seed. -NoSweep leaves it
+    out, and -Options (a run focused on some options) leaves it out too.
+
     Each case runs Record-CurlExchange.ps1 twice, on the same port with the same response,
     once with the reference as -Curl and once with the candidate, into case-<n>/curl and
     case-<n>/candidate, through a generated run script with a -TimeoutSeconds limit.
@@ -42,7 +58,7 @@
     comparison: summary.json carries `curl --version`'s first line.
 
 .PARAMETER Count
-    How many cases to generate. Default 100.
+    How many random cases to generate. Default 100. The error-path sweep comes on top.
 
 .PARAMETER Seed
     The generator's seed. Default 0.
@@ -59,7 +75,21 @@
     `dotnet build Curl.Console -c Release`.
 
 .PARAMETER Options
-    Only generate cases from these long option names (without the leading dashes).
+    Only generate cases from these long option names (without the leading dashes). Leaves out
+    the error-path sweep.
+
+.PARAMETER NoSweep
+    Leave out the error-path sweep: only the random cases run.
+
+.PARAMETER ListExcluded
+    Print, as JSON, the options the random cases never use - { long: [...], prefixes: ["proxy"],
+    short: [ { alias: "K", long: "config" }, ... ] } - and exit. The audit run reads it to refuse a conformance
+    plant whose trigger needs one of them (RunAudit.ps1's Get-SeedingProblems).
+
+.PARAMETER SelfTest
+    Check, on a fixed sample grammar and without curl, that random cases never use an excluded
+    option or its short alias, that the sweep holds exactly the cases described above, and that
+    -ListExcluded names --config and -K; print PASS or FAIL per case, and exit.
 
 .PARAMETER OutDirectory
     Where the cases and summary.json go. Default: a new folder under the temp directory.
@@ -73,9 +103,10 @@
 
 .OUTPUTS
     <OutDirectory>/summary.json: { referenceVersion, candidateCommit, candidate, seed, count,
-    same, different, normalisations, cases: [ { n, args, differences: [ "exitcode" | "stdout"
-    | "stderr" | "request" ] } ] }, and for each differing case, case-<n>/repro.ps1 holding the
-    two exact Record-CurlExchange.ps1 commands.
+    randomCount, sweepCount, same, different, normalisations, cases: [ { n, args, sweep,
+    differences: [ "exitcode" | "stdout" | "stderr" | "request" ] } ] }, and for each differing
+    case, case-<n>/repro.ps1 holding the two exact Record-CurlExchange.ps1 commands. count is
+    every case run, the sweep's included.
 
 .EXAMPLE
     powershell -NoProfile -File Audit/Tools/Invoke-DifferentialConformance.ps1 -Count 10 -Seed 1 -OutDirectory $env:TEMP\diff
@@ -88,7 +119,10 @@ param(
     [string[]]$Options = @(),
     [string]$OutDirectory,
     [int]$TimeoutSeconds = 60,
-    [switch]$ListOnly
+    [switch]$ListOnly,
+    [switch]$NoSweep,
+    [switch]$ListExcluded,
+    [switch]$SelfTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -130,6 +164,19 @@ $Excluded = [ordered]@{
     'trace-time'            = 'prints wall-clock time'
     'progress-bar'          = 'draws a bar whose updates depend on timing'
 }
+# The excluded options' short aliases in curl, so a trigger written -K is known to be --config.
+# Pairs, not a hashtable: -u and -U differ only in case.
+$ExcludedShort = @(
+    @('K', 'config'), @('n', 'netrc'), @('u', 'user'), @('h', 'help'), @('M', 'manual'), @('V', 'version'),
+    @('x', 'proxy'), @('U', 'proxy-user'), @('#', 'progress-bar')
+) | ForEach-Object { [pscustomobject]@{ alias = $_[0]; long = $_[1] } }
+# A long option starting with one of these is excluded too (Test-ExcludedOption).
+$ExcludedPrefixes = @('proxy')
+# The sweep's fixed lines, each followed by the URL.
+$SweepFixed = @(
+    @('-T', 'missing.txt'), @('-K', 'missing.txt'), @('--netrc-file', 'missing.txt'),
+    @('-v'), @('-v', '-T', 'missing.txt'), @('-v', '-d', 'a=1'), @('-v', '-I'), @('-v', '-L'), @('-v', '-u', 'user:pw')
+)
 
 $Normalisations = @(
     'program name at a line start in stderr -> curl:',
@@ -181,8 +228,30 @@ function Get-OptionGrammar([string]$Exe) {
 function Test-ExcludedOption($Option) {
     if ($Excluded.Contains($Option.Long)) { return $true }
     # Every proxy-* option configures a proxy host or its credentials.
-    if ($Option.Long -like 'proxy*') { return $true }
+    foreach ($prefix in $ExcludedPrefixes) { if ($Option.Long -like "$prefix*") { return $true } }
     return $false
+}
+
+function Get-MissingFileValues([string]$Placeholder) {
+    # The sweep's values naming a file that does not exist, by placeholder, in Get-ValuePool's order;
+    # none for a placeholder that takes no file.
+    $p = $Placeholder.ToLowerInvariant()
+    if ($p -match 'header') { return @('@missing.txt') }
+    if ($p -match 'format') { return @('@missing.txt') }
+    if ($p -match 'file|path|dir') { return @('missing.txt') }
+    if ($p -match 'name=content|name=') { return @('f=@missing.txt', 'a=<missing.txt') }
+    if ($p -match 'data|query') { return @('@missing.txt') }
+    return @()
+}
+
+function New-SweepCases([object[]]$Grammar, [string]$Url) {
+    # The fixed error-path sweep: every file-taking option with a missing file, then $SweepFixed.
+    $cases = @()
+    foreach ($option in @($Grammar | Where-Object { $_.Placeholder -and -not (Test-ExcludedOption $_) })) {
+        foreach ($value in @(Get-MissingFileValues $option.Placeholder)) { $cases += , @("--$($option.Long)", $value, $Url) }
+    }
+    foreach ($fixed in $SweepFixed) { $cases += , @($fixed + $Url) }
+    return $cases
 }
 
 function Get-ValuePool([string]$Placeholder) {
@@ -286,6 +355,40 @@ function Get-Normalised([string]$Path, [string]$Kind, [int]$Port, [string]$Progr
     return $text
 }
 
+if ($ListExcluded) {
+    Write-Output ([pscustomobject]@{ long = @($Excluded.Keys); prefixes = $ExcludedPrefixes; short = @($ExcludedShort) } | ConvertTo-Json -Depth 4)
+    exit 0
+}
+
+if ($SelfTest) {
+    $failed = 0
+    function Check([string]$Name, [bool]$Ok, [string]$Detail) { if (-not $Ok) { $script:failed++ }; Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Detail" }
+    $sample = @(
+        [pscustomobject]@{ Long = 'upload-file'; Short = 'T'; Placeholder = '<file>' },
+        [pscustomobject]@{ Long = 'config'; Short = 'K'; Placeholder = '<file>' },
+        [pscustomobject]@{ Long = 'data'; Short = 'd'; Placeholder = '<data>' },
+        [pscustomobject]@{ Long = 'header'; Short = 'H'; Placeholder = '<header/@file>' },
+        [pscustomobject]@{ Long = 'write-out'; Short = 'w'; Placeholder = '<format>' },
+        [pscustomobject]@{ Long = 'form'; Short = 'F'; Placeholder = '<name=content>' },
+        [pscustomobject]@{ Long = 'output-dir'; Short = ''; Placeholder = '<dir>' },
+        [pscustomobject]@{ Long = 'proxy-cacert'; Short = ''; Placeholder = '<file>' },
+        [pscustomobject]@{ Long = 'max-time'; Short = 'm'; Placeholder = '<seconds>' },
+        [pscustomobject]@{ Long = 'verbose'; Short = 'v'; Placeholder = '' },
+        [pscustomobject]@{ Long = 'netrc'; Short = 'n'; Placeholder = '' })
+    $random = @(New-Cases $sample 400 5 'http://127.0.0.1:PORT/' | ForEach-Object { $_ -join ' ' })
+    $usesExcluded = @($random | Where-Object { $_ -match '(^|\s)(--config|-K|--netrc|-n|--proxy-cacert)(\s|$)' })
+    Check 'random cases never use an excluded option or its short alias' ($random.Count -eq 400 -and -not $usesExcluded.Count) "$($usesExcluded.Count) of $($random.Count)"
+    $sweep = @(New-SweepCases $sample 'U' | ForEach-Object { $_ -join ' ' })
+    $want = @('--upload-file missing.txt U', '--data @missing.txt U', '--header @missing.txt U', '--write-out @missing.txt U', '--form f=@missing.txt U', '--form a=<missing.txt U', '--output-dir missing.txt U',
+        '-T missing.txt U', '-K missing.txt U', '--netrc-file missing.txt U', '-v U', '-v -T missing.txt U', '-v -d a=1 U', '-v -I U', '-v -L U', '-v -u user:pw U')
+    Check 'the sweep is every file option with a missing file, then the fixed lines' (($sweep -join '|') -eq ($want -join '|')) ($sweep -join ' | ')
+    Check 'the sweep does not depend on the seed' (((New-SweepCases $sample 'U' | ForEach-Object { $_ -join ' ' }) -join '|') -eq ($sweep -join '|')) "$($sweep.Count) cases"
+    $listed = & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -ListExcluded | Out-String | ConvertFrom-Json
+    $k = @($listed.short | Where-Object { $_.alias -ceq 'K' })
+    Check '-ListExcluded names --config and -K, and the proxy prefix' (@($listed.long) -contains 'config' -and $k.Count -eq 1 -and $k[0].long -eq 'config' -and @($listed.prefixes) -contains 'proxy') "$(@($listed.long).Count) long, $(@($listed.short).Count) short"
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
 $reference = Get-ReferenceCurl
 $referenceVersion = "$((& $reference --version | Select-Object -First 1))".Trim()
 $port = & {
@@ -296,6 +399,8 @@ $port = & {
 # generated with a placeholder port and the real one is filled in afterwards.
 $grammar = @(Get-OptionGrammar $reference)
 $cases = @(New-Cases $grammar $Count $Seed 'http://127.0.0.1:PORT/')
+$randomCount = $cases.Count
+if (-not $NoSweep -and -not $Options.Count) { $cases += @(New-SweepCases $grammar 'http://127.0.0.1:PORT/') }
 
 if ($ListOnly) {
     $n = 0
@@ -344,13 +449,13 @@ foreach ($case in $cases) {
         [IO.File]::WriteAllText((Join-Path $caseDir 'repro.ps1'),
             "# Case $n, seed ${Seed}: $($arguments -join ' ')`r`n# Differs in: $($differences -join ', ')`r`n$curlCommand`r`n$candidateCommand`r`n")
     } else { $same++ }
-    $results += [ordered]@{ n = $n; args = $arguments; differences = $differences }
+    $results += [ordered]@{ n = $n; args = $arguments; sweep = $n -gt $randomCount; differences = $differences }
     Write-Host ("case {0,3}: {1,-24} {2}" -f $n, $(if ($differences.Count) { $differences -join ',' } else { 'same' }), ($arguments -join ' '))
 }
 
 $summary = [ordered]@{
     referenceVersion = $referenceVersion; candidateCommit = $candidateCommit; candidate = $Candidate
-    seed = $Seed; count = $cases.Count; same = $same; different = $cases.Count - $same
+    seed = $Seed; count = $cases.Count; randomCount = $randomCount; sweepCount = $cases.Count - $randomCount; same = $same; different = $cases.Count - $same
     normalisations = $Normalisations; cases = $results
 }
 $json = [pscustomobject]$summary | ConvertTo-Json -Depth 6

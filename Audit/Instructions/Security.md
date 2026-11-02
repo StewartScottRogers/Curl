@@ -5,7 +5,9 @@ cryptography, TLS, SSH, QUIC, Kerberos and NTLM rather than using a vetted libra
 where a mistake costs most. Read [Auditor-Rules.md](Auditor-Rules.md) first; it binds you.
 Report in [Report-Format.md](Report-Format.md), with `"auditor": "security"`.
 
-The code in scope is these six libraries:
+Steps 1 and 2 cover these six libraries; step 3 covers every library and host, since a
+secret can be printed by any of them (the AWS_SIGV4 line is Curl.Engine's, the CONNECT tunnel's
+Curl.Networking's):
 
 - `Curl.Cryptography.UnitLibrary`
 - `Curl.Tls.UnitLibrary`
@@ -66,20 +68,46 @@ protocol version, a received type byte) is not a finding.
 ## 3. Secrets in output
 
 Run Curl.Console and the reference curl the same way against `Record-CurlExchange.ps1`'s
-loopback server, with the probe secret `s3cr3t-probe`:
+loopback server, with the probe secret `s3cr3t-probe`. Run every probe below on every audit:
+each one reaches a different line that prints "with user" or "auth using", and a probe left out
+leaves its line unread.
 
-- `-u user:s3cr3t-probe` (HTTP basic, and `--digest` and `--ntlm` where the build allows);
-- `--proxy-user user:s3cr3t-probe` with `-x http://127.0.0.1:<port>`;
+- `-u user:s3cr3t-probe` with each server auth scheme that writes `Server auth using <scheme>
+  with user`: plain (Basic), `--basic`, `--digest`, `--ntlm`, `--negotiate`, `--anyauth`, and
+  `--oauth2-bearer s3cr3t-probe` (Bearer), where the build allows each;
+- `--aws-sigv4 "aws:amz:us-east-1:s3" -u AKID:s3cr3t-probe` (AWS Signature Version 4, which
+  writes `Server auth using AWS_SIGV4 with user`), and the `--httpsig-*` options with
+  `-u user:s3cr3t-probe` where the build has them (`Server auth using HTTPSIG`);
+- `--proxy-user user:s3cr3t-probe` with `-x http://127.0.0.1:<port>`, with each proxy auth
+  scheme (`--proxy-basic`, `--proxy-digest`, `--proxy-ntlm`), which write `Proxy auth using`;
+- a CONNECT tunnel: the same `--proxy-user` with `--proxytunnel` and an `http://` URL, and with
+  an `https://` URL through `-x` (curl tunnels https:// through an HTTP proxy with CONNECT),
+  which write `Proxy auth using ...` and `Establishing HTTP proxy tunnel to`; the recorder's
+  server need not finish the tunnel, only answer the CONNECT;
 - `-H "Authorization: Bearer s3cr3t-probe"`;
+- `ws://127.0.0.1:<port>/` with `-u user:s3cr3t-probe` where the build has WebSocket;
 - an SSH key passphrase `--pass s3cr3t-probe` where an sftp:// or scp:// run is possible
   against the recorder's server.
 
 Each with `-v`, and again with `--trace-ascii -`, capturing stdout and stderr. Any place Curl
-prints `s3cr3t-probe`, or its base64 form (`dXNlcjpzM2NyM3QtcHJvYmU=` for `user:s3cr3t-probe`),
-where real curl does not, is a finding; the reproduction is the two recorder commands. State
-the reference curl's `--version` first line in your summary. Also search the six libraries and
-`Curl.Console` for secrets passed to trace, log or diagnostic-log calls (`IDiagnosticLog`,
-`Write`, `Trace`), and report any whose output real curl would not print.
+prints `s3cr3t-probe`, or its base64 form (`dXNlcjpzM2NyM3QtcHJvYmU=` for `user:s3cr3t-probe`,
+`QUtJRDpzM2NyM3QtcHJvYmU=` for `AKID:s3cr3t-probe`), where real curl does not, is a finding; the
+reproduction is the two recorder commands. State the reference curl's `--version` first line in
+your summary, and list every probe you ran and any the build refused.
+
+Then scan every library and host - not only the six above - for secrets passed to a verbose,
+trace, log or diagnostic writer:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Find-SecretsInDiagnostics.ps1 -Root <audited tree> -OutFile <temp folder>\secrets.json
+```
+
+It lists every call to a `Report*`, `Info`, `Warn*`, `Trace*`, `Debug`, `Verbose*` or `Log*`
+member, or a `Write` on an error, verbose, trace or diagnostic writer, whose arguments pass an
+identifier ending in password, passphrase, secret, key or token. Read every candidate: file the
+ones whose output real curl would not print (`secret-in-output` when it reaches `-v` or a
+`--trace` by default, `secret-in-log` otherwise), and say in your summary how many you read and
+filed. A candidate on a line a probe above reaches is confirmed or cleared by that probe.
 
 ## 4. What not to report
 
@@ -104,4 +132,4 @@ index, as in an S-box cipher), `secret-in-output`, `secret-in-log`,
 
 ## Method counts
 
-Run every step above on every audit; re-audits come on top, never instead. Report `method.fuzzTargets` and `method.timingSitesRead` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).
+Run every step above on every audit; re-audits come on top, never instead. Report `method.fuzzTargets`, `method.timingSitesRead`, and `secretProbesRun` and `secretCandidatesRead` (step 3's probes and scan candidates) in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).

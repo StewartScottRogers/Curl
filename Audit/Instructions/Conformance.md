@@ -34,7 +34,17 @@ powershell -NoProfile -File Audit/Tools/Invoke-DifferentialConformance.ps1 -Coun
 It builds Curl.Console in Release, runs each generated case through the reference curl and
 Curl against the same loopback exchange, and writes `summary.json` (with the reference curl's
 version) and a `repro.ps1` for every differing case. Report `differentialCases` and
-`differentialDifferences` in `metrics`.
+`differentialDifferences` in `metrics`, both counting the sweep below.
+
+After the random cases the same run adds a fixed **error-path sweep** (never pass `-NoSweep` or
+`-Options` here, which leave it out): every option that takes a file, given one that does not
+exist (`missing.txt`, `@missing.txt`, `f=@missing.txt`, `a=<missing.txt`), then `-T missing.txt`,
+`-K missing.txt`, `--netrc-file missing.txt`, `-v`, `-v -T missing.txt`, `-v -d a=1`, `-v -I`,
+`-v -L` and `-v -u user:pw`, all against the loopback server. Random cases reach a given error
+path only by chance; the sweep reaches every one of these on every audit. Its cases carry
+`"sweep": true` in `summary.json` and are reduced, grouped and reported in steps 2 and 3 exactly
+like the random ones. Report `sweepCases` (`summary.json`'s `sweepCount`) and
+`sweepDifferences` (its differing sweep cases) in `metrics`.
 
 ## 2. Reduce each difference
 

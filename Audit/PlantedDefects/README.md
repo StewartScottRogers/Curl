@@ -35,3 +35,10 @@ such files. It deletes `Audit/PlantedDefects/`, `Audit/Findings/` and `Audit/Sco
 that worktree, commits it as `Audit baseline` on no branch, and writes a manifest of what it
 planted outside the worktree, which only the audit runner's own steps read: `RunAudit.ps1`'s
 manifest check, `Write-AuditFindings.ps1` and `Write-AuditScorecard.ps1` (BL-1017).
+
+A plant must be observable by the method of the auditor it is planted for. The manifest check
+rejects, in the run's log and the scorecard commit, a conformance plant whose trigger uses an
+option `Audit/Tools/Invoke-DifferentialConformance.ps1 -ListExcluded` names (such as `-K`),
+since the differential tool never generates it (ADR-0267, amended 2026-11-02). A plant the
+method can reach but an auditor missed stays a miss: the auditor's method is strengthened, never
+the plant removed.
