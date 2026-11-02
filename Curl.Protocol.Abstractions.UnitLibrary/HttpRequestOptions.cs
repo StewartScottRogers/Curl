@@ -297,6 +297,14 @@ public sealed record HttpRequestOptions
     public HttpAuthSchemes AuthSchemes { get; init; } = HttpAuthSchemes.Basic;
 
     /// <summary>
+    /// Gets the authorization identity from <c>--sasl-authzid</c>, or <see langword="null" /> when
+    /// not given. With no credential and Digest the one scheme in <see cref="AuthSchemes" />, curl
+    /// 8.22.0 counts it as an empty user name: it holds a POST's body back for the Digest probe and
+    /// answers the challenge for user <c>''</c> (AF-0522, BL-4457, ADR-1182).
+    /// </summary>
+    public string? SaslAuthorizationIdentity { get; init; }
+
+    /// <summary>
     /// Gets the token from <c>--oauth2-bearer</c>, or <see langword="null" /> when not
     /// given.
     /// </summary>
