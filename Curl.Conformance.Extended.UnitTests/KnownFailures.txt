@@ -11,3 +11,8 @@ Mqtt5:MQTT5-4.13.1-1 BL-4562
 Coap:RFC7252-5.4.1-1 BL-4543
 Coap:RFC7252-5.4.1-2 BL-4543
 AzureStorage:DfsErrors-1 BL-4563
+AzureStorage:CredentialPrecedence-2 BL-4563
+AzureStorage:CredentialPrecedence-3 BL-4563
+AzureStorage:AuthorizeSas-1 BL-4563
+AzureStorage:RFC9112-6.3-1 BL-4564
+AzureStorage:RFC9112-6.3-2 BL-4564
