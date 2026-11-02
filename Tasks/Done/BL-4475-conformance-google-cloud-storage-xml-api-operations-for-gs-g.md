@@ -63,7 +63,7 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 ## Notes
 - Reference endpoint: `GcsReferenceServer` (GET/PUT Object, List Objects with prefix, delimiter and paging) behind an injected `IGcsReferenceAuthorizer` (anonymous, bearer); BL-4476 adds `Signing/` with its own authorizer (ADR-1189).
 - 10 cases in `GcsXmlApiObjectCases` and `GcsXmlApiListCases`, plus `GcsReferenceServerTests` for the endpoint's own refusals. Matrix: `Documentation/Conformance/Extended/GoogleCloudStorage.md`, 15 rows; `Date` is n/a (signed requests only, part 2).
-- Known failure: `XMLAPI-Emulator-1`, the extension reads `STORAGE_EMULATOR_HOST` from the process environment, not the run's (exit 7); filed High BL-4514 and listed in KnownFailures.txt.
+- Known failure: `XMLAPI-Emulator-1`, the extension reads `STORAGE_EMULATOR_HOST` from the process environment, not the run's (exit 7); filed High BL-4534 and listed in KnownFailures.txt.
 - Curl's error line ends in CRLF on Windows; the cases pin `Environment.NewLine`, so each platform checks its own line end. The upload temp file is created in `Path.GetTempPath()` and deleted; no drive letters. CI on Linux and macOS: platform-neutral by that, fast tests green here.
 - Measure-CodeQuality.ps1 for Curl.Conformance.Extended.UnitLibrary: 0 failing members (ParseHead and List split to stay at complexity 10 or less).
 
@@ -72,4 +72,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: faf392a4 b75f5d9f 920f3cad cec18b67 d8e3fb0e 1e94fe0f ef6c9026.
-- 2026-11-02: Doing -> Done. gs:// measured against the XML API object operations: reference endpoint, 10 cases, matrix; emulator host listed with BL-4514
+- 2026-11-02: Doing -> Done. gs:// measured against the XML API object operations: reference endpoint, 10 cases, matrix; emulator host listed with BL-4534

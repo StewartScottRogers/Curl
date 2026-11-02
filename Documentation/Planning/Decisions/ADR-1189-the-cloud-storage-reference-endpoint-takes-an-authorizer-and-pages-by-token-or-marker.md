@@ -26,5 +26,5 @@ client follows either `NextContinuationToken` or `NextMarker` to the next listin
 ## Consequences
 
 The signing part adds a file and matrix rows only. A defect the cases find in the extension, such as
-`STORAGE_EMULATOR_HOST` read from the process rather than the run's environment (BL-4514), is listed in
+`STORAGE_EMULATOR_HOST` read from the process rather than the run's environment (BL-4534), is listed in
 `KnownFailures.txt` with its fix task.

@@ -1,5 +1,5 @@
 ---
-id: BL-4514
+id: BL-4534
 title: Fix GoogleCloudStorage conformance: XMLAPI-Emulator-1 STORAGE_EMULATOR_HOST from the run's environment
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4514 — Fix GoogleCloudStorage conformance: XMLAPI-Emulator-1 STORAGE_EMULATOR_HOST from the run's environment
+# BL-4534 — Fix GoogleCloudStorage conformance: XMLAPI-Emulator-1 STORAGE_EMULATOR_HOST from the run's environment
 
 ## Goal
 
