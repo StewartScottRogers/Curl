@@ -31,3 +31,4 @@ Found by BL-4524: `CoapMessageFormatTests.MalformedAcknowledgement_IsSilentlyIgn
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 7f1cdf75 081c5817 752977b7.
