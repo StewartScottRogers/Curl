@@ -266,9 +266,10 @@ internal static partial class EngineComposition
     /// <param name="dnsServer">The <c>CURL_DNS_SERVER</c> value, or <see langword="null" /> when not honoured or not set.</param>
     /// <param name="dnsResolver">The resolver the runner was given.</param>
     /// <param name="datagramConnector">Carries the queries.</param>
+    /// <param name="timeProvider">The clock the resolver times its queries on; <see cref="TimeProvider.System" /> when <see langword="null" /> (BL-4508).</param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver DnsServerVariableResolverOf(EasyNetworkOptions network, string? dnsServer, IDnsResolver dnsResolver, IDatagramConnector datagramConnector) =>
+    internal static IDnsResolver DnsServerVariableResolverOf(EasyNetworkOptions network, string? dnsServer, IDnsResolver dnsResolver, IDatagramConnector datagramConnector, TimeProvider? timeProvider = null) =>
         string.IsNullOrEmpty(dnsServer)
             ? dnsResolver
-            : new DnsServerResolver(new DnsServerResolverOptions(dnsServer, null, null, null, AddressFamilyOf(network)), TimeProvider.System, datagramConnector);
+            : new DnsServerResolver(new DnsServerResolverOptions(dnsServer, null, null, null, AddressFamilyOf(network)), timeProvider ?? TimeProvider.System, datagramConnector);
 }

@@ -131,7 +131,7 @@ public static class InProcessCurl
     /// <summary>
     /// Runs <paramref name="arguments" /> as the overload with an environment does, with every timer
     /// of the run - the <c>-m</c>, <c>-y</c> and <c>--connect-timeout</c> watchdogs, the connection
-    /// cache, the TLS providers and the connectors - on <paramref name="timeProvider" />, so a test
+    /// cache, the TLS providers, the connectors, the QUIC dialer, the <c>CURL_DNS_SERVER</c> resolver and the NTLM, Negotiate and Kerberos contexts - on <paramref name="timeProvider" />, so a test
     /// drives a timeout with a fake clock and no real wait (BL-4500). Returns curl's exit code.
     /// </summary>
     /// <param name="arguments">The command line, without the program name.</param>

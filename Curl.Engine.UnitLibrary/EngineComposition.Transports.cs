@@ -202,7 +202,7 @@ internal static partial class EngineComposition
         Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector) =>
         dialing is null
             ? NetworkDialersOf(tcpDialer, tlsClientOptions, traces, timeProvider, createDatagramConnector(), extensionDatagramConnector)
-            : (CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, QuicDatagramConnectorOf(dialing.DatagramConnector, extensionDatagramConnector) ?? dialing.DatagramConnector), dialing.TcpDialer, dialing.DatagramConnector);
+            : (CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, QuicDatagramConnectorOf(dialing.DatagramConnector, extensionDatagramConnector) ?? dialing.DatagramConnector, timeProvider), dialing.TcpDialer, dialing.DatagramConnector);
 
     /// <summary>
     /// The dialers on the real network: a QUIC dialer that opens its channels through the connection hook's datagram
@@ -277,7 +277,8 @@ internal static partial class EngineComposition
     /// <param name="traces">The run's <c>--trace-config</c> components, for the HTTP/3 connection lines.</param>
     /// <param name="tlsClientOptions">The origin's TLS options.</param>
     /// <param name="datagramConnector">Opens the QUIC channels.</param>
+    /// <param name="timeProvider">The clock the dialer times its handshakes and idle timeouts on; <see cref="TimeProvider.System" /> when <see langword="null" /> (BL-4508).</param>
     /// <returns>The dialer.</returns>
-    internal static QuicDialer CreateDatagramConnectorQuicDialer(EngineTraceComponents traces, TlsClientOptions tlsClientOptions, IDatagramConnector datagramConnector) =>
-        new(new DatagramConnectorUdpChannelOpener(datagramConnector), tlsClientOptions, TimeProvider.System) { WritesHttp3ConnectionLines = TracesHttp3(traces) };
+    internal static QuicDialer CreateDatagramConnectorQuicDialer(EngineTraceComponents traces, TlsClientOptions tlsClientOptions, IDatagramConnector datagramConnector, TimeProvider? timeProvider = null) =>
+        new(new DatagramConnectorUdpChannelOpener(datagramConnector), tlsClientOptions, timeProvider ?? TimeProvider.System) { WritesHttp3ConnectionLines = TracesHttp3(traces) };
 }
