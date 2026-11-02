@@ -1,5 +1,5 @@
 ---
-id: BL-4563
+id: BL-4567
 title: Fix AzureStorage conformance: AzureStorage:CredentialPrecedence-2
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4563 — Fix AzureStorage conformance: AzureStorage:CredentialPrecedence-2
+# BL-4567 — Fix AzureStorage conformance: AzureStorage:CredentialPrecedence-2
 
 ## Goal
 

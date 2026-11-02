@@ -1,5 +1,5 @@
 ---
-id: BL-4564
+id: BL-4568
 title: Fix AzureStorage conformance: AzureStorage:RFC9112-6.3-1
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4564 — Fix AzureStorage conformance: AzureStorage:RFC9112-6.3-1
+# BL-4568 — Fix AzureStorage conformance: AzureStorage:RFC9112-6.3-1
 
 ## Goal
 

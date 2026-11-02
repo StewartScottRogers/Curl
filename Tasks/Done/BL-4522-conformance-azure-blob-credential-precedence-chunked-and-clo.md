@@ -34,11 +34,11 @@ Uses the reference Blob endpoint BL-4520 adds; if it lacks something these cases
 
 - Six cases in `AzureBlobCredentialAndFramingCases`: `--oauth2-bearer` over both variables, `AZURE_STORAGE_BEARER_TOKEN` over `AZURE_STORAGE_SAS_TOKEN`, the SAS variable alone (with its leading `?`), an empty chunked body, a close-delimited body and a close-delimited `Error` body. The reference Blob endpoint needed nothing new.
 - Decision: the service defines no credential order, so the `CredentialPrecedence-1..3` rows cite the extension's documented order (`AzureStorageCredential.Choose`, its description) at level MUST; `AuthorizeSas-1` cites "Authorize requests to Azure Storage". Too small for an ADR; recorded here.
-- Failing, listed in `KnownFailures.txt` with filed High tasks: BL-4563 (the extension reads `Environment.GetEnvironmentVariable`, not `ProtocolHandlerServices.ReadEnvironmentVariable`, so the harness's environment never reaches it: `CredentialPrecedence-2`, `-3`, `AuthorizeSas-1`), BL-4564 (`ReferenceTcpDialer` never sends close_notify on a TLS route, so a close-delimited body fails with `MissingCloseNotifyException`: `RFC9112-6.3-1`, `-6.3-2`; BL-4540 in Doing separately makes that exception an exit code).
+- Failing, listed in `KnownFailures.txt` with filed High tasks: BL-4567 (the extension reads `Environment.GetEnvironmentVariable`, not `ProtocolHandlerServices.ReadEnvironmentVariable`, so the harness's environment never reaches it: `CredentialPrecedence-2`, `-3`, `AuthorizeSas-1`), BL-4568 (`ReferenceTcpDialer` never sends close_notify on a TLS route, so a close-delimited body fails with `MissingCloseNotifyException`: `RFC9112-6.3-1`, `-6.3-2`; BL-4540 in Doing separately makes that exception an exit code).
 - Only test, matrix and task files changed, so no quality run was needed. Cases use no file paths or OS text, so they are platform-neutral; CI on Linux and macOS is left to the shift's watch. `dotnet build Curl.slnx -warnaserror` clean; fast tests green (Curl.Conformance.Extended.UnitTests 323 passed).
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 604a567e a4181cce 2108d112 d8e3fb0e ef6c9026.
-- 2026-11-02: Doing -> Done. Azure Blob credential precedence, chunked and close-delimited cases run; failures listed under BL-4563 and BL-4564
+- 2026-11-02: Doing -> Done. Azure Blob credential precedence, chunked and close-delimited cases run; failures listed under BL-4567 and BL-4568
