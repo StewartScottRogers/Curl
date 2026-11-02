@@ -8,7 +8,7 @@ depends-on: [BL-3406, BL-3410]
 touches: [Curl.Conformance.UnitLibrary/UpstreamTest1169Script.cs, Curl.Conformance.UnitLibrary/UpstreamTest1182Script.cs, Curl.Conformance.UnitLibrary/UpstreamCaseScreening.cs, Curl.Conformance.UnitLibrary/UpstreamCaseRunner.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1169.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1182.cs, Curl.Conformance.UnitTests/UpstreamTest1169ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamTest1182ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamCaseScreeningTests.cs, Curl.Conformance.UnitTests/UpstreamCaseRunnerTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-11-02
 ---
 # BL-3412 — Honour the runtests.pl -E exclude file and the mkdir, cp and echo precheck line in the C# interpretation of upstream runtests.pl (case 1182)
 
@@ -24,19 +24,21 @@ ADR-0803 (BL-3406) decides 1182 as `interpret`: the C# runner honours `-E <file>
 
 ## Acceptance criteria
 
-- [ ] The `runtests.pl` interpretation honours `-E <file>`: a unit test in the interpretation's tests file pins that a `test:1:<reason>` line skips test 1, writes `<reason>` to stdout and returns exit code 1.
-- [ ] A unit test in `UpstreamCaseScreeningTests.cs` pins that a precheck line made only of `mkdir`, `cp` and `echo '...' > file` commands joined by `;` is not reported as uninterpreted, and one naming any other command still is.
-- [ ] A unit test in `UpstreamCaseRunnerTests.cs` pins that such a precheck line creates the directories, copies the file and writes the echoed text, all inside the case's log directory, and that a path outside it skips the case.
-- [ ] The postcheck line `grep -q "<text>" <file>` is interpreted (only case 1182 uses it): unit tests in `UpstreamCaseScreeningTests.cs` and `UpstreamCaseRunnerTests.cs` pin that it is not reported as uninterpreted, passes when the file inside the log directory holds the text, and fails the case when it does not.
-- [ ] `1182` is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` and its ratchet row passes.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports no member past a gate.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] The `runtests.pl` interpretation honours `-E <file>`: a unit test in the interpretation's tests file pins that a `test:1:<reason>` line skips test 1, writes `<reason>` to stdout and returns exit code 1.
+- [x] A unit test in `UpstreamCaseScreeningTests.cs` pins that a precheck line made only of `mkdir`, `cp` and `echo '...' > file` commands joined by `;` is not reported as uninterpreted, and one naming any other command still is.
+- [x] A unit test in `UpstreamCaseRunnerTests.cs` pins that such a precheck line creates the directories, copies the file and writes the echoed text, all inside the case's log directory, and that a path outside it skips the case.
+- [x] The postcheck line `grep -q "<text>" <file>` is interpreted (only case 1182 uses it): unit tests in `UpstreamCaseScreeningTests.cs` and `UpstreamCaseRunnerTests.cs` pin that it is not reported as uninterpreted, passes when the file inside the log directory holds the text, and fails the case when it does not.
+- [x] `1182` is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` and its ratchet row passes.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports no member past a gate.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - 2026-10-23 (lane 4): Claimed with template placeholders for Goal, Context and criteria, which no run can tick, so moved back to Backlog to write them (the board allows criteria edits only outside Doing). Found in the same pass: the script registry is a dictionary keyed by script name and BL-3410 registers `runtests.pl` for 1169, so a second registration here would collide; added BL-3410 to `depends-on` and its files to `touches`. The precheck needs `UpstreamCaseScreening.cs` and `UpstreamCaseRunner.cs` (and their tests), which no task in Doing on origin/work/dark-factory held; added them. The postcheck `grep -q "..." %LOGDIR/stdout1182` is not interpreted either (`UninterpretedCheck` in `UpstreamCaseScreening.cs` accepts only perl one-liners and %RESOLVE lines); only case 1182 uses `grep -q` and no task covers it, so it is in this task's criteria, in the same two files. The case has no server, so nothing else stands in the way.
 
 - 2026-10-23 (lane 3): Implemented but left uncommitted for the shift to stash (the run hit its cost cap): new Curl.Conformance.UnitLibrary/UpstreamShellCheckLine.cs and Curl.Conformance.UnitTests/UpstreamShellCheckLineTests.cs (new files, no other task holds them), screening and runner wired to it, UpstreamTest1169Script honours -E (prints `test NNNN SKIPPED: reason`, exit 1), tests added, 1182 listed. Curl.Conformance.UnitTests fast run: 4321 passed, 0 failed, and the test1182 row passes. Left for the next claim: Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary, the solution fast tests, tick the boxes and commit.
+
+- 2026-11-02 (lane 12): Nothing left to implement: split tasks BL-3438 and BL-3439 (both Done) landed the work. `UpstreamRunTestsScript` (BL-3410's `runtests.pl` interpretation, renamed) honours `-E` and is pinned by `Run_ExcludeFileNamingTheTest_SkipsItPrintsTheReasonAndExits1`. `UpstreamShellCheckLine` interprets the mkdir/cp/echo precheck and the `grep -q` postcheck, pinned by `FindSkipReason_MkdirCpEchoPrecheckAndGrepPostcheck_AreInterpreted`, `FindSkipReason_ShellCheckLineWithAnotherCommand_IsUninterpreted`, `RunAsync_MkdirCpEchoPrecheck_CreatesTheDirectoriesCopiesTheFileAndWritesTheText`, `RunAsync_PrecheckWritingOutsideTheLogDirectory_SkipsTheCase` and `RunAsync_GrepPostcheck_PassesOnlyWhenTheFileHoldsTheText`. 1182 is in PassingUpstreamCases.txt. This run: `dotnet build` was clean and the solution fast tests passed with 0 failures (Curl.Conformance.UnitTests: 4376 passed, 0 failed, so the 1182 ratchet row passes). The quality criterion is ticked on BL-3439's run of `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` (no member past a gate). It was not rerun because this run changed no code. The stash is not needed: everything in it is already on the branch.
 
 ## Log
 
@@ -48,3 +50,4 @@ ADR-0803 (BL-3406) decides 1182 as `interpret`: the C# runner honours `-E <file>
 - 2026-10-23: Backlog -> Deferred. Split into BL-3438 (land the stashed work) and BL-3439 (quality gates and solution fast tests); cost cap reached
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 54e0f226 84ffb677 ef020bad 406ec57e 45ba054b 7d0a04bb 779790c0.
+- 2026-11-02: Doing -> Done. Work landed through BL-3438 and BL-3439; criteria verified, build clean and fast tests green
