@@ -43,3 +43,4 @@ When the coordinator's CI watch cannot list the `CI` runs, its log line carries 
 - 2026-10-31: Doing -> Backlog. Criteria 1-3 done and tested; likely cause (timed gh wrapper space-joins --json a,b) fixed by reproduction. Criterion 4 needs a shift log after the change, which needs the code committed first: see Notes
 - 2026-10-31: Backlog -> Deferred. Split into BL-4384 (commit the stashed work, criteria 1-3) and BL-4385 (name the cause from a shift log, criterion 4)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 842ca840 c081c1f2 9d88f1e3 cd4e4eec.
