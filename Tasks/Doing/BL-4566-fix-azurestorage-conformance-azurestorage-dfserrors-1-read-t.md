@@ -37,3 +37,4 @@ of the error body (BCL `System.Text.Json`, as `AzureStoragePathListParser` does)
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: a6e4583a 694a22a9 629c7dfb be38cb95.
