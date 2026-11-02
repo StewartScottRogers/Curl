@@ -4,7 +4,7 @@ title: Conformance: curl's transfer surface (-v, -o, -w, --fail, -m, exit codes,
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462, BL-4463]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503, BL-4463]
 touches: [Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer, Documentation/Conformance/Extended/CurlSurface-Transfer.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

@@ -4,7 +4,7 @@ title: Conformance: Google Cloud Storage V4 HMAC signing for gs:// (GoogleCloudS
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462, BL-4475]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503, BL-4475]
 touches: [Curl.Conformance.Extended.UnitLibrary/GoogleCloudStorage/Signing, Curl.Conformance.Extended.UnitTests/GoogleCloudStorage/Signing, Documentation/Conformance/Extended/GoogleCloudStorage-Signing.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

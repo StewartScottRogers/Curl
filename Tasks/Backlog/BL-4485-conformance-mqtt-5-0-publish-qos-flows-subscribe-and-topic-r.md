@@ -4,7 +4,7 @@ title: Conformance: MQTT 5.0 PUBLISH, QoS flows, SUBSCRIBE and topic rules for m
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462, BL-4484]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503, BL-4484]
 touches: [Curl.Conformance.Extended.UnitLibrary/Mqtt5/PublishSubscribe, Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe, Documentation/Conformance/Extended/Mqtt5-PublishSubscribe.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

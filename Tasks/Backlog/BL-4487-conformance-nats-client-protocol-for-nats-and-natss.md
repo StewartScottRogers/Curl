@@ -4,7 +4,7 @@ title: Conformance: NATS client protocol for nats:// and natss://
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Nats, Curl.Conformance.Extended.UnitTests/Nats, Documentation/Conformance/Extended/Nats.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

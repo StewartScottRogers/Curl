@@ -4,7 +4,7 @@ title: Conformance: Kafka Produce v3, Fetch v4 and record batch v2 for kafka:// 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462, BL-4479]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503, BL-4479]
 touches: [Curl.Conformance.Extended.UnitLibrary/Kafka/Records, Curl.Conformance.Extended.UnitTests/Kafka/Records, Documentation/Conformance/Extended/Kafka-Records.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

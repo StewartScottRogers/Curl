@@ -4,7 +4,7 @@ title: Conformance: SignalR JSON hub protocol and transports for signalr:// and 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/SignalR, Curl.Conformance.Extended.UnitTests/SignalR, Documentation/Conformance/Extended/SignalR.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

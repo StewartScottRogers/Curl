@@ -4,7 +4,7 @@ title: Conformance: Engine.IO v4 and Socket.IO v5 over WebSocket for socketio://
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/SocketIo, Curl.Conformance.Extended.UnitTests/SocketIo, Documentation/Conformance/Extended/SocketIo.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

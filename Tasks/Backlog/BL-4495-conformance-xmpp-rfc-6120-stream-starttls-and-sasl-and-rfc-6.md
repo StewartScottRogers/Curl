@@ -4,7 +4,7 @@ title: Conformance: XMPP RFC 6120 stream, STARTTLS and SASL and RFC 6121 for xmp
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Xmpp, Curl.Conformance.Extended.UnitTests/Xmpp, Documentation/Conformance/Extended/Xmpp.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

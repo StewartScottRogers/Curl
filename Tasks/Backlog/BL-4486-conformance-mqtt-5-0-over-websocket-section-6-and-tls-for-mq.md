@@ -4,7 +4,7 @@ title: Conformance: MQTT 5.0 over WebSocket (section 6) and TLS for mqtt5+ws:// 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462, BL-4484]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503, BL-4484]
 touches: [Curl.Conformance.Extended.UnitLibrary/Mqtt5/Transports, Curl.Conformance.Extended.UnitTests/Mqtt5/Transports, Documentation/Conformance/Extended/Mqtt5-Transports.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

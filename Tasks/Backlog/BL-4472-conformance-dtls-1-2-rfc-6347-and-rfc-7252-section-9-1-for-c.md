@@ -4,7 +4,7 @@ title: Conformance: DTLS 1.2 (RFC 6347) and RFC 7252 section 9.1 for coaps:// (C
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462, BL-4470]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503, BL-4470]
 touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 model: opus
 requirement: none

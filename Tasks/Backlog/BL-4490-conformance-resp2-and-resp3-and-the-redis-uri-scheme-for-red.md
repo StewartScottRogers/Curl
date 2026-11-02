@@ -4,7 +4,7 @@ title: Conformance: RESP2 and RESP3 and the redis URI scheme for redis:// and re
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Redis, Curl.Conformance.Extended.UnitTests/Redis, Documentation/Conformance/Extended/Redis.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

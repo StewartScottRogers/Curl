@@ -4,7 +4,7 @@ title: Conformance: Azure Blob service REST API for az:// (AzureStorage part 1 o
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4462]
+depends-on: [BL-4500, BL-4501, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/AzureStorage, Curl.Conformance.Extended.UnitTests/AzureStorage, Documentation/Conformance/Extended/AzureStorage.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
