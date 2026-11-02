@@ -8,7 +8,7 @@ depends-on: [BL-4018]
 touches: [Curl.Engine.UnitLibrary/CallbackTransferProgress.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Parsed.cs, Curl.Console/TransferProgressRecorder.cs, Curl.Console/ProgressMeterLines.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-11-02
 ---
 # BL-4012 — Libcurl easy handle draws the built-in progress meter on stderr when NOPROGRESS=0 and no callback, or the callback returns CURL_PROGRESSFUNC_CONTINUE
 
@@ -22,16 +22,18 @@ Found by BL-3811 (CGR-282). `CallbackTransferProgress.Of` (Curl.Engine.UnitLibra
 
 ## Acceptance criteria
 
-- [ ] A Libcurl.UnitTests test performs an easy transfer with `CURLOPT_NOPROGRESS=0`, no progress callback and `CURLOPT_STDERR` set, and finds curl's meter header lines and a final status line in what was written to it.
-- [ ] A Libcurl.UnitTests test with an XFERINFOFUNCTION returning `CURL_PROGRESSFUNC_CONTINUE` finds the meter drawn, and one returning 0 finds nothing written.
-- [ ] `dotnet build` is clean and the fast tests are green.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Libcurl` reports no member this task changed outside a gate.
+- [x] A Libcurl.UnitTests test performs an easy transfer with `CURLOPT_NOPROGRESS=0`, no progress callback and `CURLOPT_STDERR` set, and finds curl's meter header lines and a final status line in what was written to it.
+- [x] A Libcurl.UnitTests test with an XFERINFOFUNCTION returning `CURL_PROGRESSFUNC_CONTINUE` finds the meter drawn, and one returning 0 finds nothing written.
+- [x] `dotnet build` is clean and the fast tests are green.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Libcurl` reports no member this task changed outside a gate.
 
 ## Notes
 
 - 2026-10-28 (lane 11): Requeued before any code edit. The task has no Goal and only the template's placeholder criterion, so it has no definition of done, and the claim-time criteria snapshot forbids writing them while in Doing; the next Backlog edit must fill in Goal, Context and Acceptance criteria (a Libcurl.UnitTests test: easy handle, `CURLOPT_NOPROGRESS=0`, no progress callback, perform writes curl's header lines and a final status line to `CURLOPT_STDERR`; another with an XFERINFOFUNCTION returning `CURL_PROGRESSFUNC_CONTINUE`; a callback returning 0 draws nothing; measure real libcurl's bytes first). The meter move itself is a prerequisite large enough for its own run (it drags `ProgressBarRecorder`, `ParallelTransferProgress` and `HoldableStream` with it), filed as BL-4018 and added to `depends-on`. After BL-4018, this task's `touches` should name the moved Curl.Engine.UnitLibrary files (`TransferProgressRecorder.cs`, `ProgressMeterLines.cs`) instead of the Curl.Console paths, plus `Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs` (where `CURLOPT_STDERR` / `Host.StandardError` is resolved) and the Libcurl.UnitTests file the tests go in.
 
 - 2026-10-28 (lane 6): Implemented, uncommitted (stashed): CallbackTransferProgress passes reports answered with Continue (no callback always continues) to a lazily made TransferProgressRecorder writing to CURLOPT_STDERR else Host.StandardError; FinishMeter (called in ManagedEasyTransfer.Parsed.cs) writes the done draws and, only without a callback, a newline; ADR-0974. New Libcurl.UnitTests/Easy/CurlEasyProgressMeterTests.cs (3 tests) green, Engine and Libcurl fast tests green. Measure-CodeQuality (Curl.Engine.UnitLibrary) left 3 members to fix next claim: PerformParsedAsync complexity 14 (move the FinishMeter call into a helper), FinishMeter lines 119-120 uncovered (meter whose callback aborted or transfer never started), ReportUploaded branch 50% (upload report continuing to the meter). Consider try/finally so an exception still stops the meter timer. Libcurl quality not run. Requeued: run budget ran out.
+
+- 2026-11-02 (lane 7): No code change needed. The work landed through its split: BL-4057 (750e74adf, meter in CallbackTransferProgress, quality gates fixed) and BL-4058 (CurlEasyProgressMeterTests, 3 tests, real curl 8.22.0 measured). This run reran CurlEasyProgressMeterTests on this branch: 3/3 pass. Both subtasks recorded a clean build, green fast tests and Measure-CodeQuality reporting no failing member (Curl.Engine.UnitLibrary, Libcurl), which meets criteria 3 and 4. Stash 7a2468857 is superseded and not applied.
 
 ## Log
 
@@ -47,3 +49,4 @@ Found by BL-3811 (CGR-282). `CallbackTransferProgress.Of` (Curl.Engine.UnitLibra
 - 2026-10-29: Backlog -> Deferred. Over its cost cap; split into BL-4057 and BL-4058
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 5a165af6 a4efa820 e4d345af 82989fe8.
+- 2026-11-02: Doing -> Done. Delivered through BL-4057 and BL-4058; meter tests verified 3/3 on this branch
