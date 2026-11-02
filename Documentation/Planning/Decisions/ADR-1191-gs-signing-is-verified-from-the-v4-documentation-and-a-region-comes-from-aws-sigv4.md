@@ -21,7 +21,7 @@ code, a way to name a region other than `auto`, and a matrix in a second file fo
   `gs://` HMAC request cannot use.
 - A region other than `auto` is named with `--aws-sigv4 goog4:goog:<region>:storage`, curl's own
   `provider1:provider2:region:service` form, whose provider names already give `GOOG4-HMAC-SHA256` and the
-  `x-goog-` header prefix. The client ignores it today; BL-4538 implements it.
+  `x-goog-` header prefix. The client ignores it today; BL-4542 implements it.
 - A protocol split into parts keeps every part's IDs as `<Name>:`; the matrix check counts an ID in `<Name>.md` or
   any `<Name>-<Part>.md`, as `Documentation/Conformance/Extended/README.md` already says the files are named.
 

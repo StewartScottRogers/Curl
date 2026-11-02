@@ -64,11 +64,11 @@ defect in the extension library is listed in `KnownFailures.txt` with a filed Hi
 
 - Verifier: `GoogleCloudStorage/Signing/GcsV4HmacReferenceAuthorizer` and `GcsV4CanonicalRequest`, written from the V4 signing and canonical-request pages with BCL `HMACSHA256`/`SHA256` only. It re-encodes the decoded path and query itself, checks the 15-minute clock window, the credential scope, that `host` and every `x-goog-*` header are signed, the body hash, then the signature; any fault is `403 SignatureDoesNotMatch`. Its fixed vector (`a488c22c...`) was computed by hand in PowerShell from the documented steps; the documentation's worked example is an RSA signed URL, so there is no published HMAC vector (ADR-1191).
 - Cases: `GcsV4SigningCases` (GET, PUT with body hash, listing with three query parameters, reserved and non-ASCII object name, region `us-east1`, wrong secret exit 22) at a fixed clock, 2026-11-02 10:30:00 UTC, through the run's `TimeProvider`.
-- Region: the client always signs with `auto`. Decided (ADR-1191) that a region is named with `--aws-sigv4 goog4:goog:<region>:storage`; the case is listed in `KnownFailures.txt` under the filed High task BL-4538 (depends on BL-4534, which holds `GcsProtocolHandler.cs`).
+- Region: the client always signs with `auto`. Decided (ADR-1191) that a region is named with `--aws-sigv4 goog4:goog:<region>:storage`; the case is listed in `KnownFailures.txt` under the filed High task BL-4542 (depends on BL-4534, which holds `GcsProtocolHandler.cs`).
 - Widened touches to `Harness/RequirementMatrix.cs` and its tests: the matrix check matched an ID only against `<Name>.md`, so a `<Name>-<Part>.md` matrix (which the README allows) could hold no IDs. No task in Doing on `origin/work/dark-factory` named it. Now a part matrix counts for its protocol; `FindProblems_IdInAPartMatrixOfItsProtocol_ReportsNothing` pins it.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` reports 0 failing members (the first run found 4 methods over complexity 10; they were split). Fast tests green across the solution; `dotnet build Curl.slnx -warnaserror` clean. Platform-neutral: the only file is a temp file under `Path.GetTempPath()`, so CI on Linux and macOS is covered.
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 584a7dcd 66f0a2e5 cec18b67 d8e3fb0e 2b8d951f ef6c9026.
-- 2026-11-02: Doing -> Done. gs:// V4 HMAC signing is measured by a documentation-written verifier through curl; region case listed under BL-4538
+- 2026-11-02: Doing -> Done. gs:// V4 HMAC signing is measured by a documentation-written verifier through curl; region case listed under BL-4542
