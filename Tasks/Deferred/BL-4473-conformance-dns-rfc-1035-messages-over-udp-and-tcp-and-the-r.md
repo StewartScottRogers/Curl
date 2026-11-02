@@ -64,7 +64,10 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Notes
 
+- 2026-11-02 (lane 10): Split for size before any edit: a new reference DNS server (UDP and TCP, its own codec) plus some 25 cases and a seven-RFC matrix will not fit one run, and no protocol on the extended harness exists yet to copy from. BL-4514 (server, record types, URL), BL-4515 (compression, ID and question matching, RCODEs) and BL-4516 (TC to TCP, UDP retries, matrix completion and link to DnsQuery-Encrypted.md) carry every criterion; BL-4474's depends-on now names them instead of BL-4473.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 33bfa3c9 3c00e6c1 6ba469e8 f3c72898 d8e3fb0e 0cbf2573 ef6c9026.
+- 2026-11-02: Doing -> Deferred. Split into BL-4514, BL-4515, BL-4516
