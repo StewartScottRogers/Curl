@@ -44,7 +44,9 @@ public sealed class Http3ClientSessionTests
         InMemoryMultiplexedConnection connection = new() { BidirectionalOpenFailure = new IOException("refused") };
         await using Http3ClientSession session = new(connection, LocalSettings);
 
-        await Assert.ThrowsExactlyAsync<IOException>(async () => await session.OpenRequestStreamAsync(null, CancellationToken.None));
+        IOException thrown = await Assert.ThrowsExactlyAsync<IOException>(async () => await session.OpenRequestStreamAsync(null, CancellationToken.None));
+
+        Assert.AreSame(connection.BidirectionalOpenFailure, thrown);
     }
 
     [TestMethod]

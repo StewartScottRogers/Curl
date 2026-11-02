@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Http3.UnitTests]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4510 — Fix AF-0526: OpenRequestStreamAsync_ConnectionRefusesStream_ThrowsItsIOException checks only the exception type, not that it is the connection's own IOException
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The test now captures the thrown IOException and asserts Assert.AreSame with the connection's BidirectionalOpenFailure. Http3 fast tests: 361 passed. Test-only change, no production code. Linux and macOS: platform-neutral.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-02: Doing -> Done. Test now asserts the thrown exception is the connection's own
