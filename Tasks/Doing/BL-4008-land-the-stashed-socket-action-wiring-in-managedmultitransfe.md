@@ -22,11 +22,11 @@ Split from BL-3989 (cost cap), itself split from BL-3976 and BL-3563 (CGR-034 in
 
 ## Acceptance criteria
 
-- [ ] `ManagedMultiTransfer` routes a socket action through `TransferSocketWait.SignalOn` and passes the real OS socket (or `TransferSocketWait.Socket`) to the socket callback with `CurlPoll.Out`, then `CurlPoll.In`.
-- [ ] The timer callback gets the earliest transfer deadline, or -1 when none.
-- [ ] Tests in `Curl.Engine.UnitTests/Cgr034Tests.cs` pin the `C_20`, `C_74` and `C_75` sequences above and fail before the fix and pass after it (ADR-0482).
-- [ ] Upstream test530 still passes (a transfer waiting on an engine socket counts as ready in `CountReady`).
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Engine.UnitTests`.
+- [x] `ManagedMultiTransfer` routes a socket action through `TransferSocketWait.SignalOn` and passes the real OS socket (or `TransferSocketWait.Socket`) to the socket callback with `CurlPoll.Out`, then `CurlPoll.In`.
+- [x] The timer callback gets the earliest transfer deadline, or -1 when none.
+- [x] Tests in `Curl.Engine.UnitTests/Cgr034Tests.cs` pin the `C_20`, `C_74` and `C_75` sequences above and fail before the fix and pass after it (ADR-0482).
+- [x] Upstream test530 still passes (a transfer waiting on an engine socket counts as ready in `CountReady`).
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Engine.UnitTests`.
 
 ## Notes
 
@@ -38,6 +38,8 @@ Split from BL-3989 (cost cap), itself split from BL-3976 and BL-3563 (CGR-034 in
 - 2026-10-28 run (lane 13): ADR-0964 was taken by another lane's ADR, so the stash's ADR is now ADR-0969 (file, README row, citations in `ManagedMultiTransfer.cs` and `Cgr034Tests.cs`). `touches` gains `Curl.Engine.UnitTests/ManagedMultiTransferTests.SocketAction.cs`, whose expected sequence the stash changes (an extra `timer 0`); no task in Doing on `origin/work/dark-factory` names it. Measured: the stashed work builds clean, `Curl.Engine.UnitTests` is green (2751 passed), upstream test530 passes, upstream test582 fails (hangs past 20 s, twice).
 - This task cannot be committed on its own: test582 is on `PassingUpstreamCases.txt` and `Curl.Conformance.UnitTests` runs in the fast suite, so landing the stash without the test582 fix turns CI red. The next claim must fix test582 in the same run (BL-4007's first criterion; BL-4007 depends on this task, so it cannot be a `depends-on` here without a cycle), then run the quality gate for `Curl.Engine.UnitLibrary` and the fast suite once.
 - What a trace showed (a temporary trace in `SocketActionAsync` and `TellWaitedSocket`, since removed): the SFTP connection is in-memory, so the transfer waits on engine socket `0x50000001`; the transfer alternates `Out` and `In` and the app's actions follow correctly for about 1.1 s (~30 actions), then a `SocketActionAsync(0x50000001, In)` call never returns: no socket or timer callback follows it and no later action comes. So the hang is inside `MoveTransfersOnAsync` on that action, not in the app's loop. `Settle` is bounded by `SocketWaitSettleLimit` (200 ms), so look at what else blocks there: `RunQueuedCallbacks` running the upload's read callback (Lib582 reads its file through it) while `Settle`'s synchronous `Task.WaitAny` holds the app thread, or the transfer's in-memory continuations running inline on the caller's thread. Re-trace inside `MoveTransfersOnAsync` (before and after `RunQueuedCallbacks`, `MoveEveryTransferOn`, `SettleSocketWaitingTransfers`) to find which call does not return.
+
+- 2026-11-02 run (lane 6): nothing left to do. The stash's work landed through the split: BL-4015 (TransferSocketWait), BL-4016 (ManagedMultiTransfer wiring, `Cgr034Tests` pinning C_20 `SocketAction_OneTransfer_TellsTheRealSocketOutThenInThenRemove`, C_74 `Perform_TimerCallbackOnly_TellsZeroThenNoTimeout`, C_75 `SocketAction_TimeoutAgainstASilentServer_TellsTheTimeoutThenRemoveWithOperationTimedOut`, ADR-0973) and BL-4007 (test582 and the quality gates; test530 counted ready by `IsWaitingOnAnEngineSocket` in `ManagedMultiTransfer.Waiting.cs`). The stash is superseded and was not applied. Measured: `Curl.Engine.UnitTests` fast tests green (2947 passed, 7 skipped). CI on Linux and macOS: no code change here.
 
 ## Log
 
