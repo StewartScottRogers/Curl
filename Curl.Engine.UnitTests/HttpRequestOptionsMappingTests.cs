@@ -102,6 +102,21 @@ public sealed class HttpRequestOptionsMappingTests
         Assert.AreEqual(expected, mapped.SendBytesPerSecond);
     }
 
+    /// <summary>
+    /// <c>--sasl-authzid</c> reaches the HTTP handler, which counts it as an empty Digest user
+    /// (AF-0522, BL-4457, ADR-1182).
+    /// </summary>
+    [TestMethod]
+    public void Of_SaslAuthorizationIdentity_IsCopiedFromTheAuthenticationOptions()
+    {
+        Diagnostics.Arrange("--sasl-authzid", "1");
+
+        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), new EasyHttpOptions(), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions { SaslAuthorizationIdentity = "1" });
+
+        Diagnostics.Assert("authzid", "1", mapped.SaslAuthorizationIdentity);
+        Assert.AreEqual("1", mapped.SaslAuthorizationIdentity);
+    }
+
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]

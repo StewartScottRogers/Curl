@@ -52,6 +52,7 @@ public sealed class HttpRequestOptionsTests
         Assert.IsNull(options.RequestTarget);
         Assert.AreEqual(HttpAuthSchemes.Basic, options.AuthSchemes);
         Assert.IsNull(options.BearerToken);
+        Assert.IsNull(options.SaslAuthorizationIdentity);
         Assert.IsNull(options.AwsSigV4);
         Assert.IsNull(options.ForwardProxy);
         Assert.IsFalse(options.ProxyTunnel);
@@ -95,6 +96,7 @@ public sealed class HttpRequestOptionsTests
             RequestTarget = "*",
             AuthSchemes = HttpAuthSchemes.Any | HttpAuthSchemes.Bearer,
             BearerToken = "token",
+            SaslAuthorizationIdentity = "authzid",
             AwsSigV4 = "aws:amz",
             ForwardProxy = proxy,
             ProxyTunnel = true,
@@ -131,6 +133,7 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual("*", options.RequestTarget);
         Assert.AreEqual(HttpAuthSchemes.Any | HttpAuthSchemes.Bearer, options.AuthSchemes);
         Assert.AreEqual("token", options.BearerToken);
+        Assert.AreEqual("authzid", options.SaslAuthorizationIdentity);
         Assert.AreEqual("aws:amz", options.AwsSigV4);
         Assert.AreSame(proxy, options.ForwardProxy);
         Assert.IsTrue(options.ProxyTunnel);

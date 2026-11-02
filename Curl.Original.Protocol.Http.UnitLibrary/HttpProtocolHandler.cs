@@ -351,7 +351,7 @@ public sealed class HttpProtocolHandler(
             framing.Method,
             context.Url,
             options.RequestTarget ?? HttpUrlText.OriginTarget(context.Url, options.CommandLineTextEncoding),
-            context.Credentials,
+            OriginCredentialOf(context, options),
             options.BearerToken,
             AllowedSchemesOf(options),
             IsProxy: false)
@@ -360,6 +360,18 @@ public sealed class HttpProtocolHandler(
             AwsSigV4 = AwsSigV4InputsOf(context, options, framing),
             HttpSignature = HttpSignatureInputsOf(context, options),
         };
+
+    /// <summary>
+    /// Gives the credential the origin is answered with: the transfer's, else an empty user name
+    /// and password when <c>--sasl-authzid</c> is given and Digest is the one scheme allowed, as
+    /// curl 8.22.0 then probes and answers Digest for user <c>''</c> (AF-0522, BL-4457, ADR-1182);
+    /// <see langword="null" /> otherwise.
+    /// </summary>
+    private static NetworkCredential? OriginCredentialOf(ITransferContext context, HttpRequestOptions options) =>
+        context.Credentials
+            ?? (options.SaslAuthorizationIdentity is not null && AllowedSchemesOf(options) == HttpAuthSchemes.Digest
+                ? new NetworkCredential(string.Empty, string.Empty)
+                : null);
 
     /// <summary>
     /// Makes the authentication request for a forward proxy, or gives <see langword="null" />

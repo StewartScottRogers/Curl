@@ -665,6 +665,52 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// With <c>--digest --sasl-authzid</c> and no <c>-u</c>, curl 8.22.0 counts the authzid as an
+    /// empty user: the first POST is the empty Digest probe and the challenge is answered for
+    /// user <c>''</c> (AF-0522, BL-4457, ADR-1182).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestPostWithSaslAuthzidAndNoCredentials_SendsAnEmptyProbeAndAnswersAsAnEmptyUser()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        TransferContext context = AuthContext(new MemoryStream(), options: new HttpRequestOptions { Body = new BytesBody("x"u8.ToArray(), "application/x-www-form-urlencoded"), AuthSchemes = HttpAuthSchemes.Digest, SaslAuthorizationIdentity = "1" });
+        Diagnostics.Arrange("url, body, schemes, authzid", $"{AuthUrl}, -d x, --digest, 1");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.EndsWith("Content-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n", requests[0]);
+        Assert.EndsWith("Content-Length: 1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nx", requests[1]);
+        Assert.AreEqual(string.Empty, authenticator.Calls[^1].Request.Credential?.UserName);
+    }
+
+    /// <summary>
+    /// <c>--sasl-authzid</c> without <c>-u</c> under Basic, curl's default, gives no credential:
+    /// the POST goes once with its body, as curl 8.22.0 sends no <c>Authorization</c> then
+    /// (BL-4457 Notes, ADR-1182).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_BasicPostWithSaslAuthzidAndNoCredentials_SendsTheBodyAtOnce()
+    {
+        TurnTakingConnection connection = new(65536, OkHead + "ok");
+        TransferContext context = AuthContext(new MemoryStream(), options: new HttpRequestOptions { Body = new BytesBody("x"u8.ToArray(), "application/x-www-form-urlencoded"), SaslAuthorizationIdentity = "1" });
+        Diagnostics.Arrange("url, body, authzid", $"{AuthUrl}, -d x, 1");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.DoesNotContain("Authorization", connection.Written);
+        Assert.EndsWith("Content-Length: 1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nx", connection.Written);
+    }
+
+    /// <summary>
     /// With <c>--digest</c> the first POST is a probe with an empty body and
     /// <c>Content-Length: 0</c>; the body goes only with the answer to the challenge, as
     /// upstream test1001 and test2058 expect of curl 8.21.0 (ADR-0441).
