@@ -62,3 +62,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 91e67cda 98a34d8a 9592b2e5 d8e3fb0e b542984a ef6c9026.
