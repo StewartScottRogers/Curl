@@ -911,10 +911,10 @@ public sealed partial class HandBuiltTlsProviderTests
     public async Task AuthenticateAsClientAsync_WhenTheServerAsksForAClientCertificate_PresentsTheCertCertificate()
     {
         var file = WriteFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12));
-        var options = Tls12Only(new TlsClientOptions(Insecure: true, ClientCertificate: file));
+        var options = Tls12Only(new TlsClientOptions(Insecure: true, ClientCertificate: file, CertificateType: "P12"));
         var (client, server) = InMemoryDuplexStream.CreatePair();
         X509Certificate? received = null;
-        Diagnostics.Arrange("build", "Schannel");
+        Diagnostics.Arrange("build", "OpenSSL");
         Diagnostics.Arrange("client certificate file", Path.GetFileName(file));
         Diagnostics.Arrange("server TLS protocol", SslProtocols.Tls12);
         Diagnostics.Arrange("server requires a client certificate", true);
@@ -939,7 +939,7 @@ public sealed partial class HandBuiltTlsProviderTests
         ConnectResult result;
         using (Diagnostics.Phase("TLS handshake"))
         {
-            result = await Provider(options, SchannelBuild).AuthenticateAsClientAsync(
+            result = await Provider(options, OpenSslBuild).AuthenticateAsClientAsync(
                 new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
         }
 
@@ -1117,7 +1117,7 @@ public sealed partial class HandBuiltTlsProviderTests
     public async Task AuthenticateAsClientAsync_WhenTheHandshakeFailsWithACertCertificateLoaded_FailsAndDisposesThePlaintext()
     {
         var file = WriteFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12));
-        Diagnostics.Arrange("build", "Schannel");
+        Diagnostics.Arrange("build", "OpenSSL");
         Diagnostics.Arrange("client certificate file", Path.GetFileName(file));
         Diagnostics.Arrange("server answer", "reads the ClientHello, then closes");
         ArrangeCertificate("client certificate", s_clientCertificate);
@@ -1125,7 +1125,7 @@ public sealed partial class HandBuiltTlsProviderTests
         (ConnectResult Result, bool PlaintextDisposed) result;
         using (Diagnostics.Phase("TLS handshake"))
         {
-            result = await HandshakeWithServerAnsweringAsync(SchannelBuild, answer: null, Tls12Only(new TlsClientOptions(Insecure: true, ClientCertificate: file)));
+            result = await HandshakeWithServerAnsweringAsync(OpenSslBuild, answer: null, Tls12Only(new TlsClientOptions(Insecure: true, ClientCertificate: file, CertificateType: "P12")));
         }
 
         ActConnectResult(result.Result);
@@ -1140,7 +1140,7 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         var file = WriteFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12));
         var (plaintext, plaintextStream) = Unanswered();
-        Diagnostics.Arrange("build", "Schannel");
+        Diagnostics.Arrange("build", "OpenSSL");
         Diagnostics.Arrange("CA certificate file", "a directory, not a file");
         Diagnostics.Arrange("client certificate file", Path.GetFileName(file));
         ArrangeCertificate("client certificate", s_clientCertificate);
@@ -1148,7 +1148,7 @@ public sealed partial class HandBuiltTlsProviderTests
         ConnectResult result;
         using (Diagnostics.Phase("TLS handshake"))
         {
-            result = await Provider(Tls12Only(new TlsClientOptions(CaCertificateFile: _directory, ClientCertificate: file)), SchannelBuild)
+            result = await Provider(Tls12Only(new TlsClientOptions(CaCertificateFile: _directory, ClientCertificate: file, CertificateType: "P12")), OpenSslBuild)
                 .AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None);
         }
 
@@ -1248,7 +1248,7 @@ public sealed partial class HandBuiltTlsProviderTests
         var path = ClientCertificateLoaderTests.WriteRsaPkcs12File(_directory);
         Diagnostics.Arrange("PKCS#12 file", Path.GetFileName(path));
         Diagnostics.Arrange("password", "secret");
-        var (loaded, failure) = ClientCertificateLoader.LoadAsSchannelBuild(path, "secret", null, new FakeClientCertificateStore());
+        var (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(path, "secret", null, "P12", null);
         Diagnostics.Act("load failure", failure is null ? "(none)" : "present");
         Diagnostics.Assert("load failure is null", true, failure is null);
         Assert.IsNull(failure);

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 using Curl.Networking.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 using CertificateRequest = System.Security.Cryptography.X509Certificates.CertificateRequest;
@@ -35,7 +36,7 @@ public sealed class ClientCertificateLoaderTests
     }
 
     [TestMethod]
-    public void LoadAsSchannelBuild_Pkcs12RsaKey_ExportsItsPrivateParameters()
+    public void LoadAsSchannelBuild_Pkcs12RsaKey_FailsAcquiringTheCredentialsWithExit35()
     {
         Diagnostics.Arrange("file name", "client.p12");
         Diagnostics.Arrange("key", "RSA 2048");
@@ -43,10 +44,13 @@ public sealed class ClientCertificateLoaderTests
         Diagnostics.Arrange("file size", new FileInfo(path).Length);
 
         var (loaded, failure) = ClientCertificateLoader.LoadAsSchannelBuild(path, Passphrase, null, new FakeClientCertificateStore());
-        Diagnostics.Act("failure is null", failure is null);
-        Diagnostics.Act("loaded subject", loaded?.Subject);
+        Diagnostics.Act("loaded", loaded?.Subject ?? "(none)");
+        Diagnostics.Act("exit code", failure?.ExitCode);
 
-        AssertPrivateParametersExport(loaded, failure);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, failure?.ExitCode);
+        Assert.IsNull(loaded);
+        Assert.AreEqual(CurlExitCode.SslConnectError, failure?.ExitCode);
+        Assert.AreEqual(TlsFailureMessages.SchannelClientCertificateCredentialsUnknown, failure?.ErrorMessage);
     }
 
     [TestMethod]

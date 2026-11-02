@@ -1,6 +1,6 @@
 # ADR-0794: A P12 client certificate is presented where this Windows build's Schannel curl fails to acquire it
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-1187
 - **Date:** 2026-10-23
 
 **Decided by Claude under Stewart's delegation** (root `CLAUDE.md`, "Decisions"), for BL-3290

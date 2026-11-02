@@ -1,6 +1,6 @@
 # ADR-0826: CGR-096's P12 client certificate difference is kept, as ADR-0794 decided
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-1187
 - **Date:** 2026-10-26
 
 **Decided by Claude under Stewart's delegation** (root `CLAUDE.md`, "Decisions"), for BL-3625
