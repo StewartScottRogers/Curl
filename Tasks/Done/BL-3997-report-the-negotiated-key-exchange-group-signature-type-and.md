@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitLibrary/ConnectionStream.cs, Curl.Networking.UnitLibrary/ServerHandshakeRecordReader.cs, Curl.Networking.UnitTests/ServerHandshakeRecordReaderTests.cs, Curl.Networking.UnitTests/SslStreamTlsProviderTests.HandshakeEvent.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-11-02
 ---
 # BL-3997 — Report the negotiated key-exchange group and peer signature type from the SslStream TLS path in the OpenSSL build (CGR-226 source)
 
@@ -22,13 +22,15 @@ On Linux, `-v` over the SslStream path prints `SSL connection using TLSv1.3 / TL
 
 ## Acceptance criteria
 
-- [ ] Group and signature names are reported for a handshake on the SslStream path in the OpenSSL build (TLS 1.3 and TLS 1.2), pinned by unit tests.
-- [ ] An ADR records where the names come from.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Group and signature names are reported for a handshake on the SslStream path in the OpenSSL build (TLS 1.3 and TLS 1.2), pinned by unit tests.
+- [x] An ADR records where the names come from.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 Filed by BL-3755, which depends on this.
+
+2026-11-02 (lane 1): all work landed through the split subtasks BL-4039 (group), BL-4040 (signature type) and BL-4041 (wiring into ConnectionStream and SslStreamTlsProvider.DescribeHandshake), all Done; ADR-0989 records where the names come from. This claim checked it: ServerHandshakeRecordReaderTests (22 tests) and SslStreamTlsProviderTests.HandshakeEvent.cs pin TLS 1.3 and TLS 1.2 names; dotnet build clean (0 warnings) and the solution fast tests pass with no failures. No code changed in this run.
 
 Design worked out by the 2026-10-28 claim (lane 3), before any edit; record it as an ADR (Decided by Claude under Stewart's delegation):
 - New `ServerHandshakeRecordReader` (pure, unit-testable): `ConnectionStream.ReadAsync` shows it every byte read (beside `TicketRecords`), set only when `!_matchesSchannelBuild`. It joins the payloads of plaintext handshake records (content type 22) and stops at the first record of type 20 (ChangeCipherSpec) or 23, or at 64 KiB. TLS 1.3: ServerHello (or HelloRetryRequest, whose `selected_group` is the final group) then CCS or an encrypted record; TLS 1.2: ServerHello, Certificate, ServerKeyExchange, ServerHelloDone, then CCS.
@@ -44,3 +46,4 @@ Design worked out by the 2026-10-28 claim (lane 3), before any edit; record it a
 - 2026-10-28: Backlog -> Deferred. Split into BL-4039, BL-4040, BL-4041 (over its cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 0115e735 c663dd40 3d836d5e.
+- 2026-11-02: Doing -> Done. SslStream path in the OpenSSL build reports the negotiated group and peer signature type (landed via BL-4039, BL-4040, BL-4041; ADR-0989)
