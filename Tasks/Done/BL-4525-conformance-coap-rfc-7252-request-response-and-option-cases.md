@@ -51,13 +51,13 @@ Scope: section 5 (methods, token matching, options and their critical/elective, 
 
 - Cases in `Curl.Conformance.Extended.UnitTests/Coap/RequestResponse/`: `CoapRequestMethodTests` (GET, `-d` POST, `-T` PUT, `-X DELETE`: request code, options and payload; response payload written), `CoapTokenMatchingTests` (32-bit random tokens; piggybacked and separate responses with a mismatched token), `CoapOptionHandlingTests` (unrecognised critical option in a piggybacked, Confirmable and Non-confirmable response; unrecognised elective, supernumerary and out-of-range options ignored; delta 13 and 14 and length 13 and 14 read in a response, asserted on the response's bytes) and `CoapOptionEncodingTests` (request bytes: length 13 and 14 in Uri-Path, delta 13 for a Uri-Query first option, options in order). They reuse `Coap/Messaging/CoapMessagingRun` and `TimerJumpingClock` unchanged; `CoapEmptyMessage` asserts an Empty message.
 - Decision: "extended encodings in both directions" is met for length 13 and 14 and delta 13 in requests, and for all four in responses. Delta 14 (an option number of 269 or more after the one before) cannot occur in a request curl sends: its highest request option is Uri-Query (15), and RFC 7252 asks a client to send no other; the matrix row Coap:RFC7252-3.1-4 says so.
-- Found defect: curl takes a response carrying an unrecognised critical option (option 9) instead of rejecting it (RFC 7252 section 5.4.1). Coap:RFC7252-5.4.1-1 and -5.4.1-2 listed in KnownFailures.txt with filed High task BL-4543. All other new cases pass.
+- Found defect: curl takes a response carrying an unrecognised critical option (option 9) instead of rejecting it (RFC 7252 section 5.4.1). Coap:RFC7252-5.4.1-1 and -5.4.1-2 listed in KnownFailures.txt with filed High task BL-4564. All other new cases pass.
 - No code was added under `Curl.Conformance.Extended.UnitLibrary/Coap/` and no production code changed, so the coverage criterion holds vacuously and no Measure-CodeQuality run was needed.
-- `dotnet build Curl.slnx -warnaserror` clean; fast tests: one failure in the full run, `Mqtt5ConnectTests.Connect_WithoutCredentials_SendsCleanStartAndAClientIdentifierFirst` (not this task's), which passes alone: filed as flaky BL-4544. Every Coap case and the matrix and known-failures checks pass.
+- `dotnet build Curl.slnx -warnaserror` clean; fast tests: one failure in the full run, `Mqtt5ConnectTests.Connect_WithoutCredentials_SendsCleanStartAndAClientIdentifierFirst` (not this task's), which passes alone: filed as flaky BL-4565. Every Coap case and the matrix and known-failures checks pass.
 - Platform-neutral: the only file-system use is a temp file from `Path.GetTempPath()` for `-T`; no paths, drive letters or OS text are asserted. CI on Linux and macOS: met by keeping the change platform-neutral and the fast tests green here.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: a7c897a9 6108a24d d503fe2c fb1c989b d8e3fb0e ef6c9026.
-- 2026-11-02: Doing -> Done. RFC 7252 section 3.1 and 5 conformance cases for coap:// run in Coap/RequestResponse with matrix rows; critical-option rejection listed for BL-4543
+- 2026-11-02: Doing -> Done. RFC 7252 section 3.1 and 5 conformance cases for coap:// run in Coap/RequestResponse with matrix rows; critical-option rejection listed for BL-4564

@@ -1,5 +1,5 @@
 ---
-id: BL-4544
+id: BL-4565
 title: Fix flaky CI test Mqtt5ConnectTests.Connect_WithoutCredentials_SendsCleanStartAndAClientIdentifierFirst
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4544 — Fix flaky CI test Mqtt5ConnectTests.Connect_WithoutCredentials_SendsCleanStartAndAClientIdentifierFirst
+# BL-4565 — Fix flaky CI test Mqtt5ConnectTests.Connect_WithoutCredentials_SendsCleanStartAndAClientIdentifierFirst
 
 ## Goal
 

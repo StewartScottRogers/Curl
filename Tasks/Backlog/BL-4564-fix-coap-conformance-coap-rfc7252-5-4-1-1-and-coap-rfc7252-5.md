@@ -1,5 +1,5 @@
 ---
-id: BL-4543
+id: BL-4564
 title: Fix Coap conformance: Coap:RFC7252-5.4.1-1 and Coap:RFC7252-5.4.1-2 (reject a response carrying an unrecognised critical option)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4543 — Fix Coap conformance: Coap:RFC7252-5.4.1-1 and Coap:RFC7252-5.4.1-2 (reject a response carrying an unrecognised critical option)
+# BL-4564 — Fix Coap conformance: Coap:RFC7252-5.4.1-1 and Coap:RFC7252-5.4.1-2 (reject a response carrying an unrecognised critical option)
 
 ## Goal
 
