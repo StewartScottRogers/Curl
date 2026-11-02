@@ -8,7 +8,7 @@ depends-on: [BL-3846, BL-3847, BL-3859, BL-3890]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitLibrary/TransferSocketWait.cs, Curl.Engine.UnitLibrary/SocketActionGatedTcpDialer.cs, Curl.Engine.UnitTests/Cgr034Tests.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.SocketAction.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.Counts.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.Timers.cs, Curl.Engine.UnitTests/Cgr148Tests.cs, Curl.Engine.UnitTests/SocketActionGatedConnectionTests.cs, Curl.Engine.UnitTests/SocketActionGatedTcpDialerTests.cs, Curl.Engine.UnitLibrary/ConnectOnlyConnection.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-11-02
 ---
 # BL-3976 — Wire ManagedMultiTransfer to real sockets, CURL_POLL_OUT and deadline timers for CGR-034 (C_20, C_74, C_75)
 
@@ -22,10 +22,10 @@ Split from BL-3563 (CGR-034 in `Documentation/Reviews/Curl-Gap-Report-2026-10-25
 
 ## Acceptance criteria
 
-- [ ] `ManagedMultiTransfer` passes the real OS socket to the socket callback with `CurlPoll.Out`, then `CurlPoll.In`, and no longer uses `FirstTransferSocket` synthetic numbers.
-- [ ] The timer callback gets the earliest transfer deadline, or -1 when none; `RunningTransferCheckInterval` (10 ms) is removed.
-- [ ] Tests in `Curl.Engine.UnitTests/Cgr034Tests.cs` pin the `C_20`, `C_74` and `C_75` sequences above and fail before the fix and pass after it (ADR-0482).
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `ManagedMultiTransfer` passes the real OS socket to the socket callback with `CurlPoll.Out`, then `CurlPoll.In`, and no longer uses `FirstTransferSocket` synthetic numbers.
+- [x] The timer callback gets the earliest transfer deadline, or -1 when none; `RunningTransferCheckInterval` (10 ms) is removed.
+- [x] Tests in `Curl.Engine.UnitTests/Cgr034Tests.cs` pin the `C_20`, `C_74` and `C_75` sequences above and fail before the fix and pass after it (ADR-0482).
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -36,6 +36,8 @@ Split from BL-3563 (CGR-034 in `Documentation/Reviews/Curl-Gap-Report-2026-10-25
 
 - 2026-10-28 (BL-3981's run, lane 4): BL-3981 landed `TransferSocketWait.TakeSocket` (an engine socket number from `0x50000001` for a connection with no OS socket, set by `SocketActionGatedTcpDialer` after each dial) and `SignalOn(socket, events)` (ADR-0955), so BL-3981 was dropped from `depends-on` to break the cycle: BL-3981's criterion 2 needs this task's wiring. Route a socket action through `SignalOn` and tell the application `TransferSocketWait.Socket` for every transfer. Note ADR-0948 is now taken by the PEM pass-phrase ADR, so this task's ADR needs another number.
 
+- 2026-11-02 run (lane 3): no code change needed; the stash 5dcd6217 was not applied because its work has already landed through the split subtasks (BL-4007, BL-3977, BL-4027, BL-4069, BL-4051; BL-3563 Done with the CGR-034 probe PORT equal to REF). Checked: no `.cs` file in the repository names `FirstTransferSocket` or `RunningTransferCheckInterval`; `ManagedMultiTransfer.MovingOn.cs` tells the socket callback the transfer's socket with `CurlPoll.Out` then `CurlPoll.In`, and `ManagedMultiTransfer.Timer.cs:69` tells the earliest `EarliestDeadline` (-1 when none, 0 for a transfer that can run on, BL-4069). `Cgr034Tests` pins `C_20` (`T0 S777=2 T-1 S777=1 S777=4`, line 65), `C_75` (`T0 S=2 T400+ S=1 S=4 T-1` and 28, line 115) and `C_74` (`0 -1`, line 142); BL-3563's runs recorded them failing before the wiring. `dotnet build` clean; fast tests green (Curl.Engine.UnitTests 2947 passed, Libcurl.UnitTests 1541 passed, no failures anywhere). BL-3989, BL-3990 and BL-4008 are still in Backlog although their work is in the tree; their next claim should check and close them the same way.
+
 ## Log
 
 - 2026-10-28: Created.
@@ -44,3 +46,4 @@ Split from BL-3563 (CGR-034 in `Documentation/Reviews/Curl-Gap-Report-2026-10-25
 - 2026-10-28: Backlog -> Deferred. Split into BL-3989 (wire real sockets, POLL_OUT then POLL_IN, deadline timer) and BL-3990 (remove FirstTransferSocket and the 10 ms timer)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 2ff2ee8c 934d3e8d 6e4e49ca 779790c0.
+- 2026-11-02: Doing -> Done. ManagedMultiTransfer tells the real socket Out then In and the earliest deadline (-1 when none); Cgr034Tests pin C_20, C_74, C_75; landed through split subtasks
