@@ -34,3 +34,4 @@ Split from BL-4501 (see BL-4501 and BL-4462). Runs after BL-4505 and BL-4506. AD
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: a18d009a 5e07140c 8108353b feac4ffa.
