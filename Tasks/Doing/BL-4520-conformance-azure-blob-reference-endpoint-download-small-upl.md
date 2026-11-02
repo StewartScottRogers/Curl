@@ -37,3 +37,4 @@ The server implements every Blob operation the scope needs, so BL-4521 and BL-45
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 6ac4821f 960eb6cd 49bbfc2e 2108d112 d8e3fb0e ef6c9026 b73427b6.
