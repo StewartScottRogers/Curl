@@ -18,7 +18,7 @@ A mqtt5:// PUBLISH larger than the CONNACK's Maximum Packet Size is never sent: 
 
 ## Context
 
-OASIS MQTT 5.0 MQTT-3.2.2-15: the client MUST NOT send packets exceeding the Maximum Packet Size the CONNACK returns (section 3.2.2.3.6). `Mqtt5ClientFlow.RunAsync` sends the PUBLISH without checking it; compare the framed PUBLISH length (`ToBytes().Length`) with the property. Exit code and text decided in ADR-1191 (BL-4518). Found by BL-4518's `ConnackCases`.
+OASIS MQTT 5.0 MQTT-3.2.2-15: the client MUST NOT send packets exceeding the Maximum Packet Size the CONNACK returns (section 3.2.2.3.6). `Mqtt5ClientFlow.RunAsync` sends the PUBLISH without checking it; compare the framed PUBLISH length (`ToBytes().Length`) with the property. Exit code and text decided in ADR-1193 (BL-4518). Found by BL-4518's `ConnackCases`.
 
 ## Acceptance criteria
 

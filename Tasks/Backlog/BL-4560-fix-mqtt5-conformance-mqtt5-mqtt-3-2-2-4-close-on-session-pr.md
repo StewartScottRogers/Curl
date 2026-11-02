@@ -18,7 +18,7 @@ A CONNACK with Session Present 1 answering curl's Clean Start CONNECT ends the m
 
 ## Context
 
-OASIS MQTT 5.0 MQTT-3.2.2-4: a client without Session State that receives Session Present 1 MUST close the Network Connection. curl always sends Clean Start and keeps no session, so `Mqtt5ClientFlow.RunAsync` must check `Mqtt5ConnAck.SessionPresent` after the reason code. Exit code and text decided in ADR-1191 (BL-4518). Found by BL-4518's `ConnackCases`.
+OASIS MQTT 5.0 MQTT-3.2.2-4: a client without Session State that receives Session Present 1 MUST close the Network Connection. curl always sends Clean Start and keeps no session, so `Mqtt5ClientFlow.RunAsync` must check `Mqtt5ConnAck.SessionPresent` after the reason code. Exit code and text decided in ADR-1193 (BL-4518). Found by BL-4518's `ConnackCases`.
 
 ## Acceptance criteria
 

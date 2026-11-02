@@ -1,4 +1,4 @@
-# ADR-1191: The mqtt5:// client refuses Session Present after Clean Start and a PUBLISH over the server's Maximum Packet Size
+# ADR-1193: The mqtt5:// client refuses Session Present after Clean Start and a PUBLISH over the server's Maximum Packet Size
 
 - Status: Accepted
 - Date: 2026-11-02
