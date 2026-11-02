@@ -35,3 +35,4 @@ Found by BL-4521 on lane 3 (2026-11-02): it failed once (643 ms) in `dotnet test
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 6d1426b8 59888c86.
 - 2026-11-02: Doing -> Backlog. Waits on BL-4543 (CI fix for the same test, holding Curl.Conformance.Extended.UnitTests and .UnitLibrary incl. Harness/ReferenceRun.cs)
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 6d1426b8 59888c86.
