@@ -84,3 +84,4 @@ curl -sS "http://a%FFb:20200/a" --connect-to ::127.0.0.1:20200
 - 2026-10-26: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-3588-20261026-063535-L2.jsonl
 - 2026-10-26: Backlog -> Deferred. Split into BL-3884, BL-3885, BL-3886 after exceeding its cost cap
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
