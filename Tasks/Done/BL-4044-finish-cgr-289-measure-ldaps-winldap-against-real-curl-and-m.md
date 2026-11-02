@@ -8,7 +8,7 @@ depends-on: [BL-4046]
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitLibrary/WinLdapLogonBind.cs, Curl.Original.Protocol.Ldap.UnitTests/Cgr289Tests.cs, Record-CurlExchange.ps1, Curl.Networking.UnitLibrary/ISystemStoreTrustTlsProvider.cs, Curl.Networking.UnitTests/ConnectTargetTlsOverrideTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-11-02
 ---
 # BL-4044 — Finish CGR-289: measure ldaps:// WinLDAP against real curl and match the NTLM flags and single bind
 
@@ -22,8 +22,8 @@ BL-3818 made LdapProtocolHandler open WinLDAP's second ldaps connection with Tls
 
 ## Acceptance criteria
 
-- [ ] `curl -sS -k ldaps://localhost:PORT/dc=test` and the `--cacert` variant give the same exit code, stderr and wire bytes through real curl and Curl; both results are recorded in Notes.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `curl -sS -k ldaps://localhost:PORT/dc=test` and the `--cacert` variant give the same exit code, stderr and wire bytes through real curl and Curl; both results are recorded in Notes.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -34,6 +34,8 @@ BL-3818 made LdapProtocolHandler open WinLDAP's second ldaps connection with Tls
 - `--cacert` with a CA that does not issue the server certificate (Curl.Output.UnitTests/Fixtures/LoopbackChain.pem): both exit 60 with the same stderr on the first connection. The trusted-`--cacert` variant (gap report: Server Down) still needs measuring once BL-4046 is in; Record-CurlExchange's -TlsRootCertificateFile wrote no file in my hashtable-splatted run, so pass it directly next time.
 - Networking and Ldap fast tests pass (3814 and 638); Measure-CodeQuality for Curl.Networking.UnitLibrary and Curl.Original.Protocol.Ldap.UnitLibrary: 0 failing members.
 
+- 2026-11-02 lane 5: all of the work landed through the split: BL-4054 (recorder second TLS connection, -k kept, ADR-0992), BL-4055 (-k: exit 38 Unavailable and the full NTLM exchange match real curl byte for byte, flags 07 b2 08 a2, one bind, one unbind) and BL-4056 (trusted --cacert: exit 38 Server Down matches, ADR-0994; BL-3818 ticked and Done). All are in Done; the stash 0b3638d9 is that same work, already landed, so nothing was carried over. dotnet build clean and the fast tests green on this branch (115 test projects, 0 failed).
+
 ## Log
 
 - 2026-10-28: Created.
@@ -42,3 +44,4 @@ BL-3818 made LdapProtocolHandler open WinLDAP's second ldaps connection with Tls
 - 2026-10-29: Backlog -> Deferred. Split into BL-4054, BL-4055, BL-4056 (cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 8d4a1a39 779790c0.
+- 2026-11-02: Doing -> Done. Delivered through BL-4054, BL-4055 and BL-4056
