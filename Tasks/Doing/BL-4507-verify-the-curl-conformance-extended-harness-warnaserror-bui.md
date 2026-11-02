@@ -36,3 +36,4 @@ Split from BL-4501 (see BL-4501 and BL-4462). Runs after BL-4505 and BL-4506. AD
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: a18d009a 5e07140c 8108353b feac4ffa.
 - 2026-11-02: Doing -> Backlog. Returned from Doing at shift start: no lane held it and no work for it exists anywhere (no uncommitted work, no parked branch, no lane branch ahead of the shift branch).
+- 2026-11-02: Backlog -> Doing. Criteria at claim: a18d009a 5e07140c 8108353b feac4ffa.
