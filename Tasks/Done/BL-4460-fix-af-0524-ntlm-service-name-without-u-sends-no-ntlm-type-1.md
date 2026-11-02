@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4461]
-touches: [Curl.Original.Protocol.Http.UnitLibrary, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs, Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs, Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.Authentication.cs, Curl.Engine.UnitTests/HttpRequestOptionsMappingTests.cs]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4460 — Fix AF-0524: --ntlm --service-name without -u sends no NTLM Type-1 Authorization where curl starts NTLM with the default Windows credentials
 
@@ -41,12 +41,13 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-11-02 (lane 1): The HTTP handler cannot see `--service-name`: it reaches only `MailRequestOptions` and `NegotiateOptions`, never `HttpRequestOptions` or `ITransferContext`. The fix needs (1) a `ServiceName` property on `Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs`, (2) mapping `authentication.ServiceName` into it in `Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs` (next to `SaslAuthorizationIdentity`), and (3) `OriginCredentialOf` in `HttpProtocolHandler.cs` giving `new NetworkCredential("", "")` (the ADR-0142 default-credential path) when there is no `-u`, `ServiceName` is set and NTLM is among the allowed schemes, plus an ADR (Decided by Claude under Stewart's delegation) and unit tests beside the AF-0522 ones in `HttpProtocolHandlerTests.Authentication.cs`. Touches widened to name those two files. BL-4461 holds the whole of Curl.Engine.UnitLibrary, so this task depends on BL-4461 and goes back to Backlog before any code edit; no code was changed.
+- 2026-11-02 (lane 3): Fixed as lane 1 planned. `HttpRequestOptions.ServiceName` carries `--service-name` (mapped in `HttpRequestOptionsMapping.Of`), and `HttpProtocolHandler.OriginCredentialOf` gives the empty ADR-0142 credential when there is no `-u`, a service name is set and NTLM is the one scheme allowed (`StartsWithAnEmptyUser`, beside ADR-1182's Digest rule). Decision: NTLM alone, not `--anyauth` or `--negotiate`, because only `--ntlm` was measured; recorded in ADR-1183. The reproduction against the Debug build now sends `Authorization: NTLM TlRMTVNTUAABAAAAB7IIogkA...`, the same Type-1 prefix as curl's. Tests: `ExecuteAsync_NtlmWithServiceNameAndNoCredentials_SendsTheType1MessageAsAnEmptyUser`, `ExecuteAsync_NoCredentialsAndNoEmptyUserRule_SendsNoAuthorization` (Basic, Any and Digest with a service name, NTLM without one) and `Of_ServiceName_IsCopiedFromTheAuthenticationOptions`; touches widened to the two test files they live in (no task in Doing names them). The fast tests are green, and Measure-CodeQuality.ps1 reports 0 failing members across the Http, Engine and Abstractions libraries. The change is platform-neutral.
 
 ## Log
 
@@ -54,3 +55,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-11-02: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs to map --service-name into HttpRequestOptions; BL-4461 holds Curl.Engine.UnitLibrary
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-02: Doing -> Done. --ntlm --service-name without -u now sends the NTLM Type-1 Authorization as curl does
