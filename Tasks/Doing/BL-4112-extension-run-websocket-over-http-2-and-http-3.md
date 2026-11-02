@@ -46,3 +46,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-4112-20261029-140509-L5.jsonl
 - 2026-10-29: Backlog -> Deferred. Split into BL-4298, BL-4295, BL-4296 and BL-4297; cost cap exceeded
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 80dd9d14 7bdf3437 50d813ce e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
