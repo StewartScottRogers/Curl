@@ -8,7 +8,7 @@ depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4015, BL-4016, BL-4007, BL-4
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitLibrary/ManagedMultiTransfer.Timer.cs, Curl.Engine.UnitLibrary/ManagedMultiTransfer.WaitSockets.cs, Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.SocketAction.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.Counts.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.Timers.cs, Curl.Engine.UnitTests/Cgr148Tests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-11-02
 ---
 # BL-3990 — Remove FirstTransferSocket and the 10 ms RunningTransferCheckInterval timer from ManagedMultiTransfer for CGR-034
 
@@ -22,10 +22,10 @@ Split from BL-3976 (cost cap), itself split from BL-3563 (CGR-034). BL-3981 land
 
 ## Acceptance criteria
 
-- [ ] `FirstTransferSocket` and `RunningTransferCheckInterval` (10 ms) no longer exist in `Curl.Engine.UnitLibrary`.
-- [ ] The tests in `ManagedMultiTransferTests.SocketAction.cs`, `.Counts.cs`, `.Timers.cs` and `Cgr148Tests.cs` expect the real-socket answers and pass.
-- [ ] `Cgr034Tests` still pin `C_20`, `C_74` and `C_75`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `FirstTransferSocket` and `RunningTransferCheckInterval` (10 ms) no longer exist in `Curl.Engine.UnitLibrary`.
+- [x] The tests in `ManagedMultiTransferTests.SocketAction.cs`, `.Counts.cs`, `.Timers.cs` and `Cgr148Tests.cs` expect the real-socket answers and pass.
+- [x] `Cgr034Tests` still pin `C_20`, `C_74` and `C_75`.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -35,6 +35,8 @@ Split from BL-3976 (cost cap), itself split from BL-3563 (CGR-034). BL-3981 land
   - What still uses the synthetic numbers and the 10 ms timer: only a transfer whose `PerformingTransfer` is not a `ManagedEasyTransfer` (test fakes; production always forwards one since ADR-0986), plus a managed one before its dial has a socket, and one waiting without a socket.
   - Decision to record in a new ADR (decided by Claude under Stewart's delegation): a running transfer with no socket the handle knows is told no socket (drop `TellSocketCallback`'s `NeedsSocket` branch, `SocketNumberOf`, `nextTransferSocket`, `MultiEntry.Number`), is left out of `GetWaitSockets` (`WaitSocketOf` answers `CurlSocket?`, nulls skipped), and makes the timer 0 (`CheckIntervalMilliseconds` returns 0: `Math.Min(handleTimeout, 0)` is always 0 there), as libcurl's `Curl_expire(data, 0)` for a transfer that can run on. Real libcurl has no transfer without a socket, so nothing to measure.
   - Files: `ManagedMultiTransfer.cs` (class summary lines 27-29, field line 70, `FirstTransferSocket` lines 82-87, `ResolverWakeupSocket` summary "just below FirstTransferSocket", `RunningTransferCheckInterval` lines 95-100), `.Timer.cs` (summary line 57, lines 80-89), `.MovingOn.cs` (lines 181-185, 218, `IsActionFor` summary line 223), `.WaitSockets.cs` (summary line 108, line 126), `.Queueing.cs` lines 67-69 (add to touches), the three doc comments above, and the fake-transfer tests: `SocketAction.cs` (expected "socket ... In null" lines go, "timer 10" becomes "timer 0", socket actions on `FirstSocket` become `CurlMultiSockets.Timeout`), `Counts.cs` lines 75-125, `Timers.cs` line 267, `Cgr148Tests.cs` line 17, and the Curl.Engine.UnitLibrary CLAUDE.md paragraphs BL-2426 and BL-2427 that describe the numbering.
+
+- 2026-11-02 run (lane 2): nothing left to do. Its split parts landed it: BL-4072 (commit 264b4b72e removed FirstTransferSocket and the synthetic socket numbers) and BL-4073 (ADR-0997), both in Done/2026-10-29, and BL-4069 (commit 1f3b59c96 set the timer to 0, so RunningTransferCheckInterval is gone). A grep finds neither name in any .cs file or CLAUDE.md. Cgr034Tests pass. The stashed edit to ManagedMultiTransfer.cs (5e09dfc9) is obsolete and was not applied. dotnet build is clean, and all 115 fast test projects pass (Curl.Engine.UnitTests: 2947 passed, 7 skipped). No code changed, so no quality run was needed. The change stays platform-neutral.
 
 ## Log
 
@@ -48,3 +50,4 @@ Split from BL-3976 (cost cap), itself split from BL-3563 (CGR-034). BL-3981 land
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 7440ff2a 34a4aed9 18d43fff 779790c0.
 - 2026-11-02: Doing -> Backlog. Returned from Doing at shift start: no lane held it and no work for it exists anywhere (no uncommitted work, no parked branch, no lane branch ahead of the shift branch).
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 7440ff2a 34a4aed9 18d43fff 779790c0.
+- 2026-11-02: Doing -> Done. FirstTransferSocket and the 10 ms timer are gone (BL-4072, BL-4069); every multi transfer is told its real socket or none
