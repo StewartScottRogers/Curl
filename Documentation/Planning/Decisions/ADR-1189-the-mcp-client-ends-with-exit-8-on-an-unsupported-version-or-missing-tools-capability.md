@@ -23,7 +23,7 @@ or `tools/call` whatever capabilities the server declares (BL-4482's conformance
   the protocol.
 - A server whose `initialize` result declares no `tools` capability offers nothing curl can do:
   curl sends no `tools/` request and exits 8.
-- The conformance cases pin this; BL-4514 and BL-4515 make the client do it.
+- The conformance cases pin this; BL-4535 and BL-4536 make the client do it.
 
 ## Consequences
 

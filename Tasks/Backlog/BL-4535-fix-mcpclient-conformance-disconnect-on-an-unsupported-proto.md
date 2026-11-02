@@ -1,5 +1,5 @@
 ---
-id: BL-4514
+id: BL-4535
 title: Fix McpClient conformance: disconnect on an unsupported protocol version
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4514 — Fix McpClient conformance: disconnect on an unsupported protocol version
+# BL-4535 — Fix McpClient conformance: disconnect on an unsupported protocol version
 
 ## Goal
 

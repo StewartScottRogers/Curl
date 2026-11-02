@@ -1,5 +1,5 @@
 ---
-id: BL-4515
+id: BL-4536
 title: Fix McpClient conformance: use only negotiated capabilities
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4515 — Fix McpClient conformance: use only negotiated capabilities
+# BL-4536 — Fix McpClient conformance: use only negotiated capabilities
 
 ## Goal
 

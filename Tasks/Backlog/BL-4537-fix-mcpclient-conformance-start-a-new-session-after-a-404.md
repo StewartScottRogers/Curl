@@ -1,5 +1,5 @@
 ---
-id: BL-4516
+id: BL-4537
 title: Fix McpClient conformance: start a new session after a 404
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4516 — Fix McpClient conformance: start a new session after a 404
+# BL-4537 — Fix McpClient conformance: start a new session after a 404
 
 ## Goal
 
