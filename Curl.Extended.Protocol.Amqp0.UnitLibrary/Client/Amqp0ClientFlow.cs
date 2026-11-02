@@ -11,6 +11,8 @@ namespace Curl.Extended.Protocol.Amqp0.Client;
 /// default exchange and otherwise one basic.get with no-ack, and channel.close and connection.close at the end. A
 /// connection.close or channel.close from the server ends the transfer naming its reply code and text. A basic.return
 /// the server sends is read with its returned message and skipped: nothing is written and the transfer goes on (ADR-1198).
+/// A channel.flow is answered with channel.flow-ok carrying the same active bit, and after an active 0 the publish waits
+/// for a channel.flow with active 1 before it sends content (ADR-1199).
 /// </summary>
 internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
 {
@@ -37,6 +39,9 @@ internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITra
     private const ushort BasicClassId = 60;
 
     private readonly Amqp0FrameChannel channel = new(transport, cancellationToken);
+
+    /// <summary>Whether the broker lets the client send content: true until a channel.flow with active 0 (section 1.5.2.3).</summary>
+    private bool flowActive = true;
 
     /// <summary>The body bytes written to the output so far.</summary>
     internal long BytesWritten { get; private set; }
@@ -95,6 +100,7 @@ internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITra
 
     private async ValueTask PublishAsync(string queue, ReadOnlyMemory<byte> body)
     {
+        await WaitUntilFlowIsActiveAsync().ConfigureAwait(false);
         await channel.SendAsync(
             [
                 new Amqp0BasicPublish(string.Empty, queue).ToFrame(ChannelNumber),
@@ -138,16 +144,46 @@ internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITra
     private async ValueTask<T> ReceiveMethodAsync<T>()
         where T : Amqp0Method
     {
-        Amqp0Method method = Amqp0MethodReader.Read(await ReceiveFrameAsync().ConfigureAwait(false));
-        while (method is Amqp0BasicReturn)
+        Amqp0Method? method;
+        while ((method = await ReceiveAnsweringUnaskedAsync().ConfigureAwait(false)) is null)
         {
-            // An unasked basic.return (the client never sets mandatory) is read with its content and skipped (ADR-1198).
-            await ReceiveContentAsync().ConfigureAwait(false);
-            method = Amqp0MethodReader.Read(await ReceiveFrameAsync().ConfigureAwait(false));
         }
 
         await ThrowIfClosedByServerAsync(method).ConfigureAwait(false);
         return method as T ?? throw Unexpected(method);
+    }
+
+    /// <summary>Waits, answering each channel.flow, until the broker lets content flow again (ADR-1199); any other method
+    /// arriving meanwhile ends the transfer as the server's close or an unexpected method.</summary>
+    private async ValueTask WaitUntilFlowIsActiveAsync()
+    {
+        while (!flowActive)
+        {
+            if (await ReceiveAnsweringUnaskedAsync().ConfigureAwait(false) is { } method)
+            {
+                await ThrowIfClosedByServerAsync(method).ConfigureAwait(false);
+                throw Unexpected(method);
+            }
+        }
+    }
+
+    /// <summary>Reads one method; the methods the broker sends unasked are dealt with here and give <see langword="null"/>.
+    /// A basic.return (the client never sets mandatory) is read with its content and skipped (ADR-1198); a channel.flow is
+    /// answered with channel.flow-ok carrying the same active bit, which is remembered (section 1.5.2.3, ADR-1199).</summary>
+    private async ValueTask<Amqp0Method?> ReceiveAnsweringUnaskedAsync()
+    {
+        switch (Amqp0MethodReader.Read(await ReceiveFrameAsync().ConfigureAwait(false)))
+        {
+            case Amqp0BasicReturn:
+                await ReceiveContentAsync().ConfigureAwait(false);
+                return null;
+            case Amqp0ChannelFlow flow:
+                flowActive = flow.Active;
+                await channel.SendAsync(new Amqp0ChannelFlowOk(flow.Active).ToFrame(ChannelNumber)).ConfigureAwait(false);
+                return null;
+            case var method:
+                return method;
+        }
     }
 
     private async ValueTask<Amqp0Frame> ReceiveFrameAsync()

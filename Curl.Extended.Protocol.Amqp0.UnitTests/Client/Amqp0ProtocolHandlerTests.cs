@@ -97,6 +97,58 @@ public sealed class Amqp0ProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ChannelFlowBeforeDeclareOk_IsAnsweredWithFlowOkAndPublishes()
+    {
+        ScriptedAmqp0Connection connection = new([.. Opened(), .. Frame(new Amqp0ChannelFlow(true), 1), .. Frame(new Amqp0QueueDeclareOk("q", 0, 0), 1), .. Closes()]);
+
+        TransferResult result = await PublishAsync(connection);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(new Amqp0ChannelFlowOk(true), Method(connection.Writes[6], 1));
+        Assert.AreEqual(new Amqp0BasicPublish(string.Empty, "q"), Amqp0MethodReader.Read(Frames(connection.Writes[7])[0]));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ChannelFlowInactive_PublishesOnlyAfterFlowIsActiveAgain()
+    {
+        ScriptedAmqp0Connection connection = new(
+        [
+            .. Opened(), .. Frame(new Amqp0ChannelFlow(false), 1), .. Frame(new Amqp0QueueDeclareOk("q", 0, 0), 1),
+            .. Frame(new Amqp0ChannelFlow(true), 1), .. Closes(),
+        ]);
+
+        TransferResult result = await PublishAsync(connection);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(new Amqp0ChannelFlowOk(false), Method(connection.Writes[6], 1));
+        Assert.AreEqual(new Amqp0ChannelFlowOk(true), Method(connection.Writes[7], 1));
+        Assert.AreEqual(new Amqp0BasicPublish(string.Empty, "q"), Amqp0MethodReader.Read(Frames(connection.Writes[8])[0]));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ChannelCloseWhileFlowIsInactive_EndsWithWeirdServerReplyWithoutPublishing()
+    {
+        ScriptedAmqp0Connection connection = new(
+            [.. Opened(), .. Frame(new Amqp0ChannelFlow(false), 1), .. Frame(new Amqp0QueueDeclareOk("q", 0, 0), 1), .. Frame(new Amqp0ChannelClose(406, "PRECONDITION_FAILED", 0, 0), 1)]);
+
+        TransferResult result = await PublishAsync(connection);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual(new Amqp0ChannelCloseOk(), Method(connection.Writes[7], 1));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_OtherMethodWhileFlowIsInactive_EndsWithWeirdServerReplyWithoutPublishing()
+    {
+        ScriptedAmqp0Connection connection = new([.. Opened(), .. Frame(new Amqp0ChannelFlow(false), 1), .. Frame(new Amqp0QueueDeclareOk("q", 0, 0), 1), .. Frame(new Amqp0BasicGetEmpty(), 1)]);
+
+        TransferResult result = await PublishAsync(connection);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.HasCount(7, connection.Writes);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_GetEmpty_EndsAsEmptyTransfer()
     {
         ScriptedAmqp0Connection connection = new([.. Handshake(0, 0), .. Frame(new Amqp0BasicGetEmpty(), 1), .. Closes()]);
@@ -336,6 +388,18 @@ public sealed class Amqp0ProtocolHandlerTests
         .. Frame(new Amqp0ChannelOpenOk(), 1),
         .. Frame(new Amqp0QueueDeclareOk("q", 0, 0), 1),
     ];
+
+    private static byte[] Opened() =>
+    [
+        .. Frame(Start("PLAIN AMQPLAIN")),
+        .. Frame(new Amqp0ConnectionTune(0, 0, 60)),
+        .. Frame(new Amqp0ConnectionOpenOk()),
+        .. Frame(new Amqp0ChannelOpenOk(), 1),
+    ];
+
+    private static ValueTask<TransferResult> PublishAsync(ScriptedAmqp0Connection connection) =>
+        new Amqp0ProtocolHandler(new ScriptedAmqp0Connector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("amqp://broker/v/q"), Output = new MemoryStream(), PostData = "hi"u8.ToArray() });
 
     private static byte[] Closes() => [.. Frame(new Amqp0ChannelCloseOk(), 1), .. Frame(new Amqp0ConnectionCloseOk())];
 

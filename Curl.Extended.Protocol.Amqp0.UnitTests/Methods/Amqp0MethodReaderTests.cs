@@ -24,6 +24,8 @@ public sealed class Amqp0MethodReaderTests
         (new Amqp0ChannelOpen(), "0014000A" + "00"),
         (new Amqp0ChannelOpenOk(), "0014000B" + "00000000"),
         (new Amqp0ChannelClose(406, "PRECONDITION_FAILED", 50, 10), "00140028" + "0196" + "13505245434F4E444954494F4E5F4641494C4544" + "0032" + "000A"),
+        (new Amqp0ChannelFlow(Active: false), "00140014" + "00"),
+        (new Amqp0ChannelFlowOk(Active: true), "00140015" + "01"),
         (new Amqp0ChannelCloseOk(), "00140029"),
         (new Amqp0QueueDeclare("q1") { Durable = true, AutoDelete = true }, "0032000A" + "0000" + Q1 + "0A" + "00000000"),
         (new Amqp0QueueDeclareOk("q1", 3, 0), "0032000B" + Q1 + "00000003" + "00000000"),

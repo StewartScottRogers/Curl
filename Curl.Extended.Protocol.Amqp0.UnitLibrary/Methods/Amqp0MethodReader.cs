@@ -20,6 +20,8 @@ internal static class Amqp0MethodReader
         [(10, 51)] = _ => new Amqp0ConnectionCloseOk(),
         [(20, 10)] = Amqp0ChannelOpen.ReadArguments,
         [(20, 11)] = Amqp0ChannelOpenOk.ReadArguments,
+        [(20, 20)] = Amqp0ChannelFlow.ReadArguments,
+        [(20, 21)] = Amqp0ChannelFlowOk.ReadArguments,
         [(20, 40)] = Amqp0ChannelClose.ReadArguments,
         [(20, 41)] = _ => new Amqp0ChannelCloseOk(),
         [(50, 10)] = Amqp0QueueDeclare.ReadArguments,
