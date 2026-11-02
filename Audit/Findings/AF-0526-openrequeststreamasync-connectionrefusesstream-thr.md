@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Http3.UnitTests/Http3ClientSessionTests.cs:OpenRequestStreamAsync_ConnectionRefusesStream_ThrowsItsIOException:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-4510
+tasks: BL-4510
 found: 2026-11-02
 found-at: 4698726450f0ce3447bd6790d0bf9c59787bae95
 scorecard: 2026-11-02_0645.md

@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:RunDarkFactory.ps1:OpusLibraries:false-help
 reproduction: none
-task: none
-tasks:
+task: BL-4512
+tasks: BL-4512
 found: 2026-11-02
 found-at: 4698726450f0ce3447bd6790d0bf9c59787bae95
 scorecard: 2026-11-02_0645.md
