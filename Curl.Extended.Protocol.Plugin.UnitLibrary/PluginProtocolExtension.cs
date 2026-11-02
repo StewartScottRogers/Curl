@@ -9,6 +9,12 @@ namespace Curl.Extended.Protocol.Plugin;
 /// </summary>
 public static class PluginProtocolExtension
 {
+    /// <summary>Lists one directory's helper files; a field, so the delegate is made once and no call checks a cache.</summary>
+    private static readonly Func<string, IEnumerable<string>> ListHelperFiles = HelperProgramDirectory.ListHelperFiles;
+
+    /// <summary>Reads this process's environment; a field for the same reason.</summary>
+    private static readonly Func<string, string?> ReadProcessEnvironmentVariable = Environment.GetEnvironmentVariable;
+
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "plugin-protocol",
@@ -25,15 +31,17 @@ public static class PluginProtocolExtension
         "sftp", "smb", "smbs", "smtp", "smtps", "telnet", "tftp", "ws", "wss",
     ];
 
-    /// <summary>Creates the handler for the helper programs on this process's <c>PATH</c>.</summary>
-    /// <param name="services">Curl's connection services; a helper opens its own connections, so none is used.</param>
+    /// <summary>Creates the handler for the helper programs on <c>PATH</c>: the environment of the host's process starter and through it (ADR-1183), or without one this process's environment and real processes.</summary>
+    /// <param name="services">Curl's connection services; a helper opens its own connections, so only the process starter is used.</param>
     /// <param name="extensionSchemes">The schemes the other extensions serve, which a helper never takes either.</param>
     /// <returns>The handler, serving one scheme per helper found.</returns>
     public static IProtocolHandler CreateHandler(ProtocolHandlerServices services, IEnumerable<string> extensionSchemes)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(extensionSchemes);
-        return Create(Environment.GetEnvironmentVariable, OperatingSystem.IsWindows(), HelperProgramDirectory.ListHelperFiles, new SystemHelperProcessStarter(), extensionSchemes);
+        return services.ProcessStarter is { } starter
+            ? Create(starter.ReadEnvironmentVariable, OperatingSystem.IsWindows(), ListHelperFiles, new ExtensionHelperProcessStarter(starter), extensionSchemes)
+            : Create(ReadProcessEnvironmentVariable, OperatingSystem.IsWindows(), ListHelperFiles, new SystemHelperProcessStarter(), extensionSchemes);
     }
 
     /// <summary>Creates the handler for the helpers <paramref name="listHelperFiles" /> finds in the <c>PATH</c> directories.</summary>

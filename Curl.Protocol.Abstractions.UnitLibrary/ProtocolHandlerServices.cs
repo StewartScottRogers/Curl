@@ -9,8 +9,14 @@ namespace Curl.Protocol.Abstractions;
 /// <param name="DatagramConnector">Opens UDP channels; the engine's end-point recording datagram connector.</param>
 /// <param name="TlsProvider">Upgrades a connection to TLS.</param>
 /// <param name="DnsResolver">Resolves host names.</param>
+/// <param name="ProcessStarter">
+/// Starts the programs an extension runs and reads the environment it finds them in (ADR-1183);
+/// <see langword="null" /> when the host gives none, and each extension then starts real processes
+/// with its own <see cref="System.Diagnostics.Process" /> adapter and reads the process environment.
+/// </param>
 public sealed record ProtocolHandlerServices(
     IConnector Connector,
     IDatagramConnector DatagramConnector,
     ITlsProvider TlsProvider,
-    IDnsResolver DnsResolver);
+    IDnsResolver DnsResolver,
+    IExtensionProcessStarter? ProcessStarter = null);
