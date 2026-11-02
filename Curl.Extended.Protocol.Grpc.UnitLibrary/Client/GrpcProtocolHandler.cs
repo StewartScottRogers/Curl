@@ -125,7 +125,7 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
     }
 
     // A grpcs:// target carries PoolScheme https, the one scheme whose TLS handshake offers the
-    // target's ApplicationProtocols through ALPN, so the ClientHello offers h2 (ADR-1194, BL-4562).
+    // target's ApplicationProtocols through ALPN, so the ClientHello offers h2 (ADR-1197, BL-4562).
     private static ConnectTarget TargetOf(ITransferContext context, bool secure) =>
         new(context.Url.IdnHost, context.Url.Port >= 0 ? context.Url.Port : DefaultPortOf(secure), secure)
         {

@@ -1,4 +1,4 @@
-# ADR-1194: A grpcs:// target carries PoolScheme https so its handshake offers ALPN h2
+# ADR-1197: A grpcs:// target carries PoolScheme https so its handshake offers ALPN h2
 
 - Status: Accepted
 - Date: 2026-11-02
