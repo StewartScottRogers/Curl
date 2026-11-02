@@ -36,3 +36,4 @@ environment the extension services or transfer context carry (find how other ext
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 8d051639 86099949 6e066f62.
