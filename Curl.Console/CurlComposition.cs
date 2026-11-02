@@ -22,8 +22,6 @@ using Curl.Extension.Composition;
 using Curl.Kerberos;
 using Curl.Networking;
 using Curl.Ntlm;
-using Curl.Output;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Dict;
 using Curl.Original.Protocol.File;
 using Curl.Original.Protocol.Ftp;
@@ -40,6 +38,8 @@ using Curl.Original.Protocol.Ssh;
 using Curl.Original.Protocol.Telnet;
 using Curl.Original.Protocol.Tftp;
 using Curl.Original.Protocol.Ws;
+using Curl.Output;
+using Curl.Protocol.Abstractions;
 using Curl.Ssh.Negotiation;
 using Libcurl.Misc.ErrorText;
 using static Curl.Engine.EngineComposition;
@@ -364,6 +364,7 @@ internal static class CurlComposition
     /// <param name="extensionOptions">The extensions' long options the parser reads (ADR-1006); <see langword="null" /> for every registered extension's. Tests pass their own.</param>
     /// <param name="extensionResolverHookActivators">The extensions' resolver hook activators (ADR-1012); <see langword="null" /> for <see cref="ExtensionResolverHookCatalogue.Entries" />. Tests pass their own.</param>
     /// <param name="extensionConnectionHookActivators">The extensions' connection hook activators (ADR-1010); <see langword="null" /> for <see cref="ExtensionConnectionHookCatalogue.Entries" />. Tests pass their own.</param>
+    /// <param name="timeProvider">The clock every timer of the run runs on - the connection cache, the TLS providers, the TCP and pooling connectors, the DoH connector, the runner and the transfer performer's <c>-m</c>, <c>-y</c> and <c>--connect-timeout</c> watchdogs; <see cref="TimeProvider.System" /> when not given (BL-4500).</param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -396,16 +397,18 @@ internal static class CurlComposition
         bool parsesAsEchBuild = false,
         IReadOnlyList<ExtensionOption>? extensionOptions = null,
         IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>>? extensionResolverHookActivators = null,
-        IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>>? extensionConnectionHookActivators = null)
+        IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>>? extensionConnectionHookActivators = null,
+        TimeProvider? timeProvider = null)
     {
-        ConnectionCache runConnections = new(TimeProvider.System);
+        TimeProvider clock = RunClockOf(timeProvider);
+        ConnectionCache runConnections = new(clock);
         LateBoundDiagnosticLog runLog = new();
         Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
-        string? dnsServer = honoursDnsServerVariable ? environment(DnsServerVariableName) : null;
-        IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>> resolverActivators = extensionResolverHookActivators ?? ExtensionResolverHookCatalogue.Entries;
+        string? dnsServer = HonouredDnsServerOf(honoursDnsServerVariable, environment);
+        IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>> resolverActivators = ResolverHookActivatorsOf(extensionResolverHookActivators);
         IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>> connectionActivators = ConnectionHookActivatorsOf(extensionConnectionHookActivators);
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, ExtensionResolverHooksOf(options, resolverActivators).ResolverOver(DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector))), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes, connectionActivators)),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, ExtensionResolverHooksOf(options, resolverActivators).ResolverOver(DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector), clock)), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes, connectionActivators, clock)),
             RunFileSystemOf(fileSystem),
             new PhysicalFileSystem(),
             standardOutput,
@@ -428,7 +431,8 @@ internal static class CurlComposition
             parsesAsWindowsBuild: parsesAsWindowsBuild,
             parsesAsQuicBuild: parsesAsQuicBuild,
             parsesAsEchBuild: parsesAsEchBuild,
-            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
+            timeProvider: clock,
+            transferPerformer: new TransferPerformer(clock, EasyErrorText),
             extendedAttributeWriter: extendedAttributeWriter,
             debugWriteOut: DebugWriteOutStandIn.OfHonoured(honoursDebugWriteOutVariables, environment),
             extensionOptions: extensionOptions);
@@ -439,6 +443,24 @@ internal static class CurlComposition
     /// <returns>The run's connection hook activators.</returns>
     private static IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>> ConnectionHookActivatorsOf(IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>>? given) =>
         given ?? ExtensionConnectionHookCatalogue.Entries;
+
+    /// <summary>The clock every timer of the dialing runner's run runs on: <paramref name="given" />, or <see cref="TimeProvider.System" /> when none was given.</summary>
+    /// <param name="given">The clock a test gave, or <see langword="null" />.</param>
+    /// <returns>The run's clock.</returns>
+    private static TimeProvider RunClockOf(TimeProvider? given) => given ?? TimeProvider.System;
+
+    /// <summary>The <c>CURL_DNS_SERVER</c> value the dialing runner resolves through when the seam is on; <see langword="null" /> when it is off.</summary>
+    /// <param name="honoursDnsServerVariable">Whether the seam is on.</param>
+    /// <param name="environment">Reads the run's environment.</param>
+    /// <returns>The variable's value, or <see langword="null" />.</returns>
+    private static string? HonouredDnsServerOf(bool honoursDnsServerVariable, Func<string, string?> environment) =>
+        honoursDnsServerVariable ? environment(DnsServerVariableName) : null;
+
+    /// <summary>The resolver hook activators the dialing runner activates: <paramref name="given" />, or <see cref="ExtensionResolverHookCatalogue.Entries" /> when none were given.</summary>
+    /// <param name="given">The activators a test gave, or <see langword="null" />.</param>
+    /// <returns>The run's resolver hook activators.</returns>
+    private static IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>> ResolverHookActivatorsOf(IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>>? given) =>
+        given ?? ExtensionResolverHookCatalogue.Entries;
 
     /// <summary>The HSTS clock a <c>CURL_TIME</c> fixes (<see cref="HstsClockOf" />) when the seam is on; <see langword="null" />, for the real clock, when it is off.</summary>
     /// <param name="honoursHstsTimeVariable">Whether the seam is on.</param>
@@ -460,17 +482,18 @@ internal static class CurlComposition
     /// <param name="options">The option group, whose DoH URL, DoH TLS options, IP version and trace components pick the resolver.</param>
     /// <param name="tcpDialer">Opens the DoH server connections.</param>
     /// <param name="dnsResolver">The resolver the runner was given.</param>
+    /// <param name="clock">The clock the DoH connector's timers run on.</param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver DialingDohResolverOf(CommandLineOptions options, ITcpDialer tcpDialer, IDnsResolver dnsResolver)
+    internal static IDnsResolver DialingDohResolverOf(CommandLineOptions options, ITcpDialer tcpDialer, IDnsResolver dnsResolver, TimeProvider clock)
     {
         EasyNetworkOptions network = EasyOptionsFromCommandLine.NetworkOf(options);
         return network.DohUrl is { } dohUrl
-            ? CreateDohResolver(dohUrl, CreateDohConnector(EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.TlsOf(options), tcpDialer, TimeProvider.System, dnsResolver), AddressFamilyOf(network), easyErrorText: EasyErrorText)
+            ? CreateDohResolver(dohUrl, CreateDohConnector(EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.TlsOf(options), tcpDialer, clock, dnsResolver), AddressFamilyOf(network), easyErrorText: EasyErrorText)
             : dnsResolver;
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?, bool, IReadOnlyList{ExtensionOption}?, IReadOnlyList{Func{ExtensionOptionValues, IResolverHook?}}?, IReadOnlyList{Func{ExtensionOptionValues, IConnectionHook?}}?)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?, bool, IReadOnlyList{ExtensionOption}?, IReadOnlyList{Func{ExtensionOptionValues, IResolverHook?}}?, IReadOnlyList{Func{ExtensionOptionValues, IConnectionHook?}}?, TimeProvider?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
@@ -492,6 +515,7 @@ internal static class CurlComposition
     /// <param name="featureMask">The features the run behaves as built without, which the dispatch carries.</param>
     /// <param name="digestRandomBytes">Where Digest and DIGEST-MD5 draw their client nonce's bytes from; <see cref="System.Security.Cryptography.RandomNumberGenerator" /> when <see langword="null" />.</param>
     /// <param name="connectionActivators">One per extension: its connection hook when its option was given, otherwise <see langword="null" />.</param>
+    /// <param name="clock">The clock the group's TLS providers and its TCP and pooling connectors run their timers on.</param>
     /// <returns>The dispatch.</returns>
     private static TransferDispatch CreateDialingTransferDispatch(
         ITcpDialer tcpDialer,
@@ -509,7 +533,8 @@ internal static class CurlComposition
         ISecurityContextFactory? givenSecurityContexts,
         EngineFeatureMask featureMask,
         Func<int, byte[]>? digestRandomBytes,
-        IEnumerable<Func<ExtensionOptionValues, IConnectionHook?>> connectionActivators)
+        IEnumerable<Func<ExtensionOptionValues, IConnectionHook?>> connectionActivators,
+        TimeProvider clock)
     {
         ConnectionHooks connectionHooks = ExtensionConnectionHooksOf(options, connectionActivators);
         CertificateCheckHooks certificateCheckHooks = ExtensionCertificateCheckHooksOf(options);
@@ -519,15 +544,15 @@ internal static class CurlComposition
         EasyProxyOptions proxy = EasyOptionsFromCommandLine.ProxyOf(options);
         EasyAuthenticationOptions authentication = EasyOptionsFromCommandLine.AuthenticationOf(options);
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, options.UseAlpn, options.SslSessionsFile, readEnvironmentVariable);
-        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, TimeProvider.System);
-        ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyOf(tls, options.UseAlpn, readEnvironmentVariable), TimeProvider.System);
+        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, clock);
+        ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyOf(tls, options.UseAlpn, readEnvironmentVariable), clock);
         LateBoundSecurityContextFactory proxyContexts = new() { UsesHandBuiltNtlm = usesHandBuiltNtlm };
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(http, proxy, authentication, proxyContexts, diagnosticLog);
         EngineTraceComponents traces = EasyOptionsFromCommandLine.TraceComponentsOf(options);
         EngineToolOptions tool = EasyOptionsFromCommandLine.ToolOptionsOf(options);
         QuicDialer quicDialer = CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, connectionHooks.DatagramConnectorOver(datagramConnector));
-        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts, featureMask: featureMask);
-        PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, TimeProvider.System, runConnections, featureMask);
+        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, clock, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts, featureMask: featureMask);
+        PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, clock, runConnections, featureMask);
         ISecurityContextFactory securityContexts = givenSecurityContexts ?? CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
         proxyContexts.Bind(securityContexts);
         return new(
