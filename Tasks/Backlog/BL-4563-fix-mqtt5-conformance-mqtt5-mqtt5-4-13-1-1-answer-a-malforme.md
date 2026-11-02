@@ -1,5 +1,5 @@
 ---
-id: BL-4562
+id: BL-4563
 title: Fix Mqtt5 conformance: Mqtt5:MQTT5-4.13.1-1 answer a Malformed Packet or Protocol Error with DISCONNECT 0x81 or 0x82
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4562 — Fix Mqtt5 conformance: Mqtt5:MQTT5-4.13.1-1 answer a Malformed Packet or Protocol Error with DISCONNECT 0x81 or 0x82
+# BL-4563 — Fix Mqtt5 conformance: Mqtt5:MQTT5-4.13.1-1 answer a Malformed Packet or Protocol Error with DISCONNECT 0x81 or 0x82
 
 ## Goal
 
