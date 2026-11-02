@@ -1,5 +1,5 @@
 ---
-id: BL-4514
+id: BL-4530
 title: Conformance: gRPC reference server over HTTP/2 and a unary call case (Grpc part 1a)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4514 — Conformance: gRPC reference server over HTTP/2 and a unary call case (Grpc part 1a)
+# BL-4530 — Conformance: gRPC reference server over HTTP/2 and a unary call case (Grpc part 1a)
 
 ## Goal
 
@@ -31,7 +31,7 @@ grpc://host/pkg.Service/Method`, the `.proto` file in a temporary directory the 
 The server needs HPACK and HTTP/2 framing: reference `Curl.Http2.UnitLibrary` (HpackDecoder, HpackEncoder,
 Http2FrameCodec) from the library's csproj, or `Curl.Conformance.Http2Server.UnitLibrary`, and say which in
 `CLAUDE.md`; never a `Curl.Extended.Protocol.*` project (VerifyExtensionIsolation). Script the reply so later cases
-(BL-4515, BL-4516) choose response headers, DATA frame splits, trailers or Trailers-Only, HTTP status and
+(BL-4531, BL-4532) choose response headers, DATA frame splits, trailers or Trailers-Only, HTTP status and
 compressed-flag messages without editing the server, and BL-4478 can add the reflection service in
 `Grpc/Reflection/` without editing these files. The server records the request's HEADERS (decoded header list) and
 DATA frames so cases assert them.

@@ -65,15 +65,15 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 ## Notes
 
 - 2026-11-02 (lane 13): Split for size before any edit. The work needs an HTTP/2 and gRPC reference server, eleven
-  case groups and a full requirement matrix, more than one run allows. Split into BL-4514 (reference server, csproj
-  reference to the HTTP/2 layer, unary case, server coverage), BL-4515 (response cases), BL-4516 (framing, timeout
-  and grpcs cases) and BL-4517 (Grpc.md matrix and remaining request-header cases: the rest of this task, depending
+  case groups and a full requirement matrix, more than one run allows. Split into BL-4530 (reference server, csproj
+  reference to the HTTP/2 layer, unary case, server coverage), BL-4531 (response cases), BL-4532 (framing, timeout
+  and grpcs cases) and BL-4533 (Grpc.md matrix and remaining request-header cases: the rest of this task, depending
   on the other three). BL-4478's depends-on now names the four instead of BL-4477. Prerequisite found:
-  `Curl.Conformance.Extended.UnitLibrary` references no HTTP/2 or HPACK code, so BL-4514's touches include its
+  `Curl.Conformance.Extended.UnitLibrary` references no HTTP/2 or HPACK code, so BL-4530's touches include its
   csproj; no task in Doing touches that file.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 123b988a 102ec5aa a66e083a 2d0dc877 d8e3fb0e 378fd6f7 ef6c9026.
-- 2026-11-02: Doing -> Deferred. Split into BL-4514, BL-4515, BL-4516, BL-4517
+- 2026-11-02: Doing -> Deferred. Split into BL-4530, BL-4531, BL-4532, BL-4533

@@ -1,16 +1,16 @@
 ---
-id: BL-4517
+id: BL-4533
 title: Conformance: gRPC requirement matrix Grpc.md for PROTOCOL-HTTP2.md, remaining request-header cases and quality gate (Grpc part 1d)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514, BL-4515, BL-4516]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4530, BL-4531, BL-4532]
 touches: [Documentation/Conformance/Extended/Grpc.md, Curl.Conformance.Extended.UnitTests/Grpc/GrpcRequestHeaderCases.cs, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4517 — Conformance: gRPC requirement matrix Grpc.md for PROTOCOL-HTTP2.md, remaining request-header cases and quality gate (Grpc part 1d)
+# BL-4533 — Conformance: gRPC requirement matrix Grpc.md for PROTOCOL-HTTP2.md, remaining request-header cases and quality gate (Grpc part 1d)
 
 ## Goal
 
@@ -29,7 +29,7 @@ extension library is listed in `KnownFailures.txt` with a filed High task `Fix G
 focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), the `KnownFailures.txt` line is removed).
 Cases run curl in process through the harness, e.g. `curl --grpc-proto svc.proto -d '{"name":"x"}'
 grpc://host/pkg.Service/Method`, the `.proto` file in a temporary directory the test creates and deletes.
-Builds on BL-4514 (server, unary case), BL-4515 (response cases) and BL-4516 (framing, timeout, TLS cases).
+Builds on BL-4530 (server, unary case), BL-4531 (response cases) and BL-4532 (framing, timeout, TLS cases).
 
 ## Acceptance criteria
 

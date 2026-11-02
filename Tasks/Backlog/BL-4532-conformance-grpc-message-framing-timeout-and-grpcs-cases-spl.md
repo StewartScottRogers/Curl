@@ -1,16 +1,16 @@
 ---
-id: BL-4516
+id: BL-4532
 title: Conformance: gRPC message framing, timeout and grpcs cases - split DATA, truncated, compressed flag, grpc-timeout from -m, ALPN h2 (Grpc part 1c)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4530]
 touches: [Curl.Conformance.Extended.UnitTests/Grpc/GrpcFramingCases.cs, Curl.Conformance.Extended.UnitTests/Grpc/GrpcTimeoutCases.cs, Curl.Conformance.Extended.UnitTests/Grpc/GrpcTlsCases.cs, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4516 — Conformance: gRPC message framing, timeout and grpcs cases - split DATA, truncated, compressed flag, grpc-timeout from -m, ALPN h2 (Grpc part 1c)
+# BL-4532 — Conformance: gRPC message framing, timeout and grpcs cases - split DATA, truncated, compressed flag, grpc-timeout from -m, ALPN h2 (Grpc part 1c)
 
 ## Goal
 
@@ -27,7 +27,7 @@ extension library is listed in `KnownFailures.txt` with a filed High task `Fix G
 focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), the `KnownFailures.txt` line is removed).
 Cases run curl in process through the harness, e.g. `curl --grpc-proto svc.proto -d '{"name":"x"}'
 grpc://host/pkg.Service/Method`, the `.proto` file in a temporary directory the test creates and deletes.
-Uses the reference server BL-4514 adds; adds no file under `Curl.Conformance.Extended.UnitLibrary/Grpc/`. The TLS
+Uses the reference server BL-4530 adds; adds no file under `Curl.Conformance.Extended.UnitLibrary/Grpc/`. The TLS
 route is the harness's (`ReferenceRoute` TLS, `ReferenceCertificate.CreateSelfSigned`, curl under `-k`); the timeout
 runs on the harness's fake clock (BL-4503).
 
