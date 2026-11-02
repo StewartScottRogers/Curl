@@ -4,7 +4,7 @@ title: Conformance: MQTT 5.0 over WebSocket (section 6) and TLS for mqtt5+ws:// 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4484]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514, BL-4515, BL-4516]
 touches: [Curl.Conformance.Extended.UnitLibrary/Mqtt5/Transports, Curl.Conformance.Extended.UnitTests/Mqtt5/Transports, Documentation/Conformance/Extended/Mqtt5-Transports.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
@@ -25,7 +25,7 @@ Specifications: OASIS MQTT Version 5.0 (7 March 2019) chapter 6 ("Using WebSocke
 binary frames, an MQTT packet across frames or several in one, the `mqtt` subprotocol) and chapter 5 where it binds
 the client's use of TLS; RFC 6455 section 4.1 (client opening handshake: `Sec-WebSocket-Key`, `Upgrade`,
 `Connection`, `Sec-WebSocket-Protocol`, checking `Sec-WebSocket-Accept` and the selected subprotocol), 5.1 to 5.5
-(client frames masked, control frames, close). Builds on the reference broker BL-4484 wrote in
+(client frames masked, control frames, close). Builds on the reference broker BL-4514 wrote in
 `Curl.Conformance.Extended.UnitLibrary/Mqtt5/`; put its WebSocket and TLS front ends in `Mqtt5/Transports/`, writing
 the server side of RFC 6455 from the RFC (the shared `Curl.WebSocket` frame codec may be used for framing only).
 

@@ -4,7 +4,7 @@ title: Conformance: MQTT 5.0 PUBLISH, QoS flows, SUBSCRIBE and topic rules for m
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4484]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514, BL-4515, BL-4516]
 touches: [Curl.Conformance.Extended.UnitLibrary/Mqtt5/PublishSubscribe, Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe, Documentation/Conformance/Extended/Mqtt5-PublishSubscribe.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
@@ -26,7 +26,7 @@ Specification: OASIS MQTT Version 5.0 (7 March 2019), IDs `Mqtt5:MQTT-x.y.z-n`. 
 subscription identifier), 3.4-3.7 PUBACK, PUBREC, PUBREL, PUBCOMP, 3.8-3.11 SUBSCRIBE, SUBACK, UNSUBSCRIBE,
 UNSUBACK, 3.12-3.13 PINGREQ and PINGRESP and keep alive (3.1.2.10), 4.3 QoS levels and protocol flows, 4.4 message
 redelivery, 4.6 ordering, 4.7 topic names and filters, 4.8 subscriptions (shared subscriptions as they bind a client),
-4.9 flow control (Receive Maximum). Builds on the reference broker BL-4484 wrote in
+4.9 flow control (Receive Maximum). Builds on the reference broker BL-4514 wrote in
 `Curl.Conformance.Extended.UnitLibrary/Mqtt5/`; add behaviour in `Mqtt5/PublishSubscribe/` through its extension point.
 Keep-alive timing runs on the injected `TimeProvider`.
 
