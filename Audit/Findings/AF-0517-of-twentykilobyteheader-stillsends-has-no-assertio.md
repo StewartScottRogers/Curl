@@ -3,8 +3,8 @@ id: AF-0517
 title: Of_TwentyKilobyteHeader_StillSends has no assertion; its field count goes only to the diagnostics log
 auditor: quality
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-11-01 ("accept all").
+status: closed
+reason: Re-audit 2026-11-01_1801.md: the reproduction no longer reproduces.
 key: quality:Curl.Original.Protocol.Http.UnitTests/Cgr271Tests.cs:Of_TwentyKilobyteHeader_StillSends:no-assertion
 reproduction: none
 task: BL-4446
@@ -13,9 +13,9 @@ found: 2026-11-01
 found-at: 8dd012a88d26bb19a4e7d95f0be5a3371e3d2b15
 scorecard: 2026-11-01_0144.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-01
+closed-how: reliable-reaudit
+closed-by: 2026-11-01_1801.md
 ---
 # AF-0517 - Of_TwentyKilobyteHeader_StillSends has no assertion; its field count goes only to the diagnostics log
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Original.Protocol.Http.UnitTests/Cgr271Tests.cs -Patter
 ## Re-audits
 
 - 2026-11-01 | 2026-11-01_1016.md | reproduces: no | Context shows Of_TwentyKilobyteHeader_StillSends now ends with Assert.AreEqual(5, fieldCount) (Cgr271Tests.cs:39) after the diagnostics line.
+- 2026-11-01 | 2026-11-01_1801.md | reproduces: no | Of_TwentyKilobyteHeader_StillSends now ends with Assert.AreEqual(5, fieldCount) (Cgr271Tests.cs:39) after the Diagnostics.Assert line.
 
 ## Log
 
 - 2026-11-01: filed proposed.
 - 2026-11-01: proposed -> accepted. Stewart: accept all.
+- 2026-11-01: accepted -> closed. Re-audit 2026-11-01_1801.md: the reproduction no longer reproduces.

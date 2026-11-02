@@ -3,8 +3,8 @@ id: AF-0520
 title: Lib1965_OnARefusedScheme_WritesRejected passes on empty output
 auditor: quality
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-11-01 ("accept all").
+status: closed
+reason: Re-audit 2026-11-01_1801.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1964To1977Tests.cs:Lib1965_OnARefusedScheme_WritesRejected:weak-assertion
 reproduction: none
 task: BL-4455
@@ -13,9 +13,9 @@ found: 2026-11-01
 found-at: 4c39311e3e4524ac6950cb2cba36f5b3f2a6ff2e
 scorecard: 2026-11-01_1016.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-01
+closed-how: reliable-reaudit
+closed-by: 2026-11-01_1801.md
 ---
 # AF-0520 - Lib1965_OnARefusedScheme_WritesRejected passes on empty output
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1964To1977Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_1801.md | reproduces: no | Lib1965_OnARefusedScheme_WritesRejected now asserts Assert.HasCount(Lib1965.Schemes.Count, lines) and that every line ends with " REJECTED" (Lib1964To1977Tests.cs:99-100), so empty output fails.
+
 ## Log
 
 - 2026-11-01: filed proposed.
 - 2026-11-01: proposed -> accepted. Stewart: accept all.
+- 2026-11-01: accepted -> closed. Re-audit 2026-11-01_1801.md: the reproduction no longer reproduces.
