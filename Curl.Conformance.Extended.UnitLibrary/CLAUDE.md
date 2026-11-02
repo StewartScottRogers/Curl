@@ -7,7 +7,8 @@ standard error and, per connection or datagram channel, the bytes each side sent
 - `Harness/` holds the shared harness: `ExtendedConformanceHarness.RunAsync` takes the curl entry
   point as an `InProcessCurlRunner` (the tests pass `Curl.Console`'s `InProcessCurl.RunAsync`, which
   this library cannot reference), the `ReferenceRoute`s (TCP, TLS or UDP, each on a port; every
-  host name resolves to 127.0.0.1), the arguments and the environment. `ScriptedReferenceServer`
+  host name resolves to 127.0.0.1), the arguments, the environment and the clock (BL-4503: every
+  timer of the run, `-m`'s among them, runs on it, so a test drives a timeout with a fake clock). `ScriptedReferenceServer`
   and `ScriptedDatagramServer` replay fixed bytes. Both sides' bytes are recorded at the
   reference server; on a TLS route (BL-4506) they are the plaintext behind the handshake, which
   `TlsServerStream` serves with the route's certificate (`ReferenceCertificate.CreateSelfSigned`

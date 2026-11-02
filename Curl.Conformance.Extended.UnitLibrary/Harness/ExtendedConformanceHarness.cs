@@ -15,12 +15,14 @@ public static class ExtendedConformanceHarness
     /// <param name="routes">The reference servers, one per port and transport; every host name resolves to 127.0.0.1.</param>
     /// <param name="arguments">The command line, without the program name.</param>
     /// <param name="environment">The whole environment curl sees; none when <see langword="null" />.</param>
+    /// <param name="timeProvider">The clock every timer of the run runs on, so a test drives <c>-m</c> with a fake one and no real wait; <see cref="TimeProvider.System" /> when <see langword="null" />.</param>
     /// <returns>What the run ended with.</returns>
     public static async Task<CurlRunResult> RunAsync(
         InProcessCurlRunner curl,
         IReadOnlyList<ReferenceRoute> routes,
         IReadOnlyList<string> arguments,
-        IReadOnlyDictionary<string, string>? environment = null)
+        IReadOnlyDictionary<string, string>? environment = null,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(curl);
         ArgumentNullException.ThrowIfNull(routes);
@@ -37,7 +39,8 @@ public static class ExtendedConformanceHarness
             new ReferenceTcpDialer(routes, run),
             new LoopbackDnsResolver(),
             new ReferenceDatagramConnector(routes, run),
-            name => variables.GetValueOrDefault(name)).ConfigureAwait(false);
+            name => variables.GetValueOrDefault(name),
+            timeProvider ?? TimeProvider.System).ConfigureAwait(false);
         IReadOnlyList<WireExchange> exchanges = await run.EndAsync().ConfigureAwait(false);
         return new CurlRunResult(exitCode, standardOutput.ToArray(), standardError.ToArray(), exchanges);
     }

@@ -5,7 +5,7 @@ namespace Curl.Conformance.Extended.Harness;
 
 /// <summary>
 /// Runs one curl command line in process over the given dialer, resolver, datagram connector and
-/// environment, and returns its exit code: <c>Curl.Console</c>'s <c>InProcessCurl.RunAsync</c>, which
+/// environment, every timer of the run on the given clock, and returns its exit code: <c>Curl.Console</c>'s <c>InProcessCurl.RunAsync</c>, which
 /// this library cannot reference, so the tests hand it in.
 /// </summary>
 /// <param name="arguments">The command line, without the program name.</param>
@@ -16,6 +16,7 @@ namespace Curl.Conformance.Extended.Harness;
 /// <param name="dnsResolver">Resolves every host name.</param>
 /// <param name="datagramConnector">Opens every UDP channel.</param>
 /// <param name="readEnvironmentVariable">Returns an environment variable's value, or <see langword="null" /> when it is not set.</param>
+/// <param name="timeProvider">The clock every timer of the run runs on, <c>-m</c>'s among them.</param>
 /// <returns>curl's exit code.</returns>
 public delegate Task<int> InProcessCurlRunner(
     IReadOnlyList<string> arguments,
@@ -25,4 +26,5 @@ public delegate Task<int> InProcessCurlRunner(
     ITcpDialer tcpDialer,
     IDnsResolver dnsResolver,
     IDatagramConnector datagramConnector,
-    Func<string, string?> readEnvironmentVariable);
+    Func<string, string?> readEnvironmentVariable,
+    TimeProvider timeProvider);

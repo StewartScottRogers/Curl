@@ -9,9 +9,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The requirement matrices and the known-failures list are read from the output, never from the repository (BL-4502). -->
+    <!-- The requirement matrices and the known-failures list are read from the output, never from the repository (BL-4502); the folder's README is no matrix (BL-4503). -->
     <None Update="KnownFailures.txt" CopyToOutputDirectory="PreserveNewest" />
-    <ContentWithTargetPath Include="..\Documentation\Conformance\Extended\*.md" TargetPath="Conformance\Extended\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <ContentWithTargetPath Include="..\Documentation\Conformance\Extended\*.md" Exclude="..\Documentation\Conformance\Extended\README.md" TargetPath="Conformance\Extended\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
