@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests, Curl.Console]
 requirement: none
 created: 2026-10-31
-completed:
+completed: 2026-11-02
 ---
 # BL-4421 — Fix CI hang in Quality gates shard 3 of 3 (windows-latest) (Curl.Console.UnitTests)
 
@@ -26,8 +26,8 @@ A hang can be intermittent: the next run may pass. Reproduce with `dotnet test` 
 
 ## Acceptance criteria
 
-- [ ] What made `Curl.Console.UnitTests` hang in `Quality gates shard 3 of 3 (windows-latest)` is named under Notes and removed.
-- [ ] `Quality gates shard 3 of 3 (windows-latest)` finishes inside its `timeout-minutes` in the `CI` workflow for the commit that lands the fix.
+- [x] What made `Curl.Console.UnitTests` hang in `Quality gates shard 3 of 3 (windows-latest)` is named under Notes and removed.
+- [x] `Quality gates shard 3 of 3 (windows-latest)` finishes inside its `timeout-minutes` in the `CI` workflow for the commit that lands the fix.
 
 ## Notes
 
@@ -61,6 +61,8 @@ A hang can be intermittent: the next run may pass. Reproduce with `dotnet test` 
   for `Blame` and `The active test`). Then fix that test, or the code under it, and finish.
   If no hang recurs, there is nothing new to measure: do not re-run the local loop above.
 
+- 2026-11-02, lane 8, second claim. Both split parts are Done, so this claim only closes the umbrella. Cause (BL-4427): CI run 41252530857's blame named `Curl.Console.Cgr109Tests.RunAsync_SecondSameHostTransferWaitsPastMaxTime_TimesOutWithoutConnecting`; the test's `TimerFiringClock.Advance` fired only timers due at its snapshot, so a `-m` or poll timer armed after it never fired and the run waited on a clock nobody moved. Removed by BL-4442 (59686eeba) and BL-4444 (62a300628), both ancestors of this branch's HEAD (checked with `git merge-base --is-ancestor`). Criterion 2 (BL-4428): CI run 41467980936, which contains the fix, passed shard 3 in 9 min 38 s. Here, `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passed (3124 passed, 33 skipped, 0 failed, 4 s; Blame: all tests finished). No code changed in this claim, so I ran no build or quality run beyond that test pass.
+
 ## Log
 
 - 2026-10-31: Created.
@@ -69,3 +71,4 @@ A hang can be intermittent: the next run may pass. Reproduce with `dotnet test` 
 - 2026-10-31: Backlog -> Deferred. Split for cost cap into BL-4427 (name and remove the cause) and BL-4428 (confirm CI shard finishes in time)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 3fca587f 2911d5f5.
+- 2026-11-02: Doing -> Done. Hang named (Cgr109Tests TimerFiringClock missed late timers) and removed by BL-4442/BL-4444; shard 3 passed in 9m38s on CI run 41467980936
