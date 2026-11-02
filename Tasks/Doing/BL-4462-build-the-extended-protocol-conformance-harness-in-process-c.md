@@ -121,3 +121,4 @@ matrix and known-failures rules.
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 94bce983 ff67eeb1 9db82948 e9fc1ee0 32b5ab0c 074d54e3 bcfa9865 d8e3fb0e cc077f22 7111045e.
