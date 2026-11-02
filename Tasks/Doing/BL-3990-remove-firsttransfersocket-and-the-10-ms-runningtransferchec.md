@@ -45,3 +45,4 @@ Split from BL-3976 (cost cap), itself split from BL-3563 (CGR-034). BL-3981 land
 - 2026-10-29: Doing -> Backlog. Cost cap: the plan and decisions are under Notes; the next claim makes the edits and test updates
 - 2026-10-29: Backlog -> Deferred. Split into BL-4068 and BL-4069 (cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 7440ff2a 34a4aed9 18d43fff 779790c0.
