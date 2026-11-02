@@ -3,8 +3,8 @@ id: AF-0420
 title: SwsHttpServerConnection.Send's closing SwsServerSend(..., true) can become false with no test failing, so a closing reply never marks the close
 auditor: quality
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-10-24.
+status: closed
+reason: Stewart closed it on 2026-11-02 ("close 419 420"): BL-3469 and BL-4449 removed the mutated comparison from SwsHttpServerConnection.Send, so every re-audit since 2026-10-25 reported site-missing and none could close it.
 key: quality:Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs:Send-true:surviving-mutant
 reproduction: none
 task: BL-4449
@@ -13,9 +13,9 @@ found: 2026-10-24
 found-at: d3ee244c64c5cb56d3fe0ca2ed9728e9383eb8ea
 scorecard: 2026-10-24_0845.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-02
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0420 - SwsHttpServerConnection.Send's closing SwsServerSend(..., true) can become false with no test failing, so a closing reply never marks the close
 
@@ -58,3 +58,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 - 2026-10-24: filed proposed.
 - 2026-10-24: proposed -> accepted.
 - 2026-11-01: re-fix task BL-4449 filed (Stewart: re-fix them). The mutation site was removed by BL-3469's rewrite, so every re-audit since reported site-missing; reproduction set to none, so the next re-audit judges by reading the code and BL-4449's tests.
+- 2026-11-02: accepted -> closed. Stewart closed it on 2026-11-02 ("close 419 420"): BL-3469 and BL-4449 removed the mutated comparison from SwsHttpServerConnection.Send, so every re-audit since 2026-10-25 reported site-missing and none could close it.
