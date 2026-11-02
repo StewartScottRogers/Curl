@@ -39,3 +39,4 @@ Start from `Curl.Console/InProcessCurl.cs` (`RunAsync` with `ITcpDialer`, `IDnsR
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 94bce983 a163e683 ff67eeb1 07a99046 34c192a5 cc077f22 5306de6c.
