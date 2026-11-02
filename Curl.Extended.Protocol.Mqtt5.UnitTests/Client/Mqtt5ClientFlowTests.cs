@@ -89,6 +89,53 @@ public sealed class Mqtt5ClientFlowTests
     }
 
     [TestMethod]
+    public async Task RunAsync_MalformedPacketWhileSubscribed_SendsDisconnect0x81BeforeClosing()
+    {
+        byte[] disconnectWithReservedFlag = [0xE1, 0x00];
+        var connection = new ScriptedMqtt5Connection([.. ConnAck(), .. SubAck(Mqtt5ReasonCode.GrantedQos0), .. disconnectWithReservedFlag]);
+
+        Mqtt5ClientException failure = await RunFailingAsync(connection);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure.ExitCode);
+        StringAssert.StartsWith(failure.Message, "Weird server reply: malformed MQTT 5 packet: ");
+        CollectionAssert.AreEqual(new Mqtt5Disconnect { ReasonCode = Mqtt5ReasonCode.MalformedPacket }.ToBytes(), connection.Writes[^1]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SecondConnAckWhileSubscribed_IsAProtocolErrorAnsweredByDisconnect0x82()
+    {
+        var connection = new ScriptedMqtt5Connection([.. ConnAck(), .. SubAck(Mqtt5ReasonCode.GrantedQos0), .. ConnAck()]);
+
+        Mqtt5ClientException failure = await RunFailingAsync(connection);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure.ExitCode);
+        Assert.AreEqual("Weird server reply", failure.Message);
+        CollectionAssert.AreEqual(new Mqtt5Disconnect { ReasonCode = Mqtt5ReasonCode.ProtocolError }.ToBytes(), connection.Writes[^1]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ClosingDisconnectFailsToSend_KeepsTheOriginalFailure()
+    {
+        var connection = new ScriptedMqtt5Connection([.. ConnAck(), .. SubAck(Mqtt5ReasonCode.GrantedQos0), .. ConnAck()]) { FailsWritesFrom = 2 };
+
+        Mqtt5ClientException failure = await RunFailingAsync(connection);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure.ExitCode);
+        Assert.AreEqual("Weird server reply", failure.Message);
+        Assert.HasCount(2, connection.Writes);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ConnAckRefused_SendsNoDisconnect()
+    {
+        var connection = new ScriptedMqtt5Connection(ConnAck(Mqtt5ReasonCode.NotAuthorized));
+
+        await RunFailingAsync(connection, "hi");
+
+        Assert.HasCount(1, connection.Writes);
+    }
+
+    [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
     public async Task RunAsync_PingRequestOrOtherPacketWhileSubscribed_EndsWithWeirdServerReply(bool pingRequest)

@@ -62,7 +62,7 @@ internal sealed class Mqtt5PacketChannel(IConnection transport, CancellationToke
         }
         catch (Mqtt5MalformedPacketException malformed)
         {
-            throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.MalformedPacket(malformed.Message));
+            throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.MalformedPacket(malformed.Message), malformed.ReasonCode);
         }
     }
 

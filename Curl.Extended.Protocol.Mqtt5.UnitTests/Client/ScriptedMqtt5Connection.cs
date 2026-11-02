@@ -16,6 +16,8 @@ internal sealed class ScriptedMqtt5Connection(params byte[][] chunks) : IConnect
 
     public bool FailsWrites { get; init; }
 
+    public int FailsWritesFrom { get; init; } = int.MaxValue;
+
     public List<byte[]> Writes { get; } = [];
 
     public bool IsDisposed { get; private set; }
@@ -38,7 +40,7 @@ internal sealed class ScriptedMqtt5Connection(params byte[][] chunks) : IConnect
 
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
-        if (FailsWrites)
+        if (FailsWrites || Writes.Count >= FailsWritesFrom)
         {
             throw new IOException("reset");
         }

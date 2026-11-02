@@ -58,7 +58,7 @@ public sealed class ConnackCases
         (CurlRunResult result, Mqtt5ReferenceBroker broker) = await PublishAsync(Mqtt5ConnAckBytes.Build(0x02, 0));
 
         AssertFailed(result, 8, "Weird server reply: malformed MQTT 5 packet: CONNACK's reserved acknowledge flags are set.");
-        AssertSentOnlyConnect(result, broker);
+        AssertSentConnectThenDisconnect(result, broker, 0x81);
     }
 
     [TestMethod]
@@ -71,7 +71,7 @@ public sealed class ConnackCases
         Assert.AreEqual(8, result.ExitCode, Encoding.UTF8.GetString(result.StandardError));
         Assert.AreEqual(0, result.StandardOutput.Length);
         StringAssert.StartsWith(Encoding.UTF8.GetString(result.StandardError), "curl: (8) Weird server reply: malformed MQTT 5 packet: ");
-        AssertSentOnlyConnect(result, broker);
+        AssertSentConnectThenDisconnect(result, broker, 0x82);
     }
 
     [TestMethod]
@@ -197,6 +197,13 @@ public sealed class ConnackCases
         Assert.AreEqual(exitCode, result.ExitCode, Encoding.UTF8.GetString(result.StandardError));
         Assert.AreEqual(0, result.StandardOutput.Length);
         Assert.AreEqual($"curl: ({exitCode}) {message}{Environment.NewLine}", Encoding.UTF8.GetString(result.StandardError));
+    }
+
+    /// <summary>Asserts curl sent CONNECT and then, answering the malformed or protocol-breaking CONNACK, DISCONNECT with <paramref name="reasonCode"/> (section 4.13.1, ADR-1198).</summary>
+    private static void AssertSentConnectThenDisconnect(CurlRunResult result, Mqtt5ReferenceBroker broker, byte reasonCode)
+    {
+        CollectionAssert.AreEqual(new[] { Mqtt5WirePacket.Connect, Mqtt5WirePacket.Disconnect }, broker.ReceivedPackets.Select(packet => packet.PacketType).ToArray());
+        DisconnectAuthCases.AssertEndedWithDisconnect(result, broker, reasonCode);
     }
 
     private static void AssertSentOnlyConnect(CurlRunResult result, Mqtt5ReferenceBroker broker)

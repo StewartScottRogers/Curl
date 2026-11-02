@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using Curl.Extended.Protocol.Mqtt5.Packets;
 using Curl.Protocol.Abstractions;
 
@@ -21,6 +22,41 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
 
     /// <summary>Runs the flow: publishes <paramref name="payload"/> to <paramref name="topic"/>, or subscribes to it when there is none.</summary>
     internal async ValueTask RunAsync(Mqtt5Connect connect, string topic, ReadOnlyMemory<byte>? payload)
+    {
+        Mqtt5ClientException fault;
+        Mqtt5ReasonCode reasonCode;
+        try
+        {
+            await ExchangeAsync(connect, topic, payload).ConfigureAwait(false);
+            return;
+        }
+        catch (Mqtt5ClientException failure) when (failure.DisconnectReasonCode is { } code)
+        {
+            fault = failure;
+            reasonCode = code;
+        }
+
+        await SendClosingDisconnectAsync(reasonCode).ConfigureAwait(false);
+        ExceptionDispatchInfo.Throw(fault);
+    }
+
+    /// <summary>
+    /// Sends the DISCONNECT that answers a Malformed Packet or a Protocol Error before the connection closes (section
+    /// 4.13.1, ADR-1198). It is best effort: a failed send leaves the transfer ending with the original failure.
+    /// </summary>
+    private async ValueTask SendClosingDisconnectAsync(Mqtt5ReasonCode reasonCode)
+    {
+        try
+        {
+            await channel.SendAsync(new Mqtt5Disconnect { ReasonCode = reasonCode }).ConfigureAwait(false);
+        }
+        catch (Mqtt5ClientException)
+        {
+            // The original failure is the one the transfer reports.
+        }
+    }
+
+    private async ValueTask ExchangeAsync(Mqtt5Connect connect, string topic, ReadOnlyMemory<byte>? payload)
     {
         Mqtt5Packet publishOrSubscribe = BuildPublishOrSubscribe(topic, payload);
         await channel.SendAsync(connect).ConfigureAwait(false);
@@ -103,7 +139,7 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
         Mqtt5Packet packet = await channel.ReceiveAsync().ConfigureAwait(false);
         return packet.PacketType == expected
             ? packet
-            : throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.WeirdServerReply);
+            : throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.WeirdServerReply, Mqtt5ReasonCode.ProtocolError);
     }
 
     /// <summary>
@@ -153,7 +189,7 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
                 ThrowIfFailure("DISCONNECT", disconnect.ReasonCode);
                 return true;
             default:
-                throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.WeirdServerReply);
+                throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.WeirdServerReply, Mqtt5ReasonCode.ProtocolError);
         }
     }
 
