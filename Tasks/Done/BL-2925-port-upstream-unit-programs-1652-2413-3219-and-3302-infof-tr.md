@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy, Curl.Conformance.UnitProgram.UnitTests/Dns/Easy, Libcurl/Info/Longs/EasyInfoReaders.Longs.cs, Libcurl.UnitTests/Info/Longs/EasyInfoReadersLongsTests.cs, Curl.Engine.UnitLibrary/DebugCallbackTransferEvents.cs, Curl.Engine.UnitTests/DebugCallbackTransferEventsTests.cs, Curl.Core.UnitLibrary/ConnectionPeer.cs, Curl.Core.UnitTests/ConnectionPeerTests.cs, Libcurl/Libcurl.csproj]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-11-02
 ---
 # BL-2925 — Port upstream unit programs 1652, 2413, 3219 and 3302: infof truncation, peer host parsing, protocol mask and GSSAPI delegation
 
@@ -27,10 +27,10 @@ One `IUnitProgram` per case in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Eas
 
 ## Acceptance criteria
 
-- [ ] Each of `unit1652`, `unit2413`, `unit3219` and `unit3302` is ported in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy/` with checks matching the C program row for row (named in its doc comment), registered in `UnitPrograms.Dns.cs`, with a test; or Notes name the C-only thing a case tests and the ADR from BL-2840 records it.
-- [ ] Each ported case ends `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and is on `PassingUpstreamCases.txt`.
-- [ ] Where a port finds Curl wrong, the fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
+- [x] Each of `unit1652`, `unit2413`, `unit3219` and `unit3302` is ported in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy/` with checks matching the C program row for row (named in its doc comment), registered in `UnitPrograms.Dns.cs`, with a test; or Notes name the C-only thing a case tests and the ADR from BL-2840 records it.
+- [x] Each ported case ends `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and is on `PassingUpstreamCases.txt`.
+- [x] Where a port finds Curl wrong, the fix has a focused unit test in the fixed library's own `.UnitTests` project (ADR-0482).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
 
@@ -59,3 +59,5 @@ One `IUnitProgram` per case in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Eas
 - 2026-10-21: Backlog -> Deferred. Split for the cost cap into BL-3014 (land the ports), BL-3015 (run cases, ratchet), BL-3016 and BL-3017 (quality); nothing left here
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: c0969e39 2e3e75ab aca7e1a2 dd1cc079.
+- 2026-11-02 (lane 2, fourth claim): nothing left to build. The split parts are all Done: BL-3014 (the four ports in `Dns/Easy/`, `ConnectionPeer`, the infof cut in `DebugCallbackTransferEvents`, the `CURLINFO_PROTOCOL` mask), BL-3015 (cases 1652, 2413, 3219 and 3302 run `Passed` and are on `PassingUpstreamCases.txt`, lines 1616, 1883, 1978, 1989), BL-3016 and BL-3017 (quality of Core, Engine, Libcurl and the unit-program library). The stash 68641186 holds older copies of the same files, so it was not applied. Checked: the 15 `Dns.Easy` tests in Curl.Conformance.UnitProgram.UnitTests and the 11 `ConnectionPeer` tests in Curl.Core.UnitTests pass. No option changed, so `--ai-help` stays as it is. Every criterion is met by the landed subtasks.
+- 2026-11-02: Doing -> Done. Delivered by BL-3014, BL-3015, BL-3016 and BL-3017; the four ports and cases 1652, 2413, 3219 and 3302 pass
