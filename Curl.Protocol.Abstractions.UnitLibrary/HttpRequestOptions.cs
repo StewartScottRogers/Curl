@@ -306,9 +306,10 @@ public sealed record HttpRequestOptions
 
     /// <summary>
     /// Gets the service name from <c>--service-name</c>, or <see langword="null" /> when not given.
-    /// With no credential and NTLM the one scheme in <see cref="AuthSchemes" />, curl 8.22.0 starts
-    /// NTLM with the default Windows credentials: it sends the Type-1 message as user <c>''</c>
-    /// (AF-0524, BL-4460, ADR-1183).
+    /// With no credential and NTLM the one scheme in <see cref="AuthSchemes" />, on Windows only,
+    /// curl 8.22.0 (Schannel) starts NTLM with the default Windows credentials: it sends the Type-1
+    /// message as user <c>''</c>. On Linux and macOS the OpenSSL curl sends no <c>Authorization</c>,
+    /// so there the service name starts no NTLM (AF-0524, BL-4460, BL-4509, ADR-1183).
     /// </summary>
     public string? ServiceName { get; init; }
 

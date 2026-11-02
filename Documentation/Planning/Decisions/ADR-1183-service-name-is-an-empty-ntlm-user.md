@@ -30,3 +30,19 @@ Without `--service-name` neither curl nor Curl sends NTLM. Curl's HTTP handler n
 
 The finding's reproduction sends the Type 1 message as curl does. `--anyauth --service-name` and
 `--negotiate --service-name` keep their old behaviour until a measurement says otherwise.
+
+## Amendment (BL-4509): Windows only
+
+Decided by Claude under Stewart's delegation. The OpenSSL build was measured on 2026-11-02 with
+curl 8.18.0 (x86_64-pc-linux-gnu, OpenSSL/3.5.5, the Ubuntu build in WSL; no 8.22.0 OpenSSL build
+was at hand, and curl's HTTP auth code sends a host credential only when a user is set, so the
+version gap does not change the answer) against a loopback listener:
+`curl --ntlm --service-name x http://127.0.0.1:<port>/` sent `GET /` with `Host`, `User-Agent` and
+`Accept` only, and with `-d x` sent the whole POST (`Content-Length: 1`, body `x`) with no
+`Authorization` either. The empty NTLM user comes from the Schannel build's SSPI default
+credentials, so `StartsWithAnEmptyUser` now applies the `--service-name` rule only when
+`OperatingSystem.IsWindows()`; off Windows the request goes with no `Authorization`, as the OpenSSL
+curl sends it. The `--sasl-authzid` Digest rule (ADR-1182) is unchanged on every platform. Each
+platform's answer is pinned in its own `OSCondition` test in
+`HttpProtocolHandlerTests.Authentication.cs`, and `StartsWithAnEmptyUser(options, onWindows)` is
+tested for both values on every platform.

@@ -366,23 +366,26 @@ public sealed class HttpProtocolHandler(
     /// and password when <c>--sasl-authzid</c> is given and Digest is the one scheme allowed, as
     /// curl 8.22.0 then probes and answers Digest for user <c>''</c> (AF-0522, BL-4457, ADR-1182),
     /// or when <c>--service-name</c> is given and NTLM is the one scheme allowed, as curl 8.22.0
-    /// then starts NTLM with the default Windows credentials (AF-0524, BL-4460, ADR-1183);
-    /// <see langword="null" /> otherwise.
+    /// then starts NTLM with the default Windows credentials on Windows only (AF-0524, BL-4460,
+    /// BL-4509, ADR-1183); <see langword="null" /> otherwise.
     /// </summary>
     private static NetworkCredential? OriginCredentialOf(ITransferContext context, HttpRequestOptions options) =>
         context.Credentials
-            ?? (StartsWithAnEmptyUser(options) ? new NetworkCredential(string.Empty, string.Empty) : null);
+            ?? (StartsWithAnEmptyUser(options, OperatingSystem.IsWindows()) ? new NetworkCredential(string.Empty, string.Empty) : null);
 
     /// <summary>
-    /// Tells whether curl 8.22.0 answers the origin as an empty user when the transfer has no
-    /// credential: <c>--sasl-authzid</c> with Digest the one scheme (ADR-1182), or
-    /// <c>--service-name</c> with NTLM the one scheme (ADR-1183).
+    /// Tells whether the platform's curl answers the origin as an empty user when the transfer has
+    /// no credential: <c>--sasl-authzid</c> with Digest the one scheme (ADR-1182), or, on Windows
+    /// only, <c>--service-name</c> with NTLM the one scheme (ADR-1183): the Schannel build starts
+    /// NTLM with the default Windows credentials, the OpenSSL build sends no <c>Authorization</c>.
     /// </summary>
-    private static bool StartsWithAnEmptyUser(HttpRequestOptions options) =>
+    /// <param name="options">The transfer's HTTP options.</param>
+    /// <param name="onWindows">Whether Curl runs on Windows, where curl is the Schannel build.</param>
+    internal static bool StartsWithAnEmptyUser(HttpRequestOptions options, bool onWindows) =>
         AllowedSchemesOf(options) switch
         {
             HttpAuthSchemes.Digest => options.SaslAuthorizationIdentity is not null,
-            HttpAuthSchemes.Ntlm => options.ServiceName is not null,
+            HttpAuthSchemes.Ntlm => onWindows && options.ServiceName is not null,
             _ => false,
         };
 
