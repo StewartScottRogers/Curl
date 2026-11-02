@@ -117,6 +117,21 @@ public sealed class HttpRequestOptionsMappingTests
         Assert.AreEqual("1", mapped.SaslAuthorizationIdentity);
     }
 
+    /// <summary>
+    /// <c>--service-name</c> reaches the HTTP handler, which starts NTLM as an empty user with it
+    /// (AF-0524, BL-4460, ADR-1183).
+    /// </summary>
+    [TestMethod]
+    public void Of_ServiceName_IsCopiedFromTheAuthenticationOptions()
+    {
+        Diagnostics.Arrange("--service-name", "x");
+
+        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), new EasyHttpOptions(), new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions { ServiceName = "x" });
+
+        Diagnostics.Assert("service name", "x", mapped.ServiceName);
+        Assert.AreEqual("x", mapped.ServiceName);
+    }
+
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]

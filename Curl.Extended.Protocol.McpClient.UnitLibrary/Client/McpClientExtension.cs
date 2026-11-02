@@ -15,12 +15,13 @@ public static class McpClientExtension
         [],
         new Uri("https://modelcontextprotocol.io/specification/2025-06-18"));
 
-    /// <summary>Creates the handler over curl's connector and the system's process starter.</summary>
+    /// <summary>Creates the handler over curl's connector and the host's process starter, or the system's when the host gives none (ADR-1184).</summary>
     /// <param name="services">Curl's connection services.</param>
     /// <returns>The handler.</returns>
     public static IProtocolHandler CreateHandler(ProtocolHandlerServices services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        return new McpProtocolHandler(services.Connector, new McpServerProcessStarter());
+        IMcpServerProcessStarter starter = services.ProcessStarter is { } hostStarter ? new ExtensionMcpServerProcessStarter(hostStarter) : new McpServerProcessStarter();
+        return new McpProtocolHandler(services.Connector, starter);
     }
 }

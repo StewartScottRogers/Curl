@@ -1,5 +1,6 @@
 namespace Curl.Protocol.Abstractions;
 
+/// <summary>Checks the services the engine hands extension handlers (ADR-0999), with the host's process starter (ADR-1184).</summary>
 [TestClass]
 public sealed class ProtocolHandlerServicesTests
 {
@@ -15,8 +16,29 @@ public sealed class ProtocolHandlerServicesTests
         Assert.IsNull(services.DnsResolver);
     }
 
+    [TestMethod]
+    public void Constructor_WithoutAProcessStarter_CarriesNone() =>
+        Assert.IsNull(new ProtocolHandlerServices(null!, null!, null!, null!).ProcessStarter);
+
+    [TestMethod]
+    public void Constructor_WithAProcessStarter_CarriesIt()
+    {
+        NoProcessStarter starter = new();
+
+        ProtocolHandlerServices services = new(null!, null!, null!, null!, starter);
+
+        Assert.AreSame(starter, services.ProcessStarter);
+    }
+
     private sealed class NoConnector : IConnector
     {
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class NoProcessStarter : IExtensionProcessStarter
+    {
+        public string? ReadEnvironmentVariable(string name) => throw new NotSupportedException();
+
+        public IExtensionProcess Start(string program, IReadOnlyList<string> arguments) => throw new NotSupportedException();
     }
 }

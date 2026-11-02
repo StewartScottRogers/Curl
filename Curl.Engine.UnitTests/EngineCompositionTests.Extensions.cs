@@ -34,6 +34,35 @@ public sealed partial class EngineCompositionTests
         Assert.IsInstanceOfType<EndPointRecordingDatagramConnector>(given.DatagramConnector);
         Assert.AreSame(tlsProvider, given.TlsProvider);
         Assert.AreSame(dnsResolver, given.DnsResolver);
+        Assert.IsNull(given.ProcessStarter);
+    }
+
+    // ADR-1184: the host's process starter reaches the extension handlers, so they start no real process.
+    [TestMethod]
+    public void CreateProtocolHandlers_WithAProcessStarter_GivesItToTheExtensionHandlers()
+    {
+        StandInExtensionProcessStarter starter = new();
+        ProtocolHandlerServices? given = null;
+        Diagnostics.Arrange("process starter", nameof(StandInExtensionProcessStarter));
+
+        _ = EngineComposition.CreateProtocolHandlers(
+            new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver(),
+            extensionHandlers: services => { given = services; return [new ExtensionSchemeHandler("example-extension")]; },
+            extensionProcessStarter: starter);
+        Diagnostics.Act("given starter", given?.ProcessStarter?.GetType().Name ?? "none");
+
+        Assert.IsNotNull(given);
+        Assert.AreSame(starter, given.ProcessStarter);
+    }
+
+    private sealed class StandInExtensionProcessStarter : IExtensionProcessStarter
+    {
+        public string? ReadEnvironmentVariable(string name) => throw new NotSupportedException();
+
+        public IExtensionProcess Start(string program, IReadOnlyList<string> arguments) => throw new NotSupportedException();
     }
 
     [TestMethod]

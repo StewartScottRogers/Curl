@@ -22,6 +22,35 @@ public sealed class PluginProtocolExtensionTests
     public void CreateHandler_GivesTheHelperHandler() =>
         Assert.IsInstanceOfType<HelperProtocolHandler>(PluginProtocolExtension.CreateHandler(Services, []));
 
+    // ADR-1184: the helper search reads PATH through the host's process starter, and the helper starts through it.
+    [TestMethod]
+    public async Task CreateHandler_WithAHostProcessStarter_FindsHelpersOnItsPathAndStartsThemThroughIt()
+    {
+        string directory = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            string program = Path.Combine(directory, OperatingSystem.IsWindows() ? "curl-proto-hostonly.exe" : "curl-proto-hostonly");
+            await File.WriteAllBytesAsync(program, []);
+            StandInExtensionProcess process = new("get\n\nok\nhello");
+            StandInExtensionProcessStarter starter = new(process, new Dictionary<string, string?> { ["PATH"] = directory, ["PATHEXT"] = ".EXE" });
+            MemoryStream output = new();
+            IProtocolHandler handler = PluginProtocolExtension.CreateHandler(Services with { ProcessStarter = starter }, []);
+
+            TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("hostonly://host/a"), Output = output });
+
+            CollectionAssert.AreEqual(new[] { "hostonly" }, handler.SupportedSchemes.ToArray());
+            CollectionAssert.Contains(starter.ReadVariables.ToArray(), "PATH");
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(program, starter.StartedProgram);
+            CollectionAssert.AreEqual(new[] { "hostonly://host/a" }, starter.StartedArguments!.ToArray());
+            Assert.AreEqual("hello", System.Text.Encoding.UTF8.GetString(output.ToArray()));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [TestMethod]
     public void CreateHandler_WithoutServices_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => PluginProtocolExtension.CreateHandler(null!, []));

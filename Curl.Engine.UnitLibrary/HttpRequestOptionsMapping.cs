@@ -84,7 +84,8 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="EasyAuthenticationOptions.HttpAuthentication" /> as <see cref="HttpRequestOptions.AuthSchemes" />
     /// (<see cref="AuthSchemesOf" />), <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> as
     /// <see cref="HttpRequestOptions.BearerToken" />, <see cref="EasyAuthenticationOptions.SaslAuthorizationIdentity" /> as
-    /// <see cref="HttpRequestOptions.SaslAuthorizationIdentity" /> and <see cref="EasyAuthenticationOptions.AwsSigV4" /> verbatim;
+    /// <see cref="HttpRequestOptions.SaslAuthorizationIdentity" />, <see cref="EasyAuthenticationOptions.ServiceName" /> as
+    /// <see cref="HttpRequestOptions.ServiceName" /> and <see cref="EasyAuthenticationOptions.AwsSigV4" /> verbatim;
     /// the <c>--httpsig-*</c> options as <see cref="HttpRequestOptions.HttpSignature" />
     /// (<see cref="HttpSignatureSetup.Of" />), which leave <see cref="HttpRequestOptions.AuthSchemes" /> empty so a
     /// redirect hop that drops the signature sends no Basic from its URL's credentials (upstream test5025,
@@ -126,6 +127,7 @@ internal static class HttpRequestOptionsMapping
             AuthSchemes = HttpSignatureSetup.Of(authentication).Settings is null ? AuthSchemesOf(authentication) : HttpAuthSchemes.None,
             BearerToken = authentication.XOAuth2Bearer,
             SaslAuthorizationIdentity = authentication.SaslAuthorizationIdentity,
+            ServiceName = authentication.ServiceName,
             AwsSigV4 = authentication.AwsSigV4,
             HttpSignature = HttpSignatureSetup.Of(authentication).Settings,
             Version = HttpVersionMapping.ToHttpVersionPreference(http.HttpVersion),

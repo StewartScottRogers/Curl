@@ -863,6 +863,54 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// With <c>--ntlm --service-name</c> and no <c>-u</c>, curl 8.22.0 starts NTLM with the default
+    /// Windows credentials: the first request carries the Type 1 message for user <c>''</c>
+    /// (AF-0524, BL-4460, ADR-1183).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmWithServiceNameAndNoCredentials_SendsTheType1MessageAsAnEmptyUser()
+    {
+        TurnTakingConnection connection = new(65536, OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(NtlmType1, NtlmType3);
+        TransferContext context = AuthContext(new MemoryStream(), options: new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Ntlm, ServiceName = "x" });
+        Diagnostics.Arrange("url, schemes, service name", $"{AuthUrl}, --ntlm, x");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("GET ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains("Authorization: " + NtlmType1 + "\r\n", requests[0]);
+        Assert.AreEqual(string.Empty, authenticator.Calls[0].Request.Credential?.UserName);
+    }
+
+    /// <summary>
+    /// With no <c>-u</c>, a service name under any scheme but NTLM alone, and NTLM or Digest
+    /// without a service name or authzid, give no credential: the request goes with no
+    /// <c>Authorization</c>, as curl 8.22.0 sends none (AF-0524, BL-4460, ADR-1183).
+    /// </summary>
+    [TestMethod]
+    [DataRow(HttpAuthSchemes.Basic, "x")]
+    [DataRow(HttpAuthSchemes.Any, "x")]
+    [DataRow(HttpAuthSchemes.Ntlm, null)]
+    [DataRow(HttpAuthSchemes.Digest, "x")]
+    public async Task ExecuteAsync_NoCredentialsAndNoEmptyUserRule_SendsNoAuthorization(HttpAuthSchemes schemes, string? serviceName)
+    {
+        TurnTakingConnection connection = new(65536, OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(NtlmType1, NtlmType3);
+        TransferContext context = AuthContext(new MemoryStream(), options: new HttpRequestOptions { AuthSchemes = schemes, ServiceName = serviceName });
+        Diagnostics.Arrange("url, schemes, service name", $"{AuthUrl}, {schemes}, {serviceName}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsTrue(authenticator.Calls.TrueForAll(call => call.Request.Credential is null), connection.Written);
+    }
+
+    /// <summary>
     /// With <c>--ntlm</c> the POST that carries the Type 1 message sends <c>Content-Length: 0</c>
     /// and no body; the body goes only with the Type 3 message, as upstream test176 and test267
     /// expect of curl 8.21.0 (BL-2029).

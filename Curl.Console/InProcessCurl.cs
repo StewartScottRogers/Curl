@@ -1,5 +1,5 @@
-using Curl.Engine;
 using Curl.Cli;
+using Curl.Engine;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
@@ -125,7 +125,47 @@ public static class InProcessCurl
         ArgumentNullException.ThrowIfNull(dnsResolver);
         ArgumentNullException.ThrowIfNull(datagramConnector);
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
-        return RunWithEnvironmentAsync(arguments, standardOutput, standardError, standardInput, tcpDialer, dnsResolver, datagramConnector, readEnvironmentVariable, ftpListener: null);
+        return RunWithEnvironmentAsync(arguments, standardOutput, standardError, standardInput, tcpDialer, dnsResolver, datagramConnector, readEnvironmentVariable, ftpListener: null, timeProvider: null);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="arguments" /> as the overload with an environment does, with every timer
+    /// of the run - the <c>-m</c>, <c>-y</c> and <c>--connect-timeout</c> watchdogs, the connection
+    /// cache, the TLS providers and the connectors - on <paramref name="timeProvider" />, so a test
+    /// drives a timeout with a fake clock and no real wait (BL-4500). Returns curl's exit code.
+    /// </summary>
+    /// <param name="arguments">The command line, without the program name.</param>
+    /// <param name="standardOutput">Where curl writes its standard output.</param>
+    /// <param name="standardError">Where curl writes its standard error.</param>
+    /// <param name="standardInput">What curl reads as its standard input.</param>
+    /// <param name="tcpDialer">Opens every plaintext TCP connection the connector dials.</param>
+    /// <param name="dnsResolver">Resolves every host name the connector looks up.</param>
+    /// <param name="datagramConnector">Opens every UDP channel the transfers make.</param>
+    /// <param name="readEnvironmentVariable">Returns an environment variable's value, or <see langword="null" /> when it is not set.</param>
+    /// <param name="timeProvider">The clock every timer of the run runs on.</param>
+    /// <returns>The exit code curl would end with.</returns>
+    /// <exception cref="ArgumentNullException">Any argument is <see langword="null" />.</exception>
+    public static Task<int> RunAsync(
+        IReadOnlyList<string> arguments,
+        Stream standardOutput,
+        Stream standardError,
+        Stream standardInput,
+        ITcpDialer tcpDialer,
+        IDnsResolver dnsResolver,
+        IDatagramConnector datagramConnector,
+        Func<string, string?> readEnvironmentVariable,
+        TimeProvider timeProvider)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(standardOutput);
+        ArgumentNullException.ThrowIfNull(standardError);
+        ArgumentNullException.ThrowIfNull(standardInput);
+        ArgumentNullException.ThrowIfNull(tcpDialer);
+        ArgumentNullException.ThrowIfNull(dnsResolver);
+        ArgumentNullException.ThrowIfNull(datagramConnector);
+        ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        return RunWithEnvironmentAsync(arguments, standardOutput, standardError, standardInput, tcpDialer, dnsResolver, datagramConnector, readEnvironmentVariable, ftpListener: null, timeProvider);
     }
 
     /// <summary>
@@ -166,7 +206,7 @@ public static class InProcessCurl
         ArgumentNullException.ThrowIfNull(datagramConnector);
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
         ArgumentNullException.ThrowIfNull(ftpListener);
-        return RunWithEnvironmentAsync(arguments, standardOutput, standardError, standardInput, tcpDialer, dnsResolver, datagramConnector, readEnvironmentVariable, ftpListener);
+        return RunWithEnvironmentAsync(arguments, standardOutput, standardError, standardInput, tcpDialer, dnsResolver, datagramConnector, readEnvironmentVariable, ftpListener, timeProvider: null);
     }
 
     /// <summary>
@@ -182,10 +222,11 @@ public static class InProcessCurl
         IDnsResolver dnsResolver,
         IDatagramConnector datagramConnector,
         Func<string, string?> readEnvironmentVariable,
-        IConnectionListener? ftpListener)
+        IConnectionListener? ftpListener,
+        TimeProvider? timeProvider)
     {
         DefaultConfigFileSearch configFileSearch = new(readEnvironmentVariable, OperatingSystem.IsWindows(), executableDirectory: null, accountHomeDirectory: null);
-        return CreateDialingRunner(standardOutput, standardError, standardInput, tcpDialer, dnsResolver, datagramConnector, readEnvironmentVariable, configFileSearch, ftpListener).RunAsync(arguments);
+        return CreateDialingRunner(standardOutput, standardError, standardInput, tcpDialer, dnsResolver, datagramConnector, readEnvironmentVariable, configFileSearch, ftpListener, timeProvider).RunAsync(arguments);
     }
 
     /// <summary>
@@ -201,7 +242,8 @@ public static class InProcessCurl
         IDatagramConnector datagramConnector,
         Func<string, string?>? readEnvironmentVariable,
         DefaultConfigFileSearch? defaultConfigFileSearch,
-        IConnectionListener? ftpListener) =>
+        IConnectionListener? ftpListener,
+        TimeProvider? timeProvider = null) =>
         CurlComposition.CreateRunner(
             standardOutput,
             standardError,
@@ -215,5 +257,6 @@ public static class InProcessCurl
             readEnvironmentVariable: readEnvironmentVariable,
             defaultConfigFileSearch: defaultConfigFileSearch,
             ftpListener: ftpListener,
-            parsesAsEchBuild: true);
+            parsesAsEchBuild: true,
+            timeProvider: timeProvider);
 }
