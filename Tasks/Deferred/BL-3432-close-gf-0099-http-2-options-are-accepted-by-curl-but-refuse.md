@@ -66,3 +66,4 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 4f192eea 3314e1db ca72db98 7fbbecd2 1fd5de8c 28346828.
 - 2026-11-02: Doing -> Blocked. Stewart: GF-0099 needs --http2/--http2-prior-knowledge/--proxy-http2 refused on Windows (exit 2), reversing ADR-0871 you upheld 10-26 (ADR-0929); reverse ADR-0871, or close GF-0099 on the platform exclusion?
+- 2026-11-02: Blocked -> Deferred. Stewart 2026-11-02 ('keep 0871'): ADR-0871 stays - --http2, --http2-prior-knowledge and --proxy-http2 keep running HTTP/2 on Windows; the exit-2 criterion would undo it. Closed as an accepted platform difference, listed in the handoff's known differences. GF-0098 and GF-0099 are already closed on the ADR-0871 exclusion.

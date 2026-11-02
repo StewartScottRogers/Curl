@@ -32,3 +32,8 @@ Stewart decided to turn HTTP/2 on for Windows:
 - `--ai-help` no longer carries the Windows refusal line for the three options; it follows the option
   table's `RefusedBySchannelBuild` rows.
 - The upstream case runner still reports `http/2` and `h2c` off Windows; BL-3268 turns them on.
+
+## Upheld
+
+- 2026-10-26: Stewart kept it (ADR-0929).
+- 2026-11-02: Stewart kept it again ("keep 0871"), closing BL-3432 (GF-0099) and BL-3569 (CGR-040) as an accepted Windows difference for the third-party handoff.
