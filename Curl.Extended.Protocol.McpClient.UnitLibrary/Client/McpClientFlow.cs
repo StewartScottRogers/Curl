@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Curl.Extended.Protocol.McpClient.StreamableHttp;
 using Curl.Extended.Protocol.McpClient.Wire;
 using Curl.Protocol.Abstractions;
 
@@ -87,9 +88,24 @@ internal sealed class McpClientFlow(IMcpSession session, Stream output, Cancella
         return !result.IsError;
     }
 
+    /// <summary>
+    /// Sends <paramref name="request"/>; when the server answers that the session expired (404 to a request carrying an
+    /// <c>Mcp-Session-Id</c>, Streamable HTTP "Session Management"), starts a new session with <see cref="InitializeAsync"/>
+    /// and sends the request once more in it.
+    /// </summary>
     private async Task<JsonElement> RequestAsync(McpOutgoingRequest request)
     {
-        McpResponse response = await session.SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        McpResponse response;
+        try
+        {
+            response = await session.SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (McpHttpException exception) when (exception.Failure == McpHttpFailure.SessionExpired)
+        {
+            await InitializeAsync().ConfigureAwait(false);
+            response = await session.SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+
         return response.Error is { } error
             ? throw new McpClientException(CurlExitCode.WeirdServerReply, $"MCP server error {error.Code}: {error.Message}")
             : response.Result.GetValueOrDefault();

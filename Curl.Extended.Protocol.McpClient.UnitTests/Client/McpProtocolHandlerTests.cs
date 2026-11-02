@@ -14,7 +14,9 @@ namespace Curl.Extended.Protocol.McpClient.Client;
 public sealed class McpProtocolHandlerTests
 {
     private const string InitializeResult = """{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"s","version":"1"}}}""";
+    private const string ReinitializeResult = """{"jsonrpc":"2.0","id":3,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"s","version":"1"}}}""";
     private const string Accepted = "HTTP/1.1 202 Accepted\r\nContent-Length: 0\r\n\r\n";
+    private const string NotFound = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
     private const string Deleted = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
 
     [TestMethod]
@@ -74,6 +76,46 @@ public sealed class McpProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_SessionExpiresWith404_StartsANewSessionWithoutTheOldIdAndRepeatsTheRequest()
+    {
+        // Streamable HTTP "Session Management": 404 to a request carrying Mcp-Session-Id means a new initialize without it.
+        var expired = new RecordedConnection(JsonReply(InitializeResult, "Mcp-Session-Id: s-1\r\n") + Accepted + NotFound);
+        var renewed = new RecordedConnection(
+            JsonReply(ReinitializeResult, "Mcp-Session-Id: s-2\r\n") + Accepted
+            + JsonReply("""{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"echo"}]}}""")
+            + Deleted);
+        var output = new MemoryStream();
+
+        var result = await Handler(new SequencedMcpConnector(expired, renewed)).ExecuteAsync(Context("mcp://example.com/mcp", output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual("echo\n", Encoding.UTF8.GetString(output.ToArray()));
+        Assert.IsTrue(expired.IsDisposed);
+        StringAssert.EndsWith(expired.Written, "Mcp-Session-Id: s-1\r\nMCP-Protocol-Version: 2025-06-18\r\n\r\n" + """{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
+        string[] requests = renewed.Written.Split("POST ");
+        StringAssert.Contains(requests[1], "\"method\":\"initialize\"");
+        Assert.DoesNotContain("Mcp-Session-Id", requests[1]);
+        Assert.DoesNotContain("MCP-Protocol-Version", requests[1]);
+        StringAssert.Contains(requests[3], "Mcp-Session-Id: s-2\r\n");
+        StringAssert.Contains(requests[3], "\"method\":\"tools/list\"");
+        StringAssert.Contains(renewed.Written, "DELETE /mcp HTTP/1.1\r\nHost: example.com\r\nMcp-Session-Id: s-2\r\n");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NewSessionExpiresWith404Too_EndsWithExit8()
+    {
+        // The request is repeated once in the new session; a second 404 ends the transfer.
+        var expired = new RecordedConnection(JsonReply(InitializeResult, "Mcp-Session-Id: s-1\r\n") + Accepted + NotFound);
+        var expiredAgain = new RecordedConnection(JsonReply(ReinitializeResult, "Mcp-Session-Id: s-2\r\n") + Accepted + NotFound);
+
+        var result = await Handler(new SequencedMcpConnector(expired, expiredAgain)).ExecuteAsync(Context("mcp://example.com/mcp", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual("The server answered 404 Not Found: the MCP session expired.", result.ErrorMessage);
+        StringAssert.Contains(expiredAgain.Written, "Mcp-Session-Id: s-2\r\n");
     }
 
     [TestMethod]
