@@ -37,3 +37,4 @@ Split from BL-4501 (over its cost cap; BL-4501 is in Deferred). Read BL-4501 and
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: e6698f51 22785ee6 3eae45eb fd086cd3 4887121b.
