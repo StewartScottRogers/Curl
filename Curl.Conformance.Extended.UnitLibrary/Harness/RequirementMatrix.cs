@@ -107,12 +107,16 @@ public sealed record RequirementMatrix(string ProtocolName, IReadOnlyList<Requir
 
     private static IEnumerable<string> FindUnlistedIds(IReadOnlyList<RequirementMatrix> matrices, IReadOnlyList<SpecRequirementCarrier> carriers)
     {
-        HashSet<string> matrixIds = matrices.SelectMany(matrix => matrix.Rows.Select(row => row.Id).Where(id => SpecRequirementAttribute.ProtocolNameOf(id) == matrix.ProtocolName)).ToHashSet(StringComparer.Ordinal);
+        HashSet<string> matrixIds = matrices.SelectMany(matrix => matrix.Rows.Select(row => row.Id).Where(id => matrix.IsMatrixOf(SpecRequirementAttribute.ProtocolNameOf(id)))).ToHashSet(StringComparer.Ordinal);
         return carriers
             .SelectMany(carrier => carrier.RequirementIds.Select(id => (Id: id, carrier.TestName)))
             .Where(carried => !matrixIds.Contains(carried.Id))
             .Select(carried => $"{carried.Id}, carried by {carried.TestName}, is no row of {SpecRequirementAttribute.ProtocolNameOf(carried.Id)}.md.");
     }
+
+    // A protocol split into parts has one matrix per part, <Name>-<Part>.md, each holding <Name>: IDs (BL-4476).
+    private bool IsMatrixOf(string protocolName) =>
+        ProtocolName == protocolName || ProtocolName.StartsWith(protocolName + "-", StringComparison.Ordinal);
 
     private static string[]? TableCellsOf(string line) =>
         line.StartsWith('|')

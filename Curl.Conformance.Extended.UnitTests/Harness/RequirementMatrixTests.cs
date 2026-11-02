@@ -108,6 +108,15 @@ public sealed class RequirementMatrixTests
     }
 
     [TestMethod]
+    public void FindProblems_IdInAPartMatrixOfItsProtocol_ReportsNothing()
+    {
+        RequirementMatrix part = RequirementMatrix.Parse("Gcs-Signing", Header + "| Gcs:A-1 | MUST | x | T.M |\n");
+        SpecRequirementCarrier test = new("T.M", ["Gcs:A-1"]);
+
+        Assert.IsEmpty(RequirementMatrix.FindProblems([part], [test]));
+    }
+
+    [TestMethod]
     public void FindProblems_CarriedIdInNoMatrixRow_Fails()
     {
         // Mqtt5:B-1 is a row, but of Coap.md: an ID counts only in its own protocol's matrix.
