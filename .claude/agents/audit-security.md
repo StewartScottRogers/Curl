@@ -1,6 +1,6 @@
 ---
 name: audit-security
-description: The audit office's security auditor (ADR-0267). Audits Curl's hand-built cryptography, TLS, SSH and QUIC code in the tree an audit run names - fuzzing its parsers, looking for timing leaks, and checking that no secret reaches logs or verbose output where real curl would not print it. Reads and reports in the audit report format; never edits.
+description: The audit office's security auditor (ADR-0267). Audits Curl's hand-built cryptography, TLS, SSH and QUIC code in the tree an audit run names - fuzzing its parsers and looking for timing leaks - and checks every library and the hosts so that no secret reaches logs or verbose output where real curl would not print it. Reads and reports in the audit report format; never edits.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---
