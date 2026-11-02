@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4479]
-touches: [Curl.Conformance.Extended.UnitLibrary/Kafka/Records, Curl.Conformance.Extended.UnitTests/Kafka/Records, Documentation/Conformance/Extended/Kafka-Records.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
+touches: [Curl.Conformance.Extended.UnitLibrary/Kafka/Records, Curl.Conformance.Extended.UnitTests/Kafka/Records, Documentation/Conformance/Extended/Kafka-Records.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt, Curl.Conformance.Extended.UnitLibrary/Harness/RequirementMatrix.cs, Curl.Conformance.Extended.UnitTests/Harness/RequirementMatrixTests.cs]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4480 — Conformance: Kafka Produce v3, Fetch v4 and record batch v2 for kafka:// (Kafka part 2 of 3)
 
@@ -45,24 +45,40 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Kafka-Records.md` gives every requirement of this scope that binds a client
+- [x] `Documentation/Conformance/Extended/Kafka-Records.md` gives every requirement of this scope that binds a client
       a `Kafka:` ID mapped to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Kafka/Records/` run curl in process and assert wire bytes,
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Kafka/Records/` run curl in process and assert wire bytes,
       stdout, stderr and exit code for at least: a produce whose batch the broker verifies field by field and by
       CRC-32C, a produce error code, a fetch of several batches to the high watermark, a fetch starting inside a
       batch (records before the offset skipped), a partial batch at the end of a response, a bad CRC, an empty
       partition, records with null keys, headers and negative timestamp deltas, and an offset out of range.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Kafka conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Kafka/Records/` is at 100% line and branch
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Kafka/Records/` is at 100% line and branch
       coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+
+- Reference broker additions in `Kafka/Records/`: its own codec (`KafkaRecordsWriter`, `KafkaRecordsReader`), a
+  bit-by-bit `KafkaReferenceCrc32C`, `KafkaReferenceRecordBatch` (writes and reads batch v2 field by field),
+  `KafkaReferenceLog` (assigns base offsets, high watermark, answers from the batch holding the offset, cut at a byte
+  limit for partial batches), `KafkaProduceApi` and `KafkaFetchApi`, plugged in through `IKafkaReferenceApi`.
+- 11 curl cases (`KafkaProduceTests`, `KafkaFetchTests`) plus codec edge tests; every case passes, so nothing is
+  added to `KnownFailures.txt` and no fix task was filed. 24 matrix rows, 4 `n/a` (acks 0, READ_COMMITTED aborts,
+  log-append timestamps).
+- Widened `touches` to `Harness/RequirementMatrix.cs` and its tests: the matrix check matched a requirement ID's
+  protocol to the matrix file name whole, so `Kafka-Records.md` rows (IDs `Kafka:`) counted as unlisted, against the
+  README's `<Name>-<Part>.md` rule. It now compares the part before the first `-`; a focused test pins it. No task in
+  Doing on `origin/work/dark-factory` names the file. Decided without an ADR: it makes the harness do what its
+  README already says.
+- Platform: no paths, OS text or certificates; output uses `Environment.NewLine` as the existing Kafka cases do.
+  Measure-CodeQuality for Curl.Conformance.Extended.UnitLibrary: 100/100, 0 failing members.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 2b97f5e6 7e1a31d8 6873c13e d8e3fb0e 84853b77 ef6c9026.
+- 2026-11-02: Doing -> Done. kafka:// Produce v3, Fetch v4 and record batch v2 measured by 11 passing conformance cases and the Kafka-Records matrix
