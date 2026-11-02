@@ -13,6 +13,10 @@ standard error and, per connection or datagram channel, the bytes each side sent
   `TlsServerStream` serves with the route's certificate (`ReferenceCertificate.CreateSelfSigned`
   makes one curl accepts under `-k`). A server that fails, such as a TLS accept curl never
   completes, makes `RunAsync` throw its exception; one still waiting when curl ends is cancelled.
+- Requirements (BL-4502, ADR-1186): a test carries `[SpecRequirement("<Name>:<source>-<locator>")]`;
+  `RequirementMatrix` checks `Documentation/Conformance/Extended/<Name>.md` (copied to the test output)
+  against the carriers the test project collects, and `KnownFailures.RunCaseAsync` runs a case listed in
+  `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` so it passes while failing and fails once it passes.
 - Each protocol's reference server goes in `<Name>/`, one file per server, registered nowhere.
 - It references `Curl.Protocol.Abstractions`, `Curl.Networking`, `Curl.Conformance.UnitLibrary`
   and the shared layers only, never an extension (`VerifyExtensionIsolation`).
