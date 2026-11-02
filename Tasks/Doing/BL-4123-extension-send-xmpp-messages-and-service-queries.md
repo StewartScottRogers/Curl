@@ -45,3 +45,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 0364ad1b 5b43e1c5 c7e7b42b bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Deferred. Split into BL-4270 (verify delivered work and gates) and BL-4271 (SCRAM-SHA authentication) after hitting the cost cap
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 76583343 5b43e1c5 c7e7b42b bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
