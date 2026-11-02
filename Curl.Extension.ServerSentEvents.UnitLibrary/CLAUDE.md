@@ -4,7 +4,7 @@ The Server-Sent Events extension (ADR-0999, ADR-1011, ADR-1067). Namespace `Curl
 It references only `Curl.Extension.Abstractions.UnitLibrary`; `Curl.Extension.Composition` registers its
 option, description and transfer hook.
 
-- `ServerSentEventsExtension` declares the `--sse` flag, its `--extensions-help` description and `HookFor`,
+- `ServerSentEventsExtension` declares the `--sse` flag, its `--extended-help` description and `HookFor`,
   which gives the hook when the option group gave `--sse`.
 - `ServerSentEventsTransferHook` asks for an event stream (`Accept`, `Cache-Control`, `Pragma`, and
   `Last-Event-ID` once one is set), writes the body through `EventStreamWritingStream`, ends the parser's

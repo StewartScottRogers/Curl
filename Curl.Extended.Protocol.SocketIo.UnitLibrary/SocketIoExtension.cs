@@ -7,7 +7,7 @@ namespace Curl.Extended.Protocol.SocketIo;
 /// <summary>The <c>socketio://</c> and <c>socketios://</c> extension's description and handler factory (ADR-1035).</summary>
 public static class SocketIoExtension
 {
-    /// <summary>Gets what <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "socketio",
         "Connects to Socket.IO v5 servers over WebSocket: joins the URL path's namespace, emits the -d JSON array [\"event\", args...] as an event and writes each event received as one JSON array per line until the server disconnects.",

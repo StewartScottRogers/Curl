@@ -6,7 +6,7 @@ namespace Curl.Mcp;
 /// </summary>
 /// <param name="Version">The engine's version text, such as <c>8.22.0</c>.</param>
 /// <param name="Protocols">The lower-case schemes the engine supports, in the order it lists them.</param>
-/// <param name="ExtendedProtocols">The lower-case schemes Curl's extensions serve, in the order <c>--extensions-help</c> lists them; empty when <c>CURL_EXTENSIONS</c> is <c>0</c>.</param>
+/// <param name="ExtendedProtocols">The lower-case schemes Curl's extensions serve, in the order <c>--extended-help</c> lists them; empty when <c>CURL_EXTENSIONS</c> is <c>0</c>.</param>
 /// <param name="Features">The names of the features the engine has built in, in the order it lists them.</param>
 /// <param name="TlsBackend">The TLS backend's name and version; <see langword="null" /> when the engine reports none.</param>
 /// <param name="VersionLine">The first line <c>curl -V</c> prints on this platform, without a line terminator.</param>

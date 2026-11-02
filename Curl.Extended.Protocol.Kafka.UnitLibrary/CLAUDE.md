@@ -7,7 +7,7 @@ it `Curl.Protocol.Abstractions`) and the base class library. The handler is regi
 
 `Client/` (namespace `Curl.Extended.Protocol.Kafka.Client`):
 
-- `KafkaExtension` is the description `curl --extensions-help` lists and the handler factory, over
+- `KafkaExtension` is the description `curl --extended-help` lists and the handler factory, over
   `ProtocolHandlerServices.Connector`.
 - `KafkaProtocolHandler` serves `kafka://` (port 9092) and `kafkas://` (port 9093, TLS); `KafkaAddress` reads the
   topic, partition and `?offset=N` from the URL.

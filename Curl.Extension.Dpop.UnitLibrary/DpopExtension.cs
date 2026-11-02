@@ -18,7 +18,7 @@ public static class DpopExtension
         ExtensionOptionArgument.Value,
         "Sign a DPoP proof (RFC 9449) for each HTTP request with the EC or RSA private key in the PEM <key file>");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "dpop",
         "Binds OAuth 2.0 access tokens to a key: signs a DPoP proof JWT for every HTTP request, sends --oauth2-bearer as Authorization: DPoP and answers DPoP-Nonce challenges (RFC 9449).",

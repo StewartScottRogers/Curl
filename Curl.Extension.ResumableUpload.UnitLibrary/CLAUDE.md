@@ -5,7 +5,7 @@ The resumable upload extension (ADR-0999), for `--resumable-upload`. Namespace
 (for `IConnection`) and `Curl.Extension.Abstractions` (for `ITransferHook`), never `Curl.Original.Protocol.Http` or
 another extension.
 
-- `ResumableUploadExtension` holds the `--resumable-upload` flag, the description `curl --extensions-help`
+- `ResumableUploadExtension` holds the `--resumable-upload` flag, the description `curl --extended-help`
   lists and `HookFor`, which gives the transfer hook only when the flag was given (ADR-1151).
   `Curl.Extension.Composition` registers all three in its option, description and transfer hook catalogues.
 

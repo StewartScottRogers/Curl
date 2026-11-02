@@ -18,7 +18,7 @@ public static class HttpFileOptions
         ExtensionOptionArgument.Value,
         "Environment in http-client.env.json beside the --http-file to use");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> say about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "http-file",
         "Runs the requests in a Visual Studio / VS Code REST Client .http file, with file variables, {{$processEnv}} and named environments from http-client.env.json.",

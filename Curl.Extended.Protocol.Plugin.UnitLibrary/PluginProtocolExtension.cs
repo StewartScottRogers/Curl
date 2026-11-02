@@ -9,7 +9,7 @@ namespace Curl.Extended.Protocol.Plugin;
 /// </summary>
 public static class PluginProtocolExtension
 {
-    /// <summary>Gets what <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "plugin-protocol",
         "Hands a URL whose scheme neither curl nor another extension serves to a program named curl-proto-<scheme> on PATH (PATHEXT on Windows), as git hands remotes to git-remote-<transport>: the helper gets the URL as its argument, lists its capabilities (get, put) on stdout, and answers get <url> or put <url> (the -T or -d data follows on stdin) with ok and the body, or error <message>. Without such a program the scheme fails as curl fails one it does not support.",

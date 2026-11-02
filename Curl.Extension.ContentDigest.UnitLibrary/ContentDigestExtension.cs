@@ -18,7 +18,7 @@ public static class ContentDigestExtension
         ExtensionOptionArgument.None,
         "Send Content-Digest and Repr-Digest with -d data and check the server's against the body (exit 56 on a mismatch)");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "content-digest",
         "Sends SHA-256 Content-Digest and Repr-Digest fields with uploads and checks the server's digest fields against the response body (RFC 9530).",

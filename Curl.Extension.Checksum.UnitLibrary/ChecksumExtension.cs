@@ -17,7 +17,7 @@ public static class ChecksumExtension
         ExtensionOptionArgument.Value,
         "Fail with exit 61 unless the body's <alg>:<hex> digest matches (sha1, sha224, sha256, sha384, sha512, sha512-224, sha512-256)");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "checksum",
         "Verifies a download against an expected SHA-1 or SHA-2 digest and fails the transfer when it differs (FIPS 180-4).",

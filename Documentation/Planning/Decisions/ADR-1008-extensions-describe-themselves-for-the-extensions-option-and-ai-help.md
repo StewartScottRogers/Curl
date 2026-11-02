@@ -35,3 +35,12 @@ and a `-help` suffix says it prints help rather than changes a transfer, beside 
 The `--ai-help extensions` subject and the `curl://ai-help/extensions` MCP resource keep their names: they
 name a help subject, not the option. `--help` still leaves the option out, so curl's help pages stay byte
 for byte; `--ai-help` lists it under the Curl category.
+
+## Amendment (2026-11-01, BL-4459)
+
+Decided by Claude under Stewart's delegation, at Stewart's request ("rename the command line arg
+`--extensions-help` to `--extended-help`"). The option is now `--extended-help`; `--extensions-help` is
+gone, and curl answers it as any unknown option (exit 2), as it answers `--extensions`. No alias is kept,
+for the same reason as above. No curl option or extension option is named `extended-help`, so
+`ExtensionCommandLineOptions`' clash rule holds. `--ai-help extensions` and `curl://ai-help/extensions`
+keep their names, `--help` still leaves the option out, and `--ai-help` lists it under the Curl category.

@@ -6,7 +6,7 @@ namespace Curl.Extended.Protocol.Stomp.Client;
 /// <summary>The <c>stomp://</c> and <c>stomps://</c> extension's description and handler factory (ADR-1059).</summary>
 public static class StompExtension
 {
-    /// <summary>Gets what <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "stomp",
         "Sends and subscribes with STOMP 1.2: with -d it SENDs the data to the URL path's destination, otherwise it SUBSCRIBEs to it and writes each MESSAGE body until the server closes; --user gives login and passcode, stomps:// adds TLS.",

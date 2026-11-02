@@ -19,7 +19,7 @@ public static class EncryptedDnsExtension
     /// <summary>Gets <c>--dns-over-quic &lt;host[:port]&gt;</c>.</summary>
     public static ExtensionOption DnsOverQuicOption { get; } = new("dns-over-quic", ExtensionOptionArgument.Value, "Look host names up on this DNS-over-QUIC server, host[:port] (port 853 by default)");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "encrypted-dns",
         "Looks every transfer's host names up on a DNS-over-TLS (RFC 7858) or DNS-over-QUIC (RFC 9250) server.",

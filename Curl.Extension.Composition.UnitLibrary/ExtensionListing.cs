@@ -4,17 +4,17 @@ using Curl.Extension.Abstractions.Description;
 namespace Curl.Extension.Composition;
 
 /// <summary>
-/// What <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> print, built from every registered
+/// What <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> print, built from every registered
 /// extension's <see cref="ExtensionDescription" /> (ADR-1008). With
 /// <see cref="ExtensionProtocolHandlers.SwitchVariable" /> set to <c>0</c> both say that extensions are off.
 /// </summary>
 public static class ExtensionListing
 {
-    /// <summary>The line <c>--extensions-help</c> prints when extensions are off.</summary>
+    /// <summary>The line <c>--extended-help</c> prints when extensions are off.</summary>
     public const string OffLine = "Extensions are off: CURL_EXTENSIONS is 0.";
 
     /// <summary>
-    /// The lines <c>--extensions-help</c> prints: one per registered extension, or <see cref="OffLine" /> alone
+    /// The lines <c>--extended-help</c> prints: one per registered extension, or <see cref="OffLine" /> alone
     /// when extensions are off.
     /// </summary>
     /// <param name="readEnvironmentVariable">Reads the run's environment.</param>
@@ -32,7 +32,7 @@ public static class ExtensionListing
         MarkdownOf(ExtensionDescriptionCatalogue.Entries, AreOff(readEnvironmentVariable));
 
     /// <summary>
-    /// The URL schemes Curl's extensions serve, in the order <c>--extensions-help</c> lists their extensions, each once;
+    /// The URL schemes Curl's extensions serve, in the order <c>--extended-help</c> lists their extensions, each once;
     /// empty when extensions are off. What the MCP host's <c>version</c> and URL tools offer beside curl's own (BL-4451).
     /// </summary>
     /// <param name="readEnvironmentVariable">Reads the run's environment.</param>
@@ -63,7 +63,7 @@ public static class ExtensionListing
         [
             "# extensions",
             string.Empty,
-            "Curl's own additions beyond upstream curl: each adds URL schemes or long options curl does not have and never changes what curl's own options do. Set `CURL_EXTENSIONS=0` to turn every one off. `curl --extensions-help` lists them one per line.",
+            "Curl's own additions beyond upstream curl: each adds URL schemes or long options curl does not have and never changes what curl's own options do. Set `CURL_EXTENSIONS=0` to turn every one off. `curl --extended-help` lists them one per line.",
             string.Empty,
         ];
         lines.AddRange(off ? ["Extensions are off: `CURL_EXTENSIONS` is `0`."] : descriptions.SelectMany(SectionLines));

@@ -25,7 +25,7 @@ public static class ObliviousHttpExtension
         ExtensionOptionArgument.Value,
         "Read the gateway's application/ohttp-keys from <file>, or GET them from an http:// or https:// <url>");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "ohttp-relay",
         "Sends HTTP requests as Oblivious HTTP through a relay, encapsulated to a gateway's key configuration (RFC 9458, RFC 9540).",

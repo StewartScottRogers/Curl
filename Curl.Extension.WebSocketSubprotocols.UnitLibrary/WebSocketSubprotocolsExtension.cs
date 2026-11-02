@@ -17,7 +17,7 @@ public static class WebSocketSubprotocolsExtension
         ExtensionOptionArgument.Value,
         "Speak a WebSocket subprotocol: \"graphql-transport-ws <query>\", \"wamp.2.json <realm> [topic]\" or \"v12.stomp [destination]\"");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "ws-subprotocol",
         "Speaks graphql-transport-ws, WAMP or STOMP 1.2 over WebSocket: names the subprotocol and sends its opening messages, one text frame each.",

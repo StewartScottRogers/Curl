@@ -23,7 +23,7 @@ public static class DeltaDownloadExtension
         ExtensionOptionArgument.Value,
         "The local file --zsync takes unchanged blocks from (default: the control file's Filename)");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "zsync",
         "Fetches only the changed blocks of a file over HTTP ranges, taking the rest from a local copy, by a zsync 0.6 control file.",

@@ -6,7 +6,7 @@ is registered by one line in `ExtensionCatalogue.cs` and described in `Extension
 
 `Client/` (namespace `Curl.Extended.Protocol.Stomp.Client`):
 
-- `StompExtension` is the description `curl --extensions-help` lists and the handler factory, over
+- `StompExtension` is the description `curl --extended-help` lists and the handler factory, over
   `ProtocolHandlerServices.Connector`.
 - `StompProtocolHandler` serves `stomp://` (port 61613) and `stomps://` (port 61614, TLS); the URL path is the
   destination, and `--user` gives `CONNECT`'s `login` and `passcode`.

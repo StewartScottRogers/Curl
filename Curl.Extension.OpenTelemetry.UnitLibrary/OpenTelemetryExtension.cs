@@ -18,7 +18,7 @@ public static class OpenTelemetryExtension
         ExtensionOptionArgument.Value,
         "Send a W3C traceparent and export each HTTP transfer's span as OTLP/HTTP JSON to <url> (such as http://localhost:4318/v1/traces)");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "otel",
         "Traces HTTP transfers with OpenTelemetry: sends a W3C Trace Context traceparent and exports each transfer's client span over OTLP/HTTP JSON.",
