@@ -8,7 +8,7 @@ depends-on: [BL-4320]
 touches: [Curl.Ssh.UnitLibrary, Curl.Ssh.UnitTests, Curl.Original.Protocol.Ssh.UnitLibrary, Curl.Original.Protocol.Ssh.UnitTests/SshWireDecodersTests.cs, Curl.Original.Protocol.Ssh.UnitTests/SshWireDecodersAdversarialTests.cs, Curl.Original.Protocol.Ssh.UnitTests/Fakes/RepeatingRandomSource.cs, Curl.Original.Protocol.Ssh.UnitTests/GlobalUsings/Curl.Ssh.cs, Curl.Original.Protocol.Ssh.UnitTests/Curl.Original.Protocol.Ssh.UnitTests.csproj, Curl.slnx, Curl.Conformance.SshServer.UnitLibrary, Curl.Conformance.SshServer.UnitTests, Curl.Console/CurlComposition.cs, Curl.Engine.UnitLibrary/EngineComposition.PlatformBuilds.cs, Curl.Engine.UnitTests/EngineCompositionPlatformLibraryTests.cs, Curl.Original.Protocol.Ssh.IntegrationTests/Curl.Original.Protocol.Ssh.IntegrationTests.csproj, Curl.Protocol.Abstractions.UnitTests/ProtocolIsolationTests.cs, Documentation/Planning/Decisions/ADR-0120-protocol-libraries-may-reference-the-hand-built-libraries-and-nothing-else-horizontal.md]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-11-02
 ---
 # BL-4362 — Create Curl.Ssh.UnitLibrary and move the shared SSH root types into it
 
@@ -39,6 +39,8 @@ Part 1 of BL-4328 (SSH transport layer into a shared library so extensions such 
 - Touches widened: `Curl.Original.Protocol.Ssh.IntegrationTests` csproj (the stash's project reference), `ProtocolIsolationTests.cs` (the new library joins ADR-0120's table; without it ProtocolLibrary_References_OnlyAbstractionsAndHandBuiltLibraries failed) and ADR-0120 (its table row). No task in Doing names them.
 - Verified on this exact work tree: `dotnet build Curl.slnx` 0 warnings 0 errors; full fast tests green (112 assemblies; Curl.Ssh.UnitTests 431, Curl.Original.Protocol.Ssh.UnitTests 1511, Curl.Conformance.SshServer.UnitTests 139) apart from the isolation test, then fixed and its class rerun green (41); `Measure-CodeQuality.ps1 -Library Curl.Ssh.UnitLibrary,Curl.Original.Protocol.Ssh.UnitLibrary,Curl.Conformance.SshServer.UnitLibrary`: 0 failing members across the 3 assemblies; `dotnet format whitespace --verify-no-changes` clean on the changed projects. Added ADR-1162, `Curl.Ssh.UnitLibrary/CLAUDE.md`, and the protocol library's CLAUDE.md now says where the transport lives. Next claim: build, run the fast tests once, move to Done and commit; no quality rerun needed unless the code changed.
 
+- 2026-11-02 (lane 7): Nothing left to do: BL-4375 and BL-4376 (both Done) landed this move. Checked on this tree: `Curl.Ssh.UnitLibrary` and `Curl.Ssh.UnitTests` are in `/Wire/Ssh/` in `Curl.slnx`, the library references only Curl.Cryptography and Curl.Protocol.Abstractions, ISshRandomSource, SshConnectionLostException, Libssh2ErrorCode and SshTransferException live there, SshWireDecoders stays in the protocol library, ADR-1165 records the layer. `dotnet build Curl.slnx` 0 errors; Curl.Ssh.UnitTests 1011 and Curl.Original.Protocol.Ssh.UnitTests 953 passed. The stash ba89e3db (old `Curl.Protocol.Ssh` names) is superseded and was not applied.
+
 ## Log
 
 - 2026-10-30: Created.
@@ -47,3 +49,4 @@ Part 1 of BL-4328 (SSH transport layer into a shared library so extensions such 
 - 2026-10-30: Backlog -> Deferred. Split into BL-4375 and BL-4376 (over its cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: e09ab28e 98c3ca32 10174c6c e35aff77 3d836d5e.
+- 2026-11-02: Doing -> Done. Delivered through BL-4375 and BL-4376; verified build and SSH fast tests on this tree
