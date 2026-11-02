@@ -3,8 +3,8 @@ id: AF-0519
 title: Lib575_DownloadsThreeTimes counts the performs but never asserts the count
 auditor: quality
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-11-01 ("accept all").
+status: closed
+reason: Re-audit 2026-11-01_1801.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib567To576Tests.cs:Lib575_DownloadsThreeTimes:name-lies
 reproduction: none
 task: BL-4454
@@ -13,9 +13,9 @@ found: 2026-11-01
 found-at: 4c39311e3e4524ac6950cb2cba36f5b3f2a6ff2e
 scorecard: 2026-11-01_1016.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-01
+closed-how: reliable-reaudit
+closed-by: 2026-11-01_1801.md
 ---
 # AF-0519 - Lib575_DownloadsThreeTimes counts the performs but never asserts the count
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib567To576Tests.cs -Patt
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_1801.md | reproduces: no | Lib575_DownloadsThreeTimes now asserts Assert.AreEqual(performCount, performs) (Lib567To576Tests.cs:428).
+
 ## Log
 
 - 2026-11-01: filed proposed.
 - 2026-11-01: proposed -> accepted. Stewart: accept all.
+- 2026-11-01: accepted -> closed. Re-audit 2026-11-01_1801.md: the reproduction no longer reproduces.
