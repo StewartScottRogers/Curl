@@ -39,3 +39,4 @@ pooled). If the fix must go in `TcpConnector` instead, widen `touches` to it und
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 5b215245 faa0a407 fc0f872b df930c3e.
