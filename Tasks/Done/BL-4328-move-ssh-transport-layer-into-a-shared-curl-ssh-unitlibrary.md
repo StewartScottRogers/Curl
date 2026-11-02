@@ -8,7 +8,7 @@ depends-on: [BL-4320]
 touches: [Curl.Ssh.UnitLibrary, Curl.Ssh.UnitTests, Curl.Original.Protocol.Ssh.UnitLibrary, Curl.Original.Protocol.Ssh.UnitTests, Curl.slnx, Curl.Conformance.SshServer.UnitLibrary, Curl.Conformance.SshServer.UnitTests, Curl.Console/CurlComposition.cs, Curl.Engine.UnitLibrary/EngineComposition.PlatformBuilds.cs, Curl.Engine.UnitTests/EngineCompositionPlatformLibraryTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-11-02
 ---
 # BL-4328 — Move SSH transport layer into a shared Curl.Ssh.UnitLibrary
 
@@ -22,10 +22,10 @@ Extensions may reference shared layers but no `Curl.Protocol.*` library (ADR-099
 
 ## Acceptance criteria
 
-- [ ] `Curl.Ssh.UnitLibrary` and `Curl.Ssh.UnitTests` exist in `/Wire/Ssh/` in `Curl.slnx`, reference no `Curl.Protocol.*` library other than `Curl.Protocol.Abstractions.UnitLibrary`, and hold the transport, packet protection, key exchange, negotiation and compression code and its tests.
-- [ ] `Curl.Original.Protocol.Ssh.UnitLibrary` references `Curl.Ssh.UnitLibrary` and no longer holds those folders; every existing SSH unit and integration test still passes unchanged in behaviour.
-- [ ] The changed libraries meet the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `Curl.Ssh.UnitLibrary` and `Curl.Ssh.UnitTests` exist in `/Wire/Ssh/` in `Curl.slnx`, reference no `Curl.Protocol.*` library other than `Curl.Protocol.Abstractions.UnitLibrary`, and hold the transport, packet protection, key exchange, negotiation and compression code and its tests.
+- [x] `Curl.Original.Protocol.Ssh.UnitLibrary` references `Curl.Ssh.UnitLibrary` and no longer holds those folders; every existing SSH unit and integration test still passes unchanged in behaviour.
+- [x] The changed libraries meet the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -35,6 +35,8 @@ Extensions may reference shared layers but no `Curl.Protocol.*` library (ADR-099
 - Dependency closure measured (wider than Context says): the five folders hold 3,738 lines, their tests about 4,980. Beyond them they need: from the root `ISshRandomSource`, `SshWireDecoders`, `SshConnectionLostException`, `Libssh2ErrorCode`, `SshTransferException` (360 lines, uses only Abstractions) and `SshDiagnosticLog`; from `HostKeys` the signature verifiers (`SshTransport` calls `SshSignatureVerifiers.For`, `SshAlgorithmCatalogue` lists `SshSignatureVerifiers.Names`): `ISshSignatureVerifier`, `SshSignatureVerifiers`, the Dsa/Ecdsa/Ed25519/Rsa/OpenSshCertificate/SecurityKey* verifiers, `SshKeyBlobReader`, `SecurityKeySignedData` (about 530 lines, they use only Transport, KeyExchange and Cryptography). Plan: move those verifiers into `Curl.Ssh.HostKeys` (host key signature verification is RFC 4253 section 8); leave known_hosts files in the protocol library.
 - `SshDiagnosticLog` (265 lines) mixes transport lines with SFTP (`SftpRequestSent`, `SftpAnswerRead`, uses `Sftp.SftpPacketType`) and known_hosts lines (`HostKeyAccepted(SshOptions, KnownHostsFile?)`), so it must be split: a transport log in Curl.Ssh that `SshTransport` takes, and the SFTP/known_hosts lines kept in the protocol library writing through it. Record that split in the ADR.
 - Every moved type is `internal`: `Curl.Ssh.UnitLibrary` needs `InternalsVisibleTo` for Curl.Original.Protocol.Ssh.UnitLibrary, Curl.Original.Protocol.Ssh.UnitTests, Curl.Original.Protocol.Ssh.IntegrationTests, Curl.Conformance.SshServer.UnitLibrary/UnitTests, Curl.Conformance.UnitProgram.UnitLibrary, Curl.Console, Curl.Engine.UnitLibrary/UnitTests and Curl.Ssh.UnitTests (check which already see `SshAlgorithmCatalogue` today).
+
+- 2026-11-02 (lane 7): Delivered through its split: BL-4362, BL-4363, BL-4364, BL-4365, BL-4375 and BL-4376 are all Done. `Curl.Ssh.UnitLibrary`/`Curl.Ssh.UnitTests` sit in `/Wire/Ssh/`, reference only Cryptography and Protocol.Abstractions; the protocol library references them and no longer holds the moved folders; ADR-1165 records the layer; BL-4376 measured the quality gates with 0 failing members. This run checked on this branch that `dotnet build` is clean and Curl.Ssh.UnitTests (1011), Curl.Original.Protocol.Ssh.UnitTests (953) and Curl.Conformance.SshServer.UnitTests (139) pass. The stash 4109854 from the 10-29 run predates the split and is superseded, so nothing from it was carried over.
 
 ## Log
 
@@ -46,3 +48,4 @@ Extensions may reference shared layers but no `Curl.Protocol.*` library (ADR-099
 - 2026-10-30: Backlog -> Deferred. Over its cost cap; split into BL-4362, BL-4363, BL-4364, BL-4365
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: acac56da 659666f4 e35aff77 3d836d5e.
+- 2026-11-02: Doing -> Done. Delivered through BL-4362, BL-4363, BL-4364, BL-4365, BL-4375 and BL-4376
