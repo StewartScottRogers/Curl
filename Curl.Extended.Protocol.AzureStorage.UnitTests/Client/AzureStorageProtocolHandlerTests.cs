@@ -139,6 +139,17 @@ public sealed class AzureStorageProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DfsErrorWithAJsonErrorBody_FailsWithExit22NamingTheCode()
+    {
+        string body = """{"error":{"code":"PathNotFound","message":"The specified path does not exist."}}""";
+
+        TransferResult result = await Handler(new QueuedAzureStorageConnector(QueuedAzureStorageConnector.Reply(body, status: "404 Not Found"))).ExecuteAsync(Context("abfss://fs@account/f", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("Azure Storage returned error 404: PathNotFound: The specified path does not exist.", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ErrorWithoutAnErrorBody_FailsWithExit22NamingTheStatus()
     {
         TransferResult result = await Handler(new QueuedAzureStorageConnector(QueuedAzureStorageConnector.Reply("{}", status: "403 Forbidden"))).ExecuteAsync(Context("abfss://fs@account/f", new MemoryStream()));

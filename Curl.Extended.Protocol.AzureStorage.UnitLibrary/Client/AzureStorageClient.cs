@@ -140,7 +140,7 @@ internal sealed class AzureStorageClient(IConnector connector, ITransferContext 
     /// <param name="body">The response body.</param>
     /// <returns>The failure.</returns>
     internal static AzureStorageTransferException ErrorOf(int statusCode, string body) =>
-        AzureStorageErrorParser.Parse(body).Value is { } error
+        (AzureStorageErrorParser.Parse(body).Value ?? AzureStorageJsonErrorParser.Parse(body).Value) is { } error
             ? new AzureStorageTransferException(CurlExitCode.HttpReturnedError, $"Azure Storage returned error {statusCode}: {error.Code}: {error.Message}")
             : new AzureStorageTransferException(CurlExitCode.HttpReturnedError, $"Azure Storage returned error {statusCode}");
 }
