@@ -77,3 +77,4 @@ curl -sSL -H 'Authorization: Bearer xyz' -H 'Cookie: c=1' -H 'X-Custom: 1' http:
 - 2026-10-28: Doing -> Backlog. Waits on BL-3723, which holds Curl.Core.UnitLibrary/RedirectFollower.cs; the fix is written and left for the stash
 - 2026-10-28: Backlog -> Deferred. Split into BL-4002 and BL-4003 (over its cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
