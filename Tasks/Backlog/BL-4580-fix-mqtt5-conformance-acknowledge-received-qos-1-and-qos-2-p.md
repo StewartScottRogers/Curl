@@ -19,7 +19,7 @@ A subscribing `mqtt5://` curl answers each received QoS 1 PUBLISH with PUBACK an
 ## Context
 
 Requirements Mqtt5:MQTT-4.3.2-4, MQTT-4.6.0-2, MQTT-4.3.3-8, MQTT-4.3.3-11, MQTT-4.6.0-3 (OASIS MQTT 5.0). Today curl writes the payload and sends nothing, so the broker waits and `-m` ends the run. Found by BL-4485's conformance cases (`Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe/`); the expected
-behaviour is decided in ADR-1197. The change lands in `Curl.Extended.Protocol.Mqtt5.UnitLibrary/Client/Mqtt5ClientFlow.cs`.
+behaviour is decided in ADR-1199. The change lands in `Curl.Extended.Protocol.Mqtt5.UnitLibrary/Client/Mqtt5ClientFlow.cs`.
 
 ## Acceptance criteria
 

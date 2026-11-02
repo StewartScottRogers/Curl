@@ -1,4 +1,4 @@
-# ADR-1197: The `mqtt5://` client acknowledges received QoS 1 and 2, refuses a Topic Alias it never allowed and closes on a missing PINGRESP
+# ADR-1199: The `mqtt5://` client acknowledges received QoS 1 and 2, refuses a Topic Alias it never allowed and closes on a missing PINGRESP
 
 - Status: Accepted
 - Date: 2026-11-02

@@ -13,7 +13,7 @@ server's DISCONNECT. It never sends a QoS 1 or 2 PUBLISH, an UNSUBSCRIBE, a Topi
 Maximum Packet Size, and always sets Clean Start, so the statements binding a QoS > 0 sender, an unsubscriber or a
 resumed session are `n/a`. The keep-alive cases run on real time with a one-second Server Keep Alive and `-m` as a
 guard; their cost is a few seconds. The client's end of a missing PINGRESP and of a Topic Alias it never allowed are
-decided in ADR-1197.
+decided in ADR-1199.
 
 | ID | Level | Requirement | Covered by |
 |----|-------|-------------|------------|

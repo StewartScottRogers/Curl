@@ -19,7 +19,7 @@ A subscribing `mqtt5://` curl refuses a PUBLISH carrying a Topic Alias (it sends
 ## Context
 
 Requirement Mqtt5:MQTT5-3.3.2.3.4-1 (OASIS MQTT 5.0 section 3.3.2.3.4). Today curl writes the payload of both the alias-setting and the alias-reusing PUBLISH. Found by BL-4485's conformance cases (`Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe/`); the expected
-behaviour is decided in ADR-1197. The change lands in `Curl.Extended.Protocol.Mqtt5.UnitLibrary/Client/Mqtt5ClientFlow.cs`.
+behaviour is decided in ADR-1199. The change lands in `Curl.Extended.Protocol.Mqtt5.UnitLibrary/Client/Mqtt5ClientFlow.cs`.
 
 ## Acceptance criteria
 

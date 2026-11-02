@@ -19,7 +19,7 @@ A subscribing `mqtt5://` curl whose PINGREQ is unanswered when the next one fall
 ## Context
 
 Requirement Mqtt5:MQTT5-3.1.2.10-1 (OASIS MQTT 5.0 section 3.1.2.10, a SHOULD). Today curl keeps pinging until `-m` ends the run with exit 28. Found by BL-4485's conformance cases (`Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe/`); the expected
-behaviour is decided in ADR-1197. The change lands in `Curl.Extended.Protocol.Mqtt5.UnitLibrary/Client/Mqtt5ClientFlow.cs`.
+behaviour is decided in ADR-1199. The change lands in `Curl.Extended.Protocol.Mqtt5.UnitLibrary/Client/Mqtt5ClientFlow.cs`.
 
 ## Acceptance criteria
 
