@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-11-02: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs to map --service-name into HttpRequestOptions; BL-4461 holds Curl.Engine.UnitLibrary
+- 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
