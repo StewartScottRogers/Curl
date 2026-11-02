@@ -63,6 +63,14 @@ library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a 
 
 ## Notes
 
+- Cases: `Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe/` (PublishCases, SubscribeCases, ReceivedPublishCases, KeepAliveCases, builder tests); packets built by `Curl.Conformance.Extended.UnitLibrary/Mqtt5/PublishSubscribe/Mqtt5PublishSubscribeBytes.cs`; matrix `Documentation/Conformance/Extended/Mqtt5-PublishSubscribe.md`. Normative IDs written from the OASIS MQTT 5.0 text (Appendix B numbering); no copy of the specification is in the repository.
+- curl publishes and subscribes only at QoS 0 and sends no Topic Alias Maximum, Receive Maximum or Maximum Packet Size, so: "publish with each acknowledgement reason code" is measured as a QoS 0 PUBLISH answered with PUBACK of each code (curl waits for none, exits 0); "SUBACK granting a lower QoS" has no lower grant than QoS 0, so the success case grants QoS 0 and the refusal case covers nine failure codes; "packet identifiers in use not reused" is shown by the one SUBSCRIBE carrying identifier 1 (no other packet curl sends has one); "larger than the client's Maximum Packet Size" is a 70000-byte PUBLISH written whole since curl announces none (MQTT5-3.1.2.11.4-1).
+- Keep-alive cases run on real time (Server Keep Alive 1 s, `-m` as a guard) rather than a fake clock: the harness takes a TimeProvider but nothing in the test project advances one, and the cases take under 3 s.
+- Known failures filed (ADR-1197 decides the expected behaviour): BL-4573 (received QoS 1/2 not acknowledged), BL-4574 (Topic Alias accepted though never allowed), BL-4575 (missing PINGRESP never closes the connection).
+- Measure-CodeQuality (-Library Curl.Conformance.Extended.UnitLibrary): the only member of this task outside a gate was `Mqtt5PublishSubscribeBytes.PubRel` (line 70 uncovered, reached only by a known-failure case); `Mqtt5PublishSubscribeBytesTests.PubRel_...` now covers it. The two Amqp1ReferenceContainer complexity failures in the same report are not this task's code.
+- Platform check: no paths, file system, OS text or certificates; byte and text assertions use Environment.NewLine. CI on Linux and macOS is met by keeping the change platform-neutral and the fast tests green here.
+- Fast tests: solution build clean with -warnaserror, all fast test projects passed (Curl.Conformance.Extended.UnitTests 521/521).
+
 
 ## Log
 
