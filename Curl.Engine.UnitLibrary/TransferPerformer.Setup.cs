@@ -29,8 +29,11 @@ internal sealed partial class TransferPerformer
 
     /// <summary>
     /// The error text of a transfer URL curl rejects: <see cref="UrlRejectedPrefix" /> and the
-    /// parser's reason, except for a host IDNA cannot convert, which curl 8.22.0 reports with
-    /// <c>CURLE_URL_MALFORMAT</c>'s own text, <c>URL using bad/illegal format or missing URL</c> (CGR-059).
+    /// parser's reason, except for the three rejections curl 8.22.0 reports with their code's own
+    /// text and no prefix: a host IDNA cannot convert (<c>CURLE_URL_MALFORMAT</c>'s
+    /// <c>URL using bad/illegal format or missing URL</c>, CGR-059), a URL too long
+    /// (<c>CURLE_BAD_FUNCTION_ARGUMENT</c>'s <c>A libcurl function was given a bad argument</c>) and a
+    /// URL at the length limit (<c>CURLE_OUT_OF_MEMORY</c>'s <c>Out of memory</c>).
     /// </summary>
     /// <param name="rejection">Why the URL was rejected.</param>
     /// <returns>The text.</returns>

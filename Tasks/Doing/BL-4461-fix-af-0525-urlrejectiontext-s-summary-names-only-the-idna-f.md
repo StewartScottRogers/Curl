@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The summary of `UrlRejectionText` now names all three bare-text rejections (IdnConversionFailed, UrlTooLong, UrlAtLengthLimit) with each code's text. Comment-only change, so no member's metrics changed; built Curl.Engine.UnitTests and ran its fast tests (2945 passed). The reproduction now matches only line 45.
 
 ## Log
 
