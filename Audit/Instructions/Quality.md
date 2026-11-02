@@ -20,14 +20,22 @@ choose any project to read (BL-1368):
 powershell -NoProfile -File Audit/Tools/Find-WeakTests.ps1 -Root <audited tree> -OutFile <temp folder>\weak-tests.json
 ```
 
-It lists candidates of four kinds: `ignored-test` (`[Ignore]` or `Assert.Inconclusive`),
-`no-assertion` (no assertion once comments are removed), `weak-assertion` (only `IsNotNull`, or
-an `IsTrue` of a length, count or `Any()` above zero) and `name-lies` (a name with `ExitsWith<N>`
-or `ThrowsExit<N>` whose body never mentions N or its `CurlExitCode`, or `_Throws<X>` whose body
-never mentions X). Read every candidate's test: file the ones that really are what the scan says,
-under steps 1 and 2's kinds, and say in your summary how many candidates you read and how many
-you filed. A candidate is not a finding until you have read it. The scan sees only what the text
-shows; a test that lost one of several assertions is for step 3's mutants to find.
+It lists candidates of five kinds: `ignored-test` (`[Ignore]` or `Assert.Inconclusive`),
+`no-assertion` (no assertion once comments are removed), `weak-assertion`, `commented-assertion`
+and `name-lies` (a name with `ExitsWith<N>` or `ThrowsExit<N>` whose body never mentions N or its
+`CurlExitCode`, or `_Throws<X>` whose body never mentions X). `weak-assertion` is judged per
+assertion, not only per test: a test whose every assertion is `IsNotNull` or an `IsTrue` of a
+length, count or `Any()` above zero; a weak assertion that is the only check of its variable
+while the test's other assertions check other values (an exact `AreEqual` on the bytes weakened
+to `IsNotNull` beside a kept exit-code check); and an `IsNotNull` of a value that can never be
+null (a `ToString`, `GetString`, `Substring` or `string.Join` result, an interpolated string, a
+`new` expression, a `.Length` or `.Count`). `commented-assertion` is an `Assert.`,
+`CollectionAssert.` or `StringAssert.` call commented out inside the test, whatever assertions
+remain: the outcome it checked is no longer checked by it. Read every candidate's test: file the
+ones that really are what the scan says, under steps 1 and 2's kinds, and say in your summary how
+many candidates you read and how many you filed. A candidate is not a finding until you have read
+it; for a `commented-assertion`, check whether any other assertion still checks that outcome, and
+file it when none does.
 
 ## 1. Test names against bodies
 Beyond step 0's candidates, for each `.UnitTests` project in scope (the prompt names them; by default the twins of the
@@ -55,7 +63,17 @@ In the same tests, flag:
 Run the mutation tester on the libraries the prompt names. When it names none, take the three
 `.UnitLibrary` projects with the most lines changed since the last audited commit the prompt
 gives (`git diff --stat <commit> HEAD -- '*.UnitLibrary/*'`); with no earlier commit, the
-three largest by line count.
+three largest by line count. Then, every audit, add three more drawn from every library with a
+`.UnitTests` twin, so that over audits every library is mutated, not only those the factory
+changed most:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -DrawLibraries 3 -Seed <seed> -Except <the three most changed, comma-separated>
+```
+
+It prints the three names as JSON, drawn with the seed the prompt gives (a new one each audit).
+Mutate the drawn three with `-MaxMutants 25`; name all six in your summary, saying which were
+drawn.
 
 ```powershell
 powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library <Curl.X.UnitLibrary> -MaxMutants 40 -Seed <seed> -TimeoutSeconds <limit> -OutFile <temp folder>\mutation-<library>.json
@@ -119,6 +137,7 @@ Follow the key rule in [Report-Format.md](Report-Format.md). Use these kinds:
 | --- | --- |
 | `name-lies` | Step 1: the name promises what the body does not assert. |
 | `weak-assertion` | Step 2: an assertion too weak to catch the stated bug. |
+| `commented-assertion` | Step 0: an assertion commented out, with no other assertion checking its outcome. |
 | `no-assertion` | Step 2: a test with no assertion. |
 | `ignored-test` | Step 2: `[Ignore]` or `Assert.Inconclusive`. |
 | `swallowed-failure` | Step 2: a catch-all that hides the failure. |
@@ -128,8 +147,9 @@ Follow the key rule in [Report-Format.md](Report-Format.md). Use these kinds:
 
 - **High** - a surviving mutant that changes an exit code, output bytes or request bytes: a
   bug of that kind would reach users unnoticed.
-- **Medium** - a test whose name lies about what it checks; a surviving mutant in a decision
-  that does not reach output directly.
+- **Medium** - a test whose name lies about what it checks; a commented-out assertion that
+  leaves its outcome unchecked; a surviving mutant in a decision that does not reach output
+  directly.
 - **Low** - a weak but not wrong assertion; an ignored test; a swallowed failure in setup code.
 
 Use Critical only for a test that passes while the behaviour it names is visibly broken in the
