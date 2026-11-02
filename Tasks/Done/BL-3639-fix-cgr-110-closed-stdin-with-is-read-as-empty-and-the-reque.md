@@ -8,7 +8,7 @@ depends-on: [BL-3570, BL-3893]
 touches: [Curl.Cli.UnitLibrary/DiskDataFileReader.cs, Curl.Cli.UnitLibrary/ClosedStandardInputStream.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/VariableDefinition.cs, Curl.Cli.UnitLibrary/ConfigFileApplier.cs, Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Engine.UnitLibrary/MimePostForm.cs, Curl.Cli.UnitTests/Cgr110Tests.cs, Curl.Console.UnitTests/Cgr110Tests.cs, Curl.Console/Program.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-11-02
 ---
 # BL-3639 — Fix CGR-110: Closed stdin with @- is read as empty and the request is sent
 
@@ -59,10 +59,10 @@ curl -sS -d @- $H/ok <&-
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -71,6 +71,11 @@ curl -sS -d @- $H/ok <&-
 - 2026-10-26 (lane 6, first claim, no code edited): measured real curl 8.22.0 (Git for Windows ucrt64) from Git Bash with `<&-`, URL `http://127.0.0.1:1/ok`. Exit 26, two lines `curl: option <opt>: error encountered when reading a file` + the try-help line, no `Failed to open` line, nothing sent, for: `-d @-`, `--data-binary @-`, `--json @-`, `--data-urlencode @-`, `--data-urlencode x@-`, `--url-query @-`, `--variable x@-`, `-d @- -d @-`, `-d @- -K -`. Read as empty (went on to connect, exit 7): `-K -`, `-H @-`, `--url @-`, `-T -`, `-F f=@-` (the -F abort, exit 42, comes only once a server answers). With `</dev/null` (NUL) `-d @-` reads empty (exit 7), so only a closed handle fails.
 - Plan (decided, record in an ADR when coding): .NET's `Console.OpenStandardInput()` gives `Stream.Null` for an invalid handle, and tests already pass `Stream.Null` meaning "empty", so `Program.cs` swaps `Stream.Null` for a new public `Curl.Cli.ClosedStandardInputStream` (reads as end of file, like `ClosedStandardOutputStream` in Curl.Console). `DiskDataFileReader.ReadStandardInput` throws `IOException` for it, as `IDataFileReader` already documents. Callers: `CommandLineOptionTable.ReadAtFile` catches it and refuses with a new `CommandLineRefusal.StandardInputUnreadable(spelledOption)` (exit 26, no `Failed to open` line, like `UrlFileUnreadable`), except the `-H @-` header path, which reads it as empty; `VariableDefinition.ReadFile` refuses the same way; `ConfigFileApplier` (`-K -`), `SetEchConfigList` and `AddUrlsFromFile` read it as empty. For `-F f=@-`, `MimePostForm.WithStandardInput`'s read callback returns the read-abort result when the stream is a `ClosedStandardInputStream`, so the transfer ends 42 after the head is sent; check the head and the printed response against real curl with a loopback server.
 - Requeued: `CommandLineOptionTable.cs` is held by BL-3570 and `CommandLineRefusal.cs` by BL-3893 (both in Doing on work/dark-factory). Widened touches (this note) for the files the plan above needs.
+
+- 2026-11-02 (lane 6, closing claim): every part landed in its subtasks (BL-3972, BL-3973, BL-3985, BL-4000, BL-4001, all Done; the stash 72042f00 is superseded by them, nothing carried over). Re-measured at 199263d8 from Git Bash, real curl /ucrt64/bin/curl.exe 8.22.0 Schannel vs Curl.Console/bin/Debug/net10.0/curl.exe, URL http://127.0.0.1:1/ok, `<&-`: `-sS -d @-`, `--data-binary @-`, `--json @-`, `--data-urlencode @-`, `--url-query @-`, `--variable x@-`, `-d @- -K -` all exit 26 on both with identical stderr `curl: option <opt>: error encountered when reading a file` + the try-help line, empty stdout, no connection; `-H @-` (already matched) exits 7 on both. `-F f=@-` with `Record-CurlExchange.ps1 -Response 'HTTP/1.1 200 OK
+Content-Length: 5
+
+hello' -RequestReadMilliseconds 3000`: both exit 42, stderr `curl: (42) operation aborted by callback`, empty stdout (the report's 'response is printed' is wrong, as BL-4001 measured), request 236 bytes after masking boundary, port and User-Agent, byte-identical (head with chunked + Expect: 100-continue, one 6c chunk with the part head). Focused unit tests: Curl.Cli.UnitTests/Cgr110ClosedStandardInputStreamTests.cs, Cgr110DataOptionTests.cs and Curl.Console.UnitTests/Cgr110Tests.cs, from the subtasks. Build clean, fast tests green (115 test runs passed, none failed). Platform-neutral: no code changed in this claim; BL-3974 (Backlog) is also covered by BL-4000/BL-4001 and can be closed the same way.
 
 ## Log
 
@@ -82,3 +87,4 @@ curl -sS -d @- $H/ok <&-
 - 2026-10-28: Backlog -> Deferred. Split into BL-3972, BL-3973 and BL-3974 (over its cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-11-02: Doing -> Done. Closed stdin with @- matches curl 8.22.0: exit 26 for -d/--data-binary/--json and the other readers, exit 42 for -F with identical request bytes
