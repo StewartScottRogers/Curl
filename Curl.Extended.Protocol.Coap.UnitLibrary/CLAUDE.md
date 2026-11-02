@@ -44,7 +44,7 @@ whether or not the handshake succeeds) and then carries each CoAP datagram as on
 - `CoapBlockwiseTransfer` sends a payload over 1024 bytes in Block1 blocks, the next after each 2.31
   Continue, at the smaller size a 2.31 asks for, and again from block 0 at the smaller size a 4.13 asks
   for; then fetches a Block2 response block by block at the server's size, and gives it as one
-  response whose payload holds every block once, in order (exit 56 for a block out of order or short).
+  response whose payload holds every block once, in order (exit 56 for a block out of order or short, or one whose ETag differs from the first block's).
 
 `Wire/` (namespace `Curl.Extended.Protocol.Coap.Wire`) holds the message format:
 
