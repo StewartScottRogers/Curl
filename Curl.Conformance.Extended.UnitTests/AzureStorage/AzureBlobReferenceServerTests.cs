@@ -38,7 +38,8 @@ public sealed class AzureBlobReferenceServerTests
 
         string response = await ServeAsync(endpoint, $"GET /c?restype=container&comp=list&delimiter=%2F&flag HTTP/1.1\r\n{Bearer}\r\nGET /c?restype=container&comp=list&delimiter=%2F&marker=e.txt HTTP/1.1\r\n{Bearer}\r\n");
 
-        StringAssert.Contains(response, "<Blobs><Blob><Name>a.txt</Name><Properties><Content-Length>1</Content-Length><BlobType>BlockBlob</BlobType></Properties></Blob><BlobPrefix><Name>d/</Name></BlobPrefix></Blobs><NextMarker>e.txt</NextMarker>");
+        StringAssert.Contains(response, "<Blobs><Blob><Name>a.txt</Name><Properties><Last-Modified>Mon, 02 Nov 2026 12:00:00 GMT</Last-Modified><Etag>\"0x");
+        StringAssert.Contains(response, "\"</Etag><Content-Length>1</Content-Length><BlobType>BlockBlob</BlobType></Properties></Blob><BlobPrefix><Name>d/</Name></BlobPrefix></Blobs><NextMarker>e.txt</NextMarker>");
         StringAssert.Contains(response, "<Marker>e.txt</Marker><Delimiter>/</Delimiter><Blobs><Blob><Name>e.txt</Name>");
         StringAssert.Contains(response, "<NextMarker /></EnumerationResults>");
         Assert.AreEqual(string.Empty, endpoint.Requests[0].QueryValue("flag"));

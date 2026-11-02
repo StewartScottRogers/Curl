@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Linq;
 
@@ -20,6 +21,8 @@ public sealed class AzureBlobReferenceEndpoint(AzureStorageResponseFraming frami
     private readonly Dictionary<string, byte[]> stagedBlocks = new(StringComparer.Ordinal);
 
     private readonly Dictionary<string, IReadOnlyList<string>> committedBlockIds = new(StringComparer.Ordinal);
+
+    private const string LastModified = "Mon, 02 Nov 2026 12:00:00 GMT";
 
     private readonly Lock gate = new();
 
@@ -159,7 +162,7 @@ public sealed class AzureBlobReferenceEndpoint(AzureStorageResponseFraming frami
         XElement listing = new(
             "Blobs",
             entries.Take(listPageSize).Select(entry => blobs.TryGetValue(container + "/" + entry, out byte[]? content)
-                ? new XElement("Blob", new XElement("Name", entry), new XElement("Properties", new XElement("Content-Length", content.Length), new XElement("BlobType", "BlockBlob")))
+                ? new XElement("Blob", new XElement("Name", entry), PropertiesOf(content))
                 : new XElement("BlobPrefix", new XElement("Name", entry))));
         XElement results = new(
             "EnumerationResults",
@@ -172,6 +175,16 @@ public sealed class AzureBlobReferenceEndpoint(AzureStorageResponseFraming frami
         byte[] body = Encoding.UTF8.GetBytes("<?xml version=\"1.0\" encoding=\"utf-8\"?>" + results.ToString(SaveOptions.DisableFormatting));
         return AzureStorageHttpResponse.Success(200, "OK", body, new KeyValuePair<string, string>("Content-Type", "application/xml"));
     }
+
+    // Last-Modified and Etag are in every listed blob's Properties; the endpoint keeps no clock, so every blob was modified
+    // at one fixed time, and the Etag is the content's SHA-256 prefix, so it changes with the content.
+    private static XElement PropertiesOf(byte[] content) =>
+        new(
+            "Properties",
+            new XElement("Last-Modified", LastModified),
+            new XElement("Etag", "\"0x" + Convert.ToHexString(SHA256.HashData(content), 0, 8) + "\""),
+            new XElement("Content-Length", content.Length),
+            new XElement("BlobType", "BlockBlob"));
 
     private static string EntryOf(string name, string prefix, string? delimiter)
     {
