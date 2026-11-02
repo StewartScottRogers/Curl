@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4520]
 touches: [Curl.Conformance.Extended.UnitLibrary/AzureStorage/DataLake, Curl.Conformance.Extended.UnitTests/AzureStorage/DataLake, Documentation/Conformance/Extended/AzureStorage-DataLake.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4469 — Conformance: Azure Data Lake Storage Gen2 path API for abfs:// and abfss:// (AzureStorage part 2 of 2)
 
@@ -43,23 +43,30 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/AzureStorage-DataLake.md` gives every requirement of this scope that binds
+- [x] `Documentation/Conformance/Extended/AzureStorage-DataLake.md` gives every requirement of this scope that binds
       a client an `AzureStorage:` ID mapped to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/AzureStorage/DataLake/` run curl in process for `abfs://` and
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/AzureStorage/DataLake/` run curl in process for `abfs://` and
       `abfss://` and assert wire bytes, stdout, stderr and exit code for at least: read, create then append then
       flush with the right `position` values, an empty upload, a listing over several `x-ms-continuation` pages, a
       bare account name and a full `dfs.core.windows.net` host, and an error body with exit 22.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix AzureStorage conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/AzureStorage/DataLake/` is at 100% line and branch
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/AzureStorage/DataLake/` is at 100% line and branch
       coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+
+- 2026-11-02 (lane 6): `AzureDataLakeReferenceEndpoint` (`Curl.Conformance.Extended.UnitLibrary/AzureStorage/DataLake/`) derives from BL-4520's `AzureStorageReferenceEndpoint` and implements Path - Read, Path - Create (`resource=file`), Path - Update append and flush (appended bytes stay uncommitted until a flush whose `position` is their length; any other position answers `400 InvalidFlushPosition`), and Path - List (`recursive=false`, implied subdirectories marked `isDirectory: "true"`, string `contentLength`, paged by `x-ms-continuation`, the token being the next entry's name). Failures answer the DFS JSON body `{"error":{"code","message"}}` with `x-ms-error-code`, written with the relaxed JSON encoder so text reads as Azure sends it.
+- Choices (defaults, no ADR needed): an append at the wrong position answers the same `InvalidFlushPosition` the specification names for a flush, since the API gives no separate code; anonymous access is not modelled on the DFS endpoint (the Blob matrix already covers it).
+- Cases: `AzureDataLakeTransferCases` (read through `abfss://fs@acct/...` and `abfs://fs@acct.dfs.core.windows.net/...`, JSON error with exit 22) and `AzureDataLakeUploadAndListingCases` (8 MiB + 3 upload: create, appends at 0 and 8388608, flush at 8388611; empty upload: create then flush at 0; listing over three continuation pages). All pass except `AzureStorage:DfsErrors-1`: the client reads only the Blob XML `Error` body, so it prints `curl: (22) Azure Storage returned error 404` without code and message. Listed in KnownFailures.txt with BL-4563 (High).
+- Matrix: `Documentation/Conformance/Extended/AzureStorage-DataLake.md`, 10 mapped rows and 3 n/a rows; the matrix and known-failures checks pass.
+- Checks: `dotnet build Curl.slnx -warnaserror` clean; fast tests green; `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` reports 0 failing members. Tests use only the in-memory TLS route and a temp directory; no paths or OS text in assertions, so they are platform-neutral (CI on Linux and macOS covered by that).
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 91e67cda 98a34d8a 9592b2e5 d8e3fb0e b542984a ef6c9026.
+- 2026-11-02: Doing -> Done. abfs:// and abfss:// measured against the ADLS Gen2 Path API: read, create/append/flush, empty upload, continuation listing, both host forms; JSON error body listed as BL-4563
