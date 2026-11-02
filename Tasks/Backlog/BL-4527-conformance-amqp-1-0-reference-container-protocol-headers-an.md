@@ -34,7 +34,12 @@ Follow `Documentation/Conformance/Extended/README.md` and ADR-1186/ADR-1188: the
 
 ## Notes
 
+- 2026-11-02 (lane 4, run 1): Built the reference container in `Curl.Conformance.Extended.UnitLibrary/Amqp1/` (decoder, encoder with a `WideEncoding` option, `Amqp1ReferenceSession` framing, `Amqp1ReferenceContainer` with SASL and open/begin/attach/detach/end/close, `Amqp1ReferenceContainerOptions` with MaxFrameSize/IdleTimeOut/SaslOutcomeCode/AnswerHeaderProtocolId, and `IAmqp1ReferenceLinkBehaviour` with the default `Amqp1ReferenceLinkRefusal`, which detaches every link with amqp:not-found, so runs past attach end with exit 78). Wrote the cases (`Amqp1ProtocolHeaderCases.cs`, `Amqp1SaslCases.cs`), the unit tests (`Amqp1ReferenceContainerTests.cs`) and `Documentation/Conformance/Extended/Amqp1.md`. All 121 tests in Curl.Conformance.Extended.UnitTests pass, the matrix check included. No case fails, so `KnownFailures.txt` is unchanged.
+- Decision (sensible default): the container decodes only the format codes a client sends (plus symbol arrays) and refuses any other code with InvalidDataException, which keeps the code small enough for the coverage gate. Choice made under Stewart's delegation; no ADR, because this is test infrastructure only.
+- Still to do: Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary fails 9 members. Over the complexity limit of 10: Decoder.Sized (16), Encoder.Write (14), Decoder.Read (14), Decoder.WidthOf (13), Encoder.WriteSymbolArray (12), Encoder.WriteNonNumeric (12), Container.Accepts (12), Container.AnswerAsync (12). Branches not covered: Sized at 87.5%, WidthOf at 92.3%, AnswerAsync at 83.3% and Decoder.Variable at 80% (no test for an unknown 0xa? code that the switch reaches by a different branch). Fix: split the switches into smaller methods or lookup tables and add the missing tests, then run the quality check once more and run the full fast tests. Not run yet: the full-solution fast tests and `dotnet build Curl.slnx`. All the code is uncommitted for the shift to stash, because it would turn CI's quality job red.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 576ff0e5 5498bf9b 798643cc 59a9ad50 9fbc674d d8e3fb0e ef6c9026.
+- 2026-11-02: Doing -> Backlog. Container, cases and matrix are written and green; 9 Amqp1 members are still over the complexity or branch gate (see Notes)
