@@ -56,3 +56,4 @@ Linux (UTF-8 locale) is right today and must stay so: `Cgr059BidiTests` and `Cgr
 - 2026-10-28: Doing -> Backlog. Budget spent mid-fix: Windows-1252 host reading works for the measured URLs, but Cgr019Tests, CurlUrlTests and upstream test1448 need per-source handling; next steps in Notes, code in the stash
 - 2026-10-28: Backlog -> Deferred. Split into BL-3963, BL-3964 and BL-3965 after hitting the cost cap
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 37a11300 0ffe192b a91492c4 779790c0.
