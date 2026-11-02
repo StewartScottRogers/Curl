@@ -8,7 +8,7 @@ depends-on: [BL-4091, BL-4093, BL-4094, BL-4196, BL-4194, BL-4195]
 touches: [Curl.Extension.WebSocketExtendedConnect.UnitLibrary, Curl.Extension.WebSocketExtendedConnect.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-11-02
 ---
 # BL-4112 — Extension: Run WebSocket over HTTP/2 and HTTP/3
 
@@ -22,20 +22,22 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extension.WebSocketExtendedConnect.UnitLibrary` and `Curl.Extension.WebSocketExtendedConnect.UnitTests` exist in `/Extensions/WebSocketExtendedConnect/` in `Curl.slnx`, registered by one line in `ExtensionCatalogue.cs`, and the build's `VerifyExtensionIsolation` passes.
-- [ ] It provides an option that opens `ws://`/`wss://` with extended CONNECT on HTTP/2 or HTTP/3 instead of the HTTP/1.1 upgrade.
-- [ ] Unit tests check its wire behaviour against named sections of RFC 8441 and RFC 9220, with no network (fake connections or recorded bytes).
-- [ ] With `CURL_EXTENSIONS=0` its option is refused exactly as curl refuses an unknown option (exit 2), and without the option every transfer is unchanged; unit tests.
-- [ ] An ADR marked "Decided by Claude under Stewart's delegation" records its scheme or option names, the specification version followed, and anything left out with why.
-- [ ] Its description appears in `curl --extensions` and `curl --ai-help extensions`.
-- [ ] The changed libraries meet the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `Curl.Extension.WebSocketExtendedConnect.UnitLibrary` and `Curl.Extension.WebSocketExtendedConnect.UnitTests` exist in `/Extensions/WebSocketExtendedConnect/` in `Curl.slnx`, registered by one line in `ExtensionCatalogue.cs`, and the build's `VerifyExtensionIsolation` passes.
+- [x] It provides an option that opens `ws://`/`wss://` with extended CONNECT on HTTP/2 or HTTP/3 instead of the HTTP/1.1 upgrade.
+- [x] Unit tests check its wire behaviour against named sections of RFC 8441 and RFC 9220, with no network (fake connections or recorded bytes).
+- [x] With `CURL_EXTENSIONS=0` its option is refused exactly as curl refuses an unknown option (exit 2), and without the option every transfer is unchanged; unit tests.
+- [x] An ADR marked "Decided by Claude under Stewart's delegation" records its scheme or option names, the specification version followed, and anything left out with why.
+- [x] Its description appears in `curl --extensions` and `curl --ai-help extensions`.
+- [x] The changed libraries meet the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 - 2026-10-29 (lane 3, first pass, no code written): three prerequisites found and filed. (1) BL-4196: the WebSocket frame codec is only in Curl.Original.Protocol.Ws.UnitLibrary, which an extension may not reference (ADR-0999). (2) BL-4194: the HTTP/3 client session (Http3Session, Http3StreamConnection) is only in Curl.Original.Protocol.Http.UnitLibrary; HTTP/2 needs no move, Http2Connection is already in the shared Curl.Http2.UnitLibrary. (3) BL-4195: no extension hook lets an option-activated extension serve ws/wss in place of curl's handler (only transfer and connection hooks exist). Also learned: Curl.Http3 has EnableConnectProtocol (0x08) but Http2SettingIdentifier has no SETTINGS_ENABLE_CONNECT_PROTOCOL (0x8, RFC 8441 section 3); unknown settings are allowed, so this task can send and read 0x8 itself or add the member then.
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
+
+- 2026-11-02 (lane 12): nothing left to do here. The split subtasks BL-4298 (scaffold and wire types), BL-4295 (HTTP/2, RFC 8441), BL-4296 (HTTP/3, RFC 9220) and BL-4297 (option, registration, help text, ADR-1111) are all Done and together meet every criterion above; ADR-1098 and ADR-1111 record the decisions. The extension now sits in `/Extended/Features/WebSocketExtendedConnect/` in `Curl.slnx`, as ADR-1177 moved it. Its 77 unit tests pass on this branch. Stash b7d80513 (an earlier attempt from before the split, with ConnectionStream, Http2Tunnel, Http3Tunnel and similar types) duplicates code that has since landed in other forms, so none of it was carried over.
 
 ## Log
 
@@ -47,3 +49,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Backlog -> Deferred. Split into BL-4298, BL-4295, BL-4296 and BL-4297; cost cap exceeded
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 80dd9d14 7bdf3437 50d813ce e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-11-02: Doing -> Done. Delivered through BL-4298, BL-4295, BL-4296 and BL-4297
