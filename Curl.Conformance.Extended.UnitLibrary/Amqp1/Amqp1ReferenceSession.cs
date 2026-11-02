@@ -54,6 +54,10 @@ public sealed class Amqp1ReferenceSession(ReferenceConnection connection, Amqp1R
     public ValueTask SendAsync(ushort channel, Amqp1ReferenceDescribed performative, byte[]? payload = null) =>
         SendFrameAsync(Amqp1ReferenceFrame.AmqpType, channel, performative, payload ?? []);
 
+    /// <summary>Sends an empty AMQP frame on channel 0, the frame with no body an idle peer sends to keep a connection open (Part 2 sections 2.3.2 and 2.4.5).</summary>
+    /// <returns>A task that ends once it is written.</returns>
+    public ValueTask SendEmptyFrameAsync() => connection.WriteAsync(new byte[] { 0, 0, 0, FrameHeaderLength, 2, Amqp1ReferenceFrame.AmqpType, 0, 0 }, cancellationToken);
+
     /// <summary>Sends a SASL frame carrying <paramref name="body"/> on channel 0.</summary>
     /// <param name="body">The SASL frame body.</param>
     /// <returns>A task that ends once it is written.</returns>
