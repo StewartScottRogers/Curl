@@ -8,7 +8,7 @@ depends-on: [BL-4033]
 touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHostNameMapping.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHostNameMappingTable.cs, Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingTests.cs, Curl.Protocol.Abstractions.UnitTests/Cgr019Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-11-02
 ---
 # BL-3829 — Map host names with the whole UTS#46 mapping table, not the BL-3548 subset
 
@@ -22,7 +22,7 @@ BL-3548 (CGR-019, ADR-0895) added `Curl.Protocol.Abstractions.UnitLibrary/CurlUr
 
 ## Acceptance criteria
 
-- [ ] For a sample of at least 30 hosts drawn from each mapping class above, Curl's `Host` header equals curl 8.22.0's (measured, recorded in Notes).
+- [x] For a sample of at least 30 hosts drawn from each mapping class above, Curl's `Host` header equals curl 8.22.0's (measured, recorded in Notes).
 - [x] Focused tests in `CurlUrlHostNameMappingTests.cs` pin each mapping class.
 - [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
@@ -32,6 +32,7 @@ BL-3548 (CGR-019, ADR-0895) added `Curl.Protocol.Abstractions.UnitLibrary/CurlUr
 - Resumed run: the earlier run had written the generated table, NFC and the tests but no ADR; this run added ADR-0980, the table and `Cgr019Tests.cs` (its pinned `｟` now maps to `⦅`) to touches, and the abstractions tests pass (1117 passed, 2 skipped).
 - Not measured here: Windows curl uses WinIDN and an ANSI argv, and no Linux curl was reachable (a WSL probe hung). The pinned hosts follow the Unicode 15.1 table and NFC; measuring them is BL-4033 (`lane: no`). Committing the generator app, which the earlier run did not keep, is BL-4034.
 - Requeued for BL-4033: the board refuses a changed criterion, and the first one needs a Linux curl 8.22.0 with libidn2 that no lane has. The mapping code, table, tests and ADR-0980 are committed (build clean, fast tests green, `Measure-CodeQuality.ps1` clean for `CurlUrlHostNameMapping` after `Compose` was split to complexity under 10), since they are finished and only the measurement is left; the next claim ticks the first criterion from BL-4033's recorded measurements and fixes any host that differs.
+- Final claim (2026-11-02): the measurement landed through the split. BL-4033 measured 443 hosts in eight classes (30 to 117 each) with libidn2 2.3.8 and recorded the commands and results in its Notes. curl 8.18.0 stood in for 8.22.0 because 8.22.0 could not be built in WSL; both use libidn2 2.3.8, which produces the punycode. Every measured host already matched. BL-4078 added a Host-line test per class (`Curl.Original.Protocol.Http.UnitTests/Uts46MeasuredHostHeaderTests.cs`), and BL-4077 pinned the 14 hosts curl refuses. This run changed no code: the build is clean and the fast tests are green (115 assemblies passed, none failed; Curl.Protocol.Abstractions.UnitTests 1630 passed, 2 skipped).
 
 ## Log
 
@@ -41,3 +42,4 @@ BL-3548 (CGR-019, ADR-0895) added `Curl.Protocol.Abstractions.UnitLibrary/CurlUr
 - 2026-10-29: Backlog -> Deferred. Split into BL-4078 and BL-4077; mapping code, table, tests and ADR-0980 are done, only the measured-host criterion remains
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: aacc7631 98808546 779790c0.
+- 2026-11-02: Doing -> Done. Hosts map with the whole UTS 46 table and NFC; 443 measured libidn2 hosts in eight classes are pinned, with a Host-line test per class
