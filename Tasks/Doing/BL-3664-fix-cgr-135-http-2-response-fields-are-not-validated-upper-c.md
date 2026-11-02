@@ -120,3 +120,4 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x -w '\n[%{http_version} 
 - 2026-10-28: Doing -> Backlog. Waits on BL-3979 (num_headers for an HTTP/2 head failed part way, cltwo); every other CGR-135 repro now matches REF, fix stashed
 - 2026-10-28: Backlog -> Deferred. Split into BL-4004 and BL-4005 (over its cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.

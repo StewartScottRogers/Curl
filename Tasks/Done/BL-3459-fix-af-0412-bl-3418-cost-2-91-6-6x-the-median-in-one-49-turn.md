@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [RunDarkFactory.ps1]
+touches: [RunDarkFactory.ps1, DarkFactory/ModelChoice.ps1]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-11-02
 ---
 # BL-3459 — Fix AF-0412: BL-3418 cost $2.91 (6.6x the median) in one 49-turn Opus feature run porting checksrc.pl lines 900-1268
 
@@ -41,10 +41,11 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+n- Cause: BL-3418 ("Port checksrc.pl scanfile line checks...") is a routine upstream-script port but its title matched no `$RoutineFeatureTitles` rule, so the feature pipeline sent it to opus (5.02M cache-read tokens over 49 turns). Avoidable: added the rule `upstream checksrc.pl port` (`^Port checksrc.plb`) to DarkFactory/ModelChoice.ps1 (its logic lives there, so it was added to touches; no other Doing task touches it) with a -TestModelChoice case; such ports now run on sonnet. Hard-work markers still override. Build/fast tests unaffected (PowerShell-only change); -TestModelChoice passes.
 
 ## Log
 
@@ -52,3 +53,4 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 - 2026-10-24: Backlog -> Deferred. Stewart rejected its finding on 2026-10-24 (single run under the new 5-dollar cost-outlier floor); no work wanted.
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-11-02: Doing -> Done. Cause named; checksrc.pl ports now routed to sonnet
