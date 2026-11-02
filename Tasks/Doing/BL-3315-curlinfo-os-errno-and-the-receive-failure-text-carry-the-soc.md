@@ -40,3 +40,4 @@ Found by BL-3310's run of the easytest.py case list through Curl.Conformance.Dif
 - 2026-10-23: Doing -> Backlog. Waits on BL-3342 (PoolingConnector drops LastSocketError) and BL-3343 (errno of a dead reused connection retried fresh); rerun the differential after
 - 2026-10-23: Backlog -> Deferred. Over its cost cap; split into BL-3428 and BL-3429
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
