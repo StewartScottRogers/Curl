@@ -1,5 +1,5 @@
 ---
-id: BL-4563
+id: BL-4569
 title: Fix Coap conformance: Coap:RFC7959-2.4-4 (blocks of a changed ETag are not joined)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4563 — Fix Coap conformance: Coap:RFC7959-2.4-4 (blocks of a changed ETag are not joined)
+# BL-4569 — Fix Coap conformance: Coap:RFC7959-2.4-4 (blocks of a changed ETag are not joined)
 
 ## Goal
 

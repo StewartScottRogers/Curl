@@ -73,7 +73,7 @@ filed High task `Fix Coap conformance: <requirement>` (pipeline feature; touches
   expect (a stale notification sent with the first one could arrive after the clock jumped 205 s); the within-128 s
   drop is pinned by the system-clock ordering case instead.
 - Failing: `Coap:RFC7959-2.4-4` (curl joins blocks of different ETags, exits 0) is in `KnownFailures.txt` against
-  BL-4563 (High, filed). ADR-1195 records the expected answer: exit 56, nothing written.
+  BL-4569 (High, filed). ADR-1195 records the expected answer: exit 56, nothing written.
 - The RFC text was written from the RFCs' requirements as this run knew them, not fetched; a reviewer may refine
   wording, not the mapping.
 - CI on Linux and macOS: the cases use no path, file or OS text, so they are platform-neutral; fast tests green here
@@ -83,4 +83,4 @@ filed High task `Fix Coap conformance: <requirement>` (pipeline feature; touches
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: ba62812f e1b6c4b9 fb1c989b d8e3fb0e 954f469a ef6c9026.
-- 2026-11-02: Doing -> Done. coap:// block-wise and Observe measured against RFC 7959 and RFC 7641: 15 cases and a matrix; the ETag case is a known failure for BL-4563
+- 2026-11-02: Doing -> Done. coap:// block-wise and Observe measured against RFC 7959 and RFC 7641: 15 cases and a matrix; the ETag case is a known failure for BL-4569

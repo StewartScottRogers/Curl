@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-02
-- Task: BL-4471 (measured), BL-4563 (fix)
+- Task: BL-4471 (measured), BL-4569 (fix)
 - Decided by Claude under Stewart's delegation
 
 ## Context
@@ -18,7 +18,7 @@ there is no curl behaviour to match.
 A Block2 block whose ETag option differs from the first block's (an ETag appearing, disappearing or changing) fails
 the transfer with exit 56 (`CurlExitCode.RecvError`) and nothing written, as `CoapBlockwiseTransfer` already does
 for a block out of order or short (ADR-1057). The conformance case pins that answer and is listed in
-`KnownFailures.txt` against BL-4563 until the library does it.
+`KnownFailures.txt` against BL-4569 until the library does it.
 
 ## Consequences
 
