@@ -9,7 +9,7 @@ touches: [Curl.Conformance.Extended.UnitLibrary, Curl.Conformance.Extended.UnitT
 model: opus
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4462 — Build the extended-protocol conformance harness: in-process curl against spec-faithful in-memory reference servers
 
@@ -94,29 +94,38 @@ matrix and known-failures rules.
 
 ## Acceptance criteria
 
-- [ ] `Curl.Conformance.Extended.UnitLibrary` and `Curl.Conformance.Extended.UnitTests` exist, sit together in
+- [x] `Curl.Conformance.Extended.UnitLibrary` and `Curl.Conformance.Extended.UnitTests` exist, sit together in
       `/Conformance/Extended/` in `Curl.slnx`, and the UnitLibrary references no `Curl.Extension.*` or
       `Curl.Extended.Protocol.*` project; `Directory.Build.props` is unchanged.
-- [ ] A test in `Curl.Conformance.Extended.UnitTests/Harness/` runs a real curl command line in process (for example
+- [x] A test in `Curl.Conformance.Extended.UnitTests/Harness/` runs a real curl command line in process (for example
       `redis://` against the scripted server) and asserts its exit code, stdout, stderr and the client's wire bytes.
-- [ ] Tests in `Harness/` cover a TCP, a TLS and a UDP route, an environment variable reaching the run (`CURL_EXTENSIONS=0`
+- [x] Tests in `Harness/` cover a TCP, a TLS and a UDP route, an environment variable reaching the run (`CURL_EXTENSIONS=0`
       gives the unsupported-scheme exit code 1), and a `-m` timeout on an injected `TimeProvider` (exit 28), with no
       real socket, file outside a temporary directory, or process.
-- [ ] `SpecRequirementAttribute`, the matrix check and the known-failures check exist and are tested both ways
+- [x] `SpecRequirementAttribute`, the matrix check and the known-failures check exist and are tested both ways
       (a passing listed case fails with the "remove its KnownFailures.txt line" message; an unmapped matrix row fails).
-- [ ] `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` exists (comments only), is marked `merge=union` in
+- [x] `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` exists (comments only), is marked `merge=union` in
       `.gitattributes` and listed in `Tasks/SharedListFiles.txt`.
-- [ ] `Documentation/Conformance/Extended/README.md` states the layout, ID scheme, matrix format and known-failures
+- [x] `Documentation/Conformance/Extended/README.md` states the layout, ID scheme, matrix format and known-failures
       rule above.
-- [ ] The new ADR exists with the decisions above and "Decided by Claude under Stewart's delegation", and its line is
+- [x] The new ADR exists with the decisions above and "Decided by Claude under Stewart's delegation", and its line is
       in `Documentation/Planning/Decisions/README.md`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green;
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green;
       no test needs `TestCategory=Integration`.
-- [ ] `Curl.Conformance.Extended.UnitLibrary` is at 100% line and branch coverage, complexity at most 10 and CRAP at
+- [x] `Curl.Conformance.Extended.UnitLibrary` is at 100% line and branch coverage, complexity at most 10 and CRAP at
       most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test passes on Windows, Linux and macOS (no drive letters or Windows-only text).
+- [x] No package added; every test passes on Windows, Linux and macOS (no drive letters or Windows-only text).
 
 ## Notes
+
+- 2026-11-02 lane 8: nothing left to build. The split tasks BL-4500, BL-4502, BL-4503, BL-4505, BL-4506 and BL-4507 (all Done)
+  delivered every criterion; this run checked each one against the tree. `dotnet build Curl.slnx -warnaserror` clean (0 warnings);
+  `dotnet test --filter "TestCategory!=Integration"` green (Curl.Conformance.Extended.UnitTests 39/39). Coverage and
+  complexity: BL-4503's `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` (100% line, 100% branch,
+  worst CRAP 10) still holds, since the library is unchanged since commit 44bdc3bfb, so no new quality run. The UnitLibrary references only
+  Protocol.Abstractions, Networking and Conformance.UnitLibrary; Directory.Build.props unchanged; ADR-1188 carries the decisions.
+  Platform-neutral: the tests use no socket, drive letter or OS text, so CI on Linux and macOS is covered by the green fast tests here.
+  BL-4501 (Backlog) is the same work, done by its split BL-4505 to BL-4507, and can be closed.
 
 ## Log
 
@@ -125,3 +134,4 @@ matrix and known-failures rules.
 - 2026-11-02: Doing -> Deferred. Split into BL-4500, BL-4501, BL-4502, BL-4503
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 94bce983 ff67eeb1 9db82948 e9fc1ee0 32b5ab0c 074d54e3 bcfa9865 d8e3fb0e cc077f22 7111045e.
+- 2026-11-02: Doing -> Done. Extended-protocol conformance harness verified complete: in-process curl over TCP/TLS/UDP reference routes, requirement matrices and known failures (via BL-4500..4507)
