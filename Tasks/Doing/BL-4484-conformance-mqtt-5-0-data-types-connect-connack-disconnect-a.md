@@ -69,3 +69,4 @@ in the extension library is listed in `KnownFailures.txt` with a filed High task
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: f2bdcaab 1ef8b608 6809fc35 28fcee0c d8e3fb0e 6f1f0535 ef6c9026.
