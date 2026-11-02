@@ -41,3 +41,4 @@ Scope: chapter 1.5 (integers, Variable Byte Integer, UTF-8 strings and the 1.5.4
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: efa93abc 88c0bc9e 1f997f3b 28fcee0c d8e3fb0e 975979e2 ef6c9026.
