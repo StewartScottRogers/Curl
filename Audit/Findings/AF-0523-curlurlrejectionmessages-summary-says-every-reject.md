@@ -3,8 +3,8 @@ id: AF-0523
 title: CurlUrlRejectionMessages' summary says every rejection prints 'curl: (3) URL rejected: ' (exit 67 aside), but three rejections print bare text, two with exits 43 and 27
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-11-01 ("accept all").
+status: closed
+reason: Re-audit 2026-11-02_0645.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-01_1801.md, 2026-11-02_0645.md).
 key: truthfulness:Curl.Protocol.Abstractions.UnitLibrary/CurlUrlRejectionMessages.cs:CurlUrlRejectionMessages:false-doc-comment
 reproduction: none
 task: BL-4458
@@ -13,9 +13,9 @@ found: 2026-11-01
 found-at: 4c39311e3e4524ac6950cb2cba36f5b3f2a6ff2e
 scorecard: 2026-11-01_1016.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-02
+closed-how: consecutive
+closed-by: 2026-11-01_1801.md, 2026-11-02_0645.md
 ---
 # AF-0523 - CurlUrlRejectionMessages' summary says every rejection prints 'curl: (3) URL rejected: ' (exit 67 aside), but three rejections print bare text, two with exits 43 and 27
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs -Pattern 
 ## Re-audits
 
 - 2026-11-01 | 2026-11-01_1801.md | reproduces: no | Ran the reproduction: Select-String matched TransferPerformer.Setup.cs:38 (IsBareText(rejection) ? rejection.ToCurlMessage() : UrlRejectedPrefix + ...), :47 (UrlTooLong => CurlExitCode.BadFunctionArgument, 43) and :48 (UrlAtLengthLimit => CurlExitCode.OutOfMemory, 27). The code is unchanged. The statement under audit, CurlUrlRejectionMessages' summary (Curl.Protocol.Abstractions.UnitLibrary/CurlUrlRejectionMessages.cs:3-11), now reads 'URL rejected: and the text with exit 3 for most rejections, exit 67 for UserNotAllowed, and the bare text with no prefix for those three [IdnConversionFailed, UrlTooLong, UrlAtLengthLimit], with exit 3, 43 and 27 respectively', which matches what the reproduction shows. It no longer says every rejection prints the prefix.
+- 2026-11-02 | 2026-11-02_0645.md | reproduces: no | Ran the reproduction: Select-String matches TransferPerformer.Setup.cs:41 (IsBareText(rejection) ? ...), :50 (UrlTooLong => CurlExitCode.BadFunctionArgument) and :51 (UrlAtLengthLimit => CurlExitCode.OutOfMemory), the code the finding compares against. CurlUrlRejectionMessages' summary (Curl.Protocol.Abstractions.UnitLibrary/CurlUrlRejectionMessages.cs:3-11) now says 'URL rejected: and the text with exit 3 for most rejections, exit 67 for UserNotAllowed, and the bare text with no prefix for those three, with exit 3, 43 and 27 respectively', naming IdnConversionFailed, UrlTooLong and UrlAtLengthLimit. That matches ExitCodeOf and IsBareText, with CurlExitCode UrlMalformat=3, BadFunctionArgument=43, OutOfMemory=27, LoginDenied=67. The summary is now true of the code.
 
 ## Log
 
 - 2026-11-01: filed proposed.
 - 2026-11-01: proposed -> accepted. Stewart: accept all.
+- 2026-11-02: accepted -> closed. Re-audit 2026-11-02_0645.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-01_1801.md, 2026-11-02_0645.md).
