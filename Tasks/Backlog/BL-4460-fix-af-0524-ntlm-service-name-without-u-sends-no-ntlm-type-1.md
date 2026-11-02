@@ -4,8 +4,8 @@ title: Fix AF-0524: --ntlm --service-name without -u sends no NTLM Type-1 Author
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Original.Protocol.Http.UnitLibrary]
+depends-on: [BL-4461]
+touches: [Curl.Original.Protocol.Http.UnitLibrary, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs, Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs]
 requirement: none
 created: 2026-11-02
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
+- 2026-11-02 (lane 1): The HTTP handler cannot see `--service-name`: it reaches only `MailRequestOptions` and `NegotiateOptions`, never `HttpRequestOptions` or `ITransferContext`. The fix needs (1) a `ServiceName` property on `Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs`, (2) mapping `authentication.ServiceName` into it in `Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs` (next to `SaslAuthorizationIdentity`), and (3) `OriginCredentialOf` in `HttpProtocolHandler.cs` giving `new NetworkCredential("", "")` (the ADR-0142 default-credential path) when there is no `-u`, `ServiceName` is set and NTLM is among the allowed schemes, plus an ADR (Decided by Claude under Stewart's delegation) and unit tests beside the AF-0522 ones in `HttpProtocolHandlerTests.Authentication.cs`. Touches widened to name those two files. BL-4461 holds the whole of Curl.Engine.UnitLibrary, so this task depends on BL-4461 and goes back to Backlog before any code edit; no code was changed.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-02: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs to map --service-name into HttpRequestOptions; BL-4461 holds Curl.Engine.UnitLibrary
