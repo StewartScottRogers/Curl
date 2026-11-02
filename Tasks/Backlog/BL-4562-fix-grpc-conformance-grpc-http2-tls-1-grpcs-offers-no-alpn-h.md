@@ -1,5 +1,5 @@
 ---
-id: BL-4545
+id: BL-4562
 title: Fix Grpc conformance: Grpc:Http2-Tls-1 grpcs:// offers no ALPN h2
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4545 — Fix Grpc conformance: Grpc:Http2-Tls-1 grpcs:// offers no ALPN h2
+# BL-4562 — Fix Grpc conformance: Grpc:Http2-Tls-1 grpcs:// offers no ALPN h2
 
 ## Goal
 

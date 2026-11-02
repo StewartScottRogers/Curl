@@ -57,7 +57,7 @@ runs on the harness's fake clock (BL-4503).
 - The harness's TLS route offers no ALPN, so `GrpcTlsCases` serves TLS itself (`TlsServerStream`, ALPN `h2`) over a TCP
   route and checks curl's raw ClientHello for the ALPN extension. It found a defect: Curl's ClientHello has no ALPN at
   all and the call ends with exit 16, because `TcpConnector.ApplicationProtocolsFor` offers a target's protocols only
-  for `PoolScheme` `https`, which the gRPC handler does not set. Listed in `KnownFailures.txt` under BL-4545 (High,
+  for `PoolScheme` `https`, which the gRPC handler does not set. Listed in `KnownFailures.txt` under BL-4562 (High,
   filed). The deadline expiry itself (exit 28 on the fake clock) is not in the criteria and was not added.
 - Checks: `Curl.Conformance.Extended.UnitTests` 254/254 (the known-failures and matrix checks included);
   `dotnet build Curl.slnx -warnaserror` clean; full fast run 115 test projects, 0 failed; `dotnet format` clean. Only
@@ -68,4 +68,4 @@ runs on the harness's fake clock (BL-4503).
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: dff3d69e d3c3b130 3af8a194.
-- 2026-11-02: Doing -> Done. gRPC framing, grpc-timeout and grpcs ALPN cases pin PROTOCOL-HTTP2.md; the ALPN defect is a known failure under BL-4545
+- 2026-11-02: Doing -> Done. gRPC framing, grpc-timeout and grpcs ALPN cases pin PROTOCOL-HTTP2.md; the ALPN defect is a known failure under BL-4562
