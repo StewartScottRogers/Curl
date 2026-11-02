@@ -35,3 +35,4 @@ Uses the reference Blob endpoint BL-4520 adds; if it lacks something these cases
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 604a567e a4181cce 2108d112 d8e3fb0e ef6c9026.
