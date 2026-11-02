@@ -39,3 +39,4 @@ Split from BL-3563 (CGR-034), the verification part. The probe is a C# file-base
 - 2026-10-29: Doing -> Backlog. Needs BL-4075: PORT's socket-action kick intermittently returns before every transfer waits on its socket (C_21, C_75 differ from REF)
 - 2026-10-29: Backlog -> Deferred. Split into BL-4084 (probe results) and BL-4085 (quality gates) after the cost cap
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: ae632df0 d1c58933 b084e04d 779790c0.
