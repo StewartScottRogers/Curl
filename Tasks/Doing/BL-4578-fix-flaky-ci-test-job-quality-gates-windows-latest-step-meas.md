@@ -50,3 +50,4 @@ Lanes test only on Windows, so reproduce with `gh run view 41537057745 --log-fai
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 32ef7b66 e2ff6521.
 - 2026-11-02: Doing -> Backlog. Waits on BL-4546 (in Doing), which splits Amqp1ReferenceContainer.Accepts and AnswerAsync, the deterministic cause of the quality failure
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 32ef7b66 e2ff6521.
