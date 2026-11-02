@@ -888,12 +888,14 @@ public sealed partial class HttpProtocolHandlerTests
 
     /// <summary>
     /// With <c>--ntlm --service-name</c> and no <c>-u</c>, the OpenSSL curl (8.18.0 measured on
-    /// Linux) sends no <c>Authorization</c>: off Windows the request goes with no credential
-    /// (BL-4509, ADR-1183).
+    /// Linux) sends no <c>Authorization</c>: off Windows the authenticator is asked with no
+    /// credential, so it makes no value (BL-4509, ADR-1183). The scripted authenticator answers
+    /// whatever it is asked, so the test checks the credential it was given, not the bytes sent
+    /// (BL-4513).
     /// </summary>
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
-    public async Task ExecuteAsync_NtlmWithServiceNameAndNoCredentialsOffWindows_SendsNoAuthorization()
+    public async Task ExecuteAsync_NtlmWithServiceNameAndNoCredentialsOffWindows_GivesTheAuthenticatorNoCredential()
     {
         TurnTakingConnection connection = new(65536, OkHead + "ok");
         ScriptedAuthenticator authenticator = new(NtlmType1, NtlmType3);
@@ -905,7 +907,7 @@ public sealed partial class HttpProtocolHandlerTests
         WriteResult(result);
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.DoesNotContain("Authorization:", connection.Written);
+        Assert.IsTrue(authenticator.Calls.TrueForAll(call => call.Request.Credential is null), connection.Written);
     }
 
     /// <summary>
