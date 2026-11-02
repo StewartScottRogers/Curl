@@ -4,10 +4,14 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance.Extended.Harness;
 
-/// <summary>curl's UDP channel to a reference server: each datagram sent is answered at once, and the answers queue for receiving.</summary>
+/// <summary>
+/// curl's UDP channel to a reference server: each datagram sent is answered at once, and the answers queue for receiving.
+/// A receive waiting when an answer queues completes before <see cref="SendAsync" /> returns, so a clock that fires
+/// curl's timers one after another cannot fire the next before curl sees the answer to its last datagram (BL-4538).
+/// </summary>
 internal sealed class ReferenceDatagramChannel(IDatagramReferenceServer server, WireExchange exchange, EndPoint serverEndPoint) : IDatagramChannel
 {
-    private readonly Channel<byte[]> answers = Channel.CreateUnbounded<byte[]>();
+    private readonly Channel<byte[]> answers = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions { AllowSynchronousContinuations = true });
 
     public EndPoint ServerEndPoint => serverEndPoint;
 

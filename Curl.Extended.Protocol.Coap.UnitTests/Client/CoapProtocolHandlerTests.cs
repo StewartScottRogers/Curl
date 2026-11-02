@@ -226,6 +226,25 @@ public sealed class CoapProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("version 2")]
+    [DataRow("token length 9")]
+    [DataRow("payload marker with no payload")]
+    [DataRow("option delta 15")]
+    [DataRow("option length 15")]
+    [DataRow("empty message with bytes")]
+    public async Task ExecuteAsync_AMalformedAcknowledgement_IsIgnoredAndThePiggybackedResponseToTheRetransmissionTaken(string malformation)
+    {
+        var channel = new ScriptedDatagramChannel((count, sent) => count == 1 ? [Malformed(malformation, sent)] : [Piggybacked(sent, CoapCode.Content, Hello)]);
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(channel).ExecuteAsync(Context("coap://h/", output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        CollectionAssert.AreEqual(Hello, output.ToArray());
+        Assert.HasCount(2, channel.Sent);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_AnErrorResponse_WritesItsPayloadAndSucceedsAsAnHttpErrorStatusDoes()
     {
         var channel = new ScriptedDatagramChannel((_, sent) => [Piggybacked(sent, CoapCode.NotFound, Hello)]);
@@ -334,6 +353,22 @@ public sealed class CoapProtocolHandlerTests
         Encode(new CoapMessage(CoapMessageType.Acknowledgement, CoapCode.Empty, request.MessageId, [], [], []));
 
     private static byte[] Encode(CoapMessage message) => CoapMessageEncoding.Encode(message);
+
+    /// <summary>The piggybacked response to <paramref name="request" /> broken by one RFC 7252 section 3 message format error.</summary>
+    private static byte[] Malformed(string malformation, CoapMessage request)
+    {
+        byte[] good = Piggybacked(request, CoapCode.Content, Encoding.ASCII.GetBytes("bad"));
+        byte[] header = good[..(4 + request.Token.Length)];
+        return malformation switch
+        {
+            "version 2" => [(byte)(good[0] ^ 0xC0), .. good[1..]],
+            "token length 9" => [(byte)((good[0] & 0xF0) | 9), .. good[1..4], .. request.Token, .. new byte[9 - request.Token.Length], 0xFF, 1],
+            "payload marker with no payload" => [.. header, 0xFF],
+            "option delta 15" => [.. header, 0xF1, 0x00, 0xFF, 1],
+            "option length 15" => [.. header, 0x1F, 0x00, 0xFF, 1],
+            _ => [.. EmptyAcknowledgement(request), 0x00],
+        };
+    }
 
     private static string[] OptionTexts(CoapMessage message) =>
         [.. message.Options.Select(option => $"{option.Number}={Encoding.UTF8.GetString(option.Value)}")];
