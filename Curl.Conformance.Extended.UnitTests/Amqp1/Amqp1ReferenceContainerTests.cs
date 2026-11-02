@@ -110,6 +110,10 @@ public sealed class Amqp1ReferenceContainerTests
     [DataRow(null, null, (byte)1)]
     [DataRow("EXTERNAL", null, (byte)1)]
     [DataRow("PLAIN", "alice", (byte)1)]
+    [DataRow("PLAIN", null, (byte)1)]
+    [DataRow("PLAIN", "\0bob\0secret", (byte)1)]
+    [DataRow("PLAIN", "\0alice\0wrong", (byte)1)]
+    [DataRow("ANONYMOUS", null, (byte)0)]
     [DataRow("PLAIN", "x\0alice\0secret", (byte)0)]
     public async Task ServeAsync_SaslInit_AnswersOutcomeByMechanismAndCredentials(string? mechanism, string? response, byte expected)
     {
@@ -151,6 +155,9 @@ public sealed class Amqp1ReferenceContainerTests
             .. Frame(0, 0, Body(Amqp1ReferenceDescriptors.Begin, null, 0u, 10u, 10u)),
             .. Frame(0, 0, Body(Amqp1ReferenceDescriptors.Attach, "l", 0u, false)),
             .. Frame(0, 0, Body(Amqp1ReferenceDescriptors.Flow), [9]),
+            .. Frame(0, 0, Body(Amqp1ReferenceDescriptors.Transfer)),
+            .. Frame(0, 0, Body(Amqp1ReferenceDescriptors.Error)),
+            .. Frame(0, 0, Body(1)),
             .. Frame(0, 0, Body(Amqp1ReferenceDescriptors.Detach, 0u, true)),
             .. Frame(0, 0, Body(Amqp1ReferenceDescriptors.End)),
             .. Frame(0, 0, Body(Amqp1ReferenceDescriptors.Close)),

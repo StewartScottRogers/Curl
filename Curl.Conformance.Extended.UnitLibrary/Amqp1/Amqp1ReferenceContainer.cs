@@ -98,17 +98,15 @@ public sealed class Amqp1ReferenceContainer(Amqp1ReferenceContainerOptions optio
         return code == 0;
     }
 
-    // An offered mechanism, and for PLAIN the RFC 4616 message [authzid] NUL authcid NUL passwd with this container's credentials.
-    private bool Accepts(Amqp1ReferenceDescribed init, Amqp1ReferenceSymbol[] offered)
-    {
-        Amqp1ReferenceSymbol? mechanism = init.Field(0) as Amqp1ReferenceSymbol?;
-        if (mechanism is not { } chosen || !offered.Contains(chosen))
-        {
-            return false;
-        }
+    // An offered mechanism, and for PLAIN an initial response with this container's credentials.
+    private bool Accepts(Amqp1ReferenceDescribed init, Amqp1ReferenceSymbol[] offered) =>
+        init.Field(0) is Amqp1ReferenceSymbol chosen && offered.Contains(chosen) && (chosen.Value != "PLAIN" || AcceptsPlain(init.Field(1)));
 
-        string[] plain = Encoding.UTF8.GetString(init.Field(1) as byte[] ?? []).Split('\0');
-        return chosen.Value != "PLAIN" || (plain.Length == 3 && plain[1] == options.UserName && plain[2] == options.Password);
+    // The RFC 4616 message [authzid] NUL authcid NUL passwd naming this container's user name and password.
+    private bool AcceptsPlain(object? initialResponse)
+    {
+        string[] plain = Encoding.UTF8.GetString(initialResponse as byte[] ?? []).Split('\0');
+        return plain.Length == 3 && plain[1] == options.UserName && plain[2] == options.Password;
     }
 
     private async ValueTask<Amqp1ReferenceFrame?> ReadFrameAsync(Amqp1ReferenceSession session)
@@ -133,32 +131,42 @@ public sealed class Amqp1ReferenceContainer(Amqp1ReferenceContainerOptions optio
         }
     }
 
-    // False once the connection is closed.
+    // False once the connection is closed: end and close are mirrored, everything else is answered by AnswerOpenedAsync.
     private async ValueTask<bool> AnswerAsync(Amqp1ReferenceSession session, Amqp1ReferenceFrame frame, Amqp1ReferenceDescribed performative)
     {
-        switch (performative.Descriptor)
+        if (performative.Descriptor is not (Amqp1ReferenceDescriptors.End or Amqp1ReferenceDescriptors.Close))
         {
-            case Amqp1ReferenceDescriptors.Open:
-                await Reply(session, frame, Amqp1ReferenceDescriptors.Open, ContainerId, null, options.MaxFrameSize, null, options.IdleTimeOut).ConfigureAwait(false);
-                break;
-            case Amqp1ReferenceDescriptors.Begin:
-                await Reply(session, frame, Amqp1ReferenceDescriptors.Begin, frame.Channel, 0u, SessionWindow, SessionWindow).ConfigureAwait(false);
-                break;
-            case Amqp1ReferenceDescriptors.Attach:
-                await AttachAsync(session, frame, performative).ConfigureAwait(false);
-                break;
-            case Amqp1ReferenceDescriptors.Detach:
-                await Reply(session, frame, Amqp1ReferenceDescriptors.Detach, performative.Field(0), true).ConfigureAwait(false);
-                break;
-            case Amqp1ReferenceDescriptors.End or Amqp1ReferenceDescriptors.Close:
-                await Reply(session, frame, performative.Descriptor).ConfigureAwait(false);
-                return performative.Descriptor == Amqp1ReferenceDescriptors.End;
-            default:
-                await options.LinkBehaviour.ReceivedAsync(session, frame).ConfigureAwait(false);
-                break;
+            await AnswerOpenedAsync(session, frame, performative).ConfigureAwait(false);
+            return true;
         }
 
-        return true;
+        await Reply(session, frame, performative.Descriptor).ConfigureAwait(false);
+        return performative.Descriptor == Amqp1ReferenceDescriptors.End;
+    }
+
+    // Open, begin, attach and detach are answered here; any other performative goes to the link behaviour. Plain
+    // comparisons, not a switch, whose jump table over the descriptor range has a branch no descriptor reaches.
+    private ValueTask AnswerOpenedAsync(Amqp1ReferenceSession session, Amqp1ReferenceFrame frame, Amqp1ReferenceDescribed performative)
+    {
+        ulong descriptor = performative.Descriptor;
+        if (descriptor == Amqp1ReferenceDescriptors.Open)
+        {
+            return Reply(session, frame, Amqp1ReferenceDescriptors.Open, ContainerId, null, options.MaxFrameSize, null, options.IdleTimeOut);
+        }
+
+        if (descriptor == Amqp1ReferenceDescriptors.Begin)
+        {
+            return Reply(session, frame, Amqp1ReferenceDescriptors.Begin, frame.Channel, 0u, SessionWindow, SessionWindow);
+        }
+
+        if (descriptor == Amqp1ReferenceDescriptors.Attach)
+        {
+            return AttachAsync(session, frame, performative);
+        }
+
+        return descriptor == Amqp1ReferenceDescriptors.Detach
+            ? Reply(session, frame, Amqp1ReferenceDescriptors.Detach, performative.Field(0), true)
+            : options.LinkBehaviour.ReceivedAsync(session, frame);
     }
 
     // The mirror attach: the other role, the client's terminus, and an initial-delivery-count when the container is the sender.
