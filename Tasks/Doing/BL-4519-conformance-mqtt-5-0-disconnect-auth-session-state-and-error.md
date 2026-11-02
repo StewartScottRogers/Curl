@@ -40,3 +40,4 @@ Scope: 3.14 DISCONNECT, 3.15 AUTH, 4.1 session state as it binds the client, 4.1
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: dc08a549 026ea0d1 28fcee0c d8e3fb0e 975979e2 ef6c9026.
