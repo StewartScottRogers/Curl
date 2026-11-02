@@ -8,7 +8,7 @@ depends-on: [BL-4091, BL-4093, BL-4094, BL-4303, BL-4304, BL-4305]
 touches: [Curl.Extension.WebDavTools.UnitLibrary, Curl.Extension.WebDavTools.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-11-02
 ---
 # BL-4131 — Extension: List and sync WebDAV collections
 
@@ -28,8 +28,8 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 - [x] With `CURL_EXTENSIONS=0` its option is refused exactly as curl refuses an unknown option (exit 2), and without the option every transfer is unchanged; unit tests.
 - [x] An ADR marked "Decided by Claude under Stewart's delegation" records its scheme or option names, the specification version followed, and anything left out with why.
 - [x] Its description appears in `curl --extensions` and `curl --ai-help extensions`.
-- [ ] The changed libraries meet the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The changed libraries meet the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -41,6 +41,8 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-30 (lane 13): Measure-CodeQuality for WebDavTools and Composition took 64 minutes, because Composition reaches every extension test project. Results: Composition 100/100 with 0 failing members. WebDavTools 100/100, but two members failed complexity: `WebDavSyncTransferHook.DownloadAsync` (Cx 18) and `WebDavCollectionListing.ListAsync` (Cx 12). I split both (`PropfindAsync` and `Interpret`; `FetchAsync` and `Keep`); the 99 WebDavTools tests pass afterwards. The shift's 08:18 deadline came before the fast tests and a second quality run, so I requeued with the code uncommitted for the shift to stash. What is left for the next claim: apply the stash, run `Measure-CodeQuality.ps1 -Library Curl.Extension.WebDavTools.UnitLibrary` (Composition already passed and its catalogue lines are unchanged), `dotnet build`, the fast tests, then commit and Done. Criteria 1 to 6 were checked this run.
 - 2026-10-30 (lane 13): CI on Linux and macOS: the sync tests write only into a temporary folder they create and delete, and they build every expected path with `Path.Combine`, so the output does not depend on the platform.
 
+- 2026-11-02 (lane 5): Nothing left to write. The earlier stash (3817400d) is already in the tree: BL-4373 landed the code, registrations and ADR-1164, and BL-4374 met the four quality gates (67 members, 0 failing, worst CRAP 10). I did not apply the stash. Rebuilt and ran the WebDavTools fast tests here: 99 passed. Criteria 7 and 8 are ticked on those two Done subtasks.
+
 ## Log
 
 - 2026-10-29: Created.
@@ -51,3 +53,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-30: Backlog -> Deferred. Split for size (over its cost cap) into BL-4373 and BL-4374
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 9634e382 6e6e8883 ceea66be e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-11-02: Doing -> Done. Met by its subtasks BL-4373 (code, registrations, ADR-1164) and BL-4374 (quality gates); WebDavTools 99 tests pass
