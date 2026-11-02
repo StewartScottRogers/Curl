@@ -3,8 +3,8 @@ id: AF-0528
 title: RunDarkFactory.ps1's help and ModelChoice.ps1's $OpusLibraries call their list the hand-built security and crypto libraries, but it omits Curl.Ssh.UnitLibrary, which holds SSH's key exchanges and ciphers
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:RunDarkFactory.ps1:OpusLibraries:false-help
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -Command ". ./DarkFactory/ModelChoice.ps1; 'Curl.Ssh.UnitL
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

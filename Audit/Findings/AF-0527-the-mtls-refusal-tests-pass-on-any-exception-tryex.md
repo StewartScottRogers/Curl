@@ -3,8 +3,8 @@ id: AF-0527
 title: The mTLS refusal tests pass on any exception: TryExchangeAsync turns every failure into null, the value the refusal tests assert
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.UnitTests/HttpsServerConnectorTests.Mtls.cs:ConnectAsync_MtlsPortWithoutAClientCertificate_FailsTheHandshake:swallowed-failure
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.UnitTests/HttpsServerConnectorTests.Mtls.cs
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

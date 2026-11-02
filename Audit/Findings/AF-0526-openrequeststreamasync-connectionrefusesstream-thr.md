@@ -3,8 +3,8 @@ id: AF-0526
 title: OpenRequestStreamAsync_ConnectionRefusesStream_ThrowsItsIOException checks only the exception type, not that it is the connection's own IOException
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Http3.UnitTests/Http3ClientSessionTests.cs:OpenRequestStreamAsync_ConnectionRefusesStream_ThrowsItsIOException:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Http3.UnitTests/Http3ClientSessionTests.cs -Pattern 'Th
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
