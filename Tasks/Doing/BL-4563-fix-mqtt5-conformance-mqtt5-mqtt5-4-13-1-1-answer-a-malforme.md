@@ -40,3 +40,4 @@ Depends on BL-4560, which changes `Mqtt5ClientFlow.cs` too.
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: f2f790bf bab66fef 914c30cc e5dbaa1c.
