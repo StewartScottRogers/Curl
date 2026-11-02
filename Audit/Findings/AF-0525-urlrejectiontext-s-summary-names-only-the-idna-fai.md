@@ -3,8 +3,8 @@ id: AF-0525
 title: UrlRejectionText's summary names only the IDNA failure as printed without 'URL rejected: ', but UrlTooLong and UrlAtLengthLimit are too
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:UrlRejectionText:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs -Pattern 
 ## Log
 
 - 2026-11-01: filed proposed.
+- 2026-11-02: proposed -> accepted.
