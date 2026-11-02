@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: conformance:--service-name:ntlm-default-credentials:request
 reproduction: none
-task: none
-tasks:
+task: BL-4460
+tasks: BL-4460
 found: 2026-11-01
 found-at: 379ec9aa19ade61c2ce4cb9ee9b729c5aa926fc5
 scorecard: 2026-11-01_1801.md

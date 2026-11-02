@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:UrlRejectionText:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-4461
+tasks: BL-4461
 found: 2026-11-01
 found-at: 379ec9aa19ade61c2ce4cb9ee9b729c5aa926fc5
 scorecard: 2026-11-01_1801.md
