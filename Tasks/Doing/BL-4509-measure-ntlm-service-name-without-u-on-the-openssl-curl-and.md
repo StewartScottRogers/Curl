@@ -33,3 +33,4 @@ Found by the shift-end review (ADR-0710) of the shift merged at e3af7deb5, by th
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: e4cb6f5a b990f68d 0599ace1 ec513870 3d836d5e.
