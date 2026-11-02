@@ -3,8 +3,8 @@ id: AF-0522
 title: --digest --sasl-authzid with a body and no -u sends the body at once where curl sends the empty Digest probe POST first
 auditor: conformance
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-11-01 ("accept all").
+status: closed
+reason: Re-audit 2026-11-01_1801.md: the reproduction no longer reproduces.
 key: conformance:--sasl-authzid:HttpProtocolHandler.SendsDigestProbe:request
 reproduction: none
 task: BL-4457
@@ -13,9 +13,9 @@ found: 2026-11-01
 found-at: 4c39311e3e4524ac6950cb2cba36f5b3f2a6ff2e
 scorecard: 2026-11-01_1016.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-01
+closed-how: reliable-reaudit
+closed-by: 2026-11-01_1801.md
 ---
 # AF-0522 - --digest --sasl-authzid with a body and no -u sends the body at once where curl sends the empty Digest probe POST first
 
@@ -42,7 +42,10 @@ $d=(New-Item -ItemType Directory -Force (Join-Path $env:TEMP 'af-digest-authzid'
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_1801.md | reproduces: no | Ran the reproduction against curl 8.22.0 Schannel (debug build) and the Release curl.exe built from this tree. I skipped its first step, a 'dotnet build' of the folder above the temp directory (%TEMP% itself), because its output is discarded and has nothing to do with the result. Select-String found 'Content-Length: 0' on line 5 of both curl/request.bin and cand/request.bin: both send the empty Digest probe POST first. Both exit 28.
+
 ## Log
 
 - 2026-11-01: filed proposed.
 - 2026-11-01: proposed -> accepted. Stewart: accept all.
+- 2026-11-01: accepted -> closed. Re-audit 2026-11-01_1801.md: the reproduction no longer reproduces.

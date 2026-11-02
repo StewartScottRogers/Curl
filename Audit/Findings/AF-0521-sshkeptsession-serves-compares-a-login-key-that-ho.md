@@ -42,6 +42,8 @@ Select-String -Path Curl.Original.Protocol.Ssh.UnitLibrary/SshKeptSession.cs -Pa
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_1801.md | reproduces: no | Ran `Select-String -Path Curl.Original.Protocol.Ssh.UnitLibrary/SshKeptSession.cs -Pattern 'key == loginKey'`: no match. SshKeptSession.cs:50-51 now reads `internal bool Serves(string key) => CryptographicOperations.FixedTimeEquals(DigestOf(key), DigestOf(loginKey));`, where DigestOf is SHA256 of the UTF-8 bytes, so the time taken no longer depends on where the keys differ or how long they are.
+
 ## Log
 
 - 2026-11-01: filed proposed.

@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs -Pattern 
 
 ## Re-audits
 
+- 2026-11-01 | 2026-11-01_1801.md | reproduces: no | Ran the reproduction: Select-String matched TransferPerformer.Setup.cs:38 (IsBareText(rejection) ? rejection.ToCurlMessage() : UrlRejectedPrefix + ...), :47 (UrlTooLong => CurlExitCode.BadFunctionArgument, 43) and :48 (UrlAtLengthLimit => CurlExitCode.OutOfMemory, 27). The code is unchanged. The statement under audit, CurlUrlRejectionMessages' summary (Curl.Protocol.Abstractions.UnitLibrary/CurlUrlRejectionMessages.cs:3-11), now reads 'URL rejected: and the text with exit 3 for most rejections, exit 67 for UserNotAllowed, and the bare text with no prefix for those three [IdnConversionFailed, UrlTooLong, UrlAtLengthLimit], with exit 3, 43 and 27 respectively', which matches what the reproduction shows. It no longer says every rejection prints the prefix.
+
 ## Log
 
 - 2026-11-01: filed proposed.
