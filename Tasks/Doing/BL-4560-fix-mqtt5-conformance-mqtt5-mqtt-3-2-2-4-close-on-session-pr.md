@@ -32,3 +32,4 @@ OASIS MQTT 5.0 MQTT-3.2.2-4: a client without Session State that receives Sessio
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 1e0f1382 7b580d6c 5fe60615 2391cd16.
