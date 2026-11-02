@@ -76,7 +76,7 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 - curl ends its stderr message line with the platform's newline (CRLF on Windows), so the cases compare stderr with
   CRLF folded to LF; that keeps them platform-neutral.
 - Finding: on a malformed frame the client exits 8 but closes without connection.close 501 (4.2.3 / connection
-  exception). Listed in KnownFailures.txt as `Amqp0:AMQP091-4.2.3-4 BL-4514`; filed High BL-4514.
+  exception). Listed in KnownFailures.txt as `Amqp0:AMQP091-4.2.3-4 BL-4541`; filed High BL-4541.
 - Measured: Curl.Conformance.Extended.UnitLibrary 100% line, 100% branch, worst CRAP 10, 0 failing members.
   `dotnet build Curl.slnx -warnaserror` clean, fast tests green. CI on Linux and macOS: the change is platform-neutral
   (no paths, newline folded) and the fast tests are green here.
@@ -86,4 +86,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 2e98042e c52f9d6e 2b705f51 0854df25 d8e3fb0e 3b1d4f49 ef6c9026.
-- 2026-11-02: Doing -> Done. amqp:// and amqps:// are measured against AMQP 0-9-1's header, framing, data types and connection class by a reference broker; one finding filed as BL-4514
+- 2026-11-02: Doing -> Done. amqp:// and amqps:// are measured against AMQP 0-9-1's header, framing, data types and connection class by a reference broker; one finding filed as BL-4541

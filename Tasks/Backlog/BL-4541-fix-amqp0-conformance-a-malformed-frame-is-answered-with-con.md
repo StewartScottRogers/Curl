@@ -1,5 +1,5 @@
 ---
-id: BL-4514
+id: BL-4541
 title: Fix Amqp0 conformance: a malformed frame is answered with connection.close 501 (frame-error)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4514 — Fix Amqp0 conformance: a malformed frame is answered with connection.close 501 (frame-error)
+# BL-4541 — Fix Amqp0 conformance: a malformed frame is answered with connection.close 501 (frame-error)
 
 ## Goal
 
