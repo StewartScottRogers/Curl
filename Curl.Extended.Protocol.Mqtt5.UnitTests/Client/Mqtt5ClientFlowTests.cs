@@ -17,6 +17,21 @@ public sealed class Mqtt5ClientFlowTests
     }
 
     [TestMethod]
+    [DataRow("hi")]
+    [DataRow(null)]
+    public async Task RunAsync_ConnAckWithSessionPresent_EndsWithWeirdServerReplySendingNothingAfterConnect(string? body)
+    {
+        ScriptedMqtt5Connection connection = new(new Mqtt5ConnAck { SessionPresent = true }.ToBytes());
+
+        Mqtt5ClientException failure = await RunFailingAsync(connection, body);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure.ExitCode);
+        Assert.AreEqual("MQTT 5 CONNACK Session Present on a Clean Start", failure.Message);
+        Assert.HasCount(1, connection.Writes);
+        Assert.AreEqual((byte)Mqtt5PacketType.Connect << 4, connection.Writes[0][0]);
+    }
+
+    [TestMethod]
     public async Task RunAsync_SubAckFailure_EndsWithWeirdServerReplyNamingTheReasonCode()
     {
         Mqtt5ClientException failure = await RunFailingAsync(new ScriptedMqtt5Connection([.. ConnAck(), .. SubAck(Mqtt5ReasonCode.TopicFilterInvalid)]));

@@ -26,6 +26,7 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
         await channel.SendAsync(connect).ConfigureAwait(false);
         var connAck = (Mqtt5ConnAck)await ReceiveAsync(Mqtt5PacketType.ConnAck).ConfigureAwait(false);
         ThrowIfFailure("CONNACK", connAck.ReasonCode);
+        ThrowIfSessionPresent(connAck);
         await channel.SendAsync(publishOrSubscribe).ConfigureAwait(false);
         if (publishOrSubscribe is Mqtt5Publish)
         {
@@ -62,6 +63,15 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
         catch (Mqtt5MalformedPacketException invalid)
         {
             throw new Mqtt5ClientException(CurlExitCode.UrlMalformat, Mqtt5ClientMessages.TopicInvalid(invalid.Message));
+        }
+    }
+
+    /// <summary>Ends the transfer when <paramref name="connAck"/> resumes a session: curl sends Clean Start and keeps no Session State (MQTT-3.2.2-4, ADR-1193).</summary>
+    private static void ThrowIfSessionPresent(Mqtt5ConnAck connAck)
+    {
+        if (connAck.SessionPresent)
+        {
+            throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.SessionPresentOnCleanStart);
         }
     }
 

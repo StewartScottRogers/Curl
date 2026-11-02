@@ -21,6 +21,9 @@ internal static class Mqtt5ClientMessages
     /// <summary>curl's text for a server reply it did not expect.</summary>
     internal const string WeirdServerReply = "Weird server reply";
 
+    /// <summary>The text for a CONNACK with Session Present 1 answering curl's Clean Start CONNECT (ADR-1193).</summary>
+    internal const string SessionPresentOnCleanStart = "MQTT 5 CONNACK Session Present on a Clean Start";
+
     /// <summary>The text for a topic in the URL that MQTT 5 does not allow.</summary>
     internal static string TopicInvalid(string reason) => $"Invalid MQTT 5 topic: {reason}";
 
