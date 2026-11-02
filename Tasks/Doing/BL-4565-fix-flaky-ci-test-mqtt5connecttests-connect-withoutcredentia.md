@@ -30,3 +30,4 @@ Seen by BL-4525's lane on 2026-11-02: in `dotnet test Curl.slnx --filter "TestCa
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 684158b5 914c30cc.
