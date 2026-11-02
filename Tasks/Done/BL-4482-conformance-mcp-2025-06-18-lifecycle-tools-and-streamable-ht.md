@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/McpClient, Curl.Conformance.Extended.UnitTests/McpClient, Documentation/Conformance/Extended/McpClient.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4482 — Conformance: MCP 2025-06-18 lifecycle, tools and Streamable HTTP for mcp:// and mcps:// (McpClient part 1 of 2)
 
@@ -46,29 +46,36 @@ library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a 
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/McpClient.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of this
+- [x] `Documentation/Conformance/Extended/McpClient.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of this
       scope that binds a client a `McpClient:` ID mapped to a test or to `n/a: <reason>`, links to
       `McpClient-Stdio.md` (BL-4483), and the harness's matrix check passes.
-- [ ] A reference MCP server in `Curl.Conformance.Extended.UnitLibrary/McpClient/` keeps its JSON-RPC and tool logic
+- [x] A reference MCP server in `Curl.Conformance.Extended.UnitLibrary/McpClient/` keeps its JSON-RPC and tool logic
       apart from its transport, so BL-4483 can serve it over stdio from `McpClient/Stdio/` without editing this
       task's files.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/McpClient/` run curl in process and assert HTTP requests,
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/McpClient/` run curl in process and assert HTTP requests,
       stdout, stderr and exit code for at least: initialize and the initialized notification, a server that answers
       with an older or unsupported protocol version, `Mcp-Session-Id` and `MCP-Protocol-Version` on later requests,
       a JSON reply and an SSE reply (with unrelated messages before the response), a paginated `tools/list`, a call
       returning text, image and resource content, `isError`, a JSON-RPC error, a 404 for an expired session, and
       `mcps://` over the TLS route.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix McpClient conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/McpClient/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/McpClient/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+
+- Reference server (Curl.Conformance.Extended.UnitLibrary/McpClient/): McpReferenceToolServer is the JSON-RPC and tool side (initialize, tools/list with opaque cursors "opaque:<n>", tools/call, -32601/-32602 errors), with no transport; McpStreamableHttpReferenceServer serves it over Streamable HTTP (session ids session-1, session-2, ...; 400 without a session id, 404 for an unknown or expired one, 202 for a notification, JSON or an event stream with two unrelated notifications and a comment before the response, DELETE ends the session) and records every request. BL-4483 can serve McpReferenceToolServer over stdio from McpClient/Stdio/ without editing these files.
+- Cases: McpLifecycleCases, McpStreamableHttpCases, McpToolsCases (curl in process through ExtendedConformanceHarness, mcps:// over ReferenceRoute.Tls with -k); McpReferenceServerTests covers the server branches curl never reaches. Matrix Documentation/Conformance/Extended/McpClient.md: 31 client-binding rows, 25 mapped to tests, 6 n/a with reasons; it links McpClient-Stdio.md, which BL-4483 adds.
+- Measured: 3 client defects, each listed in KnownFailures.txt with a filed High fix task: Lifecycle-6 unsupported version accepted (BL-4514), Lifecycle-7 tools/list sent without the tools capability (BL-4515), StreamableHttp-8 a 404 ends the run with exit 8 instead of a new session (BL-4516). Everything else passes.
+- Decision (ADR-1189): Curl supports only 2025-06-18, so an older version (2025-03-26) is unsupported too; the client then disconnects and exits 8, as for a missing tools capability.
+- Gates: dotnet build Curl.slnx -warnaserror clean; fast tests green (115 test assemblies, exit 0); Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary: 0 failing members (Reply was split for complexity). No package. Tests are platform-neutral (no paths, file:///dir/x only as content text, the harness's self-signed certificate); CI on Linux and macOS is left to the shift's CI watch.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: d316a8f7 cd294115 6ada1d6e 14e1c865 d8e3fb0e 79cbadb2 ef6c9026.
+- 2026-11-02: Doing -> Done. MCP 2025-06-18 client conformance for mcp:// and mcps://: reference server, 15 cases, matrix, 3 known failures with fix tasks
