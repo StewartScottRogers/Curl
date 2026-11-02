@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests/Cgr170Tests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelRun.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-11-02
 ---
 # BL-3699 — Fix CGR-170: Under -Z, a later URL that cannot be set up (bad glob, unreadable -T file) makes REF abandon the whole batch, but PORT still runs the oth...
 
@@ -65,10 +65,10 @@ curl -Z --parallel-max 1 -sS -w "%{urlnum} %{exitcode} %{url}\n" "http://127.0.0
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -85,6 +85,8 @@ curl -Z --parallel-max 1 -sS -w "%{urlnum} %{exitcode} %{url}\n" "http://127.0.0
 - 2026-10-28 08:28, NOT FINISHED (lane 6, stashed code): every fast test project passed except `Curl.Console.UnitTests`, which hangs with the change. `dotnet test Curl.Console.UnitTests --filter "FullyQualifiedName~Parallel" --blame-hang-timeout 1m` hit the hang timeout after 95 tests (the 6 `Cgr170Tests` pass alone). Most likely cause: a `-Z` test whose transfers must run at once (a handler that waits for another transfer, `--parallel-max-host`, or a fake `TimeProvider` progress or `-m` test) now finds them held until the first batch (`--parallel-max` + 1) is complete or `EndParallelRunAsync` runs. Next step: list the `Parallel` tests that never finish (`--logger "console;verbosity=normal"`), fix the hold (perhaps hold only the setup checks, not the starts, or start held transfers when the URL loop next waits), then run the fast tests and `Measure-CodeQuality.ps1 -Library Curl.Console` (not yet run).
 - The focused tests in `Cgr170Tests.cs` pin the pre-fix differences measured above (the pre-fix runs of the same scenarios gave other output); the sandbox refused restoring the old code to run them against it.
 
+- 2026-11-02 (lane 7): Nothing left to do here. BL-3968 (fixed the hang and landed the held first batch) and BL-3969 (repro evidence, quality gate, criteria) are both Done; their Notes carry the measured curl and Curl results, which are the same for all three repros and the variants. ADR-0866 became ADR-0954. The 2026-10-28 stash is superseded and was not applied. On this branch `ParallelRun` holds the first batch and `dotnet test Curl.Console.UnitTests --filter Cgr170` passes 7 of 7. No code changed in this run.
+
 ## Log
 
 - 2026-10-26: Created from CGR-170 of the third-party gap report.
@@ -93,3 +95,4 @@ curl -Z --parallel-max 1 -sS -w "%{urlnum} %{exitcode} %{url}\n" "http://127.0.0
 - 2026-10-28: Backlog -> Deferred. Over cost cap; split into BL-3968 and BL-3969
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-11-02: Doing -> Done. CGR-170 fixed through BL-3968 and BL-3969: under -Z a setup failure in the first batch abandons it as curl does
