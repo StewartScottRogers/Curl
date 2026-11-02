@@ -1,13 +1,13 @@
-# MQTT 5 requirement matrix: data representation, fixed header and CONNECT
+# MQTT 5 requirement matrix: data representation, fixed header, CONNECT and CONNACK
 
 Curl's `mqtt5://` client (`Curl.Extended.Protocol.Mqtt5.UnitLibrary`) measured against OASIS MQTT Version 5.0
-(7 March 2019), chapters 1.5 (data representation), 2 (control packet format) and 3.1 (CONNECT), through the
+(7 March 2019), chapters 1.5 (data representation), 2 (control packet format), 3.1 (CONNECT) and 3.2 (CONNACK), through the
 real curl command line against the reference broker `Curl.Conformance.Extended.UnitLibrary/Mqtt5/Mqtt5ReferenceBroker`
 (BL-4517). The broker checks every packet it reads against these chapters and fails the case naming the
 requirement a packet breaks. IDs are the specification's own; a binding sentence without a number has a
 `MQTT5-<section>-<n>` ID of its own. Server-only statements are listed as `n/a`.
 
-The other parts: CONNACK in `Mqtt5-Connack.md` (BL-4518), DISCONNECT and AUTH in `Mqtt5-DisconnectAuth.md`
+The CONNACK rows (BL-4518) run curl against the broker answering with a CONNACK built by `Mqtt5/Connack/Mqtt5ConnAckBytes`. The other parts: DISCONNECT and AUTH in `Mqtt5-DisconnectAuth.md`
 (BL-4519), PUBLISH, QoS and SUBSCRIBE in [Mqtt5-PublishSubscribe.md](Mqtt5-PublishSubscribe.md) (BL-4485),
 and WebSocket and TLS in [Mqtt5-Transports.md](Mqtt5-Transports.md) (BL-4486).
 
@@ -49,7 +49,7 @@ and WebSocket and TLS in [Mqtt5-Transports.md](Mqtt5-Transports.md) (BL-4486).
 | Mqtt5:MQTT-3.1.2-18 | MUST NOT | Without the Password Flag, no Password is in the payload. | Mqtt5ConnectTests.Connect_UserWithEmptyPassword_SendsUserNameOnly |
 | Mqtt5:MQTT-3.1.2-19 | MUST | With the Password Flag, a Password is in the payload. | Mqtt5ConnectTests.Connect_UserAndPassword_SetsBothFlagsAndSendsBothFieldsLast |
 | Mqtt5:MQTT-3.1.2-20 | MUST | With a non-zero Keep Alive and nothing else to send, the client sends PINGREQ within it. | Mqtt5ConnectTests.Connect_KeepAlive_IsZeroSoNoPingIsOwed |
-| Mqtt5:MQTT-3.1.2-21 | MUST | The client uses the CONNACK's Server Keep Alive in place of its own. | n/a: a CONNACK property; measured with CONNACK in Mqtt5-Connack.md (BL-4518) |
+| Mqtt5:MQTT-3.1.2-21 | MUST | The client uses the CONNACK's Server Keep Alive in place of its own. | n/a: a CONNACK property; measured as Mqtt5:MQTT-3.2.2-21 |
 | Mqtt5:MQTT-3.1.2-22 | MUST | A server that hears nothing for one and a half Keep Alives closes the connection. | n/a: binds the server |
 | Mqtt5:MQTT-3.1.2-23 | MUST | Client and server keep the Session State after the connection closes while the Session Expiry Interval runs. | n/a: curl sends no Session Expiry Interval, so the session ends with the connection |
 | Mqtt5:MQTT-3.1.2-24 | MUST NOT | The server sends no packet over the client's Maximum Packet Size. | n/a: binds the server; curl sends no Maximum Packet Size |
@@ -77,3 +77,31 @@ and WebSocket and TLS in [Mqtt5-Transports.md](Mqtt5-Transports.md) (BL-4486).
 | Mqtt5:MQTT-3.1.4-4 | MUST | The server processes Clean Start. | n/a: binds the server |
 | Mqtt5:MQTT-3.1.4-5 | MUST | The server acknowledges CONNECT with CONNACK 0x00. | n/a: binds the server |
 | Mqtt5:MQTT-3.1.4-6 | MUST NOT | A server that rejected CONNECT processes nothing after it but AUTH. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.0-1 | MUST | The server's first packet is CONNACK, or AUTH before it. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.0-2 | MUST NOT | The server sends at most one CONNACK on a connection. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.2-1 | MUST | The reserved Connect Acknowledge Flags (bits 7-1) are 0; the client treats others as a Malformed Packet. | ConnackCases.Connack_ReservedAcknowledgeFlagSet_IsAMalformedPacketWithExit8 |
+| Mqtt5:MQTT-3.2.2-2 | MUST | A server accepting a Clean Start sets Session Present 0. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.2-3 | MUST | A server resuming a session without Clean Start sets Session Present 1. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.2-4 | MUST | A client without Session State that receives Session Present 1 closes the connection. | ConnackCases.Connack_SessionPresentAfterCleanStart_ClosesTheConnectionWithExit8 |
+| Mqtt5:MQTT-3.2.2-5 | MUST | A client with Session State that receives Session Present 0 discards it. | n/a: curl keeps no Session State between transfers |
+| Mqtt5:MQTT-3.2.2-6 | MUST | A CONNACK with a non-zero Reason Code has Session Present 0. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.2-7 | MUST | A server sending a Reason Code of 0x80 or above closes the connection. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.2-8 | MUST | The server sends a Connect Reason Code table 3-1 lists. | n/a: binds the server |
+| Mqtt5:MQTT5-3.2.2.2-1 | MUST | A client receiving a Connect Reason Code of 0x80 or above ends the connection and sends nothing after CONNECT (sections 3.2.2.2 and 4.13). | ConnackCases.Connack_FailureReasonCode_EndsTheTransferAfterConnectWithExit8 |
+| Mqtt5:MQTT-3.2.2-9 | MUST | A server not supporting QoS 1 or 2 sends Maximum QoS. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.2-10 | MUST | A server still accepts a SUBSCRIBE above its Maximum QoS. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.2-11 | MUST NOT | The client sends no PUBLISH above the Maximum QoS. | ConnackCases.Connack_ReceiveMaximumOneMaximumQos0NoRetainNoTopicAlias_PublishesAtQos0UnretainedWithNoAlias |
+| Mqtt5:MQTT-3.2.2-12 | MUST | A server rejects a CONNECT whose Will QoS exceeds its capability. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.2-13 | MUST | A server without retain support rejects a CONNECT with Will Retain 1. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.2-14 | MUST NOT | With Retain Available 0, the client sends no PUBLISH with RETAIN 1. | ConnackCases.Connack_ReceiveMaximumOneMaximumQos0NoRetainNoTopicAlias_PublishesAtQos0UnretainedWithNoAlias |
+| Mqtt5:MQTT-3.2.2-15 | MUST NOT | The client sends no packet over the server's Maximum Packet Size. | ConnackCases.Connack_MaximumPacketSizeBelowThePublish_SendsNoPublishAndExits55 |
+| Mqtt5:MQTT-3.2.2-16 | MUST | A server assigning a ClientID returns it as Assigned Client Identifier. | n/a: binds the server |
+| Mqtt5:MQTT5-3.2.2.3.3-1 | MUST | The client sends no more unacknowledged QoS 1 and 2 PUBLISH packets than the Receive Maximum (sections 3.2.2.3.3 and 4.9). | ConnackCases.Connack_ReceiveMaximumOneMaximumQos0NoRetainNoTopicAlias_PublishesAtQos0UnretainedWithNoAlias |
+| Mqtt5:MQTT5-3.2.2.3.7-1 | MUST | The client accepts a CONNACK carrying an Assigned Client Identifier (section 3.2.2.3.7). | ConnackCases.Connack_AssignedClientIdentifier_IsAcceptedAndThePublishSent |
+| Mqtt5:MQTT-3.2.2-17 | MUST NOT | The client sends no Topic Alias above the Topic Alias Maximum. | ConnackCases.Connack_TopicAliasMaximum_PublishesWithNoTopicAlias |
+| Mqtt5:MQTT-3.2.2-18 | MUST NOT | Without a Topic Alias Maximum, the client sends no Topic Alias. | ConnackCases.Connack_ReceiveMaximumOneMaximumQos0NoRetainNoTopicAlias_PublishesAtQos0UnretainedWithNoAlias |
+| Mqtt5:MQTT-3.2.2-19 | MUST NOT | The server sends no Reason String that takes CONNACK over the client's Maximum Packet Size. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.2-20 | MUST NOT | The server sends no User Property that takes CONNACK over the client's Maximum Packet Size. | n/a: binds the server |
+| Mqtt5:MQTT-3.2.2-21 | MUST | The client uses the CONNACK's Server Keep Alive in place of its own Keep Alive. | ConnackCases.Connack_ServerKeepAlive_IsUsedSoASubscriberPings |
+| Mqtt5:MQTT-3.2.2-22 | MUST | Without a Server Keep Alive, the server uses the client's Keep Alive. | n/a: binds the server |
+| Mqtt5:MQTT5-3.2.2.3-1 | MUST | A CONNACK property other than User Property appears at most once; a repeat is a Protocol Error the client refuses (section 3.2.2.3). | ConnackCases.Connack_PropertyTwice_IsRefusedWithExit8 |
