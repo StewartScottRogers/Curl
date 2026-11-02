@@ -20,7 +20,7 @@ public static class ExtensionProtocolHandlers
     /// The factory gives every extension <paramref name="readEnvironmentVariable" /> as the services'
     /// <see cref="ProtocolHandlerServices.ReadEnvironmentVariable" />, so a handler reads the run's environment (BL-4534).
     /// </summary>
-    /// <param name="readEnvironmentVariable">Reads the run's environment.</param>
+    /// <param name="readEnvironmentVariable">Reads the run's environment; the factory hands it to every extension in <see cref="ProtocolHandlerServices.ReadEnvironmentVariable" />.</param>
     /// <returns>The factory, or <see langword="null" /> for no extensions.</returns>
     public static Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? For(Func<string, string?> readEnvironmentVariable)
     {

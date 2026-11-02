@@ -5,7 +5,9 @@ Namespace `Curl.Extension.Composition`.
 
 - `ExtensionProtocolHandlers.For(readEnvironmentVariable)` gives the factory a host passes to
   `EngineComposition.CreateProtocolHandlers`' `extensionHandlers`, or `null` when `CURL_EXTENSIONS`
-  is `0`. `Curl.Console`'s `CurlComposition` passes it in both production compositions.
+  is `0`. `Curl.Console`'s `CurlComposition` passes it in both production compositions. The factory
+  builds every extension over the services with `ReadEnvironmentVariable` set to that reader, so an
+  in-process run's environment reaches the extensions (ADR-1192).
 - `ExtensionCatalogue.Entries` holds one handler factory per extension, one line each. An extension
   task adds its own line and nothing else here; the file is `merge=union` and a shared list file.
 - `ExtensionOptionCatalogue.Entries` holds each extension's long command-line option (`ExtensionOption`),
