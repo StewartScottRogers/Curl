@@ -24,6 +24,10 @@ internal static class Mqtt5ClientMessages
     /// <summary>The text for a CONNACK with Session Present 1 answering curl's Clean Start CONNECT (ADR-1193).</summary>
     internal const string SessionPresentOnCleanStart = "MQTT 5 CONNACK Session Present on a Clean Start";
 
+    /// <summary>The text for a packet larger than the Maximum Packet Size the server's CONNACK returns (ADR-1193).</summary>
+    internal static string OverMaximumPacketSize(string packetName, int size, uint maximum) =>
+        string.Create(CultureInfo.InvariantCulture, $"MQTT 5 {packetName} of {size} bytes exceeds the server's Maximum Packet Size of {maximum}");
+
     /// <summary>The text for a topic in the URL that MQTT 5 does not allow.</summary>
     internal static string TopicInvalid(string reason) => $"Invalid MQTT 5 topic: {reason}";
 

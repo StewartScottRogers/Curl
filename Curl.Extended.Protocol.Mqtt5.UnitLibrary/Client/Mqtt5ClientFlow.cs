@@ -27,6 +27,7 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
         var connAck = (Mqtt5ConnAck)await ReceiveAsync(Mqtt5PacketType.ConnAck).ConfigureAwait(false);
         ThrowIfFailure("CONNACK", connAck.ReasonCode);
         ThrowIfSessionPresent(connAck);
+        ThrowIfOverMaximumPacketSize(publishOrSubscribe, connAck);
         await channel.SendAsync(publishOrSubscribe).ConfigureAwait(false);
         if (publishOrSubscribe is Mqtt5Publish)
         {
@@ -63,6 +64,20 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
         catch (Mqtt5MalformedPacketException invalid)
         {
             throw new Mqtt5ClientException(CurlExitCode.UrlMalformat, Mqtt5ClientMessages.TopicInvalid(invalid.Message));
+        }
+    }
+
+    /// <summary>
+    /// Ends the transfer before <paramref name="packet"/> is sent when it is larger than the Maximum Packet Size
+    /// <paramref name="connAck"/> returns, since the client sends no packet over it (MQTT-3.2.2-15, ADR-1193).
+    /// </summary>
+    private static void ThrowIfOverMaximumPacketSize(Mqtt5Packet packet, Mqtt5ConnAck connAck)
+    {
+        int size = packet.ToBytes().Length;
+        if (connAck.Properties.FirstOrDefault(property => property.Identifier == Mqtt5PropertyIdentifier.MaximumPacketSize) is { } maximum && size > maximum.IntegerValue)
+        {
+            string packetName = packet is Mqtt5Publish ? "PUBLISH" : "SUBSCRIBE";
+            throw new Mqtt5ClientException(CurlExitCode.SendError, Mqtt5ClientMessages.OverMaximumPacketSize(packetName, size, maximum.IntegerValue));
         }
     }
 

@@ -32,6 +32,34 @@ public sealed class Mqtt5ClientFlowTests
     }
 
     [TestMethod]
+    [DataRow("hi", 7u, "MQTT 5 PUBLISH of 8 bytes exceeds the server's Maximum Packet Size of 7")]
+    [DataRow(null, 8u, "MQTT 5 SUBSCRIBE of 9 bytes exceeds the server's Maximum Packet Size of 8")]
+    public async Task RunAsync_ConnAckMaximumPacketSizeBelowThePacket_EndsWithSendErrorSendingNothingAfterConnect(string? body, uint maximum, string expectedMessage)
+    {
+        ScriptedMqtt5Connection connection = new(ConnAckWithMaximumPacketSize(maximum));
+
+        Mqtt5ClientException failure = await RunFailingAsync(connection, body);
+
+        Assert.AreEqual(CurlExitCode.SendError, failure.ExitCode);
+        Assert.AreEqual(expectedMessage, failure.Message);
+        Assert.HasCount(1, connection.Writes);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ConnAckMaximumPacketSizeEqualToThePublish_SendsThePublish()
+    {
+        ScriptedMqtt5Connection connection = new(ConnAckWithMaximumPacketSize(8));
+
+        await new Mqtt5ClientFlow(connection, new MemoryStream(), NoTransferProgress.Instance, TimeProvider.System, CancellationToken.None)
+            .RunAsync(new Mqtt5Connect { ClientIdentifier = "c" }, "t", System.Text.Encoding.UTF8.GetBytes("hi"));
+
+        Assert.AreEqual((byte)Mqtt5PacketType.Publish << 4, connection.Writes[1][0]);
+    }
+
+    private static byte[] ConnAckWithMaximumPacketSize(uint maximum) =>
+        new Mqtt5ConnAck { Properties = [Mqtt5Property.FromInteger(Mqtt5PropertyIdentifier.MaximumPacketSize, maximum)] }.ToBytes();
+
+    [TestMethod]
     public async Task RunAsync_SubAckFailure_EndsWithWeirdServerReplyNamingTheReasonCode()
     {
         Mqtt5ClientException failure = await RunFailingAsync(new ScriptedMqtt5Connection([.. ConnAck(), .. SubAck(Mqtt5ReasonCode.TopicFilterInvalid)]));
