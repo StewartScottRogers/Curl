@@ -1,5 +1,5 @@
 ---
-id: BL-4514
+id: BL-4539
 title: Fix S3 conformance: AWS_ENDPOINT_URL and AWS_REGION from the run's environment
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4514 — Fix S3 conformance: AWS_ENDPOINT_URL and AWS_REGION from the run's environment
+# BL-4539 — Fix S3 conformance: AWS_ENDPOINT_URL and AWS_REGION from the run's environment
 
 ## Goal
 

@@ -69,7 +69,7 @@ defect in the extension library is listed in `KnownFailures.txt` with a filed Hi
 - Reference endpoint: `Curl.Conformance.Extended.UnitLibrary/S3/S3ReferenceEndpoint` (GetObject, PutObject, CreateMultipartUpload, UploadPart, CompleteMultipartUpload, ListObjectsV2 with prefix, delimiter and continuation-token, `Error` bodies; virtual-hosted or path style by the `Host` header against a service host). Each request is checked first by an `IS3RequestAuthorizer`; `S3WellFormedAuthorization` accepts an anonymous request or any `AWS4-HMAC-SHA256 Credential=` header, so BL-4499 adds a verifying authorizer in `S3/Signing/` and passes it to the constructor without editing these files.
 - Cases in `Curl.Conformance.Extended.UnitTests/S3/`: 14 over a TLS route on 443 (AWS hosts, `-k`) and a TCP route on 9000 (custom endpoint), plus `S3ReferenceEndpointTests` driving the endpoint's other answers with http:// command lines. Multipart uses a temp file of 8 MiB + 5 bytes (the client's part size).
 - Default taken: the endpoint does not validate CompleteMultipartUpload; the case asserts its body byte for byte and the stored object instead. AbortMultipartUpload is n/a (optional, "if used").
-- Library defect: `S3Extension.CreateHandler` reads `AWS_*` from the process environment, not the run's injected reader, so `S3:Endpoints-1` and `S3:Regions-1` fail; listed in `KnownFailures.txt` with BL-4514 (High).
+- Library defect: `S3Extension.CreateHandler` reads `AWS_*` from the process environment, not the run's injected reader, so `S3:Endpoints-1` and `S3:Regions-1` fail; listed in `KnownFailures.txt` with BL-4539 (High).
 - Server fault fixed here: ListObjectsV2 `Contents` needs `LastModified` (the client requires it).
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` 0 failing members (100% line and branch, complexity at most 10); `dotnet build Curl.slnx -warnaserror` clean; fast tests green. Stderr asserted with Contains (line endings differ by platform), files only in temp directories: platform-neutral, which meets the Linux/macOS criterion.
 
@@ -77,4 +77,4 @@ defect in the extension library is listed in `KnownFailures.txt` with a filed Hi
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 00e0f0d4 d0c8875f 356f465e 94856415 d8e3fb0e 23196c4a ef6c9026.
-- 2026-11-02: Doing -> Done. s3:// conformance matrix S3.md with reference endpoint and 14 cases; endpoint and region env failures listed for BL-4514
+- 2026-11-02: Doing -> Done. s3:// conformance matrix S3.md with reference endpoint and 14 cases; endpoint and region env failures listed for BL-4539
