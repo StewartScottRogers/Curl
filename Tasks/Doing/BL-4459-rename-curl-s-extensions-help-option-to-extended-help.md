@@ -37,3 +37,4 @@ Keep the names that are not the option: the `--ai-help extensions` subject and t
 ## Log
 
 - 2026-11-01: Created.
+- 2026-11-01: Backlog -> Doing. Criteria at claim: 1683e6c0 9700a053 65ac83db bcd3f8ca 91fd3925.
