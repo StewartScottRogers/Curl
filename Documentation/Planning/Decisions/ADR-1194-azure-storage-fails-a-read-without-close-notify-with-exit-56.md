@@ -1,4 +1,4 @@
-# ADR-1192: Azure Storage fails a read without close_notify with exit 56
+# ADR-1194: Azure Storage fails a read without close_notify with exit 56
 
 - Status: Accepted
 - Date: 2026-11-02

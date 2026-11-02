@@ -24,6 +24,6 @@ public enum AzureStorageHttpFailure
     /// <summary>The request body stream ended before the length the request declared.</summary>
     RequestBodyTooShort,
 
-    /// <summary>A read found the TLS connection ended without the server's <c>close_notify</c>; the message is the platform curl build's text for it (ADR-0221, ADR-1192).</summary>
+    /// <summary>A read found the TLS connection ended without the server's <c>close_notify</c>; the message is the platform curl build's text for it (ADR-0221, ADR-1194).</summary>
     ReceiveFailed,
 }

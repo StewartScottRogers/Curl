@@ -36,4 +36,4 @@ close_notify (exit 56 with that message, or the body accepted) and match it.
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: a77d74ca f552bbde fdc35bd6.
-- 2026-11-02: Doing -> Done. A TLS read without close_notify in an az:// or abfs:// transfer now ends with exit 56 and the TLS build's text (ADR-1192)
+- 2026-11-02: Doing -> Done. A TLS read without close_notify in an az:// or abfs:// transfer now ends with exit 56 and the TLS build's text (ADR-1194)

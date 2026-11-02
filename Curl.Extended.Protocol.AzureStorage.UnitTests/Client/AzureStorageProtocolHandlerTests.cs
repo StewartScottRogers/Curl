@@ -225,7 +225,7 @@ public sealed class AzureStorageProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_CloseDelimitedDownloadEndsWithoutCloseNotify_FailsWithExit56AndKeepsTheBytesRead()
     {
-        // ADR-0221, ADR-1192: curl's HTTP layer fails such a read with exit 56 and the TLS build's text.
+        // ADR-0221, ADR-1194: curl's HTTP layer fails such a read with exit 56 and the TLS build's text.
         QueuedAzureStorageConnector connector = new("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nhello")
         {
             FailureAtEnd = new MissingCloseNotifyException("schannel: server closed abruptly (missing close_notify)"),

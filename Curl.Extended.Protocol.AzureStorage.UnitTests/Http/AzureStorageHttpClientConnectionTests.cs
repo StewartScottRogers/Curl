@@ -227,7 +227,7 @@ public sealed class AzureStorageHttpClientConnectionTests
     [TestMethod]
     public async Task SendAsync_CloseDelimitedBodyEndsWithoutCloseNotify_FailsReceiveFailedWithTheBuildsText()
     {
-        // ADR-0221, ADR-1192: a TLS read that ends without close_notify fails, whatever the framing.
+        // ADR-0221, ADR-1194: a TLS read that ends without close_notify fails, whatever the framing.
         var connection = new RecordedConnection("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nhello", failureAtEnd: new MissingCloseNotifyException("schannel: server closed abruptly (missing close_notify)"));
         var response = await new AzureStorageHttpClientConnection(connection).SendAsync(Get(), CancellationToken.None);
 
