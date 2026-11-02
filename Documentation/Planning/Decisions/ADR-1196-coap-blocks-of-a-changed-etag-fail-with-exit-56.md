@@ -1,4 +1,4 @@
-# ADR-1195: A CoAP Block2 transfer whose ETag changes between blocks fails with exit 56
+# ADR-1196: A CoAP Block2 transfer whose ETag changes between blocks fails with exit 56
 
 - Status: Accepted
 - Date: 2026-11-02
