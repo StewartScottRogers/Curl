@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4479]
 touches: [Curl.Conformance.Extended.UnitLibrary/Kafka/Compression, Curl.Conformance.Extended.UnitTests/Kafka/Compression, Documentation/Conformance/Extended/Kafka-Compression.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4481 — Conformance: Kafka record batch compression - gzip, Snappy, LZ4 and zstd - for kafka:// (Kafka part 3 of 3)
 
@@ -46,25 +46,47 @@ focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), the `Kn
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Kafka-Compression.md` gives every requirement of the four formats that binds
+- [x] `Documentation/Conformance/Extended/Kafka-Compression.md` gives every requirement of the four formats that binds
       a decoder a `Kafka:` ID mapped to a test or to `n/a: <reason>`; the harness's
       matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Kafka/Compression/` run curl in process and assert stdout, stderr
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Kafka/Compression/` run curl in process and assert stdout, stderr
       and exit code for at least: a fetch of each codec, zstd with raw, RLE
       and compressed blocks, repeat offsets, a content checksum and a dictionary id the client refuses, LZ4 with block
       and content checksums and dependent blocks, Snappy with copies of each offset width, and a corrupt stream of
       each codec.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Kafka conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Kafka/Compression/` is at 100% line and branch
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Kafka/Compression/` is at 100% line and branch
       coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+
+- Plan: encoders the tests own in `Curl.Conformance.Extended.UnitLibrary/Kafka/Compression/`:
+  `KafkaCompressedRecordBatch` (rewrites an uncompressed batch's records with the codec's bytes, its attributes,
+  batchLength and CRC-32C), `KafkaReferenceSnappyEncoder` (greedy, every copy at the one offset width a case names,
+  plus xerial framing), `KafkaReferenceLz4FrameWriter` (greedy blocks, stored blocks, linked blocks, block and content
+  checksums), `KafkaReferenceZstdFrameWriter` (frames laid out block by block: raw, RLE, and compressed blocks of raw
+  literals and RLE sequence codes written by hand from RFC 8878), `KafkaReferenceXxHash` (XXH32/XXH64, pinned to the
+  published vectors) and `KafkaReferenceMatchFinder`. Cases: `KafkaGzipTests`, `KafkaSnappyTests`, `KafkaLz4Tests`,
+  `KafkaZstdTests` (21 cases), all passing against the library as it is, so nothing goes in `KnownFailures.txt`.
+- Decision (default taken): the LZ4 and zstd checksums are written correctly, but the client skips them; the
+  "decoder checks the checksum" rows are `n/a` (SHOULD-level, and the batch CRC-32C already covers the compressed
+  bytes), not a fix task.
+- Decision (default taken): Huffman-coded literals and FSE sequence modes need a Huffman and an FSE encoder in the
+  reference, a run's worth of work of their own; their two matrix rows are `n/a` naming BL-4564, filed to add them
+  (depends on this task). It is not a prerequisite of this task's criteria, which list zstd raw, RLE and compressed
+  blocks, repeat offsets, a checksum and a dictionary id.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` reports 0 failing members
+  (four methods were split to get under complexity 10 first); `dotnet build Curl.slnx -warnaserror` clean; the fast
+  tests green across the solution (115 test assemblies passed). Platform-neutral: no paths, files, OS text or
+  certificates; the seeded `Random` is the same on every platform; CI on Linux and macOS is covered by that.
+- No package added.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: ab06262f 5b192b2e 6873c13e d8e3fb0e 700f62ad ef6c9026.
+- 2026-11-02: Doing -> Done. kafka:// fetch of gzip, Snappy, LZ4 and zstd batches measured by 21 in-process cases with a requirement matrix; all pass
