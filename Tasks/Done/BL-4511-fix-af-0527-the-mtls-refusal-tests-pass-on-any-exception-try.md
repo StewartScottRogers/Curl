@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4511 — Fix AF-0527: The mTLS refusal tests pass on any exception: TryExchangeAsync turns every failure into null, the value the refusal tests assert
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- TryExchangeAsync now catches only AuthenticationException (the TLS layer refusing the handshake) and IOException (the server dropping the connection during the handshake or exchange), with the CA1031 suppression removed; any other exception escapes and fails the refusal tests. Default taken: an exception filter rather than asserting the type in each test, so all three mTLS tests share one check. No ADR: test-only change. The 10 HttpsServerConnectorTests pass on Windows; the change is platform-neutral (both types are what SslStream throws on every platform). Fast tests green, build clean.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-02: Doing -> Done. The mTLS refusal tests catch only AuthenticationException or IOException, so an unrelated exception fails them

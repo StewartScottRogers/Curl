@@ -1,4 +1,5 @@
 using System.Net.Security;
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using Curl.Protocol.Abstractions;
 
@@ -73,9 +74,9 @@ public sealed partial class HttpsServerConnectorTests
         return (new HttpsServerConnector(sws, serverCertificate, sws, HttpsServerConnector.HttpsMtlsPort, verifier), verifier);
     }
 
-    // The reply to one request over a TLS connection to the mTLS port, or null when the handshake or the exchange fails
-    // or the server closes the connection without a reply byte.
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Any failure of a refused handshake is the outcome under test.")]
+    // The reply to one request over a TLS connection to the mTLS port, or null when the TLS layer refuses the handshake
+    // (AuthenticationException), the server drops the connection during it or the exchange (IOException), or the server
+    // closes the connection without a reply byte. Any other exception escapes and fails the test (AF-0527).
     private static async Task<string?> TryExchangeAsync(HttpsServerConnector connector, X509Certificate2? clientCertificate)
     {
         ConnectResult result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", HttpsServerConnector.HttpsMtlsPort, false), CancellationToken.None);
@@ -92,7 +93,7 @@ public sealed partial class HttpsServerConnectorTests
                 string reply = await ExchangeAsync(client, ExpectedReply.Length);
                 return reply.Length == 0 ? null : reply;
             }
-            catch (Exception)
+            catch (Exception exception) when (exception is AuthenticationException or IOException)
             {
                 return null;
             }
