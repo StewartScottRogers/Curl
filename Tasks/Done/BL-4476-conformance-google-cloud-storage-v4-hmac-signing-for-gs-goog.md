@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4475]
-touches: [Curl.Conformance.Extended.UnitLibrary/GoogleCloudStorage/Signing, Curl.Conformance.Extended.UnitTests/GoogleCloudStorage/Signing, Documentation/Conformance/Extended/GoogleCloudStorage-Signing.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
+touches: [Curl.Conformance.Extended.UnitLibrary/GoogleCloudStorage/Signing, Curl.Conformance.Extended.UnitTests/GoogleCloudStorage/Signing, Documentation/Conformance/Extended/GoogleCloudStorage-Signing.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt, Curl.Conformance.Extended.UnitLibrary/Harness/RequirementMatrix.cs, Curl.Conformance.Extended.UnitTests/Harness/RequirementMatrixTests.cs]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4476 — Conformance: Google Cloud Storage V4 HMAC signing for gs:// (GoogleCloudStorage part 2 of 2)
 
@@ -45,24 +45,30 @@ defect in the extension library is listed in `KnownFailures.txt` with a filed Hi
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/GoogleCloudStorage-Signing.md` gives every requirement of the V4 signing
+- [x] `Documentation/Conformance/Extended/GoogleCloudStorage-Signing.md` gives every requirement of the V4 signing
       process that binds a signer a `GoogleCloudStorage:` ID mapped to a test or to `n/a: <reason>`; the harness's
       matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/GoogleCloudStorage/Signing/` run curl in process with `--user`
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/GoogleCloudStorage/Signing/` run curl in process with `--user`
       and assert the signed headers, stdout, stderr and exit code for at least: GET, PUT with a body hash, a listing
       with several query parameters in canonical order, an object name with reserved and non-ASCII characters, a
       region other than `auto`, and the reference endpoint's refusal (exit 22) when the signature does not verify.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix GoogleCloudStorage conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/GoogleCloudStorage/Signing/` is at 100% line and
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/GoogleCloudStorage/Signing/` is at 100% line and
       branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
+- Verifier: `GoogleCloudStorage/Signing/GcsV4HmacReferenceAuthorizer` and `GcsV4CanonicalRequest`, written from the V4 signing and canonical-request pages with BCL `HMACSHA256`/`SHA256` only. It re-encodes the decoded path and query itself, checks the 15-minute clock window, the credential scope, that `host` and every `x-goog-*` header are signed, the body hash, then the signature; any fault is `403 SignatureDoesNotMatch`. Its fixed vector (`a488c22c...`) was computed by hand in PowerShell from the documented steps; the documentation's worked example is an RSA signed URL, so there is no published HMAC vector (ADR-1191).
+- Cases: `GcsV4SigningCases` (GET, PUT with body hash, listing with three query parameters, reserved and non-ASCII object name, region `us-east1`, wrong secret exit 22) at a fixed clock, 2026-11-02 10:30:00 UTC, through the run's `TimeProvider`.
+- Region: the client always signs with `auto`. Decided (ADR-1191) that a region is named with `--aws-sigv4 goog4:goog:<region>:storage`; the case is listed in `KnownFailures.txt` under the filed High task BL-4538 (depends on BL-4534, which holds `GcsProtocolHandler.cs`).
+- Widened touches to `Harness/RequirementMatrix.cs` and its tests: the matrix check matched an ID only against `<Name>.md`, so a `<Name>-<Part>.md` matrix (which the README allows) could hold no IDs. No task in Doing on `origin/work/dark-factory` named it. Now a part matrix counts for its protocol; `FindProblems_IdInAPartMatrixOfItsProtocol_ReportsNothing` pins it.
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` reports 0 failing members (the first run found 4 methods over complexity 10; they were split). Fast tests green across the solution; `dotnet build Curl.slnx -warnaserror` clean. Platform-neutral: the only file is a temp file under `Path.GetTempPath()`, so CI on Linux and macOS is covered.
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 584a7dcd 66f0a2e5 cec18b67 d8e3fb0e 2b8d951f ef6c9026.
+- 2026-11-02: Doing -> Done. gs:// V4 HMAC signing is measured by a documentation-written verifier through curl; region case listed under BL-4538
