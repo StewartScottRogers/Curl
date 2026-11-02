@@ -8,7 +8,7 @@ depends-on: [BL-2850]
 touches: [Curl.Cli.UnitLibrary/ManualPages, Curl.Cli.UnitTests/ManualPages, Curl.Conformance.UnitLibrary/UpstreamManagenScript.cs, Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj, Curl.Conformance.UnitTests/UpstreamManagenScriptTests.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Managen.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-11-02
 ---
 # BL-2881 — Build the manual page generator that upstream's managen is, and run cases 1705 and 1706 against it
 
@@ -22,10 +22,10 @@ Found by BL-2852 (ADR for cases 1135 to 1706). Upstream cases 1705 "managen make
 
 ## Acceptance criteria
 
-- [ ] A generator in `Curl.Cli.UnitLibrary` renders the nroff page and the ASCII page from option documents, with focused unit tests in `Curl.Cli.UnitTests` at 100% line and branch coverage and complexity at most 10.
-- [ ] `managen` is registered as a `<command type="perl">` script (`UpstreamManagenScript`), and its tests render case 1705's and 1706's option documents to their expected pages byte for byte. Running the cases themselves moved to BL-3002 (see Notes).
-- [ ] `curl --ai-help` is unchanged unless an option changes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] A generator in `Curl.Cli.UnitLibrary` renders the nroff page and the ASCII page from option documents, with focused unit tests in `Curl.Cli.UnitTests` at 100% line and branch coverage and complexity at most 10.
+- [x] `managen` is registered as a `<command type="perl">` script (`UpstreamManagenScript`), and its tests render case 1705's and 1706's option documents to their expected pages byte for byte. Running the cases themselves moved to BL-3002 (see Notes).
+- [x] `curl --ai-help` is unchanged unless an option changes.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -46,3 +46,5 @@ Found by BL-2852 (ADR for cases 1135 to 1706). Upstream cases 1705 "managen make
 - 2026-10-21: Backlog -> Deferred. Split for the cost cap into BL-3018 (land generator and script tests), BL-3019, BL-3020 and BL-3021 (coverage); nothing left here
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: e77fbcd3 d386f87e cd5a64f3 c5f8cef6.
+- 2026-11-02 (lane 2, third claim): nothing left to build. The split parts are all Done: BL-3018 (generator, `UpstreamManagenScript` and its registration), BL-3019 to BL-3021 (coverage of the header, renderer, page, layout, context and entry point) and BL-3002 (the cases' data, `%DATE`/`%VERNUM`, 1705 and 1706 on `PassingUpstreamCases.txt`). The stash d04b5e71 holds older copies of the same files, so it was not applied. Checked: the 147 `ManualPages` tests in Curl.Cli.UnitTests and the 10 managen/1705/1706 tests in Curl.Conformance.UnitTests pass. No option changed, so `--ai-help` stays as it is. Every criterion is met by the landed subtasks.
+- 2026-11-02: Doing -> Done. Delivered by BL-3018, BL-3019, BL-3020, BL-3021 and BL-3002; the managen tests and cases 1705 and 1706 pass
