@@ -9,7 +9,7 @@ using Curl.Testing;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins <c>--extensions-help</c>, that the bare <c>--extensions</c> is unknown, and <c>--ai-help extensions</c> end to end (ADR-1008): <see cref="ExtensionListing"/>'s
+/// Pins <c>--extended-help</c>, that the bare <c>--extensions</c> and the former <c>--extensions-help</c> are unknown, and <c>--ai-help extensions</c> end to end (ADR-1008): <see cref="ExtensionListing"/>'s
 /// lines and Markdown on standard output, with extensions on and with <c>CURL_EXTENSIONS=0</c>, no transfer and exit 0.
 /// </summary>
 [TestClass]
@@ -23,11 +23,11 @@ public sealed class CurlCommandRunnerExtensionsTests
     [TestMethod]
     [DataRow(null)]
     [DataRow("0")]
-    public async Task RunAsync_ExtensionsHelp_PrintsTheListingAndTransfersNothing(string? switchValue)
+    public async Task RunAsync_ExtendedHelp_PrintsTheListingAndTransfersNothing(string? switchValue)
     {
         Func<string, string?> environment = name => name == "CURL_EXTENSIONS" ? switchValue : null;
 
-        int exitCode = await RunAsync(["--extensions-help", "file:///x"], environment);
+        int exitCode = await RunAsync(["--extended-help", "file:///x"], environment);
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Concat(ExtensionListing.Lines(environment).Select(line => line + Environment.NewLine)), StandardOutputText());
@@ -36,22 +36,24 @@ public sealed class CurlCommandRunnerExtensionsTests
     }
 
     [TestMethod]
-    public async Task RunAsync_ExtensionsHelpWithExtensionsOff_SaysTheyAreOff()
+    public async Task RunAsync_ExtendedHelpWithExtensionsOff_SaysTheyAreOff()
     {
-        int exitCode = await RunAsync(["--extensions-help"], name => name == "CURL_EXTENSIONS" ? "0" : null);
+        int exitCode = await RunAsync(["--extended-help"], name => name == "CURL_EXTENSIONS" ? "0" : null);
 
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(ExtensionListing.OffLine + Environment.NewLine, StandardOutputText());
     }
 
     [TestMethod]
-    public async Task RunAsync_ExtensionsWithoutHelp_FailsAsAnUnknownOption()
+    [DataRow("--extensions")]
+    [DataRow("--extensions-help")]
+    public async Task RunAsync_FormerExtensionsOptionName_FailsAsAnUnknownOption(string formerName)
     {
-        int exitCode = await RunAsync(["--extensions", "file:///x"], _ => null);
+        int exitCode = await RunAsync([formerName, "file:///x"], _ => null);
 
         Assert.AreEqual(2, exitCode);
         Assert.AreEqual(0, standardOutput.Length);
-        StringAssert.Contains(Encoding.UTF8.GetString(standardError.ToArray()), "--extensions");
+        StringAssert.Contains(Encoding.UTF8.GetString(standardError.ToArray()), formerName);
         Assert.IsEmpty(file.Contexts);
     }
 

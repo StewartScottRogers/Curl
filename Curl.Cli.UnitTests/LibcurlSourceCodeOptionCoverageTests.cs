@@ -52,7 +52,7 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
         "skip-existing", "remove-on-error", "dump-header", "etag-save", "tcp-nodelay", "tcp-fastopen", "styled-output",
         "dump-ca-embed", "retry", "retry-delay", "retry-max-time", "retry-all-errors", "retry-connrefused", "rate",
         "xattr", "show-headers", "fail-early", "parallel-immediate", "parallel-max", "parallel-max-host", "config",
-        "next", "variable", "version", "help", "manual", "ai-help", "extensions-help", "libcurl", "raw", "sslv2", "sslv3", "metalink",
+        "next", "variable", "version", "help", "manual", "ai-help", "extended-help", "libcurl", "raw", "sslv2", "sslv3", "metalink",
         "npn", "ntlm-wb", "false-start", "egd-file", "random-file", "disable", "doh-insecure", "doh-cert-status",
         "disable-epsv", "epsv", "disable-eprt", "eprt", "krb4", "krb", "ipfs-gateway", "log-level", "log-file",
         "dns-servers", "dns-interface", "dns-ipv4-addr", "dns-ipv6-addr", "knownhosts", "ech", "ssl-sessions", "tlsuser",

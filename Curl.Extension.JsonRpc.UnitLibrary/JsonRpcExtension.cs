@@ -16,7 +16,7 @@ public static class JsonRpcExtension
         ExtensionOptionArgument.Value,
         "Send JSON-RPC 2.0 calls \"<method> [params]\", several separated by ';' as a batch, '!' before a method for a notification");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "jsonrpc",
         "Sends JSON-RPC 2.0 calls over HTTP with ids, batches and replies paired with their calls.",

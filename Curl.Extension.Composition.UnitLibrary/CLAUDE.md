@@ -13,7 +13,7 @@ Namespace `Curl.Extension.Composition`.
   isCurlLongOption)` gives them (none when `CURL_EXTENSIONS` is `0`) and fails, naming both, when one has the
   name of a curl option or of another extension option (ADR-1006).
 - `ExtensionDescriptionCatalogue.Entries` holds each extension's `ExtensionDescription`, one line each, also `merge=union`
-  and a shared list file. `ExtensionListing` builds `curl --extensions-help`' lines and `curl --ai-help extensions`' Markdown
+  and a shared list file. `ExtensionListing` builds `curl --extended-help`' lines and `curl --ai-help extensions`' Markdown
   from them, or says extensions are off when `CURL_EXTENSIONS` is `0` (ADR-1008); `ExtensionListing.Schemes` gives their
   schemes, none under `CURL_EXTENSIONS=0`, for the MCP host's URL and `version` tools (ADR-1181).
 - `ExtensionTransferHookCatalogue.Entries` holds each extension's transfer hook activator (its `ITransferHook`

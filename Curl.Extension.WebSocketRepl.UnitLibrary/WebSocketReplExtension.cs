@@ -20,7 +20,7 @@ public static class WebSocketReplExtension
         ExtensionOptionArgument.None,
         "Hold an interactive WebSocket session on a ws:// or wss:// URL: send typed lines, show replies, /binary, /ping, /close");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "ws-repl",
         "Holds an interactive WebSocket session: sends each typed line as text, binary or a ping, shows each reply, and answers pings and closes.",

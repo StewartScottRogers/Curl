@@ -18,7 +18,7 @@ public static class MlDsaCertificatesExtension
         ExtensionOptionArgument.None,
         "Require the server certificate to be ML-DSA signed and verify every ML-DSA signature in its chain");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "mldsa-verify",
         "Requires the server's certificate to be signed with ML-DSA-44, ML-DSA-65 or ML-DSA-87 and verifies every ML-DSA certificate signature in the chain against its issuer's key, failing with exit 60 otherwise (FIPS 204, RFC 9881).",

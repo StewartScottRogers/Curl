@@ -24,7 +24,7 @@ public static class OpenApiOptions
         ExtensionOptionArgument.Value,
         "Server URL to call the --openapi operation on, in place of the description's servers");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> say about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "openapi",
         "Builds a request from an OpenAPI 3 description: --openapi <spec> --operation <id> name=value... gives the method, server URL, path, query, header and cookie parameters by their style, and a JSON, form or multipart body.",

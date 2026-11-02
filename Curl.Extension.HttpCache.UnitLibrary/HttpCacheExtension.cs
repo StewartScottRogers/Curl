@@ -17,7 +17,7 @@ public static class HttpCacheExtension
         ExtensionOptionArgument.Value,
         "Cache HTTP GET responses in <dir>: reuse fresh ones, revalidate stale ones with ETag and Last-Modified");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "cache-dir",
         "Caches HTTP GET responses on disk, reusing fresh ones and revalidating stale ones with ETag and Last-Modified (RFC 9111).",

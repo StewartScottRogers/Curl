@@ -12,7 +12,7 @@ public static class MasqueExtension
     /// <summary>Gets <c>--masque &lt;uri-template&gt;</c>.</summary>
     public static ExtensionOption Option { get; } = new("masque", ExtensionOptionArgument.Value, "Run QUIC and HTTP/3 through this MASQUE proxy's CONNECT-UDP or CONNECT-IP URI template");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "masque",
         "Proxies UDP (CONNECT-UDP, RFC 9298) or IP (CONNECT-IP, RFC 9484) through an HTTP proxy, so QUIC and HTTP/3 run through it; the template's variables pick which.",
