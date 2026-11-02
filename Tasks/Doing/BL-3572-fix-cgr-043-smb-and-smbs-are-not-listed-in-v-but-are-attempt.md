@@ -78,3 +78,4 @@ curl --proto-default smb -sS 127.0.0.1:20002/share/x
 - 2026-10-26: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-3572-20261026-063535-L2.jsonl
 - 2026-10-26: Backlog -> Deferred. Over its cost cap; split into BL-3887, BL-3888, BL-3889
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
