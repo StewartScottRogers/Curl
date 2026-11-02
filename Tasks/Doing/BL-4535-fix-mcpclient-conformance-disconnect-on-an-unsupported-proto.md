@@ -31,3 +31,4 @@ Found by BL-4482's conformance case McpLifecycleCases.ServerAnswersAVersionCurlD
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: d7ef5625 80f495c6 a9b118e0.
