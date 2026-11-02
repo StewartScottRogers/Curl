@@ -58,3 +58,4 @@ No change to Curl's HTTP/2 Upgrade handling: Curl.Original.Protocol.Http.UnitLib
 - 2026-10-23: Doing -> Blocked. Stewart: GF-0098 needs --http2 refused on Windows, reversing your ADR-0871; reject the finding (and fix the gap measurement's rule 4, ADR-0809) or reverse ADR-0871?
 - 2026-10-24: Blocked -> Deferred. Stewart decided 'Keep HTTP/2 on' (2026-10-23): ADR-0871 stands, so refusing HTTP/2 on Windows is not wanted; no code change. Revisit only if Stewart reverses ADR-0871.
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: bbcffc50 1fd5de8c 28346828.
