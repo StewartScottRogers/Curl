@@ -32,3 +32,4 @@ OASIS MQTT 5.0 MQTT-3.2.2-15: the client MUST NOT send packets exceeding the Max
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 154cba23 7b580d6c 5fe60615 2391cd16.
