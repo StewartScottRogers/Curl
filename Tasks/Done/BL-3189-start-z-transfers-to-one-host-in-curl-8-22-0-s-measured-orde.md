@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests/ParallelHostQueueTests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelTransferQueue.cs, Curl.Console/ParallelHostQueue.cs, Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs, Curl.Console.UnitTests/ParallelHostQueueOrderTests.cs, Curl.Console.UnitTests/ParallelTransferQueueTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-11-02
 ---
 # BL-3189 — Start -Z transfers to one host in curl 8.22.0's measured order, one after another
 
@@ -39,10 +39,10 @@ Keep the change in `CurlCommandRunner.cs` small; put the logic in the Parallel* 
 ## Acceptance criteria
 
 - [x] Notes record curl 8.22.0's order against a keep-alive loopback server for the four URLs at `--parallel-max` 50, 2 and 1.
-- [ ] A test in `Curl.Console.UnitTests/ParallelHostQueueOrderTests.cs`, with a fake `TimeProvider` and no sleeping, shows that when a host's first transfer ends its waiters are released in the ADR-0768 order (first waiter last), one at a time.
-- [ ] A test in `Curl.Console.UnitTests/ParallelTransferQueueTests.cs` shows the transfer started when a slot frees is the earliest-waiting one.
-- [ ] A test in `Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs` with a fake server answering instantly shows stdout order `/echo /utf8 /four /default` at the default `--parallel-max`, `/echo /utf8 /default /four` at 2 and URL order at 1, for `/echo /default /utf8 /four`.
-- [ ] `dotnet build Curl.Console -warnaserror` is clean, `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes with the existing `-Z` tests unchanged, and Measure-CodeQuality.ps1 shows Curl.Console inside every gate.
+- [x] A test in `Curl.Console.UnitTests/ParallelHostQueueOrderTests.cs`, with a fake `TimeProvider` and no sleeping, shows that when a host's first transfer ends its waiters are released in the ADR-0768 order (first waiter last), one at a time.
+- [x] A test in `Curl.Console.UnitTests/ParallelTransferQueueTests.cs` shows the transfer started when a slot frees is the earliest-waiting one.
+- [x] A test in `Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs` with a fake server answering instantly shows stdout order `/echo /utf8 /four /default` at the default `--parallel-max`, `/echo /utf8 /default /four` at 2 and URL order at 1, for `/echo /default /utf8 /four`.
+- [x] `dotnet build Curl.Console -warnaserror` is clean, `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes with the existing `-Z` tests unchanged, and Measure-CodeQuality.ps1 shows Curl.Console inside every gate.
 
 ## Notes
 
@@ -78,6 +78,7 @@ Keep the change in `CurlCommandRunner.cs` small; put the logic in the Parallel* 
   `--blame-hang-timeout 60s` and the Sequence file's last test). Measure-CodeQuality.ps1 for Curl.Console not run yet.
 - Chose to requeue this task itself rather than file the remainder as a new task: the uncommitted
   work is stashed against BL-3189, so only its next claim gets it back.
+- 2026-11-02 (lane 9): nothing left to do here. The split parts, all Done, did the work: BL-3253 (ParallelHostQueue releases waiters one at a time, first waiter last; ParallelHostQueueOrderTests, ParallelTransferQueueTests earliest-waiter test), BL-3254 (runner wiring; CurlCommandRunnerParallelOrderTests pins /echo/utf8/four/default, /echo/utf8/default/four and URL order), BL-3255 (ADR-0786 keep-alive rule; Measure-CodeQuality showed Curl.Console inside every gate). On this tree the 91 Parallel fast tests in Curl.Console.UnitTests pass. Stash 78c952ee is dropped because that landed work replaces it.
 ## Log
 
 - 2026-10-22: Created.
@@ -86,3 +87,4 @@ Keep the change in `CurlCommandRunner.cs` small; put the logic in the Parallel* 
 - 2026-10-23: Backlog -> Deferred. Over its cost cap; split into BL-3253, BL-3254, BL-3255
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 6f5978ca e910298d 9f090ed0 11871184 f2813a19.
+- 2026-11-02: Doing -> Done. Its work landed through BL-3253, BL-3254 and BL-3255: -Z to one host starts in curl 8.22.0's measured order
