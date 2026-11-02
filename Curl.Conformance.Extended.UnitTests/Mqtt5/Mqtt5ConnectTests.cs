@@ -101,7 +101,7 @@ public sealed partial class Mqtt5ConnectTests
     {
         Mqtt5ReferenceBroker broker = new();
         CurlRunResult result = await ExtendedConformanceHarness.RunAsync(
-            Curl, [ReferenceRoute.Tcp(Port, broker)], ["-s", .. options, "-d", payload, $"mqtt5://localhost/{topic}"]);
+            Curl, [ReferenceRoute.Tcp(Port, new ReadUntilClosedServer(broker))], ["-s", .. options, "-d", payload, $"mqtt5://localhost/{topic}"]);
         return (result, broker);
     }
 
