@@ -61,6 +61,7 @@ internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITra
         }
         catch (Amqp0WireFormatException malformed)
         {
+            await SendCloseBestEffortAsync(new Amqp0ConnectionClose((ushort)malformed.ReplyCode, malformed.ReplyCode.ToString(), 0, 0).ToFrame(0)).ConfigureAwait(false);
             throw new Amqp0ClientException(CurlExitCode.WeirdServerReply, Amqp0ClientMessages.MalformedFrame((ushort)malformed.ReplyCode, malformed.Message));
         }
     }
@@ -158,23 +159,25 @@ internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITra
         switch (method)
         {
             case Amqp0ConnectionClose close:
-                await AnswerCloseAsync(new Amqp0ConnectionCloseOk().ToFrame(0)).ConfigureAwait(false);
+                await SendCloseBestEffortAsync(new Amqp0ConnectionCloseOk().ToFrame(0)).ConfigureAwait(false);
                 throw ClosedByServer("connection.close", close.ReplyCode, close.ReplyText);
             case Amqp0ChannelClose close:
-                await AnswerCloseAsync(new Amqp0ChannelCloseOk().ToFrame(ChannelNumber)).ConfigureAwait(false);
+                await SendCloseBestEffortAsync(new Amqp0ChannelCloseOk().ToFrame(ChannelNumber)).ConfigureAwait(false);
                 throw ClosedByServer("channel.close", close.ReplyCode, close.ReplyText);
         }
     }
 
-    private async ValueTask AnswerCloseAsync(Amqp0Frame closeOk)
+    /// <summary>Sends <paramref name="closeFrame"/> best effort: the close-ok answering the server's close, or the connection.close
+    /// signalling a connection exception for a malformed frame (sections 2.3.7 and 4.2.3).</summary>
+    private async ValueTask SendCloseBestEffortAsync(Amqp0Frame closeFrame)
     {
         try
         {
-            await channel.SendAsync(closeOk).ConfigureAwait(false);
+            await channel.SendAsync(closeFrame).ConfigureAwait(false);
         }
         catch (Amqp0ClientException)
         {
-            // The server's close is the failure to report; a connection already gone cannot take the answer.
+            // The close or the malformed frame is the failure to report; a connection already gone cannot take the frame.
         }
     }
 

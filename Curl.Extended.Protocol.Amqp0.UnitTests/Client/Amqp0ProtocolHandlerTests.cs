@@ -173,6 +173,32 @@ public sealed class Amqp0ProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_BadFrameEnd_SendsConnectionClose501OnChannelZero()
+    {
+        byte[] frame = Frame(Start("PLAIN"));
+        frame[^1] = 0x00;
+        ScriptedAmqp0Connection connection = new(frame);
+
+        await ExecuteAsync(connection, "amqp://broker/v/q", new MemoryStream());
+
+        Assert.HasCount(2, connection.Writes);
+        Assert.AreEqual(new Amqp0ConnectionClose(501, "FrameError", 0, 0), Method(connection.Writes[1]));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BadFrameEndAndCloseCannotBeSent_StillEndsWithFrameError()
+    {
+        byte[] frame = Frame(Start("PLAIN"));
+        frame[^1] = 0x00;
+        ScriptedAmqp0Connection connection = new(frame) { FailsWritesAfter = 1 };
+
+        TransferResult result = await ExecuteAsync(connection, "amqp://broker/v/q", new MemoryStream());
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual("Weird server reply: AMQP 501 A frame ends with 0x00, not frame-end 0xCE.", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ServerAnswersOtherProtocolHeader_EndsWithFrameError()
     {
         TransferResult result = await ExecuteAsync(new ScriptedAmqp0Connection("AMQP\0\0\u0009\u0000"u8.ToArray()), "amqp://broker/v/q", new MemoryStream());
