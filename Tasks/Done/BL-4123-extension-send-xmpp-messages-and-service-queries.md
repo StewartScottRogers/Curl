@@ -8,7 +8,7 @@ depends-on: [BL-4091, BL-4093, BL-4092]
 touches: [Curl.Extended.Protocol.Xmpp.UnitLibrary, Curl.Extended.Protocol.Xmpp.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Console.UnitTests/CurlCompositionTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-11-02
 ---
 # BL-4123 — Extension: Send XMPP messages and service queries
 
@@ -36,8 +36,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
 - ExtensionDescriptionCatalogue.cs added to touches: it lists each extension's description for --extensions and --ai-help extensions. CurlCompositionTests.cs added: its list of TCP handlers names each handler, so XmppProtocolHandler joins it.
-- SCRAM-SHA-1/256 is not yet done (ADR-1068); PLAIN over STARTTLS and ANONYMOUS are. Tests are platform-neutral (no paths, output written without indentation so no platform newline), so CI on Linux and macOS holds.
+- SCRAM-SHA-1/256 landed through BL-4271 (ADR-1077); PLAIN over STARTTLS and ANONYMOUS through ADR-1068. Tests are platform-neutral (no paths, output written without indentation so no platform newline), so CI on Linux and macOS holds.
 - Quality: Measure-CodeQuality.ps1 reports Curl.Extended.Protocol.Xmpp.UnitLibrary at 100% line and branch, 0 failing members.
+
+- 2026-11-02 close-out: both split parts (BL-4270, BL-4271) are Done. This run changed no code; it rebuilt the solution (0 errors) and ran the fast tests (115 projects, 0 failed; Xmpp 69 passed). The quality criterion rests on BL-4270's Measure-CodeQuality.ps1 report, since no production code changed after it.
 
 ## Log
 
@@ -46,3 +48,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Doing -> Deferred. Split into BL-4270 (verify delivered work and gates) and BL-4271 (SCRAM-SHA authentication) after hitting the cost cap
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 76583343 5b43e1c5 c7e7b42b bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-11-02: Doing -> Done. xmpp: URIs send messages and disco#info queries as an extension; delivered through BL-4270 and BL-4271
