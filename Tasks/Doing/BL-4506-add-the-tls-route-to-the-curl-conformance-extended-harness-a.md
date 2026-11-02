@@ -37,3 +37,4 @@ Split from BL-4501 (see BL-4501 and BL-4462). The stashed rediss test (RunAsync_
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 7f0f0d65 33ed76fe d9a98f17 b6235544.
