@@ -42,3 +42,4 @@ Split from BL-3976 (cost cap), itself split from BL-3563 (CGR-034 in `Documentat
 - 2026-10-28: Doing -> Backlog. Out of run budget: stash applied and test530 fixed, but upstream test582 (SFTP multi upload) still hangs under the socket-gated wait; see Notes
 - 2026-10-28: Backlog -> Deferred. Split into BL-4008 (land the stashed wiring) and BL-4007 (test582 hang and quality gates)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 3a1e0c49 1d22eb8b 6e4e49ca 779790c0.
