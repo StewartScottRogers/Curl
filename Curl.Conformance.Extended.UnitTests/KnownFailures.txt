@@ -4,7 +4,6 @@
 McpClient:MCP20250618-StreamableHttp-8 BL-4516
 S3:Endpoints-1 BL-4514
 S3:Regions-1 BL-4514
-GoogleCloudStorage:V4Signing-Scope-2 BL-4538
 Mqtt5:MQTT-3.2.2-4 BL-4560
 Mqtt5:MQTT-3.2.2-15 BL-4561
 Grpc:Http2-Tls-1 BL-4545
