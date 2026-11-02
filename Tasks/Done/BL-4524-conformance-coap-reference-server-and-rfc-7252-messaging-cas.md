@@ -54,4 +54,4 @@ Scope: section 3 (message format: version, type, token length, code, message ID,
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 0a05406d f3dd9751 b15c07d5 7cee2dc4 fb1c989b d8e3fb0e ef6c9026.
-- 2026-11-02: Doing -> Done. CoAP reference server, Coap.md matrix and RFC 7252 section 3-4 cases; malformed-ACK case known failing under BL-4527
+- 2026-11-02: Doing -> Done. CoAP reference server, Coap.md matrix and RFC 7252 section 3-4 cases; malformed-ACK case known failing under BL-4538

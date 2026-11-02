@@ -1,5 +1,5 @@
 ---
-id: BL-4527
+id: BL-4538
 title: Fix Coap conformance: Coap:RFC7252-4.2-5
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4527 — Fix Coap conformance: Coap:RFC7252-4.2-5
+# BL-4538 — Fix Coap conformance: Coap:RFC7252-4.2-5
 
 ## Goal
 
