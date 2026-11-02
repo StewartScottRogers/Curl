@@ -42,12 +42,16 @@ public static class McpResponseReader
         throw new McpWireFormatException("The response has neither a result nor an error.");
     }
 
-    /// <summary>Reads an InitializeResult's <c>protocolVersion</c> ("Lifecycle &gt; Version Negotiation").</summary>
+    /// <summary>
+    /// Reads an InitializeResult's <c>protocolVersion</c> ("Lifecycle &gt; Version Negotiation") and whether its
+    /// <c>capabilities</c> declare <c>tools</c> ("Lifecycle &gt; Capability Negotiation"); a missing or malformed
+    /// <c>capabilities</c> declares nothing.
+    /// </summary>
     /// <exception cref="McpWireFormatException">The result is not an object with a string protocolVersion.</exception>
     public static McpInitializeResult ReadInitializeResult(JsonElement result)
     {
         var initializeResult = RequireObject(result, "An InitializeResult");
-        return new McpInitializeResult(RequiredString(initializeResult, "protocolVersion"));
+        return new McpInitializeResult(RequiredString(initializeResult, "protocolVersion"), DeclaresCapability(initializeResult, "tools"));
     }
 
     /// <summary>Reads a <c>tools/list</c> result's tools and <c>nextCursor</c> ("Server Features &gt; Tools &gt; Listing Tools").</summary>
@@ -129,6 +133,12 @@ public static class McpResponseReader
             _ => throw new McpWireFormatException("The CallToolResult's isError is not a boolean."),
         };
     }
+
+    private static bool DeclaresCapability(JsonElement initializeResult, string name) =>
+        initializeResult.TryGetProperty("capabilities", out var capabilities)
+        && capabilities.ValueKind == JsonValueKind.Object
+        && capabilities.TryGetProperty(name, out var capability)
+        && capability.ValueKind == JsonValueKind.Object;
 
     private static JsonElement RequireObject(JsonElement element, string what) =>
         element.ValueKind == JsonValueKind.Object

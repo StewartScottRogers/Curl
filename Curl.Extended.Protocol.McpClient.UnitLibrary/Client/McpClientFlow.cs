@@ -29,15 +29,22 @@ internal sealed class McpClientFlow(IMcpSession session, Stream output, Cancella
     /// <summary>
     /// Sends <c>initialize</c>, takes the server's protocol version for the session, and sends <c>notifications/initialized</c>.
     /// A version curl does not support ends the exchange before the notification with exit 8 ("Lifecycle &gt; Version
-    /// Negotiation", ADR-1190).
+    /// Negotiation", ADR-1190), and so does a server that declares no tools capability, since every request curl
+    /// makes is a tools request and both parties use only negotiated capabilities ("Lifecycle &gt; Capability Negotiation").
     /// </summary>
     public async Task InitializeAsync()
     {
         JsonElement result = await RequestAsync(writer.WriteInitialize(ClientName, ClientVersion)).ConfigureAwait(false);
-        string protocolVersion = McpResponseReader.ReadInitializeResult(result).ProtocolVersion;
+        McpInitializeResult initializeResult = McpResponseReader.ReadInitializeResult(result);
+        string protocolVersion = initializeResult.ProtocolVersion;
         if (protocolVersion != McpRequestWriter.LatestProtocolVersion)
         {
             throw new McpClientException(CurlExitCode.WeirdServerReply, $"MCP server answered unsupported protocol version {protocolVersion}");
+        }
+
+        if (!initializeResult.DeclaresTools)
+        {
+            throw new McpClientException(CurlExitCode.WeirdServerReply, "MCP server declares no tools capability");
         }
 
         session.UseProtocolVersion(protocolVersion);

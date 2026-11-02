@@ -106,6 +106,22 @@ public sealed class McpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ServerDeclaresNoToolsCapability_SendsNoToolsRequestAndEndsWithExit8()
+    {
+        // "Lifecycle > Capability Negotiation" (ADR-1190, BL-4536): both parties use only negotiated capabilities.
+        var process = new InMemoryMcpServerProcess(InitializeResult.Replace("{\"tools\":{}}", "{}", StringComparison.Ordinal) + "\n");
+        var output = new MemoryStream();
+
+        var result = await Handler(new ScriptedMcpServerProcessStarter(process)).ExecuteAsync(Context("mcp+stdio://localhost/server", output));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual("MCP server declares no tools capability", result.ErrorMessage);
+        Assert.AreEqual(0, output.Length);
+        StringAssert.Contains(process.WrittenInput, "\"method\":\"initialize\"");
+        Assert.IsFalse(process.WrittenInput.Contains("tools/", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_StdioCallWithData_CallsTheToolAndWritesEachContentItem()
     {
         // "Transports > stdio" and "Calling Tools": a text item is written as its text, any other item as its JSON.
