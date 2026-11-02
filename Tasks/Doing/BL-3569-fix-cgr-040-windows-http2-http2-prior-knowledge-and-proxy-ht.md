@@ -99,3 +99,4 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
 - 2026-10-26: Doing -> Blocked. Stewart: CGR-040 asks Windows to refuse --http2/--http2-prior-knowledge/--proxy-http2 (exit 2) as Schannel curl does, reversing your ADR-0871 - keep ADR-0871 (ADR-0906) and close CGR-040 as accepted, or refuse them?
 - 2026-10-26: Blocked -> Deferred. Stewart, 2026-10-26: keep HTTP/2 on Windows (ADR-0871, ADR-0906); CGR-040 is an accepted difference from the Schannel build, not a defect. Revisit only if Stewart reverses ADR-0871.
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
