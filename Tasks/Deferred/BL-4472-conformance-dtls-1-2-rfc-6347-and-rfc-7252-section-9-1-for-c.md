@@ -62,10 +62,10 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Notes
 
-- 2026-11-02 (lane 5): Split for size before any edit: a DTLS 1.2 server written from RFC 6347 and RFC 5246 (cookie exchange, ECDHE handshake, AEAD records), eight case groups and the full matrix are more than one run. BL-4564 (reference server, cookie handshake, certificate and `-k`, CoAP over protected records), BL-4565 (fragmentation and reordering, retransmission, replay, old epoch, fatal alert; depends on BL-4564) and BL-4566 (the full matrix and any cases it still needs; depends on both) carry every acceptance criterion between them. No task outside Done names BL-4472 in `depends-on`.
+- 2026-11-02 (lane 5): Split for size before any edit: a DTLS 1.2 server written from RFC 6347 and RFC 5246 (cookie exchange, ECDHE handshake, AEAD records), eight case groups and the full matrix are more than one run. BL-4573 (reference server, cookie handshake, certificate and `-k`, CoAP over protected records), BL-4574 (fragmentation and reordering, retransmission, replay, old epoch, fatal alert; depends on BL-4573) and BL-4575 (the full matrix and any cases it still needs; depends on both) carry every acceptance criterion between them. No task outside Done names BL-4472 in `depends-on`.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35340c3a 488321ad fb1c989b d8e3fb0e f055b099 17248609.
-- 2026-11-02: Doing -> Deferred. Split into BL-4564, BL-4565, BL-4566
+- 2026-11-02: Doing -> Deferred. Split into BL-4573, BL-4574, BL-4575

@@ -1,20 +1,20 @@
 ---
-id: BL-4566
-title: Conformance: DTLS 1.2 and RFC 7252 section 9.1 requirement matrix for coaps:// (Coap DTLS part 3 of 3)
+id: BL-4573
+title: Conformance: DTLS 1.2 reference server, cookie handshake, certificate and CoAP over protected records for coaps:// (Coap DTLS part 1 of 3)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4564, BL-4565]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524]
 touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4566 — Conformance: DTLS 1.2 and RFC 7252 section 9.1 requirement matrix for coaps:// (Coap DTLS part 3 of 3)
+# BL-4573 — Conformance: DTLS 1.2 reference server, cookie handshake, certificate and CoAP over protected records for coaps:// (Coap DTLS part 1 of 3)
 
 ## Goal
 
-Every client requirement of RFC 6347 (with the RFC 5246 handshake it inherits) and RFC 7252 section 9.1 is in the `coaps://` matrix, mapped to a test or to `n/a: <reason>`.
+A DTLS 1.2 reference server measures Curl's `coaps://` client through the real curl command line for the cookie handshake, the certificate check (and `-k`) and a CoAP exchange over protected records.
 
 ## Context
 
@@ -50,11 +50,16 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Coap-Dtls.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 6347
-      (and the RFC 5246 handshake rules it inherits) and RFC 7252 section 9.1 that binds a client an `Coap:` ID mapped
-      to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Every requirement the cases of BL-4564 and BL-4565 do not yet cover gets its own case in
-      `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` (for example the `coaps` default port 5684) or an `n/a` reason.
+- [ ] A DTLS 1.2 reference server in `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/`, written from RFC 6347 and
+      RFC 5246, answers a ClientHello with a HelloVerifyRequest cookie, completes a full handshake with one cipher
+      suite the library offers, and carries CoAP messages (through the existing `CoapReferenceServer` responders)
+      one per protected record; its fault hooks (fragmenting, reordering, dropping, replaying, alerting) are left
+      to BL-4574.
+- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` run curl in process for `coaps://` and assert
+      datagram bytes, stdout, stderr and exit code for at least: a full handshake with a HelloVerifyRequest cookie,
+      a certificate the TLS provider refuses (and the same with `-k`), and a CoAP exchange over the protected records.
+- [ ] `Documentation/Conformance/Extended/Coap-Dtls.md` exists in the matrix format with a row for every
+      `[SpecRequirement]` ID these cases carry; the harness's matrix check passes.
 - [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Coap conformance: ...` task; the known-failures check passes.
 - [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is

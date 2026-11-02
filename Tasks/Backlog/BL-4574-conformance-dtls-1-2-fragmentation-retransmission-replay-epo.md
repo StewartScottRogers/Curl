@@ -1,20 +1,20 @@
 ---
-id: BL-4564
-title: Conformance: DTLS 1.2 reference server, cookie handshake, certificate and CoAP over protected records for coaps:// (Coap DTLS part 1 of 3)
+id: BL-4574
+title: Conformance: DTLS 1.2 fragmentation, retransmission, replay, epoch and alert cases for coaps:// (Coap DTLS part 2 of 3)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4573]
 touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4564 — Conformance: DTLS 1.2 reference server, cookie handshake, certificate and CoAP over protected records for coaps:// (Coap DTLS part 1 of 3)
+# BL-4574 — Conformance: DTLS 1.2 fragmentation, retransmission, replay, epoch and alert cases for coaps:// (Coap DTLS part 2 of 3)
 
 ## Goal
 
-A DTLS 1.2 reference server measures Curl's `coaps://` client through the real curl command line for the cookie handshake, the certificate check (and `-k`) and a CoAP exchange over protected records.
+Curl's `coaps://` client is measured through the real curl command line against RFC 6347's fragmentation and reassembly, flight retransmission, replay window, epoch and alert rules.
 
 ## Context
 
@@ -50,16 +50,14 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Acceptance criteria
 
-- [ ] A DTLS 1.2 reference server in `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/`, written from RFC 6347 and
-      RFC 5246, answers a ClientHello with a HelloVerifyRequest cookie, completes a full handshake with one cipher
-      suite the library offers, and carries CoAP messages (through the existing `CoapReferenceServer` responders)
-      one per protected record; its fault hooks (fragmenting, reordering, dropping, replaying, alerting) are left
-      to BL-4565.
+- [ ] The reference server from BL-4573 gains fault hooks, each in its own file under `Coap/Dtls/`: fragmenting and
+      reordering a flight, dropping a flight, replaying a record, sending a record from an old epoch, and sending a
+      fatal alert.
 - [ ] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` run curl in process for `coaps://` and assert
-      datagram bytes, stdout, stderr and exit code for at least: a full handshake with a HelloVerifyRequest cookie,
-      a certificate the TLS provider refuses (and the same with `-k`), and a CoAP exchange over the protected records.
-- [ ] `Documentation/Conformance/Extended/Coap-Dtls.md` exists in the matrix format with a row for every
-      `[SpecRequirement]` ID these cases carry; the harness's matrix check passes.
+      datagram bytes, stdout, stderr and exit code for at least: a server flight fragmented and reordered, a lost
+      flight retransmitted on the timer, a replayed and an old-epoch record dropped, and a fatal alert.
+- [ ] `Documentation/Conformance/Extended/Coap-Dtls.md` has a row for every `[SpecRequirement]` ID these cases
+      carry; the harness's matrix check passes.
 - [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Coap conformance: ...` task; the known-failures check passes.
 - [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is

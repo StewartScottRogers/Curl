@@ -1,20 +1,20 @@
 ---
-id: BL-4565
-title: Conformance: DTLS 1.2 fragmentation, retransmission, replay, epoch and alert cases for coaps:// (Coap DTLS part 2 of 3)
+id: BL-4575
+title: Conformance: DTLS 1.2 and RFC 7252 section 9.1 requirement matrix for coaps:// (Coap DTLS part 3 of 3)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4564]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4573, BL-4574]
 touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4565 — Conformance: DTLS 1.2 fragmentation, retransmission, replay, epoch and alert cases for coaps:// (Coap DTLS part 2 of 3)
+# BL-4575 — Conformance: DTLS 1.2 and RFC 7252 section 9.1 requirement matrix for coaps:// (Coap DTLS part 3 of 3)
 
 ## Goal
 
-Curl's `coaps://` client is measured through the real curl command line against RFC 6347's fragmentation and reassembly, flight retransmission, replay window, epoch and alert rules.
+Every client requirement of RFC 6347 (with the RFC 5246 handshake it inherits) and RFC 7252 section 9.1 is in the `coaps://` matrix, mapped to a test or to `n/a: <reason>`.
 
 ## Context
 
@@ -50,14 +50,11 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Acceptance criteria
 
-- [ ] The reference server from BL-4564 gains fault hooks, each in its own file under `Coap/Dtls/`: fragmenting and
-      reordering a flight, dropping a flight, replaying a record, sending a record from an old epoch, and sending a
-      fatal alert.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` run curl in process for `coaps://` and assert
-      datagram bytes, stdout, stderr and exit code for at least: a server flight fragmented and reordered, a lost
-      flight retransmitted on the timer, a replayed and an old-epoch record dropped, and a fatal alert.
-- [ ] `Documentation/Conformance/Extended/Coap-Dtls.md` has a row for every `[SpecRequirement]` ID these cases
-      carry; the harness's matrix check passes.
+- [ ] `Documentation/Conformance/Extended/Coap-Dtls.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 6347
+      (and the RFC 5246 handshake rules it inherits) and RFC 7252 section 9.1 that binds a client an `Coap:` ID mapped
+      to a test or to `n/a: <reason>`; the harness's matrix check passes.
+- [ ] Every requirement the cases of BL-4573 and BL-4574 do not yet cover gets its own case in
+      `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` (for example the `coaps` default port 5684) or an `n/a` reason.
 - [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Coap conformance: ...` task; the known-failures check passes.
 - [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
