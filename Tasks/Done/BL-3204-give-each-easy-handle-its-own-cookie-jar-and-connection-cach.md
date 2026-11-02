@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEngineSharedState.cs, Curl.Engine.UnitLibrary/ManagedShareHandle.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitLibrary/CookieEngine.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.SslSessions.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Lifecycle.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Preparation.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Cleanup.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Hsts.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.MaxConnects.cs, Curl.Engine.UnitTests/EasyHandleIsolationTests.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.SslSessions.cs, Curl.Engine.UnitTests/ManagedCurlEngineTests.cs, Libcurl.UnitTests/Share/CurlShareIsolationTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-11-02
 ---
 # BL-3204 — Give each easy handle its own cookie jar and connection cache unless a share handle links them
 
@@ -24,12 +24,12 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 
 ## Acceptance criteria
 
-- [ ] `Curl.Engine.UnitTests/EasyHandleIsolationTests.cs`: two unshared handles, no cookie crosses and B's NUM_CONNECTS is 1.
-- [ ] Cookie-only share: cookies cross, connections do not (B's NUM_CONNECTS 1).
-- [ ] Connection-only share: the connection is reused, no cookie crosses; DNS-only share: neither cookies nor connections cross.
-- [ ] After `CURLSHOPT_UNSHARE` of cookies, a new cookie set by A no longer reaches B.
-- [ ] Two handles added to one multi handle still reuse a connection, as upstream does; a test shows HSTS, alt-svc and TLS session caches are per handle unless shared.
-- [ ] Build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 0 failing members.
+- [x] `Curl.Engine.UnitTests/EasyHandleIsolationTests.cs`: two unshared handles, no cookie crosses and B's NUM_CONNECTS is 1.
+- [x] Cookie-only share: cookies cross, connections do not (B's NUM_CONNECTS 1).
+- [x] Connection-only share: the connection is reused, no cookie crosses; DNS-only share: neither cookies nor connections cross.
+- [x] After `CURLSHOPT_UNSHARE` of cookies, a new cookie set by A no longer reaches B.
+- [x] Two handles added to one multi handle still reuse a connection, as upstream does; a test shows HSTS, alt-svc and TLS session caches are per handle unless shared.
+- [x] Build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 0 failing members.
 
 ## Notes
 
@@ -69,6 +69,8 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
   `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`, and an ADR (per-handle caches, decided by Claude under
   Stewart's delegation).
 
+- 2026-11-02 (lane 3, third claim, no code edited): every part of this task was delivered by its split subtasks BL-3271 (per-handle caches, ADR-0789, Engine tests), BL-3272 (multi pooling, HSTS/alt-svc/TLS per handle) and BL-3273 (Libcurl share isolation tests, Measure-CodeQuality 0 failing members), all Done 2026-10-23. Stash ed1c89a0 is superseded by them and was not applied. Re-ran here: EasyHandleIsolationTests 16 passed, CurlShareIsolationTests 5 passed. Platform-neutral (fakes and in-memory connectors only).
+
 ## Log
 
 - 2026-10-22: Created.
@@ -79,3 +81,4 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 - 2026-10-23: Backlog -> Deferred. Over its cost cap; split into BL-3271, BL-3272 and BL-3273
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 4692e370 e2e3b72c 3d88e88c 1734c136 22e7cb9c 3639a5e6.
+- 2026-11-02: Doing -> Done. Delivered by its split subtasks BL-3271, BL-3272 and BL-3273, all Done; isolation tests re-run green
