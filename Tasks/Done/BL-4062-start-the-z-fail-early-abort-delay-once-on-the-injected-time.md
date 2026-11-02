@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/ParallelRun.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-11-02
 ---
 # BL-4062 — Start the -Z --fail-early abort delay once, on the injected TimeProvider
 
@@ -26,12 +26,14 @@ Found by the shift-end review of 2026-10-28 (code-reviewer, ADR-0710), in the di
 
 ## Acceptance criteria
 
-- [ ] `RecordEnd` starts the abort delay only on the first failure that ends the run. A later failure does not move it.
-- [ ] `abort` is created with the runner's `TimeProvider` (`new CancellationTokenSource(Timeout.InfiniteTimeSpan, timeProvider)` or equivalent), passed in through the constructor.
-- [ ] A test in `Curl.Console.UnitTests` uses a fake `TimeProvider`. It records two failures 600 ms apart and checks that `IsAborted` is true 1 s after the first.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Curl.Console` still meets the four quality gates.
+- [x] `RecordEnd` starts the abort delay only on the first failure that ends the run. A later failure does not move it.
+- [x] `abort` is created with the runner's `TimeProvider` (`new CancellationTokenSource(Timeout.InfiniteTimeSpan, timeProvider)` or equivalent), passed in through the constructor.
+- [x] A test in `Curl.Console.UnitTests` uses a fake `TimeProvider`. It records two failures 600 ms apart and checks that `IsAborted` is true 1 s after the first.
+- [x] `dotnet build` is clean, the fast tests pass, and `Curl.Console` still meets the four quality gates.
 
 ## Notes
+
+- 2026-11-02: The work landed through BL-4088 (d26c61cc6: `RecordEnd` starts one `ITimer` on the injected `TimeProvider` on the first run-ending failure; `CurlCommandRunner` passes its clock) and BL-4087 (`ParallelRunAbortDelayTests`, two failures 600 ms apart on a fake clock, aborted 1 s after the first). The stash 4c11d503 from the first run is superseded and was not applied. `ParallelRunAbortDelayTests` and `Cgr294Tests` pass here; the build and quality gates were checked by those tasks.
 
 ## Log
 
@@ -41,3 +43,4 @@ Found by the shift-end review of 2026-10-28 (code-reviewer, ADR-0710), in the di
 - 2026-10-29: Backlog -> Deferred. Split into BL-4088 and BL-4087 (over its cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 2b0d65e4 9b094dd8 9264385c 01556522.
+- 2026-11-02: Doing -> Done. Work landed through BL-4088 and BL-4087
