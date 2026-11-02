@@ -4,7 +4,7 @@ title: Conformance: the curl-proto-<scheme> helper program contract (ADR-1142) f
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463, BL-4573]
 touches: [Curl.Conformance.Extended.UnitLibrary/Plugin, Curl.Conformance.Extended.UnitTests/Plugin, Documentation/Conformance/Extended/Plugin.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
