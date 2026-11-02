@@ -5,7 +5,7 @@ namespace Curl.Conformance.Extended.Harness;
 /// <summary>One run's open exchanges and the server tasks serving them.</summary>
 internal sealed class ReferenceRun : IDisposable
 {
-    // How long, in real time, the servers may take to finish once curl's ends are closed.
+    // How long, in real time, the servers may take to read curl's last bytes and finish once curl's ends are closed (BL-4518).
     private static readonly TimeSpan DrainGrace = TimeSpan.FromSeconds(5);
 
     private readonly Lock gate = new();
