@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Imap.UnitLibrary, Curl.Original.Protocol.Imap.UnitTests/Cgr003Tests.cs, Curl.Original.Protocol.Pop3.UnitLibrary, Curl.Original.Protocol.Pop3.UnitTests/Cgr003Tests.cs, Curl.Original.Protocol.Smtp.UnitLibrary, Curl.Original.Protocol.Smtp.UnitTests/Cgr003Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-11-02
 ---
 # BL-3532 — Fix CGR-003: POP3/IMAP/SMTP ignore --connect-timeout while waiting for the server greeting (hang)
 
@@ -62,15 +62,19 @@ curl -sS -w '%{exitcode}|%{errormsg}\n' pop3://127.0.0.1:20700/ --connect-timeou
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr003Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+
+- 2026-11-02 claim: the fix landed through BL-3881 (POP3), BL-3882 (IMAP) and BL-3883 (SMTP), all Done, each with its `Cgr003Tests.cs` that fails before the fix (recorded in their Notes). Stash fe490882 holds the same work in the old `Curl.Protocol.*` paths, so it is obsolete and was not applied. This run changed no code and only verified the result.
+- Repro at 80a39ba2f, against a PowerShell `TcpListener` on loopback that never sends a byte: `curl -sS -w '%{exitcode}|%{errormsg}\n' <scheme>://127.0.0.1:PORT/ --connect-timeout 2` for pop3, imap and smtp. REF (curl 8.22.0 Schannel): exit 28 in about 2.0 s, stderr `curl: (28) Operation timed out after 20NN milliseconds with 0 bytes received`, stdout `28|Operation timed out after 20NN milliseconds with 0 bytes received`. Curl gave the same exit code, stderr and stdout for all three. No files are written, and neither binary sends a byte before the greeting. The ftp variant, which already matched, is unchanged (FtpConnectPhaseLimit).
+- `dotnet build` is clean (0 warnings) and `dotnet test --filter "TestCategory!=Integration"` passes: Imap 535, Pop3 388, Smtp 405, no failures in the solution. The tests use a manual clock and fake connections, so they are platform-neutral.
 
 ## Log
 
@@ -80,3 +84,4 @@ curl -sS -w '%{exitcode}|%{errormsg}\n' pop3://127.0.0.1:20700/ --connect-timeou
 - 2026-10-26: Backlog -> Deferred. Split over the cost cap into BL-3881 (POP3), BL-3882 (IMAP), BL-3883 (SMTP)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-11-02: Doing -> Done. pop3/imap/smtp against a server that never greets exit 28 at --connect-timeout, as curl does (fixed by BL-3881..3883, verified)
