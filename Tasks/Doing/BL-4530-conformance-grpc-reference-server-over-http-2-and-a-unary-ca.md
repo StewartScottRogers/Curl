@@ -54,3 +54,4 @@ DATA frames so cases assert them.
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 846644c2 9a1cc775 d8e1cf5f 8ca147d6 3af8a194.
