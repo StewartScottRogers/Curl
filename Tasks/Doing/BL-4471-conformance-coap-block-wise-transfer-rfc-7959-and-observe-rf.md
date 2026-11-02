@@ -63,3 +63,4 @@ filed High task `Fix Coap conformance: <requirement>` (pipeline feature; touches
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: ba62812f e1b6c4b9 fb1c989b d8e3fb0e 954f469a ef6c9026.
