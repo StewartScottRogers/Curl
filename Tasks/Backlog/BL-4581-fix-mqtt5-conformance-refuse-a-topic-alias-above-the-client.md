@@ -1,5 +1,5 @@
 ---
-id: BL-4574
+id: BL-4581
 title: Fix Mqtt5 conformance: refuse a Topic Alias above the client's Topic Alias Maximum (MQTT5-3.3.2.3.4-1)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4574 — Fix Mqtt5 conformance: refuse a Topic Alias above the client's Topic Alias Maximum (MQTT5-3.3.2.3.4-1)
+# BL-4581 — Fix Mqtt5 conformance: refuse a Topic Alias above the client's Topic Alias Maximum (MQTT5-3.3.2.3.4-1)
 
 ## Goal
 

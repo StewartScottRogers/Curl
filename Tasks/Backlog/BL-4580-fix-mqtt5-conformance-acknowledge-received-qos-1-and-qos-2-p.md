@@ -1,5 +1,5 @@
 ---
-id: BL-4573
+id: BL-4580
 title: Fix Mqtt5 conformance: acknowledge received QoS 1 and QoS 2 PUBLISH in order (MQTT-4.3.2-4, MQTT-4.3.3-8, MQTT-4.3.3-11, MQTT-4.6.0-2)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4573 — Fix Mqtt5 conformance: acknowledge received QoS 1 and QoS 2 PUBLISH in order (MQTT-4.3.2-4, MQTT-4.3.3-8, MQTT-4.3.3-11, MQTT-4.6.0-2)
+# BL-4580 — Fix Mqtt5 conformance: acknowledge received QoS 1 and QoS 2 PUBLISH in order (MQTT-4.3.2-4, MQTT-4.3.3-8, MQTT-4.3.3-11, MQTT-4.6.0-2)
 
 ## Goal
 

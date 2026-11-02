@@ -118,7 +118,7 @@ decided in ADR-1197.
 | Mqtt5:MQTT-4.3.2-2 | MUST | A QoS 1 sender sends PUBLISH with QoS 1 and DUP 0. | n/a: curl sends no QoS 1 PUBLISH |
 | Mqtt5:MQTT-4.3.2-3 | MUST | A QoS 1 sender treats the PUBLISH as unacknowledged until its PUBACK. | n/a: curl sends no QoS 1 PUBLISH |
 | Mqtt5:MQTT-4.3.2-4 | MUST | A QoS 1 receiver answers with a PUBACK carrying the PUBLISH's Packet Identifier. | ReceivedPublishCases.Received_Qos1Messages_AreEachAcknowledgedWithAPubackInOrder |
-| Mqtt5:MQTT-4.3.2-5 | MUST | After its PUBACK, a receiver treats a PUBLISH with the same identifier as new. | n/a: depends on Mqtt5:MQTT-4.3.2-4 (BL-4573) |
+| Mqtt5:MQTT-4.3.2-5 | MUST | After its PUBACK, a receiver treats a PUBLISH with the same identifier as new. | n/a: depends on Mqtt5:MQTT-4.3.2-4 (BL-4580) |
 | Mqtt5:MQTT-4.3.3-1 | MUST | A QoS 2 sender gives each new message an unused Packet Identifier. | n/a: curl sends no QoS 2 PUBLISH |
 | Mqtt5:MQTT-4.3.3-2 | MUST | A QoS 2 sender sends PUBLISH with QoS 2 and DUP 0. | n/a: curl sends no QoS 2 PUBLISH |
 | Mqtt5:MQTT-4.3.3-3 | MUST | A QoS 2 sender treats the PUBLISH as unacknowledged until its PUBREC. | n/a: curl sends no QoS 2 PUBLISH |
@@ -127,11 +127,11 @@ decided in ADR-1197.
 | Mqtt5:MQTT-4.3.3-6 | MUST NOT | A QoS 2 sender resends no PUBLISH once it sent PUBREL. | n/a: curl sends no QoS 2 PUBLISH |
 | Mqtt5:MQTT-4.3.3-7 | MUST NOT | A QoS 2 sender applies no Message Expiry once it sent PUBREL. | n/a: curl sends no QoS 2 PUBLISH |
 | Mqtt5:MQTT-4.3.3-8 | MUST | A QoS 2 receiver answers with a PUBREC carrying the PUBLISH's Packet Identifier. | ReceivedPublishCases.Received_Qos2Message_IsAcknowledgedWithPubrecThenPubcomp |
-| Mqtt5:MQTT-4.3.3-9 | MUST | After a failure PUBREC, a receiver treats a PUBLISH with the same identifier as new. | n/a: depends on Mqtt5:MQTT-4.3.3-8 (BL-4573) |
-| Mqtt5:MQTT-4.3.3-10 | MUST | Until PUBREL, a receiver answers a repeated PUBLISH with PUBREC and delivers it once. | n/a: depends on Mqtt5:MQTT-4.3.3-8 (BL-4573) |
+| Mqtt5:MQTT-4.3.3-9 | MUST | After a failure PUBREC, a receiver treats a PUBLISH with the same identifier as new. | n/a: depends on Mqtt5:MQTT-4.3.3-8 (BL-4580) |
+| Mqtt5:MQTT-4.3.3-10 | MUST | Until PUBREL, a receiver answers a repeated PUBLISH with PUBREC and delivers it once. | n/a: depends on Mqtt5:MQTT-4.3.3-8 (BL-4580) |
 | Mqtt5:MQTT-4.3.3-11 | MUST | A QoS 2 receiver answers PUBREL with a PUBCOMP carrying its Packet Identifier. | ReceivedPublishCases.Received_Qos2Message_IsAcknowledgedWithPubrecThenPubcomp |
-| Mqtt5:MQTT-4.3.3-12 | MUST | After its PUBCOMP, a receiver treats a PUBLISH with the same identifier as new. | n/a: depends on Mqtt5:MQTT-4.3.3-11 (BL-4573) |
-| Mqtt5:MQTT-4.3.3-13 | MUST | A receiver completes the QoS 2 flow even when the message expired. | n/a: depends on Mqtt5:MQTT-4.3.3-8 (BL-4573) |
+| Mqtt5:MQTT-4.3.3-12 | MUST | After its PUBCOMP, a receiver treats a PUBLISH with the same identifier as new. | n/a: depends on Mqtt5:MQTT-4.3.3-11 (BL-4580) |
+| Mqtt5:MQTT-4.3.3-13 | MUST | A receiver completes the QoS 2 flow even when the message expired. | n/a: depends on Mqtt5:MQTT-4.3.3-8 (BL-4580) |
 | Mqtt5:MQTT-4.4.0-1 | MUST | On a resumed session the client resends unacknowledged PUBLISH with DUP 1 and PUBREL. | n/a: curl always sets Clean Start and refuses Session Present (Mqtt5:MQTT-3.2.2-4) |
 | Mqtt5:MQTT-4.4.0-2 | MUST NOT | A PUBACK or PUBREC failure completes the message; it is not resent. | n/a: curl sends no QoS > 0 PUBLISH |
 | Mqtt5:MQTT-4.5.0-1 | MUST | The server adds a matching message to each subscriber's session. | n/a: binds the server |

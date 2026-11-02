@@ -1,5 +1,5 @@
 ---
-id: BL-4575
+id: BL-4582
 title: Fix Mqtt5 conformance: close the connection when no PINGRESP answers a PINGREQ (MQTT5-3.1.2.10-1)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4575 — Fix Mqtt5 conformance: close the connection when no PINGRESP answers a PINGREQ (MQTT5-3.1.2.10-1)
+# BL-4582 — Fix Mqtt5 conformance: close the connection when no PINGRESP answers a PINGREQ (MQTT5-3.1.2.10-1)
 
 ## Goal
 

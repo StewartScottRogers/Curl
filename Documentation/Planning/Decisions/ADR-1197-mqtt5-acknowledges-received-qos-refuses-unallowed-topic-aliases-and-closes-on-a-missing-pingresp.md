@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-02
-- Task: BL-4485 (measured), BL-4573, BL-4574, BL-4575 (fixes)
+- Task: BL-4485 (measured), BL-4580, BL-4581, BL-4582 (fixes)
 - Decided by Claude under Stewart's delegation
 
 ## Context
@@ -26,5 +26,5 @@ MQTT-4.6.0-2, MQTT-4.6.0-3), accepts a Topic Alias although its CONNECT sends no
 
 ## Consequences
 
-The cases stay in `KnownFailures.txt` under BL-4573, BL-4574 and BL-4575 until each fix lands; each fix adds a
+The cases stay in `KnownFailures.txt` under BL-4580, BL-4581 and BL-4582 until each fix lands; each fix adds a
 focused unit test in `Curl.Extended.Protocol.Mqtt5.UnitTests` (ADR-0482).
