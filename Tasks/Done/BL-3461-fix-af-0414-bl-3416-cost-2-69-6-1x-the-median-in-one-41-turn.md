@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-11-02
 ---
 # BL-3461 — Fix AF-0414: BL-3416 cost $2.69 (6.1x the median) in one 41-turn Opus run finishing the checksrc.pl entry point
 
@@ -41,10 +41,12 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: BL-3416 was an Opus feature-pipeline run that continued from an earlier run's stash and ported checksrc.pl (47k output tokens, 41 turns, 3.69M cache-read tokens). The cost is output-heavy porting work, not a loop, rerun or misrouted model. AF-0414 was rejected for this reason once the cost-outlier floor became $5. checksrc.pl ports now route to Sonnet (AF-0412, commit eb8d601df), so the avoidable part is already fixed. No further change; the rest is unavoidable.
 
 ## Log
 
@@ -52,3 +54,4 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 - 2026-10-24: Backlog -> Deferred. Stewart rejected its finding on 2026-10-24 (single run under the new 5-dollar cost-outlier floor); no work wanted.
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-11-02: Doing -> Done. Cause named: unavoidable Opus porting output; routing already fixed by AF-0412
