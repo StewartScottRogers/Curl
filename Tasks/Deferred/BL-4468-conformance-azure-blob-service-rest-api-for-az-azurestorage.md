@@ -64,7 +64,10 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Notes
 
+- 2026-11-02 (lane 9): Split before any edit: the scope (a reference Blob endpoint with Get/Put/Put Block/Put Block List/List Blobs/Error and three framings, about a dozen in-process cases, the matrix walk and a coverage run) is more than one run. No example protocol exists yet under Curl.Conformance.Extended.UnitLibrary to copy. Parts: BL-4514 (endpoint + download, small upload, Error/exit 22, anonymous), BL-4515 (8 MiB block upload, NextMarker listing), BL-4516 (credential precedence, chunked and close-delimited), BL-4517 (complete matrix, known failures, coverage; depends on the other three). BL-4469 now depends on BL-4514 instead of this task (it needs the endpoint to extend).
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 69e23036 24c40727 82a03bfc 9592b2e5 d8e3fb0e a8cb0c29 ef6c9026.
+- 2026-11-02: Doing -> Deferred. Split into BL-4514, BL-4515, BL-4516, BL-4517
