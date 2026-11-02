@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4579 — Fix CI failure Grpcs_ServerSelectsH2_OffersAlpnH2AndMakesTheCallOverTls on Linux and macOS and Windows
 
@@ -26,7 +26,7 @@ Lanes test only on Windows, so reproduce with `gh run view 41541574110 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `Grpcs_ServerSelectsH2_OffersAlpnH2AndMakesTheCallOverTls` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `Grpcs_ServerSelectsH2_OffersAlpnH2AndMakesTheCallOverTls` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
 
@@ -34,3 +34,4 @@ Lanes test only on Windows, so reproduce with `gh run view 41541574110 --log-fai
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: f5194c18.
+- 2026-11-02: Doing -> Done. Grpc:Http2-Tls-1 known-failure line already dropped by 9a5a6fd4f; test passes locally.
