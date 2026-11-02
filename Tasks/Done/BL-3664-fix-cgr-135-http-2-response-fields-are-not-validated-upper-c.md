@@ -8,7 +8,7 @@ depends-on: [BL-3667, BL-3668, BL-3979]
 touches: [Curl.Original.Protocol.Http.UnitLibrary/Http2ResponseHead.cs, Curl.Original.Protocol.Http.UnitLibrary/Http2StreamConnection.cs, Curl.Original.Protocol.Http.UnitLibrary/Http2Session.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpTransferMessages.cs, Record-CurlExchange.ps1, Curl.Original.Protocol.Http.UnitTests/Cgr135Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-11-02
 ---
 # BL-3664 — Fix CGR-135: HTTP/2 response fields are not validated: upper-case names, connection-specific headers, unknown, duplicate or misplaced pseudo-headers,...
 
@@ -82,10 +82,10 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x -w '\n[%{http_version} 
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -111,6 +111,8 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x -w '\n[%{http_version} 
 - PORT (this checkout, Windows, `& .\Record-CurlExchange.ps1` in one pwsh session - `pwsh -File` passes -CurlArgs as one string): upper, connhdr, keepalivehdr, upgradehdr, proxyconn, resptegzip, unkpseudo, dupstatus: exit 16 with REF's message naming the field, stdout `HTTP/2 200 \r\n` + `\n[2 200 1 0 13 0]\n`, GOAWAY last 0 error 1 - match. pseudoafter: exit 8, `[0 000 1 0 0 0]` - match. status101: 16, `[0 000 1 0 0 0]` - match. trpseudo, uppertrailer: 16, `HTTP/2 200 \r\n\r\nhello h2\n` + `[2 200 1 9 15 0]` - match (9 vs REF's 10 is the recorder escape above). twoheaders: 16, `[2 200 1 0 15 0]` - match. trnoes: 16 `nghttp2 shuts down connection with error 1: PROTOCOL_ERROR`, `HTTP/2 200 \r\n\r\nhello h2` + `[2 200 1 8 15 0]` - match. Controls te: trailers and a trailer ending the stream: exit 0, GOAWAY error 0 - match. cltwo: exit 16, message and head bytes match, but `[2 200 1 0 32 0]` against REF's `[2 200 1 0 32 1]`: num_headers does not count a head failed part way. That is in HttpResponseHeadReader/HttpProtocolHandler, outside touches: filed BL-3979 and requeued behind it.
 - Next claim: once BL-3979 is Done, apply the stash, re-run the cltwo case only, run Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Http.UnitLibrary once (not yet run), then build, fast tests, Done.
 
+- 2026-11-02 (lane 5, fourth claim): nothing left to do here. The fix landed through the split tasks BL-4004 (field validation, `Http2ResponseHead.IndexOfInvalidField`, `Http2StreamConnection.RejectInvalidFieldAsync`, focused tests in `Cgr135Tests.cs`) and BL-4005 (cltwo num_headers fix and the full REF-LINUX against PORT measurement of every repro and both controls, all matching; see BL-4005's Notes for the commands and results), both Done, with BL-3979 Done. The 2026-10-28 stash is superseded by that code and was not applied. Verified at 3baa14fe9: `dotnet test Curl.Original.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` builds clean and passes 2633, 0 failed (the 30 Cgr135 tests pass). No production code changed in this claim, so no quality run was needed. CI on Linux and macOS: the tests use scripted in-memory connections, platform-neutral.
+
 ## Log
 
 - 2026-10-26: Created from CGR-135 of the third-party gap report.
@@ -121,3 +123,4 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x -w '\n[%{http_version} 
 - 2026-10-28: Backlog -> Deferred. Split into BL-4004 and BL-4005 (over its cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-11-02: Doing -> Done. Delivered through BL-4004 and BL-4005; every CGR-135 repro matches REF-LINUX
