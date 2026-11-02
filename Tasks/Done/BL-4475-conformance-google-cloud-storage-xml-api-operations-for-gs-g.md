@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/GoogleCloudStorage, Curl.Conformance.Extended.UnitTests/GoogleCloudStorage, Documentation/Conformance/Extended/GoogleCloudStorage.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4475 — Conformance: Google Cloud Storage XML API operations for gs:// (GoogleCloudStorage part 1 of 2)
 
@@ -42,27 +42,34 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/GoogleCloudStorage.md` gives every requirement of this scope that binds a
+- [x] `Documentation/Conformance/Extended/GoogleCloudStorage.md` gives every requirement of this scope that binds a
       client (each MUST, SHOULD, and each header or parameter the API documents as required) a `GoogleCloudStorage:`
       ID mapped to a test or to `n/a: <reason>`, links to `GoogleCloudStorage-Signing.md` (BL-4476), and the
       harness's matrix check passes.
-- [ ] A reference XML API endpoint in `Curl.Conformance.Extended.UnitLibrary/GoogleCloudStorage/` lets BL-4476 add
+- [x] A reference XML API endpoint in `Curl.Conformance.Extended.UnitLibrary/GoogleCloudStorage/` lets BL-4476 add
       signature checking in `GoogleCloudStorage/Signing/` without editing this task's files.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/GoogleCloudStorage/` run curl in process and assert wire bytes,
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/GoogleCloudStorage/` run curl in process and assert wire bytes,
       stdout, stderr and exit code for at least: download, upload with `-T`, a listing with `delimiter` over several
       pages (continuation token and `NextMarker`), an object name needing percent-encoding, an `Error` body with exit
       22, bearer from `--oauth2-bearer`, anonymous, and the emulator host from `STORAGE_EMULATOR_HOST`.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix GoogleCloudStorage conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/GoogleCloudStorage/` is at 100% line and branch
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/GoogleCloudStorage/` is at 100% line and branch
       coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+- Reference endpoint: `GcsReferenceServer` (GET/PUT Object, List Objects with prefix, delimiter and paging) behind an injected `IGcsReferenceAuthorizer` (anonymous, bearer); BL-4476 adds `Signing/` with its own authorizer (ADR-1189).
+- 10 cases in `GcsXmlApiObjectCases` and `GcsXmlApiListCases`, plus `GcsReferenceServerTests` for the endpoint's own refusals. Matrix: `Documentation/Conformance/Extended/GoogleCloudStorage.md`, 15 rows; `Date` is n/a (signed requests only, part 2).
+- Known failure: `XMLAPI-Emulator-1`, the extension reads `STORAGE_EMULATOR_HOST` from the process environment, not the run's (exit 7); filed High BL-4514 and listed in KnownFailures.txt.
+- Curl's error line ends in CRLF on Windows; the cases pin `Environment.NewLine`, so each platform checks its own line end. The upload temp file is created in `Path.GetTempPath()` and deleted; no drive letters. CI on Linux and macOS: platform-neutral by that, fast tests green here.
+- Measure-CodeQuality.ps1 for Curl.Conformance.Extended.UnitLibrary: 0 failing members (ParseHead and List split to stay at complexity 10 or less).
+
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: faf392a4 b75f5d9f 920f3cad cec18b67 d8e3fb0e 1e94fe0f ef6c9026.
+- 2026-11-02: Doing -> Done. gs:// measured against the XML API object operations: reference endpoint, 10 cases, matrix; emulator host listed with BL-4514
