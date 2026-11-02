@@ -31,3 +31,4 @@ Split from BL-4462 (the extended-protocol conformance harness), whose criterion 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 95e71a5c 595af6b4 f3752ca2.
