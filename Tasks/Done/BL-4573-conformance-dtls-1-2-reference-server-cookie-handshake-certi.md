@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524]
 touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4573 — Conformance: DTLS 1.2 reference server, cookie handshake, certificate and CoAP over protected records for coaps:// (Coap DTLS part 1 of 3)
 
@@ -50,27 +50,49 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Acceptance criteria
 
-- [ ] A DTLS 1.2 reference server in `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/`, written from RFC 6347 and
+- [x] A DTLS 1.2 reference server in `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/`, written from RFC 6347 and
       RFC 5246, answers a ClientHello with a HelloVerifyRequest cookie, completes a full handshake with one cipher
       suite the library offers, and carries CoAP messages (through the existing `CoapReferenceServer` responders)
       one per protected record; its fault hooks (fragmenting, reordering, dropping, replaying, alerting) are left
       to BL-4574.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` run curl in process for `coaps://` and assert
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` run curl in process for `coaps://` and assert
       datagram bytes, stdout, stderr and exit code for at least: a full handshake with a HelloVerifyRequest cookie,
       a certificate the TLS provider refuses (and the same with `-k`), and a CoAP exchange over the protected records.
-- [ ] `Documentation/Conformance/Extended/Coap-Dtls.md` exists in the matrix format with a row for every
+- [x] `Documentation/Conformance/Extended/Coap-Dtls.md` exists in the matrix format with a row for every
       `[SpecRequirement]` ID these cases carry; the harness's matrix check passes.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Coap conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
 
 ## Notes
+
+- Server: `DtlsReferenceServer` (with `DtlsReferenceRecord`, `DtlsReferenceRecordCipher`, `DtlsReferencePrf`) answers
+  a ClientHello without its cookie with a HelloVerifyRequest, then completes a full handshake under
+  TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (0xC02F) on secp256r1 with `ReferenceCertificate`'s RSA certificate,
+  rsa_pkcs1_sha256 on the ServerKeyExchange, each handshake message whole in its own record, and one protected
+  record per CoAP datagram. Default choices: 0xC02F because the harness's certificate is RSA; no
+  extended_master_secret in the ServerHello (optional under RFC 7627); the PRF is written here (P_SHA256, checked
+  against the published TLS 1.2 test vector) rather than adding a `Curl.Tls` reference to the project file,
+  which is outside this task's touches.
+- `DtlsReferenceServerTests` drives the server with a client written in the test from RFC 6347, RFC 5246 and
+  RFC 8422; it completes the handshake and a protected exchange, which both proves the server and covers every
+  path while curl's client cannot finish.
+- Defect found in the library: curl's ClientKeyExchange carries the ECDHE point with two length bytes
+  (66, 65, 04, ...), not RFC 8422's ecdh_Yc<1..255>. Filed High BL-4577; the five cases that need a finished
+  handshake (Coap:RFC6347-4.2.1-1, Coap:RFC6347-4.1-1, Coap:RFC7252-9.1-1, -9.1-3, -9.1-4) are listed in
+  `KnownFailures.txt` against it. The exit 60 case (Coap:RFC7252-9.1-2) passes: the chain is refused before the
+  key exchange. Its stderr is pinned by the prefix `curl: (60) ` only, since the verdict's text is the platform's.
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary`: no member under `Coap/Dtls/`
+  fails; the two failing members are `Amqp1ReferenceContainer`'s, which BL-4546 (Doing) splits.
+- Platform: no paths, drive letters or OS text; the certificate is made in memory on every platform. The fast tests
+  of `Curl.Conformance.Extended.UnitTests` are green here (481); CI on Linux and macOS is left to the shift's watch.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 166e1d8b d8d74ef4 f77798d9 fb1c989b d8e3fb0e f055b099 17248609.
+- 2026-11-02: Doing -> Done. DTLS 1.2 reference server, cookie, certificate and protected-exchange cases landed; the client's double-prefixed ClientKeyExchange is filed as BL-4577 with its cases on KnownFailures.txt
