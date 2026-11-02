@@ -8,7 +8,7 @@ namespace Curl.Extended.Protocol.Coap.Client;
 /// sections 4.2, 4.8, 5.2 and 5.3): retransmits it at the initial timeout, doubled each time, up to
 /// MAX_RETRANSMIT (4) times; takes a piggybacked response from the ACK carrying its Message ID; after an
 /// empty ACK stops retransmitting and waits up to EXCHANGE_LIFETIME (247 seconds) for a separate
-/// response carrying its token, acknowledging it when it is confirmable; fails on a Reset; resets any
+/// response carrying its token, acknowledging it when it is confirmable; rejects a response carrying an unrecognised critical option (RFC 7252 section 5.4.1) as a message that is not its response; fails on a Reset; resets any
 /// other confirmable message, and ignores the rest.
 /// </summary>
 /// <param name="channel">The channel to the server.</param>
@@ -22,6 +22,16 @@ internal sealed class CoapExchange(IDatagramChannel channel, TimeProvider timePr
     public static readonly TimeSpan ExchangeLifetime = TimeSpan.FromSeconds(247);
 
     private const int MaximumDatagramLength = 65535;
+
+    /// <summary>The registered option numbers this client recognises (<see cref="CoapOptionNumber" />).</summary>
+    private static readonly HashSet<int> RecognisedOptionNumbers =
+    [
+        CoapOptionNumber.IfMatch, CoapOptionNumber.UriHost, CoapOptionNumber.ETag, CoapOptionNumber.IfNoneMatch,
+        CoapOptionNumber.Observe, CoapOptionNumber.UriPort, CoapOptionNumber.LocationPath, CoapOptionNumber.UriPath,
+        CoapOptionNumber.ContentFormat, CoapOptionNumber.MaxAge, CoapOptionNumber.UriQuery, CoapOptionNumber.Accept,
+        CoapOptionNumber.LocationQuery, CoapOptionNumber.Block2, CoapOptionNumber.Block1, CoapOptionNumber.Size2,
+        CoapOptionNumber.ProxyUri, CoapOptionNumber.ProxyScheme, CoapOptionNumber.Size1,
+    ];
 
     private enum Reply
     {
@@ -124,13 +134,19 @@ internal sealed class CoapExchange(IDatagramChannel channel, TimeProvider timePr
             return Reply.Ignored;
         }
 
-        if (IsOwnReply(request, message))
-        {
-            return ClassifyOwnReply(request, message);
-        }
-
-        return IsSeparateResponse(request, message) ? Reply.Response : Reply.Ignored;
+        Reply reply = IsOwnReply(request, message) ? ClassifyOwnReply(request, message) : SeparateReply(request, message);
+        return reply == Reply.Response && CarriesUnrecognisedCriticalOption(message) ? Reply.Ignored : reply;
     }
+
+    private static Reply SeparateReply(CoapMessage request, CoapMessage message) =>
+        IsSeparateResponse(request, message) ? Reply.Response : Reply.Ignored;
+
+    /// <summary>
+    /// Whether <paramref name="message" /> carries an option of class critical (an odd number) that is not
+    /// a registered option this client knows; such a response is rejected (RFC 7252 section 5.4.1).
+    /// </summary>
+    private static bool CarriesUnrecognisedCriticalOption(CoapMessage message) =>
+        message.Options.Any(option => option.Number % 2 == 1 && !RecognisedOptionNumbers.Contains(option.Number));
 
     private static bool IsOwnReply(CoapMessage request, CoapMessage message) =>
         message.MessageId == request.MessageId && message.Type is CoapMessageType.Acknowledgement or CoapMessageType.Reset;

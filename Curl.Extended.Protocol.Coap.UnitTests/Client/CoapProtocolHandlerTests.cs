@@ -226,6 +226,32 @@ public sealed class CoapProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ResponsesWithAnUnrecognisedCriticalOption_AreRejectedAndOnlyElectiveOrRecognisedOptionsAccepted()
+    {
+        CoapOption[] critical = [new CoapOption(9, [1])];
+        var channel = new ScriptedDatagramChannel((count, sent) => count == 1
+            ?
+            [
+                Encode(new CoapMessage(CoapMessageType.Acknowledgement, CoapCode.Content, sent.MessageId, Token, critical, [])),
+                Encode(new CoapMessage(CoapMessageType.Confirmable, CoapCode.Content, 0x0505, Token, critical, [])),
+                Encode(new CoapMessage(CoapMessageType.NonConfirmable, CoapCode.Content, 0x0606, Token, critical, [])),
+                Encode(new CoapMessage(CoapMessageType.Confirmable, CoapCode.Content, 0x0707, Token, [new CoapOption(3, [1]), new CoapOption(48, [1])], Hello)),
+            ]
+            : []);
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(channel).ExecuteAsync(Context("coap://h/", output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(Hello, output.ToArray());
+        Assert.HasCount(3, channel.Sent);
+        Assert.AreEqual(CoapMessageType.Reset, channel.Sent[1].Type);
+        Assert.AreEqual((ushort)0x0505, channel.Sent[1].MessageId);
+        Assert.AreEqual(CoapMessageType.Acknowledgement, channel.Sent[2].Type);
+        Assert.AreEqual((ushort)0x0707, channel.Sent[2].MessageId);
+    }
+
+    [TestMethod]
     [DataRow("version 2")]
     [DataRow("token length 9")]
     [DataRow("payload marker with no payload")]
