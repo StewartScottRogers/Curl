@@ -26,11 +26,21 @@ internal sealed class McpClientFlow(IMcpSession session, Stream output, Cancella
     /// <summary>Gets how many bytes have been written to the output.</summary>
     public long BytesWritten { get; private set; }
 
-    /// <summary>Sends <c>initialize</c>, takes the server's protocol version for the session, and sends <c>notifications/initialized</c>.</summary>
+    /// <summary>
+    /// Sends <c>initialize</c>, takes the server's protocol version for the session, and sends <c>notifications/initialized</c>.
+    /// A version curl does not support ends the exchange before the notification with exit 8 ("Lifecycle &gt; Version
+    /// Negotiation", ADR-1190).
+    /// </summary>
     public async Task InitializeAsync()
     {
         JsonElement result = await RequestAsync(writer.WriteInitialize(ClientName, ClientVersion)).ConfigureAwait(false);
-        session.UseProtocolVersion(McpResponseReader.ReadInitializeResult(result).ProtocolVersion);
+        string protocolVersion = McpResponseReader.ReadInitializeResult(result).ProtocolVersion;
+        if (protocolVersion != McpRequestWriter.LatestProtocolVersion)
+        {
+            throw new McpClientException(CurlExitCode.WeirdServerReply, $"MCP server answered unsupported protocol version {protocolVersion}");
+        }
+
+        session.UseProtocolVersion(protocolVersion);
         await session.SendNotificationAsync(McpRequestWriter.WriteInitializedNotification(), cancellationToken).ConfigureAwait(false);
     }
 

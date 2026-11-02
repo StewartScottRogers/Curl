@@ -89,6 +89,23 @@ public sealed class McpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ServerAnswersAnUnsupportedProtocolVersion_SendsNothingMoreAndEndsWithExit8()
+    {
+        // "Lifecycle > Version Negotiation" (ADR-1190): no notifications/initialized and no further request.
+        var process = new InMemoryMcpServerProcess(InitializeResult.Replace("2025-06-18", "2024-11-05", StringComparison.Ordinal) + "\n");
+        var output = new MemoryStream();
+
+        var result = await Handler(new ScriptedMcpServerProcessStarter(process)).ExecuteAsync(Context("mcp+stdio://localhost/server", output));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual("MCP server answered unsupported protocol version 2024-11-05", result.ErrorMessage);
+        Assert.AreEqual(0, output.Length);
+        StringAssert.Contains(process.WrittenInput, "\"method\":\"initialize\"");
+        Assert.IsFalse(process.WrittenInput.Contains("notifications/initialized", StringComparison.Ordinal));
+        Assert.IsFalse(process.WrittenInput.Contains("tools/", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_StdioCallWithData_CallsTheToolAndWritesEachContentItem()
     {
         // "Transports > stdio" and "Calling Tools": a text item is written as its text, any other item as its JSON.
