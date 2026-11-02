@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Client/AzureStorageExtension.cs, Curl.Extended.Protocol.AzureStorage.UnitTests/Client/AzureStorageExtensionTests.cs, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4567 — Fix AzureStorage conformance: AzureStorage:CredentialPrecedence-2
 
@@ -26,14 +26,17 @@ extended conformance harness gives curl (`ExtendedConformanceHarness.RunAsync(..
 
 ## Acceptance criteria
 
-- [ ] `AzureStorageExtension.CreateHandler` reads tokens through `ProtocolHandlerServices.ReadEnvironmentVariable` when it is set, else the process environment.
-- [ ] A focused unit test in `Curl.Extended.Protocol.AzureStorage.UnitTests` pins it (ADR-0482).
-- [ ] The `KnownFailures.txt` lines for `AzureStorage:CredentialPrecedence-2`, `AzureStorage:CredentialPrecedence-3` and `AzureStorage:AuthorizeSas-1` are removed and those cases pass.
-- [ ] `dotnet build` clean, fast tests green, the library at 100% line and branch coverage.
+- [x] `AzureStorageExtension.CreateHandler` reads tokens through `ProtocolHandlerServices.ReadEnvironmentVariable` when it is set, else the process environment.
+- [x] A focused unit test in `Curl.Extended.Protocol.AzureStorage.UnitTests` pins it (ADR-0482).
+- [x] The `KnownFailures.txt` lines for `AzureStorage:CredentialPrecedence-2`, `AzureStorage:CredentialPrecedence-3` and `AzureStorage:AuthorizeSas-1` are removed and those cases pass.
+- [x] `dotnet build` clean, fast tests green, the library at 100% line and branch coverage.
 
 ## Notes
+
+- Done directly rather than through the full feature pipeline: BL-4534 already set the pattern, so it needed no plan or ADR. `CreateHandler` passes `services.ReadEnvironmentVariable ?? Environment.GetEnvironmentVariable`, and `AzureStorageExtensionTests.CreateHandler_WithTheRunsEnvironment_SendsItsSasToken` pins it. Curl.Conformance.Extended.UnitTests passed 387/387 with the three lines removed. The full build is clean and the fast tests are green. Measure-CodeQuality for the library found 0 failing members. The change is platform-neutral (no paths or OS text).
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: c2d91d8c f552bbde d349e2d0 fdc35bd6.
+- 2026-11-02: Doing -> Done. az:// reads AZURE_STORAGE_BEARER_TOKEN and AZURE_STORAGE_SAS_TOKEN from the run's environment; CredentialPrecedence-2/-3 and AuthorizeSas-1 pass
