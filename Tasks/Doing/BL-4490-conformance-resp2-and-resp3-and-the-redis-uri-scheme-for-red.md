@@ -66,3 +66,4 @@ focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), the `Kn
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 990b7c72 e36b79d3 0e3b4bcc d8e3fb0e 46790798 ef6c9026.
