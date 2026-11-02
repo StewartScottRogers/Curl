@@ -10,7 +10,7 @@ namespace Curl.Protocol.Abstractions;
 /// <param name="TlsProvider">Upgrades a connection to TLS.</param>
 /// <param name="DnsResolver">Resolves host names.</param>
 /// <param name="ProcessStarter">
-/// Starts the programs an extension runs and reads the environment it finds them in (ADR-1183);
+/// Starts the programs an extension runs and reads the environment it finds them in (ADR-1184);
 /// <see langword="null" /> when the host gives none, and each extension then starts real processes
 /// with its own <see cref="System.Diagnostics.Process" /> adapter and reads the process environment.
 /// </param>

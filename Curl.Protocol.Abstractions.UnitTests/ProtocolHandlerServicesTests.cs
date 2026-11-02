@@ -1,6 +1,6 @@
 namespace Curl.Protocol.Abstractions;
 
-/// <summary>Checks the services the engine hands extension handlers (ADR-0999), with the host's process starter (ADR-1183).</summary>
+/// <summary>Checks the services the engine hands extension handlers (ADR-0999), with the host's process starter (ADR-1184).</summary>
 [TestClass]
 public sealed class ProtocolHandlerServicesTests
 {

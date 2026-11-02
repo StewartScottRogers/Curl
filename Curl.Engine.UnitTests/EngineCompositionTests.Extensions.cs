@@ -37,7 +37,7 @@ public sealed partial class EngineCompositionTests
         Assert.IsNull(given.ProcessStarter);
     }
 
-    // ADR-1183: the host's process starter reaches the extension handlers, so they start no real process.
+    // ADR-1184: the host's process starter reaches the extension handlers, so they start no real process.
     [TestMethod]
     public void CreateProtocolHandlers_WithAProcessStarter_GivesItToTheExtensionHandlers()
     {

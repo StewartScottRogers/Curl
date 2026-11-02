@@ -1,6 +1,6 @@
 namespace Curl.Extended.Protocol.Plugin;
 
-/// <summary>Checks that a helper started through the host's process starter (ADR-1183) is that process, seen as a helper.</summary>
+/// <summary>Checks that a helper started through the host's process starter (ADR-1184) is that process, seen as a helper.</summary>
 [TestClass]
 public sealed class ExtensionHelperProcessStarterTests
 {

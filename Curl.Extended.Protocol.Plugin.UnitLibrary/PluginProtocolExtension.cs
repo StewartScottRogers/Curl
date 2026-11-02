@@ -31,7 +31,7 @@ public static class PluginProtocolExtension
         "sftp", "smb", "smbs", "smtp", "smtps", "telnet", "tftp", "ws", "wss",
     ];
 
-    /// <summary>Creates the handler for the helper programs on <c>PATH</c>: the environment of the host's process starter and through it (ADR-1183), or without one this process's environment and real processes.</summary>
+    /// <summary>Creates the handler for the helper programs on <c>PATH</c>: the environment of the host's process starter and through it (ADR-1184), or without one this process's environment and real processes.</summary>
     /// <param name="services">Curl's connection services; a helper opens its own connections, so only the process starter is used.</param>
     /// <param name="extensionSchemes">The schemes the other extensions serve, which a helper never takes either.</param>
     /// <returns>The handler, serving one scheme per helper found.</returns>

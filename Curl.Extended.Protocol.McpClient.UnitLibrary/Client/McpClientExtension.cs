@@ -15,7 +15,7 @@ public static class McpClientExtension
         [],
         new Uri("https://modelcontextprotocol.io/specification/2025-06-18"));
 
-    /// <summary>Creates the handler over curl's connector and the host's process starter, or the system's when the host gives none (ADR-1183).</summary>
+    /// <summary>Creates the handler over curl's connector and the host's process starter, or the system's when the host gives none (ADR-1184).</summary>
     /// <param name="services">Curl's connection services.</param>
     /// <returns>The handler.</returns>
     public static IProtocolHandler CreateHandler(ProtocolHandlerServices services)

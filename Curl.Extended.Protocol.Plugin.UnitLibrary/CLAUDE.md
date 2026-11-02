@@ -13,6 +13,6 @@ runs through a program named `curl-proto-<scheme>` on `PATH`, git's remote-helpe
   `HelperProtocolException` carries a failure's exit code. `SystemHelperProcessStarter` is the thin `Process`
   adapter, excluded from coverage (ADR-0083), used when the host gives no process starter; given one in
   `ProtocolHandlerServices.ProcessStarter`, `CreateHandler` reads `PATH` and `PATHEXT` through it and starts helpers
-  through `ExtensionHelperProcessStarter` (ADR-1183).
+  through `ExtensionHelperProcessStarter` (ADR-1184).
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extended.Protocol.Plugin.UnitTests`.

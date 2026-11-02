@@ -65,7 +65,7 @@ delegation", one line in `Documentation/Planning/Decisions/README.md` (a shared 
 
 ## Notes
 
-- Decision (ADR-1183): `IExtensionProcessStarter` (start a program with arguments; read one environment variable)
+- Decision (ADR-1184): `IExtensionProcessStarter` (start a program with arguments; read one environment variable)
   and `IExtensionProcess` (standard input and output, exit wait, `Kill`, `IDisposable`) in Abstractions;
   `ProtocolHandlerServices.ProcessStarter` is an optional last member, `null` by default, and
   `EngineComposition.CreateProtocolHandlers(..., extensionProcessStarter: ...)` passes it on. `null` means the

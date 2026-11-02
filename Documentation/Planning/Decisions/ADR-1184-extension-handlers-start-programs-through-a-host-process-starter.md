@@ -1,4 +1,4 @@
-# ADR-1183: Extension handlers start programs through a process starter the host may give
+# ADR-1184: Extension handlers start programs through a process starter the host may give
 
 - Status: Accepted
 - Date: 2026-11-02

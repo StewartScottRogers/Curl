@@ -3,7 +3,7 @@ namespace Curl.Protocol.Abstractions;
 /// <summary>
 /// Starts the programs an extension's handler runs (a <c>curl-proto-&lt;scheme&gt;</c> helper, an
 /// <c>mcp+stdio://</c> server) and reads the environment they are searched for and started in, so a host can
-/// run those handlers against in-memory stand-ins (ADR-1183).
+/// run those handlers against in-memory stand-ins (ADR-1184).
 /// </summary>
 public interface IExtensionProcessStarter
 {

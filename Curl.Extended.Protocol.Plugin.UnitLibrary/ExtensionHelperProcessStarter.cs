@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Plugin;
 
-/// <summary>Starts helpers through the process starter the host gave the extensions (ADR-1183).</summary>
+/// <summary>Starts helpers through the process starter the host gave the extensions (ADR-1184).</summary>
 /// <param name="starter">The host's process starter.</param>
 internal sealed class ExtensionHelperProcessStarter(IExtensionProcessStarter starter) : IHelperProcessStarter
 {

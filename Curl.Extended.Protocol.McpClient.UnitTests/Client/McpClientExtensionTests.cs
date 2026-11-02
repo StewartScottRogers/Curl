@@ -22,7 +22,7 @@ public sealed class McpClientExtensionTests
     public void CreateHandler_GivesTheMcpHandler() =>
         Assert.IsInstanceOfType<McpProtocolHandler>(McpClientExtension.CreateHandler(Services));
 
-    // ADR-1183: an mcp+stdio:// server starts through the host's process starter, not a real process.
+    // ADR-1184: an mcp+stdio:// server starts through the host's process starter, not a real process.
     [TestMethod]
     public async Task CreateHandler_WithAHostProcessStarter_StartsTheServerThroughIt()
     {

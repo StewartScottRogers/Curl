@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.McpClient.Stdio;
 
-/// <summary>Starts MCP servers through the process starter the host gave the extensions (ADR-1183).</summary>
+/// <summary>Starts MCP servers through the process starter the host gave the extensions (ADR-1184).</summary>
 /// <param name="starter">The host's process starter.</param>
 internal sealed class ExtensionMcpServerProcessStarter(IExtensionProcessStarter starter) : IMcpServerProcessStarter
 {

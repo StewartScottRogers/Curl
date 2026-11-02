@@ -1,6 +1,6 @@
 namespace Curl.Extended.Protocol.McpClient.Stdio;
 
-/// <summary>Checks that an MCP server started through the host's process starter (ADR-1183) is that process, seen as a server.</summary>
+/// <summary>Checks that an MCP server started through the host's process starter (ADR-1184) is that process, seen as a server.</summary>
 [TestClass]
 public sealed class ExtensionMcpServerProcessStarterTests
 {

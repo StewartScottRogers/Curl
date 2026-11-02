@@ -22,7 +22,7 @@ public sealed class PluginProtocolExtensionTests
     public void CreateHandler_GivesTheHelperHandler() =>
         Assert.IsInstanceOfType<HelperProtocolHandler>(PluginProtocolExtension.CreateHandler(Services, []));
 
-    // ADR-1183: the helper search reads PATH through the host's process starter, and the helper starts through it.
+    // ADR-1184: the helper search reads PATH through the host's process starter, and the helper starts through it.
     [TestMethod]
     public async Task CreateHandler_WithAHostProcessStarter_FindsHelpersOnItsPathAndStartsThemThroughIt()
     {
