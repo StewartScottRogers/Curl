@@ -1,14 +1,18 @@
-# MQTT 5 requirement matrix: data representation, fixed header, CONNECT and CONNACK
+# MQTT 5 requirement matrix: data representation, fixed header, CONNECT, CONNACK, DISCONNECT, AUTH and error handling
 
 Curl's `mqtt5://` client (`Curl.Extended.Protocol.Mqtt5.UnitLibrary`) measured against OASIS MQTT Version 5.0
-(7 March 2019), chapters 1.5 (data representation), 2 (control packet format), 3.1 (CONNECT) and 3.2 (CONNACK), through the
+(7 March 2019), chapters 1.5 (data representation), 2 (control packet format), 3.1 (CONNECT), 3.2 (CONNACK), 3.14 (DISCONNECT),
+3.15 (AUTH), 4.1 (session state), 4.12 (enhanced authentication) and 4.13 (error handling), through the
 real curl command line against the reference broker `Curl.Conformance.Extended.UnitLibrary/Mqtt5/Mqtt5ReferenceBroker`
 (BL-4517). The broker checks every packet it reads against these chapters and fails the case naming the
 requirement a packet breaks. IDs are the specification's own; a binding sentence without a number has a
 `MQTT5-<section>-<n>` ID of its own. Server-only statements are listed as `n/a`.
 
-The CONNACK rows (BL-4518) run curl against the broker answering with a CONNACK built by `Mqtt5/Connack/Mqtt5ConnAckBytes`. The other parts: DISCONNECT and AUTH in `Mqtt5-DisconnectAuth.md`
-(BL-4519), PUBLISH, QoS and SUBSCRIBE in [Mqtt5-PublishSubscribe.md](Mqtt5-PublishSubscribe.md) (BL-4485),
+The CONNACK rows (BL-4518) run curl against the broker answering with a CONNACK built by `Mqtt5/Connack/Mqtt5ConnAckBytes`.
+The rows of sections 3.14 (DISCONNECT), 3.15 (AUTH), 4.1 (session state), 4.12 (enhanced authentication) and 4.13
+(error handling) (BL-4519) run curl against the broker sending the SUBACK, PUBLISH, DISCONNECT and AUTH packets
+`Mqtt5/DisconnectAuth/Mqtt5DisconnectAuthBytes` builds, some with reserved bits set or ill-formed UTF-8 on purpose.
+The other parts: PUBLISH, QoS and SUBSCRIBE in [Mqtt5-PublishSubscribe.md](Mqtt5-PublishSubscribe.md) (BL-4485),
 and WebSocket and TLS in [Mqtt5-Transports.md](Mqtt5-Transports.md) (BL-4486).
 
 | ID | Level | Requirement | Covered by |
@@ -105,3 +109,33 @@ and WebSocket and TLS in [Mqtt5-Transports.md](Mqtt5-Transports.md) (BL-4486).
 | Mqtt5:MQTT-3.2.2-21 | MUST | The client uses the CONNACK's Server Keep Alive in place of its own Keep Alive. | ConnackCases.Connack_ServerKeepAlive_IsUsedSoASubscriberPings |
 | Mqtt5:MQTT-3.2.2-22 | MUST | Without a Server Keep Alive, the server uses the client's Keep Alive. | n/a: binds the server |
 | Mqtt5:MQTT5-3.2.2.3-1 | MUST | A CONNACK property other than User Property appears at most once; a repeat is a Protocol Error the client refuses (section 3.2.2.3). | ConnackCases.Connack_PropertyTwice_IsRefusedWithExit8 |
+| Mqtt5:MQTT-3.14.0-1 | MUST NOT | The server sends no DISCONNECT before a CONNACK with a Reason Code below 0x80. | n/a: binds the server |
+| Mqtt5:MQTT-3.14.1-1 | MUST | A receiver checks the DISCONNECT's reserved fixed header bits are 0 and answers others with DISCONNECT 0x81. | DisconnectAuthCases.Subscribe_DisconnectWithReservedFlagSet_IsAnsweredByDisconnect0x81 |
+| Mqtt5:MQTT-3.14.2-1 | MUST | The sender of a DISCONNECT uses a Disconnect Reason Code table 3-10 lists. | DisconnectAuthCases.Publish_EndsWithANormalDisconnectAndSendsNothingAfterIt |
+| Mqtt5:MQTT-3.14.2-2 | MUST NOT | The server sends no Session Expiry Interval in DISCONNECT. | n/a: binds the server |
+| Mqtt5:MQTT5-3.14.2.2.2-1 | MUST NOT | A client whose CONNECT had a Session Expiry Interval of 0 sends no non-zero one in DISCONNECT (section 3.14.2.2.2). | n/a: curl's DISCONNECT carries no properties (DisconnectAuthCases.Publish_EndsWithANormalDisconnectAndSendsNothingAfterIt pins its empty body) |
+| Mqtt5:MQTT-3.14.2-3 | MUST NOT | The sender sends no Reason String that takes DISCONNECT over the receiver's Maximum Packet Size. | n/a: curl's DISCONNECT carries no Reason String |
+| Mqtt5:MQTT-3.14.2-4 | MUST NOT | The sender sends no User Property that takes DISCONNECT over the receiver's Maximum Packet Size. | n/a: curl's DISCONNECT carries no User Property |
+| Mqtt5:MQTT-3.14.4-1 | MUST NOT | After sending DISCONNECT, the sender sends no more packets on the connection. | DisconnectAuthCases.Publish_EndsWithANormalDisconnectAndSendsNothingAfterIt |
+| Mqtt5:MQTT-3.14.4-2 | MUST | After sending DISCONNECT, the sender closes the connection. | DisconnectAuthCases.Publish_EndsWithANormalDisconnectAndSendsNothingAfterIt |
+| Mqtt5:MQTT-3.14.4-3 | MUST | A server receiving DISCONNECT 0x00 discards the Will Message unpublished. | n/a: binds the server |
+| Mqtt5:MQTT5-3.14.4-1 | SHOULD | The receiver of a DISCONNECT closes the connection (section 3.14.4). | DisconnectAuthCases.Subscribe_ServerDisconnectsNormally_WritesTheMessageAndEndsWithExit0 |
+| Mqtt5:MQTT-3.15.1-1 | MUST | The AUTH fixed header's reserved bits are 0; others are a Malformed Packet and the receiver closes the connection. | DisconnectAuthCases.Subscribe_AuthWithReservedFlagSet_IsAnsweredByDisconnect0x81 |
+| Mqtt5:MQTT5-3.15-1 | MUST | An AUTH on a connection whose CONNECT named no Authentication Method is a Protocol Error the receiver refuses (section 3.15). | DisconnectAuthCases.Connect_AnsweredByAuthWithAMethodCurlDidNotOffer_IsAProtocolErrorAnsweredByDisconnect0x82 |
+| Mqtt5:MQTT-3.15.2-1 | MUST | The sender of an AUTH uses an Authenticate Reason Code table 3-12 lists. | n/a: curl sends no AUTH (DisconnectAuthCases.Connect_AnsweredByAuthWithAMethodCurlDidNotOffer_SendsNoAuthAndExits8) |
+| Mqtt5:MQTT-3.15.2-2 | MUST NOT | The sender sends no Reason String that takes AUTH over the receiver's Maximum Packet Size. | n/a: curl sends no AUTH |
+| Mqtt5:MQTT-3.15.2-3 | MUST NOT | The sender sends no User Property that takes AUTH over the receiver's Maximum Packet Size. | n/a: curl sends no AUTH |
+| Mqtt5:MQTT-4.1.0-1 | MUST NOT | Client and server do not discard the Session State while the connection is open. | n/a: curl's only Session State is its one subscription, which it holds until the connection ends; it keeps none past it (MQTT-3.1.2-23) |
+| Mqtt5:MQTT-4.1.0-2 | MUST | The server discards the Session State once the connection closes and the Session Expiry Interval passes. | n/a: binds the server |
+| Mqtt5:MQTT-4.12.0-1 | MUST | A server not supporting the client's Authentication Method closes the connection. | n/a: binds the server |
+| Mqtt5:MQTT-4.12.0-2 | MUST | A server asking for more authentication data sends AUTH with Reason Code 0x18. | n/a: binds the server |
+| Mqtt5:MQTT-4.12.0-3 | MUST | A client answering a server's AUTH sends AUTH with Reason Code 0x18. | n/a: curl sets no Authentication Method, so it never takes part in an authentication exchange |
+| Mqtt5:MQTT-4.12.0-4 | MUST | A server rejecting the authentication closes the connection. | n/a: binds the server |
+| Mqtt5:MQTT-4.12.0-5 | MUST | With an Authentication Method in CONNECT, every AUTH and a successful CONNACK carry the same Authentication Method. | n/a: curl sets no Authentication Method and sends no AUTH |
+| Mqtt5:MQTT-4.12.0-6 | MUST NOT | Without an Authentication Method in CONNECT, the server sends no AUTH and no Authentication Method in CONNACK. | n/a: binds the server; the AUTH cases break it on purpose to see curl refuse it |
+| Mqtt5:MQTT-4.12.0-7 | MUST NOT | Without an Authentication Method in CONNECT, the client sends no AUTH. | DisconnectAuthCases.Connect_AnsweredByAuthWithAMethodCurlDidNotOffer_SendsNoAuthAndExits8 |
+| Mqtt5:MQTT-4.12.1-1 | MUST | A client re-authenticating sends AUTH 0x19 with the CONNECT's Authentication Method. | n/a: curl never re-authenticates |
+| Mqtt5:MQTT-4.12.1-2 | MUST | When re-authentication fails, client and server close the connection. | n/a: curl never re-authenticates |
+| Mqtt5:MQTT-4.13.1-1 | MUST | A server detecting a Malformed Packet or Protocol Error closes the connection. | n/a: binds the server |
+| Mqtt5:MQTT5-4.13.1-1 | SHOULD | A client detecting a Malformed Packet or Protocol Error sends DISCONNECT with Reason Code 0x81 or 0x82 before it closes the connection (section 4.13.1). | ErrorHandlingCases.Connack_ReasonStringNotWellFormedUtf8_IsAnsweredByDisconnect0x81 |
+| Mqtt5:MQTT-4.13.2-1 | MUST | With a CONNACK or DISCONNECT Reason Code of 0x80 or above, the connection is closed whether or not the packet was sent. | DisconnectAuthCases.Subscribe_ServerDisconnectsWithServerShuttingDown_EndsTheTransferWithExit8 |
