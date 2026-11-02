@@ -31,7 +31,7 @@ Library: `Curl.Extended.Protocol.Amqp0.UnitLibrary` (its CLAUDE.md, ADR-1056, AD
 
 ## Notes
 
-- Delivered directly (a two-file fix): `Amqp0BasicReturn` (60.50) in `Amqp0MethodReader`; `Amqp0ClientFlow.ReceiveMethodAsync` reads any basic.return with its content and skips it, so the publish closes channel and connection with 200 and exits 0 with nothing written (ADR-1197, decided under delegation: the client never sets mandatory, so a return is unasked).
+- Delivered directly (a two-file fix): `Amqp0BasicReturn` (60.50) in `Amqp0MethodReader`; `Amqp0ClientFlow.ReceiveMethodAsync` reads any basic.return with its content and skips it, so the publish closes channel and connection with 200 and exits 0 with nothing written (ADR-1198, decided under delegation: the client never sets mandatory, so a return is unasked).
 - Tests: `Amqp0MethodReaderTests` round-trips basic.return; `Amqp0ProtocolHandlerTests.ExecuteAsync_BasicReturnAfterPublish_SkipsTheReturnedMessageAndClosesWith200` pins the flow (ADR-0482). The conformance case passes as a plain case with its KnownFailures line (which named BL-4563) removed.
 - `dotnet build Curl.slnx -warnaserror` clean, fast tests green, Measure-CodeQuality for the library: 0 failing members. Platform-neutral (no paths, OS text or certificates).
 

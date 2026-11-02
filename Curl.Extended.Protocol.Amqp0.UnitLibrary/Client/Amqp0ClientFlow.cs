@@ -10,7 +10,7 @@ namespace Curl.Extended.Protocol.Amqp0.Client;
 /// tune-ok, connection.open of the virtual host, channel 1, queue.declare, then with a body basic.publish to the
 /// default exchange and otherwise one basic.get with no-ack, and channel.close and connection.close at the end. A
 /// connection.close or channel.close from the server ends the transfer naming its reply code and text. A basic.return
-/// the server sends is read with its returned message and skipped: nothing is written and the transfer goes on (ADR-1197).
+/// the server sends is read with its returned message and skipped: nothing is written and the transfer goes on (ADR-1198).
 /// </summary>
 internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
 {
@@ -141,7 +141,7 @@ internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITra
         Amqp0Method method = Amqp0MethodReader.Read(await ReceiveFrameAsync().ConfigureAwait(false));
         while (method is Amqp0BasicReturn)
         {
-            // An unasked basic.return (the client never sets mandatory) is read with its content and skipped (ADR-1197).
+            // An unasked basic.return (the client never sets mandatory) is read with its content and skipped (ADR-1198).
             await ReceiveContentAsync().ConfigureAwait(false);
             method = Amqp0MethodReader.Read(await ReceiveFrameAsync().ConfigureAwait(false));
         }

@@ -1,4 +1,4 @@
-# ADR-1197: The AMQP 0-9-1 client reads an unasked basic.return with its message and skips it
+# ADR-1198: The AMQP 0-9-1 client reads an unasked basic.return with its message and skips it
 
 - Status: Accepted
 - Date: 2026-11-02
