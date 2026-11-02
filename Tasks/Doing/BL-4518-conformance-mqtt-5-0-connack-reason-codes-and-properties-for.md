@@ -40,3 +40,4 @@ Scope: 3.2 CONNACK. Builds on BL-4517's reference broker; add behaviour under `C
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 8d35620f 7123695d 28fcee0c d8e3fb0e 975979e2 ef6c9026.
