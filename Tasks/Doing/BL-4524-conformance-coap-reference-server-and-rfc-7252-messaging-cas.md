@@ -53,3 +53,4 @@ Scope: section 3 (message format: version, type, token length, code, message ID,
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 0a05406d f3dd9751 b15c07d5 7cee2dc4 fb1c989b d8e3fb0e ef6c9026.
