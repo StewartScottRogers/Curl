@@ -42,6 +42,7 @@ Platform-specific (macOS). The likely cause is the harness, not Curl's ECH clien
 - 2026-10-25_1542: 0 of 1 items are gaps.
 - 2026-10-30_2103: 1 of 1 items are gaps.
 - 2026-10-31_1828: 0 of 1 items are gaps.
+- 2026-11-02_0859: 0 of 1 items are gaps.
 
 ## Log
 
