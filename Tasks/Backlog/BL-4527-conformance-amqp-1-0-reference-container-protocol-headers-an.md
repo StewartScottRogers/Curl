@@ -1,5 +1,5 @@
 ---
-id: BL-4514
+id: BL-4527
 title: Conformance: AMQP 1.0 reference container, protocol headers and SASL for amqp1:// (BL-4466 part 1 of 3)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4514 — Conformance: AMQP 1.0 reference container, protocol headers and SASL for amqp1:// (BL-4466 part 1 of 3)
+# BL-4527 — Conformance: AMQP 1.0 reference container, protocol headers and SASL for amqp1:// (BL-4466 part 1 of 3)
 
 ## Goal
 
@@ -24,7 +24,7 @@ Follow `Documentation/Conformance/Extended/README.md` and ADR-1186/ADR-1188: the
 
 ## Acceptance criteria
 
-- [ ] A reference AMQP 1.0 container in `Curl.Conformance.Extended.UnitLibrary/Amqp1/` (its own type encoder and decoder, framing, SASL, open/begin/attach/detach/end/close) lets BL-4467 add transfer behaviour in `Amqp1/Messaging/` and BL-4515/BL-4516 choose frame size, idle timeout, errors and encoding widths without editing its files.
+- [ ] A reference AMQP 1.0 container in `Curl.Conformance.Extended.UnitLibrary/Amqp1/` (its own type encoder and decoder, framing, SASL, open/begin/attach/detach/end/close) lets BL-4467 add transfer behaviour in `Amqp1/Messaging/` and BL-4528/BL-4529 choose frame size, idle timeout, errors and encoding widths without editing its files.
 - [ ] `Documentation/Conformance/Extended/Amqp1.md` exists in the matrix format with every client MUST, MUST NOT, SHOULD and SHOULD NOT of 2.2 (version negotiation, protocol header) and 5.3 (SASL) given an `Amqp1:` ID and mapped to a test or `n/a: <reason>`; the harness matrix check passes.
 - [ ] Cases in `Curl.Conformance.Extended.UnitTests/Amqp1/` run curl in process for `amqp1://` and `amqp1s://` and assert wire bytes, stdout, stderr and exit code for: both protocol headers (AMQP and SASL), a server answering with another header, SASL PLAIN from `-u`, ANONYMOUS without it, and a SASL outcome other than ok.
 - [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Amqp1/` is at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).

@@ -1,16 +1,16 @@
 ---
-id: BL-4516
+id: BL-4529
 title: Conformance: AMQP 1.0 encoding widths and complete Amqp1 matrix for amqp1:// (BL-4466 part 3 of 3)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514, BL-4515]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4527, BL-4528]
 touches: [Curl.Conformance.Extended.UnitTests/Amqp1/Amqp1EncodingWidthCases.cs, Documentation/Conformance/Extended/Amqp1.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4516 — Conformance: AMQP 1.0 encoding widths and complete Amqp1 matrix for amqp1:// (BL-4466 part 3 of 3)
+# BL-4529 — Conformance: AMQP 1.0 encoding widths and complete Amqp1 matrix for amqp1:// (BL-4466 part 3 of 3)
 
 ## Goal
 

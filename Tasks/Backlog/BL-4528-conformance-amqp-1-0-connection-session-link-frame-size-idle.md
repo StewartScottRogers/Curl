@@ -1,20 +1,20 @@
 ---
-id: BL-4515
+id: BL-4528
 title: Conformance: AMQP 1.0 connection, session, link, frame size, idle timeout and errors for amqp1:// (BL-4466 part 2 of 3)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4527]
 touches: [Curl.Conformance.Extended.UnitTests/Amqp1/Amqp1ConnectionCases.cs, Curl.Conformance.Extended.UnitTests/Amqp1/Amqp1SessionLinkCases.cs, Documentation/Conformance/Extended/Amqp1.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4515 — Conformance: AMQP 1.0 connection, session, link, frame size, idle timeout and errors for amqp1:// (BL-4466 part 2 of 3)
+# BL-4528 — Conformance: AMQP 1.0 connection, session, link, frame size, idle timeout and errors for amqp1:// (BL-4466 part 2 of 3)
 
 ## Goal
 
-The AMQP 1.0 connection, session and link requirements (2.3 framing, 2.4, 2.5, 2.6 attach/detach, 2.8 errors) are measured against the BL-4514 reference container and in the Amqp1 matrix.
+The AMQP 1.0 connection, session and link requirements (2.3 framing, 2.4, 2.5, 2.6 attach/detach, 2.8 errors) are measured against the BL-4527 reference container and in the Amqp1 matrix.
 
 ## Context
 

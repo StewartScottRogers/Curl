@@ -62,10 +62,10 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Notes
 
-- 2026-11-02 (lane 5): Split for size before any code: no protocol has a reference server yet, so this run would have had to build the whole AMQP 1.0 container, every case group, the matrix and a coverage run inside one claim. Split into BL-4514 (reference container, protocol headers, SASL, matrix skeleton), BL-4515 (connection, session, link, frame size, idle timeout, errors) and BL-4516 (encoding widths, complete matrix, link to Amqp1-Messaging.md), each depending on the one before; BL-4467 now depends on all three instead of BL-4466.
+- 2026-11-02 (lane 5): Split for size before any code: no protocol has a reference server yet, so this run would have had to build the whole AMQP 1.0 container, every case group, the matrix and a coverage run inside one claim. Split into BL-4527 (reference container, protocol headers, SASL, matrix skeleton), BL-4528 (connection, session, link, frame size, idle timeout, errors) and BL-4529 (encoding widths, complete matrix, link to Amqp1-Messaging.md), each depending on the one before; BL-4467 now depends on all three instead of BL-4466.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: bb81a338 63d78303 0a6c8824 9fbc674d d8e3fb0e 59a9ad50 ef6c9026.
-- 2026-11-02: Doing -> Deferred. Split into BL-4514, BL-4515, BL-4516
+- 2026-11-02: Doing -> Deferred. Split into BL-4527, BL-4528, BL-4529
