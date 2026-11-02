@@ -36,6 +36,7 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
 - 2026-10-25_1542: 0 of 4 items are gaps.
 - 2026-10-30_2103: 0 of 4 items are gaps.
 - 2026-10-31_1828: 0 of 4 items are gaps.
+- 2026-11-02_0859: 0 of 4 items are gaps.
 
 ## Log
 

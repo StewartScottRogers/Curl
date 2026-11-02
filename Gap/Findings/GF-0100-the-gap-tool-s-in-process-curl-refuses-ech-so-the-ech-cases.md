@@ -34,6 +34,7 @@ In Curl.Console/InProcessCurl.cs, make CreateDialingRunner (and the IConnector o
 
 - 2026-10-30_2103: 2 of 2 items are gaps.
 - 2026-10-31_1828: 0 of 2 items are gaps.
+- 2026-11-02_0859: 0 of 2 items are gaps.
 
 ## Log
 

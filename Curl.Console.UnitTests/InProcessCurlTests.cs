@@ -348,7 +348,7 @@ public sealed class InProcessCurlTests
         Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, null!, datagramConnector, environment, listener));
         Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, resolver, null!, environment, listener));
         Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, resolver, datagramConnector, null!, listener));
-        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, resolver, datagramConnector, environment, null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, resolver, datagramConnector, environment, (IConnectionListener)null!));
     }
 
     private static string CreateTemporaryDirectory()
