@@ -69,3 +69,4 @@ defect in the extension library is listed in `KnownFailures.txt` with a filed Hi
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 00e0f0d4 d0c8875f 356f465e 94856415 d8e3fb0e 23196c4a ef6c9026.
