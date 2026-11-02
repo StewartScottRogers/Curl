@@ -65,3 +65,4 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 2b97f5e6 7e1a31d8 6873c13e d8e3fb0e 84853b77 ef6c9026.
