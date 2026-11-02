@@ -1229,3 +1229,4 @@ Each option and the specific reason it lost.
 | [1180](ADR-1180-mcp-serves-ai-help-extensions-through-a-host-supplied-reader.md) | The MCP server serves `curl://ai-help/extensions` through a reader the host supplies (BL-4450) | Accepted | 2026-11-01 |
 | [1181](ADR-1181-mcp-tools-serve-extended-protocols-as-curls-own.md) | The MCP tools serve Curl's extended protocols as they serve curl's own (BL-4451) | Accepted | 2026-11-01 |
 | [1182](ADR-1182-sasl-authzid-is-an-empty-digest-user.md) | With `--digest` the one scheme, `--sasl-authzid` and no `-u`, the origin is answered as an empty user, so a POST sends the empty Digest probe first (BL-4457, AF-0522) | Accepted | 2026-11-01 |
+| [1183](ADR-1183-service-name-is-an-empty-ntlm-user.md) | With `--ntlm` the one scheme, `--service-name` and no `-u`, the origin is answered as an empty user, so the NTLM Type 1 message goes on the first request (BL-4460, AF-0524) | Accepted | 2026-11-02 |
