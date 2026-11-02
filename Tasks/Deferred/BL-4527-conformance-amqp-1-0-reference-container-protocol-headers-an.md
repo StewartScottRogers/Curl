@@ -43,4 +43,4 @@ Follow `Documentation/Conformance/Extended/README.md` and ADR-1186/ADR-1188: the
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 576ff0e5 5498bf9b 798643cc 59a9ad50 9fbc674d d8e3fb0e ef6c9026.
 - 2026-11-02: Doing -> Backlog. Container, cases and matrix are written and green; 9 Amqp1 members are still over the complexity or branch gate (see Notes)
-- 2026-11-02: Backlog -> Deferred. Split for size into BL-4543 and BL-4544 after the cost cap was reached
+- 2026-11-02: Backlog -> Deferred. Split for size into BL-4545 and BL-4546 after the cost cap was reached

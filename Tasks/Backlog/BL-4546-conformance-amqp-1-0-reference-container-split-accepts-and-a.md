@@ -1,16 +1,16 @@
 ---
-id: BL-4544
+id: BL-4546
 title: Conformance: AMQP 1.0 reference container, split Accepts and AnswerAsync and verify the whole of BL-4527 (part 2 of 2)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4543]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4545]
 touches: [Curl.Conformance.Extended.UnitLibrary/Amqp1/Amqp1ReferenceContainer.cs, Curl.Conformance.Extended.UnitLibrary/Amqp1/Amqp1ReferenceContainerOptions.cs, Curl.Conformance.Extended.UnitTests/Amqp1, Curl.Conformance.Extended.UnitTests/KnownFailures.txt, Documentation/Conformance/Extended/Amqp1.md]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4544 — Conformance: AMQP 1.0 reference container, split Accepts and AnswerAsync and verify the whole of BL-4527 (part 2 of 2)
+# BL-4546 — Conformance: AMQP 1.0 reference container, split Accepts and AnswerAsync and verify the whole of BL-4527 (part 2 of 2)
 
 ## Goal
 
@@ -18,7 +18,7 @@ The reference AMQP 1.0 container's `Accepts` and `AnswerAsync` pass the quality 
 
 ## Context
 
-Split from BL-4527 (over its cost cap); follows BL-4543, which lands the container and brings the decoder and encoder under the gates. Remaining gate failures of `Amqp1ReferenceContainer`: Accepts (complexity 12) and AnswerAsync (complexity 12, branch 83.3%). Split them into smaller methods and add tests to `Amqp1ReferenceContainerTests.cs`. Then verify the rest of BL-4527 as filed: `Documentation/Conformance/Extended/Amqp1.md` (every client MUST/MUST NOT/SHOULD/SHOULD NOT of 2.2 and 5.3 has an `Amqp1:` ID mapped to a test or `n/a: <reason>`), the header and SASL cases (`Amqp1ProtocolHeaderCases.cs`, `Amqp1SaslCases.cs`) for `amqp1://` and `amqp1s://`, and `KnownFailures.txt` (a failing case is fixed or listed with a filed High `Fix Amqp1 conformance: ...` task; none failed so far). Follow `Documentation/Conformance/Extended/README.md`, ADR-1186 and ADR-1188.
+Split from BL-4527 (over its cost cap); follows BL-4545, which lands the container and brings the decoder and encoder under the gates. Remaining gate failures of `Amqp1ReferenceContainer`: Accepts (complexity 12) and AnswerAsync (complexity 12, branch 83.3%). Split them into smaller methods and add tests to `Amqp1ReferenceContainerTests.cs`. Then verify the rest of BL-4527 as filed: `Documentation/Conformance/Extended/Amqp1.md` (every client MUST/MUST NOT/SHOULD/SHOULD NOT of 2.2 and 5.3 has an `Amqp1:` ID mapped to a test or `n/a: <reason>`), the header and SASL cases (`Amqp1ProtocolHeaderCases.cs`, `Amqp1SaslCases.cs`) for `amqp1://` and `amqp1s://`, and `KnownFailures.txt` (a failing case is fixed or listed with a filed High `Fix Amqp1 conformance: ...` task; none failed so far). Follow `Documentation/Conformance/Extended/README.md`, ADR-1186 and ADR-1188.
 
 ## Acceptance criteria
 

@@ -4,7 +4,7 @@ title: Conformance: AMQP 1.0 encoding widths and complete Amqp1 matrix for amqp1
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4543, BL-4544, BL-4528]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4545, BL-4546, BL-4528]
 touches: [Curl.Conformance.Extended.UnitTests/Amqp1/Amqp1EncodingWidthCases.cs, Documentation/Conformance/Extended/Amqp1.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

@@ -4,7 +4,7 @@ title: Conformance: AMQP 1.0 transfer, flow, disposition and message format for 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4543, BL-4544, BL-4528, BL-4529]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4545, BL-4546, BL-4528, BL-4529]
 touches: [Curl.Conformance.Extended.UnitLibrary/Amqp1/Messaging, Curl.Conformance.Extended.UnitTests/Amqp1/Messaging, Documentation/Conformance/Extended/Amqp1-Messaging.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

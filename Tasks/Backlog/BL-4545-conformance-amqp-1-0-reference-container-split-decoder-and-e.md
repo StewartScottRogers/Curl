@@ -1,5 +1,5 @@
 ---
-id: BL-4543
+id: BL-4545
 title: Conformance: AMQP 1.0 reference container, split decoder and encoder under the quality gates (BL-4527 part 1 of 2)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4543 — Conformance: AMQP 1.0 reference container, split decoder and encoder under the quality gates (BL-4527 part 1 of 2)
+# BL-4545 — Conformance: AMQP 1.0 reference container, split decoder and encoder under the quality gates (BL-4527 part 1 of 2)
 
 ## Goal
 
@@ -18,7 +18,7 @@ The reference AMQP 1.0 container's type decoder and encoder in `Curl.Conformance
 
 ## Context
 
-Split from BL-4527 (over its cost cap). The stashed work holds the whole container, `Amqp1ProtocolHeaderCases.cs`, `Amqp1SaslCases.cs`, `Amqp1ReferenceContainerTests.cs` and `Documentation/Conformance/Extended/Amqp1.md`; all 121 tests in `Curl.Conformance.Extended.UnitTests` passed. What is left is the quality gate: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` failed `Amqp1ReferenceDecoder` Sized (complexity 16, branch 87.5%), Read (14), WidthOf (13, branch 92.3%), Variable (branch 80%, no test for an unknown 0xa? code), and `Amqp1ReferenceEncoder` Write (14), WriteSymbolArray (12), WriteNonNumeric (12). Split the switches into smaller methods or lookup tables and add the missing tests to `Amqp1ReferenceContainerTests.cs`. The container keeps decoding only the format codes a client sends (plus symbol arrays); do not widen it. Container.Accepts and AnswerAsync are the next task (BL-4544).
+Split from BL-4527 (over its cost cap). The stashed work holds the whole container, `Amqp1ProtocolHeaderCases.cs`, `Amqp1SaslCases.cs`, `Amqp1ReferenceContainerTests.cs` and `Documentation/Conformance/Extended/Amqp1.md`; all 121 tests in `Curl.Conformance.Extended.UnitTests` passed. What is left is the quality gate: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` failed `Amqp1ReferenceDecoder` Sized (complexity 16, branch 87.5%), Read (14), WidthOf (13, branch 92.3%), Variable (branch 80%, no test for an unknown 0xa? code), and `Amqp1ReferenceEncoder` Write (14), WriteSymbolArray (12), WriteNonNumeric (12). Split the switches into smaller methods or lookup tables and add the missing tests to `Amqp1ReferenceContainerTests.cs`. The container keeps decoding only the format codes a client sends (plus symbol arrays); do not widen it. Container.Accepts and AnswerAsync are the next task (BL-4546).
 
 ## Acceptance criteria
 
