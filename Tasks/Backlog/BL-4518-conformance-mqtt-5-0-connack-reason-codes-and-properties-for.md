@@ -1,20 +1,20 @@
 ---
-id: BL-4516
-title: Conformance: MQTT 5.0 DISCONNECT, AUTH, session state and error handling for mqtt5:// (Mqtt5 part 1c)
+id: BL-4518
+title: Conformance: MQTT 5.0 CONNACK reason codes and properties for mqtt5:// (Mqtt5 part 1b)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514, BL-4515]
-touches: [Curl.Conformance.Extended.UnitTests/Mqtt5/DisconnectAuthCases.cs, Curl.Conformance.Extended.UnitTests/Mqtt5/ErrorHandlingCases.cs, Curl.Conformance.Extended.UnitLibrary/Mqtt5/DisconnectAuth, Documentation/Conformance/Extended/Mqtt5.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4517]
+touches: [Curl.Conformance.Extended.UnitTests/Mqtt5/ConnackCases.cs, Curl.Conformance.Extended.UnitLibrary/Mqtt5/Connack, Documentation/Conformance/Extended/Mqtt5.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4516 — Conformance: MQTT 5.0 DISCONNECT, AUTH, session state and error handling for mqtt5:// (Mqtt5 part 1c)
+# BL-4518 — Conformance: MQTT 5.0 CONNACK reason codes and properties for mqtt5:// (Mqtt5 part 1b)
 
 ## Goal
 
-Curl's DISCONNECT, AUTH, session state and error handling on mqtt5:// are measured against MQTT 5.0 sections 3.14, 3.15, 4.1, 4.12 and 4.13 through the real curl command line, completing the Mqtt5 part 1 matrix.
+Curl's handling of CONNACK on mqtt5:// is measured against MQTT 5.0 section 3.2 through the real curl command line.
 
 ## Context
 
@@ -24,12 +24,12 @@ Library under test: `Curl.Extended.Protocol.Mqtt5.UnitLibrary` (`Encoding/`, `Pa
 
 Follow `Documentation/Conformance/Extended/README.md` and ADR-1186/ADR-1188: the harness, `[SpecRequirement]` IDs, the matrix format and the `KnownFailures.txt` rule. Measure against the specification, never upstream curl. The reference broker implements the wire format from the specification itself and references no `Curl.Extended.Protocol.*` project. One file per case group; nothing added to `Harness/`. A fault in the broker or cases is fixed here; a defect in the extension library is listed in `KnownFailures.txt` with a filed High task `Fix Mqtt5 conformance: <requirement>` (pipeline feature; touches the library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), the `KnownFailures.txt` line is removed). Every matrix row this task adds must be covered by a test or `n/a: <reason>` so the matrix check stays green after each part.
 
-Scope: 3.14 DISCONNECT, 3.15 AUTH, 4.1 session state as it binds the client, 4.12 enhanced authentication, 4.13 error handling. Builds on BL-4514's broker and BL-4515; add behaviour under `Curl.Conformance.Extended.UnitLibrary/Mqtt5/DisconnectAuth/` and rows to `Mqtt5.md`. This is the last part of BL-4484.
+Scope: 3.2 CONNACK. Builds on BL-4517's reference broker; add behaviour under `Curl.Conformance.Extended.UnitLibrary/Mqtt5/Connack/` without editing BL-4517's files, and add rows to `Mqtt5.md`.
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Mqtt5.md` lists every client-binding `[MQTT-…]` statement of 3.14, 3.15, 4.1, 4.12 and 4.13 (and every unnumbered MUST/SHOULD sentence there, given a `Mqtt5:` ID), each mapped to a test or `n/a: <reason>`, and the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Mqtt5/` (`DisconnectAuthCases.cs`, `ErrorHandlingCases.cs`) run curl in process and assert wire bytes, stdout, stderr and exit code for at least: a malformed packet from the server answered by DISCONNECT with the right reason code, a server DISCONNECT, AUTH with an unknown method, and invalid UTF-8 in a server string.
+- [ ] `Documentation/Conformance/Extended/Mqtt5.md` lists every `[MQTT-3.2…]` statement that binds a client (and every unnumbered MUST/SHOULD sentence of 3.2, given a `Mqtt5:` ID), each mapped to a test or `n/a: <reason>`, and the harness's matrix check passes.
+- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Mqtt5/ConnackCases.cs` run curl in process and assert wire bytes, stdout, stderr and exit code for at least CONNACK with each failure reason code, and the CONNACK properties the client must honour (Maximum Packet Size, Receive Maximum, Topic Alias Maximum, Server Keep Alive, Assigned Client Identifier).
 - [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with the ID of its filed High `Fix Mqtt5 conformance: ...` task; the known-failures check passes.
 - [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no test needs `TestCategory=Integration`.
 - [ ] The code this task adds under `Curl.Conformance.Extended.UnitLibrary/Mqtt5/` is at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).

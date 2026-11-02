@@ -1,5 +1,5 @@
 ---
-id: BL-4514
+id: BL-4517
 title: Conformance: MQTT 5.0 reference broker, data types, fixed header and CONNECT for mqtt5:// (Mqtt5 part 1a)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4514 — Conformance: MQTT 5.0 reference broker, data types, fixed header and CONNECT for mqtt5:// (Mqtt5 part 1a)
+# BL-4517 — Conformance: MQTT 5.0 reference broker, data types, fixed header and CONNECT for mqtt5:// (Mqtt5 part 1a)
 
 ## Goal
 
@@ -24,12 +24,12 @@ Library under test: `Curl.Extended.Protocol.Mqtt5.UnitLibrary` (`Encoding/`, `Pa
 
 Follow `Documentation/Conformance/Extended/README.md` and ADR-1186/ADR-1188: the harness, `[SpecRequirement]` IDs, the matrix format and the `KnownFailures.txt` rule. Measure against the specification, never upstream curl. The reference broker implements the wire format from the specification itself and references no `Curl.Extended.Protocol.*` project. One file per case group; nothing added to `Harness/`. A fault in the broker or cases is fixed here; a defect in the extension library is listed in `KnownFailures.txt` with a filed High task `Fix Mqtt5 conformance: <requirement>` (pipeline feature; touches the library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), the `KnownFailures.txt` line is removed). Every matrix row this task adds must be covered by a test or `n/a: <reason>` so the matrix check stays green after each part.
 
-Scope: chapter 1.5 (integers, Variable Byte Integer, UTF-8 strings and the 1.5.4 rules, binary data, string pairs), chapter 2 (fixed header, packet identifier rules, properties table 2-4, reason codes table 2-6), 3.1 CONNECT. The broker is designed so BL-4515 (`Mqtt5/Connack/`), BL-4516 (`Mqtt5/DisconnectAuth/`), BL-4485 (`Mqtt5/PublishSubscribe/`) and BL-4486 (`Mqtt5/Transports/`) add behaviour in their own subfolders without editing this task's files (for example a broker taking an injected CONNACK and per-packet responders).
+Scope: chapter 1.5 (integers, Variable Byte Integer, UTF-8 strings and the 1.5.4 rules, binary data, string pairs), chapter 2 (fixed header, packet identifier rules, properties table 2-4, reason codes table 2-6), 3.1 CONNECT. The broker is designed so BL-4518 (`Mqtt5/Connack/`), BL-4519 (`Mqtt5/DisconnectAuth/`), BL-4485 (`Mqtt5/PublishSubscribe/`) and BL-4486 (`Mqtt5/Transports/`) add behaviour in their own subfolders without editing this task's files (for example a broker taking an injected CONNACK and per-packet responders).
 
 ## Acceptance criteria
 
 - [ ] `Documentation/Conformance/Extended/Mqtt5.md` exists, lists every `[MQTT-…]` statement of chapters 1.5, 2 and 3.1 that binds a client (and every MUST/SHOULD sentence there without a number, given a `Mqtt5:` ID of its own), each mapped to a test or to `n/a: <reason>`, links to `Mqtt5-PublishSubscribe.md` (BL-4485) and `Mqtt5-Transports.md` (BL-4486), and the harness's matrix check passes.
-- [ ] A reference MQTT 5 broker in `Curl.Conformance.Extended.UnitLibrary/Mqtt5/` lets BL-4515, BL-4516, BL-4485 and BL-4486 add behaviour in their own subfolders without editing this task's files.
+- [ ] A reference MQTT 5 broker in `Curl.Conformance.Extended.UnitLibrary/Mqtt5/` lets BL-4518, BL-4519, BL-4485 and BL-4486 add behaviour in their own subfolders without editing this task's files.
 - [ ] Cases in `Curl.Conformance.Extended.UnitTests/Mqtt5/` run curl in process and assert wire bytes, stdout, stderr and exit code for at least CONNECT fields and flags: clean start, keep alive, and credentials from `-u`.
 - [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with the ID of its filed High `Fix Mqtt5 conformance: ...` task; the known-failures check passes.
 - [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no test needs `TestCategory=Integration`.

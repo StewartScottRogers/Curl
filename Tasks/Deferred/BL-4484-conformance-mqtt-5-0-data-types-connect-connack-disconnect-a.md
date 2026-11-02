@@ -66,10 +66,10 @@ in the extension library is listed in `KnownFailures.txt` with a filed High task
 
 ## Notes
 
-- 2026-11-02 (lane 2): Split before any edit for size (reference broker, full matrix and a dozen-plus cases exceed one run): BL-4514 (broker, chapters 1.5, 2, 3.1 CONNECT), BL-4515 (3.2 CONNACK), BL-4516 (3.14, 3.15, 4.1, 4.12, 4.13; last part). BL-4485 and BL-4486 now depend on the three new IDs.
+- 2026-11-02 (lane 2): Split before any edit for size (reference broker, full matrix and a dozen-plus cases exceed one run): BL-4517 (broker, chapters 1.5, 2, 3.1 CONNECT), BL-4518 (3.2 CONNACK), BL-4519 (3.14, 3.15, 4.1, 4.12, 4.13; last part). BL-4485 and BL-4486 now depend on the three new IDs.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: f2bdcaab 1ef8b608 6809fc35 28fcee0c d8e3fb0e 6f1f0535 ef6c9026.
-- 2026-11-02: Doing -> Deferred. Split into BL-4514, BL-4515, BL-4516
+- 2026-11-02: Doing -> Deferred. Split into BL-4517, BL-4518, BL-4519
