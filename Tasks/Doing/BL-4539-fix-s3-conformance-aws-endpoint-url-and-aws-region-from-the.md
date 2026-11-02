@@ -36,3 +36,4 @@ reader, as `ExtendedConformanceHarness` passes) cannot set the endpoint or regio
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 0bc13b29 c6122747 585afcef bf6a8285.
