@@ -35,7 +35,7 @@ public static class SigstoreExtension
         ExtensionOptionArgument.Value,
         "PEM file of the Fulcio CA certificates to trust (needed with --sigstore-bundle)");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "sigstore",
         "Verifies a download against a Sigstore bundle - digest, signature, Fulcio certificate chain and signer identity - before writing it.",

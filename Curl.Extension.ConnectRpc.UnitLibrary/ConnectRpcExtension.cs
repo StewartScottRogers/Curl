@@ -16,7 +16,7 @@ public static class ConnectRpcExtension
         ExtensionOptionArgument.Value,
         "Send a Connect call, \"unary\" or \"stream\", with the JSON message(s) given by -d as the request");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "connect-rpc",
         "Sends a Connect protocol unary or streaming call with JSON messages and writes the reply messages one per line.",

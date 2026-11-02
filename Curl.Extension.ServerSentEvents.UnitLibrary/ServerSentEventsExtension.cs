@@ -17,7 +17,7 @@ public static class ServerSentEventsExtension
         ExtensionOptionArgument.None,
         "Read a Server-Sent Events stream: write its events and reconnect with Last-Event-ID after its retry time");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "sse",
         "Reads Server-Sent Events streams, writing each event and reconnecting with Last-Event-ID after the stream's retry time.",

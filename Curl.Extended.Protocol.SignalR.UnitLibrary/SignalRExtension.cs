@@ -8,7 +8,7 @@ namespace Curl.Extended.Protocol.SignalR;
 /// <summary>The <c>signalr://</c> and <c>signalrs://</c> extension's description and handler factory (ADR-1084).</summary>
 public static class SignalRExtension
 {
-    /// <summary>Gets what <c>curl --extensions-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "signalr",
         "Connects to ASP.NET Core SignalR hubs: negotiates, opens the WebSocket transport with the JSON hub protocol, sends the -d message {\"type\":1|4,\"target\":\"Method\",\"arguments\":[...]} as an invocation (1) or stream invocation (4) and writes its result or each stream item as one JSON line; without -d writes each call the hub makes as a JSON array [\"target\", args...] per line until it closes.",

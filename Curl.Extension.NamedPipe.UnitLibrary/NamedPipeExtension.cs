@@ -10,7 +10,7 @@ public static class NamedPipeExtension
     /// <summary>Gets <c>--npipe &lt;\\.\pipe\name&gt;</c>.</summary>
     public static ExtensionOption Option { get; } = new("npipe", ExtensionOptionArgument.Value, @"Connect through this Windows named pipe, such as \\.\pipe\name");
 
-    /// <summary>Gets what <c>curl --extensions-help</c> says about the extension.</summary>
+    /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "npipe",
         "Runs every transfer over a Windows named pipe, the Windows counterpart of --unix-socket.",
