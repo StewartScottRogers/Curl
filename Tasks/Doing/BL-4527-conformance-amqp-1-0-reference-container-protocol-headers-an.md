@@ -37,3 +37,4 @@ Follow `Documentation/Conformance/Extended/README.md` and ADR-1186/ADR-1188: the
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 576ff0e5 5498bf9b 798643cc 59a9ad50 9fbc674d d8e3fb0e ef6c9026.
