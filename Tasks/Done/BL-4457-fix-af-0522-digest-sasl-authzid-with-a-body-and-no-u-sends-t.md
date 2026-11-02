@@ -8,7 +8,7 @@ depends-on: [BL-4458]
 touches: [Curl.Original.Protocol.Http.UnitLibrary, Curl.Original.Protocol.Http.UnitTests, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs, Curl.Protocol.Abstractions.UnitTests/HttpRequestOptionsTests.cs, Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs, Curl.Engine.UnitTests/HttpRequestOptionsMappingTests.cs]
 requirement: none
 created: 2026-11-01
-completed:
+completed: 2026-11-01
 ---
 # BL-4457 — Fix AF-0522: --digest --sasl-authzid with a body and no -u sends the body at once where curl sends the empty Digest probe POST first
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -67,9 +67,12 @@ The finding closes only when a later re-audit by the conformance auditor confirm
   the whole Curl.Protocol.Abstractions.UnitLibrary, so this task depends on it and goes
   back to Backlog until it is Done (lane rule 3). No commits carry code for this task yet.
 
+- 2026-11-01 (lane 1, second claim): done as planned above. `HttpRequestOptions.SaslAuthorizationIdentity`, set by `HttpRequestOptionsMapping.Of`; `HttpProtocolHandler.OriginCredentialOf` gives an empty `NetworkCredential` when there is no credential, the authzid is set and Digest is the one scheme allowed, so `SendsDigestProbe` probes and the challenge is answered for user `''`. Limited to Digest-only because Basic must not send `Basic Og==` (measured) and `--anyauth` was not measured (ADR-1182). The finding's reproduction, run against the Debug build, now gives `Content-Length: 0` for both curl and Curl. Fast tests of the three changed test projects green; Measure-CodeQuality.ps1 for the three libraries: 0 failing members. Change is platform-neutral (no paths, OS text or certificates).
+
 ## Log
 
 - 2026-11-01: Created.
 - 2026-11-01: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-11-01: Doing -> Backlog. Needs Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs, which BL-4458 holds; waits on BL-4458
 - 2026-11-01: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-01: Doing -> Done. Digest-only --sasl-authzid without -u now answers as an empty user and sends the empty probe POST first (ADR-1182)
