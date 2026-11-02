@@ -43,3 +43,4 @@ Design worked out by the 2026-10-28 claim (lane 3), before any edit; record it a
 - 2026-10-28: Doing -> Backlog. Split before any edit: SslStream cannot expose the encrypted TLS 1.3 handshake messages, so the trace criterion moves to BL-4009 and BL-4010; criteria and touches narrowed to the group and signature names
 - 2026-10-28: Backlog -> Deferred. Split into BL-4039, BL-4040, BL-4041 (over its cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 0115e735 c663dd40 3d836d5e.
