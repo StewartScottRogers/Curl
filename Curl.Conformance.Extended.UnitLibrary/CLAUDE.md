@@ -13,7 +13,9 @@ standard error and, per connection or datagram channel, the bytes each side sent
   reference server; on a TLS route (BL-4506) they are the plaintext behind the handshake, which
   `TlsServerStream` serves with the route's certificate (`ReferenceCertificate.CreateSelfSigned`
   makes one curl accepts under `-k`). A server that fails, such as a TLS accept curl never
-  completes, makes `RunAsync` throw its exception; one still waiting when curl ends is cancelled.
+  completes, makes `RunAsync` throw its exception. When curl ends, its end of every TCP connection is closed so
+  each server reads what curl last sent and then the end of the stream (BL-4543); one still waiting
+  after that, on anything else, is cancelled.
 - Requirements (BL-4502, ADR-1186): a test carries `[SpecRequirement("<Name>:<source>-<locator>")]`;
   `RequirementMatrix` checks `Documentation/Conformance/Extended/<Name>.md` (copied to the test output)
   against the carriers the test project collects, and `KnownFailures.RunCaseAsync` runs a case listed in

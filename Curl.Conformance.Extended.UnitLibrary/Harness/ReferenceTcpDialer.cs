@@ -17,7 +17,7 @@ internal sealed class ReferenceTcpDialer(IReadOnlyList<ReferenceRoute> routes, R
             ?? throw new SocketException((int)SocketError.ConnectionRefused);
         (InMemoryDuplexStream clientEnd, InMemoryDuplexStream serverEnd) = InMemoryDuplexStream.CreatePair();
         WireExchange exchange = run.Open(route);
-        run.Serve(ServeAsync(route, serverEnd, exchange, run.Stopping));
+        run.Serve(ServeAsync(route, serverEnd, exchange, run.Stopping), clientEnd);
         ReferenceClientConnection connection = new(clientEnd, endPoint);
         return ValueTask.FromResult(new DialedTcpConnection(connection, (IPEndPoint)connection.LocalEndPoint!));
     }
