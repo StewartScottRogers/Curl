@@ -31,3 +31,4 @@ Found by BL-4482's conformance case McpStreamableHttpCases.ExpiredSession404_Cur
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 4f32e72d 80f495c6 a9b118e0.
