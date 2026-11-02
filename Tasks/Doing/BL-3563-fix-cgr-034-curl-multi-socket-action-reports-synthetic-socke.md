@@ -99,3 +99,4 @@ probe.exe C_20,C_21,C_65,C_74,C_75 2
 - 2026-10-28: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-3563-20261028-052757-L1.jsonl
 - 2026-10-28: Backlog -> Deferred. Split into BL-3976, BL-3977, BL-3978 (cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
