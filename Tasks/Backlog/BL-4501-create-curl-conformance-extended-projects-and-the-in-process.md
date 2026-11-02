@@ -36,7 +36,22 @@ Start from `Curl.Console/InProcessCurl.cs` (`RunAsync` with `ITcpDialer`, `IDnsR
 
 ## Notes
 
+- 2026-11-02 lane 1 (run 1, handed back at the cost cap; nothing committed, the shift stashes the code):
+  - Done: both projects, `/Conformance/Extended/` in `Curl.slnx`, the three `InternalsVisibleTo` lines,
+    the UnitLibrary's `CLAUDE.md`, and `Harness/`: `ExtendedConformanceHarness.RunAsync` takes the curl entry
+    point as an `InProcessCurlRunner` delegate (the UnitLibrary cannot reference `Curl.Console`; tests pass
+    `InProcessCurl.RunAsync`), `ReferenceRoute` (Tcp/Tls/Udp by port; every host resolves to 127.0.0.1),
+    `ScriptedReferenceServer`/`ScriptStep`, `ScriptedDatagramServer`, `WireExchange`, `ReferenceConnection`
+    (records at the server, so a TLS route records plaintext), `ReferenceCertificate`. TimeProvider left to BL-4503.
+  - Measured: `redis://` sends RESP3 `HELLO 3` before the command; the script answers `%0` then `+PONG`.
+    TCP (redis), UDP (tftp), `CURL_EXTENSIONS=0` (exit 1), refused port (exit 7) and the dialer/channel tests pass.
+  - Left: `RunAsync_RedisPingOverTls_...` hangs or crashes the test host (`rediss://` with `-k`). Suspect
+    `ReferenceTcpDialer.ServeAsync`'s TLS branch (no ALPN in `TlsServerOptions`; a failed accept is swallowed by
+    `ReferenceRun.EndAsync`). Then verify the TCP test's `PONG\n` stdout, build the solution `-warnaserror`, fast
+    tests, one `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary`, and an ADR for the harness.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 94bce983 a163e683 ff67eeb1 07a99046 34c192a5 cc077f22 5306de6c.
+- 2026-11-02: Doing -> Backlog. Cost cap: harness, projects and TCP/UDP routes written (uncommitted, stashed); TLS route test hangs, quality run and ADR left
