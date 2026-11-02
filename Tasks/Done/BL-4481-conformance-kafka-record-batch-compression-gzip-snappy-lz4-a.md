@@ -76,7 +76,7 @@ focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), the `Kn
   "decoder checks the checksum" rows are `n/a` (SHOULD-level, and the batch CRC-32C already covers the compressed
   bytes), not a fix task.
 - Decision (default taken): Huffman-coded literals and FSE sequence modes need a Huffman and an FSE encoder in the
-  reference, a run's worth of work of their own; their two matrix rows are `n/a` naming BL-4564, filed to add them
+  reference, a run's worth of work of their own; their two matrix rows are `n/a` naming BL-4572, filed to add them
   (depends on this task). It is not a prerequisite of this task's criteria, which list zstd raw, RLE and compressed
   blocks, repeat offsets, a checksum and a dictionary id.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` reports 0 failing members

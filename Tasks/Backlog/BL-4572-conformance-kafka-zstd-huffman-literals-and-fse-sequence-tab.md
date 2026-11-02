@@ -1,5 +1,5 @@
 ---
-id: BL-4564
+id: BL-4572
 title: Conformance: Kafka zstd Huffman literals and FSE sequence tables for kafka://
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4564 — Conformance: Kafka zstd Huffman literals and FSE sequence tables for kafka://
+# BL-4572 — Conformance: Kafka zstd Huffman literals and FSE sequence tables for kafka://
 
 ## Goal
 
