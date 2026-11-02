@@ -52,3 +52,4 @@ Scope: section 5 (methods, token matching, options and their critical/elective, 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: a7c897a9 6108a24d d503fe2c fb1c989b d8e3fb0e ef6c9026.
