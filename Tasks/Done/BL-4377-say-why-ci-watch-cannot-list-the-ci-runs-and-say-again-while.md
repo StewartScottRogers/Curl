@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/CiWatch.ps1, DarkFactory/ShiftEnd.ps1, DarkFactory/Heartbeat.ps1, DarkFactory/ShiftCoordinator.ps1]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-11-02
 ---
 # BL-4377 — Say why CI watch cannot list the CI runs, and say again while it still cannot
 
@@ -25,7 +25,7 @@ When the coordinator's CI watch cannot list the `CI` runs, its log line carries 
 - [x] The `cannot list` line includes gh's exit code and the first line of its stderr.
 - [x] While listing keeps failing, the line is written again at most every 30 minutes with how long the watch has been unable to list; the first successful list after a failure writes one `listing CI runs again` line.
 - [x] `RunDarkFactory.ps1`'s CI-watch self-test (`-TestCiWatch` or the area's own switch) covers the three cases with stand-in `-ListRuns` blocks.
-- [ ] The cause of the first-heartbeat failure is named in Notes from a shift's log after this change, and fixed if it is the factory's own (for example a call made before the shift's environment is ready).
+- [x] The cause of the first-heartbeat failure is named in Notes from a shift's log after this change, and fixed if it is the factory's own (for example a call made before the shift's environment is ready).
 
 ## Notes
 
@@ -36,6 +36,8 @@ When the coordinator's CI watch cannot list the `CI` runs, its log line carries 
 - 2026-10-31 (lane 2): criterion 4 stays unticked. It asks for the cause to be named from a shift's log taken after this change, and no shift can run inside a lane. To finish: once these commits are on the shift branch, read the first shift log after them. If it has no `cannot list the CI runs` line (or only one followed by `listing CI runs again`), record that it confirms the cause above and tick the box. If the line is still there, its exit code and gh's stderr now name the real cause: fix it.
 - 2026-10-31 (lane 2): dotnet build clean (0 warnings), fast tests 0 failed. The code is left uncommitted for the shift to stash (lane rule 6), but criterion 4 needs that code to run in a shift first, so this task cannot reach Done while its code stays in a stash. Whoever claims it next should commit the stashed change (criteria 1-3 are met and tested) so a shift runs it, then come back for criterion 4; or Stewart restates criterion 4 as "named from reproduction".
 
+- 2026-11-02 (lane 2): every criterion is met by the split's two tasks, both Done: BL-4384 committed criteria 1-3 as 8c14126f5; BL-4385 read DarkFactory-20261031-060833.log, the first shift to load 8c14126f5, which listed the CI runs at 06:09:08 with no `cannot list` line, confirming the cause named above (the timed gh wrapper space-joined `--json a,b`), already fixed by 8c14126f5. Criterion 4 ticked on that evidence; no code changed in this run.
+
 ## Log
 
 - 2026-10-30: Created.
@@ -44,3 +46,4 @@ When the coordinator's CI watch cannot list the `CI` runs, its log line carries 
 - 2026-10-31: Backlog -> Deferred. Split into BL-4384 (commit the stashed work, criteria 1-3) and BL-4385 (name the cause from a shift log, criterion 4)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 842ca840 c081c1f2 9d88f1e3 cd4e4eec.
+- 2026-11-02: Doing -> Done. CI watch and merge wait say gh's exit code and error, re-trace every 30 min and on recovery; cause (timed gh wrapper space-joining --json) fixed and confirmed from shift log 060833 (BL-4384, BL-4385)
