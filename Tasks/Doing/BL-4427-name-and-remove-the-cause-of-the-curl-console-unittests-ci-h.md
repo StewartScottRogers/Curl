@@ -35,3 +35,4 @@ Split from BL-4421 (its criterion 1). BL-4421 already landed `Curl.Console.UnitT
 - 2026-10-31: Backlog -> Doing. Criteria at claim: 68c218e4.
 - 2026-10-31: Doing -> Blocked. a CI hang after 9ce35d213 to read: no Quality gates shard 3 run has hung since HangBlame.runsettings landed (run 41236102295 passed, blame found no hung test)
 - 2026-11-02: Blocked -> Backlog. Stewart 2026-11-02: complete all tasks; stop waiting for a recurrence - reproduce the Curl.Console.UnitTests hang under load (repeat runs, parallel shards, CPU contention), then fix it, or close it with the evidence that it no longer occurs.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 68c218e4.
