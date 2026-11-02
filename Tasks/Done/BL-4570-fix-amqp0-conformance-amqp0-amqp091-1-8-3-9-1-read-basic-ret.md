@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ClientFlow.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Methods, Curl.Extended.Protocol.Amqp0.UnitTests, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4570 — Fix Amqp0 conformance: Amqp0:AMQP091-1.8.3.9-1 (read basic.return and its content)
 
@@ -24,14 +24,19 @@ Library: `Curl.Extended.Protocol.Amqp0.UnitLibrary` (its CLAUDE.md, ADR-1056, AD
 
 ## Acceptance criteria
 
-- [ ] The case Publish_ReturnedByTheBroker_IsReadWithItsContentAndTheChannelClosesCleanly passes as a plain case.
-- [ ] A focused unit test in `Curl.Extended.Protocol.Amqp0.UnitTests` pins the fix (ADR-0482).
-- [ ] The `Amqp0:AMQP091-1.8.3.9-1` line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests are green and the library stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30.
+- [x] The case Publish_ReturnedByTheBroker_IsReadWithItsContentAndTheChannelClosesCleanly passes as a plain case.
+- [x] A focused unit test in `Curl.Extended.Protocol.Amqp0.UnitTests` pins the fix (ADR-0482).
+- [x] The `Amqp0:AMQP091-1.8.3.9-1` line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests are green and the library stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30.
 
 ## Notes
+
+- Delivered directly (a two-file fix): `Amqp0BasicReturn` (60.50) in `Amqp0MethodReader`; `Amqp0ClientFlow.ReceiveMethodAsync` reads any basic.return with its content and skips it, so the publish closes channel and connection with 200 and exits 0 with nothing written (ADR-1197, decided under delegation: the client never sets mandatory, so a return is unasked).
+- Tests: `Amqp0MethodReaderTests` round-trips basic.return; `Amqp0ProtocolHandlerTests.ExecuteAsync_BasicReturnAfterPublish_SkipsTheReturnedMessageAndClosesWith200` pins the flow (ADR-0482). The conformance case passes as a plain case with its KnownFailures line (which named BL-4563) removed.
+- `dotnet build Curl.slnx -warnaserror` clean, fast tests green, Measure-CodeQuality for the library: 0 failing members. Platform-neutral (no paths, OS text or certificates).
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 482aeb1b d78c25d3 865591a2 e97c1b31.
+- 2026-11-02: Doing -> Done. amqp:// reads a basic.return with its content and skips it, closing with 200

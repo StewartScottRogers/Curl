@@ -28,6 +28,7 @@ public sealed class Amqp0MethodReaderTests
         (new Amqp0QueueDeclare("q1") { Durable = true, AutoDelete = true }, "0032000A" + "0000" + Q1 + "0A" + "00000000"),
         (new Amqp0QueueDeclareOk("q1", 3, 0), "0032000B" + Q1 + "00000003" + "00000000"),
         (new Amqp0BasicPublish("", "q1") { Mandatory = true }, "003C0028" + "0000" + "00" + Q1 + "01"),
+        (new Amqp0BasicReturn(312, "q1", "", "q1"), "003C0032" + "0138" + Q1 + "00" + Q1),
         (new Amqp0BasicGet("q1", NoAck: true), "003C0046" + "0000" + Q1 + "01"),
         (new Amqp0BasicGetOk(1, false, "", "q1", 0), "003C0047" + "0000000000000001" + "00" + "00" + Q1 + "00000000"),
         (new Amqp0BasicGetEmpty(), "003C0048" + "00"),
@@ -65,6 +66,7 @@ public sealed class Amqp0MethodReaderTests
             new Amqp0QueueDeclare("q") { Passive = true, Exclusive = true, NoWait = true },
             new Amqp0BasicPublish("amq.direct", "k") { Immediate = true },
             new Amqp0BasicGetOk(9, true, "x", "k", 4),
+            new Amqp0BasicReturn(313, "NO_CONSUMERS", "amq.direct", "k"),
             new Amqp0BasicAck(7, Multiple: true),
         ];
 
@@ -75,7 +77,8 @@ public sealed class Amqp0MethodReaderTests
             Assert.AreEqual(Convert.ToHexString(method.ToPayload()), Convert.ToHexString(read.ToPayload()));
         }
 
-        Assert.AreEqual(new Amqp0BasicAck(7, true), Amqp0MethodReader.Read(methods[5].ToPayload()));
+        Assert.AreEqual(new Amqp0BasicAck(7, true), Amqp0MethodReader.Read(methods[6].ToPayload()));
+        Assert.AreEqual(new Amqp0BasicReturn(313, "NO_CONSUMERS", "amq.direct", "k"), Amqp0MethodReader.Read(methods[5].ToPayload()));
     }
 
     [TestMethod]

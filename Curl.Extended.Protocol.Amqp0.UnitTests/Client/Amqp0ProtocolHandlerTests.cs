@@ -77,6 +77,26 @@ public sealed class Amqp0ProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_BasicReturnAfterPublish_SkipsTheReturnedMessageAndClosesWith200()
+    {
+        byte[] returned =
+        [
+            .. Frame(new Amqp0BasicReturn(312, "NO_ROUTE", string.Empty, "q"), 1),
+            .. Amqp0Content.ToFrames(1, 60, Amqp0BasicProperties.None, "hi"u8.ToArray(), 4096).SelectMany(frame => frame.ToBytes()),
+        ];
+        ScriptedAmqp0Connection connection = new([.. Handshake(0, 0), .. returned, .. Closes()]);
+        MemoryStream output = new();
+        TransferContext context = new() { Url = CurlUrl.Parse("amqp://broker/v/q"), Output = output, PostData = "hi"u8.ToArray() };
+
+        TransferResult result = await new Amqp0ProtocolHandler(new ScriptedAmqp0Connector(ConnectResult.Connected(connection))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(0L, output.Length);
+        Assert.AreEqual(new Amqp0ChannelClose(200, "Goodbye", 0, 0), Method(connection.Writes[7], 1));
+        Assert.AreEqual(new Amqp0ConnectionClose(200, "Goodbye", 0, 0), Method(connection.Writes[8]));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_GetEmpty_EndsAsEmptyTransfer()
     {
         ScriptedAmqp0Connection connection = new([.. Handshake(0, 0), .. Frame(new Amqp0BasicGetEmpty(), 1), .. Closes()]);

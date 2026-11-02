@@ -25,6 +25,7 @@ internal static class Amqp0MethodReader
         [(50, 10)] = Amqp0QueueDeclare.ReadArguments,
         [(50, 11)] = Amqp0QueueDeclareOk.ReadArguments,
         [(60, 40)] = Amqp0BasicPublish.ReadArguments,
+        [(60, 50)] = Amqp0BasicReturn.ReadArguments,
         [(60, 70)] = Amqp0BasicGet.ReadArguments,
         [(60, 71)] = Amqp0BasicGetOk.ReadArguments,
         [(60, 72)] = Amqp0BasicGetEmpty.ReadArguments,
