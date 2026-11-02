@@ -42,3 +42,4 @@ Split from BL-3639 (CGR-110, Documentation/Reviews/Curl-Gap-Report-2026-10-25.md
 - 2026-10-28: Doing -> Backlog. Waiting on BL-3985: the tool's -F @- path (Curl.Core MultipartFormBodyBuilder) reads stdin up front, so the end-to-end exit 42 needs it; unit fix is in the stash
 - 2026-10-28: Backlog -> Deferred. Over its cost cap; split into BL-4000 (MimePostForm abort) and BL-4001 (real curl comparison)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 32acf4e5 20956cfc c259902e.
