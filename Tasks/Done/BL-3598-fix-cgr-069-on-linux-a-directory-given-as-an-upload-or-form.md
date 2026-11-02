@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Cli.UnitTests/Cgr069Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-11-02
 ---
 # BL-3598 — Fix CGR-069: On Linux, a directory given as an upload or form file (-T dir, -F f=@dir) fails with exit 26 where curl uploads an empty body and exits 0...
 
@@ -72,15 +72,17 @@ curl -sS -d @sub http://127.0.0.1:20355/a
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr069Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+
+- 2026-11-02 (lane 8): nothing left to do here. Stewart sent this umbrella back from Deferred, but all three parts of its split are Done (Tasks/Done/2026-10-28): BL-3894 (`-d @dir` refused with curl's two lines, exit 26, no `Failed to open` line), BL-3895 (`-T dir` off Windows sends an empty chunked PUT and exits 0) and BL-3896 (`-F f=@dir` off Windows sends an empty file part and exits 0). Each part's Notes hold the repro commands and both results; their focused tests are Curl.Cli.UnitTests/Cgr069DataFileTests.cs, Curl.Cli.UnitTests/Cgr069FormFileTests.cs and Curl.Console.UnitTests/Cgr069UploadDirectoryTests.cs. All of those pass here (10 + 3 tests). The full fast suites of Curl.Cli.UnitTests (4501 passed) and Curl.Console.UnitTests (3124 passed) are green. Stash cd80d714 was the first claim's draft of the same fix, which the parts replaced, so none of it was carried over. No code changed, so no quality run was needed. The criteria are ticked on the parts' evidence; the Linux behaviour stays platform-neutral and pinned by OSCondition tests in those files.
 
 ## Log
 
@@ -90,3 +92,4 @@ curl -sS -d @sub http://127.0.0.1:20355/a
 - 2026-10-26: Backlog -> Deferred. Split into BL-3894, BL-3895, BL-3896
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-11-02: Doing -> Done. All three parts of the split (BL-3894, BL-3895, BL-3896) are Done: on Linux, -T dir and -F f=@dir send empty bodies and exit 0, and -d @dir gives curl's two lines and exit 26
