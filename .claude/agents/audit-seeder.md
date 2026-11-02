@@ -39,7 +39,10 @@ Do exactly this:
    pools plus `http://127.0.0.1:PORT/`, e.g. via `Record-CurlExchange.ps1`) against the planted
    build and against real curl. The exit code (or stderr) must differ. If it does not, undo the
    site and choose another; never keep a conformance plant that needs a URL the tool does not
-   generate. A load plant's **Trigger** is instead a `Audit/Tools/Test-TransfersUnderLoad.ps1
+   generate, or whose trigger uses an option the tool never generates (run
+   `powershell -NoProfile -File Audit/Tools/Invoke-DifferentialConformance.ps1 -ListExcluded`:
+   `-K`/`--config`, `--netrc*`, `-u`, `--proxy*`, `-x` and the rest). The audit run rejects such a
+   plant, since the conformance method cannot observe it. A load plant's **Trigger** is instead a `Audit/Tools/Test-TransfersUnderLoad.ps1
    -Scenario <name>` run, with `-Candidate` naming the planted build: real curl must finish and
    the planted build must time out or exit differently. Keep the one command and both outcomes
    for the manifest's `trigger`.
