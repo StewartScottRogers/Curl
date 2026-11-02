@@ -31,3 +31,4 @@ Split from BL-4421 (its criterion 2). Depends on BL-4427, which names and remove
 ## Log
 
 - 2026-10-31: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 348e26be.
