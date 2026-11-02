@@ -29,7 +29,10 @@ internal sealed class ReferenceTcpDialer(IReadOnlyList<ReferenceRoute> routes, R
         throw new SocketException((int)SocketError.ConnectionRefused);
 
     // Serves the connection, through a TLS server handshake on a TLS route, and closes the server's
-    // end when done. It yields first so curl's dial returns before the handshake waits for its hello.
+    // end when done: on a TLS route it first sends close_notify, as a real TLS server ending the
+    // connection does, so a client reading a close-delimited body sees its end. A write to the
+    // in-memory pair never fails, so a client that has already closed does not stop the shutdown.
+    // It yields first so curl's dial returns before the handshake waits for its hello.
     private static async Task ServeAsync(ReferenceRoute route, InMemoryDuplexStream serverEnd, WireExchange exchange, CancellationToken cancellationToken)
     {
         await Task.Yield();
@@ -43,5 +46,6 @@ internal sealed class ReferenceTcpDialer(IReadOnlyList<ReferenceRoute> routes, R
         TlsServerOptions options = new(route.Certificate, [], RequestClientCertificate: false);
         await using Stream tls = await TlsServerStream.AcceptAsync(serverEnd, options, TlsServerStream.PlatformServesTls13, cancellationToken).ConfigureAwait(false);
         await route.StreamServer!.ServeAsync(new ReferenceConnection(tls, exchange), cancellationToken).ConfigureAwait(false);
+        await TlsServerStream.ShutdownAsync(tls).ConfigureAwait(false);
     }
 }
