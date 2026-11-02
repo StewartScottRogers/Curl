@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4517, BL-4
 touches: [Curl.Conformance.Extended.UnitLibrary/Mqtt5/PublishSubscribe, Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe, Documentation/Conformance/Extended/Mqtt5-PublishSubscribe.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4485 — Conformance: MQTT 5.0 PUBLISH, QoS flows, SUBSCRIBE and topic rules for mqtt5:// (Mqtt5 part 2 of 3)
 
@@ -44,26 +44,28 @@ library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a 
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Mqtt5-PublishSubscribe.md` lists every `[MQTT-…]` statement of this scope
+- [x] `Documentation/Conformance/Extended/Mqtt5-PublishSubscribe.md` lists every `[MQTT-…]` statement of this scope
       that binds a client (unnumbered MUST/SHOULD sentences given `Mqtt5:` IDs of their own), each mapped to a test or
       to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe/` run curl in process and assert wire
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe/` run curl in process and assert wire
       bytes, stdout, stderr and exit code for at least: publish at the QoS the client uses with each acknowledgement
       reason code, a subscribe with SUBACK granting a lower QoS and refusing, received QoS 0, 1 and 2 messages
       acknowledged in order, a topic alias set and reused by the server, a wildcard topic name refused, packet
       identifiers in use not reused, PINGREQ at the keep-alive interval and a missing PINGRESP, and a message larger
       than the client's Maximum Packet Size.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Mqtt5 conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Mqtt5/PublishSubscribe/` is at 100% line and branch
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Mqtt5/PublishSubscribe/` is at 100% line and branch
       coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: d4d8d4d4 73e63400 28fcee0c d8e3fb0e d2da9c9b ef6c9026.
+- 2026-11-02: Doing -> Done. mqtt5:// PUBLISH, QoS flows, SUBSCRIBE, keep alive and topic rules measured against MQTT 5.0 with a full matrix; three client defects filed as BL-4573..4575
