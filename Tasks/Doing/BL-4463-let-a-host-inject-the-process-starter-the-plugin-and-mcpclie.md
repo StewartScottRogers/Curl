@@ -68,3 +68,4 @@ delegation", one line in `Documentation/Planning/Decisions/README.md` (a shared 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: ec78e582 c0680051 0dd67f5e 09011436 914c30cc e1d01e88.
