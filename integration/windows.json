@@ -1,0 +1,14 @@
+{
+  "platform": "Windows",
+  "commit": "e5223db984c5120032721514d21268bb80c3e5cf",
+  "runUrl": "https://github.com/StewartScottRogers/Curl/actions/runs/41373973876",
+  "measuredAt": "2026-11-02T02:35:36Z",
+  "resultFiles": 246,
+  "projects": 10,
+  "passed": 78,
+  "failed": 1,
+  "notRun": 17,
+  "failedTests": [
+    "curl.networking.integrationtests: AuthenticateAsClientAsync_WhenTheServerSendsAnIntermediate_ReportsItAfterTheServersCertificate"
+  ]
+}
