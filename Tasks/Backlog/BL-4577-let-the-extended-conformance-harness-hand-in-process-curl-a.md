@@ -1,5 +1,5 @@
 ---
-id: BL-4573
+id: BL-4577
 title: Let the extended conformance harness hand in-process curl a stand-in extension process starter
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4573 — Let the extended conformance harness hand in-process curl a stand-in extension process starter
+# BL-4577 — Let the extended conformance harness hand in-process curl a stand-in extension process starter
 
 ## Goal
 

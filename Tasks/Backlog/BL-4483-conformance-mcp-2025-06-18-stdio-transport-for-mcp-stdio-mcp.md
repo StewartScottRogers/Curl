@@ -4,7 +4,7 @@ title: Conformance: MCP 2025-06-18 stdio transport for mcp+stdio:// (McpClient p
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4482, BL-4463, BL-4573]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4482, BL-4463, BL-4577]
 touches: [Curl.Conformance.Extended.UnitLibrary/McpClient/Stdio, Curl.Conformance.Extended.UnitTests/McpClient/Stdio, Documentation/Conformance/Extended/McpClient-Stdio.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
@@ -63,7 +63,7 @@ defect in the extension library is listed in `KnownFailures.txt` with a filed Hi
 - 2026-11-02 (lane 4, first claim, no code edited): the stand-in process cannot reach curl yet. BL-4463 stops at
   `EngineComposition.CreateProtocolHandlers(extensionProcessStarter:)`; `InProcessCurl.RunAsync`, the
   `CurlComposition` dialing runner, the harness's `InProcessCurlRunner` and `ExtendedConformanceHarness.RunAsync`
-  take no starter, and this task may add nothing to `Harness/` or `Curl.Console`. Filed BL-4573 for that plumbing
+  take no starter, and this task may add nothing to `Harness/` or `Curl.Console`. Filed BL-4577 for that plumbing
   (also added to BL-4489's `depends-on`, which needs the same seam) and requeued. Once it is Done, pass the stand-in
   through the harness's new parameter; the stand-in (`McpClient/Stdio/`) wraps `McpReferenceToolServer` over an
   in-memory stdin/stdout pair and records the program, arguments, stdin bytes and its own stderr lines.
@@ -72,4 +72,4 @@ defect in the extension library is listed in `KnownFailures.txt` with a filed Hi
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 887016a3 b03319d6 14e1c865 add6527d 0c609014 ef6c9026.
-- 2026-11-02: Doing -> Backlog. Waits on BL-4573: in-process curl and the conformance harness cannot yet take a stand-in extension process starter
+- 2026-11-02: Doing -> Backlog. Waits on BL-4577: in-process curl and the conformance harness cannot yet take a stand-in extension process starter
