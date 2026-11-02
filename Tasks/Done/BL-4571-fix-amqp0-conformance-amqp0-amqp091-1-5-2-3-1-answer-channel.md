@@ -32,7 +32,7 @@ Library: `Curl.Extended.Protocol.Amqp0.UnitLibrary` (its CLAUDE.md, ADR-1056, AD
 ## Notes
 
 - Done directly rather than through the full /feature subagent stages: a small change in one library, and the run's cost cap is tight.
-- Decision (ADR-1199): channel.flow is answered at once with flow-ok carrying the same active bit, wherever the client waits for a method; after active 0 the publish waits, answering further flows, until a channel.flow with active 1, rather than failing. A close meanwhile ends it as a server close; any other method as unexpected (exit 8). basic.get is not held by flow.
+- Decision (ADR-1200): channel.flow is answered at once with flow-ok carrying the same active bit, wherever the client waits for a method; after active 0 the publish waits, answering further flows, until a channel.flow with active 1, rather than failing. A close meanwhile ends it as a server close; any other method as unexpected (exit 8). basic.get is not held by flow.
 - Added Amqp0ChannelFlow and Amqp0ChannelFlowOk (both read by Amqp0MethodReader), and four Amqp0ProtocolHandlerTests plus reader round-trip rows.
 - Measured: Measure-CodeQuality for Curl.Extended.Protocol.Amqp0.UnitLibrary at 100% line and 100% branch, 0 failing members; the Amqp0 conformance cases (30) pass with the KnownFailures line removed; dotnet build Curl.slnx -warnaserror clean, fast tests green (115 test projects).
 - CI on Linux and macOS: the change is platform-neutral (in-memory scripted connection, no paths or OS text).

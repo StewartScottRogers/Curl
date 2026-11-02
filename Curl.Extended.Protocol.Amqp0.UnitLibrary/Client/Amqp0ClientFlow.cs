@@ -12,7 +12,7 @@ namespace Curl.Extended.Protocol.Amqp0.Client;
 /// connection.close or channel.close from the server ends the transfer naming its reply code and text. A basic.return
 /// the server sends is read with its returned message and skipped: nothing is written and the transfer goes on (ADR-1198).
 /// A channel.flow is answered with channel.flow-ok carrying the same active bit, and after an active 0 the publish waits
-/// for a channel.flow with active 1 before it sends content (ADR-1199).
+/// for a channel.flow with active 1 before it sends content (ADR-1200).
 /// </summary>
 internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
 {
@@ -153,7 +153,7 @@ internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITra
         return method as T ?? throw Unexpected(method);
     }
 
-    /// <summary>Waits, answering each channel.flow, until the broker lets content flow again (ADR-1199); any other method
+    /// <summary>Waits, answering each channel.flow, until the broker lets content flow again (ADR-1200); any other method
     /// arriving meanwhile ends the transfer as the server's close or an unexpected method.</summary>
     private async ValueTask WaitUntilFlowIsActiveAsync()
     {
@@ -169,7 +169,7 @@ internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITra
 
     /// <summary>Reads one method; the methods the broker sends unasked are dealt with here and give <see langword="null"/>.
     /// A basic.return (the client never sets mandatory) is read with its content and skipped (ADR-1198); a channel.flow is
-    /// answered with channel.flow-ok carrying the same active bit, which is remembered (section 1.5.2.3, ADR-1199).</summary>
+    /// answered with channel.flow-ok carrying the same active bit, which is remembered (section 1.5.2.3, ADR-1200).</summary>
     private async ValueTask<Amqp0Method?> ReceiveAnsweringUnaskedAsync()
     {
         switch (Amqp0MethodReader.Read(await ReceiveFrameAsync().ConfigureAwait(false)))

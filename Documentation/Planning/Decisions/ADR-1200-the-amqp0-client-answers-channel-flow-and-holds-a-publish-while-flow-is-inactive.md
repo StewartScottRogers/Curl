@@ -1,4 +1,4 @@
-# ADR-1199: The AMQP 0-9-1 client answers channel.flow and holds a publish while flow is inactive
+# ADR-1200: The AMQP 0-9-1 client answers channel.flow and holds a publish while flow is inactive
 
 - Status: Accepted
 - Date: 2026-11-02
