@@ -8,7 +8,7 @@ depends-on: [BL-3723]
 touches: [Curl.Original.Protocol.Http.UnitLibrary, Curl.Original.Protocol.Http.UnitTests/Cgr076Tests.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.Cgr076.cs, Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/Cgr076RedirectFollowerTests.cs, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-11-02
 ---
 # BL-3605 — Fix CGR-076: A redirect to another host with userinfo in the Location sends Basic credentials even though the user set a custom Authorization header
 
@@ -59,16 +59,19 @@ curl -sSL -H 'Authorization: Bearer xyz' -H 'Cookie: c=1' -H 'X-Custom: 1' http:
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr076Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 - 2026-10-28 (lane 4, resumed run): the fix needs the follower to tell the HTTP handler that it withheld an `-H Authorization` value, so it adds `HttpRequestOptions.AuthorizationHeaderWithheld` (Abstractions), sets it in `RedirectFollower.cs` (Core) and honours it in `HttpRequestHeadFormatter.AppendAuthorization` and `HttpProtocolHandler.ReportAuthorizationLines`; tests in `Cgr076Tests.cs`, `HttpProtocolHandlerTests.Cgr076.cs` and `Curl.Core.UnitTests/Cgr076RedirectFollowerTests.cs`. Those files were added to touches. `RedirectFollower.cs` is held by BL-3723 (Doing), so the task waits on it; the code is written but not yet built, tested or quality-measured, and is left uncommitted for the shift to stash. Next claim: apply the stash, build, run the fast tests, run Measure-CodeQuality.ps1 for Core, Abstractions and Http, measure real curl for the repro and record it here.
+
+- 2026-11-02 (lane 10): nothing was left to change. The split parts landed the whole fix: BL-4002 (`HttpRequestOptions.AuthorizationHeaderWithheld`, set in `RedirectFollower.cs`, tests in `Curl.Core.UnitTests/Cgr076RedirectFollowerTests.cs`) and BL-4003 (handler and formatter, tests in `Cgr076Tests.cs` and `HttpProtocolHandlerTests.Cgr076.cs`), both Done 2026-10-28. BL-4003's Notes record the real curl comparison (curl 8.22.0 against Curl through `Record-CurlExchange.ps1`): for the repro `curl -sSL -H 'Authorization: Bearer xyz' -H 'Cookie: c=1' -H 'X-Custom: 1' http://127.0.0.1:18605/a`, both exit 0 with stdout `ok
+` and empty stderr, and the second hop carries no `Authorization`. The variant without `-H Authorization`, which already matched, still sends `Basic eDp5` in both. The stash's changes are already in the tree under the renamed `Curl.Original.Protocol.Http` projects, so it was not applied. At this commit the focused CGR-076 tests pass (4 in `Curl.Original.Protocol.Http.UnitTests`, 4 in `Curl.Core.UnitTests`). No code changed, so no new build, full fast test run or quality run was needed.
 
 ## Log
 
@@ -78,3 +81,4 @@ curl -sSL -H 'Authorization: Bearer xyz' -H 'Cookie: c=1' -H 'X-Custom: 1' http:
 - 2026-10-28: Backlog -> Deferred. Split into BL-4002 and BL-4003 (over its cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-11-02: Doing -> Done. A redirect to another host that withholds an -H Authorization value sends no Basic from the Location userinfo, as curl does (fixed by BL-4002 and BL-4003)
