@@ -24,15 +24,34 @@ The server implements every Blob operation the scope needs, so BL-4521 and BL-45
 
 ## Acceptance criteria
 
-- [ ] A reference Blob endpoint in `Curl.Conformance.Extended.UnitLibrary/AzureStorage/` implements the operations above and lets BL-4469 add the DFS endpoint in `AzureStorage/DataLake/` without editing this task's files.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/AzureStorage/AzureBlobTransferCases.cs` run curl in process and assert wire bytes, stdout, stderr and exit code for: download, a small upload, an `Error` body with exit 22, and anonymous access.
-- [ ] `Documentation/Conformance/Extended/AzureStorage.md` exists in the matrix format with a row for every `AzureStorage:` ID these cases carry.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with the ID of its filed High `Fix AzureStorage conformance: ...` task; the known-failures check and the matrix check pass.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no test needs `TestCategory=Integration`.
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/AzureStorage/` is at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`), with its own tests in `AzureBlobReferenceServerTests.cs` where the cases do not reach a branch.
+- [x] A reference Blob endpoint in `Curl.Conformance.Extended.UnitLibrary/AzureStorage/` implements the operations above and lets BL-4469 add the DFS endpoint in `AzureStorage/DataLake/` without editing this task's files.
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/AzureStorage/AzureBlobTransferCases.cs` run curl in process and assert wire bytes, stdout, stderr and exit code for: download, a small upload, an `Error` body with exit 22, and anonymous access.
+- [x] `Documentation/Conformance/Extended/AzureStorage.md` exists in the matrix format with a row for every `AzureStorage:` ID these cases carry.
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with the ID of its filed High `Fix AzureStorage conformance: ...` task; the known-failures check and the matrix check pass.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no test needs `TestCategory=Integration`.
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/AzureStorage/` is at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`), with its own tests in `AzureBlobReferenceServerTests.cs` where the cases do not reach a branch.
 
 ## Notes
+
+- Design: `AzureStorageHttpRequestReader` (shared HTTP/1.1 request reader), `AzureStorageHttpResponseWriter`
+  (Content-Length, chunked or close framing), `AzureStorageHttpResponse.Error` (the `Error` body) and the abstract
+  `AzureStorageReferenceEndpoint` (records every request, serves until close). `AzureBlobReferenceEndpoint` derives from it
+  with an operation table (Get Blob, Put Blob, Put Block, Put Block List, List Blobs with `NextMarker` paging). BL-4469 adds
+  `AzureStorage/DataLake/AzureDataLakeReferenceEndpoint.cs` deriving from the same base, editing none of these files.
+- Choice: an anonymous request to a container without anonymous read access answers `404 ResourceNotFound`, as the Blob
+  service documents for private containers; one to an unknown container `404 ContainerNotFound`; an unknown verb/comp
+  `405 UnsupportedHttpVerb`.
+- Choice: the curl cases pin `x-ms-date` with a test clock overriding only `GetUtcNow`; stderr's line end is
+  `Environment.NewLine`, as curl writes it on each platform.
+- Found: close-delimited framing over the TLS route makes the client throw `MissingCloseNotifyException` out of the run
+  (filed BL-4524); the cases use chunked and Content-Length framing, and the Close framing is covered by
+  `AzureBlobReferenceServerTests`. No case fails, so `KnownFailures.txt` is unchanged.
+- Found: `AzureStorageExtension` reads `AZURE_STORAGE_*` from the process environment (`Environment.GetEnvironmentVariable`),
+  not the run's, so a case cannot set them through the harness; these cases use `--oauth2-bearer` and anonymous access.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary`: 0 failing members. Build of
+  `Curl.slnx -warnaserror` clean, fast tests green. CI on Linux and macOS: the tests are platform-neutral (in-memory
+  streams, a temporary upload file by `Path.Combine`, no OS text).
 
 ## Log
 
