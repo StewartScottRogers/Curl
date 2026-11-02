@@ -8,7 +8,7 @@ depends-on: [BL-2965]
 touches: [Curl.Cli.UnitLibrary/LibcurlSourceCode.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.ProtocolOptions.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.ProxyTlsAndAuthentication.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.TransferOptions.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.TransferFiles.cs, Curl.Cli.UnitTests/LibcurlSourceCodeTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeOptionTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeProxyTlsAndAuthenticationTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeTransferFileTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeTransferOptionTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeProtocolOptionTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeOptionCoverageTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Console.UnitTests/CurlCommandRunnerLibcurlTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-11-02
 ---
 # BL-2966 — Write --libcurl's curl_easy_setopt lines in curl 8.22.0's config2setopts order (upstream cases 1405 and 1407)
 
@@ -27,16 +27,18 @@ The other nine `--libcurl` cases (1400 to 1404, 1406, 1420, 1465, 1481) already 
 
 ## Acceptance criteria
 
-- [ ] Each `LibcurlSourceCode` method's order follows curl 8.22.0's `config2setopts.c`, and its doc comments name 8.22.0.
-- [ ] A focused unit test in `Curl.Cli.UnitTests` pins `CURLOPT_USERPWD` before `CURLOPT_DIRLISTONLY` and `CURLOPT_FTP_SKIP_PASV_IP` after `CURLOPT_PREQUOTE`, and fails without the fix (ADR-0482).
-- [ ] 1405 and 1407 pass with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`; the cases BL-2965 listed still pass.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes; Curl.Cli.UnitLibrary keeps 100% line and branch coverage and complexity at most 10; CI is green on Linux and macOS.
+- [x] Each `LibcurlSourceCode` method's order follows curl 8.22.0's `config2setopts.c`, and its doc comments name 8.22.0.
+- [x] A focused unit test in `Curl.Cli.UnitTests` pins `CURLOPT_USERPWD` before `CURLOPT_DIRLISTONLY` and `CURLOPT_FTP_SKIP_PASV_IP` after `CURLOPT_PREQUOTE`, and fails without the fix (ADR-0482).
+- [x] 1405 and 1407 pass with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`; the cases BL-2965 listed still pass.
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes; Curl.Cli.UnitLibrary keeps 100% line and branch coverage and complexity at most 10; CI is green on Linux and macOS.
 
 ## Notes
 
 - BL-2965 measured with the vendored files: 1402, 1404, 1406 and 1465 also fail on order, CURLOPT_USERAGENT written after POSTFIELDS, the mime parts or CURLOPT_UPLOAD instead of in credentials_and_headers_setopts. Moving the whole generator to 8.22.0 order should fix them too; add each that then passes to PassingUpstreamCases.txt. Only 1400, 1401, 1403, 1420 and 1481 are listed so far.
 
 - 2026-10-21 (lane 8, BL-2966 run 1): generator moved to 8.22.0 order (measured with real curl 8.22.0: proxy, credentials_and_headers, transfer, http/ftp, ssh, tls, dns_and_network, mail_and_sasl, misc; misc writes GSSAPI_DELEGATION, MAIL_AUTH, SASL_AUTHZID, SASL_IR a second time). Cases 1400-1407, 1420, 1465, 1481 all pass; 1402, 1404-1407 and 1465 added to the ratchet. Curl.Cli.UnitTests updated (94 order expectations, 5 renames) and the focused test added in LibcurlSourceCodeProtocolOptionTests.cs; all pass. Left: Curl.Console.UnitTests CurlCommandRunnerLibcurlTests.RunAsync_LibcurlWithAnUploadFile_WritesItsUrlUploadAndSize pins the old order (added to touches; no Doing task names it), then the fast suite and Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary. The run ran out of its cost cap; the code is in the shift stash.
+
+- 2026-11-02 (lane 2, claim after Stewart's reopen): nothing left to do. BL-3022 (Done 2026-10-22) landed the 8.22.0 order from this task's stash, with the focused test Generate_FtpCredentialsListOnlyQuotesAndSkipPasvIp_WritesUserPwdBeforeDirListOnlyAndSkipPasvIpAfterPrequote in LibcurlSourceCodeProtocolOptionTests.cs; 1400-1407, 1420, 1465 and 1481 are on PassingUpstreamCases.txt; the doc comments name 8.22.0. BL-3023 (Done) recorded no LibcurlSourceCode* member past a gate and CI run 39723672567 green on Windows, Linux, macOS and quality. The 2026-10-21 stash is superseded and was not applied.
 
 ## Log
 
@@ -46,3 +48,4 @@ The other nine `--libcurl` cases (1400 to 1404, 1406, 1420, 1465, 1481) already 
 - 2026-10-21: Backlog -> Deferred. Split for the cost cap into BL-3022 (land the 8.22.0 order, fix the Console test) and BL-3023 (quality and CI); nothing left here
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 0b924be1 61dab663 782ca8e4 7eaf8a6e.
+- 2026-11-02: Doing -> Done. Delivered by BL-3022 and BL-3023: 8.22.0 setopt order, focused test, cases 1405 and 1407 on the ratchet, quality and CI green
