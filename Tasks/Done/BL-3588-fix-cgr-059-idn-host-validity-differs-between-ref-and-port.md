@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitTests/Cgr059Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-11-02
 ---
 # BL-3588 — Fix CGR-059: IDN host validity differs between REF and PORT
 
@@ -67,15 +67,26 @@ curl -sS "http://a%FFb:20200/a" --connect-to ::127.0.0.1:20200
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr059Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+
+- 2026-11-02 (lane 6): the work landed through its split tasks BL-3884, BL-3885 and BL-3886 (all Done 2026-10-28), so this claim changed no code. The stash 5328375b is the work BL-3884 carried over and was not reapplied.
+- Windows repro re-measured at f4aaed5c with Record-CurlExchange.ps1 -Port 20200 -Response 'HTTP/1.1 200 OK
+Content-Length: 3
+
+ok
+' -CurlArgs -sS,http://a%FFb:20200/a,--connect-to,::127.0.0.1:20200: real curl 8.22.0 and Curl both exit 0, stdout `ok
+`, empty stderr, request `GET /a HTTP/1.1` / `Host: xn--ab-6ka:20200` / `User-Agent: curl/8.22.0` / `Accept: */*`, byte for byte identical.
+- Linux cases (-ü.example exit 3; ü..example as xn--tda..example; aא.example as xn--a-0hc.example) were measured against Linux curl and pinned by Cgr059LabelRulesTests and Cgr059BidiTests (see BL-3885 and BL-3886). Their platform-neutral pure-code tests pass here.
+- Criterion 2: the focused tests are Cgr059PercentEncodedHostTests, Cgr059LabelRulesTests and Cgr059BidiTests, from the split tasks. Cgr059Tests.cs was not created because those tests already cover the issue.
+- Curl.Protocol.Abstractions.UnitTests fast tests: 1630 passed, 2 skipped. No production code changed, so no quality run was needed.
 
 ## Log
 
@@ -85,3 +96,4 @@ curl -sS "http://a%FFb:20200/a" --connect-to ::127.0.0.1:20200
 - 2026-10-26: Backlog -> Deferred. Split into BL-3884, BL-3885, BL-3886 after exceeding its cost cap
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-11-02: Doing -> Done. Every CGR-059 repro matches curl through BL-3884, BL-3885 and BL-3886; a%FFb re-measured byte-identical on Windows
