@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http, Curl.Extended.Protocol.AzureStorage.UnitTests/Http]
+touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http, Curl.Extended.Protocol.AzureStorage.UnitTests/Http, Curl.Extended.Protocol.AzureStorage.UnitLibrary/Client/AzureStorageProtocolHandler.cs, Curl.Extended.Protocol.AzureStorage.UnitTests/Client/AzureStorageProtocolHandlerTests.cs, Curl.Extended.Protocol.AzureStorage.UnitTests/Client/QueuedAzureStorageConnector.cs]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4540 — Fix AzureStorage: close-delimited body over TLS without close_notify escapes as MissingCloseNotifyException
 
@@ -26,9 +26,9 @@ close_notify (exit 56 with that message, or the body accepted) and match it.
 
 ## Acceptance criteria
 
-- [ ] `MissingCloseNotifyException` while reading an Azure Storage response body becomes a `TransferResult` failure with curl's exit code, decided by an ADR.
-- [ ] A focused unit test in `Curl.Extended.Protocol.AzureStorage.UnitTests` pins it (ADR-0482).
-- [ ] `dotnet build` clean, fast tests green, the library at 100% line and branch coverage.
+- [x] `MissingCloseNotifyException` while reading an Azure Storage response body becomes a `TransferResult` failure with curl's exit code, decided by an ADR.
+- [x] A focused unit test in `Curl.Extended.Protocol.AzureStorage.UnitTests` pins it (ADR-0482).
+- [x] `dotnet build` clean, fast tests green, the library at 100% line and branch coverage.
 
 ## Notes
 
@@ -36,3 +36,4 @@ close_notify (exit 56 with that message, or the body accepted) and match it.
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: a77d74ca f552bbde fdc35bd6.
+- 2026-11-02: Doing -> Done. A TLS read without close_notify in an az:// or abfs:// transfer now ends with exit 56 and the TLS build's text (ADR-1192)

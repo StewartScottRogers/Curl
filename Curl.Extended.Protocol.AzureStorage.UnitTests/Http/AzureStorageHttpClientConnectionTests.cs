@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.AzureStorage.Http;
 
@@ -222,6 +223,27 @@ public sealed class AzureStorageHttpClientConnectionTests
     [TestMethod]
     public async Task SendAsync_LineLongerThanTheLimit_FailsLineTooLong() =>
         await AssertFailureAsync(AzureStorageHttpFailure.LineTooLong, () => SendAsync("HTTP/1.1 200 OK\r\nX-Long: " + new string('a', AzureStorageHttpConnectionReader.MaxLineLength) + "\r\n\r\n"));
+
+    [TestMethod]
+    public async Task SendAsync_CloseDelimitedBodyEndsWithoutCloseNotify_FailsReceiveFailedWithTheBuildsText()
+    {
+        // ADR-0221, ADR-1192: a TLS read that ends without close_notify fails, whatever the framing.
+        var connection = new RecordedConnection("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nhello", failureAtEnd: new MissingCloseNotifyException("schannel: server closed abruptly (missing close_notify)"));
+        var response = await new AzureStorageHttpClientConnection(connection).SendAsync(Get(), CancellationToken.None);
+
+        var failure = await Assert.ThrowsExactlyAsync<AzureStorageHttpException>(() => ReadToEndAsync(response.Body));
+
+        Assert.AreEqual(AzureStorageHttpFailure.ReceiveFailed, failure.Failure);
+        Assert.AreEqual("schannel: server closed abruptly (missing close_notify)", failure.Message);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_HeadEndsWithoutCloseNotify_FailsReceiveFailed()
+    {
+        var connection = new RecordedConnection("HTTP/1.1 200 OK\r\n", failureAtEnd: new MissingCloseNotifyException("missing close_notify"));
+
+        await AssertFailureAsync(AzureStorageHttpFailure.ReceiveFailed, () => new AzureStorageHttpClientConnection(connection).SendAsync(Get(), CancellationToken.None));
+    }
 
     private static AzureStorageHttpRequest Get() => new("GET", "/container/blob", HostOnly);
 

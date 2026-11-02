@@ -223,6 +223,23 @@ public sealed class AzureStorageProtocolHandlerTests
         CollectionAssert.AreEqual(new[] { "az", "abfs", "abfss" }, Handler(new QueuedAzureStorageConnector()).SupportedSchemes.ToArray());
 
     [TestMethod]
+    public async Task ExecuteAsync_CloseDelimitedDownloadEndsWithoutCloseNotify_FailsWithExit56AndKeepsTheBytesRead()
+    {
+        // ADR-0221, ADR-1192: curl's HTTP layer fails such a read with exit 56 and the TLS build's text.
+        QueuedAzureStorageConnector connector = new("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nhello")
+        {
+            FailureAtEnd = new MissingCloseNotifyException("schannel: server closed abruptly (missing close_notify)"),
+        };
+        MemoryStream output = new();
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Context("az://account/c/b", output));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("schannel: server closed abruptly (missing close_notify)", result.ErrorMessage);
+        Assert.AreEqual("hello", Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_WithoutContext_Throws() =>
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await Handler(new QueuedAzureStorageConnector()).ExecuteAsync(null!));
 

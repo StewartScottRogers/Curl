@@ -43,9 +43,12 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
         }
         catch (AzureStorageHttpException failure)
         {
-            return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message);
+            return TransferResult.Failure(ExitCodeOf(failure.Failure), failure.Message);
         }
     }
+
+    private static CurlExitCode ExitCodeOf(AzureStorageHttpFailure failure) =>
+        failure == AzureStorageHttpFailure.ReceiveFailed ? CurlExitCode.RecvError : CurlExitCode.WeirdServerReply;
 
     private static CurlExitCode ExitCodeOf(AzureStorageRequestFailure failure) =>
         failure is AzureStorageRequestFailure.InvalidSasToken or AzureStorageRequestFailure.InvalidBearerToken

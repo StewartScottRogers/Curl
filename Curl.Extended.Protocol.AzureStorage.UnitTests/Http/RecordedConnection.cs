@@ -4,8 +4,8 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.AzureStorage.Http;
 
-/// <summary>A fake <see cref="IConnection"/> that replays recorded response bytes, at most <c>readSize</c> per read, and records what is written.</summary>
-internal sealed class RecordedConnection(string response, int readSize = int.MaxValue) : IConnection
+/// <summary>A fake <see cref="IConnection"/> that replays recorded response bytes, at most <c>readSize</c> per read, then throws <c>failureAtEnd</c> if one is given, and records what is written.</summary>
+internal sealed class RecordedConnection(string response, int readSize = int.MaxValue, IOException? failureAtEnd = null) : IConnection
 {
     private readonly byte[] responseBytes = Encoding.Latin1.GetBytes(response);
     private readonly MemoryStream written = new();
@@ -21,6 +21,11 @@ internal sealed class RecordedConnection(string response, int readSize = int.Max
 
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        if (position == responseBytes.Length && failureAtEnd is not null)
+        {
+            throw failureAtEnd;
+        }
+
         var count = Math.Min(Math.Min(buffer.Length, readSize), responseBytes.Length - position);
         responseBytes.AsMemory(position, count).CopyTo(buffer);
         position += count;
