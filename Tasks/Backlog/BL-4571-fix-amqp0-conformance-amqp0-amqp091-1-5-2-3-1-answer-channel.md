@@ -1,5 +1,5 @@
 ---
-id: BL-4564
+id: BL-4571
 title: Fix Amqp0 conformance: Amqp0:AMQP091-1.5.2.3-1 (answer channel.flow with flow-ok)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4564 — Fix Amqp0 conformance: Amqp0:AMQP091-1.5.2.3-1 (answer channel.flow with flow-ok)
+# BL-4571 — Fix Amqp0 conformance: Amqp0:AMQP091-1.5.2.3-1 (answer channel.flow with flow-ok)
 
 ## Goal
 

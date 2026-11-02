@@ -61,8 +61,8 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 - Added `Amqp0/Messaging/`: `Amqp0BrokerContent` (writes and reads content header and body frames), `Amqp0BrokerContentHeader`, and `Amqp0MessagingMethods`, which adds answers through `Amqp0MethodTable.With` (get-ok with a message, basic.return, channel.close on queue.declare, channel.flow before declare-ok). BL-4464's files are unchanged.
 - Cases in `Amqp0/Messaging/Amqp0MessagingTests.cs`; matrix `Documentation/Conformance/Extended/Amqp0-Messaging.md` has 22 rows, 3 of them n/a (flow sent by the client, basic.ack, consume).
-- Choice: the client publishes with mandatory and immediate clear (RabbitMQ refuses immediate), so the "mandatory publish returned" case has the broker send basic.return unasked. The client must still read the return and its content and close cleanly. Today the client fails with 503 because the reader does not know method 60.50. Listed as known failure BL-4563.
-- channel.flow (20.20) is not in the client's method reader either: the client fails with 503 and never sends flow-ok. Listed as known failure BL-4564.
+- Choice: the client publishes with mandatory and immediate clear (RabbitMQ refuses immediate), so the "mandatory publish returned" case has the broker send basic.return unasked. The client must still read the return and its content and close cleanly. Today the client fails with 503 because the reader does not know method 60.50. Listed as known failure BL-4570.
+- channel.flow (20.20) is not in the client's method reader either: the client fails with 503 and never sends flow-ok. Listed as known failure BL-4571.
 - Channel exceptions: the client sends close-ok and nothing else on the channel; 403 exits 67; 404, 405 and 406 exit 8 with "AMQP server sent channel.close: reply code N, text". A body frame on another channel closes the connection with 505 and exits 8.
 - Checks: build -warnaserror clean; fast tests green (113 projects, 0 failed); Measure-CodeQuality -Library Curl.Conformance.Extended.UnitLibrary: 0 failing members. No package added. The tests use no paths, files or OS text, so they do not depend on the platform. CI on Linux and macOS is met by that platform-neutral change.
 
@@ -70,4 +70,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: e9049952 ea5999b7 0854df25 d8e3fb0e 62863a38 ef6c9026.
-- 2026-11-02: Doing -> Done. Amqp0 messaging conformance: 22-row matrix, publish/get/content/channel-exception cases; basic.return and channel.flow listed as BL-4563, BL-4564
+- 2026-11-02: Doing -> Done. Amqp0 messaging conformance: 22-row matrix, publish/get/content/channel-exception cases; basic.return and channel.flow listed as BL-4570, BL-4571

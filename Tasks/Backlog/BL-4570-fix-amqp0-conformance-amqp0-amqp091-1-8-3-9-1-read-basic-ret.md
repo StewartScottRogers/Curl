@@ -1,5 +1,5 @@
 ---
-id: BL-4563
+id: BL-4570
 title: Fix Amqp0 conformance: Amqp0:AMQP091-1.8.3.9-1 (read basic.return and its content)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4563 — Fix Amqp0 conformance: Amqp0:AMQP091-1.8.3.9-1 (read basic.return and its content)
+# BL-4570 — Fix Amqp0 conformance: Amqp0:AMQP091-1.8.3.9-1 (read basic.return and its content)
 
 ## Goal
 
