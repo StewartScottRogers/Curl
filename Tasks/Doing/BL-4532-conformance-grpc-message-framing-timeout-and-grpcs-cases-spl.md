@@ -46,3 +46,4 @@ runs on the harness's fake clock (BL-4503).
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: dff3d69e d3c3b130 3af8a194.
