@@ -8,7 +8,7 @@ depends-on: [BL-3846, BL-3847, BL-3859, BL-3890]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitTests/Cgr034Tests.cs, Curl.Engine.UnitLibrary/TransferSocketWait.cs, Curl.Engine.UnitLibrary/SocketActionGatedTcpDialer.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-11-02
 ---
 # BL-3563 — Fix CGR-034: curl_multi_socket_action reports synthetic socket numbers, never CURL_POLL_OUT, and a 10 ms polling timer instead of libcurl's timeouts
 
@@ -74,10 +74,10 @@ probe.exe C_20,C_21,C_65,C_74,C_75 2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -100,3 +100,4 @@ probe.exe C_20,C_21,C_65,C_74,C_75 2
 - 2026-10-28: Backlog -> Deferred. Split into BL-3976, BL-3977, BL-3978 (cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-11-02: Doing -> Done. CGR-034 probe cases C_20, C_21, C_65, C_74, C_75 give PORT equal to REF; work landed through its split subtasks
