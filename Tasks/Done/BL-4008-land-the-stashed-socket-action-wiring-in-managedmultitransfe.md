@@ -8,7 +8,7 @@ depends-on: [BL-3846, BL-3847, BL-3859, BL-3890]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitLibrary/TransferSocketWait.cs, Curl.Engine.UnitLibrary/SocketActionGatedTcpDialer.cs, Curl.Engine.UnitLibrary/ConnectOnlyConnection.cs, Curl.Engine.UnitTests/Cgr034Tests.cs, Curl.Engine.UnitTests/SocketActionGatedConnectionTests.cs, Curl.Engine.UnitTests/SocketActionGatedTcpDialerTests.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.SocketAction.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-11-02
 ---
 # BL-4008 — Land the stashed socket-action wiring in ManagedMultiTransfer and pin CGR-034 C_20, C_74, C_75
 
@@ -49,3 +49,4 @@ Split from BL-3989 (cost cap), itself split from BL-3976 and BL-3563 (CGR-034 in
 - 2026-10-28: Backlog -> Deferred. Split (cost cap) into BL-4015 and BL-4016
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 3a1e0c49 1d22eb8b 6e4e49ca 34b11bef a0b1d3ee.
+- 2026-11-02: Doing -> Done. Work landed through split tasks BL-4015, BL-4016 and BL-4007; Engine fast tests green
