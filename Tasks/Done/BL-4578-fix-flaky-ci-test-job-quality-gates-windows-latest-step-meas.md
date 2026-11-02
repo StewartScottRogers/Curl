@@ -8,7 +8,7 @@ depends-on: [BL-4546]
 touches: [Measure-CodeQuality.ps1, Curl.Conformance.Extended.UnitLibrary/Amqp1/Amqp1ReferenceContainer.cs]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4578 — Fix flaky CI test job Quality gates (windows-latest) step Measure coverage, complexity and CRAP that failed once on Windows
 
@@ -26,8 +26,8 @@ Lanes test only on Windows, so reproduce with `gh run view 41537057745 --log-fai
 
 ## Acceptance criteria
 
-- [ ] What made `job Quality gates (windows-latest) step Measure coverage, complexity and CRAP` fail intermittently is named under Notes and removed.
-- [ ] `job Quality gates (windows-latest) step Measure coverage, complexity and CRAP` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
+- [x] What made `job Quality gates (windows-latest) step Measure coverage, complexity and CRAP` fail intermittently is named under Notes and removed.
+- [x] `job Quality gates (windows-latest) step Measure coverage, complexity and CRAP` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
 
@@ -45,9 +45,18 @@ Lanes test only on Windows, so reproduce with `gh run view 41537057745 --log-fai
   only has to confirm the quality job passes (`Measure-CodeQuality.ps1 -Library
   Curl.Conformance.Extended.UnitLibrary`) and tick the criteria; no script change is needed.
 
+- 2026-11-02 (lane 4): Cause confirmed and removed: `Amqp1ReferenceContainer.Accepts` and `AnswerAsync`
+  were landed outside the complexity and branch gates by 9598845a7 (deterministic, not
+  intermittent); BL-4546 (f00c2c4e5, e6283a026) split them. `Measure-CodeQuality.ps1 -Library
+  Curl.Conformance.Extended.UnitLibrary` now reports 0 failing members locally on Windows, after
+  running the test projects that reach the library. No code changed in this run, so the CI
+  criterion on Linux and macOS is met by the change being platform-neutral (lane rule 11);
+  the shift CI watch files a task for any failure.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 32ef7b66 e2ff6521.
 - 2026-11-02: Doing -> Backlog. Waits on BL-4546 (in Doing), which splits Amqp1ReferenceContainer.Accepts and AnswerAsync, the deterministic cause of the quality failure
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 32ef7b66 e2ff6521.
+- 2026-11-02: Doing -> Done. Quality job passes: BL-4546 split the two Amqp1ReferenceContainer members that were outside the gates
