@@ -47,3 +47,4 @@ Builds on BL-4530 (server, unary case), BL-4531 (response cases) and BL-4532 (fr
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 123b988a abb71175 36ff140a 3af8a194.
