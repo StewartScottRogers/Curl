@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitTests/Cgr059Windows1252HostTests.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHostNameMapping.cs, Curl.Protocol.Abstractions.UnitTests/Cgr059PercentEncodedHostTests.cs, Curl.Protocol.Abstractions.UnitTests/Cgr059BidiTests.cs, Curl.Protocol.Abstractions.UnitTests/Cgr059LabelRulesTests.cs, Curl.Protocol.Abstractions.UnitTests/Cgr019Tests.cs, Curl.Protocol.Abstractions.UnitTests/CurlUrlTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-11-02
 ---
 # BL-3953 — Read a whole non-ASCII host as Windows-1252 on Windows, as curl 8.22.0 does (CGR-059)
 
@@ -27,10 +27,10 @@ Linux (UTF-8 locale) is right today and must stay so: `Cgr059BidiTests` and `Cgr
 
 ## Acceptance criteria
 
-- [ ] On Windows, the two URLs above, run through real curl and Curl as described, give the same exit code, stdout bytes, stderr text and request bytes; the commands and results are recorded in Notes.
-- [ ] A unit test in `Cgr059Windows1252HostTests.cs` pins the Windows-1252 reading of valid UTF-8 bytes (`%C3%BC` to `xn--14-ria7423a`, `a%D7%90` refused) and fails before the fix.
-- [ ] The UTF-8 locale tests (`Cgr059BidiTests`, `Cgr059PercentEncodedHostTests`, `Cgr059LabelRulesTests`) stay green.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] On Windows, the two URLs above, run through real curl and Curl as described, give the same exit code, stdout bytes, stderr text and request bytes; the commands and results are recorded in Notes.
+- [x] A unit test in `Cgr059Windows1252HostTests.cs` pins the Windows-1252 reading of valid UTF-8 bytes (`%C3%BC` to `xn--14-ria7423a`, `a%D7%90` refused) and fails before the fix.
+- [x] The UTF-8 locale tests (`Cgr059BidiTests`, `Cgr059PercentEncodedHostTests`, `Cgr059LabelRulesTests`) stay green.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -49,6 +49,8 @@ Linux (UTF-8 locale) is right today and must stay so: `Cgr059BidiTests` and `Cgr
     - Upstream test1448 (redirect to UTF-8 IDN `åäö.se`): the redirect is no longer followed.
     - The unit tests use the platform default, so they now read Windows-1252 on Windows. Next step: pin them to `hostAsWindows1252: false` (UTF-8 locale) or give them per-platform answers. Then find how a `Location` host reaches `CurlUrlHost`: real curl sees its raw UTF-8 bytes, so measure real Windows curl on test1448 before deciding, and keep or hold the case on the ratchet per platform. Then write the ADR-0939 amendment and run Measure-CodeQuality for Curl.Protocol.Abstractions.UnitLibrary.
 
+- 2026-11-02 (lane 1, reclaim): every criterion was met by the split subtasks, all Done: BL-3963 (whole-host Windows-1252 reading, `Cgr059Windows1252HostTests` pinning `%C3%BC` to `xn--14-ria7423a` and refusing `a%D7%90`, UTF-8 locale tests pinned to `hostAsWindows1252: false`; real curl 8.22.0 and Curl measured byte for byte equal on both URLs, commands in its Notes), BL-3964 (test1448 redirect on Windows) and BL-3965 (ADR amended, quality gates clear). BL-3956 covers the config-file literal. The stash 01b8a0ed is superseded by that work and was not applied. Checked here: `Curl.Protocol.Abstractions.UnitTests` fast tests pass (1630 passed, 2 skipped per platform, 0 failed). CI on Linux and macOS: met by the platform-pinned tests BL-3963 landed.
+
 ## Log
 
 - 2026-10-28: Created.
@@ -57,3 +59,4 @@ Linux (UTF-8 locale) is right today and must stay so: `Cgr059BidiTests` and `Cgr
 - 2026-10-28: Backlog -> Deferred. Split into BL-3963, BL-3964 and BL-3965 after hitting the cost cap
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 37a11300 0ffe192b a91492c4 779790c0.
+- 2026-11-02: Doing -> Done. Work landed through BL-3963, BL-3964 and BL-3965
