@@ -79,3 +79,4 @@ curl -sS -w '%{exitcode}|%{errormsg}\n' pop3://127.0.0.1:20700/ --connect-timeou
 - 2026-10-26: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-3532-20261026-063535-L1.jsonl
 - 2026-10-26: Backlog -> Deferred. Split over the cost cap into BL-3881 (POP3), BL-3882 (IMAP), BL-3883 (SMTP)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
