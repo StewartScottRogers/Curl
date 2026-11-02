@@ -39,3 +39,4 @@ for close-ok.
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 283f2cab 6b262408 a073a36d cb53e249.
