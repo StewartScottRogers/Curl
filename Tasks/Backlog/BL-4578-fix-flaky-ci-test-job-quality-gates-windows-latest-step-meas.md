@@ -4,8 +4,8 @@ title: Fix flaky CI test job Quality gates (windows-latest) step Measure coverag
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Measure-CodeQuality.ps1]
+depends-on: [BL-4546]
+touches: [Measure-CodeQuality.ps1, Curl.Conformance.Extended.UnitLibrary/Amqp1/Amqp1ReferenceContainer.cs]
 requirement: none
 created: 2026-11-02
 completed:
@@ -31,7 +31,22 @@ Lanes test only on Windows, so reproduce with `gh run view 41537057745 --log-fai
 
 ## Notes
 
+- 2026-11-02 (lane 5): The failure is not intermittent and not in `Measure-CodeQuality.ps1`.
+  Commit 9598845a7 (BL-4545, part 1 of BL-4527's split) landed
+  `Curl.Conformance.Extended.UnitLibrary/Amqp1/Amqp1ReferenceContainer.cs` with `Accepts`
+  (complexity 12) and `AnswerAsync` (complexity 12, branch 83.3%) knowingly outside the gates,
+  so every quality run that contains that commit fails; the runs "either side" either predate
+  it or did not reach the quality job. The run log (41537057745) shows the script working as
+  designed: it rechecked `Curl.Conformance.Extended.UnitTests` and still found the two members.
+- The fix is BL-4546 ("split Accepts and AnswerAsync"), in Doing on `work/dark-factory` and
+  holding `Amqp1ReferenceContainer.cs`. Doing the same split here would collide with that
+  lane's edit of the same two methods, so per lane rule 3 this task names the file in
+  `touches`, depends on BL-4546 and goes back to Backlog. When BL-4546 is Done, the next claim
+  only has to confirm the quality job passes (`Measure-CodeQuality.ps1 -Library
+  Curl.Conformance.Extended.UnitLibrary`) and tick the criteria; no script change is needed.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 32ef7b66 e2ff6521.
+- 2026-11-02: Doing -> Backlog. Waits on BL-4546 (in Doing), which splits Amqp1ReferenceContainer.Accepts and AnswerAsync, the deterministic cause of the quality failure
