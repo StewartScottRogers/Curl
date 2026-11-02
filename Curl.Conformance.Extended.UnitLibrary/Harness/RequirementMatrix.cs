@@ -5,7 +5,7 @@ namespace Curl.Conformance.Extended.Harness;
 /// one Markdown table of <see cref="RequirementMatrixRow"/>s. The test project copies the matrices
 /// into its output, so <see cref="LoadAll"/> reads them there rather than from the repository.
 /// </summary>
-/// <param name="ProtocolName">The protocol name, the matrix file's name without <c>.md</c>.</param>
+/// <param name="ProtocolName">The matrix file's name without <c>.md</c>: the protocol name, or <c>&lt;Name&gt;-&lt;Part&gt;</c> for one part of a protocol split into parts.</param>
 /// <param name="Rows">The table's rows, header and separator excluded.</param>
 public sealed record RequirementMatrix(string ProtocolName, IReadOnlyList<RequirementMatrixRow> Rows)
 {

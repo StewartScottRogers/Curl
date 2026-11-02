@@ -52,6 +52,15 @@ public sealed class RequirementMatrixTests
     }
 
     [TestMethod]
+    public void FindProblems_IdInAPartMatrixOfItsProtocol_IsListed()
+    {
+        RequirementMatrix part = RequirementMatrix.Parse("Kafka-Records", Header + "| Kafka:Guide-Fetch-1 | MUST | Fetch it. | FetchTests.Fetches |\n");
+        SpecRequirementCarrier test = new("FetchTests.Fetches", ["Kafka:Guide-Fetch-1"]);
+
+        Assert.AreEqual(0, RequirementMatrix.FindProblems([part], [test]).Count);
+    }
+
+    [TestMethod]
     public void FindProblems_NoMatrices_ReportsNothing()
     {
         Assert.AreEqual(0, RequirementMatrix.FindProblems([], []).Count);
