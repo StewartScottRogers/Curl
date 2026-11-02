@@ -39,9 +39,15 @@ powershell -NoProfile -File Audit/Tools/Find-BooleanNameMismatches.ps1 -Root <au
 It lists each public or internal bool method or property named `Is`, `Has`, `Can`, `Should`,
 `Lacks`, `Not`, `No`, `Never` or `Missing` whose name and doc comment point opposite ways: a
 negative name (`LacksScheme`, `IsNotEmpty`) with a doc whose main clause says nothing negative,
-or the reverse. Read each candidate's code: when the name, the doc or the code says the opposite
-of the other two, that is a finding. Say in your summary how many candidates you read and filed;
-they count toward `method.names`.
+or the reverse (`polarity-mismatch`). The same scan reads every documented method and property,
+of any type, for a name renamed to its opposite while its doc kept the old sense
+(`antonym-mismatch`): `IsInvalid` documented "true when the value is valid", `TryWrite`
+documented "Tries to read", `Decode` documented "Encodes" - negating prefixes (`In-`, `Un-`,
+`Dis-`, `Non-`, `Im-`) on a state's name, and the pairs Read/Write, Encode/Decode, Open/Close,
+Enable/Disable, Allow/Deny, Allow/Refuse, Accept/Reject, Valid/Invalid and Lock/Unlock. Read each
+candidate's code: when the name, the doc or the code says the opposite of the other two, that is
+a finding (`misleading-name`). Say in your summary how many candidates you read and filed; they
+count toward `method.names`.
 
 ## 2. XML doc comments - the same members
 
@@ -61,9 +67,30 @@ Take the 10 most recent ADRs in `Documentation/Planning/Decisions/` whose status
 For each, does the code still do what it decided? ADRs are your subject, so you read them in
 phase 1, as claims to check - never as justification for the code.
 
+Check every number and every default each of the 10 states - in its Context and Consequences as
+well as its Decision: a limit, a timeout, a count, a port, a size, a retry or lane count, a
+percentage, an exit code, a parameter's default. Find the constant, default or literal in the
+code that implements it (`Select-String` for the number and for the name it would have) and
+compare. A number the code contradicts is a finding (`stale-adr`), however minor the sentence
+it sits in; a number with no code to compare against (a measurement, a date, history) is not.
+Say in your summary how many numbers you checked across the 10.
+
 ## 5. Scripts - 10 statements each
 
-Read the comment-based help of `RunDarkFactory.ps1` and of
+First, check every documented default of every script at once:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Find-HelpDefaultMismatches.ps1 -Root <audited tree> -OutFile <temp folder>\help-defaults.json
+```
+
+It reads every `.ps1` with a param block - `RunDarkFactory.ps1`, `Audit/RunAudit.ps1`,
+`Gap/RunGapAnalysis.ps1` and the rest - and compares each "(default N)", "Default N" or
+"defaults to N" in its comment-based help (a `.PARAMETER` section, or "-Name ... (default N)"
+anywhere in the help) and in the comment above a parameter with the param block's real default.
+Read each candidate and file the true ones as `false-help` (High: an agent acts on a default).
+Say in your summary how many claims it checked and how many you filed.
+
+Then read the comment-based help of `RunDarkFactory.ps1` and of
 `.claude/skills/task-board/task-board.ps1`, and check 10 statements from each against what the
 script does: its parameters, its outputs, the files it writes, its refusals. Run its `-Test*`
 switches or its read-only commands where that settles a statement; never start a shift.
