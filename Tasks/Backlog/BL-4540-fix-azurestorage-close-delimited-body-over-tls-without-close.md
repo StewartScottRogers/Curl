@@ -1,5 +1,5 @@
 ---
-id: BL-4524
+id: BL-4540
 title: Fix AzureStorage: close-delimited body over TLS without close_notify escapes as MissingCloseNotifyException
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4524 — Fix AzureStorage: close-delimited body over TLS without close_notify escapes as MissingCloseNotifyException
+# BL-4540 — Fix AzureStorage: close-delimited body over TLS without close_notify escapes as MissingCloseNotifyException
 
 ## Goal
 

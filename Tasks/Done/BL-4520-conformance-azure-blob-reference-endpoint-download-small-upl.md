@@ -45,7 +45,7 @@ The server implements every Blob operation the scope needs, so BL-4521 and BL-45
 - Choice: the curl cases pin `x-ms-date` with a test clock overriding only `GetUtcNow`; stderr's line end is
   `Environment.NewLine`, as curl writes it on each platform.
 - Found: close-delimited framing over the TLS route makes the client throw `MissingCloseNotifyException` out of the run
-  (filed BL-4524); the cases use chunked and Content-Length framing, and the Close framing is covered by
+  (filed BL-4540); the cases use chunked and Content-Length framing, and the Close framing is covered by
   `AzureBlobReferenceServerTests`. No case fails, so `KnownFailures.txt` is unchanged.
 - Found: `AzureStorageExtension` reads `AZURE_STORAGE_*` from the process environment (`Environment.GetEnvironmentVariable`),
   not the run's, so a case cannot set them through the harness; these cases use `--oauth2-bearer` and anonymous access.
