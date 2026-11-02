@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4505, BL-4506, BL-4507]
-touches: [Curl.Conformance.Extended.UnitLibrary/Harness/SpecRequirementAttribute.cs, Curl.Conformance.Extended.UnitLibrary/Harness/RequirementMatrix.cs, Curl.Conformance.Extended.UnitLibrary/Harness/KnownFailures.cs, Curl.Conformance.Extended.UnitTests/Harness/RequirementMatrixTests.cs, Curl.Conformance.Extended.UnitTests/Harness/KnownFailuresTests.cs, Curl.Conformance.Extended.UnitTests/KnownFailures.txt, .gitattributes, Tasks/SharedListFiles.txt]
+touches: [Curl.Conformance.Extended.UnitLibrary/Harness/SpecRequirementAttribute.cs, Curl.Conformance.Extended.UnitLibrary/Harness/RequirementMatrix.cs, Curl.Conformance.Extended.UnitLibrary/Harness/KnownFailures.cs, Curl.Conformance.Extended.UnitTests/Harness/RequirementMatrixTests.cs, Curl.Conformance.Extended.UnitTests/Harness/KnownFailuresTests.cs, Curl.Conformance.Extended.UnitLibrary/Harness/RequirementMatrixRow.cs, Curl.Conformance.Extended.UnitLibrary/Harness/SpecRequirementCarrier.cs, Curl.Conformance.Extended.UnitLibrary/Harness/KnownFailurePassedException.cs, Curl.Conformance.Extended.UnitLibrary/CLAUDE.md, Curl.Conformance.Extended.UnitTests/Curl.Conformance.Extended.UnitTests.csproj, Curl.Conformance.Extended.UnitTests/KnownFailures.txt, .gitattributes, Tasks/SharedListFiles.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4502 — Add SpecRequirementAttribute, the requirement-matrix check and the KnownFailures.txt check to the extended-protocol conformance harness
 
@@ -22,10 +22,10 @@ Split from BL-4462; read BL-4462 (in `Tasks/Deferred`) for the rules. Requiremen
 
 ## Acceptance criteria
 
-- [ ] `SpecRequirementAttribute`, the matrix check and the known-failures check exist in `Harness/` and are tested both ways (a passing listed case fails with the "remove its KnownFailures.txt line" message; an unmapped matrix row fails; a duplicate ID fails; an empty matrix fails).
-- [ ] `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` exists (comments only), is marked `merge=union` in `.gitattributes` and listed in `Tasks/SharedListFiles.txt`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests are green; `Curl.Conformance.Extended.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral.
+- [x] `SpecRequirementAttribute`, the matrix check and the known-failures check exist in `Harness/` and are tested both ways (a passing listed case fails with the "remove its KnownFailures.txt line" message; an unmapped matrix row fails; a duplicate ID fails; an empty matrix fails).
+- [x] `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` exists (comments only), is marked `merge=union` in `.gitattributes` and listed in `Tasks/SharedListFiles.txt`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests are green; `Curl.Conformance.Extended.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 (`Measure-CodeQuality.ps1`).
+- [x] No package added; every test is platform-neutral.
 
 ## Notes
 
@@ -33,3 +33,4 @@ Split from BL-4462; read BL-4462 (in `Tasks/Deferred`) for the rules. Requiremen
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 48ace738 32b5ab0c 9663c745 feac4ffa.
+- 2026-11-02: Doing -> Done. SpecRequirementAttribute, the requirement-matrix check and the KnownFailures.txt check run in the extended conformance harness
