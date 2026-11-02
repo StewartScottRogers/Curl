@@ -1,4 +1,4 @@
-# ADR-1190: Extension handlers read the run's environment from ProtocolHandlerServices
+# ADR-1192: Extension handlers read the run's environment from ProtocolHandlerServices
 
 - Status: Accepted
 - Date: 2026-11-02
