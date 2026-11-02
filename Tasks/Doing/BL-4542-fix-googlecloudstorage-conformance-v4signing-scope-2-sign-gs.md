@@ -22,11 +22,13 @@ Found by BL-4476: `GcsV4SigningCases.Download_WithHmacKeyAndARegion_SignsWithTha
 
 ## Acceptance criteria
 
-- [ ] `GcsV4SigningCases.Download_WithHmacKeyAndARegion_SignsWithThatRegionsScope` passes.
-- [ ] A focused unit test in `Curl.Extended.Protocol.GoogleCloudStorage.UnitTests` pins the region taken from `--aws-sigv4` (ADR-0482).
-- [ ] The `GoogleCloudStorage:V4Signing-Scope-2 BL-4538` line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`; `dotnet build` clean and the fast tests green.
+- [x] `GcsV4SigningCases.Download_WithHmacKeyAndARegion_SignsWithThatRegionsScope` passes.
+- [x] A focused unit test in `Curl.Extended.Protocol.GoogleCloudStorage.UnitTests` pins the region taken from `--aws-sigv4` (ADR-0482).
+- [x] The `GoogleCloudStorage:V4Signing-Scope-2 BL-4538` line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`; `dotnet build` clean and the fast tests green.
 
 ## Notes
+
+- `GcsProtocolHandler.RegionOf` takes the region from the third field of `--aws-sigv4` (`context.Http.AwsSigV4`), as ADR-1191 records; a missing or empty third field keeps `auto`. Focused test: `GcsProtocolHandlerTests.ExecuteAsync_HmacKeyWithAwsSigV4_SignsWithTheRegionInItsThirdField`. Also updated the library's CLAUDE.md line on HMAC signing (documentation of the changed file). Measure-CodeQuality for the GCS library: 0 failing members. Fast tests green; platform-neutral (no paths or OS text).
 
 ## Log
 

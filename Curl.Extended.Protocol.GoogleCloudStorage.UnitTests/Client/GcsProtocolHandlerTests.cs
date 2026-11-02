@@ -44,6 +44,22 @@ public sealed class GcsProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("goog4:goog:us-east1:storage", "us-east1")]
+    [DataRow("goog4:goog:us-east1", "us-east1")]
+    [DataRow("goog4:goog::storage", "auto")]
+    [DataRow("goog4:goog", "auto")]
+    [DataRow(null, "auto")]
+    public async Task ExecuteAsync_HmacKeyWithAwsSigV4_SignsWithTheRegionInItsThirdField(string? awsSigV4, string region)
+    {
+        QueuedGcsConnector connector = new(QueuedGcsConnector.Ok(string.Empty));
+        TransferContext context = Context("gs://bucket/k", new MemoryStream(), new NetworkCredential("GOOGID", "secret"), awsSigV4: awsSigV4, withHttp: true);
+
+        await Handler(connector, Emulator).ExecuteAsync(context);
+
+        Assert.Contains($"Credential=GOOGID/20200101/{region}/storage/goog4_request, ", connector.Connections[0].Written);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_BearerTokenAndHmacKey_SendsOnlyTheBearerToken()
     {
         QueuedGcsConnector connector = new(QueuedGcsConnector.Ok(string.Empty));
@@ -185,12 +201,12 @@ public sealed class GcsProtocolHandlerTests
     private static GcsProtocolHandler Handler(QueuedGcsConnector connector, string? emulatorHost) =>
         new(connector, name => name == "STORAGE_EMULATOR_HOST" ? emulatorHost : null);
 
-    private static TransferContext Context(string url, Stream output, NetworkCredential? credentials = null, string? bearerToken = null, string? upload = null, bool? withHttp = null) => new()
+    private static TransferContext Context(string url, Stream output, NetworkCredential? credentials = null, string? bearerToken = null, string? upload = null, bool? withHttp = null, string? awsSigV4 = null) => new()
     {
         Url = CurlUrl.Parse(url),
         Output = output,
         Credentials = credentials,
-        Http = withHttp ?? bearerToken is not null ? new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = bearerToken } : null,
+        Http = withHttp ?? bearerToken is not null ? new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = bearerToken, AwsSigV4 = awsSigV4 } : null,
         Upload = upload is null ? null : new MemoryStream(Encoding.UTF8.GetBytes(upload)),
         TimeProvider = new FixedTimeProvider(),
     };
