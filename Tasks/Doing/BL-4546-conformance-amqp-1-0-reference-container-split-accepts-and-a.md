@@ -36,3 +36,4 @@ Split from BL-4527 (over its cost cap); follows BL-4545, which lands the contain
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 6b771b0d 42a3c661 fcf5f5d2 7cd1715d 0f4dc4be 00203731.
