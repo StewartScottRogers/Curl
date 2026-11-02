@@ -30,6 +30,20 @@ public sealed class ProtocolHandlerServicesTests
         Assert.AreSame(starter, services.ProcessStarter);
     }
 
+    [TestMethod]
+    public void Constructor_WithoutAnEnvironmentReader_CarriesNone() =>
+        Assert.IsNull(new ProtocolHandlerServices(null!, null!, null!, null!).ReadEnvironmentVariable);
+
+    [TestMethod]
+    public void Constructor_WithAnEnvironmentReader_CarriesIt()
+    {
+        Func<string, string?> reader = _ => "value";
+
+        ProtocolHandlerServices services = new(null!, null!, null!, null!, ReadEnvironmentVariable: reader);
+
+        Assert.AreSame(reader, services.ReadEnvironmentVariable);
+    }
+
     private sealed class NoConnector : IConnector
     {
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) => throw new NotSupportedException();

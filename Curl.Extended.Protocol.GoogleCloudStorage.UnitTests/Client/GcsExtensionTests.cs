@@ -21,6 +21,19 @@ public sealed class GcsExtensionTests
     public void CreateHandler_GivesTheGcsHandler() =>
         Assert.IsInstanceOfType<GcsProtocolHandler>(GcsExtension.CreateHandler(Services));
 
+    // BL-4534: STORAGE_EMULATOR_HOST comes from the run's environment the host hands the extensions.
+    [TestMethod]
+    public async Task CreateHandler_WithTheRunsEnvironment_SendsTheRequestToItsEmulator()
+    {
+        QueuedGcsConnector connector = new(QueuedGcsConnector.Ok("emulated"));
+        ProtocolHandlerServices services = new(connector, null!, null!, null!, ReadEnvironmentVariable: name => name == "STORAGE_EMULATOR_HOST" ? "http://localhost:9023" : null);
+
+        TransferResult result = await GcsExtension.CreateHandler(services).ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("gs://local/a.txt"), Output = new MemoryStream() });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(("localhost", 9023, false), (connector.Targets[0].Host, connector.Targets[0].Port, connector.Targets[0].UseTls));
+    }
+
     [TestMethod]
     public void CreateHandler_WithoutServices_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => GcsExtension.CreateHandler(null!));

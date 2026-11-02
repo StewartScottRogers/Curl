@@ -14,9 +14,14 @@ namespace Curl.Protocol.Abstractions;
 /// <see langword="null" /> when the host gives none, and each extension then starts real processes
 /// with its own <see cref="System.Diagnostics.Process" /> adapter and reads the process environment.
 /// </param>
+/// <param name="ReadEnvironmentVariable">
+/// Reads the environment of the run, which may be its own rather than the process's (the in-process harness,
+/// BL-4534); <see langword="null" /> when the host gives none, and each extension then reads the process environment.
+/// </param>
 public sealed record ProtocolHandlerServices(
     IConnector Connector,
     IDatagramConnector DatagramConnector,
     ITlsProvider TlsProvider,
     IDnsResolver DnsResolver,
-    IExtensionProcessStarter? ProcessStarter = null);
+    IExtensionProcessStarter? ProcessStarter = null,
+    Func<string, string?>? ReadEnvironmentVariable = null);

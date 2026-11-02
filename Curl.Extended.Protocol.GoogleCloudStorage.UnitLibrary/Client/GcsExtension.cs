@@ -14,12 +14,15 @@ public static class GcsExtension
         [],
         new Uri("https://cloud.google.com/storage/docs/xml-api/overview"));
 
-    /// <summary>Creates the handler over curl's connector, reading <c>STORAGE_EMULATOR_HOST</c> from the process environment.</summary>
+    /// <summary>
+    /// Creates the handler over curl's connector, reading <c>STORAGE_EMULATOR_HOST</c> from the run's environment
+    /// (<see cref="ProtocolHandlerServices.ReadEnvironmentVariable" />), else the process environment (BL-4534).
+    /// </summary>
     /// <param name="services">Curl's connection services.</param>
     /// <returns>The handler.</returns>
     public static IProtocolHandler CreateHandler(ProtocolHandlerServices services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        return new GcsProtocolHandler(services.Connector, Environment.GetEnvironmentVariable);
+        return new GcsProtocolHandler(services.Connector, services.ReadEnvironmentVariable ?? Environment.GetEnvironmentVariable);
     }
 }

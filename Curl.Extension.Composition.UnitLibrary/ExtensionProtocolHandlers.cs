@@ -17,13 +17,17 @@ public static class ExtensionProtocolHandlers
     /// <summary>
     /// Gives the factory a host passes to the engine, or <see langword="null" /> when
     /// <see cref="SwitchVariable" /> is <c>0</c>, which leaves exactly upstream curl's handlers.
+    /// The factory gives every extension <paramref name="readEnvironmentVariable" /> as the services'
+    /// <see cref="ProtocolHandlerServices.ReadEnvironmentVariable" />, so a handler reads the run's environment (BL-4534).
     /// </summary>
     /// <param name="readEnvironmentVariable">Reads the run's environment.</param>
     /// <returns>The factory, or <see langword="null" /> for no extensions.</returns>
     public static Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? For(Func<string, string?> readEnvironmentVariable)
     {
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
-        return readEnvironmentVariable(SwitchVariable) == "0" ? null : Create;
+        return readEnvironmentVariable(SwitchVariable) == "0"
+            ? null
+            : services => Create(services with { ReadEnvironmentVariable = readEnvironmentVariable });
     }
 
     /// <summary>Builds every registered extension's handler over <paramref name="services" />, in registration order.</summary>
