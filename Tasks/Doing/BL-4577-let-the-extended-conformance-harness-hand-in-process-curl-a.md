@@ -52,3 +52,4 @@ stand-in's `ReadEnvironmentVariable`, as ADR-1184 says.
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: cf4fd37d b5239a59 4b2811c8 e3597dcc.
