@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlComposition.cs, Curl.Console/InProcessCurl.cs, Curl.Console.UnitTests/CurlCompositionInjectedTimeProviderTests.cs, Curl.Console.UnitTests/InProcessCurlTests.cs]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4500 — Let CurlComposition's dialing runner take an injected TimeProvider so -m and --connect-timeout run on it
 
@@ -37,3 +37,4 @@ Split from BL-4462 (the extended-protocol conformance harness), whose criterion 
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 95e71a5c 595af6b4 f3752ca2.
+- 2026-11-02: Doing -> Done. The dialing runner and InProcessCurl.RunAsync take an injected TimeProvider; -m against a silent in-memory server ends with exit 28 on a fake clock
