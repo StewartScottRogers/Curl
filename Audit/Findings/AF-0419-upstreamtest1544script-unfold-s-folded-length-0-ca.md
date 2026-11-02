@@ -3,8 +3,8 @@ id: AF-0419
 title: UpstreamTest1544Script.Unfold's folded.Length > 0 can become >= 0 with no test failing, so every unfolded line gains a leading space
 auditor: quality
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-10-24.
+status: closed
+reason: Stewart closed it on 2026-11-02 ("close 419 420"): BL-3468 and BL-4448 removed the mutated comparison from UpstreamTest1544Script.Unfold, so every re-audit since 2026-10-25 reported site-missing and none could close it.
 key: quality:Curl.Conformance.UnitLibrary/UpstreamTest1544Script.cs:Unfold-gt:surviving-mutant
 reproduction: none
 task: BL-4448
@@ -13,9 +13,9 @@ found: 2026-10-24
 found-at: d3ee244c64c5cb56d3fe0ca2ed9728e9383eb8ea
 scorecard: 2026-10-24_0845.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-02
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0419 - UpstreamTest1544Script.Unfold's folded.Length > 0 can become >= 0 with no test failing, so every unfolded line gains a leading space
 
@@ -58,3 +58,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 - 2026-10-24: filed proposed.
 - 2026-10-24: proposed -> accepted.
 - 2026-11-01: re-fix task BL-4448 filed (Stewart: re-fix them). The mutation site was removed by BL-3468's rewrite, so every re-audit since reported site-missing; reproduction set to none, so the next re-audit judges by reading the code and BL-4448's tests.
+- 2026-11-02: accepted -> closed. Stewart closed it on 2026-11-02 ("close 419 420"): BL-3468 and BL-4448 removed the mutated comparison from UpstreamTest1544Script.Unfold, so every re-audit since 2026-10-25 reported site-missing and none could close it.

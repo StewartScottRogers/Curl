@@ -3,12 +3,12 @@ id: AF-0524
 title: --ntlm --service-name without -u sends no NTLM Type-1 Authorization where curl starts NTLM with the default Windows credentials
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:--service-name:ntlm-default-credentials:request
 reproduction: none
-task: none
-tasks:
+task: BL-4460
+tasks: BL-4460
 found: 2026-11-01
 found-at: 379ec9aa19ade61c2ce4cb9ee9b729c5aa926fc5
 scorecard: 2026-11-01_1801.md
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release -v q; & ./Record-CurlExchange.ps1 -Port 506
 ## Log
 
 - 2026-11-01: filed proposed.
+- 2026-11-02: proposed -> accepted.
