@@ -28,7 +28,7 @@ Found by BL-4482's conformance case McpStreamableHttpCases.ExpiredSession404_Cur
 
 ## Notes
 
-- Plan (ADR-1193): the transport answers a 404 to a request it sent with a session id by forgetting the session id and protocol version and failing with the new McpHttpFailure.SessionExpired; McpClientFlow.RequestAsync catches it once per request, runs initialize and notifications/initialized again, and repeats the request; a second 404 is exit 8. A 404 without a session id stays UnexpectedStatus.
+- Plan (ADR-1195): the transport answers a 404 to a request it sent with a session id by forgetting the session id and protocol version and failing with the new McpHttpFailure.SessionExpired; McpClientFlow.RequestAsync catches it once per request, runs initialize and notifications/initialized again, and repeats the request; a second 404 is exit 8. A 404 without a session id stays UnexpectedStatus.
 - Tests: McpStreamableHttpTransportTests.SendRequestAsync_NotFoundWithASessionId_FailsWithSessionExpiredAndForgetsTheSession and McpProtocolHandlerTests.ExecuteAsync_SessionExpiresWith404_* and ExecuteAsync_NewSessionExpiresWith404Too_EndsWithExit8 (new fake SequencedMcpConnector, since the closed connection after the 404 is replaced by a new one). Conformance case passes with its KnownFailures line removed.
 - Measured: Measure-CodeQuality for Curl.Extended.Protocol.McpClient.UnitLibrary: 100% line, 100% branch, max complexity 10, 0 failing members. dotnet build clean (0 warnings); full fast tests green.
 

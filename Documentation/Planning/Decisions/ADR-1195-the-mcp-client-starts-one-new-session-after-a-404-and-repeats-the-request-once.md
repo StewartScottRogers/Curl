@@ -1,4 +1,4 @@
-# ADR-1193: The MCP client starts one new session after a 404 and repeats the request once
+# ADR-1195: The MCP client starts one new session after a 404 and repeats the request once
 
 - Status: Accepted
 - Date: 2026-11-02
