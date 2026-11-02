@@ -32,3 +32,4 @@ Split from BL-4462; read BL-4462 (in `Tasks/Deferred`) for the rules. Requiremen
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 48ace738 32b5ab0c 9663c745 feac4ffa.
