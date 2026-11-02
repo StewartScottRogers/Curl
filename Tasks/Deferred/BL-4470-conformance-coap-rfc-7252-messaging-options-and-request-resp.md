@@ -64,10 +64,10 @@ fixed here, but a defect in the extension library is listed in `KnownFailures.tx
 
 ## Notes
 
-- 2026-11-02 (lane 8): Split for size before any code: a reference server, about twenty in-process cases across four RFC 7252 sections, a matrix of every client MUST/SHOULD and a coverage run do not fit one run's budget. Split into BL-4514 (reference server, sections 3 and 4 messaging cases, matrix created), BL-4515 (section 5 request/response and section 3.1 option encoding cases) and BL-4516 (section 6 URI, response codes with -f and -i, section 12, matrix completed with the BL-4471 and BL-4472 links), chained in that order with disjoint case subfolders. BL-4471 and BL-4472 now depend on BL-4514 (the server) instead of BL-4470.
+- 2026-11-02 (lane 8): Split for size before any code: a reference server, about twenty in-process cases across four RFC 7252 sections, a matrix of every client MUST/SHOULD and a coverage run do not fit one run's budget. Split into BL-4524 (reference server, sections 3 and 4 messaging cases, matrix created), BL-4525 (section 5 request/response and section 3.1 option encoding cases) and BL-4526 (section 6 URI, response codes with -f and -i, section 12, matrix completed with the BL-4471 and BL-4472 links), chained in that order with disjoint case subfolders. BL-4471 and BL-4472 now depend on BL-4524 (the server) instead of BL-4470.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 2abe036a c14f1ec9 5ce91802 fb1c989b d8e3fb0e 7cee2dc4 ef6c9026.
-- 2026-11-02: Doing -> Deferred. Split into BL-4514, BL-4515, BL-4516
+- 2026-11-02: Doing -> Deferred. Split into BL-4524, BL-4525, BL-4526

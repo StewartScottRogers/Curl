@@ -1,16 +1,16 @@
 ---
-id: BL-4515
+id: BL-4525
 title: Conformance: CoAP RFC 7252 request/response and option cases for coap:// (Coap part 1b)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524]
 touches: [Curl.Conformance.Extended.UnitTests/Coap/RequestResponse, Documentation/Conformance/Extended/Coap.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4515 — Conformance: CoAP RFC 7252 request/response and option cases for coap:// (Coap part 1b)
+# BL-4525 — Conformance: CoAP RFC 7252 request/response and option cases for coap:// (Coap part 1b)
 
 ## Goal
 
@@ -34,7 +34,7 @@ filed High task `Fix Coap conformance: <requirement>` (pipeline feature; touches
 `KnownFailures.txt`; criteria: the case passes, a focused unit test in the library's `.UnitTests` pins the fix
 (ADR-0482), the `KnownFailures.txt` line is removed).
 
-Scope: section 5 (methods, token matching, options and their critical/elective, unsafe and repeatable handling, payload, Content-Format) and section 3.1 (option delta and length, extended 13 and 14 encodings). Uses the reference server BL-4514 adds; adds rows to `Documentation/Conformance/Extended/Coap.md`.
+Scope: section 5 (methods, token matching, options and their critical/elective, unsafe and repeatable handling, payload, Content-Format) and section 3.1 (option delta and length, extended 13 and 14 encodings). Uses the reference server BL-4524 adds; adds rows to `Documentation/Conformance/Extended/Coap.md`.
 
 ## Acceptance criteria
 

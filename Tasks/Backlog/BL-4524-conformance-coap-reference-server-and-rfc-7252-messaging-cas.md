@@ -1,5 +1,5 @@
 ---
-id: BL-4514
+id: BL-4524
 title: Conformance: CoAP reference server and RFC 7252 messaging cases for coap:// (Coap part 1a)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4514 — Conformance: CoAP reference server and RFC 7252 messaging cases for coap:// (Coap part 1a)
+# BL-4524 — Conformance: CoAP reference server and RFC 7252 messaging cases for coap:// (Coap part 1a)
 
 ## Goal
 
@@ -34,11 +34,11 @@ filed High task `Fix Coap conformance: <requirement>` (pipeline feature; touches
 `KnownFailures.txt`; criteria: the case passes, a focused unit test in the library's `.UnitTests` pins the fix
 (ADR-0482), the `KnownFailures.txt` line is removed).
 
-Scope: section 3 (message format: version, type, token length, code, message ID, token, payload marker) and section 4 (confirmable, non-confirmable, ACK, Reset, retransmission with ACK_TIMEOUT, ACK_RANDOM_FACTOR and MAX_RETRANSMIT, message ID and deduplication). This part creates `Documentation/Conformance/Extended/Coap.md`; BL-4515 and BL-4516 add rows to it.
+Scope: section 3 (message format: version, type, token length, code, message ID, token, payload marker) and section 4 (confirmable, non-confirmable, ACK, Reset, retransmission with ACK_TIMEOUT, ACK_RANDOM_FACTOR and MAX_RETRANSMIT, message ID and deduplication). This part creates `Documentation/Conformance/Extended/Coap.md`; BL-4525 and BL-4526 add rows to it.
 
 ## Acceptance criteria
 
-- [ ] A reference CoAP server in `Curl.Conformance.Extended.UnitLibrary/Coap/` (its own encoder and decoder, configurable responses: piggybacked, separate, duplicate, Reset, silence, arbitrary options) lets BL-4515, BL-4516, BL-4471 and BL-4472 add behaviour in their own files and subfolders (`Coap/BlockwiseObserve/`, `Coap/Dtls/`) without editing this task's files.
+- [ ] A reference CoAP server in `Curl.Conformance.Extended.UnitLibrary/Coap/` (its own encoder and decoder, configurable responses: piggybacked, separate, duplicate, Reset, silence, arbitrary options) lets BL-4525, BL-4526, BL-4471 and BL-4472 add behaviour in their own files and subfolders (`Coap/BlockwiseObserve/`, `Coap/Dtls/`) without editing this task's files.
 - [ ] `Documentation/Conformance/Extended/Coap.md` exists in the README's matrix format and gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 7252 sections 3 and 4 that binds a client a `Coap:` ID mapped to a test or to `n/a: <reason>`; the harness's matrix check passes.
 - [ ] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Messaging/` run curl in process and assert datagram bytes, stdout, stderr and exit code for at least: a confirmable GET with a piggybacked response, a separate response (empty ACK then CON response, which curl ACKs), a duplicate response, a Reset (exit 56), retransmission timing (ACK_TIMEOUT doubling within ACK_RANDOM_FACTOR) and give-up after MAX_RETRANSMIT (exit 28), and the header fields of every datagram curl sends.
 - [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/` is at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).

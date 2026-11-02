@@ -1,16 +1,16 @@
 ---
-id: BL-4516
+id: BL-4526
 title: Conformance: CoAP RFC 7252 URI, response code, -f and -i cases and the complete Coap matrix (Coap part 1c)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514, BL-4515]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4525]
 touches: [Curl.Conformance.Extended.UnitTests/Coap/UriAndResponse, Documentation/Conformance/Extended/Coap.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4516 — Conformance: CoAP RFC 7252 URI, response code, -f and -i cases and the complete Coap matrix (Coap part 1c)
+# BL-4526 — Conformance: CoAP RFC 7252 URI, response code, -f and -i cases and the complete Coap matrix (Coap part 1c)
 
 ## Goal
 
@@ -34,7 +34,7 @@ filed High task `Fix Coap conformance: <requirement>` (pipeline feature; touches
 `KnownFailures.txt`; criteria: the case passes, a focused unit test in the library's `.UnitTests` pins the fix
 (ADR-0482), the `KnownFailures.txt` line is removed).
 
-Scope: section 6 (`coap` URI, Uri-Host, Uri-Port, Uri-Path, Uri-Query composition and decomposition, percent-encoding), section 5.9 response classes as curl reports them (4.xx and 5.xx with and without `-f`, `-i`'s status line) and section 12 (registries the client uses). Last of the parts split from BL-4470; uses BL-4514's server and finishes the matrix.
+Scope: section 6 (`coap` URI, Uri-Host, Uri-Port, Uri-Path, Uri-Query composition and decomposition, percent-encoding), section 5.9 response classes as curl reports them (4.xx and 5.xx with and without `-f`, `-i`'s status line) and section 12 (registries the client uses). Last of the parts split from BL-4470; uses BL-4524's server and finishes the matrix.
 
 ## Acceptance criteria
 
