@@ -7,7 +7,7 @@ stdio transport is in [McpClient-Stdio.md](McpClient-Stdio.md) (BL-4483). Only r
 rows; the server's own are kept by the reference server in `Curl.Conformance.Extended.UnitLibrary/McpClient/`, whose
 JSON-RPC side (`McpReferenceToolServer`) is apart from its transport (`McpStreamableHttpReferenceServer`). Cases
 listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` fail today and name the task that fixes them.
-ADR-1189 records what Curl does where the specification leaves the client's reaction open.
+ADR-1190 records what Curl does where the specification leaves the client's reaction open.
 
 | ID | Level | Requirement | Covered by |
 |----|:-----:|-------------|------------|

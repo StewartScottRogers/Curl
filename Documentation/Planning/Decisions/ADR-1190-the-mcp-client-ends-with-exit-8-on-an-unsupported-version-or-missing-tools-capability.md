@@ -1,4 +1,4 @@
-# ADR-1189: The MCP client ends with exit 8 on an unsupported version or a missing tools capability
+# ADR-1190: The MCP client ends with exit 8 on an unsupported version or a missing tools capability
 
 - Status: Accepted
 - Date: 2026-11-02

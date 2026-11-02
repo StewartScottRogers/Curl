@@ -18,7 +18,7 @@ When a request carrying Mcp-Session-Id is answered 404, curl starts a new sessio
 
 ## Context
 
-Found by BL-4482's conformance case McpStreamableHttpCases.ExpiredSession404_CurlStartsANewSessionWithoutTheOldId for McpClient:MCP20250618-StreamableHttp-8 (Model Context Protocol 2025-06-18; matrix Documentation/Conformance/Extended/McpClient.md, ADR-1189). The case is listed in Curl.Conformance.Extended.UnitTests/KnownFailures.txt and passes while it fails. Library: Curl.Extended.Protocol.McpClient.UnitLibrary.
+Found by BL-4482's conformance case McpStreamableHttpCases.ExpiredSession404_CurlStartsANewSessionWithoutTheOldId for McpClient:MCP20250618-StreamableHttp-8 (Model Context Protocol 2025-06-18; matrix Documentation/Conformance/Extended/McpClient.md, ADR-1190). The case is listed in Curl.Conformance.Extended.UnitTests/KnownFailures.txt and passes while it fails. Library: Curl.Extended.Protocol.McpClient.UnitLibrary.
 
 ## Acceptance criteria
 

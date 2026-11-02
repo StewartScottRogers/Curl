@@ -14,11 +14,11 @@ completed:
 
 ## Goal
 
-When the server's initialize result names a protocol version Curl does not support (anything but 2025-06-18), curl sends no notifications/initialized and no further request and exits 8 (ADR-1189).
+When the server's initialize result names a protocol version Curl does not support (anything but 2025-06-18), curl sends no notifications/initialized and no further request and exits 8 (ADR-1190).
 
 ## Context
 
-Found by BL-4482's conformance case McpLifecycleCases.ServerAnswersAVersionCurlDoesNotSupport_CurlDisconnectsWithExit8 for McpClient:MCP20250618-Lifecycle-6 (Model Context Protocol 2025-06-18; matrix Documentation/Conformance/Extended/McpClient.md, ADR-1189). The case is listed in Curl.Conformance.Extended.UnitTests/KnownFailures.txt and passes while it fails. Library: Curl.Extended.Protocol.McpClient.UnitLibrary.
+Found by BL-4482's conformance case McpLifecycleCases.ServerAnswersAVersionCurlDoesNotSupport_CurlDisconnectsWithExit8 for McpClient:MCP20250618-Lifecycle-6 (Model Context Protocol 2025-06-18; matrix Documentation/Conformance/Extended/McpClient.md, ADR-1190). The case is listed in Curl.Conformance.Extended.UnitTests/KnownFailures.txt and passes while it fails. Library: Curl.Extended.Protocol.McpClient.UnitLibrary.
 
 ## Acceptance criteria
 

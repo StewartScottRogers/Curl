@@ -14,11 +14,11 @@ completed:
 
 ## Goal
 
-When the server's initialize result declares no tools capability, curl sends no tools/list or tools/call and exits 8 (ADR-1189).
+When the server's initialize result declares no tools capability, curl sends no tools/list or tools/call and exits 8 (ADR-1190).
 
 ## Context
 
-Found by BL-4482's conformance case McpLifecycleCases.ServerDeclaresNoToolsCapability_CurlSendsNoToolsRequestAndExits8 for McpClient:MCP20250618-Lifecycle-7 (Model Context Protocol 2025-06-18; matrix Documentation/Conformance/Extended/McpClient.md, ADR-1189). The case is listed in Curl.Conformance.Extended.UnitTests/KnownFailures.txt and passes while it fails. Library: Curl.Extended.Protocol.McpClient.UnitLibrary.
+Found by BL-4482's conformance case McpLifecycleCases.ServerDeclaresNoToolsCapability_CurlSendsNoToolsRequestAndExits8 for McpClient:MCP20250618-Lifecycle-7 (Model Context Protocol 2025-06-18; matrix Documentation/Conformance/Extended/McpClient.md, ADR-1190). The case is listed in Curl.Conformance.Extended.UnitTests/KnownFailures.txt and passes while it fails. Library: Curl.Extended.Protocol.McpClient.UnitLibrary.
 
 ## Acceptance criteria
 
