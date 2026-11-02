@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineProtocolSet.cs, Curl.Cli.UnitTests/Cgr043Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-11-02
 ---
 # BL-3572 — Fix CGR-043: smb:// and smbs:// are not listed in -V but are attempted; --proto =smb and --proto-default smb are accepted
 
@@ -61,15 +61,23 @@ curl --proto-default smb -sS 127.0.0.1:20002/share/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr043Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+
+- 2026-11-02 (lane 13): The work was done by the split subtasks BL-3887 (smb:// and smbs:// URLs give exit 1, Protocol "smb" is disabled), BL-3888 (--proto =smb gives exit 2, unrecognized protocol) and BL-3889 (--proto-default smb gives exit 1, unsupported by libcurl), all Done. This claim made no code change; the earlier run's stash e52dc3ec is superseded by those subtasks and was not carried over. The task's touches named `Cgr043Tests.cs`, but its focused tests (ADR-0482) are the subtasks' `Curl.Cli.UnitTests/Cgr043SmbProtoTests.cs`, `Curl.Cli.UnitTests/Cgr043SmbProtoDefaultTests.cs` and `Curl.Engine.UnitTests/Cgr043SmbUrlTests.cs`. They fail before the fix and pass after it, and they pass now (10 + 2).
+- Measured on Windows: real curl 8.22.0 Schannel against Curl.Console built from this commit, port 20002 closed. Both gave byte-identical stderr, empty stdout and wrote no files:
+  - `curl -sS smb://127.0.0.1:20002/share/x`: `curl: (1) Protocol "smb" is disabled`, exit 1 (smbs:// in Curl: `Protocol "smbs" is disabled`, exit 1).
+  - `curl --proto =smb -sS smb://127.0.0.1:20002/share/x`: `curl: unrecognized protocol 'smb'` / `curl: option --proto: is badly used here` / `curl: try 'curl --help' or 'curl --manual' for more information`, exit 2.
+  - `curl --proto-default smb -sS 127.0.0.1:20002/share/x`: `curl: option --proto-default: a specified protocol is unsupported by libcurl` / try-help line, exit 1.
+  - Nothing reaches the wire in either binary: every command fails before connecting.
+- Build was clean. The full fast suite was not rerun, because this claim changed no code; the subtasks ran it when they were integrated. CI on Linux and macOS: no change, so nothing platform-specific was added.
 
 ## Log
 
@@ -79,3 +87,4 @@ curl --proto-default smb -sS 127.0.0.1:20002/share/x
 - 2026-10-26: Backlog -> Deferred. Over its cost cap; split into BL-3887, BL-3888, BL-3889
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-11-02: Doing -> Done. smb:// and smbs:// fail with Protocol disabled (exit 1), --proto =smb exits 2 and --proto-default smb exits 1, matching curl 8.22.0 (via BL-3887, BL-3888, BL-3889)
