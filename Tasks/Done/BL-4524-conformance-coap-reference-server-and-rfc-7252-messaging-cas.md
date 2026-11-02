@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Coap, Curl.Conformance.Extended.UnitTests/Coap/Messaging, Documentation/Conformance/Extended/Coap.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4524 — Conformance: CoAP reference server and RFC 7252 messaging cases for coap:// (Coap part 1a)
 
@@ -38,15 +38,15 @@ Scope: section 3 (message format: version, type, token length, code, message ID,
 
 ## Acceptance criteria
 
-- [ ] A reference CoAP server in `Curl.Conformance.Extended.UnitLibrary/Coap/` (its own encoder and decoder, configurable responses: piggybacked, separate, duplicate, Reset, silence, arbitrary options) lets BL-4525, BL-4526, BL-4471 and BL-4472 add behaviour in their own files and subfolders (`Coap/BlockwiseObserve/`, `Coap/Dtls/`) without editing this task's files.
-- [ ] `Documentation/Conformance/Extended/Coap.md` exists in the README's matrix format and gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 7252 sections 3 and 4 that binds a client a `Coap:` ID mapped to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Messaging/` run curl in process and assert datagram bytes, stdout, stderr and exit code for at least: a confirmable GET with a piggybacked response, a separate response (empty ACK then CON response, which curl ACKs), a duplicate response, a Reset (exit 56), retransmission timing (ACK_TIMEOUT doubling within ACK_RANDOM_FACTOR) and give-up after MAX_RETRANSMIT (exit 28), and the header fields of every datagram curl sends.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/` is at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] A reference CoAP server in `Curl.Conformance.Extended.UnitLibrary/Coap/` (its own encoder and decoder, configurable responses: piggybacked, separate, duplicate, Reset, silence, arbitrary options) lets BL-4525, BL-4526, BL-4471 and BL-4472 add behaviour in their own files and subfolders (`Coap/BlockwiseObserve/`, `Coap/Dtls/`) without editing this task's files.
+- [x] `Documentation/Conformance/Extended/Coap.md` exists in the README's matrix format and gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 7252 sections 3 and 4 that binds a client a `Coap:` ID mapped to a test or to `n/a: <reason>`; the harness's matrix check passes.
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Messaging/` run curl in process and assert datagram bytes, stdout, stderr and exit code for at least: a confirmable GET with a piggybacked response, a separate response (empty ACK then CON response, which curl ACKs), a duplicate response, a Reset (exit 56), retransmission timing (ACK_TIMEOUT doubling within ACK_RANDOM_FACTOR) and give-up after MAX_RETRANSMIT (exit 28), and the header fields of every datagram curl sends.
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/` is at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Coap conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
@@ -54,3 +54,4 @@ Scope: section 3 (message format: version, type, token length, code, message ID,
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 0a05406d f3dd9751 b15c07d5 7cee2dc4 fb1c989b d8e3fb0e ef6c9026.
+- 2026-11-02: Doing -> Done. CoAP reference server, Coap.md matrix and RFC 7252 section 3-4 cases; malformed-ACK case known failing under BL-4527
