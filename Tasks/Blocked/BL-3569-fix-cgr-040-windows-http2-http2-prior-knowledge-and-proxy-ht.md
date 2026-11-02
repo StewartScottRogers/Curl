@@ -91,6 +91,7 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
   - `--proxy-http2 -s URL`: REF exit 2, refusal; NG exit 0, `hello`; PORT exit 0, `hello`, the same plain HTTP/1.1 request.
   - `-s -S --http2 URL` (UC-16): REF exit 2, refusal; NG exit 16, `curl: (16) Remote peer returned unexpected data while we expected SETTINGS frame.  Perhaps, peer does not support HTTP/2 properly.`; PORT exit 56, `curl: (56) Recv failure: Connection was aborted`. That NG difference is BL-3650's (CGR-121).
 - Decision (ADR-0929): Curl keeps Stewart's ADR-0871 (the three options run on Windows as the nghttp2 build runs them); refusing them would reverse a decision Stewart made himself, which the delegation does not cover, so the criteria (match REF's exit 2) cannot be met as written. Blocked for Stewart. If he reverses ADR-0871, the fix is `.RefusedBySchannelBuild()` on the three rows (`--proxy-http2` lives outside HttpVersionRows) plus `Cgr040Tests.cs` and `--ai-help`.
+- 2026-11-02 (lane 7): Claimed again after commit ec9518ed1 ("bring back 58 deferred tasks ... complete all existing tasks"), a bulk return that does not mention HTTP/2. ADR-0871 is still Accepted and unchanged (README row 0871; no later ADR supersedes it), and Stewart's 2026-10-26 ruling (keep HTTP/2 on Windows; CGR-040 is an accepted difference) still holds. Criterion 1 (exit 2 like the Schannel REF) can only be met by reversing ADR-0871, which the delegation does not cover. No code changed and nothing re-measured; lane 5's measurements above still stand. Blocked for Stewart: either reverse ADR-0871 (the fix is then the small one described above), or confirm CGR-040 as accepted so the task can close without criterion 1.
 
 ## Log
 
@@ -100,3 +101,4 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
 - 2026-10-26: Blocked -> Deferred. Stewart, 2026-10-26: keep HTTP/2 on Windows (ADR-0871, ADR-0906); CGR-040 is an accepted difference from the Schannel build, not a defect. Revisit only if Stewart reverses ADR-0871.
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-11-02: Doing -> Blocked. Stewart: your 11-02 bulk return asks to complete BL-3569, but meeting it means refusing --http2/--http2-prior-knowledge/--proxy-http2 on Windows (exit 2), which reverses your ADR-0871 that you upheld 10-26. Reverse ADR-0871, or close CGR-040 as an accepted difference?
