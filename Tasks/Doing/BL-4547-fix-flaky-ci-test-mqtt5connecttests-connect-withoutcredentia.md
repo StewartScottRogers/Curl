@@ -30,3 +30,4 @@ Found by BL-4521 on lane 3 (2026-11-02): it failed once (643 ms) in `dotnet test
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 6d1426b8 59888c86.
