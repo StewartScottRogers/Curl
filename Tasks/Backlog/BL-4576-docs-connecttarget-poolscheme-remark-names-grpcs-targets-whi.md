@@ -1,5 +1,5 @@
 ---
-id: BL-4563
+id: BL-4576
 title: Docs: ConnectTarget.PoolScheme remark names grpcs:// targets, which set it without MarkReusable
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4563 — Docs: ConnectTarget.PoolScheme remark names grpcs:// targets, which set it without MarkReusable
+# BL-4576 — Docs: ConnectTarget.PoolScheme remark names grpcs:// targets, which set it without MarkReusable
 
 ## Goal
 

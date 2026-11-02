@@ -39,7 +39,7 @@ pooled). If the fix must go in `TcpConnector` instead, widen `touches` to it und
 - Fix stays in the extension (ADR-1194): `GrpcProtocolHandler.TargetOf` gives a `grpcs://` target `PoolScheme = "https"`, the one scheme `TcpConnector.ApplicationProtocolsFor` offers a target's `ApplicationProtocols` for; `grpc://` keeps none. `TcpConnector` left alone so no other TLS scheme's ALPN offer changes.
 - Pinned by `ExecuteAsync_Grpcs_TargetsHttpsPoolSchemeSoTheHandshakeOffersAlpnH2` and `ExecuteAsync_Grpc_TargetsNoPoolScheme`; `GrpcTlsCases` (47 Grpc conformance cases) pass with `Grpc:Http2-Tls-1` off KnownFailures.
 - Build -warnaserror clean, fast tests green, Measure-CodeQuality for the Grpc library: 0 failing members. Change is platform-neutral (no paths, OS text or certificates), so CI on Linux and macOS is covered.
-- `ConnectTarget.PoolScheme`'s remark (Abstractions, outside touches) is now incomplete: filed BL-4563.
+- `ConnectTarget.PoolScheme`'s remark (Abstractions, outside touches) is now incomplete: filed BL-4576.
 
 ## Log
 
