@@ -31,3 +31,4 @@ Found by BL-4476: `GcsV4SigningCases.Download_WithHmacKeyAndARegion_SignsWithTha
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: b8f2907f ed58e9fc 6466a373.
