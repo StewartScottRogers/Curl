@@ -78,3 +78,4 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 - 2026-10-23: Doing -> Backlog. Out of this run's cost cap with 7 Engine tests still pinning engine-wide sharing; per-handle caches implemented and stashed, remaining steps under Notes
 - 2026-10-23: Backlog -> Deferred. Over its cost cap; split into BL-3271, BL-3272 and BL-3273
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 4692e370 e2e3b72c 3d88e88c 1734c136 22e7cb9c 3639a5e6.
