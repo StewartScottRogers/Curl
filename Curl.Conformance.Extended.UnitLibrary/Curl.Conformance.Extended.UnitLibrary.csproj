@@ -9,6 +9,8 @@
     <ProjectReference Include="..\Curl.Networking.UnitLibrary\Curl.Networking.UnitLibrary.csproj" />
     <!-- InMemoryDuplexStream and TlsServerStream carry the reference servers' connections (BL-4501). -->
     <ProjectReference Include="..\Curl.Conformance.UnitLibrary\Curl.Conformance.UnitLibrary.csproj" />
+    <!-- HpackEncoder, HpackDecoder and the HTTP/2 frame codec carry the gRPC reference server (BL-4530). -->
+    <ProjectReference Include="..\Curl.Http2.UnitLibrary\Curl.Http2.UnitLibrary.csproj" />
   </ItemGroup>
 
 </Project>

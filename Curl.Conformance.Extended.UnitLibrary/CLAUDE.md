@@ -19,5 +19,11 @@ standard error and, per connection or datagram channel, the bytes each side sent
   against the carriers the test project collects, and `KnownFailures.RunCaseAsync` runs a case listed in
   `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` so it passes while failing and fails once it passes.
 - Each protocol's reference server goes in `<Name>/`, one file per server, registered nowhere.
+- `Grpc/` (BL-4530) is a gRPC server written from PROTOCOL-HTTP2.md over HTTP/2 prior knowledge, on
+  `Curl.Http2.UnitLibrary`'s `HpackEncoder`, `HpackDecoder` and frame codec (not
+  `Curl.Conformance.Http2Server.UnitLibrary`, a relay to a backend). `GrpcReferenceServer` records each
+  `GrpcReferenceCall` (decoded header list, DATA frames) and sends the `GrpcReferenceReply` of the first
+  `IGrpcReferenceService` that answers; a case scripts its reply with `GrpcScriptedService`, and another
+  service (such as reflection in `Grpc/Reflection/`) is its own `IGrpcReferenceService`.
 - It references `Curl.Protocol.Abstractions`, `Curl.Networking`, `Curl.Conformance.UnitLibrary`
   and the shared layers only, never an extension (`VerifyExtensionIsolation`).
