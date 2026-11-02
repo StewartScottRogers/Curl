@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Kafka, Curl.Conformance.Extended.UnitTests/Kafka, Documentation/Conformance/Extended/Kafka.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4479 — Conformance: Kafka wire protocol framing, Metadata and SASL PLAIN for kafka:// (Kafka part 1 of 3)
 
@@ -45,27 +45,51 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Kafka.md` gives every requirement of this scope that binds a client a
+- [x] `Documentation/Conformance/Extended/Kafka.md` gives every requirement of this scope that binds a client a
       `Kafka:` ID mapped to a test or to `n/a: <reason>`, links to `Kafka-Records.md` (BL-4480) and
       `Kafka-Compression.md` (BL-4481), and the harness's matrix check passes.
-- [ ] A reference broker in `Curl.Conformance.Extended.UnitLibrary/Kafka/` (one or several broker ids) lets BL-4480
+- [x] A reference broker in `Curl.Conformance.Extended.UnitLibrary/Kafka/` (one or several broker ids) lets BL-4480
       and BL-4481 add behaviour in `Kafka/Records/` and `Kafka/Compression/` without editing this task's files.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Kafka/` run curl in process and assert wire bytes, stdout, stderr
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Kafka/` run curl in process and assert wire bytes, stdout, stderr
       and exit code for at least: request header fields and correlation ids, a response with a wrong correlation id,
       a truncated response, Metadata with the leader on this broker and on another one (reconnect), a topic or
       partition error code, SASL handshake with PLAIN offered and not offered, a failed SaslAuthenticate (exit 67),
       and `kafkas://` over the TLS route.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Kafka conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Kafka/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Kafka/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+
+- Plan, done directly (no subagents, to keep the run inside its cost): a reference broker in
+  `Curl.Conformance.Extended.UnitLibrary/Kafka/` with its own codec (`KafkaWireWriter`, `KafkaWireReader`, sharing
+  nothing with the client), `KafkaReferenceBroker` (size-prefixed requests, request header v1 parsed into
+  `KafkaReferenceRequest`, every request recorded in `Requests`), and one `IKafkaReferenceApi` per API:
+  `KafkaMetadataApi` (v4; a topic the cluster lacks answers UNKNOWN_TOPIC_OR_PARTITION), `KafkaSaslHandshakeApi`
+  (v1; UNSUPPORTED_SASL_MECHANISM when PLAIN is not enabled), `KafkaSaslPlainAuthenticateApi` (v0; parses the RFC 4616
+  message itself, refuses with SASL_AUTHENTICATION_FAILED). BL-4480 and BL-4481 add Produce, Fetch and compression as
+  new `IKafkaReferenceApi` types in `Kafka/Records/` and `Kafka/Compression/` and pass them to the broker's
+  constructor, without editing these files.
+- Decision (sensible default): the broker closes the connection on an api_key it does not serve, as a Kafka broker
+  does. In this part it serves no Fetch, so the Metadata-leader and SASL-success cases assert the Fetch request the
+  client sends next (api key, correlation id, which broker) and then exit 56 "Connection disconnected".
+- Wrong correlation id and truncated response use `ScriptedReferenceServer` with bytes built by `KafkaWireWriter`.
+- curl ends its stderr line with `Environment.NewLine` (measured: CRLF on Windows), so the stderr assertions append
+  `Environment.NewLine`; every test is platform-neutral (no paths, `localhost` only). CI on Linux and macOS is met by
+  that and the fast tests green here.
+- Results: 13 Kafka cases (12 curl runs + broker edges) pass; no failing case, so `KnownFailures.txt` is unchanged and
+  the known-failures and matrix checks pass. `dotnet build Curl.slnx -warnaserror` clean, fast tests green (115 test
+  assemblies passed, none failed).
+- `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` reported one member, the unused
+  `KafkaWireReader.Int8()` (uncovered); it was removed, leaving every Kafka member at 100% line and branch, complexity
+  at most 10, CRAP at most 30.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 6da75e7a 204c1fd3 f77f21ba 6873c13e d8e3fb0e d1f51b8e ef6c9026.
+- 2026-11-02: Doing -> Done. kafka:// framing, Metadata leader and reconnect, error codes, SASL PLAIN and kafkas:// are measured against a reference broker, mapped in Kafka.md
