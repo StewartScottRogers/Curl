@@ -36,3 +36,4 @@ extended conformance harness gives curl (`ExtendedConformanceHarness.RunAsync(..
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: c2d91d8c f552bbde d349e2d0 fdc35bd6.
