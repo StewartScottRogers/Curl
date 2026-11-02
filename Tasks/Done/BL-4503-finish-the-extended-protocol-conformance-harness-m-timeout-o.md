@@ -35,7 +35,7 @@ Split from BL-4462 as its last part; read BL-4462 (in `Tasks/Deferred`) for the 
   csproj (no other task in Doing held any of them).
 - Decision: the `InProcessCurlRunner` delegate gains a `TimeProvider` parameter, so the tests' `InProcessCurl.RunAsync`
   method group binds to BL-4500's overload; `RunAsync` takes an optional `timeProvider`, `TimeProvider.System` when null
-  (ADR-1187).
+  (ADR-1188).
 - The test csproj excludes `Documentation/Conformance/Extended/README.md` from the copied matrices: copied, it would read
   as a matrix named README with no rows and fail the matrix check.
 - `ExtendedCurlRunTimeoutTests` runs `-m 100` against a Redis reference server that takes HELLO and never answers,
@@ -48,4 +48,4 @@ Split from BL-4462 as its last part; read BL-4462 (in `Tasks/Deferred`) for the 
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: ed383a02 27131998 bcfa9865 29c4c51e feac4ffa.
-- 2026-11-02: Doing -> Done. Harness runs take an injected TimeProvider (-m exit 28 with no real wait), conformance README and ADR-1187 written
+- 2026-11-02: Doing -> Done. Harness runs take an injected TimeProvider (-m exit 28 with no real wait), conformance README and ADR-1188 written

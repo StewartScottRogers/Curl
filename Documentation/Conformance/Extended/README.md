@@ -1,7 +1,7 @@
 # Extended protocol conformance
 
 Curl's extended protocols (ADR-0999: what Curl adds beyond upstream curl) are measured against their
-own specifications, not against curl (ADR-1187). Each one is tested by running a real curl command
+own specifications, not against curl (ADR-1188). Each one is tested by running a real curl command
 line in process against a reference server written from the specification, and each test is traced
 to the specification's requirements through a requirement matrix in this folder.
 

@@ -1,4 +1,4 @@
-# ADR-1187: Extended protocols conform to their own specifications
+# ADR-1188: Extended protocols conform to their own specifications
 
 - Status: Accepted
 - Date: 2026-11-02
