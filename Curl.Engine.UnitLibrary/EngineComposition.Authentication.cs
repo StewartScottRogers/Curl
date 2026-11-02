@@ -65,16 +65,17 @@ internal static partial class EngineComposition
     /// <param name="datagramConnector">Opens UDP channels to a KDC.</param>
     /// <returns>The router.</returns>
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
-    internal static RoutingSecurityContextFactory CreateSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector, IDiagnosticLog? diagnosticLog = null) =>
+    /// <param name="timeProvider">The clock the hand-built contexts, their KDC transports and their SRV lookups time on; <see cref="TimeProvider.System" /> when <see langword="null" /> (BL-4508).</param>
+    internal static RoutingSecurityContextFactory CreateSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector, IDiagnosticLog? diagnosticLog = null, TimeProvider? timeProvider = null) =>
         new(
             OperatingSystem.IsWindows(),
             new SystemSecurityContextFactory(),
-            CreateHandBuiltSecurityContextFactory(connector, datagramConnector, diagnosticLog),
+            CreateHandBuiltSecurityContextFactory(connector, datagramConnector, diagnosticLog, timeProvider ?? TimeProvider.System),
             diagnosticLog);
 
     /// <summary>
     /// Creates the contexts the dialing runner (<c>Curl.Console</c>'s <c>CurlComposition.CreateRunner</c>)
-    /// uses: <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />'s
+    /// uses: <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?, TimeProvider?)" />'s
     /// router, with NTLM sent to the hand-built context on every platform when
     /// <paramref name="usesHandBuiltNtlm" /> is set (<see cref="HandBuiltNtlmSecurityContextFactory" />, BL-1858).
     /// </summary>
@@ -82,25 +83,27 @@ internal static partial class EngineComposition
     /// <param name="datagramConnector">Opens UDP channels to a KDC.</param>
     /// <param name="diagnosticLog">The run's diagnostic log.</param>
     /// <param name="usesHandBuiltNtlm">Whether NTLM is answered by the hand-built context, as curl's non-SSPI build answers it.</param>
+    /// <param name="timeProvider">The clock the hand-built contexts, their KDC transports and their SRV lookups time on; <see cref="TimeProvider.System" /> when <see langword="null" /> (BL-4508).</param>
     /// <returns>The factory.</returns>
-    internal static ISecurityContextFactory CreateDialingSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector, IDiagnosticLog? diagnosticLog, bool usesHandBuiltNtlm) =>
+    internal static ISecurityContextFactory CreateDialingSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector, IDiagnosticLog? diagnosticLog, bool usesHandBuiltNtlm, TimeProvider? timeProvider = null) =>
         usesHandBuiltNtlm
-            ? new HandBuiltNtlmSecurityContextFactory(CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog), CreateHandBuiltSecurityContextFactory(connector, datagramConnector, diagnosticLog))
-            : CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog);
+            ? new HandBuiltNtlmSecurityContextFactory(CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog, timeProvider), CreateHandBuiltSecurityContextFactory(connector, datagramConnector, diagnosticLog, timeProvider ?? TimeProvider.System))
+            : CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog, timeProvider);
 
     /// <summary>
     /// Creates ADR-0142's hand-built factory: curl's own NTLM, and SPNEGO and Kerberos over the
     /// hand-built Kerberos whose KDC exchanges are described on
-    /// <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />.
+    /// <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?, TimeProvider?)" />.
     /// </summary>
     /// <param name="connector">Opens TCP connections to a KDC.</param>
     /// <param name="datagramConnector">Opens UDP channels to a KDC.</param>
     /// <param name="diagnosticLog">The run's diagnostic log.</param>
+    /// <param name="timeProvider">The clock the contexts, the KDC transports and the SRV lookups time on.</param>
     /// <returns>The factory.</returns>
-    private static HandBuiltSecurityContextFactory CreateHandBuiltSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector, IDiagnosticLog? diagnosticLog)
+    private static HandBuiltSecurityContextFactory CreateHandBuiltSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector, IDiagnosticLog? diagnosticLog, TimeProvider timeProvider)
     {
-        KerberosKdcSocketTransport kdcTransport = new(datagramConnector, connector, KdcReplyTimeout, TimeProvider.System);
-        DnsServerResolver srvResolver = new(new DnsServerResolverOptions(null, null, null, null), TimeProvider.System);
+        KerberosKdcSocketTransport kdcTransport = new(datagramConnector, connector, KdcReplyTimeout, timeProvider);
+        DnsServerResolver srvResolver = new(new DnsServerResolverOptions(null, null, null, null), timeProvider);
         HandBuiltKerberosSources sources = new(
             new KerberosDiskFileReader(),
             new KerberosDiskFileWriter(),
@@ -108,9 +111,9 @@ internal static partial class EngineComposition
             ProcessUserId.Read,
             new KerberosDnsSrvLookup(srvResolver.ResolveServiceAsync),
             kdcTransport,
-            new KerberosKdcProxyHttpsTransport(connector, KdcProxyExchangeTimeout, TimeProvider.System),
-            TimeProvider.System);
-        return new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource(), new SystemNtlmRandomSource(), diagnosticLog);
+            new KerberosKdcProxyHttpsTransport(connector, KdcProxyExchangeTimeout, timeProvider),
+            timeProvider);
+        return new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), timeProvider, new SystemKerberosRandomSource(), new SystemNtlmRandomSource(), diagnosticLog);
     }
 
     /// <summary>
