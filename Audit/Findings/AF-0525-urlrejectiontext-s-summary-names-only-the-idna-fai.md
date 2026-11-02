@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs -Pattern 
 
 ## Re-audits
 
+- 2026-11-02 | 2026-11-02_0645.md | reproduces: no | Ran the reproduction: 'except for a host IDNA cannot convert' no longer matches; only line 45 (rejection is CurlUrlRejection.IdnConversionFailed or CurlUrlRejection.UrlTooLong or CurlUrlRejection.UrlAtLengthLimit) matches. UrlRejectionText's summary (TransferPerformer.Setup.cs:30-37) now names all three rejections printed without the prefix: a host IDNA cannot convert (CURLE_URL_MALFORMAT's text), a URL too long (CURLE_BAD_FUNCTION_ARGUMENT's) and a URL at the length limit (CURLE_OUT_OF_MEMORY's), matching IsBareText.
+
 ## Log
 
 - 2026-11-01: filed proposed.
