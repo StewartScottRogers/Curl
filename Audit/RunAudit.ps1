@@ -28,12 +28,17 @@
          <stamp>\avoid-files.txt. When every catalogue entry for an auditor fits only avoided
          files, it draws another entry or lists the auditor under "unseeded" in the manifest.
          The run then checks the manifest and warns, in its log and the scorecard commit's
-         message, about any selected auditor left unseeded and any defect in an avoided file.
+         message, about any selected auditor left unseeded and any defect in an avoided file,
+         and rejects a conformance defect whose trigger uses an option the differential tool
+         never generates (Invoke-DifferentialConformance.ps1 -ListExcluded: -K, --config,
+         --proxy* and the rest), which the conformance method cannot observe.
       5. Each selected auditor in the fixed order, one at a time, in the planted tree, with its
          open findings from the audit branch to re-audit - less any accepted finding about one
          past run's cost (key ...:cost-outlier) whose tasks are all in Tasks/Done at the audited
          commit, which step 6 closes without a re-audit (ADR-0422, amended 2026-10-14) and which
-         step 4 does not avoid either; its reply goes to
+         step 4 does not avoid either - and with an auditor seed for its samples, derived from
+         -Seed and new each audit (the quality auditor draws its extra mutation libraries with
+         it); its reply goes to
          <stamp>\reports\<auditor>.md. A planted tree left changed afterwards marks that auditor
          as having written to the audited tree (unreliable), and is reset before the next.
       6. Write-AuditScorecard.ps1 -ReliabilityOnly, then Write-AuditFindings.ps1 -Tree <planted>
@@ -105,7 +110,8 @@
     Check the refusals on a faked process list, the -Auditors warnings, that the auditor list,
     the -Auditors default and help, the models, the methods and the agent files agree on the five
     auditors (and that the retired performance auditor is gone and refused), and the seeder's
-    avoided files and manifest check on scratch findings and task paths, and the final tab
+    avoided files and manifest check on scratch findings and task paths (a conformance trigger
+    behind an excluded option rejected), the auditor seed, and the final tab
     caption of a finished run, a thrown error and a refusal (each run as a child process that
     records its captions to a file instead of renaming a tab).
 
@@ -354,10 +360,35 @@ function Test-AvoidedFile([string]$Planted, [string]$Avoided) {
     return ($p -ieq $a) -or $p.EndsWith('/' + $a, [StringComparison]::OrdinalIgnoreCase) -or $a.EndsWith('/' + $p, [StringComparison]::OrdinalIgnoreCase)
 }
 
-function Get-SeedingProblems($Manifest, [string[]]$Chosen, [string[]]$AvoidFiles) {
+function Get-AuditorSeed([int]$PlantSeed) {
+    # The auditors' sampling seed: new each audit, so the quality auditor's drawn libraries
+    # (Invoke-MutationTest.ps1 -DrawLibraries) and other samples move from audit to audit, yet
+    # not the seeder's own seed, so it says nothing about which entries were drawn.
+    return [int]((([long]$PlantSeed * 7919) + 104729) % 1000003)
+}
+
+function Get-ExcludedTriggerOption([string]$Trigger, $Excluded) {
+    # The first option in a conformance plant's trigger that the differential tool's random cases
+    # never use ($Excluded is Invoke-DifferentialConformance.ps1 -ListExcluded's JSON): --config,
+    # -K, a --proxy* option and the like. '' when there is none. Such a plant cannot be observed
+    # by the method it is planted for (PD-301 planted behind -K in the audits of 2026-10 and 2026-11).
+    if (-not $Trigger -or -not $Excluded) { return '' }
+    foreach ($m in [regex]::Matches($Trigger, '(?<![\w/-])(--([A-Za-z0-9][A-Za-z0-9-]*)|-([A-Za-z#]))(?=[\s=''"]|$)')) {
+        if ($m.Groups[2].Success) {
+            $long = $m.Groups[2].Value
+            if (@($Excluded.long) -contains $long -or @($Excluded.prefixes | Where-Object { $long -like "$_*" }).Count) { return $m.Groups[1].Value }
+        }
+        elseif (@($Excluded.short | Where-Object { "$($_.alias)" -ceq $m.Groups[3].Value }).Count) { return $m.Groups[1].Value }
+    }
+    return ''
+}
+
+function Get-SeedingProblems($Manifest, [string[]]$Chosen, [string[]]$AvoidFiles, $ExcludedOptions) {
     # What the seeder's manifest gets wrong against the run's rules (BL-2108): an auditor with no
-    # planted defect (with the seeder's reason when its "unseeded" list gives one), and a defect
-    # planted in a file a finding awaiting a re-audit names.
+    # planted defect (with the seeder's reason when its "unseeded" list gives one), a defect
+    # planted in a file a finding awaiting a re-audit names, and a conformance defect whose
+    # trigger needs an option the differential tool never generates ($ExcludedOptions), which the
+    # run rejects: its auditor's method cannot reach it, so a miss says nothing of the auditor.
     $problems = @()
     $planted = @($Manifest.planted | Where-Object { $_ })
     $reasons = @{}
@@ -370,6 +401,10 @@ function Get-SeedingProblems($Manifest, [string[]]$Chosen, [string[]]$AvoidFiles
     foreach ($p in $planted) {
         $hit = @($AvoidFiles | Where-Object { Test-AvoidedFile "$($p.file)" $_ } | Select-Object -First 1)
         if ($hit.Count) { $problems += "Planted defect $($p.id) ($($p.auditor)) sits in $($p.file), a file a finding awaiting a re-audit names ($($hit[0])); that finding's verdict may be set aside." }
+        if ("$($p.auditor)" -eq 'conformance') {
+            $option = Get-ExcludedTriggerOption "$($p.trigger)" $ExcludedOptions
+            if ($option) { $problems += "Rejected planted defect $($p.id) (conformance): its trigger uses $option, which Invoke-DifferentialConformance.ps1 never generates, so the conformance method cannot observe it; a miss of it is the seeder's, not the auditor's." }
+        }
     }
     return $problems
 }
@@ -486,6 +521,18 @@ if ($SelfTest) {
         $bad = [pscustomobject]@{ planted = @([pscustomobject]@{ id = 'PD-201'; auditor = 'conformance'; file = 'Curl.Console\CurlCommandRunner.cs' }); unseeded = @([pscustomobject]@{ auditor = 'quality'; reason = 'every quality entry fits only avoided files' }) }
         $problems = @(Get-SeedingProblems $bad @('quality', 'conformance', 'process') $avoid)
         Check 'an unseeded auditor is reported with the seeder''s reason, a silent gap too, and a plant in an avoided file' ($problems.Count -eq 3 -and $problems[0] -like 'Could not seed quality: every quality entry*' -and $problems[1] -like 'Could not seed process: the manifest names no defect*' -and $problems[2] -like 'Planted defect PD-201 *CurlCommandRunner.cs*') ($problems -join ' / ')
+        Check 'the auditors'' seed follows the plant seed, differs from it and stays in range' ((Get-AuditorSeed 5) -eq (Get-AuditorSeed 5) -and (Get-AuditorSeed 5) -ne (Get-AuditorSeed 6) -and (Get-AuditorSeed 5) -ne 5 -and (Get-AuditorSeed 1000000006) -ge 0) "$(Get-AuditorSeed 5)"
+        # A conformance plant behind an option the differential tool never generates is rejected (PD-301 behind -K).
+        $excludedJson = & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Tools/Invoke-DifferentialConformance.ps1') -ListExcluded | Out-String | ConvertFrom-Json
+        # Pairs, not a hashtable: '-u x' and '-U x' differ only in case.
+        $triggers = @(@('-K missing.cfg http://127.0.0.1:PORT/ exits 25, curl 26', '-K'), @('curl --config c.txt http://127.0.0.1:PORT/', '--config'), @('--proxy-user u:p http://127.0.0.1:PORT/', '--proxy-user'),
+            @('-T missing.txt http://127.0.0.1:PORT/ exits 25, curl 26', ''), @('-v -k http://127.0.0.1:PORT/', ''), @('-u x http://127.0.0.1:PORT/', '-u'), @('-U x http://127.0.0.1:PORT/', '-U'),
+            @("Record-CurlExchange.ps1 -Port 1 -CurlArgs @('-K','c.txt')", '-K'))
+        $seen = @($triggers | ForEach-Object { "$(Get-ExcludedTriggerOption $_[0] $excludedJson)" })
+        Check 'a trigger''s excluded option is found by long name, short alias (case kept) and prefix; -T, -v and -k are not excluded' (($seen -join ',') -ceq (@($triggers | ForEach-Object { $_[1] }) -join ',')) ($seen -join ',')
+        $rejected = [pscustomobject]@{ planted = @([pscustomobject]@{ id = 'PD-301'; auditor = 'conformance'; file = 'Curl.Console/X.cs'; trigger = '-K missing.cfg http://127.0.0.1:PORT/' }, [pscustomobject]@{ id = 'PD-302'; auditor = 'conformance'; file = 'Curl.Console/Y.cs'; trigger = '-T missing.txt http://127.0.0.1:PORT/' }) }
+        $problems = @(Get-SeedingProblems $rejected @('conformance') @() $excludedJson)
+        Check 'a conformance plant whose trigger uses an excluded option is rejected, one on -T is not' ($problems.Count -eq 1 -and $problems[0] -like 'Rejected planted defect PD-301 (conformance): its trigger uses -K*') ($problems -join ' / ')
 
         # -ReauditOnly: a reply's new findings are dropped, its re-audits kept; the prompt asks for re-audits only.
         $reply = "Notes.`n``````json`n{ `"auditor`": `"quality`", `"findings`": [ { `"key`": `"k`" } ], `"reaudits`": [ { `"finding`": `"AF-0010`", `"reproduces`": false } ] }`n```````nAfter."
@@ -580,6 +627,7 @@ foreach ($a in $Auditors) { if ($Order -notcontains $a) { Write-Host (Get-Unknow
 $Selected = @($Order | Where-Object { $Auditors -contains $_ })
 if (-not $ReauditOnly -and $Planted -lt $Selected.Count) { Write-Host "-Planted $Planted is fewer than the $($Selected.Count) auditors selected; each needs at least one."; Exit-Audit 'refused' 1 }
 if ($Seed -lt 0) { $Seed = [int]($Started.Ticks % 1000000007) }
+$AuditorSeed = Get-AuditorSeed $Seed
 
 # The dry runs' paths, with this platform's separator.
 $DryPlanted = Join-Path $RunDir 'planted'
@@ -692,7 +740,8 @@ try {
     if (-not (Test-Path -LiteralPath $manifest)) { throw 'The seeder wrote no manifest.' }
     $seeded = ConvertFrom-SeederManifest (Get-Content -LiteralPath $manifest -Raw)
     Write-Step "seeded: $(@($seeded.planted).Count) defects"
-    $seedingProblems = @(Get-SeedingProblems $seeded $Selected $avoidFiles)
+    $excludedOptions = & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $auditTree 'Audit/Tools/Invoke-DifferentialConformance.ps1') -ListExcluded | Out-String | ConvertFrom-Json
+    $seedingProblems = @(Get-SeedingProblems $seeded $Selected $avoidFiles $excludedOptions)
     $seedingProblems | ForEach-Object { Write-Step "Warning: $_" }
     }
 
@@ -707,7 +756,7 @@ try {
         $reaudit = if ($open.Count) { "Re-audit these open findings by running each reproduction:`n" + ($open -join "`n") } else { 'There are no findings to re-audit.' }
         $logsLine = if ($a -eq 'process') { " The factory's log folder is $logs; the previous scorecard's date is $($since.ToString('yyyy-MM-dd'))." } else { '' }
         $prompt = if ($ReauditOnly) { Get-ReauditOnlyPrompt $plantedTree $auditedCommit $fingerprint $logsLine $scratch $open $Method[$a] }
-        else { "Audit the tree at $plantedTree (commit $auditedCommit; auditor fingerprint $fingerprint).$logsLine Your temporary folder is $scratch. Do every step of your method in full and report its method counts; the re-audits below come on top of it, never instead. $reaudit Follow Audit/Instructions/Auditor-Rules.md and Audit/Instructions/$($Method[$a]).md in that tree, and end with exactly one json report block." }
+        else { "Audit the tree at $plantedTree (commit $auditedCommit; auditor fingerprint $fingerprint).$logsLine Your temporary folder is $scratch. Your sampling seed for this audit is ${AuditorSeed}: use it wherever your method asks for the seed the prompt gives. Do every step of your method in full and report its method counts; the re-audits below come on top of it, never instead. $reaudit Follow Audit/Instructions/Auditor-Rules.md and Audit/Instructions/$($Method[$a]).md in that tree, and end with exactly one json report block." }
         $replyPath = Join-Path $RunDir "reports\$a.md"
         $exit = Invoke-Agent "audit-$a" $Models[$a] $prompt $plantedTree $(if ($ReauditOnly) { Join-Path $RunDir "reports\$a.full.md" } else { $replyPath })
         if ($ReauditOnly) { [IO.File]::WriteAllText($replyPath, (Remove-ReportFindings ([IO.File]::ReadAllText((Join-Path $RunDir "reports\$a.full.md")))), $Utf8) }

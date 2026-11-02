@@ -87,9 +87,24 @@
 .PARAMETER ExcludeBaselineFailures
     Leave out the tests that already fail unmutated, instead of stopping.
 
+.PARAMETER DrawLibraries
+    Draw mode: print, as a JSON array, this many libraries drawn with System.Random(-Seed) from
+    every Curl.*.UnitLibrary under -Root that has a .UnitTests twin (sorted by name, less
+    -Except), and exit without mutating anything. The quality auditor mutates these beside the
+    most-changed libraries, so over audits every library is reached, not only those the factory
+    changed most (PD-001 and PD-003 sat in Core and Gopher while Engine, Networking and LibTest
+    were mutated, audits of 2026-10 and 2026-11).
+
+.PARAMETER Except
+    Draw mode: libraries never to draw, e.g. the ones already chosen as most changed.
+
+.PARAMETER Root
+    Draw mode: the tree whose libraries are drawn. Default: the repository holding this script.
+
 .PARAMETER SelfTest
-    Check the site finder, the operators, the member finder, site resolution, the test filter
-    and the baseline-failure path on samples, print PASS or FAIL per case, and exit.
+    Check the site finder, the operators, the member finder, site resolution, the test filter,
+    the baseline-failure path and the library draw on samples, print PASS or FAIL per case, and
+    exit.
 
 .OUTPUTS
     JSON: { library, commit, seed, baselineMs, excludedTests, mutants: [ { file, line, member,
@@ -100,6 +115,8 @@
     powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Original.Protocol.Dict.UnitLibrary -MaxMutants 5 -Seed 1 -OutFile $env:TEMP\dict.json
 .EXAMPLE
     powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/TcpPendingConnection.cs:77:true -ExcludeBaselineFailures -TimeoutSeconds 300
+.EXAMPLE
+    powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -DrawLibraries 3 -Seed 41 -Except Curl.Engine.UnitLibrary,Curl.Networking.UnitLibrary
 #>
 param(
     [string]$Library,
@@ -111,6 +128,9 @@ param(
     [string]$Site,
     [string]$Member,
     [switch]$ExcludeBaselineFailures,
+    [int]$DrawLibraries = 0,
+    [string[]]$Except = @(),
+    [string]$Root,
     [switch]$SelfTest
 )
 
@@ -392,6 +412,23 @@ function Invoke-Mutant($SiteRecord, [string]$TestProject, [string]$WorkTree, [in
     return [ordered]@{ file = $SiteRecord.File; line = $SiteRecord.Line; member = $SiteRecord.Member; operator = $SiteRecord.Operator; original = $originalLine.Trim(); mutated = (Get-MutatedLine $originalLine $SiteRecord).Trim(); outcome = $outcome; ms = $ms }
 }
 
+function Get-DrawnLibraries([string]$Tree, [int]$Count, [int]$DrawSeed, [string[]]$Leave) {
+    # -DrawLibraries: $Count libraries drawn with System.Random($DrawSeed) from every
+    # Curl.*.UnitLibrary under $Tree that has a .UnitTests twin, sorted by name first and less
+    # $Leave, so every library can be drawn and the same tree and seed always draw the same ones.
+    $all = @(Get-ChildItem -LiteralPath $Tree -Directory | Where-Object { $_.Name -match '^Curl(\.[A-Za-z0-9]+)+\.UnitLibrary$' -and $Leave -notcontains $_.Name -and (Test-Path -LiteralPath (Join-Path $Tree ($_.Name -replace '\.UnitLibrary$', '.UnitTests'))) } | ForEach-Object { $_.Name } | Sort-Object)
+    $random = New-Object System.Random $DrawSeed
+    $drawn = @()
+    $left = [System.Collections.Generic.List[string]]::new()
+    foreach ($name in $all) { $left.Add($name) }
+    while ($drawn.Count -lt $Count -and $left.Count) {
+        $k = $random.Next($left.Count)
+        $drawn += $left[$k]
+        $left.RemoveAt($k)
+    }
+    return $drawn
+}
+
 function Get-Score([int]$Killed, [int]$TimedOut, [int]$Survived) {
     $counted = $Killed + $TimedOut + $Survived
     if ($counted -eq 0) { return $null }
@@ -467,7 +504,27 @@ if ($SelfTest) {
     finally { Remove-Item -LiteralPath $trxPath -ErrorAction SilentlyContinue }
     Check 'the site argument' 'Curl.Networking.UnitLibrary|Curl.Networking.UnitLibrary/TcpPendingConnection.cs|77|true' ((ConvertFrom-SiteArgument 'Curl.Networking.UnitLibrary\TcpPendingConnection.cs:77:true' '').Values -join '|')
     Check 'a site relative to its library' 'Curl.Cli.UnitLibrary|Curl.Cli.UnitLibrary/Parser.cs|5|' ((ConvertFrom-SiteArgument 'Parser.cs:5' 'Curl.Cli.UnitLibrary').Values -join '|')
+    # -DrawLibraries: a scratch tree of libraries, two without a twin and one left out by -Except.
+    $tree = Join-Path ([IO.Path]::GetTempPath()) ('mutation-selftest-' + [guid]::NewGuid().ToString('N'))
+    try {
+        foreach ($area in 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H') { New-Item -ItemType Directory -Force (Join-Path $tree "Curl.$area.UnitLibrary"), (Join-Path $tree "Curl.$area.UnitTests") | Out-Null }
+        New-Item -ItemType Directory -Force (Join-Path $tree 'Curl.Lonely.UnitLibrary'), (Join-Path $tree 'Curl.Console'), (Join-Path $tree 'Other.UnitLibrary') | Out-Null
+        $first = @(Get-DrawnLibraries $tree 3 7 @('Curl.A.UnitLibrary'))
+        $again = @(Get-DrawnLibraries $tree 3 7 @('Curl.A.UnitLibrary'))
+        Check 'a draw takes the asked number of twinned libraries, never one left out' '3 True' "$($first.Count) $(-not @($first | Where-Object { $_ -notmatch '^Curl\.[B-H]\.UnitLibrary$' }).Count)"
+        Check 'the same seed draws the same libraries' ($first -join ',') ($again -join ',')
+        $seen = @(foreach ($s in 0..40) { Get-DrawnLibraries $tree 3 $s @('Curl.A.UnitLibrary') }) | Sort-Object -Unique
+        Check 'over seeds every twinned library is drawn, and no other' 'Curl.B.UnitLibrary,Curl.C.UnitLibrary,Curl.D.UnitLibrary,Curl.E.UnitLibrary,Curl.F.UnitLibrary,Curl.G.UnitLibrary,Curl.H.UnitLibrary' ($seen -join ',')
+        Check 'asking for more than there are draws them all' '7' "$(@(Get-DrawnLibraries $tree 50 1 @('Curl.A.UnitLibrary')).Count)"
+    }
+    finally { Remove-Item -Recurse -Force -LiteralPath $tree -ErrorAction SilentlyContinue }
     exit $(if ($failed) { 1 } else { 0 })
+}
+
+if ($DrawLibraries -gt 0) {
+    $tree = if ($Root) { (Resolve-Path $Root).Path } else { "$(git -C $PSScriptRoot rev-parse --show-toplevel)".Trim() }
+    Write-Output (ConvertTo-Json -InputObject @(Get-DrawnLibraries $tree $DrawLibraries $Seed $Except) -Compress)
+    exit 0
 }
 
 if ($Site) {

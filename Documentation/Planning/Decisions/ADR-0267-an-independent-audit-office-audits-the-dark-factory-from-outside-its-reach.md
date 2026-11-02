@@ -91,6 +91,24 @@ throwaway detached worktree. Each auditor's catch rate is reported beside its fi
 and an auditor that misses a defect planted for it has its findings flagged unreliable in
 that scorecard.
 
+> **Amended 2026-11-02, decided by Claude under Stewart's delegation:** six audits running
+> missed the same plants, and their reports showed why. Two catalogue entries allowed plants no
+> method could observe: one behind an option the differential tool never generates, one that
+> removed an assertion while another still checked the same outcome. Those two are fixed in
+> the catalogue, and the run's manifest check (`RunAudit.ps1`'s `Get-SeedingProblems`) rejects a
+> conformance plant whose trigger uses an option `Invoke-DifferentialConformance.ps1
+> -ListExcluded` names. Every other miss was the method's, so the auditors were strengthened and
+> the plants kept: the quality scan (`Find-WeakTests.ps1`) judges weakness per assertion, flags
+> commented-out assertions and `IsNotNull` of values that cannot be null, and mutation adds
+> three libraries drawn from all of them each audit (`Invoke-MutationTest.ps1 -DrawLibraries`,
+> with an auditor seed the run now gives); the security method probes `--aws-sigv4`, CONNECT
+> tunnels and every scheme that prints "auth using", and scans every library's verbose and log
+> writers (`Find-SecretsInDiagnostics.ps1`); the conformance tool runs a fixed error-path sweep
+> every audit; and the truthfulness method checks every documented script default
+> (`Find-HelpDefaultMismatches.ps1`), antonym renames (`Find-BooleanNameMismatches.ps1`) and
+> every number in each sampled ADR. A plant is kept or changed only by whether the method it is
+> planted for can reach it, never to raise a catch rate.
+
 ### 5. Scorecard and cadence
 
 Each audit produces one scorecard in a fixed format, so trends show from one audit to the
