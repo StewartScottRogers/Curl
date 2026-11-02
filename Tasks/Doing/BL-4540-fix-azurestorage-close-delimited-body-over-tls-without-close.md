@@ -35,3 +35,4 @@ close_notify (exit 56 with that message, or the body accepted) and match it.
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: a77d74ca f552bbde fdc35bd6.
