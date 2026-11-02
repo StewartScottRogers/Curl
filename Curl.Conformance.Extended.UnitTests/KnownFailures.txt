@@ -6,11 +6,4 @@ Mqtt5:MQTT-3.15.1-1 BL-4562
 Mqtt5:MQTT5-3.15-1 BL-4562
 Mqtt5:MQTT5-4.13.1-1 BL-4562
 AzureStorage:DfsErrors-1 BL-4563
-Amqp0:AMQP091-1.8.3.9-1 BL-4563
-AzureStorage:CredentialPrecedence-2 BL-4563
-AzureStorage:CredentialPrecedence-3 BL-4563
-AzureStorage:AuthorizeSas-1 BL-4563
-AzureStorage:RFC9112-6.3-1 BL-4564
-AzureStorage:RFC9112-6.3-2 BL-4564
-Coap:RFC7959-2.4-4 BL-4563
 Amqp0:AMQP091-1.5.2.3-1 BL-4564
