@@ -33,3 +33,4 @@ Split from BL-4462 as its last part; read BL-4462 (in `Tasks/Deferred`) for the 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: ed383a02 27131998 bcfa9865 29c4c51e feac4ffa.
