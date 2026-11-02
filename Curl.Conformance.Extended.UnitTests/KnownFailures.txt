@@ -13,3 +13,5 @@ Mqtt5:MQTT5-4.13.1-1 BL-4562
 Coap:RFC7252-5.4.1-1 BL-4543
 Coap:RFC7252-5.4.1-2 BL-4543
 AzureStorage:DfsErrors-1 BL-4563
+GoogleCloudStorage:V4Signing-Scope-2 BL-4538
+Coap:RFC7252-4.2-5 BL-4527
