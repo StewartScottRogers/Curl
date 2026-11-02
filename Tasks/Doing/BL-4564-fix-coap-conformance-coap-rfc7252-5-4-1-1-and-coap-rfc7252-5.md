@@ -33,3 +33,4 @@ Found by BL-4525's cases in `Curl.Conformance.Extended.UnitTests/Coap/RequestRes
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: fa5cfe4d a91ff38c 7872daae 44307beb 914c30cc.
