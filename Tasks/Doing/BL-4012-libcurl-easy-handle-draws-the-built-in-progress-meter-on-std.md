@@ -46,3 +46,4 @@ Found by BL-3811 (CGR-282). `CallbackTransferProgress.Of` (Curl.Engine.UnitLibra
 - 2026-10-28: Doing -> Backlog. Run budget ran out; 3 quality-gate failures left in the stashed work (see Notes)
 - 2026-10-29: Backlog -> Deferred. Over its cost cap; split into BL-4057 and BL-4058
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 5a165af6 a4efa820 e4d345af 82989fe8.
