@@ -8,7 +8,7 @@ depends-on: [BL-3182]
 touches: [Curl.Engine.UnitLibrary/UrlEffective.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlParser.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlIPv4Address.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlRejectionMessages.cs, Curl.Core.UnitLibrary/UrlSchemeGuesser.cs, Curl.Engine.UnitTests/UrlEffectiveNormalizationTests.cs, Curl.Protocol.Abstractions.UnitTests/CurlUrlHostPortTableTests.cs, Curl.Console.UnitTests/CurlCommandRunnerUrlRejectionTests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Core.UnitTests/UrlSchemeGuesserTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-11-02
 ---
 # BL-3173 — Normalise %{url_effective}, url.host and url.port as curl 8.22.0 does and reject no-host URLs
 
@@ -22,11 +22,11 @@ Stewart reported on 2026-10-22. Measured with `-w '%{url_effective}'` against a 
 
 ## Acceptance criteria
 
-- [ ] Notes record curl 8.22.0's `%{url_effective}`, `%{url.host}` and `%{url.port}` (and exit code and text for rejected ones) for the 20 inputs, including every example above.
-- [ ] A table-driven test in `Curl.Engine.UnitTests/UrlEffectiveNormalizationTests.cs` runs the 20 inputs through `UrlEffective.Normalize` and compares with the recorded `%{url_effective}`; a second table in `Curl.Protocol.Abstractions.UnitTests/CurlUrlHostPortTableTests.cs` compares `%{url.host}` and `%{url.port}` (as `CurlUrl` yields them).
-- [ ] `//127.0.0.1:18080/echo` returns exit 3 with 8.22.0's measured no-host text, in a test through the command runner (`Curl.Console.UnitTests/CurlCommandRunnerUrlRejectionTests.cs`).
-- [ ] `http:127.0.0.1:18080/echo` and URLs with leading/trailing spaces report `%{url_effective}` unchanged (or as 8.22.0 measures, noted in the test); zone-ID connect-error text is pinned.
-- [ ] `dotnet build Curl.Engine.UnitLibrary Curl.Protocol.Abstractions.UnitLibrary Curl.Core.UnitLibrary -warnaserror` is clean and the fast tests of the matching `.UnitTests` projects pass; the existing `UrlEffective` and `CurlUrl` tests still pass.
+- [x] Notes record curl 8.22.0's `%{url_effective}`, `%{url.host}` and `%{url.port}` (and exit code and text for rejected ones) for the 20 inputs, including every example above.
+- [x] A table-driven test in `Curl.Engine.UnitTests/UrlEffectiveNormalizationTests.cs` runs the 20 inputs through `UrlEffective.Normalize` and compares with the recorded `%{url_effective}`; a second table in `Curl.Protocol.Abstractions.UnitTests/CurlUrlHostPortTableTests.cs` compares `%{url.host}` and `%{url.port}` (as `CurlUrl` yields them).
+- [x] `//127.0.0.1:18080/echo` returns exit 3 with 8.22.0's measured no-host text, in a test through the command runner (`Curl.Console.UnitTests/CurlCommandRunnerUrlRejectionTests.cs`).
+- [x] `http:127.0.0.1:18080/echo` and URLs with leading/trailing spaces report `%{url_effective}` unchanged (or as 8.22.0 measures, noted in the test); zone-ID connect-error text is pinned.
+- [x] `dotnet build Curl.Engine.UnitLibrary Curl.Protocol.Abstractions.UnitLibrary Curl.Core.UnitLibrary -warnaserror` is clean and the fast tests of the matching `.UnitTests` projects pass; the existing `UrlEffective` and `CurlUrl` tests still pass.
 
 ## Notes
 
@@ -57,6 +57,8 @@ Stewart reported on 2026-10-22. Measured with `-w '%{url_effective}'` against a 
 - Requeued for BL-3182: the zone-ID connect-error text cannot be pinned here. On Windows Curl's refused connect times out (exit 28) instead of exit 7, and the text is built in `Curl.Networking.UnitLibrary/TcpConnector.cs`, which BL-3172 holds. Left for the next claim: once BL-3182 is Done, pin the zone-ID connect text (`Failed to connect to ::1:9`), add a `UrlSchemeGuesserTests` row for `/x` staying unchanged, run the Curl.Console fast tests, run `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Core.UnitLibrary,Curl.Console`, tick the boxes and commit.
 - Decision (sensible default): a URL with no scheme that starts with `/` is not given a guessed scheme, because curl 8.22.0 rejects all such URLs with `No host present` and prints them as typed.
 
+- 2026-11-02 claim: nothing left to do. The split subtasks BL-3266 (normalisation, no-host rejection, tables; commit 83645df3f) and BL-3265 (zone-ID connect text pinned through the runner) are both Done, and later commits (BL-3721, BL-3722) refined url_effective further. The stash f8a72ca5 is superseded by that landed work, so it was not applied. Verified here: the URL tests in Curl.Engine.UnitTests (298), Curl.Protocol.Abstractions.UnitTests (994), Curl.Core.UnitTests (85) and Curl.Console.UnitTests (10) pass with no failures. No code changed, so no quality run. CI on Linux and macOS: no change in this run.
+
 ## Log
 
 - 2026-10-22: Created.
@@ -65,3 +67,4 @@ Stewart reported on 2026-10-22. Measured with `-w '%{url_effective}'` against a 
 - 2026-10-23: Backlog -> Deferred. Split over cost cap into BL-3266 and BL-3265
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 3debb382 9eefc518 e6155fdf dd37067d 92579dca.
+- 2026-11-02: Doing -> Done. Work landed through split subtasks BL-3266 and BL-3265; URL tests verified green
