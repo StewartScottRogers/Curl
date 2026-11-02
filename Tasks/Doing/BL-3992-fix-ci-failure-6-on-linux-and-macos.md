@@ -35,3 +35,4 @@ Lanes test only on Windows, so reproduce with `gh run view 40774593052 --log-fai
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Deferred. Duplicate of BL-3993: the CI watch named a data row ('-4' or '-6') of TcpConnectorTests.ConnectAsync_UnderTheOtherFamilyToAnAddressLiteral_DialsTheLiteral, failing in the same run from the same commit; BL-3993 now covers every row. Revisit only if that test still fails after BL-3993 is Done.
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: e4bd77f6.
