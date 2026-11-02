@@ -8,7 +8,7 @@ depends-on: [BL-4534]
 touches: [Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Client/GcsProtocolHandler.cs, Curl.Extended.Protocol.GoogleCloudStorage.UnitTests/Client, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4542 — Fix GoogleCloudStorage conformance: V4Signing-Scope-2 (sign gs:// with a named region)
 
@@ -34,3 +34,4 @@ Found by BL-4476: `GcsV4SigningCases.Download_WithHmacKeyAndARegion_SignsWithTha
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b8f2907f ed58e9fc 6466a373.
+- 2026-11-02: Doing -> Done. gs:// signs with the region --aws-sigv4 goog4:goog:<region>:storage names
