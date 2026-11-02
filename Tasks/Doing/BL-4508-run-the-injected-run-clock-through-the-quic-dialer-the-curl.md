@@ -39,3 +39,4 @@ A test that advances a fake clock with `--http3`, `CURL_DNS_SERVER` or `--negoti
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 2e2d1f5f dd834adf 883e7975 a2ae2cb0 3d836d5e.
