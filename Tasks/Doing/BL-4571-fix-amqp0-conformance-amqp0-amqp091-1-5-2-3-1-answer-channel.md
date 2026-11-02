@@ -34,3 +34,4 @@ Library: `Curl.Extended.Protocol.Amqp0.UnitLibrary` (its CLAUDE.md, ADR-1056, AD
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 20572201 d78c25d3 1c7fa6c3 e97c1b31.
