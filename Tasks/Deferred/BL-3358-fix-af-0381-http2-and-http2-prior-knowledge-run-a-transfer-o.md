@@ -50,6 +50,8 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 - 2026-10-24 (interactive): Stewart decided 'Keep HTTP/2 on' (2026-10-23, about 23:30 Arizona): ADR-0871 stands, so the refuse-on-Windows fix this task asks for is not wanted and no code changes. Done for it: AF-0381 closed by Stewart (closed-how: stewart, citing ADR-0871) on the audit branch, PR #221; on the gap branch (PR #217, commits 7c68dc274 and ea55d6f6b) Gap/Baselines/platform-exclusions.json has Measure-GapAreas.ps1 measure options:--http2, --http2-prior-knowledge, --proxy-http2, --proxy-http2:no-form and behaviour:test1704 as excluded with reason decided:ADR-0871 on Windows only, and GF-0098 and GF-0099 log the decision; they close on the next gap run that measures those items excluded. This task's criteria (exit 2 on Windows) cannot be met without undoing ADR-0871, so it is deferred rather than ticked; BL-3372 still covers the 16/56 exit flip ADR-0871 does not.
 
+- 2026-11-02 (lane 2): Claimed again after Stewart's "complete all existing tasks". Checked first: ADR-0871 still stands, and ADR-0929 (2026-10-26) records Stewart confirming "Keep HTTP/2 on" a second time; `CommandLineOptionTable.HttpVersionRows.cs` still runs both options, as those ADRs require. The only way to meet the criteria (exit 2 on Windows) is to undo two of Stewart's own decisions, which the delegation does not cover, and the general instruction to finish tasks does not reverse them. BL-3372 (the 16/56 flip) is Done, and AF-0381 is already closed by Stewart citing ADR-0871. No code changed. Deferred again; to revive it, Stewart reverses ADR-0871 and ADR-0929, or files a new task with criteria that match them.
+
 ## Log
 
 - 2026-10-23: Created.
@@ -58,3 +60,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-10-24: Blocked -> Deferred. Stewart decided 'Keep HTTP/2 on' (2026-10-23): ADR-0871 stands, so refusing HTTP/2 on Windows is not wanted; no code change. Revisit only if Stewart reverses ADR-0871.
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-02: Doing -> Deferred. ADR-0871 and ADR-0929 (Stewart's 'Keep HTTP/2 on', confirmed twice) keep --http2 running on Windows; the exit-2 criteria would undo them; AF-0381 already closed by Stewart. Revisit only if Stewart reverses ADR-0871.
