@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Conformance.Extended.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Networking.UnitLibrary\Curl.Networking.UnitLibrary.csproj" />
+    <!-- InMemoryDuplexStream and TlsServerStream carry the reference servers' connections (BL-4501). -->
+    <ProjectReference Include="..\Curl.Conformance.UnitLibrary\Curl.Conformance.UnitLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

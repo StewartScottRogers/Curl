@@ -1,0 +1,37 @@
+using System.Net;
+using System.Net.Sockets;
+using Curl.Networking;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Conformance.Extended.Harness;
+
+/// <summary>
+/// Dials each TCP connection to the TCP or TLS route on its port, starting the route's server on
+/// the other end of an in-memory pair; a port no such route answers is refused, as a real one is.
+/// </summary>
+internal sealed class ReferenceTcpDialer(IReadOnlyList<ReferenceRoute> routes, ReferenceRun run) : ITcpDialer
+{
+    public ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
+    {
+        ReferenceRoute route = routes.FirstOrDefault(candidate => candidate.Port == endPoint.Port && candidate.Transport != ReferenceTransport.Udp)
+            ?? throw new SocketException((int)SocketError.ConnectionRefused);
+        (InMemoryDuplexStream clientEnd, InMemoryDuplexStream serverEnd) = InMemoryDuplexStream.CreatePair();
+        WireExchange exchange = run.Open(route);
+        run.Serve(ServeAsync(route, serverEnd, exchange, run.Stopping));
+        ReferenceClientConnection connection = new(clientEnd, endPoint);
+        return ValueTask.FromResult(new DialedTcpConnection(connection, (IPEndPoint)connection.LocalEndPoint!));
+    }
+
+    public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken) =>
+        DialAsync(endPoint, cancellationToken);
+
+    public ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken) =>
+        throw new SocketException((int)SocketError.ConnectionRefused);
+
+    // Serves the connection and closes the server's end when done.
+    private static async Task ServeAsync(ReferenceRoute route, InMemoryDuplexStream serverEnd, WireExchange exchange, CancellationToken cancellationToken)
+    {
+        await using InMemoryDuplexStream closing = serverEnd;
+        await route.StreamServer!.ServeAsync(new ReferenceConnection(serverEnd, exchange), cancellationToken).ConfigureAwait(false);
+    }
+}

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Conformance.Extended.UnitLibrary\Curl.Conformance.Extended.UnitLibrary.csproj" />
+    <!-- The cases run curl in process through InProcessCurl, and the curl-surface checks reach Curl.Mcp (BL-4462). -->
+    <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
+    <ProjectReference Include="..\Curl.Mcp\Curl.Mcp.csproj" />
+  </ItemGroup>
+
+</Project>

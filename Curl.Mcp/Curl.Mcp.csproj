@@ -45,6 +45,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Conformance.Extended.UnitTests" />
     <InternalsVisibleTo Include="Curl.Mcp.IntegrationTests" />
     <InternalsVisibleTo Include="Curl.Mcp.UnitTests" />
   </ItemGroup>
