@@ -58,3 +58,4 @@ One `IUnitProgram` per case in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Eas
 - 2026-10-21: Blocked -> Backlog. Cost cap window passed: its runs of the last 24 hours now leave 1 US dollar or more of its cost cap, so the cost cap allows a fresh run
 - 2026-10-21: Backlog -> Deferred. Split for the cost cap into BL-3014 (land the ports), BL-3015 (run cases, ratchet), BL-3016 and BL-3017 (quality); nothing left here
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: c0969e39 2e3e75ab aca7e1a2 dd1cc079.
