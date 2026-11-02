@@ -38,3 +38,4 @@ Coap:RFC7252-9.1-3, Coap:RFC7252-9.1-4.
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: f298e558 bff304f3 34f35708.
