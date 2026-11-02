@@ -8,7 +8,7 @@ depends-on: [BL-3406]
 touches: [Curl.Conformance.UnitLibrary/UpstreamTest1185Script.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1185.cs, Curl.Conformance.UnitTests/UpstreamTest1185ScriptTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-11-02
 ---
 # BL-3413 — Interpret upstream scripts/checksrc.pl in C# for the sample C file of case 1185
 
@@ -22,7 +22,7 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
 
@@ -33,6 +33,8 @@ completed:
   - Uncommitted (the shift stashes it): `Curl.Conformance.UnitLibrary/UpstreamChecksrcScript.cs` (the entry point) and `UpstreamChecksrcRun.cs` (options, usage, checksrc.skip, .checksrc, `!checksrc!` instructions, checkwarn, the file and suppression counters). Fix first: it uses `[GeneratedRegex]`, which this library's CLAUDE.md forbids because generated code counts against coverage. Switch to `static readonly Regex` fields with `UpstreamRegex.MatchTimeout`, as `UpstreamTest1276Script` does.
   - Still to write: `ScanFile` and the line checks of checksrc.pl lines 532-1268 (curl-8_22_0), in the script's order. Perl quirks to keep: SPACEBEFOREPAREN's typedef test reads the keyword capture when `first` is `*`; `if($l)` is false for `"0"`; the banned-function loop replaces `prefix.bad.suff` with `prefix` plus `x` times (len+1); `goto comment` loops the comment stripping; and `#line` `next` skips `$line++` and the prev-line updates. Then write the tests to 100% line and branch coverage, the registration file, add `1185` to `PassingUpstreamCases.txt`, write the ADR, and run Measure-CodeQuality once for Curl.Conformance.UnitLibrary.
 
+- 2026-11-02 (lane 11): every part of the work landed in BL-3416, BL-3417, BL-3418 and BL-3419, all Done: UpstreamChecksrcScript, UpstreamChecksrcRun and the two scan-check files, their tests, the UpstreamPerlCommandScripts.Checksrc.cs registration, ADR-0807, and 1185 in PassingUpstreamCases.txt. The stash 62a0853a is superseded by that work and was not applied. Re-checked here: Curl.Conformance.UnitTests builds clean and its fast tests pass (4376 passed, 0 failed). No production code changed in this run, so no quality run was needed.
+
 ## Log
 
 - 2026-10-23: Created.
@@ -41,3 +43,4 @@ completed:
 - 2026-10-23: Backlog -> Deferred. Split into BL-3416, BL-3417, BL-3418, BL-3419 (over its cost cap)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-11-02: Doing -> Done. checksrc.pl is interpreted in C# and case 1185 passes, via BL-3416 to BL-3419
