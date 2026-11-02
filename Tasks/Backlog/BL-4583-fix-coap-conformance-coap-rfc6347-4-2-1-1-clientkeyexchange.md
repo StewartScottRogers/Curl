@@ -1,5 +1,5 @@
 ---
-id: BL-4577
+id: BL-4583
 title: Fix Coap conformance: Coap:RFC6347-4.2.1-1 (ClientKeyExchange carries the ECDHE point with two length prefixes)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4577 — Fix Coap conformance: Coap:RFC6347-4.2.1-1 (ClientKeyExchange carries the ECDHE point with two length prefixes)
+# BL-4583 — Fix Coap conformance: Coap:RFC6347-4.2.1-1 (ClientKeyExchange carries the ECDHE point with two length prefixes)
 
 ## Goal
 

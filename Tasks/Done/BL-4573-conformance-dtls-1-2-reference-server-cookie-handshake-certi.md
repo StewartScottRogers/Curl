@@ -82,7 +82,7 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
   RFC 8422; it completes the handshake and a protected exchange, which both proves the server and covers every
   path while curl's client cannot finish.
 - Defect found in the library: curl's ClientKeyExchange carries the ECDHE point with two length bytes
-  (66, 65, 04, ...), not RFC 8422's ecdh_Yc<1..255>. Filed High BL-4577; the five cases that need a finished
+  (66, 65, 04, ...), not RFC 8422's ecdh_Yc<1..255>. Filed High BL-4583; the five cases that need a finished
   handshake (Coap:RFC6347-4.2.1-1, Coap:RFC6347-4.1-1, Coap:RFC7252-9.1-1, -9.1-3, -9.1-4) are listed in
   `KnownFailures.txt` against it. The exit 60 case (Coap:RFC7252-9.1-2) passes: the chain is refused before the
   key exchange. Its stderr is pinned by the prefix `curl: (60) ` only, since the verdict's text is the platform's.
@@ -95,4 +95,4 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 166e1d8b d8d74ef4 f77798d9 fb1c989b d8e3fb0e f055b099 17248609.
-- 2026-11-02: Doing -> Done. DTLS 1.2 reference server, cookie, certificate and protected-exchange cases landed; the client's double-prefixed ClientKeyExchange is filed as BL-4577 with its cases on KnownFailures.txt
+- 2026-11-02: Doing -> Done. DTLS 1.2 reference server, cookie, certificate and protected-exchange cases landed; the client's double-prefixed ClientKeyExchange is filed as BL-4583 with its cases on KnownFailures.txt
