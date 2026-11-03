@@ -38,3 +38,4 @@ Fix: translate the refusal only until the channel has received its first datagra
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 57062642 abbe5c45 2b57dc98 13a4f46b.
