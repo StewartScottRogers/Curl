@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4771 — Fix AF-0607: Surviving mutant: SessionTicketRecordDetector can count one ticket record past its list without a test failing
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The mutant was equivalent. With `tickets <= Count`, the extra call `RunEndAccountingFor(Count, read)` summed no record and returned -1 for any read other than 0, which `CountTicketRecords` already rules out, so no test could tell the two apart. The fix is in production code: `RunEndAccountingFor` now reads the run's first record without a bounds check (a run holds at least one record), so asking past the queue throws. Behaviour for every index inside the queue is unchanged.
+- Mutation check: a lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand at SessionTicketRecordDetector.cs:104. With `<=`, `CountTicketRecords_ReadStoppingInsideARecord_CountsNone` and `CountTicketRecords_NoRunOfRecordsAccountsForTheRead_CountsNone` fail (2 failed, 9 passed). With the line restored they all pass. No new test was needed, so `touches` stays at the library.
+- `dotnet build`: 0 warnings, 0 errors. `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` ran the fast tests of all 21 projects that reach the library: all passed, Curl.Networking.UnitTests with 4018 passed and 34 skipped. It reported 0 failing members. The change is platform-neutral (in-memory code only).
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. SessionTicketRecordDetector's tickets <= Count mutant now throws and is killed by the detector's no-run tests
