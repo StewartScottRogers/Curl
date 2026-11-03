@@ -295,6 +295,49 @@ public sealed class OciRegistryProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
         Assert.AreEqual("The requested URL returned error: 500", result.ErrorMessage);
     }
+    [TestMethod]
+    public async Task ExecuteAsync_WithTransferEvents_HandsThemToEveryConnectionForVerbosesConnectionLines()
+    {
+        var connector = new SequenceConnector(
+            SequenceConnector.Respond(Challenge), SequenceConnector.Respond("200 OK", """{"token":"t"}"""), SequenceConnector.Respond("200 OK", Manifest));
+        var events = new ConnectionOpenedCapturingTransferEvents(NoTransferEvents.Instance);
+
+        var result = await new OciRegistryProtocolHandler(connector).ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse("oci://reg.example/alpine:3.20"), Output = new MemoryStream(), Events = events });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(3, connector.Targets);
+        Assert.IsTrue(connector.Targets.TrueForAll(target => ReferenceEquals(events, target.Events)));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FailWithBodyMissingManifest_WritesTheErrorBodyAndExits22()
+    {
+        const string ErrorBody = """{"errors":[{"code":"MANIFEST_UNKNOWN","message":"manifest unknown"}]}""";
+
+        var (result, output) = await PullWithFailModeAsync(HttpFailMode.FailWithBody, ErrorBody);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(ErrorBody, output);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FailMissingManifest_WritesNothingAndExits22()
+    {
+        var (result, output) = await PullWithFailModeAsync(HttpFailMode.Fail, """{"errors":[{"code":"MANIFEST_UNKNOWN"}]}""");
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(string.Empty, output);
+    }
+
+    private static async Task<(TransferResult Result, string Output)> PullWithFailModeAsync(HttpFailMode fail, string errorBody)
+    {
+        using var output = new MemoryStream();
+        var result = await new OciRegistryProtocolHandler(new SequenceConnector(SequenceConnector.Respond("404 Not Found", errorBody))).ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse("oci://reg.example/alpine:none"), Output = output, Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Fail = fail } });
+        return (result, Encoding.UTF8.GetString(output.ToArray()));
+    }
+
     private static string Sha256Of(string content) => "sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
 
     private static async Task<(TransferResult Result, string Output)> PullAsync(SequenceConnector connector, string url, NetworkCredential? credentials = null)

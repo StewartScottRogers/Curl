@@ -42,7 +42,7 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
 
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context, OciPullReference reference)
     {
-        var session = new OciRegistrySession(new OciHttpClient(connector), context.Credentials);
+        var session = new OciRegistrySession(new OciHttpClient(new TransferEventsConnector(connector, context)), context.Credentials);
         context.Progress.ReportTransferStarted();
         try
         {
@@ -54,6 +54,12 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
         }
         catch (OciTransferException failure)
         {
+            // curl's --fail-with-body writes the error response's body before it fails (manual, "--fail-with-body").
+            if (context.Http?.Fail == HttpFailMode.FailWithBody)
+            {
+                await context.Output.WriteAsync(failure.ErrorBody, context.CancellationToken);
+            }
+
             return TransferResult.Failure(failure.ExitCode, failure.Message);
         }
     }
