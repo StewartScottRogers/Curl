@@ -38,7 +38,7 @@ public sealed class Amqp1ReferenceContainer(Amqp1ReferenceContainerOptions optio
     public async Task ServeAsync(ReferenceConnection connection, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(connection);
-        Amqp1ReferenceSession session = new(connection, new Amqp1ReferenceEncoder(options.WideEncoding), cancellationToken);
+        Amqp1ReferenceSession session = new(connection, new Amqp1ReferenceEncoder(options.WideEncoding), cancellationToken, options.BodyEncoding);
         if (options.AnswerHeaderProtocolId is { } answer)
         {
             await AnswerFirstHeaderAsync(session, answer).ConfigureAwait(false);

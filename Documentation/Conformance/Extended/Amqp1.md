@@ -3,7 +3,7 @@
 Curl's `amqp1://` and `amqp1s://` client measured against OASIS AMQP Version 1.0 (29 October 2012): the version
 negotiation and protocol headers of Part 2 section 2.2, the SASL layer of Part 5 section 5.3, and the framing,
 connection, session, link attach and detach, and error requirements of Part 2 sections 2.3 to 2.6 and 2.8 (BL-4528).
-Transfer, flow, disposition and the message format are measured by BL-4467; encoding widths by BL-4529.
+Transfer, flow, disposition and the message format are measured in [Amqp1-Messaging.md](Amqp1-Messaging.md) (BL-4467). The encodings of Part 1 sections 1.3 to 1.6 that curl reads are measured by `Amqp1EncodingWidthCases` (BL-4529): the widest forms, the forms that skip the zero-width shortcuts, list32 around small values, symbolic descriptors and a single symbol where a field is multiple, written by the container's `BodyEncoding`.
 
 The cases run against `Amqp1ReferenceContainer` (`Curl.Conformance.Extended.UnitLibrary/Amqp1/`), which implements
 the type system, framing, SASL and open, begin, attach, detach, end and close from the specification. Its default link
@@ -51,3 +51,11 @@ connection with an error.
 | Amqp1:Core-2.6.5-1 | MUST | A peer whose link the other peer detaches with closed set answers with its own closing detach. | Amqp1SessionLinkCases.Link_DetachedByThePeer_AnswersWithADetach |
 | Amqp1:Core-2.6.6-1 | MUST | A link is closed with a detach whose closed field is true, on the attached handle, before the session ends. | Amqp1SessionLinkCases.Order_SendMessage_OpenBeginAttachTransferDetachEndClose |
 | Amqp1:Core-2.8.15-1 | MUST | An error carries a condition symbol and may carry a description; detach, end and close carry the error that ends them, which the receiving peer acts on. | Amqp1ConnectionCases.CloseWithError_ContainerClosesAfterAttach_ReportsTheErrorWithExit8 |
+| Amqp1:Types-1.3-1 | MUST | A field marked multiple carries either a single value of its type or an array of them, and a reader takes both. | Amqp1EncodingWidthCases.MultipleField_SingleSymbolForServerMechanisms_InitsThatMechanism |
+| Amqp1:Types-1.4-1 | MUST | A composite value is a described list of its fields in order, and trailing null fields may be left out of the list; a reader takes a missing field as null. | Amqp1EncodingWidthCases.Widest_ContainerWritesEveryLargeForm_CurlSendsTheMessage |
+| Amqp1:Types-1.5-1 | MUST | A descriptor is a symbol or a ulong, and a reader takes a composite type's symbolic name in place of its numeric code. | Amqp1EncodingWidthCases.SymbolicDescriptors_EveryBodyDescribedByName_CurlSendsTheMessage |
+| Amqp1:Types-1.6-1 | MUST | A reader takes every fixed-width encoding the writer may choose: uint0, smalluint and uint, smallulong and ulong, true, false and boolean with a byte. | Amqp1EncodingWidthCases.ZeroWidthFormsSkipped_SmallUintBooleanByteAndList8_CurlSendsTheMessage |
+| Amqp1:Types-1.6-2 | MUST | A reader takes both widths of every variable-width encoding: vbin8 and vbin32, str8 and str32, sym8 and sym32. | Amqp1EncodingWidthCases.Widest_DetachErrorInStr32AndSym32_ReportsTheErrorWithExit78 |
+| Amqp1:Types-1.6-3 | MUST | A reader takes every list encoding: list0, list8 and list32. | Amqp1EncodingWidthCases.List32WithSmallScalars_EveryListInList32_CurlSendsTheMessage |
+| Amqp1:Types-1.6-4 | MUST | A reader takes both array encodings, array8 and array32. | Amqp1EncodingWidthCases.Widest_ContainerWritesEveryLargeForm_CurlSendsTheMessage |
+| Amqp1:Types-1.6-5 | MUST | A reader takes the encodings of the remaining primitive types (signed integers, floating point, decimals, char, timestamp, uuid and map). | n/a: no frame of Parts 2.2 to 2.6, 2.8 and 5.3 the client reads carries one; message sections, which may, are measured in Amqp1-Messaging.md |

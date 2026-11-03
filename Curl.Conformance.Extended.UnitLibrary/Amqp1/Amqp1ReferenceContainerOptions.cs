@@ -27,6 +27,12 @@ public sealed record Amqp1ReferenceContainerOptions
     /// <summary>Gets a value indicating whether the container writes the widest encodings instead of the smallest.</summary>
     public bool WideEncoding { get; init; }
 
+    /// <summary>
+    /// Gets what writes each frame body the container sends in encodings a case chooses (Part 1 section 1.6), answering
+    /// null to leave a body to the container's encoder; null to use the encoder for every body.
+    /// </summary>
+    public Func<Amqp1ReferenceDescribed, byte[]?>? BodyEncoding { get; init; }
+
     /// <summary>Gets what the container does with a link once attached.</summary>
     public IAmqp1ReferenceLinkBehaviour LinkBehaviour { get; init; } = new Amqp1ReferenceLinkRefusal();
 }

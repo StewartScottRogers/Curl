@@ -10,7 +10,11 @@ namespace Curl.Conformance.Extended.Amqp1;
 /// <param name="connection">The server's end of the connection.</param>
 /// <param name="encoder">How the container encodes what it sends.</param>
 /// <param name="cancellationToken">Cancels the exchange.</param>
-public sealed class Amqp1ReferenceSession(ReferenceConnection connection, Amqp1ReferenceEncoder encoder, CancellationToken cancellationToken)
+/// <param name="bodyEncoding">
+/// Writes a frame body in encodings a case chooses, or answers null to leave that body to <paramref name="encoder"/>;
+/// null to use the encoder for every body.
+/// </param>
+public sealed class Amqp1ReferenceSession(ReferenceConnection connection, Amqp1ReferenceEncoder encoder, CancellationToken cancellationToken, Func<Amqp1ReferenceDescribed, byte[]?>? bodyEncoding = null)
 {
     private const int FrameHeaderLength = 8;
 
@@ -65,7 +69,7 @@ public sealed class Amqp1ReferenceSession(ReferenceConnection connection, Amqp1R
 
     private ValueTask SendFrameAsync(byte type, ushort channel, Amqp1ReferenceDescribed body, byte[] payload)
     {
-        byte[] encoded = encoder.Encode(body);
+        byte[] encoded = bodyEncoding?.Invoke(body) ?? encoder.Encode(body);
         byte[] frame = new byte[FrameHeaderLength + encoded.Length + payload.Length];
         BinaryPrimitives.WriteUInt32BigEndian(frame, (uint)frame.Length);
         frame[4] = 2;
