@@ -74,6 +74,19 @@ public sealed class WebTransportProtocolHandlerTests
 
     [TestMethod]
     [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task ExecuteAsync_SessionHasClosedTheConnection_DoesNotCloseItAgain()
+    {
+        ScriptedHttp3Connection connection = new() { AnswerStream = Echo };
+
+        (TransferResult result, string output) = await RunAsync(connection, "webtransport://example.com/echo", "hi");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, "a second CloseAsync on the closed QUIC connection throws ObjectDisposedException");
+        Assert.AreEqual("hi", output);
+        Assert.AreEqual((long)Http3ErrorCode.NoError, connection.ClosedWith);
+    }
+
+    [TestMethod]
+    [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task ExecuteAsync_Section6_ClosesTheSessionWithWtCloseSessionInAData()
     {
         ScriptedHttp3Connection connection = new() { AnswerStream = Echo };

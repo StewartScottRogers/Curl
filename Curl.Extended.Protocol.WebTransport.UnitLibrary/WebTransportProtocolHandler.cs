@@ -60,7 +60,6 @@ public sealed class WebTransportProtocolHandler : IProtocolHandler
         await using IMultiplexedConnection connection = await dial(request, context.CancellationToken).ConfigureAwait(false);
         context.Progress.ReportTransferStarted();
         long written = await new WebTransportSession(connection, context).RunAsync(request).ConfigureAwait(false);
-        await connection.CloseAsync((long)Http3ErrorCode.NoError, context.CancellationToken).ConfigureAwait(false);
         return TransferResult.Success(written);
     }
 }
