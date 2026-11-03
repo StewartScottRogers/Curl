@@ -32,6 +32,10 @@ internal static class Mqtt5WebSocketUpgrade
 
     private const string ProtocolHeader = "Sec-WebSocket-Protocol:";
 
+    private const string UpgradeHeader = "Upgrade:";
+
+    private const string ConnectionHeader = "Connection:";
+
     private static readonly byte[] HeadEnd = "\r\n\r\n"u8.ToArray();
 
     /// <summary>Gives a new <c>Sec-WebSocket-Key</c>: sixteen bytes from <paramref name="randomSource"/>, base64 encoded.</summary>
@@ -123,6 +127,8 @@ internal static class Mqtt5WebSocketUpgrade
             throw new Mqtt5ClientException(CurlExitCode.HttpReturnedError, Mqtt5WebSocketMessages.RefusedUpgrade(statusLine[1]));
         }
 
+        CheckUpgradeHeaders(lines);
+
         if (!HasHeader(lines, AcceptHeader, AcceptFor(key)))
         {
             throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5WebSocketMessages.AcceptMismatch);
@@ -134,6 +140,22 @@ internal static class Mqtt5WebSocketUpgrade
         }
     }
 
+    private static void CheckUpgradeHeaders(string[] lines)
+    {
+        if (!lines.Any(line => HasValue(line, UpgradeHeader, value => value.Equals("websocket", StringComparison.OrdinalIgnoreCase))))
+        {
+            throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5WebSocketMessages.NoUpgradeWebsocket);
+        }
+
+        if (!lines.Any(line => HasValue(line, ConnectionHeader, value => value.Split(",").Any(token => token.Trim().Equals("Upgrade", StringComparison.OrdinalIgnoreCase)))))
+        {
+            throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5WebSocketMessages.NoConnectionUpgrade);
+        }
+    }
+
+    private static bool HasValue(string line, string name, Func<string, bool> matches) =>
+        line.StartsWith(name, StringComparison.OrdinalIgnoreCase) && matches(line[name.Length..].Trim());
+
     private static bool HasHeader(string[] lines, string name, string value) =>
-        lines.Any(line => line.StartsWith(name, StringComparison.OrdinalIgnoreCase) && line[name.Length..].Trim() == value);
+        lines.Any(line => HasValue(line, name, found => found == value));
 }

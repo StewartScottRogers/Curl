@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Mqtt5.UnitLibrary/WebSocket/Mqtt5WebSocketUpgrade.cs, Curl.Extended.Protocol.Mqtt5.UnitLibrary/WebSocket/Mqtt5WebSocketMessages.cs, Curl.Extended.Protocol.Mqtt5.UnitTests/WebSocket, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4593 — Fix Mqtt5 conformance: Mqtt5:RFC6455-4.1-9 and Mqtt5:RFC6455-4.1-10 (upgrade reply without Upgrade or Connection)
 
@@ -22,13 +22,16 @@ Found by BL-4486: `Mqtt5WebSocketUpgrade.CheckHead` checks only the status, Sec-
 
 ## Acceptance criteria
 
-- [ ] Both cases pass and the Mqtt5:RFC6455-4.1-9 and Mqtt5:RFC6455-4.1-10 lines are removed from Curl.Conformance.Extended.UnitTests/KnownFailures.txt.
-- [ ] A focused unit test in Curl.Extended.Protocol.Mqtt5.UnitTests pins each check (ADR-0482).
-- [ ] dotnet build is clean, the fast tests are green and Curl.Extended.Protocol.Mqtt5.UnitLibrary stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30.
+- [x] Both cases pass and the Mqtt5:RFC6455-4.1-9 and Mqtt5:RFC6455-4.1-10 lines are removed from Curl.Conformance.Extended.UnitTests/KnownFailures.txt.
+- [x] A focused unit test in Curl.Extended.Protocol.Mqtt5.UnitTests pins each check (ADR-0482).
+- [x] dotnet build is clean, the fast tests are green and Curl.Extended.Protocol.Mqtt5.UnitLibrary stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30.
 
 ## Notes
+
+- Upgrade and Connection are checked after the status line and before Sec-WebSocket-Accept, in RFC 6455 4.1's order; Upgrade must equal `websocket` and Connection must hold an `Upgrade` token (a comma list such as `keep-alive, Upgrade` passes), both case-insensitive. Exit 8 (WeirdServerReply) like the Accept mismatch. Measure-CodeQuality.ps1 for Curl.Extended.Protocol.Mqtt5.UnitLibrary: 0 failing members. The change is platform-neutral, so CI on Linux and macOS is covered by the fast tests here.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: f44d6cb0 be93e6c9 91dca242.
+- 2026-11-02: Doing -> Done. mqtt5+ws:// fails the upgrade without Upgrade: websocket or Connection: Upgrade; both cases off KnownFailures
