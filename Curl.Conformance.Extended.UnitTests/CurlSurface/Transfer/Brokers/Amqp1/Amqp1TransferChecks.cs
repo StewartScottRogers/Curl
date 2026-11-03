@@ -93,7 +93,7 @@ internal static class Amqp1TransferChecks
 
     /// <summary>
     /// --fail and --fail-with-body: the manual's "server errors" are HTTP response codes, and the extension maps no AMQP
-    /// error to exit 22, so a refused link still ends with ADR-1062's exit 78 and its message under either option (ADR-1217).
+    /// error to exit 22, so a refused link still ends with ADR-1062's exit 78 and its message under either option (ADR-1219).
     /// </summary>
     public static Task FailAsync(Amqp1TransferScheme scheme, string option, string requirementOption) =>
         RunCaseAsync(scheme, requirementOption, async directory =>
@@ -105,7 +105,7 @@ internal static class Amqp1TransferChecks
                 new Amqp1TransferClock());
 
             Assert.AreEqual(78, result.ExitCode, Text(result.StandardError));
-            Assert.AreEqual($"curl: (78) {RefusedLinkMessage}\n", Text(result.StandardError), "ADR-1062: amqp:not-found is exit 78; ADR-1217");
+            Assert.AreEqual($"curl: (78) {RefusedLinkMessage}\n", Text(result.StandardError), "ADR-1062: amqp:not-found is exit 78; ADR-1219");
             Assert.AreEqual($"78:{RefusedLinkMessage}", Text(result.StandardOutput), "manual, -w %{exitcode} and %{errormsg}");
         });
 

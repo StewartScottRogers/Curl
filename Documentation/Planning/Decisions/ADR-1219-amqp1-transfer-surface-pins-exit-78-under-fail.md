@@ -1,4 +1,4 @@
-# ADR-1217: The AMQP 1.0 transfer surface pins a refused link's exit 78 under `--fail`
+# ADR-1219: The AMQP 1.0 transfer surface pins a refused link's exit 78 under `--fail`
 
 - Status: Accepted
 - Date: 2026-11-02

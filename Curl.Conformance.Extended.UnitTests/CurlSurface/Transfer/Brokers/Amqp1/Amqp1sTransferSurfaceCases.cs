@@ -4,7 +4,7 @@ namespace Curl.Conformance.Extended.UnitTests.CurlSurface.Transfer.Brokers.Amqp1
 
 /// <summary>
 /// curl's transfer options for <c>amqp1s://</c> over TLS on 5671, trusted with <c>-k</c> (ADR-1062): a receive from the address <c>queue</c> that the reference
-/// container answers with one message, and a link it refuses with amqp:not-found for <c>--fail</c> (ADR-1217).
+/// container answers with one message, and a link it refuses with amqp:not-found for <c>--fail</c> (ADR-1219).
 /// </summary>
 [TestClass]
 public sealed class Amqp1sTransferSurfaceCases

@@ -32,7 +32,7 @@ Split from BL-4613 (the broker schemes' part of BL-4496, the transfer surface fo
 ## Notes
 
 - Cases: `CurlSurface/Transfer/Brokers/Amqp1/` holds `Amqp1TransferSurfaceCases` (amqp1, 5672) and `Amqp1sTransferSurfaceCases` (amqp1s, 5671, TLS with `-k`), the shared `Amqp1TransferChecks`, the scheme record `Amqp1TransferScheme` and `Amqp1TransferClock`, copied from `RealtimeTransferClock` as the Context asks. The never-answering server for `-m` is a private class in the checks file. IDs end `-1` for amqp1 and `-2` for amqp1s.
-- Decision (ADR-1217): the extension maps no AMQP error to exit 22, so the `--fail`/`--fail-with-body` rows pin that a link refused with amqp:not-found still ends with ADR-1062's exit 78 and its message under either option.
+- Decision (ADR-1219): the extension maps no AMQP error to exit 22, so the `--fail`/`--fail-with-body` rows pin that a link refused with amqp:not-found still ends with ADR-1062's exit 78 and its message under either option.
 - All 14 cases passed at the first run: no gap, nothing added to `KnownFailures.txt`, no fix task filed. `KnownFailures.txt` is unchanged.
 - `Curl.Conformance.Extended.UnitLibrary` is unchanged, so no quality run was needed. The cases use temporary directories through `Path.Combine` and pick the TLS line per platform, so they are platform-neutral; the CI Linux/macOS run is left to the shift's CI watch.
 - Verified: `dotnet build Curl.slnx -warnaserror` clean, `dotnet format --verify-no-changes` clean, fast tests green across the solution.
