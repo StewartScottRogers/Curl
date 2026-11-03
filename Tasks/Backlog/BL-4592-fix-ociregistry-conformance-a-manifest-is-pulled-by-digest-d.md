@@ -1,5 +1,5 @@
 ---
-id: BL-4584
+id: BL-4592
 title: Fix OciRegistry conformance: a manifest is pulled by digest (DIST-PullManifests-2)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4584 — Fix OciRegistry conformance: a manifest is pulled by digest (DIST-PullManifests-2)
+# BL-4592 — Fix OciRegistry conformance: a manifest is pulled by digest (DIST-PullManifests-2)
 
 ## Goal
 

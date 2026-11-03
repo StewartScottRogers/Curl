@@ -1,5 +1,5 @@
 ---
-id: BL-4583
+id: BL-4591
 title: Fix OciRegistry conformance: a blob pulled by digest is verified against the digest (IMAGE-Descriptor-Digests-1)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4583 — Fix OciRegistry conformance: a blob pulled by digest is verified against the digest (IMAGE-Descriptor-Digests-1)
+# BL-4591 — Fix OciRegistry conformance: a blob pulled by digest is verified against the digest (IMAGE-Descriptor-Digests-1)
 
 ## Goal
 
