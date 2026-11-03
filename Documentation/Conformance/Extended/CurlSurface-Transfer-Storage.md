@@ -8,7 +8,7 @@ against each scheme's reference server over TLS on port 443 (`ReferenceRoute.Tls
 `StorageTransferChecks`. Expected values come from curl's manual page for curl 8.22.0 ("-v", "-o", "-O", "-w",
 "--fail", "--fail-with-body", "-m", "EXIT CODES") and, for the exit code of a service's error status, from ADR-1090
 (s3), ADR-1093 (oci), ADR-1099 (gs) and ADR-1105 (az, abfs, abfss). The `-v` and `--fail-with-body` cases fail for every
-storage scheme and are listed in `KnownFailures.txt` with BL-4620 to BL-4623. IDs are `CurlSurface:<option>-<scheme>-<n>`.
+storage scheme and are listed in `KnownFailures.txt` with BL-4657 to BL-4660. IDs are `CurlSurface:<option>-<scheme>-<n>`.
 
 | ID | Level | Requirement | Covered by |
 |----|-------|-------------|------------|
