@@ -1,3 +1,4 @@
+using System.Net;
 using Curl.Extended.Protocol.DnsQuery.Client;
 using Curl.Extended.Protocol.DnsQuery.Transport.Udp;
 using Curl.Extended.Protocol.DnsQuery.UnitTests.Wire;
@@ -100,8 +101,74 @@ public sealed class DnsUdpTransportTests
             await new DnsUdpTransport(server, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(TimeProvider.System, cancellation.Token)));
     }
 
-    private static TransferContext ContextOf(TimeProvider clock, CancellationToken cancellationToken = default) =>
-        new() { Url = CurlUrl.Parse("dns://h/example.com"), Output = new MemoryStream(), TimeProvider = clock, CancellationToken = cancellationToken };
+    [TestMethod]
+    public async Task ExchangeAsync_ChannelOpened_ReportsTheConnectionForTheVerboseEstablishedLine()
+    {
+        var server = new ScriptedDnsServer((_, _) => [Answer], []);
+        var connector = new EndPointOverridingConnector(server, null, null, 7);
+        var events = new ConnectionOpenedCapturingTransferEvents(NoTransferEvents.Instance);
+
+        await new DnsUdpTransport(connector, new RecordingTransport()).ExchangeAsync("localhost", 53, Query, ContextOf(new ImmediateTimeProvider(), events: events));
+
+        ConnectionOpenedEvent opened = events.Opened!;
+        Assert.AreEqual("localhost", opened.HostName);
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 53), opened.RemoteEndPoint);
+        Assert.AreEqual(new IPEndPoint(IPAddress.Any, 0), opened.LocalEndPoint);
+        Assert.AreEqual(7, opened.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_ChannelNamesItsLocalAddress_ReportsThatLocalAddress()
+    {
+        var server = new ScriptedDnsServer((_, _) => [Answer], []);
+        var local = new IPEndPoint(IPAddress.Loopback, 50000);
+        var events = new ConnectionOpenedCapturingTransferEvents(NoTransferEvents.Instance);
+
+        await new DnsUdpTransport(new EndPointOverridingConnector(server, null, local, 1), new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider(), events: events));
+
+        Assert.AreEqual(local, events.Opened!.LocalEndPoint);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_ServerEndPointIsNotAnAddress_ReportsNoConnection()
+    {
+        var server = new ScriptedDnsServer((_, _) => [Answer], []);
+        var connector = new EndPointOverridingConnector(server, new DnsEndPoint("h", 53), null, 1);
+        var events = new ConnectionOpenedCapturingTransferEvents(NoTransferEvents.Instance);
+
+        byte[] answer = await new DnsUdpTransport(connector, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider(), events: events));
+
+        CollectionAssert.AreEqual(Answer, answer);
+        Assert.IsNull(events.Opened);
+    }
+
+    private static TransferContext ContextOf(TimeProvider clock, CancellationToken cancellationToken = default, ITransferEvents? events = null) =>
+        new() { Url = CurlUrl.Parse("dns://h/example.com"), Output = new MemoryStream(), TimeProvider = clock, CancellationToken = cancellationToken, Events = events ?? NoTransferEvents.Instance };
+
+    /// <summary>Opens the inner connector's channel and gives it the server address, local address and connection number given.</summary>
+    private sealed class EndPointOverridingConnector(IDatagramConnector inner, EndPoint? serverEndPoint, EndPoint? localEndPoint, long connectionNumber) : IDatagramConnector
+    {
+        public async ValueTask<DatagramOpenResult> OpenAsync(string host, int port, CancellationToken cancellationToken)
+        {
+            DatagramOpenResult open = await inner.OpenAsync(host, port, cancellationToken);
+            return DatagramOpenResult.Opened(new OverridingChannel(open.Channel!, serverEndPoint, localEndPoint)).WithConnectionNumber(connectionNumber);
+        }
+
+        private sealed class OverridingChannel(IDatagramChannel inner, EndPoint? serverEndPoint, EndPoint? localEndPoint) : IDatagramChannel
+        {
+            public EndPoint ServerEndPoint => serverEndPoint ?? inner.ServerEndPoint;
+
+            public EndPoint? LocalEndPoint => localEndPoint;
+
+            public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken) =>
+                inner.SendAsync(datagram, destination, cancellationToken);
+
+            public ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+                inner.ReceiveAsync(buffer, cancellationToken);
+
+            public ValueTask DisposeAsync() => inner.DisposeAsync();
+        }
+    }
 
     private sealed class RecordingTransport : IDnsQueryTransport
     {
