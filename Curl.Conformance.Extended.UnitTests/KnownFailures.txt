@@ -6,3 +6,11 @@ CurlSurface:FailWithBody-Gs-1 BL-4621
 CurlSurface:FailWithBody-S3-1 BL-4622
 CurlSurface:Verbose-Oci-1 BL-4623
 CurlSurface:FailWithBody-Oci-1 BL-4623
+CurlSurface:Verbose-Redis-1 BL-4645
+CurlSurface:Verbose-Rediss-1 BL-4645
+CurlSurface:unresolvable-host-coap-1 BL-4628
+CurlSurface:unresolvable-host-coaps-1 BL-4628
+CurlSurface:unresolvable-host-dns-1 BL-4628
+CurlSurface:unresolvable-host-webtransport-1 BL-4628
+CurlSurface:unresolvable-host-oci-1 BL-4629
+CurlSurface:connection-refused-oci-1 BL-4629

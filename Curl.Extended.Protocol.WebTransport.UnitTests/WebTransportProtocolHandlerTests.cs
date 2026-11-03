@@ -312,6 +312,50 @@ public sealed class WebTransportProtocolHandlerTests
         Assert.AreEqual("WebTransport session failed: network down", result.ErrorMessage);
     }
 
+    [TestMethod]
+    [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task ExecuteAsync_Section6_ServerClose_EndsTheTransferWithExit56AndTheClientSendsOnlyFin()
+    {
+        byte[] otherCapsule = CapsuleCodec.Encode(new Capsule(0x99, new byte[] { 1 }));
+        byte[] tooShortClose = CapsuleCodec.Encode(new Capsule(WebTransportWire.CloseSessionCapsuleType, new byte[] { 0, 1 }));
+        byte[] close = new WebTransportCloseSession(7, "going away").ToCapsuleBytes();
+        ScriptedHttp3Connection connection = new()
+        {
+            ConnectAnswer = [.. ScriptedHttp3Connection.Headers("200"), .. new Http3DataFrame((byte[])[.. otherCapsule, .. tooShortClose, .. close[..3]]).ToBytes(), .. new Http3DataFrame(close[3..]).ToBytes()],
+        };
+
+        (TransferResult result, string output) = await RunAsync(connection, "webtransport://example.com/", "hi");
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("The server closed the WebTransport session: code 7, going away", result.ErrorMessage);
+        Assert.AreEqual(string.Empty, output);
+        InMemoryMultiplexedStream connect = connection.BidirectionalStreams[0];
+        Assert.IsTrue(connect.IsWriteEnded);
+        byte[] written = connect.Written.ToArray();
+        HttpDatagramVariableLengthInteger.TryRead(written, out _, out int typeLength);
+        HttpDatagramVariableLengthInteger.TryRead(written.AsSpan(typeLength), out ulong length, out int lengthLength);
+        Assert.AreEqual(written.Length, typeLength + lengthLength + (int)length, "only the HEADERS frame, then a FIN: no capsule of the client's own");
+    }
+
+    [TestMethod]
+    [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task ExecuteAsync_Section6_SessionStreamEndsWithoutClose_TheExchangeStillCompletes()
+    {
+        ScriptedHttp3Connection connection = new()
+        {
+            AnswerStream = (server, stream) =>
+            {
+                server.BidirectionalStreams[0].EndReceiving();
+                Echo(server, stream);
+            },
+        };
+
+        (TransferResult result, string output) = await RunAsync(connection, "webtransport://example.com/", "ok");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("ok", output);
+    }
+
     private static void Echo(ScriptedHttp3Connection server, InMemoryMultiplexedStream stream)
     {
         byte[] written = stream.Written.ToArray();

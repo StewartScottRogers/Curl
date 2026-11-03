@@ -14,6 +14,14 @@ internal sealed record WebTransportCloseSession(uint ErrorCode, string Message)
 {
     private const int ErrorCodeLength = 4;
 
+    /// <summary>Reads a capsule the server sent as a <c>WT_CLOSE_SESSION</c>, when it is one.</summary>
+    /// <param name="capsule">The capsule.</param>
+    /// <returns>The close, or <see langword="null" /> for another capsule type or a value too short to hold the error code.</returns>
+    public static WebTransportCloseSession? TryRead(Capsule capsule) =>
+        capsule.Type == WebTransportWire.CloseSessionCapsuleType && capsule.Value.Length >= ErrorCodeLength
+            ? new WebTransportCloseSession(BinaryPrimitives.ReadUInt32BigEndian(capsule.Value.Span), Encoding.UTF8.GetString(capsule.Value.Span[ErrorCodeLength..]))
+            : null;
+
     /// <summary>Encodes the capsule, type and length included.</summary>
     /// <returns>The capsule's bytes.</returns>
     /// <exception cref="ArgumentException">The message is longer than 1024 bytes in UTF-8.</exception>

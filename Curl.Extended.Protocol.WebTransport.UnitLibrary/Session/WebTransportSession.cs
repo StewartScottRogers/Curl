@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Threading.Channels;
 using Curl.Extended.Protocol.WebTransport.Wire;
 using Curl.Http2;
@@ -23,6 +24,8 @@ internal sealed class WebTransportSession(IMultiplexedConnection connection, ITr
 
     private readonly TaskCompletionSource<Http3SettingsFrame> peerSettings = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private volatile WebTransportCloseSession? serverClose;
+
     /// <summary>Runs the session.</summary>
     /// <param name="request">What the transfer sends and how.</param>
     /// <returns>How many bytes were written to the output.</returns>
@@ -39,7 +42,20 @@ internal sealed class WebTransportSession(IMultiplexedConnection connection, ITr
 
         await connect.SendHeadersAsync(ConnectFields(request), endStream: false, cancellationToken).ConfigureAwait(false);
         await ReadSessionResponseAsync(connect, cancellationToken).ConfigureAwait(false);
-        long written = await ExchangeAsync(request, connect.StreamId, cancellationToken).ConfigureAwait(false);
+        using CancellationTokenSource exchangeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _ = WatchForServerCloseAsync(connect, exchangeCancellation);
+        long written;
+        try
+        {
+            written = await ExchangeAsync(request, connect.StreamId, exchangeCancellation.Token).ConfigureAwait(false);
+        }
+        catch (Exception) when (serverClose is { } close)
+        {
+            // Section 6: the server ended the session; the client answers with a FIN and no capsule.
+            await connect.EndRequestAsync(cancellationToken).ConfigureAwait(false);
+            throw new WebTransportException(CurlExitCode.RecvError, $"The server closed the WebTransport session: code {close.ErrorCode}, {close.Message}");
+        }
+
         await connect.SendDataAsync(new WebTransportCloseSession(0, string.Empty).ToCapsuleBytes(), endStream: true, cancellationToken).ConfigureAwait(false);
         return written;
     }
@@ -55,6 +71,35 @@ internal sealed class WebTransportSession(IMultiplexedConnection connection, ITr
         new(":authority", request.Authority),
         new(":path", request.Path),
     ];
+
+    /// <summary>
+    /// Reads the CONNECT stream after the response for the server's <c>WT_CLOSE_SESSION</c> (section 6):
+    /// records it and cancels the exchange. Other capsules are skipped (RFC 9297 section 3.2); a capsule
+    /// too short to hold an error code is skipped too.
+    /// </summary>
+    /// <param name="connect">The CONNECT stream, its response read.</param>
+    /// <param name="exchangeCancellation">Cancels the exchange when the server closes the session.</param>
+    /// <returns>A task that ends with the stream, the server's close, or the connection's failure.</returns>
+    private async Task WatchForServerCloseAsync(Http3ClientRequestStream connect, CancellationTokenSource exchangeCancellation)
+    {
+        byte[] buffer = new byte[BufferLength];
+        List<byte> capsules = [];
+        Http3FrameOrData read;
+        while (!(read = await connect.ReadFrameOrDataAsync(buffer, exchangeCancellation.Token).ConfigureAwait(false)).IsEndOfStream)
+        {
+            capsules.AddRange(buffer.AsSpan(0, read.DataLength));
+            while (CapsuleCodec.TryDecode(CollectionsMarshal.AsSpan(capsules), out Capsule? capsule, out int consumed))
+            {
+                capsules.RemoveRange(0, consumed);
+                if (WebTransportCloseSession.TryRead(capsule!) is { } close)
+                {
+                    serverClose = close;
+                    await exchangeCancellation.CancelAsync().ConfigureAwait(false);
+                    return;
+                }
+            }
+        }
+    }
 
     private void OnControlFrame(Http3Frame frame)
     {
