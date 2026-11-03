@@ -3,8 +3,8 @@ id: AF-0550
 title: ByteRangeParser at the long limit checks only that a range exists, never its positions
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Core.UnitTests/CoreParserAdversarialTests.cs:ByteRangeParser_PositionsAtTheLongLimit_NameARange:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Core.UnitTests/CoreParserAdversarialTests.cs -Pattern '
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
