@@ -1270,3 +1270,4 @@ Each option and the specific reason it lost.
 | [1220](ADR-1220-stomp-send-takes-the-content-type-a-h-header-gives.md) | STOMP SEND takes the content-type a -H header gives (BL-4610) | Accepted | 2026-11-02 |
 | [1221](ADR-1221-etag-save-naming-the-open-stderr-file-skips-the-transfer-on-windows.md) | `--etag-save` naming the open `--stderr` file skips the transfer on Windows (BL-4644) | Accepted | 2026-11-02 |
 | [1222](ADR-1222-coap-transfer-surface-verbose-and-timeout-lines.md) | The CoAP transfer surface pins the DTLS verbose line and a connect-phase timeout for coaps (BL-4627) | Accepted | 2026-11-03 |
+| [1223](ADR-1223-coaps-verbose-names-the-dtls-cipher-as-openssl-does.md) | `-v` on coaps names the DTLS cipher suite as OpenSSL does, after a connection line from the UDP channel (BL-4667) | Accepted | 2026-11-03 |

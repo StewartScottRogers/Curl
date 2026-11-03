@@ -25,6 +25,9 @@ internal sealed class DtlsDatagramChannel : IDatagramChannel
     /// <inheritdoc />
     public EndPoint ServerEndPoint => transport.ServerEndPoint;
 
+    /// <summary>Gets OpenSSL's name for the cipher suite the handshake agreed, as <c>-v</c> writes it.</summary>
+    public string CipherName => DtlsClientHello.OpenSslNameOf(session.CipherSuite);
+
     /// <summary>
     /// Runs the DTLS 1.2 handshake over <paramref name="transport" />, verifying the server's certificate
     /// for <paramref name="targetHost" /> through <paramref name="tlsProvider" /> (section 9.1.3.3), and

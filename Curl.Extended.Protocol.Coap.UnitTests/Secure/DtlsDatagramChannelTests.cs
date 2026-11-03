@@ -45,6 +45,24 @@ public sealed class DtlsDatagramChannelTests
     }
 
     [TestMethod]
+    [DataRow(false, false, "ECDHE-ECDSA-AES128-GCM-SHA256")]
+    [DataRow(true, false, "ECDHE-RSA-AES128-GCM-SHA256")]
+    [DataRow(false, true, "ECDHE-ECDSA-AES128-CCM8")]
+    public async Task ExecuteAsync_Adr1222_ACoapsGet_ReportsTheConnectionThenTheDtlsLineThenTheResponse(bool rsa, bool useAes128Ccm8, string cipher)
+    {
+        using DtlsTestServer server = new(rsa ? DtlsTestServerKeyKind.Rsa : DtlsTestServerKeyKind.Ecdsa) { UseAes128Ccm8 = useAes128Ccm8, AnswerApplicationData = request => Piggybacked(request, CoapCode.Content, [], Hello) };
+        var connector = new ScriptedDatagramConnector(DatagramOpenResult.Opened(new DtlsTestServerChannel(server)));
+        var events = new RecordingTransferEvents();
+        var context = new TransferContext { Url = CurlUrl.Parse("coaps://localhost/a"), Output = new MemoryStream(), Events = events, TimeProvider = new SilentTimeProvider() };
+
+        TransferResult result = await Handler(connector, insecure: true).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(5684, events.OpenedConnections.Single().RemoteEndPoint.Port);
+        CollectionAssert.AreEqual(new[] { $"SSL connection using DTLSv1.2 / {cipher}", "CoAP response 2.05" }, events.InfoLines);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Rfc7252Section9_1_ACoapsUrlWithAPort_OpensThatPort()
     {
         using DtlsTestServer server = new(DtlsTestServerKeyKind.Ecdsa) { AnswerApplicationData = request => Piggybacked(request, CoapCode.Content, [], Hello) };

@@ -26,6 +26,19 @@ internal static class DtlsClientHello
     /// <summary>Gets the cipher suites the client offers, in preference order.</summary>
     public static IReadOnlyList<ushort> CipherSuites { get; } = [EcdheEcdsaWithAes128GcmSha256, EcdheRsaWithAes128GcmSha256, EcdheEcdsaWithAes128Ccm8];
 
+    /// <summary>
+    /// Gives OpenSSL's name for one of <see cref="CipherSuites" />, the name curl's OpenSSL build writes in its
+    /// <c>SSL connection using</c> line (ADR-1222).
+    /// </summary>
+    /// <param name="cipherSuite">The cipher suite.</param>
+    /// <returns>The OpenSSL name.</returns>
+    public static string OpenSslNameOf(ushort cipherSuite) => cipherSuite switch
+    {
+        EcdheRsaWithAes128GcmSha256 => "ECDHE-RSA-AES128-GCM-SHA256",
+        EcdheEcdsaWithAes128Ccm8 => "ECDHE-ECDSA-AES128-CCM8",
+        _ => "ECDHE-ECDSA-AES128-GCM-SHA256",
+    };
+
     /// <summary>Writes the ClientHello body with <paramref name="cookie" />, empty before a HelloVerifyRequest.</summary>
     public static byte[] Encode(byte[] random, byte[] cookie, string targetHost)
     {

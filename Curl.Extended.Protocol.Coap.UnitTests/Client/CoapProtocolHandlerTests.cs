@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using Curl.Extended.Protocol.Coap.Wire;
 using Curl.Protocol.Abstractions;
@@ -338,6 +339,50 @@ public sealed class CoapProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_WithoutAContext_Throws() =>
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await Handler(new ScriptedDatagramChannel((_, _) => [])).ExecuteAsync(null!));
+
+    [TestMethod]
+    public async Task ExecuteAsync_AnOpenedChannel_ReportsTheConnectionForVerboseBeforeTheResponseLine()
+    {
+        var local = new IPEndPoint(IPAddress.Loopback, 50123);
+        var channel = new ScriptedDatagramChannel((_, sent) => [Piggybacked(sent, CoapCode.Content, Hello)]) { LocalEndPoint = local };
+        var connector = new ScriptedDatagramConnector(DatagramOpenResult.Opened(channel).WithConnectionNumber(3));
+        var events = new RecordingTransferEvents();
+        var context = new TransferContext { Url = CurlUrl.Parse("coap://localhost/r"), Output = new MemoryStream(), Events = events, TimeProvider = new ImmediateTimeProvider() };
+
+        await Handler(connector).ExecuteAsync(context);
+
+        ConnectionOpenedEvent opened = events.OpenedConnections.Single();
+        Assert.AreEqual("localhost", opened.HostName);
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 5683), opened.RemoteEndPoint);
+        Assert.AreEqual(local, opened.LocalEndPoint);
+        Assert.AreEqual(3, opened.ConnectionNumber);
+        CollectionAssert.AreEqual(new[] { "CoAP response 2.05" }, events.InfoLines);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AChannelWithoutALocalAddress_ReportsTheConnectionFromTheUnspecifiedAddress()
+    {
+        var channel = new ScriptedDatagramChannel((_, sent) => [Piggybacked(sent, CoapCode.Content, Hello)]);
+        var events = new RecordingTransferEvents();
+        var context = new TransferContext { Url = CurlUrl.Parse("coap://h/r"), Output = new MemoryStream(), Events = events, TimeProvider = new ImmediateTimeProvider() };
+
+        await Handler(channel).ExecuteAsync(context);
+
+        Assert.AreEqual(new IPEndPoint(IPAddress.Any, 0), events.OpenedConnections.Single().LocalEndPoint);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AChannelWhoseServerIsNotAnIpAddress_ReportsNoConnection()
+    {
+        var channel = new ScriptedDatagramChannel((_, sent) => [Piggybacked(sent, CoapCode.Content, Hello)]) { ServerEndPoint = new DnsEndPoint("h", 5683) };
+        var events = new RecordingTransferEvents();
+        var context = new TransferContext { Url = CurlUrl.Parse("coap://h/r"), Output = new MemoryStream(), Events = events, TimeProvider = new ImmediateTimeProvider() };
+
+        TransferResult result = await Handler(channel).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsEmpty(events.OpenedConnections);
+    }
 
     [TestMethod]
     public void SupportedSchemes_AreCoapAndCoaps() =>
