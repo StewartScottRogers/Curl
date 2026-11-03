@@ -519,6 +519,8 @@ if ($TestIntegrateLock) {
                 "$fresh3 $stale3 $own $held $(Test-Path (Get-LockPriorityPath))" })
             ,@('an integration of a CI fix asks for the lock with -Priority', 'True', {
                 "$((& $source 'Integrate.ps1') -match 'Enter-Lock -Priority:\$ciFix')" })
+            ,@('a claim asks for the lock with -Priority, ahead of ordinary integrations (BL-4779)', 'True', {
+                "$((& $source 'Claim.ps1') -match '(?s)function Invoke-Claim.*?\$lock = Enter-Lock -Priority\r?\n')" })
             ,@('a clean integration pushes, with no resolve', "'' ours-1 0 resolves", {
                 & $commit $repo 'ours-1'
                 $r = & $integrate

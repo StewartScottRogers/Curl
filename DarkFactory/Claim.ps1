@@ -424,7 +424,9 @@ function Invoke-Claim {
     param([string[]]$Skip, [switch]$CiFixOnly)
     $splitDue = @()
     $ciFixRefused = @()
-    $lock = Enter-Lock
+    # A claim holds the lock for seconds, so it goes before ordinary integrations waiting
+    # on their build and tests; otherwise idle lanes queue behind them (BL-4779).
+    $lock = Enter-Lock -Priority
     # Every task next offers is checked against its cost cap while this lane holds the lock
     # every claim and integration waits on, and each check read the 40 newest run logs again
     # (about 19 s): the costs are read once for the whole claim (BL-3988's read-once memo).
