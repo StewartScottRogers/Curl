@@ -3,8 +3,8 @@ id: AF-0547
 title: Lib1576_UploadsWithTheCustomMethod never checks the custom method, and checks the read callback only for null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs:Lib1576_UploadsWithTheCustomMethodAndAnswersItsCode:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs -Pa
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
