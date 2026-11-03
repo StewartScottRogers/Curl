@@ -31,3 +31,4 @@ Engine.IO v4: maxPayload in the open packet bounds what the server accepts. Sock
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: d4fdcd17 150bac4e ff8cc365.
