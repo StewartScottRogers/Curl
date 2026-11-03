@@ -1258,3 +1258,4 @@ Each option and the specific reason it lost.
 | [1208](ADR-1208-redis-falls-back-to-resp2-when-the-server-refuses-hello.md) | Redis falls back to RESP2 when the server refuses HELLO, authenticating with AUTH (BL-4601) | Accepted | 2026-11-02 |
 | [1209](ADR-1209-stomp-send-carries-content-type-application-octet-stream.md) | STOMP SEND carries content-type application/octet-stream (BL-4609) | Accepted | 2026-11-02 |
 | [1210](ADR-1210-socketio-ends-with-exit-56-when-no-ping-arrives.md) | Socket.IO ends with exit 56 when no ping arrives within the open packet's `pingInterval` + `pingTimeout`, on the transfer's clock (BL-4598) | Accepted | 2026-11-02 |
+| [1211](ADR-1211-s3-signing-conformance-sends-the-nearest-request-to-each-example.md) | S3 signing conformance sends the nearest request to each example (BL-4499) | Accepted | 2026-11-02 |
