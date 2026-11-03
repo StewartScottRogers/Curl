@@ -82,7 +82,7 @@ public static class ProtobufJsonParser
 
     private static ProtobufJsonError TryReadField(JsonElement element, DynamicMessage message, DynamicField field, int depth)
     {
-        if (element.ValueKind == JsonValueKind.Null)
+        if (element.ValueKind == JsonValueKind.Null && !ProtobufJsonStructTypes.AcceptsNull(field))
         {
             message.ClearValue(field.Name);
             return ProtobufJsonError.None;
@@ -153,16 +153,42 @@ public static class ProtobufJsonParser
         {
             var nested = new DynamicMessage(field.MessageType!);
             value = nested;
-            if (ProtobufJsonTimeTypes.HasStringForm(nested.Type))
-            {
-                return ProtobufJsonTimeTypes.TryRead(element, nested);
-            }
+            return TryReadMessageValue(element, nested, depth);
+        }
 
-            return depth >= ProtobufReader.MaximumDepth ? ProtobufJsonError.NestingTooDeep : TryReadMessage(element, nested, depth + 1);
+        if (ProtobufJsonStructTypes.IsNullValue(field))
+        {
+            return ProtobufJsonStructTypes.TryReadNullValue(element, field, out value);
         }
 
         return field.Kind == DynamicValueKind.Enum
             ? ProtobufJsonScalars.TryReadEnum(element, field.EnumType!, out value)
             : ProtobufJsonScalars.TryRead(element, field.Kind, out value);
+    }
+
+    // A well-known type from its own JSON form, or any other message from an object.
+    private static ProtobufJsonError TryReadMessageValue(JsonElement element, DynamicMessage nested, int depth)
+    {
+        if (ProtobufJsonTimeTypes.HasStringForm(nested.Type))
+        {
+            return ProtobufJsonTimeTypes.TryRead(element, nested);
+        }
+
+        if (ProtobufJsonWrapperTypes.IsWrapper(nested.Type))
+        {
+            return ProtobufJsonWrapperTypes.TryRead(element, nested);
+        }
+
+        if (ProtobufJsonFieldMask.IsFieldMask(nested.Type))
+        {
+            return ProtobufJsonFieldMask.TryRead(element, nested);
+        }
+
+        if (ProtobufJsonStructTypes.IsStructType(nested.Type))
+        {
+            return ProtobufJsonStructTypes.TryRead(element, nested, depth);
+        }
+
+        return depth >= ProtobufReader.MaximumDepth ? ProtobufJsonError.NestingTooDeep : TryReadMessage(element, nested, depth + 1);
     }
 }
