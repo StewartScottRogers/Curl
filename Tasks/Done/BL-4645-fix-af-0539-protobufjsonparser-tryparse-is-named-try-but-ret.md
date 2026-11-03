@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protobuf.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-02
 ---
 # BL-4645 — Fix AF-0539: ProtobufJsonParser.TryParse is named Try... but returns a ProtobufJsonError enum, not bool
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Renamed ProtobufJsonParser.TryParse to Parse (returns ProtobufJsonError, so no Try prefix); updated ProtobufJsonConverter and the tests. Build clean, 327 Protobuf tests green, Measure-CodeQuality 0 failing members.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-02: Doing -> Done. Renamed to Parse; build and tests green

@@ -9,7 +9,7 @@ public static class ProtobufJsonConverter
     /// <summary>Converts UTF-8 JSON to the binary form of a message of this type; the binary is null unless the error is <see cref="ProtobufJsonError.None" />.</summary>
     public static ProtobufJsonError TryConvertJsonToBinary(DynamicMessageType type, ReadOnlyMemory<byte> json, out byte[]? binary)
     {
-        var error = ProtobufJsonParser.TryParse(type, json, out var message);
+        var error = ProtobufJsonParser.Parse(type, json, out var message);
         binary = message is null ? null : DynamicMessageEncoder.Encode(message);
         return error;
     }
