@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4700 — Fix AF-0552: BuildsTheDispatcherOverASocketCallbackPool checks the dispatcher only for null
 
@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Dispatcher test now drives a transfer through CreateDispatcher's socket callback pool
