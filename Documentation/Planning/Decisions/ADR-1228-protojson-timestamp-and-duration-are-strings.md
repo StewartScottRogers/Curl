@@ -29,4 +29,6 @@ gRPC, so there is no curl output to measure; the rules follow the specification 
 ## Consequences
 
 A `grpc://` call (the only user of `ProtobufJsonConverter`) reads and prints Timestamp and Duration fields as their ProtoJSON strings. The
-other well-known types (wrappers, `Struct`, `Any`, `FieldMask`, `Empty`) keep their plain message form.
+other well-known types were left alone by this decision. Later decisions and code gave most of them their own ProtoJSON
+forms: the nine wrapper types (`ProtobufJsonWrapperTypes.cs`), `Struct`, `Value` and `ListValue` (`ProtobufJsonStructTypes.cs`),
+`FieldMask` (`ProtobufJsonFieldMask.cs`) and `Any` (`ProtobufJsonAny.cs`, ADR-1232). Only `Empty` keeps its plain message form.
