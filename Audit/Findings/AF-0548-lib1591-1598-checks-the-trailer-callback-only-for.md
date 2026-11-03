@@ -3,8 +3,8 @@ id: AF-0548
 title: Lib1591/1598 checks the trailer callback only for null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1589To1648Tests.cs:Lib1591And1598_SendTheTrailerHeaderAndCallbackAndAnswerTheirCode:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1589To1648Tests.cs -Pa
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
