@@ -48,7 +48,7 @@ stand-in's `ReadEnvironmentVariable`, as ADR-1184 says.
       at most 30 per method; no package added; tests platform-neutral.
 
 ## Notes
-- Decided (ADR-1200): a new public `InProcessCurl.RunAsync` overload takes an `IExtensionProcessStarter` after the
+- Decided (ADR-1203): a new public `InProcessCurl.RunAsync` overload takes an `IExtensionProcessStarter` after the
   clock and reaches `CreateProtocolHandlers` through a new optional `extensionProcessStarter` on
   `CurlComposition.CreateRunner` and `CreateDialingTransferDispatch`. I left the production `CreateTransferDispatch`
   (line 950) alone, because the shipped curl keeps each extension's real starter. In the harness, a new delegate

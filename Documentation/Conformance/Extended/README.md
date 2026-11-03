@@ -38,7 +38,7 @@ command line and returns a `CurlRunResult`:
   overload `RunAsync(curl, routes, arguments, processStarter, environment, timeProvider)`, whose
   `curl` is an `InProcessCurlProcessRunner` - `Curl.Console`'s `InProcessCurl.RunAsync` overload that
   takes the starter. Every program the handlers run is then started by the stand-in and looked for in
-  the environment its `ReadEnvironmentVariable` reads, so no real process starts (ADR-1200, BL-4577):
+  the environment its `ReadEnvironmentVariable` reads, so no real process starts (ADR-1203, BL-4577):
   `ExtendedConformanceHarnessProcessTests` runs `mcp+stdio://localhost/server?a` and sees the stand-in
   asked to start `server` with `a`.
 - The result holds the exit code, the standard output and standard error bytes and, per connection
