@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using Curl.Extended.Protocol.DnsQuery.Client;
 using Curl.Extended.Protocol.DnsQuery.Transport.Udp;
 using Curl.Extended.Protocol.DnsQuery.UnitTests.Wire;
@@ -187,6 +188,59 @@ public sealed class DnsUdpTransportTests
     private static TransferContext ContextOf(TimeProvider clock, CancellationToken cancellationToken = default, ITransferEvents? events = null) =>
         new() { Url = CurlUrl.Parse("dns://h/example.com"), Output = new MemoryStream(), TimeProvider = clock, CancellationToken = cancellationToken, Events = events ?? NoTransferEvents.Instance };
 
+    [TestMethod]
+    public async Task ExchangeAsync_RefusalAfterAStrayDatagram_ThrowsExitRecvError()
+    {
+        var connector = new RefusingConnector(failSend: false);
+
+        DnsQueryException exception = await Assert.ThrowsExactlyAsync<DnsQueryException>(async () =>
+            await new DnsUdpTransport(connector, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider())));
+
+        Assert.AreEqual(CurlExitCode.RecvError, exception.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_SendFailsWithASocketError_ThrowsExitSendError()
+    {
+        var connector = new RefusingConnector(failSend: true);
+
+        DnsQueryException exception = await Assert.ThrowsExactlyAsync<DnsQueryException>(async () =>
+            await new DnsUdpTransport(connector, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider())));
+
+        Assert.AreEqual(CurlExitCode.SendError, exception.ExitCode);
+    }
+
+    /// <summary>Opens a channel that gives one stray datagram and then fails with a connection reset, or fails every send.</summary>
+    private sealed class RefusingConnector(bool failSend) : IDatagramConnector
+    {
+        public ValueTask<DatagramOpenResult> OpenAsync(string host, int port, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(DatagramOpenResult.Opened(new RefusingChannel(failSend)));
+
+        private sealed class RefusingChannel(bool failSend) : IDatagramChannel
+        {
+            private bool strayGiven;
+
+            public EndPoint ServerEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 53);
+
+            public EndPoint? LocalEndPoint => null;
+
+            public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken) =>
+                failSend ? throw new SocketException((int)SocketError.ConnectionReset) : ValueTask.CompletedTask;
+
+            public ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+            {
+                if (strayGiven)
+                {
+                    throw new SocketException((int)SocketError.ConnectionReset);
+                }
+
+                strayGiven = true;
+                return ValueTask.FromResult(new DatagramReceived(3, ServerEndPoint));
+            }
+
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
     /// <summary>Opens the inner connector's channel and gives it the server address, local address and connection number given.</summary>
     private sealed class EndPointOverridingConnector(IDatagramConnector inner, EndPoint? serverEndPoint, EndPoint? localEndPoint, long connectionNumber) : IDatagramConnector
     {

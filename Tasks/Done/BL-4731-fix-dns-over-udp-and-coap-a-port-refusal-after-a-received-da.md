@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.DnsQuery.UnitLibrary/Transport/Udp/DnsUdpTransport.cs, Curl.Extended.Protocol.DnsQuery.UnitTests/Transport/DnsUdpTransportTests.cs, Curl.Extended.Protocol.Coap.UnitLibrary/Client/CoapExchange.cs, Curl.Extended.Protocol.Coap.UnitTests/Client]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4731 — Fix dns:// over UDP and CoAP: a port refusal after a received datagram escapes as exit 2
 
@@ -27,13 +27,16 @@ Found by the shift-end review of 2026-11-03 (silent-failure-hunter; diff 58b155f
 
 ## Acceptance criteria
 
-- [ ] `DnsUdpTransport` turns a `SocketException` on receive into a `DnsQueryException` with exit 56 (`RecvError`), and on send into exit 55 (`SendError`); unit tests use a stray datagram followed by a refusal.
-- [ ] CoAP's exchange reports the same case with its own receive or send exit code instead of letting the `SocketException` escape (unit test).
-- [ ] Exit 7 is still reported for a refusal before any datagram arrives (existing tests stay green).
-- [ ] `dotnet build` is clean, the fast tests pass, and both libraries keep 100% line and branch coverage.
+- [x] `DnsUdpTransport` turns a `SocketException` on receive into a `DnsQueryException` with exit 56 (`RecvError`), and on send into exit 55 (`SendError`); unit tests use a stray datagram followed by a refusal.
+- [x] CoAP's exchange reports the same case with its own receive or send exit code instead of letting the `SocketException` escape (unit test).
+- [x] Exit 7 is still reported for a refusal before any datagram arrives (existing tests stay green).
+- [x] `dotnet build` is clean, the fast tests pass, and both libraries keep 100% line and branch coverage.
 ## Notes
+
+DNS: `SendQueryAsync` maps a SocketException on send to exit 55 and `ReceiveAnswerAsync` on receive to exit 56. CoAP: `CoapExchange.SendAsync` and `ReceivedAsync` do the same. Exit 7 before any datagram is untouched (done in the channel). Quality run: 0 failing members. Criteria met: no ADR needed (follows the TFTP and KDC pattern).
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 9c08d223 0c7447a0 f1b89992 89ae1a50.
+- 2026-11-03: Doing -> Done. DNS UDP and CoAP map socket errors to exit 55/56
