@@ -61,9 +61,24 @@ From `README.md`, `CLAUDE.md`, every project's `CLAUDE.md` and `README.md`, and
 against the code or by running it. Prefer statements an agent would act on: a file path, an
 exit code, a command, a rule, a count.
 
-## 4. ADRs - the 10 most recent Accepted
+## 4. ADRs - every ADR scanned, the 10 most recent Accepted read
 
-Take the 10 most recent ADRs in `Documentation/Planning/Decisions/` whose status is Accepted.
+First, scan every ADR, not only a sample, for an exit code stated two ways:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Find-AdrNumberMismatches.ps1 -Root <audited tree> -OutFile <temp folder>\adr-numbers.json
+```
+
+It lists `exit-name-mismatch` (an exit number beside a curl code name whose value in
+`CurlExitCode.cs` is another number: "exits 9 (`CURLE_WEIRD_SERVER_REPLY`)", which is 8) and
+`title-exit-mismatch` (a title that names its exit code while the Decision states one the title
+does not). Read every candidate, whatever its ADR's age, against the ADR's other sentences and the
+code: an `exit-name-mismatch` is a finding unless the scan misread the sentence; a
+`title-exit-mismatch` is one when the Decision gives a different code for the outcome the title
+names (not when it names a second outcome's code). File the true ones as `stale-adr`, High (a
+wrong exit code). Say in your summary how many candidates you read and filed.
+
+Then take the 10 most recent ADRs in `Documentation/Planning/Decisions/` whose status is Accepted.
 For each, does the code still do what it decided? ADRs are your subject, so you read them in
 phase 1, as claims to check - never as justification for the code.
 
@@ -73,7 +88,14 @@ percentage, an exit code, a parameter's default. Find the constant, default or l
 code that implements it (`Select-String` for the number and for the name it would have) and
 compare. A number the code contradicts is a finding (`stale-adr`), however minor the sentence
 it sits in; a number with no code to compare against (a measurement, a date, history) is not.
-Say in your summary how many numbers you checked across the 10.
+Check each ADR against itself too: a number its title, its Decision bullets and its Consequences
+state for the same thing must agree.
+
+When one of the 10 cites another ADR for a number or a rule ("exit 8, the exit every other
+transport failure gives (ADR-NNNN)"), open the cited ADR and check that statement in it as
+well, however old it is: the citation says the two agree, so check that they do and that the
+code does what both say. Say in your summary how many numbers you checked across the 10 and the
+ADRs they cite.
 
 ## 5. Scripts - 10 statements each
 

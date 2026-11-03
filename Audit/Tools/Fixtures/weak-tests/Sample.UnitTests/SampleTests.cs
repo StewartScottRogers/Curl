@@ -1,7 +1,7 @@
 namespace Sample.UnitTests;
 
-// Fixture for Find-WeakTests.ps1 -SelfTest (BL-1368). Nothing here is real: nine weak tests, of
-// each kind the audit seeder plants, and six sound ones the scan must leave alone.
+// Fixture for Find-WeakTests.ps1 -SelfTest (BL-1368). Nothing here is real: weak tests of
+// each kind the audit seeder plants, and sound ones the scan must leave alone.
 [TestClass]
 public sealed class SampleTests
 {
@@ -126,6 +126,33 @@ public sealed class SampleTests
         Assert.AreEqual(2, tries);
         // Assert.AreEqual(28, code);
         _ = code;
+    }
+
+    // Weak: a fake returns an exact value, and the variable that should carry it is checked only
+    // with IsNotNull beside a kept IsTrue (as audit 20261102-172448 missed one).
+    [TestMethod]
+    public void Rewrite_EmptyPath_ReadsTheConfiguredFile()
+    {
+        System.Func<string, string?> read = path => path == "/home/u/gateway" ? "http://127.0.0.1:9" : null;
+        bool rewritten = Rewrite(read, out string? url);
+        Assert.IsTrue(rewritten);
+        Assert.IsNotNull(url);
+    }
+
+    // Sound: the same fake, and the exact value it returns is asserted inside the expected URL.
+    [TestMethod]
+    public void Rewrite_EmptyPath_UsesTheConfiguredGateway()
+    {
+        System.Func<string, string?> read = path => path == "/home/u/gateway" ? "http://127.0.0.1:9" : null;
+        bool rewritten = Rewrite(read, out string? url);
+        Assert.IsTrue(rewritten);
+        Assert.AreEqual("http://127.0.0.1:9/x", url);
+    }
+
+    private static bool Rewrite(System.Func<string, string?> read, out string? url)
+    {
+        url = read("/home/u/gateway") + "/x";
+        return true;
     }
 
     private static void AssertWrites(string expected) => Assert.AreEqual(expected, expected);
