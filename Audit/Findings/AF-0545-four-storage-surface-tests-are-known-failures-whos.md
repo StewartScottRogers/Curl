@@ -3,8 +3,8 @@ id: AF-0545
 title: Four storage surface tests are known failures whose catch (Exception) lets them pass on any failure while their named behaviour is broken
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.Extended.UnitLibrary/Harness/KnownFailures.cs:RunCaseAsync:ignored-test
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.Extended.UnitLibrary/Harness/KnownFailures.
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
