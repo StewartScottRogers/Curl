@@ -37,3 +37,4 @@ Scenario: the broker sends `close` with an error and drops TCP while a heartbeat
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: c4baed8a d7c2cb80 be47649c fb6dbfd9 7e844464.
