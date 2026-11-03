@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4
 touches: [Curl.Conformance.Extended.UnitTests/Coap/UriAndResponse, Documentation/Conformance/Extended/Coap.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4526 — Conformance: CoAP RFC 7252 URI, response code, -f and -i cases and the complete Coap matrix (Coap part 1c)
 
@@ -38,18 +38,24 @@ Scope: section 6 (`coap` URI, Uri-Host, Uri-Port, Uri-Path, Uri-Query compositio
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Coap.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 7252 sections 3, 4, 5, 6 and 12 that binds a client a `Coap:` ID mapped to a test or to `n/a: <reason>`, links to `Coap-BlockwiseObserve.md` (BL-4471) and `Coap-Dtls.md` (BL-4472), and the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Coap/UriAndResponse/` run curl in process and assert datagram bytes, stdout, stderr and exit code for at least: the Uri-* options built from host, port, path segments and query (percent-encoding included, default port omitted), 4.xx and 5.xx with and without `-f`, and `-i`'s status line.
-- [ ] Any code this task adds under `Curl.Conformance.Extended.UnitLibrary/Coap/` (in its own new files) is at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] `Documentation/Conformance/Extended/Coap.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 7252 sections 3, 4, 5, 6 and 12 that binds a client a `Coap:` ID mapped to a test or to `n/a: <reason>`, links to `Coap-BlockwiseObserve.md` (BL-4471) and `Coap-Dtls.md` (BL-4472), and the harness's matrix check passes.
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Coap/UriAndResponse/` run curl in process and assert datagram bytes, stdout, stderr and exit code for at least: the Uri-* options built from host, port, path segments and query (percent-encoding included, default port omitted), 4.xx and 5.xx with and without `-f`, and `-i`'s status line.
+- [x] Any code this task adds under `Curl.Conformance.Extended.UnitLibrary/Coap/` (in its own new files) is at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Coap conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+- Added `Coap/UriAndResponse/`: `CoapUriAndResponseRun` (curl -sS against a one-shot piggybacked `CoapReferenceServer` on the case's UDP port), `CoapUriOptionTests` (Uri-Host lowercased and percent-decoded, Uri-Path per segment incl. empty and encoded `/`, Uri-Query per `&` argument, default and non-default port send no Uri-Port, IP literal and empty path, fragment not sent; exact option bytes) and `CoapResponseCodeTests` (4.xx/5.xx with and without `-f`, unknown codes 4.17 and 5.30 treated as their class, `-i` status line `CoAP/1.0 c.dd`).
+- Matrix `Coap.md` gains rows for 5.9, 6.1 to 6.5 and 12.1, 12.2, 12.3, 12.6, and links Coap-BlockwiseObserve.md and Coap-Dtls.md; the matrix check passes. Every case passes, so nothing went to KnownFailures.txt and no Fix task was filed.
+- Pinned `-f`'s stderr as the library's `curl: (22) The requested URL returned error: c.dd`: measured against the specification, the text is the library's existing HTTP-shaped message (ADR-1047), not a new decision.
+- No code added under `Curl.Conformance.Extended.UnitLibrary/Coap/` (the cases use raw response codes), so the coverage criterion holds trivially and no Measure-CodeQuality run was needed; no production code changed.
+- `dotnet build Curl.slnx -warnaserror` clean; fast tests green (115 projects, 0 failed). Cases are platform-neutral (no paths, stderr compared after ReplaceLineEndings); CI on Linux/macOS is met by that.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 488e7695 151e64b3 d503fe2c fb1c989b d8e3fb0e ef6c9026.
+- 2026-11-02: Doing -> Done. CoAP RFC 7252 URI, response code, -f and -i cases pass and the Coap matrix is complete

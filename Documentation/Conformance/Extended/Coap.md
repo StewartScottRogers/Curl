@@ -4,7 +4,10 @@ Curl's `coap://` client (`Curl.Extended.Protocol.Coap.UnitLibrary`) measured aga
 `Curl.Conformance.Extended.UnitTests/Coap/`, run against `CoapReferenceServer`
 (`Curl.Conformance.Extended.UnitLibrary/Coap/`). BL-4524 holds sections 3 (message format) and 4 (messaging), the
 requirements that bind a client; BL-4525 adds section 3.1's extended option encodings and section 5
-(request/response semantics, `Coap/RequestResponse/`); BL-4526 adds rows for the later sections. Where the
+(request/response semantics, `Coap/RequestResponse/`); BL-4526 adds section 5.9 (response codes as curl reports them, with and without `-f` and `-i`), section 6 (`coap` URIs
+and the Uri-* options, `Coap/UriAndResponse/`) and section 12 (the registries a client uses), which completes the
+matrix for RFC 7252. RFC 7959 and RFC 7641 are in [Coap-BlockwiseObserve.md](Coap-BlockwiseObserve.md) and `coaps://`
+(RFC 7252 section 9) in [Coap-Dtls.md](Coap-Dtls.md). Where the
 RFC states a rule of the retransmission algorithm without a keyword, the Level says "(unkeyworded)".
 
 | ID | Level | Requirement | Covered by |
@@ -61,3 +64,21 @@ RFC states a rule of the retransmission algorithm without a keyword, the Level s
 | Coap:RFC7252-5.7-1 | MUST | The forward- and reverse-proxy rules of section 5.7. | n/a: binds a proxy; curl sends no Proxy-Uri or Proxy-Scheme option |
 | Coap:RFC7252-5.8-1 | (unkeyworded) | GET, POST, PUT and DELETE are request codes 0.01, 0.02, 0.03 and 0.04. | CoapRequestMethodTests.Method_IsSentWithItsCodeAndPayloadAndTheResponsePayloadIsWritten |
 | Coap:RFC7252-5.10-1 | MUST, MUST NOT | The rules for Proxy-Uri, Accept, ETag, If-Match and If-None-Match in a request (section 5.10). | n/a: curl sends none of these options in a coap:// request; Uri-Host, Uri-Port, Uri-Path and Uri-Query (sections 5.10.1 and 6.4) are BL-4526's |
+| Coap:RFC7252-5.9-1 | (unkeyworded) | Class 2 response codes say the request succeeded; class 4 (client error) and class 5 (server error) say it failed. curl writes a 4.xx or 5.xx payload with exit 0 as it does an HTTP error status, and ends with exit 22 under `-f`. | CoapResponseCodeTests.ErrorResponse_WithFail_EndsWithExit22AndWritesNothing |
+| Coap:RFC7252-5.9-2 | (unkeyworded) | A response code the client does not recognise is treated as the generic code of its class (4.00 or 5.00). | CoapResponseCodeTests.ErrorResponse_WithFail_EndsWithExit22AndWritesNothing |
+| Coap:RFC7252-5.9-3 | SHOULD | A 4.xx or 5.xx response carries a diagnostic payload. | n/a: binds the server that answers; curl writes whatever payload the response carries (CoapResponseCodeTests.ErrorResponse_WithoutFail_IsWrittenWithExit0) |
+| Coap:RFC7252-6.1-1 | (unkeyworded) | A `coap` URI without a port, or with an empty one, means UDP port 5683. | CoapUriOptionTests.Port_IsTheDestinationAndNoUriPortIsSent |
+| Coap:RFC7252-6.2-1 | MUST, MUST NOT | The `coaps` URI scheme, its default port 5684 and DTLS. | n/a: `coaps://` is BL-4472's, see [Coap-Dtls.md](Coap-Dtls.md) |
+| Coap:RFC7252-6.3-1 | (unkeyworded) | Normalisation and comparison of `coap` URIs (case of scheme and host, default port, percent-encoding). | CoapUriOptionTests.HostPathSegmentsAndQueryArguments_AreSentAsUriOptionsPercentDecoded |
+| Coap:RFC7252-6.4-1 | (unkeyworded) | Unless the host is an IP literal, Uri-Host is the host, lowercased and percent-decoded. | CoapUriOptionTests.HostPathSegmentsAndQueryArguments_AreSentAsUriOptionsPercentDecoded |
+| Coap:RFC7252-6.4-2 | (unkeyworded) | Uri-Port is included only when the URI's port differs from the request's destination UDP port; the default port is never sent. | CoapUriOptionTests.Port_IsTheDestinationAndNoUriPortIsSent |
+| Coap:RFC7252-6.4-3 | (unkeyworded) | Each path segment, empty segments included, is one Uri-Path option, percent-decoded (an encoded `/` stays inside its segment). | CoapUriOptionTests.HostPathSegmentsAndQueryArguments_AreSentAsUriOptionsPercentDecoded |
+| Coap:RFC7252-6.4-4 | (unkeyworded) | Each `&`-separated query argument is one Uri-Query option, percent-decoded. | CoapUriOptionTests.HostPathSegmentsAndQueryArguments_AreSentAsUriOptionsPercentDecoded |
+| Coap:RFC7252-6.4-5 | (unkeyworded) | An IP-literal host sends no Uri-Host; a path that is empty or `/` sends no Uri-Path. | CoapUriOptionTests.IpLiteralHostAndEmptyPath_SendNoUriHostAndNoUriPath |
+| Coap:RFC7252-6.4-6 | (unkeyworded) | A URI's fragment is never decomposed into an option. | CoapUriOptionTests.Fragment_IsNotSent |
+| Coap:RFC7252-6.5-1 | (unkeyworded) | Composing a URI from the Uri-* options of a received request. | n/a: binds the server or proxy that receives the request; curl is the client |
+| Coap:RFC7252-12.1-1 | (unkeyworded) | The response code registry: 4.00 to 4.15 and 5.00 to 5.05 as the client error and server error codes. | CoapResponseCodeTests.ErrorResponse_WithoutFail_IsWrittenWithExit0 |
+| Coap:RFC7252-12.1-2 | (unkeyworded) | A response code is written `c.dd` (class, then two-digit detail); curl's `-i` writes it as the status line `CoAP/1.0 c.dd`. | CoapResponseCodeTests.IncludeHeaders_WritesTheResponseCodeAsAStatusLineBeforeThePayload |
+| Coap:RFC7252-12.2-1 | (unkeyworded) | The option number registry: Uri-Host 3, Uri-Port 7, Uri-Path 11, Uri-Query 15. | CoapUriOptionTests.HostPathSegmentsAndQueryArguments_AreSentAsUriOptionsPercentDecoded |
+| Coap:RFC7252-12.3-1 | (unkeyworded) | The Content-Format registry. | n/a: curl sends no Content-Format and passes a response's payload on as it is whatever its Content-Format (Coap:RFC7252-5.5-2) |
+| Coap:RFC7252-12.6-1 | (unkeyworded) | The `coap` URI scheme registration, default port 5683. | CoapUriOptionTests.Port_IsTheDestinationAndNoUriPortIsSent |
