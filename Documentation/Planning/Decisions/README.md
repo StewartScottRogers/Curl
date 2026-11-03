@@ -1255,3 +1255,4 @@ Each option and the specific reason it lost.
 | [1205](ADR-1205-the-amqp1-client-sends-an-empty-frame-every-half-of-the-peers-idle-time-out.md) | The AMQP 1.0 client sends an empty frame every half of the peer's idle-time-out (BL-4586) | Accepted | 2026-11-02 |
 | [1206](ADR-1206-oci-refuses-a-blob-pulled-by-digest-whose-content-does-not-hash-to-it.md) | OCI refuses a blob pulled by digest whose content does not hash to it (sha256, sha512), with exit 8 and no output (BL-4591) | Accepted | 2026-11-02 |
 | [1207](ADR-1207-oci-pulls-the-manifest-under-a-digest-the-registry-holds-no-blob-under.md) | OCI pulls the manifest under a digest the registry holds no blob under, after the blob request is answered 404 (BL-4592) | Accepted | 2026-11-02 |
+| [1208](ADR-1208-redis-falls-back-to-resp2-when-the-server-refuses-hello.md) | Redis falls back to RESP2 when the server refuses HELLO, authenticating with AUTH (BL-4601) | Accepted | 2026-11-02 |

@@ -79,7 +79,6 @@ public sealed class RedisProtocolHandlerTests
     [TestMethod]
     [DataRow("-WRONGPASS invalid username-password pair\r\n", true, CurlExitCode.LoginDenied)]
     [DataRow("-NOAUTH HELLO must be called with the client already authenticated\r\n", false, CurlExitCode.LoginDenied)]
-    [DataRow("-ERR unknown command 'HELLO'\r\n", false, CurlExitCode.WeirdServerReply)]
     public async Task ExecuteAsync_HelloRefused_EndsWithLoginDeniedOnlyForAuthentication(string reply, bool withCredentials, CurlExitCode exitCode)
     {
         ScriptedRedisConnection connection = ScriptedRedisConnection.Replaying(reply);
@@ -88,6 +87,46 @@ public sealed class RedisProtocolHandlerTests
 
         Assert.AreEqual(exitCode, result.ExitCode);
         Assert.AreEqual($"Redis server answered HELLO with error: {reply.TrimEnd()[1..]}", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HelloRefusedAsUnknown_GoesOnInResp2AndSendsTheCommand()
+    {
+        ScriptedRedisConnection connection = ScriptedRedisConnection.Replaying("-ERR unknown command 'HELLO'\r\n", "$-1\r\n");
+        MemoryStream output = new();
+
+        TransferResult result = await ExecuteAsync(connection, "redis://cache/GET/k", output);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("\n", Encoding.UTF8.GetString(output.ToArray()));
+        Assert.AreEqual(Hello + "|*2\r\n$3\r\nGET\r\n$1\r\nk\r\n", string.Join("|", connection.WrittenText));
+    }
+
+    [TestMethod]
+    [DataRow("alice", "*3\r\n$4\r\nAUTH\r\n$5\r\nalice\r\n$2\r\npw\r\n")]
+    [DataRow("", "*2\r\n$4\r\nAUTH\r\n$2\r\npw\r\n")]
+    public async Task ExecuteAsync_HelloRefusedWithCredentials_AuthenticatesWithResp2AuthBeforeTheCommand(string user, string auth)
+    {
+        ScriptedRedisConnection connection = ScriptedRedisConnection.Replaying("-ERR unknown command 'HELLO'\r\n", "+OK\r\n", "+PONG\r\n");
+        MemoryStream output = new();
+
+        TransferResult result = await ExecuteAsync(connection, "redis://cache/PING", output, new NetworkCredential(user, "pw"));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("PONG\n", Encoding.UTF8.GetString(output.ToArray()));
+        Assert.AreEqual(auth, connection.WrittenText.ElementAt(1));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Resp2AuthRefused_EndsWithLoginDenied()
+    {
+        ScriptedRedisConnection connection = ScriptedRedisConnection.Replaying("-ERR unknown command 'HELLO'\r\n", "-ERR invalid password\r\n");
+
+        TransferResult result = await ExecuteAsync(connection, "redis://cache/PING", new MemoryStream(), new NetworkCredential("u", "p"));
+
+        Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
+        Assert.AreEqual("Redis server answered AUTH with error: ERR invalid password", result.ErrorMessage);
+        Assert.AreEqual(2, connection.WrittenText.Count());
     }
 
     [TestMethod]
