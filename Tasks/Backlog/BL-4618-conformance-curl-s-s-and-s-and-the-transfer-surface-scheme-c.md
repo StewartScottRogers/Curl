@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463, BL-4619, BL-4612, BL-4628, BL-4629, BL-4630, BL-4631, BL-4632, BL-4625, BL-4626, BL-4627, BL-4623, BL-4624, BL-4615, BL-4616, BL-4617]
-touches: [Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/Silent, Documentation/Conformance/Extended/CurlSurface-Transfer.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
+touches: [Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/Silent, Documentation/Conformance/Extended/CurlSurface-Transfer-Silent.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
@@ -24,7 +24,7 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/CurlSurface-Transfer.md` lists `-s` and `-S` for every extended scheme with a `CurlSurface:` ID mapped to a test or to `n/a: <reason>`, and the harness's matrix check passes.
+- [ ] `Documentation/Conformance/Extended/CurlSurface-Transfer-Silent.md` lists `-s` and `-S` for every extended scheme with a `CurlSurface:` ID mapped to a test or to `n/a: <reason>`, and the harness's matrix check passes.
 - [ ] Cases in `Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/Silent/` run curl in process for every scheme and assert stdout, stderr and exit code, naming the manual-page source.
 - [ ] A test fails when a scheme some extension registers has no row for one of BL-4496's checks in the `CurlSurface-Transfer*.md` matrices, and passes on the tree.
 - [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with the ID of its filed High `Fix <Name> conformance: ...` task; the known-failures check passes.
