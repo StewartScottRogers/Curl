@@ -218,6 +218,20 @@ public sealed class RedisProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("redis://cache/PING")]
+    [DataRow("rediss://cache/PING")]
+    public async Task ExecuteAsync_Url_HandsTheTransfersEventsToTheConnectorForVerbosesConnectionLine(string url)
+    {
+        // The connector writes -v's "Established connection to ..." line through these events (BL-4651).
+        ScriptedRedisConnector connector = new(ConnectResult.Refused("refused"));
+        ConnectionOpenedCapturingTransferEvents events = new(NoTransferEvents.Instance);
+
+        await new RedisProtocolHandler(connector).ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream(), Events = events });
+
+        Assert.AreSame(events, connector.Target!.Events);
+    }
+
+    [TestMethod]
     public void SupportedSchemes_AreRedisAndRediss() =>
         CollectionAssert.AreEqual(new[] { "redis", "rediss" }, new RedisProtocolHandler(new ScriptedRedisConnector(ConnectResult.Refused("x"))).SupportedSchemes.ToArray());
 

@@ -177,11 +177,14 @@ public sealed class RedisTransferSurfaceCases
 
     private static string Url(string scheme) => $"{scheme}://localhost/GET/k";
 
-    // The connection line every transfer's -v writes, and for rediss a TLS line after it: the Schannel build's
-    // "* schannel: ..." on Windows, the OpenSSL build's "* SSL connection using TLSv1..." elsewhere.
+    // The connection line every transfer's -v writes (curl 8.22.0 measured: "* Established connection to localhost
+    // (127.0.0.1 port 6379) from 127.0.0.1 port <local>", BL-4651 Notes), and for rediss a TLS line after it: the
+    // Schannel build's "* schannel: ..." on Windows, the OpenSSL build's "* SSL connection using TLSv1..." elsewhere.
+    private const string ConnectionLine = "* Established connection to localhost (127.0.0.1 port 6379) from ";
+
     private static string[] VerboseLines(string scheme) => scheme == "rediss"
-        ? ["* Connected to localhost (127.0.0.1) port 6379", OperatingSystem.IsWindows() ? "* schannel: " : "* SSL connection using TLSv1."]
-        : ["* Connected to localhost (127.0.0.1) port 6379"];
+        ? [ConnectionLine, OperatingSystem.IsWindows() ? "* schannel: " : "* SSL connection using TLSv1."]
+        : [ConnectionLine];
 
     private static TransferSurfaceRoute Route(string scheme, Func<string, string[]> replies)
     {
