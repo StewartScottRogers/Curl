@@ -9,11 +9,16 @@ namespace Curl.Protobuf.Json;
 /// <summary>
 /// Writes a <see cref="DynamicMessage" /> as JSON under the proto3 JSON mapping: fields by their
 /// JSON names, default values of fields without presence and empty repeated and map fields
-/// left out, and unknown fields dropped, since JSON has no form for them.
+/// left out, and unknown fields dropped, since JSON has no form for them. A
+/// <c>google.protobuf.Timestamp</c> or <c>google.protobuf.Duration</c> field is written in its
+/// string form (<see cref="ProtobufJsonTimeTypes" />).
 /// </summary>
 public static class ProtobufJsonFormatter
 {
-    /// <summary>The message as JSON text, on one line or indented.</summary>
+    /// <summary>
+    /// The message as JSON text, on one line or indented. Throws <see cref="FormatException" />
+    /// when a Timestamp or Duration field holds a value outside its type's range.
+    /// </summary>
     public static string Format(DynamicMessage message, bool indented)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -93,6 +98,9 @@ public static class ProtobufJsonFormatter
     {
         switch (field.Kind)
         {
+            case DynamicValueKind.Message when ProtobufJsonTimeTypes.HasStringForm(field.MessageType!):
+                writer.WriteStringValue(ProtobufJsonTimeTypes.Format((DynamicMessage)value));
+                break;
             case DynamicValueKind.Message:
                 WriteMessage(writer, (DynamicMessage)value);
                 break;

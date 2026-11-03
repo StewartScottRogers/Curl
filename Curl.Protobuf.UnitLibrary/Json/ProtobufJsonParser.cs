@@ -153,6 +153,11 @@ public static class ProtobufJsonParser
         {
             var nested = new DynamicMessage(field.MessageType!);
             value = nested;
+            if (ProtobufJsonTimeTypes.HasStringForm(nested.Type))
+            {
+                return ProtobufJsonTimeTypes.TryRead(element, nested);
+            }
+
             return depth >= ProtobufReader.MaximumDepth ? ProtobufJsonError.NestingTooDeep : TryReadMessage(element, nested, depth + 1);
         }
 
