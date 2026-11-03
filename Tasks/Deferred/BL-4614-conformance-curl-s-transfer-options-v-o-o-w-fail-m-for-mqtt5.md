@@ -37,3 +37,4 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: a0f8b8b0 9605f2d3 fe617ef5 be674468 9438adeb ef6c9026.
+- 2026-11-02: Doing -> Deferred. Split into BL-4620, BL-4621, BL-4622, BL-4623, BL-4624

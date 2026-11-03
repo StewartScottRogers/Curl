@@ -4,7 +4,7 @@ title: Conformance: curl's -s and -S and the transfer-surface scheme coverage ch
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463, BL-4619, BL-4612, BL-4613, BL-4614, BL-4615, BL-4616, BL-4617]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463, BL-4619, BL-4612, BL-4613, BL-4620, BL-4621, BL-4622, BL-4623, BL-4624, BL-4615, BL-4616, BL-4617]
 touches: [Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/Silent, Documentation/Conformance/Extended/CurlSurface-Transfer.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
