@@ -30,3 +30,4 @@ Found by BL-4683: `DnsOverQuicCases.Quic_ExplicitPort53_IsRefusedWithoutAConnect
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: d9b87036 b16c8440.
