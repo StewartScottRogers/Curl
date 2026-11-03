@@ -37,3 +37,4 @@ Fix it inside `KerberosKdcSocketTransport.ExchangeDatagramAsync`: turn a `Socket
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 0f3fc340 76d54b12 24ec0abc.
