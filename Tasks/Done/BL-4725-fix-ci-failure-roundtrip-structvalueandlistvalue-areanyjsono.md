@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.slnx]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4725 — Fix CI failure RoundTrip_StructValueAndListValue_AreAnyJsonObjectValueAndArray on Linux and Windows
 
@@ -26,11 +26,16 @@ Lanes test only on Windows, so reproduce with `gh run view 41632220793 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `RoundTrip_StructValueAndListValue_AreAnyJsonObjectValueAndArray` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `RoundTrip_StructValueAndListValue_AreAnyJsonObjectValueAndArray` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+- Cause: BL-4721 made Grpc:ProtoJson-Struct-1, -FieldMask-1 and -Wrappers-1 pass while `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` still listed them, so KnownFailures threw KnownFailurePassedException on every platform (run 41632220793, first failing 27b710a0).
+- Already fixed: 1df901115 (BL-4691) removed the three lines; it is not an ancestor of 27b710a0, so it landed after the failing run. No code change needed here.
+- Checked: Curl.Conformance.Extended.UnitTests fast tests 1717 passed, 1 skipped, 0 failed on Windows. The fix only removes list lines, so it is platform-neutral; the shift's CI watch files a task for any remaining failure.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 86382862.
+- 2026-11-03: Doing -> Done. Struct, FieldMask and Wrappers ProtoJson cases pass; their stale KnownFailures.txt lines were already removed by 1df901115
