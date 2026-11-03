@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitLibrary/DohTraceLines.ExchangeFailures.cs, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitLibrary/DohDnsResolver.SubTransferTrace.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.ExchangeFailures.cs, Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitLibrary/DnsAnswer.cs, Curl.Networking.UnitLibrary/DnsMessageFailure.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.AnswerDecoding.cs, Curl.Networking.UnitLibrary/DnsServerQuery.cs, Curl.Networking.UnitLibrary/DohDnsResolver.AnswerDecoding.cs, Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.AnswerDecoding.cs, Curl.Networking.UnitTests/NetworkingAdversarialTests.cs, Curl.Networking.UnitTests/DohDnsResolverSubTransferTests.cs, Curl.Engine.UnitTests/EngineCompositionDohSubTransferTraceTests.cs, Curl.Engine.UnitTests/EngineCompositionDohTests.cs, Documentation/Planning/Decisions/ADR-0738-doh-answers-decode-nxdomain-and-cap-ttls-as-curl-8-22-0-does.md]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-11-02
 ---
 # BL-2970 â€” Decode DoH CNAME answers as curl 8.22.0 does and write its A and AAAA --trace-config doh lines
 
@@ -29,9 +29,9 @@ If too big for one run, split it: the decoder change (CNAME skipped, no NoConten
 
 ## Acceptance criteria
 
-- [ ] `Curl.Networking.UnitTests` pins that `DnsAnswerDecoder.Decode` gives `None` for unit1650's self-pointing CNAME row and for an answer with no record.
-- [ ] An ADR (or an amendment to ADR-0738) records curl 8.22.0's measured `-v --trace-config doh` lines and exit code for an A answer, an NXDOMAIN answer, a CNAME-only answer and an empty answer, and `DohDnsResolverTraceTests` pins them.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Networking.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
+- [x] `Curl.Networking.UnitTests` pins that `DnsAnswerDecoder.Decode` gives `None` for unit1650's self-pointing CNAME row and for an answer with no record.
+- [x] An ADR (or an amendment to ADR-0738) records curl 8.22.0's measured `-v --trace-config doh` lines and exit code for an A answer, an NXDOMAIN answer, a CNAME-only answer and an empty answer, and `DohDnsResolverTraceTests` pins them.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Networking.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
 
@@ -88,6 +88,8 @@ If too big for one run, split it: the decoder change (CNAME skipped, no NoConten
 
 - 2026-10-21, lane 2, third claim. The stash applied cleanly (git diff --stat matches the second claim's 13 files). Requeued at once with nothing new done: this claim's cost cap was $1.02, too small for the trace-test port, the Engine test lines, the ADR-0738 amendment, a build, the fast tests and a quality run. The next claim needs a cap of about $2.50 or more; what is left is unchanged from the second claim's note.
 
+- 2026-11-02, lane 7, fourth claim. Nothing left to do: the split subtasks are Done (BL-3011 landed the decoder change, the 8.22.0 failure lines and the Engine test lines in 91918338 and c16a867d; BL-3012 amended ADR-0738 with the measured lines and exit codes; BL-3013 brought the library back to the gates). This branch pins `None` for unit1650's self-pointing CNAME and the CNAME-only answer (`DnsAnswerDecoderTests`) and the measured lines (`DohDnsResolverTraceTests.AnswerDecoding.cs`); `Curl.Networking.UnitTests` passes (3996 passed, 34 skipped). The stash 639766a5 is stale (BL-3011 already applied it), so nothing was carried over. The criteria are ticked on that evidence.
+
 ## Log
 
 - 2026-10-21: Created.
@@ -100,3 +102,4 @@ If too big for one run, split it: the decoder change (CNAME skipped, no NoConten
 - 2026-10-21: Backlog -> Deferred. Split for the cost cap into BL-3011 (decoder change, tests; stash applied there), BL-3012 (ADR-0738 amendment) and BL-3013 (coverage); nothing left here
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 582ece38 47a1bf8a 2a446683.
+- 2026-11-02: Doing -> Done. Work landed by its split subtasks BL-3011, BL-3012 and BL-3013; criteria verified on this branch
