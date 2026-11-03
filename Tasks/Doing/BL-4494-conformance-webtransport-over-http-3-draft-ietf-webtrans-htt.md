@@ -66,3 +66,4 @@ library's `.UnitTests` pins the fix (ADR-0482), the `KnownFailures.txt` line is 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 06fab208 b8e0bf7a feec4e2a d8e3fb0e b686519a 17248609.
