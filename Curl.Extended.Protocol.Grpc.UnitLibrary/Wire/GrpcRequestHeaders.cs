@@ -1,27 +1,39 @@
+using Curl.Extended.Protocol.Grpc.Client;
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Extended.Protocol.Grpc.Wire;
 
 /// <summary>
-/// Builds the Request-Headers of PROTOCOL-HTTP2.md "Requests", pseudo-headers first as HTTP/2
-/// requires: <c>:method POST</c>, <c>:scheme</c>, <c>:path /Service/Method</c>, <c>:authority</c>,
-/// <c>te: trailers</c>, <c>grpc-timeout</c> when the call has a deadline,
-/// <c>content-type: application/grpc</c> and <c>user-agent</c> when one is given.
+/// Builds the Request-Headers of PROTOCOL-HTTP2.md "Requests", pseudo-headers first as HTTP/2 requires:
+/// <c>:method POST</c>, <c>:scheme</c>, <c>:path /Service/Method</c>, <c>:authority</c>, then <c>grpc-timeout</c>
+/// straight after them when the call has a deadline, <c>te: trailers</c>, <c>content-type: application/grpc</c>,
+/// <c>user-agent</c> when one is given, and last the <c>-H</c> values as Custom-Metadata (ADR-1227).
 /// </summary>
+/// <remarks>
+/// A <c>-H</c> value is read as curl reads one: <c>Name: value</c> sends the value, <c>Name:</c> sends nothing and
+/// <c>Name;</c> sends an empty value. One naming a Call-Definition header curl builds (<c>te</c>, <c>grpc-timeout</c>,
+/// <c>content-type</c>, <c>user-agent</c>) replaces it in place, or removes it when it sends nothing; a pseudo-header
+/// cannot be given. Names go lower case, and a <c>-bin</c> key's value is read as base64 and sent un-padded (ADR-1226).
+/// </remarks>
 internal static class GrpcRequestHeaders
 {
     /// <summary>The content type every gRPC request carries.</summary>
     public const string ContentType = "application/grpc";
 
+    private const string BinarySuffix = "-bin";
+
     /// <summary>
     /// Builds the header list for one call.
     /// </summary>
     /// <param name="target">The method to call and the server to call it on.</param>
-    /// <param name="timeout">The call's deadline, or <see langword="null" /> for none.</param>
-    /// <param name="userAgent">The <c>user-agent</c> value, or <see langword="null" /> to send none.</param>
+    /// <param name="values">The deadline, <c>user-agent</c> and <c>-H</c> values the call sends.</param>
     /// <returns>The header fields, names lower case, in the order they go on the wire.</returns>
     /// <exception cref="ArgumentException">The scheme is not <c>http</c> or <c>https</c>, the authority is empty, or the service or method is empty or holds a <c>/</c>.</exception>
-    public static IReadOnlyList<KeyValuePair<string, string>> Build(GrpcRequestTarget target, TimeSpan? timeout, string? userAgent)
+    /// <exception cref="GrpcClientException">A <c>-bin</c> key's value is not base64 (exit 2, curl's usage error).</exception>
+    public static IReadOnlyList<KeyValuePair<string, string>> Build(GrpcRequestTarget target, GrpcRequestHeaderValues values)
     {
         ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(values);
         RequireValidTarget(target);
         List<KeyValuePair<string, string>> headers =
         [
@@ -29,20 +41,97 @@ internal static class GrpcRequestHeaders
             new(":scheme", target.Scheme),
             new(":path", $"/{target.Service}/{target.Method}"),
             new(":authority", target.Authority),
-            new("te", "trailers"),
         ];
-        if (timeout is { } deadline)
+        if (values.Timeout is { } deadline)
         {
             headers.Add(new("grpc-timeout", GrpcTimeout.Format(deadline)));
         }
 
+        headers.Add(new("te", "trailers"));
         headers.Add(new("content-type", ContentType));
-        if (userAgent is not null)
+        if (values.UserAgent is { Length: > 0 } userAgent)
         {
             headers.Add(new("user-agent", userAgent));
         }
 
+        int callDefinitionCount = headers.Count;
+        foreach (string entry in values.CustomHeaders)
+        {
+            AddCustomHeader(headers, callDefinitionCount, entry);
+        }
+
         return headers;
+    }
+
+    private static void AddCustomHeader(List<KeyValuePair<string, string>> headers, int callDefinitionCount, string entry)
+    {
+        if (ParseCustomHeader(entry) is not (var name, var value))
+        {
+            return;
+        }
+
+        int built = headers.FindIndex(0, callDefinitionCount, header => header.Key == name);
+        if (value is null)
+        {
+            RemoveAt(headers, built);
+            return;
+        }
+
+        KeyValuePair<string, string> field = new(name, name.EndsWith(BinarySuffix, StringComparison.Ordinal) ? UnpaddedBase64(name, value) : value);
+        if (built >= 0)
+        {
+            headers[built] = field;
+        }
+        else
+        {
+            headers.Add(field);
+        }
+    }
+
+    private static void RemoveAt(List<KeyValuePair<string, string>> headers, int index)
+    {
+        if (index >= 0)
+        {
+            headers.RemoveAt(index);
+        }
+    }
+
+    /// <summary>
+    /// Reads one <c>-H</c> value: its name, lower case and trimmed, and the value it sends (<see langword="null" /> for
+    /// none); <see langword="null" /> when it names no header.
+    /// </summary>
+    private static (string Name, string? Value)? ParseCustomHeader(string entry)
+    {
+        int colon = entry.IndexOf(':', StringComparison.Ordinal);
+        int separator = colon >= 0 ? colon : TrailingSemicolonOf(entry);
+        string name = separator > 0 ? entry[..separator].Trim().ToLowerInvariant() : string.Empty;
+        if (name.Length == 0)
+        {
+            return null;
+        }
+
+        string value = entry[(separator + 1)..].Trim();
+        return (name, colon < 0 || value.Length > 0 ? value : null);
+    }
+
+    /// <summary>Gives the index of the <c>;</c> ending a <c>Name;</c> value, or -1 when it does not end so.</summary>
+    private static int TrailingSemicolonOf(string entry)
+    {
+        int semicolon = entry.IndexOf(';', StringComparison.Ordinal);
+        return semicolon == entry.Length - 1 ? semicolon : -1;
+    }
+
+    private static string UnpaddedBase64(string name, string value)
+    {
+        string unpadded = value.TrimEnd('=');
+        string padded = unpadded.PadRight(unpadded.Length + ((4 - (unpadded.Length % 4)) % 4), '=');
+        byte[] bytes = new byte[padded.Length];
+        if (!Convert.TryFromBase64String(padded, bytes, out int written))
+        {
+            throw new GrpcClientException(CurlExitCode.FailedInit, $"The value of the gRPC metadata {name} is not base64");
+        }
+
+        return Convert.ToBase64String(bytes, 0, written).TrimEnd('=');
     }
 
     private static void RequireValidTarget(GrpcRequestTarget target)

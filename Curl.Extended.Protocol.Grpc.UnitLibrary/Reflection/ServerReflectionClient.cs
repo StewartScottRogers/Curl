@@ -16,7 +16,7 @@ internal static class ServerReflectionClient
     /// <summary>Describes the method the call invokes.</summary>
     /// <param name="session">The call's connection.</param>
     /// <param name="callTarget">The call: its scheme, authority, service and method.</param>
-    /// <param name="timeout">The <c>grpc-timeout</c> to send, or <see langword="null" /> for none.</param>
+    /// <param name="headerValues">The deadline, <c>user-agent</c> and <c>-H</c> values the call sends, which the reflection stream sends too.</param>
     /// <param name="cancellationToken">Cancels the reflection.</param>
     /// <returns>The method's message types.</returns>
     /// <exception cref="GrpcClientException">
@@ -24,9 +24,9 @@ internal static class ServerReflectionClient
     /// or method (exit 2).
     /// </exception>
     /// <exception cref="GrpcWireException">A reply breaks PROTOCOL-HTTP2.md, or its files do not decode or do not resolve.</exception>
-    public static async Task<GrpcProtoMethod> DescribeAsync(GrpcHttp2Session session, GrpcRequestTarget callTarget, TimeSpan? timeout, CancellationToken cancellationToken)
+    public static async Task<GrpcProtoMethod> DescribeAsync(GrpcHttp2Session session, GrpcRequestTarget callTarget, GrpcRequestHeaderValues headerValues, CancellationToken cancellationToken)
     {
-        ServerReflectionStream stream = await ServerReflectionStream.OpenAsync(session, callTarget, timeout, cancellationToken).ConfigureAwait(false);
+        ServerReflectionStream stream = await ServerReflectionStream.OpenAsync(session, callTarget, headerValues, cancellationToken).ConfigureAwait(false);
         var files = new Dictionary<string, ReflectedProtoFile>(StringComparer.Ordinal);
         Add(files, await stream.ExchangeAsync(ServerReflectionRequest.FileContainingSymbol(callTarget.Service), cancellationToken).ConfigureAwait(false));
         while (MissingDependency(files) is { } fileName)

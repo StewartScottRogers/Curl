@@ -123,13 +123,21 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
     private static async Task<TransferResult> CallOverAsync(ITransferContext context, IConnection connection, GrpcRequestTarget target, GrpcProtoMethod? method, byte[]? request)
     {
         GrpcHttp2Session session = await GrpcHttp2Session.OpenAsync(new ConnectionStream(connection), context.CancellationToken).ConfigureAwait(false);
-        method ??= await ServerReflectionClient.DescribeAsync(session, target, context.MaxTime, context.CancellationToken).ConfigureAwait(false);
+        GrpcRequestHeaderValues headerValues = HeaderValuesOf(context);
+        method ??= await ServerReflectionClient.DescribeAsync(session, target, headerValues, context.CancellationToken).ConfigureAwait(false);
         request ??= GrpcMessageJson.Encode(method.Input, context.PostData);
         context.Progress.ReportTransferStarted();
-        var headers = GrpcRequestHeaders.Build(target, context.MaxTime, null);
+        var headers = GrpcRequestHeaders.Build(target, headerValues);
         GrpcCallResult result = await GrpcHttp2Call.RunAsync(session, headers, request, context.CancellationToken).ConfigureAwait(false);
         return await WriteAsync(context, method.Output, result).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Gives what the Request-Headers carry from the command line: <c>-m</c> as <c>grpc-timeout</c>, <c>-A</c> (or curl's
+    /// own) as <c>user-agent</c> and each <c>-H</c> as Custom-Metadata (ADR-1227).
+    /// </summary>
+    private static GrpcRequestHeaderValues HeaderValuesOf(ITransferContext context) =>
+        new(context.MaxTime, GrpcRequestHeaderValues.UserAgentFor(context.Http?.UserAgent), context.Http?.Headers ?? []);
 
     /// <summary>Writes each response message as JSON, then ends the transfer by the call's status.</summary>
     private static async Task<TransferResult> WriteAsync(ITransferContext context, Protobuf.DynamicMessages.DynamicMessageType type, GrpcCallResult result)

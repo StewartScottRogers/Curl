@@ -10,7 +10,8 @@ Namespace `Curl.Extended.Protocol.Grpc`, with `Wire`, `Client` and `Reflection` 
 works on header lists (`KeyValuePair<string, string>`, names lower case) and bytes, and owns no
 stream or connection.
 
-- `GrpcRequestHeaders` builds a call's Request-Headers for a `GrpcRequestTarget`, with
+- `GrpcRequestHeaders` builds a call's Request-Headers for a `GrpcRequestTarget` and its `GrpcRequestHeaderValues`
+  (`grpc-timeout`, `user-agent` and the `-H` values sent as Custom-Metadata, `-bin` ones re-encoded, ADR-1226, ADR-1227), with
   `GrpcTimeout` writing `grpc-timeout` (finest unit that fits 8 digits, rounded up).
 - `LengthPrefixedMessage` frames a message; `LengthPrefixedMessageReader` reads `GrpcMessage`s
   from body bytes in any pieces, and its `Complete` fails a truncated message.
