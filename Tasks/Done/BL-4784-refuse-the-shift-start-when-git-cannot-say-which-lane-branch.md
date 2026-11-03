@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/ShiftCoordinator.ps1, DarkFactory/Park.ps1]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4784 — Refuse the shift start when git cannot say which lane branches are ahead of an orphan
 
@@ -40,3 +40,4 @@ Get-UnknownLaneBranchesRefusal (Park.ps1) is checked in ShiftCoordinator before 
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 0e4829b5 b353cccc 9fb14368 3e851acc.
+- 2026-11-03: Doing -> Done. Shift start stops naming the failed git query when lane branches are unknown; -TestPark covers both cases; ADR-1234 states the exception
