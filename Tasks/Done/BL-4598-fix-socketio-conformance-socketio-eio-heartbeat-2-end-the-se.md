@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary, Curl.Extended.Protocol.SocketIo.UnitTests, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4598 — Fix SocketIo conformance: SocketIo:EIO-Heartbeat-2 end the session when no ping arrives within pingInterval + pingTimeout
 
@@ -36,3 +36,4 @@ Engine.IO v4 heartbeat: the client must consider the connection closed when the 
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 1a5677c6 150bac4e ff8cc365.
+- 2026-11-02: Doing -> Done. socketio:// ends with exit 56 when no ping arrives within pingInterval + pingTimeout on the transfer's clock
