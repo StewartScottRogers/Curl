@@ -1,8 +1,8 @@
 # DnsQuery requirement matrix
 
 Curl's `dns://` client (`Curl.Extended.Protocol.DnsQuery.UnitLibrary`) measured over UDP and TCP against RFC 1035,
-RFC 3596, RFC 2782, RFC 8659, RFC 3597 and RFC 4501, through the reference DNS server in
-`Curl.Conformance.Extended.UnitLibrary/DnsQuery/Reference/` (BL-4514). The encrypted transports are BL-4474's.
+RFC 3596, RFC 2782, RFC 8659, RFC 3597, RFC 5452, RFC 7766 and RFC 4501, through the reference DNS server in
+`Curl.Conformance.Extended.UnitLibrary/DnsQuery/Reference/` (BL-4514). The encrypted transports (DNS over TLS, QUIC and HTTPS) have their own matrix, [DnsQuery-Encrypted.md](DnsQuery-Encrypted.md) (BL-4474).
 
 | ID | Level | Requirement | Covered by |
 |----|-------|-------------|------------|
@@ -38,3 +38,16 @@ RFC 3596, RFC 2782, RFC 8659, RFC 3597 and RFC 4501, through the reference DNS s
 | DnsQuery:RFC1035-4.1.1-6 | MUST | RCODE 3 is written as `status: NXDOMAIN`, exit 0 as dig does. | DnsQueryMessageTests.ResponseCode3_NameError_IsWrittenAsNxdomainWithExit0 |
 | DnsQuery:RFC1035-4.1.1-7 | MUST | RCODE 4 is written as `status: NOTIMP`, exit 0 as dig does. | DnsQueryMessageTests.ResponseCode4_NotImplemented_IsWrittenAsNotimpWithExit0 |
 | DnsQuery:RFC1035-4.1.1-8 | MUST | RCODE 5 is written as `status: REFUSED`, exit 0 as dig does. | DnsQueryMessageTests.ResponseCode5_Refused_IsWrittenAsRefusedWithExit0 |
+| DnsQuery:RFC1035-4.2.1-1 | MUST | A UDP reply with TC set is truncated and is not taken as the answer. | DnsQueryTransportTests.UdpReplyWithTruncationSet_IsAskedAgainOverTcpWithTheLengthPrefix |
+| DnsQuery:RFC7766-5-1 | MUST | A client that gets a UDP reply with TC set asks the query again over TCP. | DnsQueryTransportTests.UdpReplyWithTruncationSet_IsAskedAgainOverTcpWithTheLengthPrefix |
+| DnsQuery:RFC1035-4.2.2-2 | MUST | The query asked again over TCP is the same message, after its two-octet length prefix. | DnsQueryTransportTests.UdpReplyWithTruncationSet_IsAskedAgainOverTcpWithTheLengthPrefix |
+| DnsQuery:RFC1035-7.2-1 | SHOULD | A UDP query that gets no answer in its wait is sent again, with the same ID. | DnsQueryTransportTests.UdpQueryWithNoAnswer_IsSentAgainWithTheSameIdAfterItsWait |
+| DnsQuery:RFC1035-7.2-2 | SHOULD | After a bounded number of attempts with no answer the client gives up: exit 28, no output. | DnsQueryTransportTests.UdpQueryNeverAnswered_GivesUpAfterThreeAttemptsWithExit28 |
+| DnsQuery:RFC1035-4.2.1-2 | MUST | A message carried by UDP is at most 512 octets. | n/a: a query holds one question whose name is at most 255 octets, so curl's UDP query is always under 512 octets |
+| DnsQuery:RFC5452-9.2-1 | SHOULD | The message ID and the UDP source port are chosen at random for each query. | n/a: randomness is not observable from one run's wire bytes; the reference server only sees what one query carries |
+| DnsQuery:RFC7766-6.2.1-1 | MUST | A client that pipelines queries on one TCP connection matches each response to its query by ID, in any order. | n/a: curl sends one query per TCP connection and never pipelines |
+| DnsQuery:RFC7766-6.2.1.1-1 | SHOULD | A client that pipelines queries handles responses that arrive out of order. | n/a: curl sends one query per TCP connection and never pipelines |
+| DnsQuery:RFC7766-8-1 | SHOULD | The two-octet length field and its message are passed to TCP in one write. | n/a: the harness records the bytes curl sent, not how TCP segmented them |
+| DnsQuery:RFC7766-6.2.3-1 | SHOULD | A client closes an idle TCP connection it no longer needs. | n/a: curl closes the connection when its one exchange ends, so no connection is left idle |
+| DnsQuery:RFC4501-2-5 | MUST | With no `CLASS=` element the query's class is IN, and with no `TYPE=` element its type is A. | DnsQueryTransportTests.Url_WithNoElementsOrTransport_IsQueriedForTypeAClassInOverUdp |
+| DnsQuery:RFC4501-2-6 | MUST | With no authority the client asks its configured resolver. | n/a: that is the machine's DNS configuration, which a conformance case never reads; every case names its server |
