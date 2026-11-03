@@ -42,14 +42,14 @@ internal sealed class WebTransportSession(IMultiplexedConnection connection, ITr
 
         await connect.SendHeadersAsync(ConnectFields(request), endStream: false, cancellationToken).ConfigureAwait(false);
         await ReadSessionResponseAsync(connect, cancellationToken).ConfigureAwait(false);
-        using CancellationTokenSource exchangeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _ = WatchForServerCloseAsync(connect, exchangeCancellation);
+        CancellationTokenSource exchangeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        await using StoppedWatcher watcher = new(WatchForServerCloseAsync(connect, exchangeCancellation), exchangeCancellation);
         long written;
         try
         {
             written = await ExchangeAsync(request, connect.StreamId, exchangeCancellation.Token).ConfigureAwait(false);
         }
-        catch (Exception) when (serverClose is { } close)
+        catch (OperationCanceledException) when (serverClose is { } close)
         {
             // Section 6: the server ended the session; the client answers with a FIN and no capsule.
             await connect.EndRequestAsync(cancellationToken).ConfigureAwait(false);
@@ -74,30 +74,58 @@ internal sealed class WebTransportSession(IMultiplexedConnection connection, ITr
 
     /// <summary>
     /// Reads the CONNECT stream after the response for the server's <c>WT_CLOSE_SESSION</c> (section 6):
-    /// records it and cancels the exchange. Other capsules are skipped (RFC 9297 section 3.2); a capsule
+    /// records it and cancels the exchange; a FIN or a reset of the stream without one is a close too. Other capsules are skipped (RFC 9297 section 3.2); a capsule
     /// too short to hold an error code is skipped too.
     /// </summary>
     /// <param name="connect">The CONNECT stream, its response read.</param>
     /// <param name="exchangeCancellation">Cancels the exchange when the server closes the session.</param>
-    /// <returns>A task that ends with the stream, the server's close, or the connection's failure.</returns>
+    /// <returns>A task that ends with the stream, the server's close, a failure of the stream, or the exchange's end; it never faults.</returns>
     private async Task WatchForServerCloseAsync(Http3ClientRequestStream connect, CancellationTokenSource exchangeCancellation)
     {
         byte[] buffer = new byte[BufferLength];
         List<byte> capsules = [];
-        Http3FrameOrData read;
-        while (!(read = await connect.ReadFrameOrDataAsync(buffer, exchangeCancellation.Token).ConfigureAwait(false)).IsEndOfStream)
+        try
         {
-            capsules.AddRange(buffer.AsSpan(0, read.DataLength));
-            while (CapsuleCodec.TryDecode(CollectionsMarshal.AsSpan(capsules), out Capsule? capsule, out int consumed))
+            Http3FrameOrData read;
+            while (!(read = await connect.ReadFrameOrDataAsync(buffer, exchangeCancellation.Token).ConfigureAwait(false)).IsEndOfStream)
             {
-                capsules.RemoveRange(0, consumed);
-                if (WebTransportCloseSession.TryRead(capsule!) is { } close)
+                capsules.AddRange(buffer.AsSpan(0, read.DataLength));
+                while (CapsuleCodec.TryDecode(CollectionsMarshal.AsSpan(capsules), out Capsule? capsule, out int consumed))
                 {
-                    serverClose = close;
-                    await exchangeCancellation.CancelAsync().ConfigureAwait(false);
-                    return;
+                    capsules.RemoveRange(0, consumed);
+                    if (WebTransportCloseSession.TryRead(capsule!) is { } close)
+                    {
+                        serverClose = close;
+                        await exchangeCancellation.CancelAsync().ConfigureAwait(false);
+                        return;
+                    }
                 }
             }
+
+            // Section 6: a FIN on the CONNECT stream closes the session with code 0.
+            serverClose = new WebTransportCloseSession(0, "the CONNECT stream ended without a WT_CLOSE_SESSION");
+        }
+        catch (Exception exception) when (!exchangeCancellation.IsCancellationRequested)
+        {
+            serverClose = new WebTransportCloseSession(0, $"the CONNECT stream was reset: {exception.Message}");
+        }
+        catch (Exception)
+        {
+            // The session cancelled this read: the exchange is over, nothing to record.
+            return;
+        }
+
+        await exchangeCancellation.CancelAsync().ConfigureAwait(false);
+    }
+
+    // Stops the watcher and waits for it before the cancellation source it reads is disposed.
+    private sealed class StoppedWatcher(Task watcher, CancellationTokenSource cancellation) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            await cancellation.CancelAsync().ConfigureAwait(false);
+            await watcher.ConfigureAwait(false);
+            cancellation.Dispose();
         }
     }
 
@@ -212,9 +240,21 @@ internal sealed class WebTransportSession(IMultiplexedConnection connection, ITr
             ReadOnlyMemory<byte> payload = Http3Datagram.Decode(await datagrams.ReceiveDatagramAsync(cancellationToken).ConfigureAwait(false), out ulong streamId);
             if (streamId == (ulong)sessionId)
             {
-                await context.Output.WriteAsync(payload, cancellationToken).ConfigureAwait(false);
+                await WriteToOutputAsync(payload, cancellationToken).ConfigureAwait(false);
                 return payload.Length;
             }
+        }
+    }
+
+    private async ValueTask WriteToOutputAsync(ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await context.Output.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException failure)
+        {
+            throw new WebTransportException(CurlExitCode.WriteError, $"Failure writing output: {failure.Message}");
         }
     }
 
@@ -225,7 +265,7 @@ internal sealed class WebTransportSession(IMultiplexedConnection connection, ITr
         int read;
         while ((read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
         {
-            await context.Output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            await WriteToOutputAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             written += read;
         }
 

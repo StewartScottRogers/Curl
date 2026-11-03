@@ -44,6 +44,12 @@ internal sealed class ScriptedHttp3Connection : IMultiplexedConnection, IDatagra
     /// <summary>Gets the exception the client's bidirectional open throws after the CONNECT stream, or <see langword="null" />.</summary>
     public Exception? DataStreamOpenFailure { get; init; }
 
+    /// <summary>Gets whether the server ends the CONNECT stream (a FIN) right after its answer.</summary>
+    public bool EndsConnectAfterAnswer { get; init; }
+
+    /// <summary>Gets the error the CONNECT stream fails with after its answer, or <see langword="null" />.</summary>
+    public Exception? FailsConnectAfterAnswer { get; init; }
+
     public List<InMemoryMultiplexedStream> BidirectionalStreams { get; } = [];
 
     public List<InMemoryMultiplexedStream> UnidirectionalStreams { get; } = [];
@@ -144,6 +150,15 @@ internal sealed class ScriptedHttp3Connection : IMultiplexedConnection, IDatagra
 
         AddPeerStream([0x00, .. new Http3SettingsFrame(ServerSettings).ToBytes()], end: false);
         connect.Receive(ConnectAnswer);
+        if (EndsConnectAfterAnswer)
+        {
+            connect.EndReceiving();
+        }
+
+        if (FailsConnectAfterAnswer is { } reset)
+        {
+            connect.FailReceiving(reset);
+        }
     }
 
     // A client data stream: once the client ends it, the script answers.
