@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.DnsQuery.UnitLibrary/Transport/Udp/DnsUdpTransport.cs, Curl.Extended.Protocol.DnsQuery.UnitLibrary/CLAUDE.md, Curl.Extended.Protocol.DnsQuery.UnitTests/Transport/DnsUdpTransportTests.cs, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4672 — Fix DnsQuery conformance: CurlSurface:Verbose-Dns-1
 
@@ -28,14 +28,17 @@ and mqtt5 transfer-surface cases measured). `DnsUdpTransport.ExchangeAsync` open
 
 ## Acceptance criteria
 
-- [ ] `CurlSurface:Verbose-Dns-1` passes in `DnsTransferSurfaceCases`, and its line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
-- [ ] A focused unit test in `Curl.Extended.Protocol.DnsQuery.UnitTests` pins the reported connection (ADR-0482).
-- [ ] `Curl.Extended.Protocol.DnsQuery.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 (`Measure-CodeQuality.ps1`).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `CurlSurface:Verbose-Dns-1` passes in `DnsTransferSurfaceCases`, and its line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
+- [x] A focused unit test in `Curl.Extended.Protocol.DnsQuery.UnitTests` pins the reported connection (ADR-0482).
+- [x] `Curl.Extended.Protocol.DnsQuery.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 (`Measure-CodeQuality.ps1`).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- `DnsUdpTransport.ExchangeAsync` reports the opened channel as CoAP does (BL-4667, ADR-1222): HostName is the host the transport was asked to query (the server it connected to), the local address falls back to `0.0.0.0:0`. Three unit tests in `DnsUdpTransportTests` pin it (ADR-0482). Quality run for the library: 0 failing members. Tests are platform-neutral (fake channel, no sockets), so CI on Linux and macOS is covered by the fast tests green here.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 7bcaef45 a09d4a4a 81704b3f 914c30cc.
+- 2026-11-03: Doing -> Done. dns -v writes the Established connection line
