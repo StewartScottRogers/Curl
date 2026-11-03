@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.GrpcWeb.UnitLibrary]
+touches: [Curl.Extension.GrpcWeb.UnitLibrary, Curl.Extension.GrpcWeb.UnitTests/GrpcWebFramingTests.cs]
 requirement: none
 created: 2026-11-03
 completed:
@@ -41,10 +41,14 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The fix is test-only. `GrpcWebFraming.PayloadAt` was already right, but no test parsed a body that ends in a zero-length frame. Added `Parse_ABodyEndingInAnEmptyDataFrame_GivesTheEmptyMessage_MessageFraming` and `Parse_ABodyEndingInAnEmptyTrailersFrame_GivesNoTrailerFields_MessageFraming` to `Curl.Extension.GrpcWeb.UnitTests/GrpcWebFramingTests.cs`. That file is now in touches, and no other task in Doing names it.
+- Lanes may not run the finding's mutation tool, so the mutant was applied by hand (`<` -> `<=` at GrpcWebFraming.cs:67). Both new tests failed against it, so it is killed. The edit was then reverted. The quality auditor's re-audit runs the finding's own reproduction.
+- No production code changed, so there was no Measure-CodeQuality.ps1 run. `dotnet build` is clean and the fast tests are green on Windows. The tests use only byte arrays, so they behave the same on every platform.
 
 ## Log
 

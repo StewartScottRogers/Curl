@@ -33,6 +33,26 @@ public sealed class GrpcWebFramingTests
     }
 
     [TestMethod]
+    public void Parse_ABodyEndingInAnEmptyDataFrame_GivesTheEmptyMessage_MessageFraming()
+    {
+        GrpcWebReply reply = GrpcWebFraming.Parse(new byte[] { 0, 0, 0, 0, 1, 0x41, 0, 0, 0, 0, 0 });
+
+        Assert.HasCount(2, reply.Messages);
+        CollectionAssert.AreEqual(new byte[] { 0x41 }, reply.Messages[0].ToArray());
+        Assert.IsTrue(reply.Messages[1].IsEmpty);
+        Assert.IsNull(reply.Trailers);
+    }
+
+    [TestMethod]
+    public void Parse_ABodyEndingInAnEmptyTrailersFrame_GivesNoTrailerFields_MessageFraming()
+    {
+        GrpcWebReply reply = GrpcWebFraming.Parse(new byte[] { 0x80, 0, 0, 0, 0 });
+
+        Assert.IsEmpty(reply.Messages);
+        Assert.IsEmpty(reply.Trailers!);
+    }
+
+    [TestMethod]
     [DataRow(new byte[] { 0, 0, 0 }, DisplayName = "prefix cut short")]
     [DataRow(new byte[] { 0, 0, 0, 0, 2, 0x41 }, DisplayName = "message cut short")]
     public void Parse_AFrameCutShort_ThrowsFormatException_MessageFraming(byte[] body)
