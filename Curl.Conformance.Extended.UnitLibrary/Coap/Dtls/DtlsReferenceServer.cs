@@ -14,7 +14,7 @@ namespace Curl.Conformance.Extended.Coap.Dtls;
 /// </summary>
 /// <param name="application">The server the protected datagrams are for, such as a <see cref="CoapReferenceServer" />.</param>
 /// <param name="certificate">The server's RSA certificate with its private key.</param>
-/// <param name="fault">How the hello flight and the answers go on the wire; <see cref="DtlsReferenceFault.None" /> when omitted.</param>
+/// <param name="fault">How the hello flight, the server's Finished and the answers go on the wire; <see cref="DtlsReferenceFault.None" /> when omitted.</param>
 public sealed class DtlsReferenceServer(IDatagramReferenceServer application, X509Certificate2 certificate, DtlsReferenceFault? fault = null) : IDatagramReferenceServer, IDisposable
 {
     private const byte ClientHelloType = 1;
@@ -172,7 +172,7 @@ public sealed class DtlsReferenceServer(IDatagramReferenceServer application, X5
         byte[] parameters = [3, 0x00, 0x17, 65, 4, .. point.X!, .. point.Y!];
         using RSA key = certificate.GetRSAPrivateKey()!;
         byte[] signature = key.SignData([.. clientRandom, .. serverRandom, .. parameters], HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        return [.. parameters, 0x04, 0x01, (byte)(signature.Length >> 8), (byte)signature.Length, .. signature];
+        return [.. parameters, 0x04, 0x01, (byte)(signature.Length >> 8), (byte)signature.Length, .. fault.ServerKeyExchangeSignature(signature)];
     }
 
     /// <summary>Takes the client's ECDHE public value and derives the master secret and key block (RFC 5246 sections 8.1 and 6.3, RFC 5288 section 3).</summary>
@@ -214,7 +214,7 @@ public sealed class DtlsReferenceServer(IDatagramReferenceServer application, X5
         byte[] verifyData = DtlsReferencePrf.Compute(masterSecret, "server finished", SHA256.HashData([.. transcript]), 12);
         return [
             PlainRecord(DtlsReferenceRecord.ChangeCipherSpec, [1]),
-            ProtectedRecord(DtlsReferenceRecord.Handshake, HandshakeMessage(FinishedType, messageSequence++, verifyData)),
+            ProtectedRecord(DtlsReferenceRecord.Handshake, HandshakeMessage(FinishedType, messageSequence++, fault.ServerFinishedVerifyData(verifyData))),
         ];
     }
 

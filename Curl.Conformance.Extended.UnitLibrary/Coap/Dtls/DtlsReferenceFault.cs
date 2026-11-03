@@ -23,4 +23,14 @@ public class DtlsReferenceFault
     /// <returns>The records to send, in order, each in its own datagram.</returns>
     public virtual IReadOnlyList<DtlsReferenceRecord> SendApplicationAnswer(byte[] plaintext, DtlsReferenceServer server) =>
         [server.ProtectedRecord(DtlsReferenceRecord.ApplicationData, plaintext)];
+
+    /// <summary>Gives the verify_data the server's Finished carries.</summary>
+    /// <param name="verifyData">The verify_data of the handshake (RFC 5246 section 7.4.9).</param>
+    /// <returns>The verify_data to send; this base sends it unchanged.</returns>
+    public virtual byte[] ServerFinishedVerifyData(byte[] verifyData) => verifyData;
+
+    /// <summary>Gives the signature the ServerKeyExchange carries.</summary>
+    /// <param name="signature">The rsa_pkcs1_sha256 signature over both randoms and the ECDHE parameters (RFC 8422 section 5.4).</param>
+    /// <returns>The signature to send; this base sends it unchanged.</returns>
+    public virtual byte[] ServerKeyExchangeSignature(byte[] signature) => signature;
 }
