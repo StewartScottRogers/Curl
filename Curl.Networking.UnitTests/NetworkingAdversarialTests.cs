@@ -518,6 +518,7 @@ public sealed class NetworkingAdversarialTests
         var destination = new ConnectToMappings([mapping]).Map("h", 1);
 
         Assert.AreEqual(expected, destination.ParseError);
+        Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, destination.ParseErrorCode);
         Assert.IsFalse(destination.IsMapped);
     }
 
