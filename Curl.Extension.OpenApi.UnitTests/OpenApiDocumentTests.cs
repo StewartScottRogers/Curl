@@ -77,10 +77,13 @@ public sealed class OpenApiDocumentTests
     }
 
     [TestMethod]
-    public void FindOperation_UnknownId_FailsWithExit2() =>
-        Assert.AreEqual(
-            "openapi: no operation nope in the description",
-            Assert.ThrowsExactly<ArgumentExpansionException>(() => Document("""{"paths":{"/":{"get":5,"summary":"x"}}}""").FindOperation("nope")).Message);
+    public void FindOperation_UnknownId_FailsWithExit2()
+    {
+        var failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => Document("""{"paths":{"/":{"get":5,"summary":"x"}}}""").FindOperation("nope"));
+
+        Assert.AreEqual("openapi: no operation nope in the description", failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+    }
 
     [TestMethod]
     public void FindOperation_WithoutPaths_FailsWithExit2() =>
