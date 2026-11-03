@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/PortUnreachableReportingDatagramChannel.cs, Curl.Networking.UnitLibrary/UdpDatagramConnector.cs, Curl.Networking.UnitTests/PortUnreachableReportingDatagramChannelTests.cs, Curl.Networking.UnitTests/UdpDatagramConnectorTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4675 — Report a UDP port refusal as exit 7 only before the first datagram is received
 
@@ -41,3 +41,4 @@ Fix: translate the refusal only until the channel has received its first datagra
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 57062642 abbe5c45 2b57dc98 13a4f46b.
+- 2026-11-03: Doing -> Done. A UDP port refusal is exit 7 only before the first datagram is received; later refusals pass through as SocketException.
