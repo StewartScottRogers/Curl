@@ -1,5 +1,5 @@
 ---
-id: BL-4603
+id: BL-4606
 title: Let Http3ServerConnection send and receive QUIC DATAGRAM frames (RFC 9221) for the WebTransport reference server
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4603 — Let Http3ServerConnection send and receive QUIC DATAGRAM frames (RFC 9221) for the WebTransport reference server
+# BL-4606 — Let Http3ServerConnection send and receive QUIC DATAGRAM frames (RFC 9221) for the WebTransport reference server
 
 ## Goal
 

@@ -1,20 +1,20 @@
 ---
-id: BL-4604
+id: BL-4607
 title: WebTransport over HTTP/3 reference server for the extended conformance harness
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4603]
+depends-on: [BL-4606]
 touches: [Curl.Conformance.Extended.UnitLibrary/WebTransport/Server, Curl.Conformance.Extended.UnitTests/WebTransport/Server, Curl.Conformance.Extended.UnitLibrary/Curl.Conformance.Extended.UnitLibrary.csproj, Curl.Conformance.Extended.UnitTests/Curl.Conformance.Extended.UnitTests.csproj]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4604 — WebTransport over HTTP/3 reference server for the extended conformance harness
+# BL-4607 — WebTransport over HTTP/3 reference server for the extended conformance harness
 
 ## Goal
 
-`Curl.Conformance.Extended.UnitLibrary/WebTransport/Server/` holds a reference server for WebTransport over HTTP/3 (draft-ietf-webtrans-http3-16). It runs on `Http3ServerConnection` behind the harness's `IDatagramReferenceServer` UDP route and can be scripted for every case BL-4605 needs.
+`Curl.Conformance.Extended.UnitLibrary/WebTransport/Server/` holds a reference server for WebTransport over HTTP/3 (draft-ietf-webtrans-http3-16). It runs on `Http3ServerConnection` behind the harness's `IDatagramReferenceServer` UDP route and can be scripted for every case BL-4608 needs.
 
 ## Context
 

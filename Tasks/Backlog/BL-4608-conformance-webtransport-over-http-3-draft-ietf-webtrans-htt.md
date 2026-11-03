@@ -1,16 +1,16 @@
 ---
-id: BL-4605
+id: BL-4608
 title: Conformance: WebTransport over HTTP/3 (draft-ietf-webtrans-http3-16) matrix and cases
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4603, BL-4604]
+depends-on: [BL-4606, BL-4607]
 touches: [Curl.Conformance.Extended.UnitLibrary/WebTransport, Curl.Conformance.Extended.UnitTests/WebTransport/Cases, Documentation/Conformance/Extended/WebTransport.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4605 — Conformance: WebTransport over HTTP/3 (draft-ietf-webtrans-http3-16) matrix and cases
+# BL-4608 — Conformance: WebTransport over HTTP/3 (draft-ietf-webtrans-http3-16) matrix and cases
 
 ## Goal
 
@@ -18,7 +18,7 @@ Curl's `webtransport://` client is measured through the real curl command line a
 
 ## Context
 
-This is what is left of BL-4494 after its split: BL-4603 gives the HTTP/3 stand-in QUIC datagrams, and BL-4604 builds the WebTransport reference server in `Curl.Conformance.Extended.UnitLibrary/WebTransport/Server/`. BL-4494's Context (in `Tasks/Deferred`) gives the specifications, the library under test (`Curl.Extended.Protocol.WebTransport.UnitLibrary`, ADR-1089) and the rules: the `[SpecRequirement]` IDs (`WebTransport:WTH3-<section>-<n>`, `WebTransport:RFC9297-<section>-<n>` and the like), and the matrix format and `KnownFailures.txt` rule in `Documentation/Conformance/Extended/README.md`. Put one file per case group under `Curl.Conformance.Extended.UnitTests/WebTransport/Cases/`.
+This is what is left of BL-4494 after its split: BL-4606 gives the HTTP/3 stand-in QUIC datagrams, and BL-4607 builds the WebTransport reference server in `Curl.Conformance.Extended.UnitLibrary/WebTransport/Server/`. BL-4494's Context (in `Tasks/Deferred`) gives the specifications, the library under test (`Curl.Extended.Protocol.WebTransport.UnitLibrary`, ADR-1089) and the rules: the `[SpecRequirement]` IDs (`WebTransport:WTH3-<section>-<n>`, `WebTransport:RFC9297-<section>-<n>` and the like), and the matrix format and `KnownFailures.txt` rule in `Documentation/Conformance/Extended/README.md`. Put one file per case group under `Curl.Conformance.Extended.UnitTests/WebTransport/Cases/`.
 
 A fault in the reference server is fixed here. A defect in the extension library is listed in `KnownFailures.txt` with a filed High task `Fix WebTransport conformance: <requirement>`, with pipeline feature, touching the library, its `.UnitTests` and `KnownFailures.txt`. That task's criteria: the case passes, a focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), and the `KnownFailures.txt` line is removed.
 
