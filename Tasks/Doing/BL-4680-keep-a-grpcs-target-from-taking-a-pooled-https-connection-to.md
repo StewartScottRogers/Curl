@@ -38,3 +38,4 @@ Fix options: a separate `ConnectTarget` flag that asks for the ALPN offer withou
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: dd58c80d 6e9eca2d e5c5f6d5 15cd56ef.
