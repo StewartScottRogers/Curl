@@ -32,3 +32,4 @@ Found by BL-4488: `OciPullCases.BlobPull_WhoseContentDoesNotMatchItsDigest_IsRef
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 82f89a7c e1f099c7 8368df41.
