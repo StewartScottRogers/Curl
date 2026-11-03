@@ -3,8 +3,8 @@ id: AF-0558
 title: Surviving mutant: a POP3 user name or password with a space can be refused with exit 43 without a test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Original.Protocol.Pop3.UnitLibrary/Pop3ProtocolHandler.cs:HasControlByte-lt:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Pop3.UnitLibrary/Pop3ProtocolHandler.cs:87:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Origi
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
