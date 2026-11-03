@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.WebDavTools.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4745 — Fix AF-0581: WebDavSync ExecuteAsync_AGetThatSucceedsWithNoReport_FailsWithExit22 never checks exit 22
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode) to the test; WebDavTools unit tests pass (99). Platform-neutral.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Exit 22 asserted
