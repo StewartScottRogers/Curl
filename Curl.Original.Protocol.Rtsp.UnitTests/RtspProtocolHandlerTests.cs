@@ -763,6 +763,8 @@ public sealed class RtspProtocolHandlerTests
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: -3\r\n\r\n")).ExecuteAsync(Context());
 
         Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
+        Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         Diagnostics.Diff("error", "The CSeq of this request 1 did not match the response -3", result.ErrorMessage ?? string.Empty);
         Assert.AreEqual("The CSeq of this request 1 did not match the response -3", result.ErrorMessage);
     }
