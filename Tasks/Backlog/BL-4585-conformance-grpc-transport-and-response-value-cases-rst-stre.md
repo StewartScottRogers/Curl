@@ -1,5 +1,5 @@
 ---
-id: BL-4563
+id: BL-4585
 title: Conformance: gRPC transport and response-value cases - RST_STREAM, GOAWAY, PING, invalid grpc-message and metadata values (Grpc part 1e)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4563 — Conformance: gRPC transport and response-value cases - RST_STREAM, GOAWAY, PING, invalid grpc-message and metadata values (Grpc part 1e)
+# BL-4585 — Conformance: gRPC transport and response-value cases - RST_STREAM, GOAWAY, PING, invalid grpc-message and metadata values (Grpc part 1e)
 
 ## Goal
 

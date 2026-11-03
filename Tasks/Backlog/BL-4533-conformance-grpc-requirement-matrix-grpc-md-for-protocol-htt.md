@@ -4,7 +4,7 @@ title: Conformance: gRPC requirement matrix Grpc.md for PROTOCOL-HTTP2.md, remai
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4530, BL-4531, BL-4532, BL-4563]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4530, BL-4531, BL-4532, BL-4585]
 touches: [Documentation/Conformance/Extended/Grpc.md, Curl.Conformance.Extended.UnitTests/Grpc/GrpcRequestHeaderCases.cs, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
@@ -47,7 +47,7 @@ Builds on BL-4530 (server, unary case), BL-4531 (response cases) and BL-4532 (fr
 - 2026-11-02 (lane 15, first pass, no code edited): PROTOCOL-HTTP2.md's client requirements include RST_STREAM handling
   and its error-code table, GOAWAY ("streams after the last accepted are UNAVAILABLE"), PING echo, and two response
   MUST NOTs (invalid `grpc-message` percent-encoding, invalid ASCII-Value metadata). `GrpcReferenceServer` cannot send
-  RST_STREAM, GOAWAY or its own PING, so those need reference-server work no task covered: filed BL-4563 (it adds
+  RST_STREAM, GOAWAY or its own PING, so those need reference-server work no task covered: filed BL-4585 (it adds
   `Grpc-Transport.md`), added to `depends-on`, requeued. Once it is Done, this task's `Grpc.md` links to
   `Grpc-Transport.md` and `Grpc-Responses.md` for those rows.
 - Measured for the next claim: `GrpcRequestHeaders.Build` (Curl.Extended.Protocol.Grpc.UnitLibrary/Wire) sends no
@@ -68,4 +68,4 @@ Builds on BL-4530 (server, unary case), BL-4531 (response cases) and BL-4532 (fr
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 123b988a abb71175 36ff140a 3af8a194.
-- 2026-11-02: Doing -> Backlog. Waits on BL-4563: the reference server cannot yet send RST_STREAM, GOAWAY or PING, which the client requirements in the matrix need
+- 2026-11-02: Doing -> Backlog. Waits on BL-4585: the reference server cannot yet send RST_STREAM, GOAWAY or PING, which the client requirements in the matrix need
