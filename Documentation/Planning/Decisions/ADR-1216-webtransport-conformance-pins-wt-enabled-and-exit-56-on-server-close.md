@@ -1,4 +1,4 @@
-# ADR-1213: WebTransport conformance pins SETTINGS_WT_ENABLED and exit 56 on a server's WT_CLOSE_SESSION
+# ADR-1216: WebTransport conformance pins SETTINGS_WT_ENABLED and exit 56 on a server's WT_CLOSE_SESSION
 
 - Status: Accepted
 - Date: 2026-11-02
