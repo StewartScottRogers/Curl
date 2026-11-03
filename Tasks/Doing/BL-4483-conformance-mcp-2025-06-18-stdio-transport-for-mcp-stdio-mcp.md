@@ -73,3 +73,4 @@ defect in the extension library is listed in `KnownFailures.txt` with a filed Hi
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 887016a3 b03319d6 14e1c865 add6527d 0c609014 ef6c9026.
 - 2026-11-02: Doing -> Backlog. Waits on BL-4577: in-process curl and the conformance harness cannot yet take a stand-in extension process starter
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 887016a3 b03319d6 14e1c865 add6527d 0c609014 ef6c9026.
