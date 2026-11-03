@@ -11,7 +11,7 @@ namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
 /// Sends one XML API request per connection (ADR-1099): it adds <c>Host</c> and then either the OAuth 2.0
 /// <c>Authorization: Bearer</c> header or, with an HMAC key, the V4 signing process's <c>GOOG4-HMAC-SHA256</c> headers over
 /// the payload's SHA-256, and turns a response of 300 or above into a failure naming the <c>Error</c> code ("XML API error
-/// responses").
+/// responses"), writing its body to the output first under <c>--fail-with-body</c>.
 /// </summary>
 /// <param name="connector">Opens the connection to the endpoint.</param>
 /// <param name="context">The transfer, for its clock, proxy, events and cancellation.</param>
@@ -49,7 +49,7 @@ internal sealed class GcsClient(IConnector connector, ITransferContext context, 
             GcsHttpResponse response = await new GcsHttpClientConnection(connection).SendAsync(request, context.CancellationToken);
             if (response.StatusCode >= 300)
             {
-                throw ErrorOf(response.StatusCode, await ReadTextAsync(response));
+                throw ErrorOf(response.StatusCode, await ReadErrorBodyAsync(response));
             }
 
             return await readResponse(response);
@@ -63,6 +63,24 @@ internal sealed class GcsClient(IConnector connector, ITransferContext context, 
     {
         using StreamReader reader = new(response.Body, Encoding.UTF8);
         return await reader.ReadToEndAsync(context.CancellationToken);
+    }
+
+    /// <summary>
+    /// Reads an error response's body as UTF-8 text and, under <c>--fail-with-body</c>, first writes its bytes to the
+    /// transfer's output, as curl does before it fails with exit 22 (manual, "--fail-with-body").
+    /// </summary>
+    /// <param name="response">The error response.</param>
+    /// <returns>The body's text.</returns>
+    private async Task<string> ReadErrorBodyAsync(GcsHttpResponse response)
+    {
+        using MemoryStream body = new();
+        await response.Body.CopyToAsync(body, context.CancellationToken);
+        if (context.Http?.Fail == HttpFailMode.FailWithBody)
+        {
+            await context.Output.WriteAsync(body.GetBuffer().AsMemory(0, (int)body.Length), context.CancellationToken);
+        }
+
+        return Encoding.UTF8.GetString(body.GetBuffer(), 0, (int)body.Length);
     }
 
     /// <summary>Gives the failure for a Cloud Storage error: exit 22 with its code and message, or only the status when the body is no <c>Error</c>.</summary>

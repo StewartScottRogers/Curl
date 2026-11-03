@@ -13,7 +13,8 @@ is written here rather than shared with the S3 extension. It is registered in
   ADR-1191), else the request is unauthenticated.
 - `Client/GcsEndpoint` is `https://storage.googleapis.com`, path-style, or the emulator
   `STORAGE_EMULATOR_HOST` names. `Client/GcsOperations` holds the three operations,
-  `Client/GcsClient` sends one request per connection and turns a status of 300 or more into exit 22
+  `Client/GcsClient` sends one request per connection and turns a status of 300 or more into exit 22,
+  writing the error body to the output first under `--fail-with-body`
   (`GcsTransferException`).
 
 - `Signing/GcsRequestSigner` signs a request with an HMAC key as the Cloud Storage "V4 signing
