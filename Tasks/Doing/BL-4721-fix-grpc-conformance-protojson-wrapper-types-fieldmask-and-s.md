@@ -41,3 +41,4 @@ file per type group there, called from `ProtobufJsonFormatter` and `ProtobufJson
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 655c552e 3578e965 e3a4fd8b.
