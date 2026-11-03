@@ -66,4 +66,4 @@ fixed here, but a defect in the extension library is listed in `KnownFailures.tx
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 8272e82f 081e4f29 010a29e2 d8e3fb0e 32c763d1 ef6c9026.
-- 2026-11-02: Doing -> Done. STOMP 1.2 matrix of 43 client requirements with 21 in-process cases for stomp:// and stomps://; content-type on SEND listed for BL-4603
+- 2026-11-02: Doing -> Done. STOMP 1.2 matrix of 43 client requirements with 21 in-process cases for stomp:// and stomps://; content-type on SEND listed for BL-4609

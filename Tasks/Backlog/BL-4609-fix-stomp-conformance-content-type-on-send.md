@@ -1,5 +1,5 @@
 ---
-id: BL-4603
+id: BL-4609
 title: Fix Stomp conformance: content-type on SEND
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4603 — Fix Stomp conformance: content-type on SEND
+# BL-4609 — Fix Stomp conformance: content-type on SEND
 
 ## Goal
 
