@@ -31,3 +31,4 @@ Engine.IO v4 heartbeat: the client must consider the connection closed when the 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 1a5677c6 150bac4e ff8cc365.
