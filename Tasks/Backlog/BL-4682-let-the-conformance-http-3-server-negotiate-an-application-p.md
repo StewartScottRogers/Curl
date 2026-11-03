@@ -1,5 +1,5 @@
 ---
-id: BL-4675
+id: BL-4682
 title: Let the conformance HTTP/3 server negotiate an application protocol other than h3 (for DoQ's doq)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4675 — Let the conformance HTTP/3 server negotiate an application protocol other than h3 (for DoQ's doq)
+# BL-4682 — Let the conformance HTTP/3 server negotiate an application protocol other than h3 (for DoQ's doq)
 
 ## Goal
 
@@ -21,7 +21,7 @@ protocol other than `h3`, so a DNS over QUIC (RFC 9250) reference server can neg
 
 Split from BL-4474 (DnsQuery encrypted conformance). `Http3ServerTlsSettings.ApplicationProtocol` is a `const "h3"`,
 read by `Http3ServerClientOffer` (line 36, refuses a ClientHello without it) and `Http3ServerTlsHandshake` (line 238,
-the EncryptedExtensions ALPN). BL-4676's DoQ reference server needs `doq` there; curl's `DnsQuicTransport` offers
+the EncryptedExtensions ALPN). BL-4683's DoQ reference server needs `doq` there; curl's `DnsQuicTransport` offers
 only `doq`. Suggested shape: an `init` property on `Http3ServerTlsSettings` defaulting to `"h3"` (keep a
 `DefaultApplicationProtocol` const if other code reads the const), read from the settings instance in both places.
 Every other reader of the const (`grep -rn "Http3ServerTlsSettings.ApplicationProtocol"`) must keep building.

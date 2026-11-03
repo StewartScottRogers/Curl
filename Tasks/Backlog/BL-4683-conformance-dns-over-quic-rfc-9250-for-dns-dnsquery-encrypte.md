@@ -1,28 +1,28 @@
 ---
-id: BL-4676
+id: BL-4683
 title: Conformance: DNS over QUIC (RFC 9250) for dns:// (DnsQuery encrypted part 3 of 3)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4674, BL-4675]
+depends-on: [BL-4681, BL-4682]
 touches: [Curl.Conformance.Extended.UnitLibrary/DnsQuery/Encrypted, Curl.Conformance.Extended.UnitTests/DnsQuery/Encrypted, Documentation/Conformance/Extended/DnsQuery-Encrypted.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4676 — Conformance: DNS over QUIC (RFC 9250) for dns:// (DnsQuery encrypted part 3 of 3)
+# BL-4683 — Conformance: DNS over QUIC (RFC 9250) for dns:// (DnsQuery encrypted part 3 of 3)
 
 ## Goal
 
 Curl's `dns://` DNS over QUIC transport (`--dns-transport quic`) is measured against RFC 9250 through the real curl
-command line, every client requirement is in BL-4674's matrix mapped to a test, and every failure is fixed or listed
+command line, every client requirement is in BL-4681's matrix mapped to a test, and every failure is fixed or listed
 with its fix task; this finishes BL-4474's work.
 
 ## Context
 
 Split from BL-4474 (part 3 of 3; read its Context in `Tasks/Deferred/` for the harness, ID, matrix and
-`KnownFailures.txt` rules). Builds on BL-4674 (`DnsQuery-Encrypted.md` and the `DnsQuery/Encrypted/` folder) and
-BL-4675 (the conformance HTTP/3 server negotiating `doq`). Write a DoQ reference server in `DnsQuery/Encrypted/` as
+`KnownFailures.txt` rules). Builds on BL-4681 (`DnsQuery-Encrypted.md` and the `DnsQuery/Encrypted/` folder) and
+BL-4682 (the conformance HTTP/3 server negotiating `doq`). Write a DoQ reference server in `DnsQuery/Encrypted/` as
 an `IDatagramReferenceServer` over `ReferenceRoute.Udp(853, ...)` driving `Curl.Conformance.Http3Server`'s
 `Http3ServerConnection` with the application protocol `doq`, the way
 `Curl.Conformance.Extended.UnitLibrary/WebTransport/Server/WebTransportReferenceServer.cs` drives it for h3 (see

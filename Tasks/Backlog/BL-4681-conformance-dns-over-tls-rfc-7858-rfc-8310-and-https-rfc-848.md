@@ -1,5 +1,5 @@
 ---
-id: BL-4674
+id: BL-4681
 title: Conformance: DNS over TLS (RFC 7858, RFC 8310) and HTTPS (RFC 8484) for dns:// (DnsQuery encrypted part 1 of 3)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4674 — Conformance: DNS over TLS (RFC 7858, RFC 8310) and HTTPS (RFC 8484) for dns:// (DnsQuery encrypted part 1 of 3)
+# BL-4681 — Conformance: DNS over TLS (RFC 7858, RFC 8310) and HTTPS (RFC 8484) for dns:// (DnsQuery encrypted part 1 of 3)
 
 ## Goal
 
@@ -20,7 +20,7 @@ requirement is in a matrix mapped to a test, and every failure is fixed or liste
 
 ## Context
 
-Split from BL-4474 (part 1 of 3; BL-4675 and BL-4676 do DoQ). Read BL-4474's Context (in `Tasks/Deferred/`): the
+Split from BL-4474 (part 1 of 3; BL-4682 and BL-4683 do DoQ). Read BL-4474's Context (in `Tasks/Deferred/`): the
 harness, `[SpecRequirement]` IDs (`DnsQuery:RFC7858-<section>-<n>`, `DnsQuery:RFC8484-<section>-<n>`), the matrix
 format and the `KnownFailures.txt` rule, `Documentation/Conformance/Extended/README.md`; measure against the
 specification, one file per case group, nothing added to `Harness/`.
@@ -40,7 +40,7 @@ ADR-1143, ADR-1148). A defect in the library is listed in `KnownFailures.txt` wi
 
 - [ ] `Documentation/Conformance/Extended/DnsQuery-Encrypted.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
       RFC 7858 and RFC 8484 (and RFC 8310 where RFC 7858's profile rules bind a client) that binds a client a
-      `DnsQuery:` ID mapped to a test or to `n/a: <reason>`, leaving a section for RFC 9250 (BL-4676); the harness's
+      `DnsQuery:` ID mapped to a test or to `n/a: <reason>`, leaving a section for RFC 9250 (BL-4683); the harness's
       matrix check passes.
 - [ ] Cases in `Curl.Conformance.Extended.UnitTests/DnsQuery/Encrypted/` run curl in process and assert wire bytes,
       stdout, stderr and exit code for at least: DoT on port 853 with the length prefix, a refused certificate (and
