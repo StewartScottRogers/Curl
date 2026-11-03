@@ -63,7 +63,16 @@ internal sealed class AzureStorageHttpConnectionReader(IConnection connection)
     private async ValueTask<bool> FillAsync(CancellationToken cancellationToken)
     {
         start = 0;
-        end = await connection.ReadAsync(buffer, cancellationToken);
+        try
+        {
+            end = await connection.ReadAsync(buffer, cancellationToken);
+        }
+        catch (MissingCloseNotifyException failure)
+        {
+            end = 0;
+            throw new AzureStorageHttpException(AzureStorageHttpFailure.ReceiveFailed, failure.Message);
+        }
+
         return end > 0;
     }
 }

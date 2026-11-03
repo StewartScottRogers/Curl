@@ -7,7 +7,8 @@ namespace Curl.Extended.Protocol.Redis.Wire;
 
 /// <summary>
 /// Reads RESP3 replies off an <see cref="IConnection"/> ("RESP protocol description"): every type the specification
-/// names, RESP2's <c>-1</c> null bulk string and null array, and an attribute dropped before the reply it describes.
+/// names, RESP2's <c>-1</c> null bulk string (a null) and null array (an aggregate with no elements, which renders as
+/// nothing, ADR-1208), and an attribute dropped before the reply it describes.
 /// A reply that breaks the specification throws <see cref="FormatException"/>; the connection ending inside one
 /// throws <see cref="IOException"/>.
 /// </summary>
@@ -134,12 +135,7 @@ internal sealed class RespReplyReader(IConnection transport, CancellationToken c
 
     private async ValueTask<RespReply> ReadAggregateAsync(RespReplyKind kind, byte[] header, int depth)
     {
-        int count = LengthOf(header);
-        if (count < 0)
-        {
-            return RespReply.Scalar(RespReplyKind.Null, []);
-        }
-
+        int count = Math.Max(LengthOf(header), 0);
         List<RespReply> elements = await ReadElementsAsync(kind == RespReplyKind.Map ? 2L * count : count, depth + 1).ConfigureAwait(false);
         return new RespReply(kind, [], elements);
     }

@@ -103,7 +103,7 @@ internal static class ClientCertificateLoader
     /// refused once the file is found.
     /// </param>
     /// <param name="certificateStore">Opens the store a store path names.</param>
-    /// <returns>The certificate with its key, or the exit 58 failure.</returns>
+    /// <returns>The certificate from a store with its key, or the exit 58 or exit 35 failure.</returns>
     public static (X509Certificate2? Certificate, ConnectResult? Failure) LoadAsSchannelBuild(
         string path,
         string? passphrase,
@@ -171,12 +171,16 @@ internal static class ClientCertificateLoader
 
         try
         {
-            return (X509CertificateLoader.LoadPkcs12(contents, passphrase, Pkcs12KeyStorage), null);
+            X509CertificateLoader.LoadPkcs12(contents, passphrase, Pkcs12KeyStorage).Dispose();
         }
         catch (CryptographicException)
         {
             return Failed(TlsFailureMessages.SchannelClientCertificatePasswordBad(path));
         }
+
+        // Schannel curl imports the file into an ephemeral key set and AcquireCredentialsHandle
+        // then refuses it, before any ClientHello is sent (ADR-0794, ADR-1187).
+        return (null, ConnectResult.Failed(CurlExitCode.SslConnectError, TlsFailureMessages.SchannelClientCertificateCredentialsUnknown));
     }
 
     /// <summary>

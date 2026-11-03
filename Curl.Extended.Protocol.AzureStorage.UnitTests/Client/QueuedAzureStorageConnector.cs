@@ -16,6 +16,9 @@ internal sealed class QueuedAzureStorageConnector(params string[] responses) : I
 
     public List<ConnectTarget> Targets { get; } = [];
 
+    /// <summary>Gets or sets what each connection throws once its response is read, such as a missing <c>close_notify</c>.</summary>
+    public IOException? FailureAtEnd { get; set; }
+
     /// <summary>Gives a response with <paramref name="body"/> and its <c>Content-Length</c>.</summary>
     public static string Reply(string body, string headers = "", string status = "200 OK") =>
         $"HTTP/1.1 {status}\r\n{headers}Content-Length: {Encoding.UTF8.GetByteCount(body)}\r\n\r\n{body}";
@@ -29,7 +32,7 @@ internal sealed class QueuedAzureStorageConnector(params string[] responses) : I
             return ValueTask.FromResult(ConnectResult.Refused("Failed to connect to account.blob.core.windows.net port 443"));
         }
 
-        RecordedConnection connection = new(response);
+        RecordedConnection connection = new(response, failureAtEnd: FailureAtEnd);
         Connections.Add(connection);
         return ValueTask.FromResult(ConnectResult.Connected(connection));
     }

@@ -30,6 +30,31 @@ public sealed class ExtensionProtocolHandlersTests
     }
 
     [TestMethod]
+    public void For_GivesTheExtensionsTheRunsEnvironmentReader()
+    {
+        Func<string, string?> reader = _ => null;
+
+        IEnumerable<IProtocolHandler> handlers = ExtensionProtocolHandlers.For(reader)!(Services);
+
+        Assert.HasCount(ExtensionCatalogue.Entries.Count, handlers);
+        Assert.IsNull(Services.ReadEnvironmentVariable);
+    }
+
+    [TestMethod]
+    public void For_HandsEachExtensionFactoryServicesCarryingTheGivenReader()
+    {
+        Func<string, string?> reader = _ => null;
+        List<ProtocolHandlerServices> seen = [];
+        Func<ProtocolHandlerServices, IProtocolHandler> factory = services => { seen.Add(services); return new SchemeOnlyHandler("x"); };
+
+        _ = ExtensionProtocolHandlers.For(reader, [factory, factory])!(Services).ToList();
+
+        Assert.HasCount(2, seen);
+        Assert.AreSame(reader, seen[0].ReadEnvironmentVariable);
+        Assert.AreSame(reader, seen[1].ReadEnvironmentVariable);
+    }
+
+    [TestMethod]
     public void For_WithNoReader_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => ExtensionProtocolHandlers.For(null!));
 

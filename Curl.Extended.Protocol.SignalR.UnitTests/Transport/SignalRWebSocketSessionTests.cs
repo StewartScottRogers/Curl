@@ -104,6 +104,31 @@ public sealed class SignalRWebSocketSessionTests
         Assert.IsFalse(string.IsNullOrEmpty(failure.Message));
     }
 
+    [TestMethod]
+    public async Task CloseAsync_ServerHasNotClosed_SendsAMaskedCloseWithStatus1000_Rfc6455Section1Point4And7Point1Point2()
+    {
+        ScriptedConnection connection = ScriptedConnection.FromText(Upgraded);
+        SignalRWebSocketSession session = await UpgradeAsync(connection);
+        int handshakeLength = connection.Written.Length;
+
+        await session.CloseAsync(CancellationToken.None);
+
+        CollectionAssert.AreEqual(ClientFrame(0x88, [0x03, 0xE8]), connection.Written[handshakeLength..]);
+    }
+
+    [TestMethod]
+    public async Task CloseAsync_ServerAlreadyClosed_SendsNothingMore_Rfc6455Section5Point5Point1()
+    {
+        ScriptedConnection connection = new([.. Encoding.Latin1.GetBytes(Upgraded), 0x88, 0x02, 0x03, 0xE8]);
+        SignalRWebSocketSession session = await UpgradeAsync(connection);
+        _ = await session.ReceiveRecordAsync(CancellationToken.None);
+        int answeredLength = connection.Written.Length;
+
+        await session.CloseAsync(CancellationToken.None);
+
+        Assert.HasCount(answeredLength, connection.Written);
+    }
+
     private static Task<SignalRWebSocketSession> UpgradeAsync(ScriptedConnection connection) =>
         SignalRWebSocketUpgrade.UpgradeAsync(
             connection,

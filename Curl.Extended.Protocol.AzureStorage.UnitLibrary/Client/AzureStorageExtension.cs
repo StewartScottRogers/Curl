@@ -17,12 +17,13 @@ public static class AzureStorageExtension
         [],
         new Uri("https://learn.microsoft.com/rest/api/storageservices/blob-service-rest-api"));
 
-    /// <summary>Creates the handler over curl's connector, reading the Azure Storage tokens from the process environment.</summary>
+    /// <summary>Creates the handler over curl's connector, reading the Azure Storage tokens from the run's environment
+    /// (<see cref="ProtocolHandlerServices.ReadEnvironmentVariable" />), else the process environment (BL-4567).</summary>
     /// <param name="services">Curl's connection services.</param>
     /// <returns>The handler.</returns>
     public static IProtocolHandler CreateHandler(ProtocolHandlerServices services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        return new AzureStorageProtocolHandler(services.Connector, Environment.GetEnvironmentVariable, DefaultBlockSize);
+        return new AzureStorageProtocolHandler(services.Connector, services.ReadEnvironmentVariable ?? Environment.GetEnvironmentVariable, DefaultBlockSize, AzureBlobOperations.MaxBlockCount);
     }
 }

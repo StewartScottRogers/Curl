@@ -44,6 +44,8 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
 
     private ushort nextMessageSequence;
 
+    private ushort cipherSuite;
+
     private delegate bool DtlsRecordOpener(ReadOnlySpan<byte> record, out DtlsRecordHeader header, out byte[] plaintext);
 
     /// <summary>Runs the handshake.</summary>
@@ -122,6 +124,7 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
         ServerHello hello = Decoded(ServerHello.Decode(serverFlight[0].Body), HandshakeType.ServerHello);
         Require(hello.LegacyVersion == DtlsRecordHeader.Dtls12Version, "the server did not choose DTLS 1.2");
         Require(DtlsClientHello.CipherSuites.Contains(hello.CipherSuite), $"the server chose cipher suite 0x{hello.CipherSuite:X4}, which the client did not offer");
+        cipherSuite = hello.CipherSuite;
         byte[] leaf = VerifyCertificateChain(Decoded(Tls12CertificateMessage.Decode(serverFlight[1].Body), HandshakeType.Certificate));
         Tls12ServerKeyExchange keyExchange = Decoded(Tls12ServerKeyExchange.Decode(serverFlight[2].Body, Tls12KeyExchange.Ecdhe, true, true), HandshakeType.ServerKeyExchange);
         Tls12EcdheParameters parameters = (Tls12EcdheParameters)keyExchange.Parameters;
@@ -132,7 +135,7 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
         Require(
             DtlsServerKeyExchangeSignature.Verify(leaf, keyExchange.SignatureAlgorithm!.Value, keyExchange.BuildSignedContent(clientRandom, hello.Random), keyExchange.Signature!),
             "the server's ServerKeyExchange signature does not verify with its certificate's key");
-        byte[] clientKeyExchange = new Tls12ClientKeyExchange(Tls12KeyExchange.Ecdhe, [(byte)clientShare.PublicKey.Length, .. clientShare.PublicKey]).Encode()[HandshakeMessage.HeaderLength..];
+        byte[] clientKeyExchange = new Tls12ClientKeyExchange(Tls12KeyExchange.Ecdhe, clientShare.PublicKey).Encode()[HandshakeMessage.HeaderLength..];
         byte[] keyExchangeFragment = new DtlsHandshakeMessage(HandshakeType.ClientKeyExchange, nextMessageSequence++, clientKeyExchange).TranscriptBytes();
         transcript.AddRange(keyExchangeFragment);
         // RFC 7627 section 4: the session hash covers the transcript through ClientKeyExchange.
@@ -160,7 +163,7 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
     {
         DtlsRecordProtector protector = new(keys.ClientWrite, 1, bulkCipher);
         DtlsRecordUnprotector unprotector = new(keys.ServerWrite, 1, bulkCipher);
-        DtlsClientSession session = new(channel, protector, unprotector);
+        DtlsClientSession session = new(channel, protector, unprotector) { CipherSuite = cipherSuite };
         try
         {
             openRecord = unprotector.TryUnprotect;

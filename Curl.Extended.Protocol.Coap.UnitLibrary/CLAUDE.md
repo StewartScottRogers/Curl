@@ -12,7 +12,8 @@ registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDes
   `ProtocolHandlerServices.DatagramConnector` and `ProtocolHandlerServices.TlsProvider`, for `coap` and `coaps`.
 - `CoapProtocolHandler` sends a confirmable request (block-wise through `Blockwise/` when the payload or response needs it) to port 5683, 5684 for `coaps` (or the URL's port), over `Secure/` for `coaps`, and writes the
   response payload. A 4.xx or 5.xx response ends with exit 0, or exit 22 under `-f` and
-  `--fail-with-body`; `-i` writes `CoAP/1.0 c.dd` before the payload.
+  `--fail-with-body`; `-i` writes `CoAP/1.0 c.dd` before the payload. It reports the opened UDP channel for `-v`'s
+  `Established connection` line and, for `coaps`, `SSL connection using DTLSv1.2 / <OpenSSL cipher name>` (ADR-1223).
 - `CoapRequest` gives the method (GET, POST with `-d`, PUT with `-T`, or `-X` GET, POST, PUT or DELETE; any other is
   exit 2) and the Uri-Host, Uri-Path and Uri-Query options (RFC 7252 section 6.4).
 - `CoapExchange` retransmits at ACK_TIMEOUT times a random factor, doubling up to MAX_RETRANSMIT times
@@ -44,7 +45,7 @@ whether or not the handshake succeeds) and then carries each CoAP datagram as on
 - `CoapBlockwiseTransfer` sends a payload over 1024 bytes in Block1 blocks, the next after each 2.31
   Continue, at the smaller size a 2.31 asks for, and again from block 0 at the smaller size a 4.13 asks
   for; then fetches a Block2 response block by block at the server's size, and gives it as one
-  response whose payload holds every block once, in order (exit 56 for a block out of order or short).
+  response whose payload holds every block once, in order (exit 56 for a block out of order or short, or one whose ETag differs from the first block's).
 
 `Wire/` (namespace `Curl.Extended.Protocol.Coap.Wire`) holds the message format:
 

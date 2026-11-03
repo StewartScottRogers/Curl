@@ -4,7 +4,7 @@ title: Conformance: gRPC server reflection and the proto3 JSON mapping for grpc:
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4501, BL-4502, BL-4503, BL-4477]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4530, BL-4531, BL-4532, BL-4533]
 touches: [Curl.Conformance.Extended.UnitLibrary/Grpc/Reflection, Curl.Conformance.Extended.UnitTests/Grpc/Reflection, Documentation/Conformance/Extended/Grpc-Reflection.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02

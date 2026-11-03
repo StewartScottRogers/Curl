@@ -93,6 +93,7 @@ public sealed class Cgr094Tests
     [TestMethod]
     [DataRow(OpenSslBuild, "DEFAULT@SECLEVEL=0")]
     [DataRow(OpenSslBuild, "DEFAULT@SECLEVEL=2:@SECLEVEL=0")]
+    [DataRow(OpenSslBuild, "@SECLEVEL=0:ALL")]
     [DataRow(SchannelBuild, null)]
     public async Task AuthenticateAsClientAsync_WithATls11MinimumTheSecurityLevelAllows_CompletesWithATls11Server(bool matchesSchannelBuild, string? ciphers)
     {

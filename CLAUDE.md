@@ -269,7 +269,10 @@ accepted findings wait on a re-audit (`reaudit-pending:<n>`), on a task no lane 
 audit has run (BL-1022).
 
 Findings are `Audit/Findings/AF-####-*.md`, arriving `proposed`. Only Stewart sets
-`accepted` or `rejected`; `Audit/Triage.md` and `Audit\Tools\New-TasksFromAcceptedFindings.ps1`
+`accepted` or `rejected`, with one standing exception (Stewart, 2026-11-02: "standing accept",
+for the run-up to a third-party handoff review): an interactive session sets every `proposed`
+finding `accepted` on his behalf, with the reason "Accepted under Stewart's standing accept of
+2026-11-02.", files its tasks and reports what it accepted; rejecting one is still his alone; `Audit/Triage.md` and `Audit\Tools\New-TasksFromAcceptedFindings.ps1`
 turn accepted ones into lane-eligible Curl tasks, and a `Re-fix` task when a re-audit finds
 one still reproducing after its tasks are Done. A finding closes only on evidence, never
 because its task reached Done (ADR-0422): its own auditor's re-audit says it no longer

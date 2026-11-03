@@ -11,13 +11,19 @@ namespace Curl.Extended.Protocol.SignalR.Client;
 /// Speaks the JSON hub protocol over an upgraded WebSocket (HubProtocol.md): sends the handshake request and checks
 /// its response, sends the call when there is one, and writes one line to <paramref name="output"/> per message the
 /// hub sends that curl shows: the call's Completion result, each of its StreamItems, and each Invocation the hub makes
-/// as the JSON array <c>["target", args...]</c>. It ends at the call's Completion, a Close message or the WebSocket's close.
+/// as the JSON array <c>["target", args...]</c>. Curl implements no client methods, so it answers an Invocation that
+/// carries an <c>invocationId</c> (a client result) with a Completion whose error is <see cref="NoClientResultError"/>
+/// (ADR-1204). It ends at the call's Completion, a Close message or the WebSocket's close, and at the first two
+/// starts the WebSocket closing handshake with a Close frame (RFC 6455 section 1.4).
 /// </summary>
 /// <param name="session">The upgraded WebSocket.</param>
 /// <param name="callRecord">The Invocation or StreamInvocation record <see cref="SignalRCall"/> gave, or <see langword="null"/>.</param>
 /// <param name="output">Where the lines go.</param>
 internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]? callRecord, Stream output)
 {
+    /// <summary>The error of the Completion curl sends for a hub call that expects a client result: the .NET client's text.</summary>
+    internal const string NoClientResultError = "Client didn't provide a result.";
+
     private long bytesWritten;
 
     /// <summary>Runs the session and gives the number of bytes written to the output.</summary>
@@ -44,6 +50,7 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
         {
         }
 
+        await session.CloseAsync(cancellationToken);
         return bytesWritten;
     }
 
@@ -63,6 +70,22 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
         }
 
         return Encoding.UTF8.GetString(buffer.WrittenSpan);
+    }
+
+    // The type 3 Completion record that refuses a hub call expecting a client result (HubProtocol.md, "Completion").
+    private static byte[] RefusalOf(string invocationId)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteNumber("type", 3);
+            writer.WriteString("invocationId", invocationId);
+            writer.WriteString("error", NoClientResultError);
+            writer.WriteEndObject();
+        }
+
+        return [.. buffer.WrittenSpan, 0x1E];
     }
 
     // The line curl writes for a message, or null for none; a failed Completion of the call throws.
@@ -94,6 +117,11 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
         if (LineFor(message) is { } line)
         {
             await WriteLineAsync(line, cancellationToken);
+        }
+
+        if (message is InvocationMessage { InvocationId: { } invocationId })
+        {
+            await session.SendTextAsync(RefusalOf(invocationId), cancellationToken);
         }
 
         return Ends(message);

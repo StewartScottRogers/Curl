@@ -56,15 +56,29 @@ public sealed class Mqtt5WebSocketUpgradeTests
     [DataRow("garbage\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the upgrade reply has no status line")]
     [DataRow("FTP 101 x\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the upgrade reply has no status line")]
     [DataRow("HTTP/1.1 404 Not Found\r\n\r\n", CurlExitCode.HttpReturnedError, "Refused WebSocket upgrade: 404")]
-    [DataRow("HTTP/1.1 101 Switching Protocols\r\nSec-WebSocket-Accept: wrong\r\nSec-WebSocket-Protocol: mqtt\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the server's Sec-WebSocket-Accept does not match the key sent")]
-    [DataRow("HTTP/1.1 101 Switching Protocols\r\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the server did not select the mqtt subprotocol")]
-    [DataRow("HTTP/1.1 101 Switching Protocols\r\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\nSec-WebSocket-Protocol: mqttv3.1\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the server did not select the mqtt subprotocol")]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: wrong\r\nSec-WebSocket-Protocol: mqtt\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the server's Sec-WebSocket-Accept does not match the key sent")]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the server did not select the mqtt subprotocol")]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\nSec-WebSocket-Protocol: mqttv3.1\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the server did not select the mqtt subprotocol")]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\nSec-WebSocket-Protocol: mqtt\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the upgrade reply has no Upgrade: websocket header")]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nUpgrade: h2c\r\nConnection: Upgrade\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the upgrade reply has no Upgrade: websocket header")]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\nSec-WebSocket-Protocol: mqtt\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the upgrade reply has no Connection: Upgrade header")]
+    [DataRow("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: keep-alive\r\n\r\n", CurlExitCode.WeirdServerReply, "MQTT 5 over WebSocket: the upgrade reply has no Connection: Upgrade header")]
     public async Task ReadReplyAsync_BadReply_EndsTheTransfer(string reply, CurlExitCode exitCode, string message)
     {
         Mqtt5ClientException failure = await ReadFailureAsync(new ScriptedMqtt5Connection(System.Text.Encoding.ASCII.GetBytes(reply)));
 
         Assert.AreEqual(exitCode, failure.ExitCode);
         Assert.AreEqual(message, failure.Message);
+    }
+
+    [TestMethod]
+    public async Task ReadReplyAsync_UpgradeAndConnectionInOtherCaseAndConnectionAList_IsAccepted()
+    {
+        string reply = Accepted.Replace("Upgrade: websocket", "upgrade: WebSocket", StringComparison.Ordinal).Replace("Connection: Upgrade", "connection: keep-alive, upgrade", StringComparison.Ordinal);
+
+        ReadOnlyMemory<byte> rest = await Mqtt5WebSocketUpgrade.ReadReplyAsync(new ScriptedMqtt5Connection(System.Text.Encoding.ASCII.GetBytes(reply)), ScriptedWebSocketRandomSource.SampleKey, CancellationToken.None);
+
+        Assert.IsTrue(rest.IsEmpty);
     }
 
     [TestMethod]

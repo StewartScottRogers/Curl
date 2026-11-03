@@ -16,7 +16,7 @@ public sealed class RespReplyReaderTests
     [DataRow("$0\r\n\r\n", nameof(RespReplyKind.BulkString), "")]
     [DataRow("_\r\n", nameof(RespReplyKind.Null), "")]
     [DataRow("$-1\r\n", nameof(RespReplyKind.Null), "")]
-    [DataRow("*-1\r\n", nameof(RespReplyKind.Null), "")]
+    [DataRow("*-1\r\n", nameof(RespReplyKind.Array), "")]
     [DataRow("#t\r\n", nameof(RespReplyKind.Boolean), "t")]
     [DataRow("#f\r\n", nameof(RespReplyKind.Boolean), "f")]
     [DataRow(",1.23\r\n", nameof(RespReplyKind.Double), "1.23")]

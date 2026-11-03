@@ -200,7 +200,7 @@ internal sealed class DtlsTestServer : IDisposable
 
         transcript.AddRange(HandshakeFragmentOf(type, messageSequence, body));
         byte[] publicValue = Tls12ClientKeyExchange.Decode(body, Tls12KeyExchange.Ecdhe).Value.ExchangeKeys;
-        byte[] preMasterSecret = keyShare.ComputeSharedSecret(publicValue[1..])
+        byte[] preMasterSecret = keyShare.ComputeSharedSecret(publicValue)
             ?? throw new InvalidOperationException("The client's ECDHE public value is not a point on the curve.");
         masterSecret = EchoExtendedMasterSecret
             ? TlsPrf.Sha256.ComputeExtendedMasterSecret(preMasterSecret, SHA256.HashData(transcript.ToArray()))

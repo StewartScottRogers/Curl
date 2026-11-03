@@ -15,7 +15,7 @@ public static class ProtobufJsonParser
     private static readonly JsonDocumentOptions DocumentOptions = new() { MaxDepth = int.MaxValue };
 
     /// <summary>Reads a message of this type from UTF-8 JSON; the message is null unless the error is <see cref="ProtobufJsonError.None" />.</summary>
-    public static ProtobufJsonError TryParse(DynamicMessageType type, ReadOnlyMemory<byte> json, out DynamicMessage? message)
+    public static ProtobufJsonError Parse(DynamicMessageType type, ReadOnlyMemory<byte> json, out DynamicMessage? message)
     {
         ArgumentNullException.ThrowIfNull(type);
         message = null;

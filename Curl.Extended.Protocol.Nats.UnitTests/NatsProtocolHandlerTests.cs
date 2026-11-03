@@ -161,6 +161,21 @@ public sealed class NatsProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("nats://example.com/orders.*", "hi", "orders.*")]
+    [DataRow("nats://example.com/orders.%3E?request", null, "orders.>")]
+    public async Task ExecuteAsync_PublishOrRequestToAWildcard_FailsWithExit3BeforeConnecting(string url, string? data, string subject)
+    {
+        ScriptedConnector connector = new(ConnectResult.Connected(ScriptedConnection.Of()));
+        TransferContext context = Context(url, new MemoryStream(), data);
+
+        TransferResult result = await new NatsProtocolHandler(connector, () => "_INBOX.t").ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Assert.AreEqual($"NATS subject \"{subject}\" holds a wildcard, which a publish cannot name", result.ErrorMessage);
+        Assert.IsNull(connector.Target);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ConnectionRefused_GivesTheConnectorsFailure()
     {
         TransferResult result = await new NatsProtocolHandler(new ScriptedConnector(ConnectResult.Refused("Failed to connect")), () => "_INBOX.t").ExecuteAsync(Context("nats://example.com/a", new MemoryStream()));

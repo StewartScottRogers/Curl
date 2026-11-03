@@ -58,7 +58,9 @@ public sealed class McpStreamableHttpTransport : IAsyncDisposable
     /// <param name="request">The request.</param>
     /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <returns>The response whose id is the request's.</returns>
-    /// <exception cref="McpHttpException">The status is not 200, the reply's type is neither, or the reply ended without the response.</exception>
+    /// <exception cref="McpHttpException">The status is not 200, the reply's type is neither, or the reply ended without the response;
+    /// <see cref="McpHttpFailure.SessionExpired"/>, with <see cref="SessionId"/> and <see cref="ProtocolVersion"/> cleared, when a
+    /// request carrying a session id is answered 404.</exception>
     public async Task<McpResponse> SendRequestAsync(McpOutgoingRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -139,6 +141,17 @@ public sealed class McpStreamableHttpTransport : IAsyncDisposable
         throw NoResponse();
     }
 
+    /// <summary>
+    /// Forgets the expired session's id and protocol version, so the next request, a new <c>initialize</c>, carries
+    /// neither ("Session Management"), and gives the failure that tells the caller to start the new session.
+    /// </summary>
+    private McpHttpException ExpireSession()
+    {
+        SessionId = null;
+        protocolVersion = null;
+        return new McpHttpException(McpHttpFailure.SessionExpired, "The server answered 404 Not Found: the MCP session expired.", 404);
+    }
+
     private void RecordSessionId(McpHttpResponse response)
     {
         var sessionId = response.FindHeader("Mcp-Session-Id");
@@ -190,6 +203,11 @@ public sealed class McpStreamableHttpTransport : IAsyncDisposable
     private async Task<(McpResponse Value, bool KeepConnection)> ExchangeRequestAsync(McpOutgoingRequest request, CancellationToken cancellationToken)
     {
         var response = await ExchangeAsync("POST", request.Bytes, cancellationToken);
+        if (response.StatusCode == 404 && SessionId is not null)
+        {
+            throw ExpireSession();
+        }
+
         RequireStatus(response, 200);
         RecordSessionId(response);
         var mediaType = (response.FindHeader("Content-Type") ?? string.Empty).Split(';')[0].Trim();

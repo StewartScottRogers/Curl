@@ -8,7 +8,8 @@ namespace Curl.Extended.Protocol.SocketIo;
 /// <summary>
 /// Whole WebSocket text messages over an upgraded connection (RFC 6455 sections 5 and 6), decoded with
 /// the shared <see cref="WsFrameDecoder" /> and sent with <see cref="WsFrameEncoder" />. Each ping is
-/// answered with a pong (section 5.5.2); binary messages are dropped, as Engine.IO v4 carries only
+/// answered with a pong (section 5.5.2) and the server's first close frame with a close echoing its
+/// status code (section 5.5.1); binary messages are dropped, as Engine.IO v4 carries only
 /// Socket.IO's binary attachments in them.
 /// </summary>
 /// <param name="connection">The upgraded connection.</param>
@@ -30,6 +31,11 @@ internal sealed class WebSocketMessageChannel(IConnection connection, IWebSocket
     private ReadOnlyMemory<byte> pending = received;
 
     private bool isBinaryMessage;
+
+    // The status code of the servers close frame, until this channel has answered it.
+    private ReadOnlyMemory<byte>? closeToAnswer;
+
+    private bool isCloseAnswered;
 
     /// <summary>Waits for the next whole text message.</summary>
     /// <param name="cancellationToken">Cancels the wait.</param>
@@ -82,6 +88,13 @@ internal sealed class WebSocketMessageChannel(IConnection connection, IWebSocket
         {
             await SendAsync(WsOpcode.Pong, ping, cancellationToken).ConfigureAwait(false);
         }
+
+        if (closeToAnswer is { } status)
+        {
+            closeToAnswer = null;
+            isCloseAnswered = true;
+            await SendAsync(WsOpcode.Close, status, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private void Collect(WsFrameRun run)
@@ -89,12 +102,22 @@ internal sealed class WebSocketMessageChannel(IConnection connection, IWebSocket
         if (run.Opcode is WsOpcode.Close)
         {
             messages.Enqueue(null);
+            AnswerCloseOnce(run.Payload);
             return;
         }
 
         if (run.Opcode is not (WsOpcode.Ping or WsOpcode.Pong))
         {
             CollectData(run);
+        }
+    }
+
+    // RFC 6455 section 5.5.1: the first close frame is answered with a close echoing its status code.
+    private void AnswerCloseOnce(ReadOnlyMemory<byte> payload)
+    {
+        if (!isCloseAnswered)
+        {
+            closeToAnswer = payload[..Math.Min(payload.Length, 2)];
         }
     }
 

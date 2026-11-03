@@ -389,7 +389,7 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         var file = WriteFile("ech-client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12));
         var (plaintext, stream) = Unanswered();
-        Diagnostics.Arrange("build", "Schannel");
+        Diagnostics.Arrange("build", "OpenSSL");
         Diagnostics.Arrange("Ech", "hard");
         Diagnostics.Arrange("EchConfigList", "(none)");
         ArrangeCertificate("client certificate", s_clientCertificate);
@@ -397,7 +397,7 @@ public sealed partial class HandBuiltTlsProviderTests
         ConnectResult result;
         using (Diagnostics.Phase("TLS handshake"))
         {
-            result = await Provider(new TlsClientOptions(Insecure: true, Ech: "hard", ClientCertificate: file), SchannelBuild)
+            result = await Provider(new TlsClientOptions(Insecure: true, Ech: "hard", ClientCertificate: file, CertificateType: "P12"), OpenSslBuild)
                 .AuthenticateAsClientAsync(plaintext, EchHost, CancellationToken.None);
         }
 

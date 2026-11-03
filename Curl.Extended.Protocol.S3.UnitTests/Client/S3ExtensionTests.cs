@@ -22,6 +22,17 @@ public sealed class S3ExtensionTests
         Assert.IsInstanceOfType<S3ProtocolHandler>(S3Extension.CreateHandler(Services));
 
     [TestMethod]
+    public async Task CreateHandler_WithTheRunsEnvironmentReader_ReadsTheEndpointFromIt()
+    {
+        QueuedS3Connector connector = new(QueuedS3Connector.Ok("x"));
+        ProtocolHandlerServices services = new(connector, null!, null!, null!, ReadEnvironmentVariable: name => name == "AWS_ENDPOINT_URL" ? "http://injected.example:9000" : null);
+
+        await S3Extension.CreateHandler(services).ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("s3://bucket/k"), Output = new MemoryStream() });
+
+        Assert.AreEqual(("injected.example", 9000), (connector.Targets.Single().Host, connector.Targets.Single().Port));
+    }
+
+    [TestMethod]
     public void CreateHandler_WithoutServices_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => S3Extension.CreateHandler(null!));
 

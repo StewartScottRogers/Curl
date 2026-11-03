@@ -20,6 +20,19 @@ public sealed class AzureStorageExtensionTests
     public void CreateHandler_GivesTheAzureStorageHandler() =>
         Assert.IsInstanceOfType<AzureStorageProtocolHandler>(AzureStorageExtension.CreateHandler(Services));
 
+    // BL-4567: the tokens come from the run's environment the host hands the extensions.
+    [TestMethod]
+    public async Task CreateHandler_WithTheRunsEnvironment_SendsItsSasToken()
+    {
+        QueuedAzureStorageConnector connector = new(QueuedAzureStorageConnector.Reply("hello"));
+        ProtocolHandlerServices services = new(connector, null!, null!, null!, ReadEnvironmentVariable: name => name == "AZURE_STORAGE_SAS_TOKEN" ? "sv=2025-01-05&sig=abc" : null);
+
+        TransferResult result = await AzureStorageExtension.CreateHandler(services).ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("az://account/container/blob"), Output = new MemoryStream() });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.StartsWith("GET /container/blob?sv=2025-01-05&sig=abc HTTP/1.1\r\n", connector.Connections[0].Written);
+    }
+
     [TestMethod]
     public void CreateHandler_WithoutServices_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => AzureStorageExtension.CreateHandler(null!));

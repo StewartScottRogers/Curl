@@ -19,7 +19,8 @@ references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers 
   options to `DnsQueryProtocolHandler` as a `DnsQueryContext`; `DnsQueryRequest` reads the URL (no server: the
   system's first DNS server); failures are `DnsQueryException`s carrying the exit code.
 - `Transport/` holds `DnsQueryTransportSelection` (each `--dns-transport` name and its `IDnsQueryTransport`, which
-  also gives the port a URL naming none is queried on), `Udp/DnsUdpTransport` (3 tries of 5
+  also gives the port a URL naming none is queried on), `Udp/DnsUdpTransport` (reports the opened channel for
+  `-v`'s `Established connection` line, 3 tries of 5
   seconds, TCP retry when TC is set), `Tcp/DnsTcpTransport` (two-octet length prefix), `Tls/DnsTlsTransport` (DNS
   over TLS, RFC 7858: port 853, the TLS provider's handshake, then TCP's framing), `Quic/DnsQuicTransport` (DNS
   over QUIC, RFC 9250: port 853, ALPN `doq`, one stream with Message ID 0 and FIN, the certificate judged by the TLS

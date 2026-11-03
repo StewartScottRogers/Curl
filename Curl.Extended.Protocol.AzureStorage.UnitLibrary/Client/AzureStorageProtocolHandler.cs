@@ -13,7 +13,8 @@ namespace Curl.Extended.Protocol.AzureStorage.Client;
 /// <param name="connector">Opens each connection.</param>
 /// <param name="environment">Gives an environment variable's value, or <see langword="null"/> when it is unset.</param>
 /// <param name="blockSize">The size of each uploaded block, and the size from which an upload is sent in blocks.</param>
-internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<string, string?> environment, int blockSize) : IProtocolHandler
+/// <param name="maxBlockCount">The most blocks an <c>az://</c> upload commits a blob from (ADR-1213).</param>
+internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<string, string?> environment, int blockSize, int maxBlockCount) : IProtocolHandler
 {
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes { get; } = ["az", "abfs", "abfss"];
@@ -29,7 +30,7 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
             AzureStorageClient client = new(connector, context, new AzureStorageRequestAuthorizer(context.TimeProvider), credential);
             context.Progress.ReportTransferStarted();
             Task<long> transfer = context.Url.Scheme == "az"
-                ? new AzureBlobOperations(client, blockSize).TransferAsync(endpoint, context.Upload, context.Output)
+                ? new AzureBlobOperations(client, blockSize, maxBlockCount).TransferAsync(endpoint, context.Upload, context.Output)
                 : new AzureDataLakeOperations(client, blockSize).TransferAsync(endpoint, context.Upload, context.Output);
             return TransferResult.Success(await transfer);
         }
@@ -43,9 +44,12 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
         }
         catch (AzureStorageHttpException failure)
         {
-            return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message);
+            return TransferResult.Failure(ExitCodeOf(failure.Failure), failure.Message);
         }
     }
+
+    private static CurlExitCode ExitCodeOf(AzureStorageHttpFailure failure) =>
+        failure == AzureStorageHttpFailure.ReceiveFailed ? CurlExitCode.RecvError : CurlExitCode.WeirdServerReply;
 
     private static CurlExitCode ExitCodeOf(AzureStorageRequestFailure failure) =>
         failure is AzureStorageRequestFailure.InvalidSasToken or AzureStorageRequestFailure.InvalidBearerToken

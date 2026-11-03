@@ -228,9 +228,9 @@ public sealed class UdpDatagramConnectorTests
         ActResult(result);
         Assert.IsNotNull(result.Channel);
         await using var channel = result.Channel;
-        Diagnostics.Assert("channel type", nameof(UdpDatagramChannel), channel.GetType().Name);
+        Diagnostics.Assert("channel type", nameof(PortUnreachableReportingDatagramChannel), channel.GetType().Name);
         Diagnostics.Assert("channel server end point", "127.0.0.1:69", channel.ServerEndPoint);
-        Assert.IsInstanceOfType<UdpDatagramChannel>(channel);
+        Assert.IsInstanceOfType<PortUnreachableReportingDatagramChannel>(channel);
         Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 69), channel.ServerEndPoint);
     }
 

@@ -18,7 +18,7 @@ internal static class OciRegistryError
     {
         var (code, message) = ReadFirstError(response.Body);
         var detail = code is null ? string.Empty : $" ({code}: {message})";
-        return new OciTransferException(ExitCodeFor(code, response.StatusCode), $"The requested URL returned error: {response.StatusCode}{detail}");
+        return new OciTransferException(ExitCodeFor(code, response.StatusCode), $"The requested URL returned error: {response.StatusCode}{detail}", response.Body);
     }
 
     private static CurlExitCode ExitCodeFor(string? code, int statusCode) =>

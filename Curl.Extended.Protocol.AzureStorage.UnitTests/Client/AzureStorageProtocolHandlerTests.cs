@@ -139,6 +139,54 @@ public sealed class AzureStorageProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ErrorWithFailWithBody_WritesTheErrorBodyAndFailsWithExit22()
+    {
+        string body = "<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.</Message></Error>";
+        MemoryStream output = new();
+        TransferContext context = Context("az://account/c/b", output, fail: HttpFailMode.FailWithBody);
+
+        TransferResult result = await Handler(new QueuedAzureStorageConnector(QueuedAzureStorageConnector.Reply(body, status: "404 Not Found"))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(body, Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ErrorWithFail_WritesNothingAndFailsWithExit22()
+    {
+        string body = """{"error":{"code":"PathNotFound","message":"The specified path does not exist."}}""";
+        MemoryStream output = new();
+        TransferContext context = Context("abfs://fs@account/f", output, fail: HttpFailMode.Fail);
+
+        TransferResult result = await Handler(new QueuedAzureStorageConnector(QueuedAzureStorageConnector.Reply(body, status: "404 Not Found"))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(0, output.Length);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Url_HandsTheTransfersEventsToTheConnectorForVerbosesConnectionLine()
+    {
+        QueuedAzureStorageConnector connector = new(QueuedAzureStorageConnector.Reply("x"));
+        TransferContext context = Context("abfss://fs@account/f", new MemoryStream());
+
+        await Handler(connector).ExecuteAsync(context);
+
+        Assert.AreSame(context.Events, connector.Targets.Single().Events);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DfsErrorWithAJsonErrorBody_FailsWithExit22NamingTheCode()
+    {
+        string body = """{"error":{"code":"PathNotFound","message":"The specified path does not exist."}}""";
+
+        TransferResult result = await Handler(new QueuedAzureStorageConnector(QueuedAzureStorageConnector.Reply(body, status: "404 Not Found"))).ExecuteAsync(Context("abfss://fs@account/f", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("Azure Storage returned error 404: PathNotFound: The specified path does not exist.", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ErrorWithoutAnErrorBody_FailsWithExit22NamingTheStatus()
     {
         TransferResult result = await Handler(new QueuedAzureStorageConnector(QueuedAzureStorageConnector.Reply("{}", status: "403 Forbidden"))).ExecuteAsync(Context("abfss://fs@account/f", new MemoryStream()));
@@ -223,19 +271,65 @@ public sealed class AzureStorageProtocolHandlerTests
         CollectionAssert.AreEqual(new[] { "az", "abfs", "abfss" }, Handler(new QueuedAzureStorageConnector()).SupportedSchemes.ToArray());
 
     [TestMethod]
+    public async Task ExecuteAsync_CloseDelimitedDownloadEndsWithoutCloseNotify_FailsWithExit56AndKeepsTheBytesRead()
+    {
+        // ADR-0221, ADR-1194: curl's HTTP layer fails such a read with exit 56 and the TLS build's text.
+        QueuedAzureStorageConnector connector = new("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nhello")
+        {
+            FailureAtEnd = new MissingCloseNotifyException("schannel: server closed abruptly (missing close_notify)"),
+        };
+        MemoryStream output = new();
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Context("az://account/c/b", output));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("schannel: server closed abruptly (missing close_notify)", result.ErrorMessage);
+        Assert.AreEqual("hello", Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_WithoutContext_Throws() =>
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await Handler(new QueuedAzureStorageConnector()).ExecuteAsync(null!));
 
-    private static AzureStorageProtocolHandler Handler(QueuedAzureStorageConnector connector, string? sas = null) =>
-        new(connector, name => name == "AZURE_STORAGE_SAS_TOKEN" ? sas : null, 8);
+    [TestMethod]
+    public async Task ExecuteAsync_UploadOfKnownLengthOverTheBlockLimit_GrowsTheBlockToStayWithinIt()
+    {
+        string created = QueuedAzureStorageConnector.Reply(string.Empty, status: "201 Created");
+        QueuedAzureStorageConnector connector = new(created, created, created);
 
-    private static TransferContext Context(string url, Stream output, string? upload = null, string? bearer = null) => new()
+        TransferResult result = await Handler(connector, maxBlockCount: 2).ExecuteAsync(Context("az://account/container/blob", new MemoryStream(), upload: "123456789ABCDEFGHIJ"));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(19, result.BytesTransferred);
+        Assert.EndsWith("123456789A", connector.Connections[0].Written);
+        Assert.EndsWith("BCDEFGHIJ", connector.Connections[1].Written);
+        Assert.Contains("<Latest>MDAwMDAw</Latest><Latest>MDAwMDAx</Latest></BlockList>", connector.Connections[2].Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadOfUnknownLengthOverTheBlockLimit_FailsWithExit63BeforeTheBlockPastIt()
+    {
+        string created = QueuedAzureStorageConnector.Reply(string.Empty, status: "201 Created");
+        QueuedAzureStorageConnector connector = new(created, created);
+        TransferContext context = Context("az://account/container/blob", new MemoryStream(), uploadStream: new UnseekableStream(Encoding.UTF8.GetBytes("123456789ABCDEFGHIJ")));
+
+        TransferResult result = await Handler(connector, maxBlockCount: 2).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Assert.AreEqual("An Azure Storage upload needs more than 2 blocks of 8 bytes", result.ErrorMessage);
+        Assert.HasCount(2, connector.Connections);
+    }
+
+    private static AzureStorageProtocolHandler Handler(QueuedAzureStorageConnector connector, string? sas = null, int maxBlockCount = AzureBlobOperations.MaxBlockCount) =>
+        new(connector, name => name == "AZURE_STORAGE_SAS_TOKEN" ? sas : null, 8, maxBlockCount);
+
+    private static TransferContext Context(string url, Stream output, string? upload = null, string? bearer = null, Stream? uploadStream = null, HttpFailMode fail = HttpFailMode.None) => new()
     {
         Url = CurlUrl.Parse(url),
         Output = output,
-        Upload = upload is null ? null : new MemoryStream(Encoding.UTF8.GetBytes(upload)),
+        Upload = uploadStream ?? (upload is null ? null : new MemoryStream(Encoding.UTF8.GetBytes(upload))),
         TimeProvider = new FixedTimeProvider(),
-        Http = bearer is null ? null : new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = bearer },
+        Http = bearer is null && fail == HttpFailMode.None ? null : new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = bearer, Fail = fail },
     };
 
     private static string Blob(string name) =>
@@ -243,6 +337,12 @@ public sealed class AzureStorageProtocolHandlerTests
 
     private static string Listing(string entries, string marker) =>
         $"<EnumerationResults ContainerName=\"container\"><Blobs>{entries}</Blobs>{marker}</EnumerationResults>";
+
+    /// <summary>An upload read from a pipe, whose length is not known before it ends.</summary>
+    private sealed class UnseekableStream(byte[] bytes) : MemoryStream(bytes)
+    {
+        public override bool CanSeek => false;
+    }
 
     private sealed class FixedTimeProvider : TimeProvider
     {

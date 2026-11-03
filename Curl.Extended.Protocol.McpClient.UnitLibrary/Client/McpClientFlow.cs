@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Curl.Extended.Protocol.McpClient.StreamableHttp;
 using Curl.Extended.Protocol.McpClient.Wire;
 using Curl.Protocol.Abstractions;
 
@@ -26,11 +27,28 @@ internal sealed class McpClientFlow(IMcpSession session, Stream output, Cancella
     /// <summary>Gets how many bytes have been written to the output.</summary>
     public long BytesWritten { get; private set; }
 
-    /// <summary>Sends <c>initialize</c>, takes the server's protocol version for the session, and sends <c>notifications/initialized</c>.</summary>
+    /// <summary>
+    /// Sends <c>initialize</c>, takes the server's protocol version for the session, and sends <c>notifications/initialized</c>.
+    /// A version curl does not support ends the exchange before the notification with exit 8 ("Lifecycle &gt; Version
+    /// Negotiation", ADR-1190), and so does a server that declares no tools capability, since every request curl
+    /// makes is a tools request and both parties use only negotiated capabilities ("Lifecycle &gt; Capability Negotiation").
+    /// </summary>
     public async Task InitializeAsync()
     {
         JsonElement result = await RequestAsync(writer.WriteInitialize(ClientName, ClientVersion)).ConfigureAwait(false);
-        session.UseProtocolVersion(McpResponseReader.ReadInitializeResult(result).ProtocolVersion);
+        McpInitializeResult initializeResult = McpResponseReader.ReadInitializeResult(result);
+        string protocolVersion = initializeResult.ProtocolVersion;
+        if (protocolVersion != McpRequestWriter.LatestProtocolVersion)
+        {
+            throw new McpClientException(CurlExitCode.WeirdServerReply, $"MCP server answered unsupported protocol version {protocolVersion}");
+        }
+
+        if (!initializeResult.DeclaresTools)
+        {
+            throw new McpClientException(CurlExitCode.WeirdServerReply, "MCP server declares no tools capability");
+        }
+
+        session.UseProtocolVersion(protocolVersion);
         await session.SendNotificationAsync(McpRequestWriter.WriteInitializedNotification(), cancellationToken).ConfigureAwait(false);
     }
 
@@ -70,9 +88,24 @@ internal sealed class McpClientFlow(IMcpSession session, Stream output, Cancella
         return !result.IsError;
     }
 
+    /// <summary>
+    /// Sends <paramref name="request"/>; when the server answers that the session expired (404 to a request carrying an
+    /// <c>Mcp-Session-Id</c>, Streamable HTTP "Session Management"), starts a new session with <see cref="InitializeAsync"/>
+    /// and sends the request once more in it.
+    /// </summary>
     private async Task<JsonElement> RequestAsync(McpOutgoingRequest request)
     {
-        McpResponse response = await session.SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        McpResponse response;
+        try
+        {
+            response = await session.SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (McpHttpException exception) when (exception.Failure == McpHttpFailure.SessionExpired)
+        {
+            await InitializeAsync().ConfigureAwait(false);
+            response = await session.SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+
         return response.Error is { } error
             ? throw new McpClientException(CurlExitCode.WeirdServerReply, $"MCP server error {error.Code}: {error.Message}")
             : response.Result.GetValueOrDefault();

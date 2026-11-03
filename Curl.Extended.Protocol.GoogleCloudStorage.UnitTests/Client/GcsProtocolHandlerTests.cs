@@ -44,6 +44,22 @@ public sealed class GcsProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("goog4:goog:us-east1:storage", "us-east1")]
+    [DataRow("goog4:goog:us-east1", "us-east1")]
+    [DataRow("goog4:goog::storage", "auto")]
+    [DataRow("goog4:goog", "auto")]
+    [DataRow(null, "auto")]
+    public async Task ExecuteAsync_HmacKeyWithAwsSigV4_SignsWithTheRegionInItsThirdField(string? awsSigV4, string region)
+    {
+        QueuedGcsConnector connector = new(QueuedGcsConnector.Ok(string.Empty));
+        TransferContext context = Context("gs://bucket/k", new MemoryStream(), new NetworkCredential("GOOGID", "secret"), awsSigV4: awsSigV4, withHttp: true);
+
+        await Handler(connector, Emulator).ExecuteAsync(context);
+
+        Assert.Contains($"Credential=GOOGID/20200101/{region}/storage/goog4_request, ", connector.Connections[0].Written);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_BearerTokenAndHmacKey_SendsOnlyTheBearerToken()
     {
         QueuedGcsConnector connector = new(QueuedGcsConnector.Ok(string.Empty));
@@ -76,6 +92,35 @@ public sealed class GcsProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
         Assert.AreEqual("Cloud Storage returned error 404: NoSuchKey: The specified key does not exist.", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ErrorResponseUnderFailWithBody_WritesTheErrorBodyThenFailsWithExit22()
+    {
+        const string Body = "<Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>";
+        QueuedGcsConnector connector = new($"HTTP/1.1 404 Not Found\r\nContent-Length: {Body.Length}\r\n\r\n{Body}");
+        MemoryStream output = new();
+
+        TransferResult result = await Handler(connector, Emulator).ExecuteAsync(Context("gs://bucket/k", output, fail: HttpFailMode.FailWithBody));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("Cloud Storage returned error 404: NoSuchKey: The specified key does not exist.", result.ErrorMessage);
+        Assert.AreEqual(Body, Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
+    [DataRow(HttpFailMode.None)]
+    [DataRow(HttpFailMode.Fail)]
+    public async Task ExecuteAsync_ErrorResponseWithoutFailWithBody_WritesNothingToTheOutput(HttpFailMode fail)
+    {
+        const string Body = "<Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>";
+        QueuedGcsConnector connector = new($"HTTP/1.1 404 Not Found\r\nContent-Length: {Body.Length}\r\n\r\n{Body}");
+        MemoryStream output = new();
+
+        TransferResult result = await Handler(connector, Emulator).ExecuteAsync(Context("gs://bucket/k", output, withHttp: true, fail: fail));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(0, output.Length);
     }
 
     [TestMethod]
@@ -185,12 +230,12 @@ public sealed class GcsProtocolHandlerTests
     private static GcsProtocolHandler Handler(QueuedGcsConnector connector, string? emulatorHost) =>
         new(connector, name => name == "STORAGE_EMULATOR_HOST" ? emulatorHost : null);
 
-    private static TransferContext Context(string url, Stream output, NetworkCredential? credentials = null, string? bearerToken = null, string? upload = null, bool? withHttp = null) => new()
+    private static TransferContext Context(string url, Stream output, NetworkCredential? credentials = null, string? bearerToken = null, string? upload = null, bool? withHttp = null, string? awsSigV4 = null, HttpFailMode fail = HttpFailMode.None) => new()
     {
         Url = CurlUrl.Parse(url),
         Output = output,
         Credentials = credentials,
-        Http = withHttp ?? bearerToken is not null ? new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = bearerToken } : null,
+        Http = withHttp ?? (bearerToken is not null || fail != HttpFailMode.None) ? new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = bearerToken, AwsSigV4 = awsSigV4, Fail = fail } : null,
         Upload = upload is null ? null : new MemoryStream(Encoding.UTF8.GetBytes(upload)),
         TimeProvider = new FixedTimeProvider(),
     };

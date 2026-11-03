@@ -17,12 +17,12 @@ public static class S3Extension
         [],
         new Uri("https://docs.aws.amazon.com/AmazonS3/latest/API/Welcome.html"));
 
-    /// <summary>Creates the handler over curl's connector, reading the AWS settings from the process environment.</summary>
+    /// <summary>Creates the handler over curl's connector, reading the AWS settings from the run's environment, else the process's.</summary>
     /// <param name="services">Curl's connection services.</param>
     /// <returns>The handler.</returns>
     public static IProtocolHandler CreateHandler(ProtocolHandlerServices services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        return new S3ProtocolHandler(services.Connector, Environment.GetEnvironmentVariable, DefaultPartSize);
+        return new S3ProtocolHandler(services.Connector, services.ReadEnvironmentVariable ?? Environment.GetEnvironmentVariable, DefaultPartSize);
     }
 }

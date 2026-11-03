@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using Curl.Extended.Protocol.Coap.Wire;
 using Curl.Protocol.Abstractions;
@@ -226,6 +227,51 @@ public sealed class CoapProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ResponsesWithAnUnrecognisedCriticalOption_AreRejectedAndOnlyElectiveOrRecognisedOptionsAccepted()
+    {
+        CoapOption[] critical = [new CoapOption(9, [1])];
+        var channel = new ScriptedDatagramChannel((count, sent) => count == 1
+            ?
+            [
+                Encode(new CoapMessage(CoapMessageType.Acknowledgement, CoapCode.Content, sent.MessageId, Token, critical, [])),
+                Encode(new CoapMessage(CoapMessageType.Confirmable, CoapCode.Content, 0x0505, Token, critical, [])),
+                Encode(new CoapMessage(CoapMessageType.NonConfirmable, CoapCode.Content, 0x0606, Token, critical, [])),
+                Encode(new CoapMessage(CoapMessageType.Confirmable, CoapCode.Content, 0x0707, Token, [new CoapOption(3, [1]), new CoapOption(48, [1])], Hello)),
+            ]
+            : []);
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(channel).ExecuteAsync(Context("coap://h/", output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(Hello, output.ToArray());
+        Assert.HasCount(3, channel.Sent);
+        Assert.AreEqual(CoapMessageType.Reset, channel.Sent[1].Type);
+        Assert.AreEqual((ushort)0x0505, channel.Sent[1].MessageId);
+        Assert.AreEqual(CoapMessageType.Acknowledgement, channel.Sent[2].Type);
+        Assert.AreEqual((ushort)0x0707, channel.Sent[2].MessageId);
+    }
+
+    [TestMethod]
+    [DataRow("version 2")]
+    [DataRow("token length 9")]
+    [DataRow("payload marker with no payload")]
+    [DataRow("option delta 15")]
+    [DataRow("option length 15")]
+    [DataRow("empty message with bytes")]
+    public async Task ExecuteAsync_AMalformedAcknowledgement_IsIgnoredAndThePiggybackedResponseToTheRetransmissionTaken(string malformation)
+    {
+        var channel = new ScriptedDatagramChannel((count, sent) => count == 1 ? [Malformed(malformation, sent)] : [Piggybacked(sent, CoapCode.Content, Hello)]);
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(channel).ExecuteAsync(Context("coap://h/", output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        CollectionAssert.AreEqual(Hello, output.ToArray());
+        Assert.HasCount(2, channel.Sent);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_AnErrorResponse_WritesItsPayloadAndSucceedsAsAnHttpErrorStatusDoes()
     {
         var channel = new ScriptedDatagramChannel((_, sent) => [Piggybacked(sent, CoapCode.NotFound, Hello)]);
@@ -295,6 +341,50 @@ public sealed class CoapProtocolHandlerTests
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await Handler(new ScriptedDatagramChannel((_, _) => [])).ExecuteAsync(null!));
 
     [TestMethod]
+    public async Task ExecuteAsync_AnOpenedChannel_ReportsTheConnectionForVerboseBeforeTheResponseLine()
+    {
+        var local = new IPEndPoint(IPAddress.Loopback, 50123);
+        var channel = new ScriptedDatagramChannel((_, sent) => [Piggybacked(sent, CoapCode.Content, Hello)]) { LocalEndPoint = local };
+        var connector = new ScriptedDatagramConnector(DatagramOpenResult.Opened(channel).WithConnectionNumber(3));
+        var events = new RecordingTransferEvents();
+        var context = new TransferContext { Url = CurlUrl.Parse("coap://localhost/r"), Output = new MemoryStream(), Events = events, TimeProvider = new ImmediateTimeProvider() };
+
+        await Handler(connector).ExecuteAsync(context);
+
+        ConnectionOpenedEvent opened = events.OpenedConnections.Single();
+        Assert.AreEqual("localhost", opened.HostName);
+        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 5683), opened.RemoteEndPoint);
+        Assert.AreEqual(local, opened.LocalEndPoint);
+        Assert.AreEqual(3, opened.ConnectionNumber);
+        CollectionAssert.AreEqual(new[] { "CoAP response 2.05" }, events.InfoLines);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AChannelWithoutALocalAddress_ReportsTheConnectionFromTheUnspecifiedAddress()
+    {
+        var channel = new ScriptedDatagramChannel((_, sent) => [Piggybacked(sent, CoapCode.Content, Hello)]);
+        var events = new RecordingTransferEvents();
+        var context = new TransferContext { Url = CurlUrl.Parse("coap://h/r"), Output = new MemoryStream(), Events = events, TimeProvider = new ImmediateTimeProvider() };
+
+        await Handler(channel).ExecuteAsync(context);
+
+        Assert.AreEqual(new IPEndPoint(IPAddress.Any, 0), events.OpenedConnections.Single().LocalEndPoint);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AChannelWhoseServerIsNotAnIpAddress_ReportsNoConnection()
+    {
+        var channel = new ScriptedDatagramChannel((_, sent) => [Piggybacked(sent, CoapCode.Content, Hello)]) { ServerEndPoint = new DnsEndPoint("h", 5683) };
+        var events = new RecordingTransferEvents();
+        var context = new TransferContext { Url = CurlUrl.Parse("coap://h/r"), Output = new MemoryStream(), Events = events, TimeProvider = new ImmediateTimeProvider() };
+
+        TransferResult result = await Handler(channel).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsEmpty(events.OpenedConnections);
+    }
+
+    [TestMethod]
     public void SupportedSchemes_AreCoapAndCoaps() =>
         CollectionAssert.AreEqual(new[] { "coap", "coaps" }, Handler(new ScriptedDatagramChannel((_, _) => [])).SupportedSchemes.ToArray());
 
@@ -334,6 +424,22 @@ public sealed class CoapProtocolHandlerTests
         Encode(new CoapMessage(CoapMessageType.Acknowledgement, CoapCode.Empty, request.MessageId, [], [], []));
 
     private static byte[] Encode(CoapMessage message) => CoapMessageEncoding.Encode(message);
+
+    /// <summary>The piggybacked response to <paramref name="request" /> broken by one RFC 7252 section 3 message format error.</summary>
+    private static byte[] Malformed(string malformation, CoapMessage request)
+    {
+        byte[] good = Piggybacked(request, CoapCode.Content, Encoding.ASCII.GetBytes("bad"));
+        byte[] header = good[..(4 + request.Token.Length)];
+        return malformation switch
+        {
+            "version 2" => [(byte)(good[0] ^ 0xC0), .. good[1..]],
+            "token length 9" => [(byte)((good[0] & 0xF0) | 9), .. good[1..4], .. request.Token, .. new byte[9 - request.Token.Length], 0xFF, 1],
+            "payload marker with no payload" => [.. header, 0xFF],
+            "option delta 15" => [.. header, 0xF1, 0x00, 0xFF, 1],
+            "option length 15" => [.. header, 0x1F, 0x00, 0xFF, 1],
+            _ => [.. EmptyAcknowledgement(request), 0x00],
+        };
+    }
 
     private static string[] OptionTexts(CoapMessage message) =>
         [.. message.Options.Select(option => $"{option.Number}={Encoding.UTF8.GetString(option.Value)}")];

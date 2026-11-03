@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using Curl.Extended.Protocol.Coap.Blockwise;
 using Curl.Extended.Protocol.Coap.Observe;
@@ -63,9 +64,28 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
 
         await using (transport.ConfigureAwait(false))
         {
+            ReportConnectionOpened(context, transport, open.ConnectionNumber);
             return CoapRequest.IsSecure(context.Url)
                 ? await SecureExchangeAsync(context, transport, request).ConfigureAwait(false)
                 : await ExchangeAsync(context, transport, request).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Reports the opened UDP channel, which <c>-v</c> writes as the <c>Established connection</c> line every
+    /// transfer writes (ADR-1222), naming the URL's host, the server's address and the local address.
+    /// </summary>
+    private static void ReportConnectionOpened(ITransferContext context, IDatagramChannel transport, long connectionNumber)
+    {
+        if (transport.ServerEndPoint is IPEndPoint server)
+        {
+            context.Events.ReportConnectionOpened(new ConnectionOpenedEvent
+            {
+                HostName = context.Url.IdnHost,
+                RemoteEndPoint = server,
+                LocalEndPoint = transport.LocalEndPoint as IPEndPoint ?? new IPEndPoint(IPAddress.Any, 0),
+                ConnectionNumber = connectionNumber,
+            });
         }
     }
 
@@ -75,6 +95,7 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
         DtlsDatagramChannel secured = await DtlsDatagramChannel.OpenAsync(transport, tlsProvider, context.Url.IdnHost, context.TimeProvider, context.CancellationToken).ConfigureAwait(false);
         await using (secured.ConfigureAwait(false))
         {
+            context.Events.ReportInfo($"SSL connection using DTLSv1.2 / {secured.CipherName}");
             return await ExchangeAsync(context, secured, request).ConfigureAwait(false);
         }
     }

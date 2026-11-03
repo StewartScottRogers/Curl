@@ -45,11 +45,40 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
         {
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message);
         }
-        catch (Exception failure) when (failure is Http2ProtocolException or Http2StreamResetException or Http2GoAwayException or HpackDecodingException or EndOfStreamException)
+        catch (Http2StreamResetException reset)
+        {
+            return StatusFailure(StatusOfReset(reset.ErrorCode), reset.Message);
+        }
+        catch (Http2GoAwayException goAway)
+        {
+            return StatusFailure(GrpcStatusCode.Unavailable, goAway.Message);
+        }
+        catch (Exception failure) when (failure is Http2ProtocolException or HpackDecodingException or EndOfStreamException)
         {
             return TransferResult.Failure(CurlExitCode.Http2, failure.Message);
         }
     }
+
+    /// <summary>
+    /// Gives the gRPC status PROTOCOL-HTTP2.md's Errors table maps an RST_STREAM error code to (ADR-1202): REFUSED_STREAM is
+    /// UNAVAILABLE, CANCEL is CANCELLED, ENHANCE_YOUR_CALM is RESOURCE_EXHAUSTED, INADEQUATE_SECURITY is PERMISSION_DENIED,
+    /// and every other code is INTERNAL.
+    /// </summary>
+    /// <param name="errorCode">The error code the server reset the call's stream with.</param>
+    /// <returns>The status the call fails with.</returns>
+    internal static GrpcStatusCode StatusOfReset(Http2ErrorCode errorCode) =>
+        ResetStatuses.TryGetValue(errorCode, out GrpcStatusCode code) ? code : GrpcStatusCode.Internal;
+
+    private static readonly Dictionary<Http2ErrorCode, GrpcStatusCode> ResetStatuses = new()
+    {
+        [Http2ErrorCode.RefusedStream] = GrpcStatusCode.Unavailable,
+        [Http2ErrorCode.Cancel] = GrpcStatusCode.Cancelled,
+        [Http2ErrorCode.EnhanceYourCalm] = GrpcStatusCode.ResourceExhausted,
+        [Http2ErrorCode.InadequateSecurity] = GrpcStatusCode.PermissionDenied,
+    };
+
+    private static TransferResult StatusFailure(GrpcStatusCode code, string message) =>
+        TransferResult.Failure(CurlExitCode.HttpReturnedError, $"grpc-status {(int)code} ({GrpcStatus.NameOf(code)}): {message}");
 
     private static bool IsSecure(CurlUrl url) => string.Equals(url.Scheme, SecureScheme, StringComparison.OrdinalIgnoreCase);
 
@@ -124,10 +153,13 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
             : TransferResult.Failure(CurlExitCode.HttpReturnedError, $"grpc-status {(int)status.Code} ({status.CodeName}): {status.Message}", written);
     }
 
+    // A grpcs:// target carries PoolScheme https, the one scheme whose TLS handshake offers the
+    // target's ApplicationProtocols through ALPN, so the ClientHello offers h2 (ADR-1197, BL-4562).
     private static ConnectTarget TargetOf(ITransferContext context, bool secure) =>
         new(context.Url.IdnHost, context.Url.Port >= 0 ? context.Url.Port : DefaultPortOf(secure), secure)
         {
             ApplicationProtocols = ["h2"],
+            PoolScheme = secure ? "https" : null,
             Proxy = context.Proxy,
             Events = context.Events,
             DiagnosticLog = context.DiagnosticLog,

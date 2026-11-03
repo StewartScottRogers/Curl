@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Conformance.Extended.UnitTests" />
     <InternalsVisibleTo Include="Curl.Mcp.UnitTests" />
   </ItemGroup>
 

@@ -11,7 +11,7 @@ public sealed class ProtobufJsonParserTests
     [TestMethod]
     [DataRow("""{"fInt32":3}""")]
     [DataRow("""{"f_int32":3}""")]
-    public void TryParse_LowerCamelCaseOrOriginalName_SetsTheField(string json)
+    public void Parse_LowerCamelCaseOrOriginalName_SetsTheField(string json)
     {
         var message = Parse("Scalars", json);
 
@@ -19,7 +19,7 @@ public sealed class ProtobufJsonParserTests
     }
 
     [TestMethod]
-    public void TryParse_JsonNameOption_NamesTheField()
+    public void Parse_JsonNameOption_NamesTheField()
     {
         var message = Parse("Scalars", """{"custom":17}""");
 
@@ -29,7 +29,7 @@ public sealed class ProtobufJsonParserTests
     [TestMethod]
     [DataRow("""{"fint32":3}""")]
     [DataRow("""{"renamedd":3}""")]
-    public void TryParse_UnknownMember_IsUnknownField(string json)
+    public void Parse_UnknownMember_IsUnknownField(string json)
     {
         var error = Parse("Scalars", json, out var message);
 
@@ -51,7 +51,7 @@ public sealed class ProtobufJsonParserTests
     [DataRow("fSfixed32", "-11", -11)]
     [DataRow("fUint32", "4294967295", uint.MaxValue)]
     [DataRow("fFixed32", "\"9\"", 9U)]
-    public void TryParse_IntegerAsNumberOrString_IsRead(string member, string json, object expected)
+    public void Parse_IntegerAsNumberOrString_IsRead(string member, string json, object expected)
     {
         var message = Parse("Scalars", $$"""{"{{member}}":{{json}}}""");
 
@@ -67,7 +67,7 @@ public sealed class ProtobufJsonParserTests
     [DataRow("fInt64", "\"9223372036854775808\"")]
     [DataRow("fUint64", "\"18446744073709551616\"")]
     [DataRow("fInt64", "1e400")]
-    public void TryParse_IntegerOutOfRangeOrNotIntegral_IsInvalidValue(string member, string json)
+    public void Parse_IntegerOutOfRangeOrNotIntegral_IsInvalidValue(string member, string json)
     {
         Assert.AreEqual(ProtobufJsonError.InvalidValue, ParseError("Scalars", $$"""{"{{member}}":{{json}}}"""));
     }
@@ -78,7 +78,7 @@ public sealed class ProtobufJsonParserTests
     [DataRow("\"-Infinity\"", double.NegativeInfinity)]
     [DataRow("1.5", 1.5)]
     [DataRow("\"-2.25\"", -2.25)]
-    public void TryParse_Double_ReadsNumbersAndNonFiniteNames(string json, double expected)
+    public void Parse_Double_ReadsNumbersAndNonFiniteNames(string json, double expected)
     {
         var message = Parse("Scalars", $$"""{"fDouble":{{json}}}""");
 
@@ -88,7 +88,7 @@ public sealed class ProtobufJsonParserTests
     [TestMethod]
     [DataRow("\"Infinity\"", float.PositiveInfinity)]
     [DataRow("2.5", 2.5f)]
-    public void TryParse_Float_ReadsNumbersAndNonFiniteNames(string json, float expected)
+    public void Parse_Float_ReadsNumbersAndNonFiniteNames(string json, float expected)
     {
         var message = Parse("Scalars", $$"""{"fFloat":{{json}}}""");
 
@@ -101,13 +101,13 @@ public sealed class ProtobufJsonParserTests
     [DataRow("fDouble", "\"abc\"")]
     [DataRow("fFloat", "1e39")]
     [DataRow("fFloat", "\"1e400\"")]
-    public void TryParse_FloatingPointOutOfRange_IsInvalidValue(string member, string json)
+    public void Parse_FloatingPointOutOfRange_IsInvalidValue(string member, string json)
     {
         Assert.AreEqual(ProtobufJsonError.InvalidValue, ParseError("Scalars", $$"""{"{{member}}":{{json}}}"""));
     }
 
     [TestMethod]
-    public void TryParse_BoolAndString_AreRead()
+    public void Parse_BoolAndString_AreRead()
     {
         var message = Parse("Scalars", """{"fBool":true,"fString":"café"}""");
 
@@ -121,7 +121,7 @@ public sealed class ProtobufJsonParserTests
     [DataRow("\"AQI\"", new byte[] { 1, 2 })]
     [DataRow("\"-_8\"", new byte[] { 0xFB, 0xFF })]
     [DataRow("\"+/8=\"", new byte[] { 0xFB, 0xFF })]
-    public void TryParse_Bytes_ReadsStandardOrUrlSafeBase64WithOrWithoutPadding(string json, byte[] expected)
+    public void Parse_Bytes_ReadsStandardOrUrlSafeBase64WithOrWithoutPadding(string json, byte[] expected)
     {
         var message = Parse("Scalars", $$"""{"fBytes":{{json}}}""");
 
@@ -133,7 +133,7 @@ public sealed class ProtobufJsonParserTests
     [DataRow("fBytes", "\"!!!!\"")]
     [DataRow("fColor", "\"BLUE\"")]
     [DataRow("fColor", "2147483648")]
-    public void TryParse_BytesNotBase64OrUnknownEnumName_IsInvalidValue(string member, string json)
+    public void Parse_BytesNotBase64OrUnknownEnumName_IsInvalidValue(string member, string json)
     {
         Assert.AreEqual(ProtobufJsonError.InvalidValue, ParseError("Scalars", $$"""{"{{member}}":{{json}}}"""));
     }
@@ -142,7 +142,7 @@ public sealed class ProtobufJsonParserTests
     [DataRow("\"GREEN\"", 1)]
     [DataRow("1", 1)]
     [DataRow("7", 7)]
-    public void TryParse_Enum_ReadsNameOrNumber(string json, int expected)
+    public void Parse_Enum_ReadsNameOrNumber(string json, int expected)
     {
         var message = Parse("Scalars", $$"""{"fColor":{{json}}}""");
 
@@ -163,7 +163,7 @@ public sealed class ProtobufJsonParserTests
     [DataRow("Maps", """{"counts":{"a":true}}""")]
     [DataRow("Scalars", "[]")]
     [DataRow("Scalars", "1")]
-    public void TryParse_ValueOfTheWrongKind_IsWrongType(string name, string json)
+    public void Parse_ValueOfTheWrongKind_IsWrongType(string name, string json)
     {
         var error = Parse(name, json, out var message);
 
@@ -172,7 +172,7 @@ public sealed class ProtobufJsonParserTests
     }
 
     [TestMethod]
-    public void TryParse_NullMember_LeavesTheFieldUnset()
+    public void Parse_NullMember_LeavesTheFieldUnset()
     {
         var message = Parse("Presence", """{"count":1,"count":null,"child":null}""");
 
@@ -181,7 +181,7 @@ public sealed class ProtobufJsonParserTests
     }
 
     [TestMethod]
-    public void TryParse_EmbeddedMessage_IsRead()
+    public void Parse_EmbeddedMessage_IsRead()
     {
         var message = Parse("Presence", """{"child":{"fInt32":5}}""");
 
@@ -189,7 +189,7 @@ public sealed class ProtobufJsonParserTests
     }
 
     [TestMethod]
-    public void TryParse_RepeatedFields_ReadEveryElement()
+    public void Parse_RepeatedFields_ReadEveryElement()
     {
         var message = Parse("Lists", """{"numbers":["1",2],"items":[{"fInt32":3},{}],"colors":["GREEN",0]}""");
 
@@ -199,7 +199,7 @@ public sealed class ProtobufJsonParserTests
     }
 
     [TestMethod]
-    public void TryParse_Maps_ReadKeysFromMemberNames()
+    public void Parse_Maps_ReadKeysFromMemberNames()
     {
         var message = Parse("Maps", """{"counts":{"a":1},"items":{"-5":{"fInt32":3}},"flags":{"true":"t","false":"f"},"colors":{"4294967295":"GREEN"}}""");
 
@@ -214,7 +214,7 @@ public sealed class ProtobufJsonParserTests
     [DataRow("""{"flags":{"maybe":"x"}}""")]
     [DataRow("""{"items":{"five":{}}}""")]
     [DataRow("""{"colors":{"-1":"GREEN"}}""")]
-    public void TryParse_MapKeyNotOfTheKeyType_IsInvalidValue(string json)
+    public void Parse_MapKeyNotOfTheKeyType_IsInvalidValue(string json)
     {
         Assert.AreEqual(ProtobufJsonError.InvalidValue, ParseError("Maps", json));
     }
@@ -224,7 +224,7 @@ public sealed class ProtobufJsonParserTests
     [DataRow("""{"fInt32":1,}""")]
     [DataRow("""{"fInt32":1} x""")]
     [DataRow("")]
-    public void TryParse_MalformedJson_IsMalformedJson(string json)
+    public void Parse_MalformedJson_IsMalformedJson(string json)
     {
         var error = Parse("Scalars", json, out var message);
 
@@ -233,23 +233,23 @@ public sealed class ProtobufJsonParserTests
     }
 
     [TestMethod]
-    public void TryParse_InvalidUtf8_IsMalformedJson()
+    public void Parse_InvalidUtf8_IsMalformedJson()
     {
         byte[] json = [.. "{\"fString\":\""u8, 0xFF, .. "\"}"u8];
 
-        Assert.AreEqual(ProtobufJsonError.MalformedJson, ProtobufJsonParser.TryParse(Type("Scalars"), json, out _));
+        Assert.AreEqual(ProtobufJsonError.MalformedJson, ProtobufJsonParser.Parse(Type("Scalars"), json, out _));
     }
 
     [TestMethod]
     [DataRow("""{"fString":"\uD800"}""")]
     [DataRow("""{"\uD800":1}""")]
-    public void TryParse_LoneSurrogateEscape_IsMalformedJson(string json)
+    public void Parse_LoneSurrogateEscape_IsMalformedJson(string json)
     {
         Assert.AreEqual(ProtobufJsonError.MalformedJson, ParseError("Scalars", json));
     }
 
     [TestMethod]
-    public void TryParse_MessagesNestedOneHundredDeep_AreRead()
+    public void Parse_MessagesNestedOneHundredDeep_AreRead()
     {
         var message = Parse("Node", NestedNodes(100));
 
@@ -257,13 +257,13 @@ public sealed class ProtobufJsonParserTests
     }
 
     [TestMethod]
-    public void TryParse_MessagesNestedPastOneHundred_IsNestingTooDeep()
+    public void Parse_MessagesNestedPastOneHundred_IsNestingTooDeep()
     {
         Assert.AreEqual(ProtobufJsonError.NestingTooDeep, ParseError("Node", NestedNodes(101)));
     }
 
     [TestMethod]
-    public void TryParse_DeepJsonArrays_IsWrongTypeNotAnException()
+    public void Parse_DeepJsonArrays_IsWrongTypeNotAnException()
     {
         var json = $$"""{"numbers":{{new string('[', 10_000)}}{{new string(']', 10_000)}}}""";
 
@@ -271,9 +271,9 @@ public sealed class ProtobufJsonParserTests
     }
 
     [TestMethod]
-    public void TryParse_NullType_Throws()
+    public void Parse_NullType_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => ProtobufJsonParser.TryParse(null!, Encoding.UTF8.GetBytes("{}"), out _));
+        Assert.ThrowsExactly<ArgumentNullException>(() => ProtobufJsonParser.Parse(null!, Encoding.UTF8.GetBytes("{}"), out _));
     }
 
     internal static string NestedNodes(int depth) =>

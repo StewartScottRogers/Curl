@@ -12,12 +12,13 @@ the base class library. The handler is registered by one line in `ExtensionCatal
 - `RedisProtocolHandler` serves `redis://` and `rediss://` (TLS), both on port 6379.
 - `RedisUrlCommand` reads the URL path `/[db]/command/argument/...`; `-d` appends one more argument.
 - `RedisClientFlow` runs `HELLO 3` (with `AUTH` from `--user` or the URL), `SELECT` when the path names a database,
-  then the command, writing its reply. `RedisClientMessages` holds the error texts and `RedisClientException` carries
+  then the command, writing its reply; a server that refuses `HELLO` (not with `NOAUTH` or `WRONGPASS`) is spoken to
+  in RESP2, with `AUTH` first when there are credentials (ADR-1208). `RedisClientMessages` holds the error texts and `RedisClientException` carries
   the exit code.
 
 `Wire/` (namespace `Curl.Extended.Protocol.Redis.Wire`):
 
 - `RespReply` and `RespReplyKind` are one reply and its type.
 - `RespCommandEncoding` writes a command as an array of bulk strings.
-- `RespReplyReader` reads replies off an `IConnection`: every RESP3 type, RESP2's `-1` nulls, attributes dropped.
+- `RespReplyReader` reads replies off an `IConnection`: every RESP3 type, RESP2's `-1` nulls (a null array as an empty array), attributes dropped.
 - `RespReplyRendering` writes a reply as `redis-cli --raw` does.

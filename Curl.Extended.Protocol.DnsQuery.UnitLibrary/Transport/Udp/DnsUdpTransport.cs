@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Net;
 using Curl.Extended.Protocol.DnsQuery.Client;
 using Curl.Extended.Protocol.DnsQuery.Wire;
 using Curl.Protocol.Abstractions;
@@ -39,10 +40,30 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
         byte[] answer;
         await using (channel.ConfigureAwait(false))
         {
+            ReportConnectionOpened(context, host, channel, open.ConnectionNumber);
             answer = await ExchangeOverAsync(channel, query, context).ConfigureAwait(false);
         }
 
         return IsTruncated(answer) ? await fallback.ExchangeAsync(host, port, query, context).ConfigureAwait(false) : answer;
+    }
+
+    /// <summary>
+    /// Reports the opened UDP channel, which <c>-v</c> writes as the <c>Established connection</c> line every transfer
+    /// writes (ADR-1222), naming the server's host, its address and the local address (<c>0.0.0.0:0</c> when the
+    /// channel names none).
+    /// </summary>
+    private static void ReportConnectionOpened(ITransferContext context, string host, IDatagramChannel channel, long connectionNumber)
+    {
+        if (channel.ServerEndPoint is IPEndPoint server)
+        {
+            context.Events.ReportConnectionOpened(new ConnectionOpenedEvent
+            {
+                HostName = host,
+                RemoteEndPoint = server,
+                LocalEndPoint = channel.LocalEndPoint as IPEndPoint ?? new IPEndPoint(IPAddress.Any, 0),
+                ConnectionNumber = connectionNumber,
+            });
+        }
     }
 
     private static async ValueTask<byte[]> ExchangeOverAsync(IDatagramChannel channel, byte[] query, ITransferContext context)

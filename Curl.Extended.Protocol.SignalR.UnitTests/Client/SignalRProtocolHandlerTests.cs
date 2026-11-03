@@ -38,9 +38,23 @@ public sealed class SignalRProtocolHandlerTests
         StringAssert.StartsWith(webSocket.WrittenText, "GET /chat?room=a&id=tok HTTP/1.1\r\n");
         StringAssert.Contains(webSocket.WrittenText, HandshakeRequest);
         StringAssert.Contains(webSocket.WrittenText, "{\"type\":1,\"invocationId\":\"1\",\"target\":\"Add\",\"arguments\":[1,2]}\u001e");
+        CollectionAssert.AreEqual(new byte[] { 0x88, 0x82, 0, 0, 0, 0, 0x03, 0xE8 }, webSocket.Written[^8..]);
         Assert.IsTrue(webSocket.IsDisposed);
         Assert.AreEqual(("example.com", 5000, false), (connector.Targets[0].Host, connector.Targets[0].Port, connector.Targets[0].UseTls));
         Assert.AreEqual(("example.com", 5000, false), (connector.Targets[1].Host, connector.Targets[1].Port, connector.Targets[1].UseTls));
+    }
+
+    [TestMethod]
+    public async Task WithoutData_HubCallWithInvocationId_IsAnsweredWithACompletionError_HubProtocolInvocationAndCompletion()
+    {
+        ScriptedConnection webSocket = Hub("{}", "{\"type\":1,\"invocationId\":\"s1\",\"target\":\"Ask\",\"arguments\":[]}", "{\"type\":7}");
+        var output = new MemoryStream();
+
+        TransferResult result = await Run(Connector(webSocket), "signalr://example.com/chat", output, null);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("[\"Ask\"]\n", Encoding.UTF8.GetString(output.ToArray()));
+        StringAssert.Contains(webSocket.WrittenText, "{\"type\":3,\"invocationId\":\"s1\",\"error\":\"Client didn\\u0027t provide a result.\"}\u001e");
     }
 
     [TestMethod]

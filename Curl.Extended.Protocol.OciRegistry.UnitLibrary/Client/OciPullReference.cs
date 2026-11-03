@@ -2,7 +2,7 @@ namespace Curl.Extended.Protocol.OciRegistry.Client;
 
 /// <summary>
 /// What an <c>oci://</c> URL's path asks to pull, or with <c>-T</c> to push (ADR-1093, ADR-1097): <c>/name[:tag]</c> a manifest, the tag <c>latest</c> when
-/// the path names none, or <c>/name@digest</c> a blob, checked against the OCI Distribution Specification 1.1's
+/// the path names none, or <c>/name@digest</c> a blob, or the manifest under that digest when there is no such blob (ADR-1207), checked against the OCI Distribution Specification 1.1's
 /// grammar for names, tags and digests ("Pulling manifests", "Pulling blobs").
 /// </summary>
 /// <param name="Repository">The repository name, such as <c>library/alpine</c>.</param>
@@ -14,7 +14,13 @@ internal sealed record OciPullReference(string Repository, string Reference, boo
     internal const string DefaultTag = "latest";
 
     /// <summary>Gets the registry API path: <c>/v2/&lt;name&gt;/manifests/&lt;tag&gt;</c> or <c>/v2/&lt;name&gt;/blobs/&lt;digest&gt;</c>.</summary>
-    public string ApiPath => $"/v2/{Repository}/{(IsBlob ? "blobs" : "manifests")}/{Reference}";
+    public string ApiPath => IsBlob ? $"/v2/{Repository}/blobs/{Reference}" : ManifestApiPath;
+
+    /// <summary>
+    /// Gets the manifest API path of the reference, <c>/v2/&lt;name&gt;/manifests/&lt;reference&gt;</c>, which a pull by
+    /// digest falls back to when the registry holds no blob under it (ADR-1207).
+    /// </summary>
+    public string ManifestApiPath => $"/v2/{Repository}/manifests/{Reference}";
 
     /// <summary>Parses an <c>oci://</c> URL's path.</summary>
     /// <param name="absolutePath">The path, starting with <c>/</c>.</param>

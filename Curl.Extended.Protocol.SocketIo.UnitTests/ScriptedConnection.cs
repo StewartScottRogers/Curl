@@ -38,15 +38,24 @@ internal sealed class ScriptedConnection(params byte[][] chunks) : IConnection
     public string[] SentFrames() =>
         [.. Writes.Where(write => write.Length > 0 && write[0] != (byte)'G').Select(write => $"{write[0] & 0x0F}:{Encoding.UTF8.GetString(write.AsSpan(6))}")];
 
+    /// <summary>Whether a read past the script waits until cancelled instead of giving the end of the stream.</summary>
+    public bool WaitsAtEnd { get; set; }
+
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         if (!reads.TryDequeue(out byte[]? chunk))
         {
-            return ValueTask.FromResult(0);
+            return WaitsAtEnd ? WaitUntilCancelledAsync(cancellationToken) : ValueTask.FromResult(0);
         }
 
         chunk.CopyTo(buffer);
         return ValueTask.FromResult(chunk.Length);
+    }
+
+    private static async ValueTask<int> WaitUntilCancelledAsync(CancellationToken cancellationToken)
+    {
+        await Task.Delay(Timeout.Infinite, cancellationToken);
+        return 0;
     }
 
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)

@@ -146,6 +146,15 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    public void Get_PortZeroWritten_KeepsItInThePortAndTheUrl()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://h:0/");
+
+        Assert.AreEqual("0", GetOk(url, CurlUrlPart.Port));
+        Assert.AreEqual("http://h:0/", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
     [DataRow("http://h:/")]
     [DataRow("http://[::1]/")]
     [DataRow("http://h/?x=:80")]

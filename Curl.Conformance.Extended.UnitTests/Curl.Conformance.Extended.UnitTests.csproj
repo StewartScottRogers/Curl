@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The requirement matrices and the known-failures list are read from the output, never from the repository (BL-4502); the folder's README is no matrix (BL-4503). -->
+    <None Update="KnownFailures.txt" CopyToOutputDirectory="PreserveNewest" />
+    <ContentWithTargetPath Include="..\Documentation\Conformance\Extended\*.md" Exclude="..\Documentation\Conformance\Extended\README.md" TargetPath="Conformance\Extended\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Conformance.Extended.UnitLibrary\Curl.Conformance.Extended.UnitLibrary.csproj" />
+    <!-- The cases run curl in process through InProcessCurl, and the curl-surface checks reach Curl.Mcp (BL-4462). -->
+    <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
+    <ProjectReference Include="..\Curl.Mcp\Curl.Mcp.csproj" />
+    <!-- The WebTransport reference server's tests drive it with Curl.Quic's client state (BL-4607). -->
+    <ProjectReference Include="..\Curl.Conformance.Http3Server.UnitLibrary\Curl.Conformance.Http3Server.UnitLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

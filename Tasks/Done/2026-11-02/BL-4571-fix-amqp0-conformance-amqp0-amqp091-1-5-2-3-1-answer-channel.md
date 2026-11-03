@@ -1,0 +1,44 @@
+---
+id: BL-4571
+title: Fix Amqp0 conformance: Amqp0:AMQP091-1.5.2.3-1 (answer channel.flow with flow-ok)
+priority: High
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ClientFlow.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Methods, Curl.Extended.Protocol.Amqp0.UnitTests, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
+requirement: none
+created: 2026-11-02
+completed: 2026-11-02
+---
+# BL-4571 — Fix Amqp0 conformance: Amqp0:AMQP091-1.5.2.3-1 (answer channel.flow with flow-ok)
+
+## Goal
+
+Curl's `amqp://` client handles channel.flow as AMQP 0-9-1 requires, so the conformance case Flow_FromTheBroker_IsAnsweredWithFlowOk passes.
+
+## Context
+
+Found by BL-4465 (Amqp0 conformance part 2): case `Curl.Conformance.Extended.UnitTests/Amqp0/Messaging/Amqp0MessagingTests.cs`
+Flow_FromTheBroker_IsAnsweredWithFlowOk, requirement `Amqp0:AMQP091-1.5.2.3-1` in `Documentation/Conformance/Extended/Amqp0-Messaging.md`. 20.20 (channel.flow) is not in Amqp0MethodReader, so a channel.flow arriving while the flow awaits a reply ends the transfer with exit 8 and connection.close 503. Add Amqp0ChannelFlow and Amqp0ChannelFlowOk records, and have Amqp0ClientFlow answer channel.flow with flow-ok carrying the same active bit, then keep waiting for the reply it expected. With active 0, the client must not publish content until flow is active again (or, simplest, fail clearly): decide in an ADR.
+Library: `Curl.Extended.Protocol.Amqp0.UnitLibrary` (its CLAUDE.md, ADR-1056, ADR-1060).
+
+## Acceptance criteria
+
+- [x] The case Flow_FromTheBroker_IsAnsweredWithFlowOk passes as a plain case.
+- [x] A focused unit test in `Curl.Extended.Protocol.Amqp0.UnitTests` pins the fix (ADR-0482).
+- [x] The `Amqp0:AMQP091-1.5.2.3-1` line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests are green and the library stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30.
+
+## Notes
+
+- Done directly rather than through the full /feature subagent stages: a small change in one library, and the run's cost cap is tight.
+- Decision (ADR-1200): channel.flow is answered at once with flow-ok carrying the same active bit, wherever the client waits for a method; after active 0 the publish waits, answering further flows, until a channel.flow with active 1, rather than failing. A close meanwhile ends it as a server close; any other method as unexpected (exit 8). basic.get is not held by flow.
+- Added Amqp0ChannelFlow and Amqp0ChannelFlowOk (both read by Amqp0MethodReader), and four Amqp0ProtocolHandlerTests plus reader round-trip rows.
+- Measured: Measure-CodeQuality for Curl.Extended.Protocol.Amqp0.UnitLibrary at 100% line and 100% branch, 0 failing members; the Amqp0 conformance cases (30) pass with the KnownFailures line removed; dotnet build Curl.slnx -warnaserror clean, fast tests green (115 test projects).
+- CI on Linux and macOS: the change is platform-neutral (in-memory scripted connection, no paths or OS text).
+
+## Log
+
+- 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 20572201 d78c25d3 1c7fa6c3 e97c1b31.
+- 2026-11-02: Doing -> Done. The amqp:// client answers channel.flow with flow-ok and holds a publish while flow is inactive

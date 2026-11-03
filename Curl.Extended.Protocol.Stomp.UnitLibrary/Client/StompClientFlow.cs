@@ -23,7 +23,7 @@ internal sealed class StompClientFlow(IConnection transport, Stream output, ITra
     internal long BytesWritten { get; private set; }
 
     /// <summary>Runs the flow: sends <paramref name="body"/> to <paramref name="destination"/>, or subscribes to it when there is none.</summary>
-    internal async ValueTask RunAsync(StompFrame connect, string destination, ReadOnlyMemory<byte>? body)
+    internal async ValueTask RunAsync(StompFrame connect, string destination, ReadOnlyMemory<byte>? body, string contentType = SendContentType)
     {
         await SendAsync(connect).ConfigureAwait(false);
         StompFrame connected = await ReceiveAsync("CONNECTED").ConfigureAwait(false);
@@ -34,7 +34,7 @@ internal sealed class StompClientFlow(IConnection transport, Stream output, ITra
 
         if (body is { } data)
         {
-            await SendAsync(SendFrame(destination, data)).ConfigureAwait(false);
+            await SendAsync(SendFrame(destination, data, contentType)).ConfigureAwait(false);
             await SendAsync(new StompFrame("DISCONNECT", [new("receipt", DisconnectReceipt)], [])).ConfigureAwait(false);
             await ReceiveReceiptAsync().ConfigureAwait(false);
             return;
@@ -44,9 +44,12 @@ internal sealed class StompClientFlow(IConnection transport, Stream output, ITra
         await WriteMessagesUntilClosedAsync().ConfigureAwait(false);
     }
 
-    /// <summary>Gives the <c>SEND</c> frame for <paramref name="body"/>, with its <c>content-length</c> so the body may hold NUL.</summary>
-    internal static StompFrame SendFrame(string destination, ReadOnlyMemory<byte> body) =>
-        new("SEND", [new("destination", destination), new("content-length", body.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))], body.ToArray());
+    /// <summary>The <c>content-type</c> every <c>SEND</c> frame carries (ADR-1209): the body is bytes as given, of no declared type.</summary>
+    internal const string SendContentType = "application/octet-stream";
+
+    /// <summary>Gives the <c>SEND</c> frame for <paramref name="body"/>, with its <c>content-length</c> so the body may hold NUL, and its <c>content-type</c>.</summary>
+    internal static StompFrame SendFrame(string destination, ReadOnlyMemory<byte> body, string contentType = SendContentType) =>
+        new("SEND", [new("destination", destination), new("content-length", body.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)), new("content-type", contentType)], body.ToArray());
 
     private async ValueTask SendAsync(StompFrame frame)
     {

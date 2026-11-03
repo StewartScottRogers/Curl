@@ -121,6 +121,24 @@ public sealed class McpStreamableHttpTransportTests
     }
 
     [TestMethod]
+    public async Task SendRequestAsync_NotFoundWithASessionId_FailsWithSessionExpiredAndForgetsTheSession()
+    {
+        // "Session Management": 404 to a request carrying Mcp-Session-Id means the session expired; the client starts a new one without it.
+        var connection = new RecordedConnection(JsonReply(Result, "Mcp-Session-Id: abc-123\r\n") + "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
+        await using var transport = Transport(connection);
+        await transport.SendRequestAsync(OutgoingRequest(), TestContext.CancellationToken);
+        transport.ProtocolVersion = "2025-06-18";
+
+        var exception = await Assert.ThrowsExactlyAsync<McpHttpException>(() => transport.SendRequestAsync(OutgoingRequest(), TestContext.CancellationToken));
+
+        Assert.AreEqual(McpHttpFailure.SessionExpired, exception.Failure);
+        Assert.AreEqual(404, exception.StatusCode);
+        Assert.IsNull(transport.SessionId);
+        Assert.IsNull(transport.ProtocolVersion);
+        Assert.IsTrue(connection.IsDisposed);
+    }
+
+    [TestMethod]
     [DataRow("Mcp-Session-Id: a b")]
     [DataRow("Mcp-Session-Id:")]
     public async Task SendRequestAsync_SessionIdNotVisibleAscii_FailsWithMalformedHeaderField(string field)

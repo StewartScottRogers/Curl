@@ -24,6 +24,12 @@ public enum McpHttpFailure
     /// <summary>The server answered with a status the transport does not accept for the message; <see cref="McpHttpException.StatusCode"/> holds it.</summary>
     UnexpectedStatus,
 
+    /// <summary>
+    /// The server answered a request carrying an <c>Mcp-Session-Id</c> with 404 Not Found: the session expired ("Session
+    /// Management"), so the client must start a new one with a new <c>initialize</c> carrying no session id.
+    /// </summary>
+    SessionExpired,
+
     /// <summary>A reply to a request is neither <c>application/json</c> nor <c>text/event-stream</c>.</summary>
     UnexpectedContentType,
 

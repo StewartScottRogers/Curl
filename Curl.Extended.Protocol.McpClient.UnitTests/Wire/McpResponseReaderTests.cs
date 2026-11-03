@@ -74,7 +74,20 @@ public sealed class McpResponseReaderTests
             "serverInfo":{"name":"ExampleServer","title":"Example Server Display Name","version":"1.0.0"},"instructions":"Optional instructions for the client"}}
             """);
 
-        Assert.AreEqual(new McpInitializeResult("2024-11-05"), McpResponseReader.ReadInitializeResult(result));
+        Assert.AreEqual(new McpInitializeResult("2024-11-05", DeclaresTools: true), McpResponseReader.ReadInitializeResult(result));
+    }
+
+    [TestMethod]
+    [DataRow("""{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18"}}""", DisplayName = "no capabilities")]
+    [DataRow("""{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":[]}}""", DisplayName = "capabilities not an object")]
+    [DataRow("""{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"prompts":{}}}}""", DisplayName = "no tools")]
+    [DataRow("""{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":true}}}""", DisplayName = "tools not an object")]
+    public void ReadInitializeResult_CapabilityNegotiationWithoutToolsObject_DeclaresNoTools(string message)
+    {
+        // "Lifecycle > Capability Negotiation": only a tools object declares the tools capability.
+        var result = ReadResult(message);
+
+        Assert.IsFalse(McpResponseReader.ReadInitializeResult(result).DeclaresTools);
     }
 
     [TestMethod]

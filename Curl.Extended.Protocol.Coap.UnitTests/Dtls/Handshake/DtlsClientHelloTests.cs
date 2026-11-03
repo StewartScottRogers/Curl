@@ -19,6 +19,13 @@ public sealed class DtlsClientHelloTests
     }
 
     [TestMethod]
+    [DataRow(DtlsClientHello.EcdheEcdsaWithAes128GcmSha256, "ECDHE-ECDSA-AES128-GCM-SHA256")]
+    [DataRow(DtlsClientHello.EcdheRsaWithAes128GcmSha256, "ECDHE-RSA-AES128-GCM-SHA256")]
+    [DataRow(DtlsClientHello.EcdheEcdsaWithAes128Ccm8, "ECDHE-ECDSA-AES128-CCM8")]
+    public void OpenSslNameOf_AnOfferedSuite_IsOpenSslsName(ushort cipherSuite, string expected) =>
+        Assert.AreEqual(expected, DtlsClientHello.OpenSslNameOf(cipherSuite));
+
+    [TestMethod]
     public void ExtensionsFor_Rfc6066Section3_HostName_AddsServerName()
     {
         List<TlsExtension> extensions = DtlsClientHello.ExtensionsFor("coap.example");

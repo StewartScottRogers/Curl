@@ -123,6 +123,7 @@ internal sealed class ScriptedHttp3Connection : IMultiplexedConnection, IDatagra
 
     public ValueTask CloseAsync(long applicationErrorCode, CancellationToken cancellationToken)
     {
+        ObjectDisposedException.ThrowIf(ClosedWith is not null || IsDisposed, this);
         ClosedWith = applicationErrorCode;
         return ValueTask.CompletedTask;
     }

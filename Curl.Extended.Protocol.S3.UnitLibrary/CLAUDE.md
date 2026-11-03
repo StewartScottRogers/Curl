@@ -8,7 +8,7 @@ base class library, `Curl.Protocol.Abstractions` and `Curl.Extension.Abstraction
 - `Client/S3ProtocolHandler` serves `s3://bucket/key`: `-T` uploads, an empty key or one ending in `/` lists, otherwise
   it downloads. `Client/S3Configuration` reads `--user` and the `AWS_*` variables; `Client/S3Endpoint` picks the
   virtual-hosted or path-style server; `Client/S3Client` signs and sends one request per connection and turns a status
-  of 300 or more into exit 22; `Client/S3Operations` holds GetObject, PutObject, the multipart upload and ListObjectsV2.
+  of 300 or more into exit 22, writing the error body to the output first under `--fail-with-body`; `Client/S3Operations` holds GetObject, PutObject, the multipart upload and ListObjectsV2.
 
 - `Xml/S3ListBucketResultParser`, `Xml/S3InitiateMultipartUploadResultParser` and
   `Xml/S3ErrorResponseParser` read the ListObjectsV2, CreateMultipartUpload and error response

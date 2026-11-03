@@ -55,6 +55,20 @@ public sealed class DtlsClientHandshakeTests
     }
 
     [TestMethod]
+    public async Task RunAsync_Rfc8422Section5_7_ClientKeyExchange_CarriesTheUncompressedPointBehindOneLengthByte()
+    {
+        using DtlsTestServer server = new(DtlsTestServerKeyKind.Ecdsa);
+        DtlsTestServerChannel channel = new(server);
+
+        using DtlsClientSession session = await RunAsync(channel, insecure: true);
+
+        byte[] body = HandshakeFragmentOf(channel.Sent.First(datagram => IsHandshake(datagram, HandshakeType.ClientKeyExchange, 2))).Body;
+        Assert.HasCount(66, body);
+        Assert.AreEqual((byte)65, body[0]);
+        Assert.AreEqual((byte)0x04, body[1]);
+    }
+
+    [TestMethod]
     public async Task RunAsync_Rfc6347Section4_2_1_MalformedHelloVerifyRequest_FailsWithExit35()
     {
         using DtlsTestServer server = new(DtlsTestServerKeyKind.Ecdsa);

@@ -98,6 +98,24 @@ public sealed class EndPointReportingProtocolHandlerTests
         Assert.AreEqual(Remote, result.Report!.RemoteEndPoint);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_HandlerLetsAClosedUdpPortEscape_FailsWithExit7AndItsText()
+    {
+        const string Text = "Failed to connect to localhost:1 after 4 ms: Could not connect to server";
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("coap", _ => throw new Curl.Networking.DatagramPortUnreachableException(System.Net.Sockets.SocketError.ConnectionReset, Text)),
+            new ConnectionEndPointRecorder());
+        Diagnostics.Arrange("handler throws", Text);
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(0));
+        Diagnostics.Act("exit code", result.ExitCode);
+
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.Assert("error message", Text, result.ErrorMessage);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(Text, result.ErrorMessage);
+    }
+
     private static TransferContext ContextOf(int redirectsFollowed) => new()
     {
         Url = CurlUrl.Parse("http://127.0.0.1/"),

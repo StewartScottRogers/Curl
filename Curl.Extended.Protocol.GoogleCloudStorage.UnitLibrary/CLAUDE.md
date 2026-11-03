@@ -9,10 +9,12 @@ is written here rather than shared with the S3 extension. It is registered in
 - `Client/GcsProtocolHandler` serves `gs://bucket/object`: `-T` uploads (one PUT Object), an empty
   name or one ending in `/` lists (List objects, `list-type=2`, delimiter `/`, every page), anything
   else downloads (GET Object). `--oauth2-bearer` sends a bearer token, else `--user ACCESS_ID:SECRET`
-  signs with an HMAC key, else the request is unauthenticated.
+  signs with an HMAC key (region `auto`, or the third field of `--aws-sigv4 goog4:goog:<region>:storage`,
+  ADR-1191), else the request is unauthenticated.
 - `Client/GcsEndpoint` is `https://storage.googleapis.com`, path-style, or the emulator
   `STORAGE_EMULATOR_HOST` names. `Client/GcsOperations` holds the three operations,
-  `Client/GcsClient` sends one request per connection and turns a status of 300 or more into exit 22
+  `Client/GcsClient` sends one request per connection and turns a status of 300 or more into exit 22,
+  writing the error body to the output first under `--fail-with-body`
   (`GcsTransferException`).
 
 - `Signing/GcsRequestSigner` signs a request with an HMAC key as the Cloud Storage "V4 signing

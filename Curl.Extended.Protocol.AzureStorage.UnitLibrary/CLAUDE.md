@@ -10,7 +10,8 @@ or another extension. It is registered in `ExtensionCatalogue.cs` and `Extension
   `AzureBlobOperations` (Get Blob, Put Blob, Put Block and Put Block List from 8 MiB, List Blobs) and
   `abfs`/`abfss` to `AzureDataLakeOperations` (Path Read, Path Create, Path Update append and flush,
   Path List). `AzureStorageClient` sends one request per connection over HTTPS on 443 and turns a status
-  of 300 or above into exit 22 naming the `Error` code; every other failure is an
+  of 300 or above into exit 22 naming the `Error` code (the XML `Error` body, else the DFS JSON
+  `error` body); every other failure is an
   `AzureStorageTransferException` carrying its exit code.
 
 - `Http/AzureStorageHttpClientConnection` sends one HTTP/1.1 request at a time over an `IConnection`
@@ -21,7 +22,7 @@ or another extension. It is registered in `ExtensionCatalogue.cs` and `Extension
   (ADR-1018) under this library's names; extensions never reference each other, so it is a copy, not a
   reference.
 - `Bodies/` reads and writes the bodies the handler exchanges: `AzureBlobListingParser` (List Blobs
-  `EnumerationResults`, with `NextMarker`), `AzureStorageErrorParser` (the `Error` body),
+  `EnumerationResults`, with `NextMarker`), `AzureStorageErrorParser` (the `Error` body), `AzureStorageJsonErrorParser` (the DFS JSON `error` body),
   `AzureBlockListWriter` (Put Block List `BlockList`) and `AzureStoragePathListParser` (ADLS Gen2
   Path List JSON; the `x-ms-continuation` header is the caller's). A parser never throws on a bad
   body: it returns a failed `AzureStorageBodyParseResult` saying why. `System.Xml.Linq` and

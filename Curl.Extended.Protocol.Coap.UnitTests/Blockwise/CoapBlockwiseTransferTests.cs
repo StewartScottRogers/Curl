@@ -75,6 +75,31 @@ public sealed class CoapBlockwiseTransferTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ALaterBlockWithAnotherETag_FailsWithExit56AndWritesNothing()
+    {
+        var channel = new ScriptedDatagramChannel((count, sent) => [Response(sent, CoapCode.Content, [Block(CoapOptionNumber.Block2, count == 1 ? 0u : 1u, count == 1, 3), new CoapOption(CoapOptionNumber.ETag, count == 1 ? [1, 2, 3, 4] : [2])], Representation[..(count == 1 ? 128 : 100)])]);
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(channel).ExecuteAsync(Context("coap://h/status", output));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("CoAP server sent block 1 of a different representation (its ETag changed)", result.ErrorMessage);
+        Assert.AreEqual(0, output.Length);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EveryBlockWithTheSameETag_IsJoined()
+    {
+        var channel = new ScriptedDatagramChannel((count, sent) => [Response(sent, CoapCode.Content, [Block(CoapOptionNumber.Block2, count == 1 ? 0u : 1u, count == 1, 3), new CoapOption(CoapOptionNumber.ETag, [1, 2, 3, 4])], count == 1 ? Representation[..128] : Representation[128..])]);
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(channel).ExecuteAsync(Context("coap://h/status", output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(Representation, output.ToArray());
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_AShortBlockWithMoreToCome_FailsWithExit56()
     {
         var channel = new ScriptedDatagramChannel((_, sent) => [Response(sent, CoapCode.Content, [Block(CoapOptionNumber.Block2, 0, true, 3)], Bytes(100))]);

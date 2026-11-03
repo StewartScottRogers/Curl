@@ -51,6 +51,8 @@ public sealed class Http3ServerConnection(Http3ServerTlsSettings tlsSettings, IT
 
     private readonly Queue<byte[]> outbox = [];
 
+    private readonly Queue<byte[]> receivedDatagrams = [];
+
     private Http3ServerTlsHandshake? tls;
 
     private byte[] originalDestinationConnectionId = [];
@@ -83,6 +85,7 @@ public sealed class Http3ServerConnection(Http3ServerTlsSettings tlsSettings, IT
         InitialMaxStreamDataUni = 1UL << 40,
         InitialMaxStreamsBidi = 1UL << 20,
         InitialMaxStreamsUni = 1UL << 20,
+        MaxDatagramFrameSize = 1200,
     };
 
     /// <summary>Gets the connection ID the server chose.</summary>
@@ -157,6 +160,30 @@ public sealed class Http3ServerConnection(Http3ServerTlsSettings tlsSettings, IT
         RequireOpen();
         SendStream(streamId).Append(bytes, endStream);
         QueueStreamFrames();
+    }
+
+    /// <summary>Takes the payload of the oldest QUIC DATAGRAM frame (RFC 9221) the client sent that has not been taken yet.</summary>
+    /// <returns>The payload, or <see langword="null" /> when none waits.</returns>
+    public byte[]? AcceptDatagram() => receivedDatagrams.TryDequeue(out var payload) ? payload : null;
+
+    /// <summary>Queues one QUIC DATAGRAM frame (RFC 9221) for the next 1-RTT packet <see cref="TakeDatagramsToSend" /> returns. It is never sent again when its packet is lost (section 5).</summary>
+    /// <param name="payload">The application data.</param>
+    /// <exception cref="InvalidOperationException">The handshake is not complete, the connection is closed, the client did not advertise <c>max_datagram_frame_size</c> (section 3), or the frame would exceed it.</exception>
+    public void SendDatagram(ReadOnlySpan<byte> payload)
+    {
+        RequireOpen();
+        var limit = clientParameters.MaxDatagramFrameSize;
+        if (limit == 0)
+        {
+            throw new InvalidOperationException("The client did not advertise max_datagram_frame_size, so no DATAGRAM frame may be sent (RFC 9221 section 3).");
+        }
+
+        if ((ulong)(payload.Length + QuicDatagramFrame.Overhead) > limit)
+        {
+            throw new InvalidOperationException($"A datagram of {payload.Length} bytes does not fit the client's max_datagram_frame_size of {limit}.");
+        }
+
+        application.QueueFrame(new QuicDatagramFrame(payload.ToArray()));
     }
 
     /// <summary>Returns the datagrams carrying what waits to be sent, such as the stream data <see cref="Write" /> queued.</summary>
@@ -339,13 +366,21 @@ public sealed class Http3ServerConnection(Http3ServerTlsSettings tlsSettings, IT
             case QuicStreamFrame stream:
                 ReceiveStream(stream);
                 break;
-            case QuicMaxDataFrame maxData:
-                connectionSendLimit = Math.Max(connectionSendLimit, maxData.MaximumData);
-                QueueStreamFrames();
+            case QuicMaxDataFrame or QuicMaxStreamDataFrame:
+                ReceiveFlowControl(frame);
                 break;
-            case QuicMaxStreamDataFrame maxStreamData:
-                SendStream(maxStreamData.StreamId).Raise(maxStreamData.MaximumStreamData);
-                QueueStreamFrames();
+            default:
+                ReceiveDatagramOrClose(frame);
+                break;
+        }
+    }
+
+    private void ReceiveDatagramOrClose(QuicFrame frame)
+    {
+        switch (frame)
+        {
+            case QuicDatagramFrame datagram:
+                receivedDatagrams.Enqueue(datagram.Data.ToArray());
                 break;
             case QuicConnectionCloseFrame close:
                 // The client closed: the server drains and sends nothing more (RFC 9000 section 10.2.2).
@@ -356,6 +391,21 @@ public sealed class Http3ServerConnection(Http3ServerTlsSettings tlsSettings, IT
                 // ACK (nothing is resent), PING, PADDING, the client's BLOCKED and MAX_STREAMS frames and connection ID frames ask nothing of the stand-in.
                 break;
         }
+    }
+
+    private void ReceiveFlowControl(QuicFrame frame)
+    {
+        if (frame is QuicMaxDataFrame maxData)
+        {
+            connectionSendLimit = Math.Max(connectionSendLimit, maxData.MaximumData);
+        }
+        else
+        {
+            var maxStreamData = (QuicMaxStreamDataFrame)frame;
+            SendStream(maxStreamData.StreamId).Raise(maxStreamData.MaximumStreamData);
+        }
+
+        QueueStreamFrames();
     }
 
     private void ReceiveCrypto(Http3ServerPacketSpace space, QuicCryptoFrame frame)

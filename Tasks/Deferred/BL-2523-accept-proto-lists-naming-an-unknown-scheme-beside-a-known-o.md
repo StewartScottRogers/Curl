@@ -28,8 +28,15 @@ Measured 2026-10-16 during BL-2491 on Windows' curl 8.21.0 (Schannel): `-s -S --
 
 ## Notes
 
+- 2026-11-02 (lane 4): Re-measured on this machine's curl 8.22.0 (Schannel, the target per ADR-0479). `-s -S --proto =ipfs,http http://127.0.0.1:1/`, `--proto =ipfs` and `-v --proto =ipfs,http` all print `curl: unrecognized protocol 'ipfs'`, `curl: option --proto: is badly used here` and the try-help line, then exit 2. That is the same as Curl today, and `CommandLineProtocolSetOptionTests` already pins it (the "ipfs unknown" row). Making Curl accept the list, as the Goal and criterion 1 ask, would break drop-in parity with 8.22.0. Criterion 2's "no unrecognized protocol line" was only true of 8.21.0. The criteria cannot be met as written without going against the target curl, and a lane may not reword them (BL-2488). No code was changed.
+
 ## Log
 
 - 2026-10-16: Created.
 - 2026-10-16: Backlog -> Doing. Criteria at claim: 9cafc694 46d4e715 a0b0533f.
 - 2026-10-16: Doing -> Deferred. Lane 3 measured curl 8.22.0 (the target, ADR-0479) refusing --proto =ipfs,http and http,bogus with exit 2, exactly as Curl does; only 8.21.0 accepted them, so there is nothing to change. The lane's Deferred move was lost (STALL path), applied here.
+- 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 9cafc694 46d4e715 a0b0533f.
+- 2026-11-02: Doing -> Blocked. Stewart: curl 8.22.0 (the target) refuses --proto =ipfs,http with exit 2 exactly as Curl already does, so the 8.21.0 criteria would break parity; may this task be closed as already met by 8.22.0 parity, or Deferred?
+- 2026-11-02: Blocked -> Doing. Interactive session closes it under the delegated decision rule (which curl build to match). Criteria at claim: 9cafc694 46d4e715 a0b0533f.
+- 2026-11-02: Doing -> Deferred. Closed as obsolete, decided by Claude under Stewart's delegation: the target curl 8.22.0 (Gap/Baselines/target.json) refuses --proto =ipfs,http with exit 2 exactly as Curl does, so meeting these 8.21.0 criteria would break parity. Not to be reopened unless the target moves back.

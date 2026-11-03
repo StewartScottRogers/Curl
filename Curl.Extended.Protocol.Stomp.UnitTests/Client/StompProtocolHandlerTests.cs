@@ -22,10 +22,45 @@ public sealed class StompProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
-            new[] { ConnectFrame, "SEND\ndestination:/queue/a\ncontent-length:2\n\nhi\0", "DISCONNECT\nreceipt:disconnect\n\n\0" },
+            new[] { ConnectFrame, "SEND\ndestination:/queue/a\ncontent-length:2\ncontent-type:application/octet-stream\n\nhi\0", "DISCONNECT\nreceipt:disconnect\n\n\0" },
             connection.WrittenText.ToArray());
         Assert.IsTrue(connection.IsDisposed);
     }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ContentTypeHeader_ReplacesTheDefaultAndAppearsOnce()
+    {
+        ScriptedStompConnection connection = ScriptedStompConnection.Replaying(Connected, "RECEIPT\nreceipt-id:disconnect\n\n\0");
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("stomp://broker/queue/a"),
+            Output = new MemoryStream(),
+            PostData = Encoding.UTF8.GetBytes("hi"),
+            Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Headers = ["X-Other: 1", "Content-Type: text/plain"] },
+        };
+
+        TransferResult result = await new StompProtocolHandler(new ScriptedStompConnector(ConnectResult.Connected(connection))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string send = connection.WrittenText.Single(frame => frame.StartsWith("SEND", StringComparison.Ordinal));
+        Assert.AreEqual("SEND\ndestination:/queue/a\ncontent-length:2\ncontent-type:text/plain\n\nhi\0", send);
+    }
+
+    [TestMethod]
+    [DataRow("Accept: x", "application/octet-stream")]
+    [DataRow("content-type;", "application/octet-stream")]
+    [DataRow("content-type:", "application/octet-stream")]
+    [DataRow(":content-type", "application/octet-stream")]
+    public void ContentTypeOf_NoUsableContentType_GivesTheDefault(string header, string expected) =>
+        Assert.AreEqual(expected, StompProtocolHandler.ContentTypeOf([header]));
+
+    [TestMethod]
+    public void ContentTypeOf_NoHeaders_GivesTheDefault() =>
+        Assert.AreEqual("application/octet-stream", StompProtocolHandler.ContentTypeOf(null));
+
+    [TestMethod]
+    public void ContentTypeOf_SeveralContentTypes_GivesTheLast() =>
+        Assert.AreEqual("b/b", StompProtocolHandler.ContentTypeOf(["content-type: a/a", "CONTENT-TYPE:b/b"]));
 
     [TestMethod]
     public async Task ExecuteAsync_NoBody_SubscribesAndWritesEachMessageBodyUntilTheServerCloses()

@@ -865,10 +865,11 @@ public sealed partial class HttpProtocolHandlerTests
     /// <summary>
     /// With <c>--ntlm --service-name</c> and no <c>-u</c>, curl 8.22.0 starts NTLM with the default
     /// Windows credentials: the first request carries the Type 1 message for user <c>''</c>
-    /// (AF-0524, BL-4460, ADR-1183).
+    /// (AF-0524, BL-4460, ADR-1183). Only the Schannel build does: this is Windows' answer.
     /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_NtlmWithServiceNameAndNoCredentials_SendsTheType1MessageAsAnEmptyUser()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_NtlmWithServiceNameAndNoCredentialsOnWindows_SendsTheType1MessageAsAnEmptyUser()
     {
         TurnTakingConnection connection = new(65536, OkHead + "ok");
         ScriptedAuthenticator authenticator = new(NtlmType1, NtlmType3);
@@ -883,6 +884,50 @@ public sealed partial class HttpProtocolHandlerTests
         string[] requests = connection.Written.Split("GET ", StringSplitOptions.RemoveEmptyEntries);
         Assert.Contains("Authorization: " + NtlmType1 + "\r\n", requests[0]);
         Assert.AreEqual(string.Empty, authenticator.Calls[0].Request.Credential?.UserName);
+    }
+
+    /// <summary>
+    /// With <c>--ntlm --service-name</c> and no <c>-u</c>, the OpenSSL curl (8.18.0 measured on
+    /// Linux) sends no <c>Authorization</c>: off Windows the authenticator is asked with no
+    /// credential, so it makes no value (BL-4509, ADR-1183). The scripted authenticator answers
+    /// whatever it is asked, so the test checks the credential it was given, not the bytes sent
+    /// (BL-4513).
+    /// </summary>
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_NtlmWithServiceNameAndNoCredentialsOffWindows_GivesTheAuthenticatorNoCredential()
+    {
+        TurnTakingConnection connection = new(65536, OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(NtlmType1, NtlmType3);
+        TransferContext context = AuthContext(new MemoryStream(), options: new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Ntlm, ServiceName = "x" });
+        Diagnostics.Arrange("url, schemes, service name", $"{AuthUrl}, --ntlm, x");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsTrue(authenticator.Calls.TrueForAll(call => call.Request.Credential is null), connection.Written);
+    }
+
+    /// <summary>
+    /// The empty-user rule for <c>--ntlm --service-name</c> holds on Windows alone, where curl is
+    /// the Schannel build; <c>--sasl-authzid</c> with Digest holds on every platform
+    /// (ADR-1182, ADR-1183, BL-4509).
+    /// </summary>
+    [TestMethod]
+    [DataRow(HttpAuthSchemes.Ntlm, true, true)]
+    [DataRow(HttpAuthSchemes.Ntlm, false, false)]
+    [DataRow(HttpAuthSchemes.Digest, false, true)]
+    public void StartsWithAnEmptyUser_ServiceNameOrAuthzidOnEachPlatform_HoldsOnlyWhereCurlSendsTheEmptyUser(HttpAuthSchemes schemes, bool onWindows, bool expected)
+    {
+        HttpRequestOptions options = new() { AuthSchemes = schemes, ServiceName = "x", SaslAuthorizationIdentity = "x" };
+        Diagnostics.Arrange("schemes, on Windows", $"{schemes}, {onWindows}");
+
+        bool actual = HttpProtocolHandler.StartsWithAnEmptyUser(options, onWindows);
+
+        Diagnostics.Assert("starts with an empty user", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     /// <summary>

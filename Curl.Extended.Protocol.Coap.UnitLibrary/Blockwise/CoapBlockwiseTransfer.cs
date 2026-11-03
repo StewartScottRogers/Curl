@@ -11,7 +11,7 @@ namespace Curl.Extended.Protocol.Coap.Blockwise;
 /// Large whose Block1 asks for a smaller size starts the payload again at that size. A response with
 /// Block2 is then fetched block after block, at the size the server chooses, by repeating the request
 /// without payload with Block2 naming the next block, and given as one response whose payload is every
-/// block once, in order. Each message takes the next Message ID; all keep the request's token.
+/// block once, in order; a block whose ETag differs from the first block's fails the transfer rather than mix two representations. Each message takes the next Message ID; all keep the request's token.
 /// </summary>
 /// <param name="exchange">Sends one confirmable message and gives its response.</param>
 internal sealed class CoapBlockwiseTransfer(Func<CoapMessage, CancellationToken, ValueTask<CoapMessage>> exchange)
@@ -25,7 +25,7 @@ internal sealed class CoapBlockwiseTransfer(Func<CoapMessage, CancellationToken,
     /// <param name="request">The request, with its whole payload.</param>
     /// <param name="cancellationToken">Cancels the transfer.</param>
     /// <returns>The final response, its payload every Block2 block joined.</returns>
-    /// <exception cref="CoapException">The server sent a block out of order, a short block or an invalid block option (exit 56), or an exchange failed.</exception>
+    /// <exception cref="CoapException">The server sent a block out of order, a short block, a block whose ETag differs from the first block's or an invalid block option (exit 56), or an exchange failed.</exception>
     public async ValueTask<CoapMessage> RunAsync(CoapMessage request, CancellationToken cancellationToken)
     {
         messageId = request.MessageId;
@@ -69,8 +69,14 @@ internal sealed class CoapBlockwiseTransfer(Func<CoapMessage, CancellationToken,
     private async ValueTask<CoapMessage> ReceivePayloadAsync(CoapMessage request, CoapMessage response, CancellationToken stop)
     {
         var body = new MemoryStream();
+        byte[]? etag = ETagOf(response);
         while (BlockOf(response, CoapOptionNumber.Block2) is { } block)
         {
+            if (!ETagOf(response).AsSpan().SequenceEqual(etag))
+            {
+                throw new CoapException(CurlExitCode.RecvError, $"CoAP server sent block {block.Number} of a different representation (its ETag changed)");
+            }
+
             Append(body, block, response.Payload);
             if (!block.More)
             {
@@ -112,6 +118,9 @@ internal sealed class CoapBlockwiseTransfer(Func<CoapMessage, CancellationToken,
             throw new CoapException(CurlExitCode.RecvError, "CoAP server sent an invalid block option");
         }
     }
+
+    /// <summary>Gives the value of the response's ETag option, or null without one; blocks of one representation share it (RFC 7959 section 2.4).</summary>
+    private static byte[]? ETagOf(CoapMessage response) => response.Options.FirstOrDefault(candidate => candidate.Number == CoapOptionNumber.ETag)?.Value;
 
     private static CoapOption BlockOption(int number, int blockNumber, bool more, int sizeExponent) =>
         new(number, new CoapBlockValue((uint)blockNumber, more, sizeExponent).Encode());

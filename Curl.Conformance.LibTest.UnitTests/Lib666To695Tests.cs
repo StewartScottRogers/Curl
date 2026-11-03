@@ -609,6 +609,36 @@ public sealed class Lib666To695Tests
     }
 
     [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task Lib677Exchange_AFailedPerformOrADoneMessageWithoutASocket_GoesToTheCleanup(bool failPerform)
+    {
+        var clock = new ManualTimeProvider(DateTimeOffset.UnixEpoch);
+        var engine = new FakeCurlEngine();
+        engine.Multi.Waiting = () => clock.Advance(TimeSpan.FromSeconds(1));
+        await using CurlLibrary library = CurlGlobal.Init(engine);
+        await using CurlMulti multi = library.MultiInit();
+        await using CurlEasy easy = library.EasyInit();
+        _ = multi.AddHandle(easy);
+        if (failPerform)
+        {
+            engine.Multi.PerformResult = (CurlMultiCode.BadHandle, 0);
+        }
+        else
+        {
+            engine.Multi.DoneResult = CurlCode.Ok;
+        }
+
+        var run = new PortRun(engine, 677, "imap://x/677");
+        var exchange = new Lib677.Exchange(run.Steps, multi, easy, run.Context);
+
+        bool ranToItsEnd = await exchange.RunAsync(clock, CancellationToken.None);
+
+        Assert.IsFalse(ranToItsEnd);
+        Assert.AreEqual(string.Empty, run.OutputText);
+    }
+
+    [TestMethod]
     public async Task EasyPerformOrWriteAsync_WritesTheLineOnlyWhenTheTransferFails()
     {
         var engine = new FakeCurlEngine { PerformResult = CurlCode.RecvError };

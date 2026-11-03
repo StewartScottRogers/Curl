@@ -6,7 +6,7 @@
 
 $ModelNames = 'haiku', 'sonnet', 'opus'
 # The hand-built security and crypto libraries; a task touching one, or its test twin, runs on opus.
-$OpusLibraries = 'Curl.Cryptography', 'Curl.Tls', 'Curl.Quic', 'Curl.Kerberos', 'Curl.Ntlm', 'Curl.Original.Protocol.Ssh'
+$OpusLibraries = 'Curl.Cryptography', 'Curl.Tls', 'Curl.Quic', 'Curl.Kerberos', 'Curl.Ntlm', 'Curl.Ssh', 'Curl.Original.Protocol.Ssh'
 $OpusLibraryPattern = '^(' + (($OpusLibraries | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')(\.(UnitLibrary|UnitTests|IntegrationTests))?([\\/].*)?$'
 $script:ModelChoice = @{ Id = ''; Model = ''; Why = '' }
 
@@ -18,6 +18,7 @@ $script:ModelChoice = @{ Id = ''; Model = ''; Why = '' }
 # diagnosis, and those runs came back on opus too. Key: the kind the lane log names.
 $RoutineFeatureTitles = [ordered]@{
     'upstream unit program port'          = '^Port upstream unit programs?\b'
+    'upstream checksrc.pl port'           = '^Port checksrc\.pl\b'
     'harness stand-in'                    = '^(Stand in for\b|Add (an? |the )?([\w./-]+ ){0,4}stand-ins?\b)'
     'upstream test script interpretation' = '^Interpret upstream test\d+\.pl\b'
     'upstream case bookkeeping'           = '^(Run|Check|List)\b.*\bupstream\b.*\bcases? \d'
@@ -186,6 +187,7 @@ if ($TestModelChoice) {
         ,@('a lookalike library is not a crypto library', 'sonnet', (Get-CaseModel -Touches 'Curl.TlsSettings.UnitLibrary'))
         ,@('a feature task with no routine title', 'opus: feature pipeline', (Format-Choice (Get-ModelChoice -Forced 'auto' -Pipeline 'feature' -Title 'Reach a SOCKS proxy over a Unix domain socket')))
         ,@('a routine feature title names its kind', 'sonnet: routine feature: upstream unit program port', (Format-Choice (Get-ModelChoice -Forced 'auto' -Pipeline 'feature' -Title 'Port upstream unit program 1304 (netrc parsing) over NetrcFile')))
+        ,@('a checksrc.pl port title is routine', 'sonnet: routine feature: upstream checksrc.pl port', (Format-Choice (Get-ModelChoice -Forced 'auto' -Pipeline 'feature' -Title 'Port checksrc.pl scanfile line checks, second half (lines 900-1268)')))
         ,@('a routine title overruled by a hard marker names it', 'opus: feature pipeline, names DoH', (Format-Choice (Get-ModelChoice -Forced 'auto' -Pipeline 'feature' -Title 'Port upstream unit program 1658: DoH HTTPS resource record decoding')))
         ,@('a hard marker in touches keeps a routine title on opus', 'opus: feature pipeline, names framing', (Format-Choice (Get-ModelChoice -Forced 'auto' -Pipeline 'feature' -Title 'Port upstream unit program 9999' -Touches 'Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Headers.Capsule.cs')))
         ,@('a routine feature title on a retried task', 'opus: retry after a run that came back', (Format-Choice (Get-ModelChoice -Forced 'auto' -Pipeline 'feature' -Title 'Port upstream unit program 1304' -Retried)))

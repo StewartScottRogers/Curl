@@ -31,7 +31,7 @@ internal static class JsonTestTypes
     public static DynamicMessageType Type(string name) => Catalogue.GetMessageType($"json.{name}");
 
     public static ProtobufJsonError Parse(string name, string json, out DynamicMessage? message) =>
-        ProtobufJsonParser.TryParse(Type(name), Encoding.UTF8.GetBytes(json), out message);
+        ProtobufJsonParser.Parse(Type(name), Encoding.UTF8.GetBytes(json), out message);
 
     public static DynamicMessage Parse(string name, string json)
     {

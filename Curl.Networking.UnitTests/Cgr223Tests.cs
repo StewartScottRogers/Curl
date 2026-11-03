@@ -89,15 +89,21 @@ public sealed class Cgr223Tests
         var matchesSchannelBuild = OperatingSystem.IsWindows();
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), matchesSchannelBuild);
+        var clientHandshakeDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var serverTask = Task.Run(async () =>
         {
             var serverStream = new SslStream(server, leaveInnerStreamOpen: true);
             await serverStream.AuthenticateAsServerAsync(s_serverCertificate);
+
+            // The garbage record must reach the client only after its handshake has finished, so the
+            // client meets it in ReadAsync and never inside its own last handshake read (BL-4655).
+            await clientHandshakeDone.Task;
             await server.WriteAsync(new byte[] { 0x63, 0x03, 0x03, 0x00, 0x05, 1, 2, 3, 4, 5 });
             return serverStream;
         });
 
         var result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, new IPEndPoint(IPAddress.Loopback, 443)), "localhost", CancellationToken.None);
+        clientHandshakeDone.SetResult();
         using var serverSide = await serverTask;
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
 

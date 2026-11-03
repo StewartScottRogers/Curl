@@ -85,6 +85,51 @@ public sealed class Amqp1ClientFlowTests
     }
 
     [TestMethod]
+    public async Task RunAsync_NoBodyTransferOnUnattachedHandle_EndsTheSessionWithUnattachedHandleAndWritesNothing_Part2Section2_7_5()
+    {
+        MemoryStream output = new();
+        ScriptedAmqp1Connection connection = new([.. Authenticated, .. Opened(false), .. Transfer(DataMessage("hello"), handle: 7)]);
+
+        var failure = await RunAsync(connection, output);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure!.ExitCode);
+        Assert.AreEqual("Weird server reply: AMQP 1.0 transfer on unattached handle 7", failure.Message);
+        Assert.AreEqual(0, output.Length);
+        Assert.AreEqual("header,sasl-init,header,open,begin,attach,flow,end", Names(connection));
+        var error = Amqp1Composite.Read(Written(connection)[^1].Performative!["error"]);
+        Assert.AreEqual(Amqp1CompositeType.Error, error.Type);
+        Assert.AreEqual(new Amqp1Symbol("amqp:session:unattached-handle"), error["condition"]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NoBodyContinuationChangesTheDeliveryId_FailsWithWeirdServerReplyAndWritesNothing_Part2Section2_7_5()
+    {
+        var message = DataMessage("hello");
+        MemoryStream output = new();
+        ScriptedAmqp1Connection connection = new([
+            .. Authenticated, .. Opened(false), .. Transfer(message[..4], more: true, deliveryId: 0), .. Transfer(message[4..], deliveryId: 1)]);
+
+        var failure = await RunAsync(connection, output);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure!.ExitCode);
+        Assert.AreEqual("Weird server reply: AMQP 1.0 continuation transfer changed delivery-id 0 to 1", failure.Message);
+        Assert.AreEqual(0, output.Length);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NoBodyContinuationOmitsTheDeliveryId_WritesTheMessage_Part2Section2_7_5()
+    {
+        var message = DataMessage("hello");
+        MemoryStream output = new();
+        ScriptedAmqp1Connection connection = new([
+            .. Authenticated, .. Opened(false), .. Transfer(message[..4], more: true), .. Transfer(message[4..], deliveryId: null), .. Closed]);
+
+        Assert.IsNull(await RunAsync(connection, output));
+
+        Assert.AreEqual("hello", Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
     public async Task RunAsync_NoBodyPresettledValueAndSequence_WritesTheirBodiesAndSendsNoDisposition_Part3Section3_2()
     {
         var message = Message(
@@ -129,6 +174,43 @@ public sealed class Amqp1ClientFlowTests
 
         Assert.AreEqual(CurlExitCode.RemoteFileNotFound, failure!.ExitCode);
         Assert.AreEqual("AMQP 1.0 detach error: amqp:not-found: no queue q", failure.Message);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ClosingDetachWithErrorAfterAttach_AnswersWithAClosingDetachAndReportsTheError_Part2Section2_6_5()
+    {
+        ScriptedAmqp1Connection connection = new([.. Authenticated, .. Opened(true), .. Detach(Error(new Amqp1Symbol("amqp:unauthorized-access"), "no"))]);
+
+        var failure = await RunAsync(connection, new MemoryStream(), "hi");
+
+        Assert.AreEqual("AMQP 1.0 detach error: amqp:unauthorized-access: no", failure!.Message);
+        Assert.AreEqual("header,sasl-init,header,open,begin,attach,detach", Names(connection));
+        Assert.IsTrue(true.Equals(Written(connection)[^1].Performative!["closed"]));
+        Assert.IsNull(Written(connection)[^1].Performative!["error"]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ClosingDetachWithoutErrorAfterAttach_AnswersWithAClosingDetachAndEndsWithWeirdServerReply_Part2Section2_6_5()
+    {
+        ScriptedAmqp1Connection connection = new([.. Authenticated, .. Opened(true), .. Detach()]);
+
+        var failure = await RunAsync(connection, new MemoryStream(), "hi");
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure!.ExitCode);
+        Assert.AreEqual("header,sasl-init,header,open,begin,attach,detach", Names(connection));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_CloseWithErrorAfterAttach_AnswersWithCloseAndReportsTheError_Part2Section2_4_3()
+    {
+        ScriptedAmqp1Connection connection = new([.. Authenticated, .. Opened(true), .. Close(Error(new Amqp1Symbol("amqp:internal-error"), "bye"))]);
+
+        var failure = await RunAsync(connection, new MemoryStream(), "hi");
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure!.ExitCode);
+        Assert.AreEqual("AMQP 1.0 close error: amqp:internal-error: bye", failure.Message);
+        Assert.AreEqual("header,sasl-init,header,open,begin,attach,close", Names(connection));
+        Assert.IsNull(Written(connection)[^1].Performative!["error"]);
     }
 
     [TestMethod]
@@ -179,11 +261,56 @@ public sealed class Amqp1ClientFlowTests
 
     private static string Text(object? value) => Encoding.UTF8.GetString(Amqp1ClientFlow.OutputBytesOf(value));
 
-    private static async Task<Amqp1ClientException?> RunAsync(ScriptedAmqp1Connection connection, Stream output, string? body = null)
+    [TestMethod]
+    public async Task RunAsync_PeerIdleTimeOut1000ms_SendsAnEmptyFrameEvery500msWhileWaitingForTheOutcome_Part2Section2_4_5()
+    {
+        ManualAmqp1TimeProvider clock = new();
+        ScriptedAmqp1Connection connection = new(
+            [.. Authenticated, .. Open(idleTimeOut: 1000), .. Begin, .. Attach(true), .. Flow(1)],
+            [.. Disposition(State(Amqp1CompositeType.Accepted)), .. Closed])
+        { HoldsRead = 1 };
+
+        Task<Amqp1ClientException?> run = RunAsync(connection, new MemoryStream(), "hi", clock);
+        await connection.ReadHeld;
+        await clock.TimerCreated.WaitAsync();
+        clock.Advance(TimeSpan.FromMilliseconds(499));
+        int beforeHalf = Heartbeats(connection);
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        await clock.TimerCreated.WaitAsync();
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        await clock.TimerCreated.WaitAsync();
+        connection.ReleaseHeldRead();
+        var failure = await run;
+
+        Assert.IsNull(failure);
+        Assert.AreEqual(0, beforeHalf);
+        Assert.AreEqual(2, Heartbeats(connection));
+        int transfer = connection.Writes.FindIndex(write => write.Length > Heartbeat.Length && Amqp1FrameCodec.TryRead(write, out var frame, out _) && frame!.ReadBody().Performative?.Type == Amqp1CompositeType.Transfer);
+        Assert.AreEqual(2, connection.Writes.Skip(transfer).Count(write => write.AsSpan().SequenceEqual(Heartbeat)));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PeerIdleTimeOutZero_SendsNoEmptyFrames_Part2Section2_4_5()
+    {
+        ManualAmqp1TimeProvider clock = new();
+        ScriptedAmqp1Connection connection = new([.. Authenticated, .. Open(idleTimeOut: 0), .. Begin, .. Attach(true), .. Flow(1),
+            .. Disposition(State(Amqp1CompositeType.Accepted)), .. Closed]);
+
+        var failure = await RunAsync(connection, new MemoryStream(), "hi", clock);
+
+        Assert.IsNull(failure);
+        Assert.AreEqual(0, clock.TimerCreated.CurrentCount);
+        Assert.AreEqual(0, Heartbeats(connection));
+    }
+
+    private static int Heartbeats(ScriptedAmqp1Connection connection) =>
+        connection.Writes.ToArray().Count(write => write.AsSpan().SequenceEqual(Heartbeat));
+
+    private static async Task<Amqp1ClientException?> RunAsync(ScriptedAmqp1Connection connection, Stream output, string? body = null, TimeProvider? clock = null)
     {
         try
         {
-            await new Amqp1ClientFlow(connection, output, NoTransferProgress.Instance, CancellationToken.None)
+            await new Amqp1ClientFlow(connection, output, NoTransferProgress.Instance, clock ?? TimeProvider.System, CancellationToken.None)
                 .RunAsync(null, "broker", "c", "q", body is null ? (ReadOnlyMemory<byte>?)null : Encoding.UTF8.GetBytes(body));
             return null;
         }

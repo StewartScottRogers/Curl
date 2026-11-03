@@ -8,7 +8,8 @@ namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
 /// Serves <c>gs://bucket/object</c> (ADR-1099): with <c>-T</c> it uploads the object, with an empty name or one ending in
 /// <c>/</c> it lists the names under it, otherwise it downloads the object. <c>--oauth2-bearer</c> sends an OAuth 2.0
 /// access token; otherwise <c>--user ACCESS_ID:SECRET</c> signs with an HMAC key; with neither the requests go
-/// unauthenticated, for public objects. The server is <see cref="GcsEndpoint"/>; the requests are <see cref="GcsOperations"/>.
+/// unauthenticated, for public objects. A region other than <c>auto</c> is named in curl's own
+/// <c>--aws-sigv4 provider1:provider2:region:service</c> form (ADR-1191). The server is <see cref="GcsEndpoint"/>; the requests are <see cref="GcsOperations"/>.
 /// </summary>
 /// <param name="connector">Opens each connection.</param>
 /// <param name="environment">Gives an environment variable's value, or <see langword="null"/> when it is unset.</param>
@@ -27,7 +28,7 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
             return TransferResult.Failure(CurlExitCode.UrlMalformat, $"The Cloud Storage endpoint \"{emulatorHost}\" is not an http or https URL");
         }
 
-        GcsHmacKey? hmacKey = context.Credentials is { } user ? new GcsHmacKey(user.UserName, user.Password) : null;
+        GcsHmacKey? hmacKey = context.Credentials is { } user ? new GcsHmacKey(user.UserName, user.Password, RegionOf(context)) : null;
         GcsOperations operations = new(new GcsClient(connector, context, endpoint, BearerTokenOf(context), hmacKey), context.Url.Host, context.CancellationToken);
         try
         {
@@ -41,6 +42,13 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
         {
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message);
         }
+    }
+
+    /// <summary>The third field of <c>--aws-sigv4</c> (<c>goog4:goog:us-east1:storage</c> gives <c>us-east1</c>), or <c>auto</c> when it names none.</summary>
+    private static string RegionOf(ITransferContext context)
+    {
+        string[] fields = (context.Http?.AwsSigV4 ?? string.Empty).Split(':');
+        return fields.Length > 2 && fields[2].Length > 0 ? fields[2] : GcsHmacKey.AutoRegion;
     }
 
     private static string? BearerTokenOf(ITransferContext context) =>

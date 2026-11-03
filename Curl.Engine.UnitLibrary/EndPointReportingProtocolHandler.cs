@@ -1,3 +1,4 @@
+using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -32,7 +33,15 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         recorder.Clear(context.Http?.RedirectsFollowed > 0);
-        TransferResult result = await handler.ExecuteAsync(context).ConfigureAwait(false);
+        TransferResult result;
+        try
+        {
+            result = await handler.ExecuteAsync(context).ConfigureAwait(false);
+        }
+        catch (DatagramPortUnreachableException refused)
+        {
+            result = TransferResult.Failure(CurlExitCode.CouldntConnect, refused.Message);
+        }
 
         return recorder.ReportOn(result);
     }

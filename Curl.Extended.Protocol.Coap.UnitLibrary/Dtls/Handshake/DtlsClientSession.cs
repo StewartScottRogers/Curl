@@ -19,6 +19,9 @@ internal sealed class DtlsClientSession(IDatagramChannel channel, DtlsRecordProt
 
     private readonly byte[] buffer = new byte[MaximumDatagramLength];
 
+    /// <summary>Gets the cipher suite the server chose, one of <see cref="DtlsClientHello.CipherSuites" />.</summary>
+    public ushort CipherSuite { get; init; }
+
     /// <summary>Sends <paramref name="payload" /> as one protected application data record.</summary>
     public ValueTask SendAsync(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken) =>
         channel.SendAsync(protector.Protect(TlsContentType.ApplicationData, payload.Span), channel.ServerEndPoint, cancellationToken);

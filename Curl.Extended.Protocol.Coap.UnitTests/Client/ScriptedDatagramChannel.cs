@@ -22,7 +22,10 @@ internal sealed class ScriptedDatagramChannel(Func<int, CoapMessage, IEnumerable
     public bool IsDisposed { get; private set; }
 
     /// <inheritdoc />
-    public EndPoint ServerEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 5683);
+    public EndPoint ServerEndPoint { get; init; } = new IPEndPoint(IPAddress.Loopback, 5683);
+
+    /// <inheritdoc />
+    public EndPoint? LocalEndPoint { get; init; }
 
     /// <inheritdoc />
     public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken)
