@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.DnsQuery.UnitLibrary/Transport/Https/DohHttp2Exchange.cs, Curl.Extended.Protocol.DnsQuery.UnitTests/Transport/Https/DohHttp2ExchangeTests.cs, Documentation/Planning/Decisions/ADR-1231-dns-over-https-prefers-http2-through-alpn.md]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4730 — Fix DoH over HTTP/2: map HTTP/2 and HPACK failures to DnsQueryException and cap the answer at 65535 octets
 
@@ -47,3 +47,4 @@ Found by the shift-end review of 2026-11-03 (silent-failure-hunter, code-reviewe
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 51df3932 ad459068 c42bcdef a963b8b4.
+- 2026-11-03: Doing -> Done. DoH over HTTP/2 maps reset/GOAWAY/early close to exit 56, HPACK/protocol errors to exit 8, caps answer at 65535; ADR-1231 updated.
