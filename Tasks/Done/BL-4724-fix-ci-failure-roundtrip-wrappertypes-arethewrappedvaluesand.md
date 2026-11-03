@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.slnx]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4724 — Fix CI failure RoundTrip_WrapperTypes_AreTheWrappedValuesAndKeepAZero on Linux and Windows
 
@@ -26,7 +26,7 @@ Lanes test only on Windows, so reproduce with `gh run view 41632220793 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `RoundTrip_WrapperTypes_AreTheWrappedValuesAndKeepAZero` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `RoundTrip_WrapperTypes_AreTheWrappedValuesAndKeepAZero` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
 
@@ -34,3 +34,4 @@ Lanes test only on Windows, so reproduce with `gh run view 41632220793 --log-fai
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 3e490659.
+- 2026-11-03: Doing -> Done. Already fixed by 1df901115, which drops the stale ProtoJSON known-failure lines; test passes locally
