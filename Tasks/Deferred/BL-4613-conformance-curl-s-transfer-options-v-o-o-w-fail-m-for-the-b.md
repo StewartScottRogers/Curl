@@ -33,7 +33,11 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 
 ## Notes
 
+- 2026-11-02 (lane 6, first pass before any edit): split for size. Five broker libraries, each with its own reference server (Amqp0ReferenceBroker, Amqp1ReferenceContainer, KafkaReferenceBroker, scripted NATS and STOMP), and none of their `-v`, `-w`, `--fail` or `-m` answers measured yet: about 70 cases, more than one run's cap. Split into one task per library: BL-4628 (amqp, amqps), BL-4629 (amqp1, amqp1s), BL-4630 (kafka, kafkas), BL-4631 (nats, natss), BL-4632 (stomp, stomps), each with this task's `depends-on` and its share of the criteria. Nothing is left here, so no last task waits on them. Decision: each part keeps its own matrix `CurlSurface-Transfer-Brokers-<Name>.md` and folder `CurlSurface/Transfer/Brokers/<Name>/` instead of the one `CurlSurface-Transfer-Brokers.md`, so the five run in parallel without editing one table (the reason BL-4476 gave each `CurlSurface` part its own matrix), with IDs `CurlSurface:<Name><option>-<n>` so no two matrices share an ID. BL-4618's `depends-on` now names the five instead of BL-4613.
+- 2026-11-02 (lane 6, rebase): the parts first filed as BL-4620 to BL-4624 were renumbered BL-4628 to BL-4632, because other lanes had taken BL-4620 to BL-4627 first.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 41b31e62 636af73a fe617ef5 be674468 9438adeb ef6c9026.
+- 2026-11-02: Doing -> Deferred. Split into BL-4628, BL-4629, BL-4630, BL-4631, BL-4632
