@@ -31,3 +31,4 @@ Found by BL-4486: `Mqtt5WebSocketUpgrade.CheckHead` checks only the status, Sec-
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: f44d6cb0 be93e6c9 91dca242.
