@@ -36,3 +36,4 @@ A fault in the reference server is fixed here. A defect in the extension library
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 06fab208 e13a7e37 feec4e2a d8e3fb0e 28ebdf4f 17248609.
