@@ -116,6 +116,49 @@ public sealed class ConnectionCacheTests
     }
 
     [TestMethod]
+    [DataRow(1L, 3)]
+    [DataRow(2L, 3)]
+    [DataRow(3L, 2)]
+    [DataRow(4L, 1)]
+    [DataRow(5L, 0)]
+    public async Task CloseIdleToMakeRoomAsync_ThreeIdleAndOneLeasedForANewHost_ClosesTheOldestIdleUntilFewerThanTheLimitRemain(long limit, int expectedClosed)
+    {
+        var cache = new ConnectionCache(new ManualTimeProvider());
+        var inner = new FakeConnector();
+        var connector = new PoolingConnector(inner, cache, configuration: null);
+        foreach (string host in new[] { "oldest.example", "older.example", "newest.example" })
+        {
+            var opened = await connector.ConnectAsync(Target(host), CancellationToken.None);
+            opened.Connection!.MarkReusable();
+            await opened.Connection.DisposeAsync();
+        }
+
+        var inUse = await connector.ConnectAsync(Target("in-use.example"), CancellationToken.None);
+
+        await cache.CloseIdleToMakeRoomAsync(limit, "new.example", 80);
+
+        bool[] disposed = [.. inner.Opened.Select(connection => connection.IsDisposed)];
+        bool[] expected = [.. Enumerable.Range(0, 4).Select(index => index < expectedClosed)];
+        CollectionAssert.AreEqual(expected, disposed);
+        Assert.IsNotNull(inUse.Connection);
+    }
+
+    [TestMethod]
+    public async Task CloseIdleToMakeRoomAsync_AnIdleConnectionToTheSameHostWaits_ClosesNone()
+    {
+        var cache = new ConnectionCache(new ManualTimeProvider());
+        var inner = new FakeConnector();
+        var connector = new PoolingConnector(inner, cache, configuration: null);
+        var idle = await connector.ConnectAsync(Target("idle.example"), CancellationToken.None);
+        idle.Connection!.MarkReusable();
+        await idle.Connection.DisposeAsync();
+
+        await cache.CloseIdleToMakeRoomAsync(1, "IDLE.example", 80);
+
+        Assert.IsFalse(inner.Opened[0].IsDisposed);
+    }
+
+    [TestMethod]
     public async Task CloseIdleOwnedByAsync_OwnedIdleOtherIdleAndOwnedLeased_ClosesOnlyTheOwnedIdleOne()
     {
         var cache = new ConnectionCache(new ManualTimeProvider());
