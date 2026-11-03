@@ -303,10 +303,110 @@ public sealed class Amqp1ClientFlowTests
         Assert.AreEqual(0, Heartbeats(connection));
     }
 
+    [TestMethod]
+    public async Task RunAsync_HeartbeatWriteFailsWhileWaitingForTheLastReply_TransferStillSucceeds_Part2Section2_4_5()
+    {
+        ManualAmqp1TimeProvider clock = new();
+        ScriptedAmqp1Connection scripted = new(
+            [.. Authenticated, .. Open(idleTimeOut: 1000), .. Begin, .. Attach(true), .. Flow(1)],
+            [.. Disposition(State(Amqp1CompositeType.Accepted))], Detach(), End(), Close())
+        { HoldsRead = 4 };
+        HeartbeatRejectingConnection connection = new(scripted);
+
+        Task<Amqp1ClientException?> run = RunAsync(connection, new MemoryStream(), "hi", clock);
+        await scripted.ReadHeld;
+        await clock.TimerCreated.WaitAsync();
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        await connection.HeartbeatRejected;
+        scripted.ReleaseHeldRead();
+        var failure = await run;
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HeartbeatWriteFailsAndBrokerEndsWithError_ReportsTheBrokersExitCode_Part2Section2_4_5()
+    {
+        ManualAmqp1TimeProvider clock = new();
+        ScriptedAmqp1Connection scripted = new(
+            [.. Authenticated, .. Open(idleTimeOut: 1000), .. Begin, .. Attach(true), .. Flow(1)],
+            End(Error(new Amqp1Symbol("amqp:not-found"), "no queue q")))
+        { HoldsRead = 1 };
+        HeartbeatRejectingConnection connection = new(scripted);
+
+        Task<Amqp1ClientException?> run = RunAsync(connection, new MemoryStream(), "hi", clock);
+        await scripted.ReadHeld;
+        await clock.TimerCreated.WaitAsync();
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        await connection.HeartbeatRejected;
+        scripted.ReleaseHeldRead();
+        var failure = await run;
+
+        Assert.AreEqual(CurlExitCode.RemoteFileNotFound, failure!.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HeartbeatWriteFailsAndTheExchangeIsCancelledByIt_ReportsTheSendFailure_Part2Section2_4_5()
+    {
+        ManualAmqp1TimeProvider clock = new();
+        ScriptedAmqp1Connection scripted = new(
+            [.. Authenticated, .. Open(idleTimeOut: 1000), .. Begin, .. Attach(true), .. Flow(1)],
+            [.. Disposition(State(Amqp1CompositeType.Accepted)), .. Closed])
+        { HoldsRead = 1 };
+        HeartbeatRejectingConnection connection = new(scripted);
+
+        Task<Amqp1ClientException?> run = RunAsync(connection, new MemoryStream(), "hi", clock);
+        await scripted.ReadHeld;
+        await clock.TimerCreated.WaitAsync();
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        await connection.ReadCancelled;
+        scripted.ReleaseHeldRead();
+        var failure = await run;
+
+        Assert.AreEqual(CurlExitCode.SendError, failure!.ExitCode);
+    }
+
+    private sealed class HeartbeatRejectingConnection(ScriptedAmqp1Connection inner) : IConnection
+    {
+        private readonly TaskCompletionSource rejected = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task HeartbeatRejected => rejected.Task;
+
+        private readonly TaskCompletionSource readCancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>Completes once the token of a read has been cancelled.</summary>
+        public Task ReadCancelled => readCancelled.Task;
+
+        public bool IsSecure => inner.IsSecure;
+
+        public System.Net.EndPoint? RemoteEndPoint => inner.RemoteEndPoint;
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            cancellationToken.Register(() => readCancelled.TrySetResult());
+            return inner.ReadAsync(buffer, cancellationToken);
+        }
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+        {
+            if (buffer.Span.SequenceEqual(Heartbeat))
+            {
+                rejected.TrySetResult();
+                throw new IOException("reset");
+            }
+
+            return inner.WriteAsync(buffer, cancellationToken);
+        }
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
+
     private static int Heartbeats(ScriptedAmqp1Connection connection) =>
         connection.Writes.ToArray().Count(write => write.AsSpan().SequenceEqual(Heartbeat));
 
-    private static async Task<Amqp1ClientException?> RunAsync(ScriptedAmqp1Connection connection, Stream output, string? body = null, TimeProvider? clock = null)
+    private static async Task<Amqp1ClientException?> RunAsync(IConnection connection, Stream output, string? body = null, TimeProvider? clock = null)
     {
         try
         {

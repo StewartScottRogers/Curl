@@ -31,6 +31,11 @@ public sealed class ExtensionHelperProcessStarterTests
     }
 
     [TestMethod]
-    public void Start_WhenTheHostCannotStartIt_ThrowsTheHostsIOException() =>
-        Assert.ThrowsExactly<IOException>(() => new ExtensionHelperProcessStarter(new StandInExtensionProcessStarter(null)).Start("p", "demo://h"));
+    public void Start_WhenTheHostCannotStartIt_ThrowsTheHostsIOException()
+    {
+        IOException thrown = Assert.ThrowsExactly<IOException>(() => new ExtensionHelperProcessStarter(new StandInExtensionProcessStarter(null)).Start("p", "demo://h"));
+
+        Assert.AreEqual("The system cannot find the file specified.", thrown.Message);
+        Assert.IsNull(thrown.InnerException);
+    }
 }

@@ -9,10 +9,11 @@ public sealed class DynamicMessageType
     private readonly Dictionary<string, DynamicField> fieldsByName = new(StringComparer.Ordinal);
     private DynamicField[] fields = [];
 
-    internal DynamicMessageType(string fullName, ProtoMessageDescriptor descriptor)
+    internal DynamicMessageType(string fullName, ProtoMessageDescriptor descriptor, DynamicTypeCatalogue catalogue)
     {
         FullName = fullName;
         Descriptor = descriptor;
+        Catalogue = catalogue;
     }
 
     /// <summary>The message's full name, its package and enclosing messages before it: <c>pkg.Outer.Inner</c>.</summary>
@@ -20,6 +21,9 @@ public sealed class DynamicMessageType
 
     /// <summary>The message as the <c>.proto</c> file declares it.</summary>
     public ProtoMessageDescriptor Descriptor { get; }
+
+    /// <summary>The catalogue the type came from, which resolves the other types its files declare, as a <c>google.protobuf.Any</c>'s type URL names one.</summary>
+    public DynamicTypeCatalogue Catalogue { get; }
 
     /// <summary>The message's fields in field number order, the order they are written in.</summary>
     public IReadOnlyList<DynamicField> Fields => fields;

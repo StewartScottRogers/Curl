@@ -1272,3 +1272,11 @@ Each option and the specific reason it lost.
 | [1222](ADR-1222-coap-transfer-surface-verbose-and-timeout-lines.md) | The CoAP transfer surface pins the DTLS verbose line and a connect-phase timeout for coaps (BL-4627) | Accepted | 2026-11-03 |
 | [1223](ADR-1223-coaps-verbose-names-the-dtls-cipher-as-openssl-does.md) | `-v` on coaps names the DTLS cipher suite as OpenSSL does, after a connection line from the UDP channel (BL-4667) | Accepted | 2026-11-03 |
 | [1224](ADR-1224-closed-udp-port-is-exit-7.md) | A closed UDP port ends a `coap`, `dns` or `webtransport` transfer with exit 7 (BL-4654) | Accepted | 2026-11-03 |
+| [1225](ADR-1225-dns-udp-reply-must-carry-the-query-question.md) | A `dns://` reply over UDP must carry the query's question, QNAME compared without regard to case (BL-4673) | Accepted | 2026-11-03 |
+| [1226](ADR-1226-grpc-bin-metadata-given-to-h-is-base64.md) | A `-bin` metadata value given to `-H` on a gRPC call is read as base64 and sent un-padded (BL-4533) | Accepted | 2026-11-03 |
+| [1227](ADR-1227-grpc-request-headers-carry-h-and-user-agent.md) | A gRPC call sends `-H` as Custom-Metadata, `-A` or curl's own `user-agent`, and `grpc-timeout` straight after the pseudo-headers (BL-4674) | Accepted | 2026-11-03 |
+| [1228](ADR-1228-protojson-timestamp-and-duration-are-strings.md) | ProtoJSON writes and reads `google.protobuf.Timestamp` and `Duration` as their string forms (BL-4686) | Accepted | 2026-11-03 |
+| [1229](ADR-1229-dns-over-https-queries-carry-dns-id-0.md) | DNS over HTTPS queries carry DNS ID 0 (BL-4688) | Accepted | 2026-11-03 |
+| [1230](ADR-1230-dns-over-tls-queries-carry-edns-padding.md) | DNS over TLS queries carry EDNS(0) Padding to a 128-octet block (BL-4689) | Accepted | 2026-11-03 |
+| [1231](ADR-1231-dns-over-https-prefers-http2-through-alpn.md) | DNS over HTTPS prefers HTTP/2 through ALPN (BL-4690) | Accepted | 2026-11-03 |
+| [1232](ADR-1232-protojson-any-resolves-its-type-in-the-catalogue.md) | ProtoJSON Any resolves its type URL in the message type's catalogue (BL-4720) | Accepted | 2026-11-03 |

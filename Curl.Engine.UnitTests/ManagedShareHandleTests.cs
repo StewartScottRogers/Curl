@@ -108,7 +108,7 @@ public sealed class ManagedShareHandleTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_ConnectionsSharedAndNoUrl_LocksTheConnectionsThreeTimesAtTheStart()
+    public async Task PerformAsync_ConnectionsSharedAndNoUrl_LocksTheConnectionsThreeTimesToTakeThePoolAndOnceWhenDone()
     {
         await using ManagedCurlEngine engine = CreateEngine(new ScriptedConnector([]));
         IShareHandle share = engine.CreateShare();
@@ -119,7 +119,7 @@ public sealed class ManagedShareHandleTests
 
         await PerformAsync(engine, string.Empty, share);
 
-        Assert.AreEqual(4, locks);
+        Assert.AreEqual(3 + 1, locks, "three locks while the perform takes the shared pool, one when it is done");
     }
 
     [TestMethod]

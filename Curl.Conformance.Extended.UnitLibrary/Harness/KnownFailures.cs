@@ -8,6 +8,8 @@ namespace Curl.Conformance.Extended.Harness;
 /// </summary>
 public sealed class KnownFailures
 {
+    private const string AssertionFailureTypeName = "Microsoft.VisualStudio.TestTools.UnitTesting.UnitTestAssertException";
+
     private readonly Dictionary<string, string> taskIdsByRequirementId;
     private readonly List<string> formatProblems;
 
@@ -86,7 +88,7 @@ public sealed class KnownFailures
 
     /// <summary>
     /// Runs a conformance case. When none of its requirement IDs is listed, the case runs as is.
-    /// When one is, a failing case passes, and a passing case throws
+    /// When one is, a case failing an assertion passes, a case throwing anything else fails, and a passing case throws
     /// <see cref="KnownFailurePassedException"/> asking for its line to be removed.
     /// </summary>
     /// <param name="requirementIds">The requirement IDs the case carries.</param>
@@ -105,12 +107,33 @@ public sealed class KnownFailures
         {
             await runCase().ConfigureAwait(false);
         }
-        catch (Exception)
+        catch (Exception exception) when (IsAssertionFailure(exception))
         {
             return;
         }
 
         throw new KnownFailurePassedException(
             $"{listedId} passes now: remove its KnownFailures.txt line ({taskIdsByRequirementId[listedId]}).");
+    }
+
+    /// <summary>
+    /// Reports whether an exception is a failed assertion: MSTest's <c>UnitTestAssertException</c> or a
+    /// type derived from it, named rather than referenced so this library takes no test framework. A
+    /// listed case records a difference its assertions catch; any other exception, a crash included,
+    /// still fails it.
+    /// </summary>
+    /// <param name="exception">The exception the case threw.</param>
+    /// <returns><see langword="true"/> when it is a failed assertion.</returns>
+    private static bool IsAssertionFailure(Exception exception)
+    {
+        for (Type? type = exception.GetType(); type is not null; type = type.BaseType)
+        {
+            if (type.FullName == AssertionFailureTypeName)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

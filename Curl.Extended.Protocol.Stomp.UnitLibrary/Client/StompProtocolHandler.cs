@@ -67,7 +67,7 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
     }
 
     /// <summary>
-    /// Gives the <c>content-type</c> for the <c>SEND</c> frame (ADR-1210): the value of the last <c>-H "content-type: ..."</c>
+    /// Gives the <c>content-type</c> for the <c>SEND</c> frame (ADR-1220): the value of the last <c>-H "content-type: ..."</c>
     /// in <paramref name="headers"/> (name matched without regard to case), or <see cref="StompClientFlow.SendContentType"/>
     /// when there is none or its value is empty.
     /// </summary>

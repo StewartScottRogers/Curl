@@ -16,7 +16,7 @@ namespace Curl.Extended.Protocol.DnsQuery.Client;
 /// </summary>
 /// <param name="services">Curl's connection services, which the transports open their connections through.</param>
 /// <param name="systemDnsServers">Lists the system's DNS servers.</param>
-/// <param name="randomBytes">Gives the given number of random bytes, for the message ID.</param>
+/// <param name="randomBytes">Gives the given number of random bytes, for the message ID of a transport that does not query with ID 0.</param>
 internal sealed class DnsQueryProtocolHandler(ProtocolHandlerServices services, Func<IReadOnlyList<IPEndPoint>> systemDnsServers, Func<int, byte[]> randomBytes) : IProtocolHandler
 {
     /// <inheritdoc />
@@ -41,20 +41,30 @@ internal sealed class DnsQueryProtocolHandler(ProtocolHandlerServices services, 
         DnsQueryContext? options = context as DnsQueryContext;
         IDnsQueryTransport transport = DnsQueryTransportSelection.TransportOf(options?.Transport ?? DnsQueryTransportSelection.Udp, services);
         DnsQueryRequest request = DnsQueryRequest.Of(context.Url, transport.DefaultPort);
-        ushort id = BinaryPrimitives.ReadUInt16BigEndian(randomBytes(2));
+        ushort id = MessageIdFor(transport);
         byte[] query = Required(DnsQueryEncoder.Encode(id, request.Name, request.Type, request.Class, recursionDesired: true), CurlExitCode.UrlMalformat);
         (string host, int port) = ServerOf(request);
         context.Progress.ReportTransferStarted();
         byte[] answer = await transport.ExchangeAsync(host, port, query, context).ConfigureAwait(false);
         DnsMessage message = Required(DnsMessageDecoder.Decode(answer), CurlExitCode.WeirdServerReply);
-        if (message.Header.Id != id)
-        {
-            throw new DnsQueryException(CurlExitCode.WeirdServerReply, $"The DNS server answered with message ID {message.Header.Id}, not the query's {id}");
-        }
+        RequireQueryId(message, id);
 
         byte[] output = Encoding.UTF8.GetBytes(options?.Json == true ? DnsJsonRenderer.Render(message) + "\n" : DnsTextRenderer.Render(message));
         await context.Output.WriteAsync(output, context.CancellationToken).ConfigureAwait(false);
         return TransferResult.Success(output.Length);
+    }
+
+    /// <summary>Gives the query's message ID: 0 for a transport that queries with ID 0, otherwise a random one (RFC 5452 section 4).</summary>
+    private ushort MessageIdFor(IDnsQueryTransport transport) =>
+        transport.QueriesWithMessageIdZero ? (ushort)0 : BinaryPrimitives.ReadUInt16BigEndian(randomBytes(2));
+
+    /// <summary>Fails with exit 8 when the answer does not carry the query's message ID (RFC 1035 section 4.1.1).</summary>
+    private static void RequireQueryId(DnsMessage message, ushort id)
+    {
+        if (message.Header.Id != id)
+        {
+            throw new DnsQueryException(CurlExitCode.WeirdServerReply, $"The DNS server answered with message ID {message.Header.Id}, not the query's {id}");
+        }
     }
 
     /// <summary>

@@ -3,6 +3,7 @@ using Curl.Extended.Protocol.DnsQuery.Client;
 using Curl.Extended.Protocol.DnsQuery.Transport.Quic;
 using Curl.Extended.Protocol.DnsQuery.UnitTests.Transport.Tls;
 using Curl.Extended.Protocol.DnsQuery.UnitTests.Wire;
+using Curl.Extended.Protocol.DnsQuery.Wire;
 using Curl.Protocol.Abstractions;
 using Curl.Quic;
 
@@ -50,9 +51,11 @@ public sealed class DnsQuicTransportTests
         Assert.AreEqual("dns.example", tls.TargetHost, "the certificate is judged by the TLS provider against the server's host");
         (ulong streamId, byte[] sent) = channel.Queries.Single();
         Assert.AreEqual(0UL, streamId, "the first client-initiated bidirectional stream");
-        Assert.AreEqual(Query.Length, BinaryPrimitives.ReadUInt16BigEndian(sent), "two-octet length prefix");
+        Assert.AreEqual(128, BinaryPrimitives.ReadUInt16BigEndian(sent), "two-octet length prefix of the padded query");
         Assert.AreEqual(0, BinaryPrimitives.ReadUInt16BigEndian(sent.AsSpan(2)), "Message ID 0 (section 4.2.1)");
-        CollectionAssert.AreEqual(Query[2..], sent[4..]);
+        CollectionAssert.AreEqual(DnsEdnsPadding.Pad(Query)[2..], sent[4..]);
+        Assert.AreEqual(1, BinaryPrimitives.ReadUInt16BigEndian(sent.AsSpan(12)), "ARCOUNT 1");
+        Assert.AreEqual(12, BinaryPrimitives.ReadUInt16BigEndian(sent.AsSpan(2 + Query.Length + 11)), "the OPT record's first option is Padding");
         Assert.AreEqual(0x1234, BinaryPrimitives.ReadUInt16BigEndian(answer), "the answer carries the query's own ID back to the caller");
         CollectionAssert.AreEqual(Response(sent)[2..], answer[2..]);
     }

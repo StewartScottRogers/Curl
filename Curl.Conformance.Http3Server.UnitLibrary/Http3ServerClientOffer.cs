@@ -21,19 +21,20 @@ internal sealed record Http3ServerClientOffer(
 
     /// <summary>
     /// Reads <paramref name="hello" />: without TLS 1.3 in <c>supported_versions</c> it is
-    /// <c>protocol_version</c>, without ALPN <c>h3</c> <c>no_application_protocol</c> (RFC 9001
+    /// <c>protocol_version</c>, without ALPN <paramref name="applicationProtocol" /> <c>no_application_protocol</c> (RFC 9001
     /// section 8.1), without groups, key shares, signature schemes or transport parameters
     /// <c>missing_extension</c>, and a malformed extension is its decoder's alert.
     /// </summary>
     /// <param name="hello">The ClientHello.</param>
+    /// <param name="applicationProtocol">The ALPN protocol the client must offer.</param>
     /// <returns>The offer.</returns>
     /// <exception cref="TlsAlertException">The hello cannot be served; the alert says why.</exception>
-    public static Http3ServerClientOffer Parse(ClientHello hello)
+    public static Http3ServerClientOffer Parse(ClientHello hello, string applicationProtocol)
     {
         IReadOnlyList<ushort> versions = Decode(hello, TlsExtensionType.SupportedVersions, SupportedVersionsExtension.DecodeOffered, TlsAlertDescription.ProtocolVersion);
         Require(versions.Contains(Tls13), TlsAlertDescription.ProtocolVersion);
         IReadOnlyList<string> protocols = Decode(hello, TlsExtensionType.ApplicationLayerProtocolNegotiation, ApplicationLayerProtocolNegotiationExtension.Decode, TlsAlertDescription.NoApplicationProtocol);
-        Require(protocols.Contains(Http3ServerTlsSettings.ApplicationProtocol), TlsAlertDescription.NoApplicationProtocol);
+        Require(protocols.Contains(applicationProtocol), TlsAlertDescription.NoApplicationProtocol);
         return new(
             Decode(hello, TlsExtensionType.SupportedGroups, SupportedGroupsExtension.Decode, TlsAlertDescription.MissingExtension),
             Decode(hello, TlsExtensionType.KeyShare, KeyShareExtension.DecodeClientShares, TlsAlertDescription.MissingExtension),

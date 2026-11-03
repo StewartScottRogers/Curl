@@ -33,12 +33,12 @@ internal sealed class ServerReflectionStream
     /// <summary>Opens the stream on the call's connection.</summary>
     /// <param name="session">The connection.</param>
     /// <param name="callTarget">The call the reflection is for: its scheme and authority are the stream's.</param>
-    /// <param name="timeout">The <c>grpc-timeout</c> to send, or <see langword="null" /> for none.</param>
+    /// <param name="headerValues">The deadline, <c>user-agent</c> and <c>-H</c> values the call sends, which the stream sends too.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>The open stream.</returns>
-    public static async Task<ServerReflectionStream> OpenAsync(GrpcHttp2Session session, GrpcRequestTarget callTarget, TimeSpan? timeout, CancellationToken cancellationToken)
+    public static async Task<ServerReflectionStream> OpenAsync(GrpcHttp2Session session, GrpcRequestTarget callTarget, GrpcRequestHeaderValues headerValues, CancellationToken cancellationToken)
     {
-        var headers = GrpcRequestHeaders.Build(callTarget with { Service = Service, Method = Method }, timeout, null);
+        var headers = GrpcRequestHeaders.Build(callTarget with { Service = Service, Method = Method }, headerValues);
         return new ServerReflectionStream(session, await session.OpenStreamAsync(headers, cancellationToken).ConfigureAwait(false));
     }
 

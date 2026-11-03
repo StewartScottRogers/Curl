@@ -134,6 +134,33 @@ public sealed class PortUnreachableReportingDatagramChannelTests
         }
     }
 
+    private sealed class AnswerThenFailChannel(Exception failure) : IDatagramChannel
+    {
+        private bool _answered;
+
+        public EndPoint ServerEndPoint => Server;
+
+        public async ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            throw failure;
+        }
+
+        public async ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            if (_answered)
+            {
+                throw failure;
+            }
+
+            _answered = true;
+            return new DatagramReceived(2, Server);
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     private sealed class FailingChannel(Exception failure) : IDatagramChannel
     {
         public EndPoint ServerEndPoint => Server;

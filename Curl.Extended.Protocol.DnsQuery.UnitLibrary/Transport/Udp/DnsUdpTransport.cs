@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Net;
+using System.Text;
 using Curl.Extended.Protocol.DnsQuery.Client;
 using Curl.Extended.Protocol.DnsQuery.Wire;
 using Curl.Protocol.Abstractions;
@@ -9,7 +10,7 @@ namespace Curl.Extended.Protocol.DnsQuery.Transport.Udp;
 /// <summary>
 /// Sends a query as one UDP datagram and waits for the answer (RFC 1035 section 4.2.1): it sends the query up to
 /// <see cref="Attempts" /> times, waiting <see cref="AttemptTimeout" /> on the transfer's clock after each, ignores any
-/// datagram that is not a response with the query's message ID, and asks the query again over <paramref name="fallback" />
+/// datagram that is not a response with the query's message ID and question (RFC 5452 section 9.1), and asks the query again over <paramref name="fallback" />
 /// when the answer has TC set. No answer after the last attempt ends with exit 28.
 /// </summary>
 /// <param name="connector">Opens the datagram channel to the server.</param>
@@ -103,11 +104,41 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
         }
     }
 
-    /// <summary>Tells whether a datagram is a response (QR set) carrying the query's message ID (RFC 1035 section 4.1.1).</summary>
+    /// <summary>
+    /// Tells whether a datagram is a response (QR set) carrying the query's message ID (RFC 1035 section 4.1.1) and,
+    /// when it has a question section, the query's question (RFC 5452 section 9.1, ADR-1225).
+    /// </summary>
     private static bool IsAnswerTo(ReadOnlySpan<byte> datagram, byte[] query) =>
         datagram.Length >= HeaderLength
         && datagram[..2].SequenceEqual(query.AsSpan(0, 2))
-        && (BinaryPrimitives.ReadUInt16BigEndian(datagram[2..]) & DnsHeader.ResponseFlag) != 0;
+        && (BinaryPrimitives.ReadUInt16BigEndian(datagram[2..]) & DnsHeader.ResponseFlag) != 0
+        && (BinaryPrimitives.ReadUInt16BigEndian(datagram[4..]) == 0 || StartsWithQuestionOf(datagram[HeaderLength..], query));
+
+    /// <summary>
+    /// Tells whether a response's question section starts with the query's question: the same QNAME, compared without
+    /// regard to ASCII case, and the same QTYPE and QCLASS (RFC 5452 section 9.1). The query's own QNAME is uncompressed.
+    /// </summary>
+    private static bool StartsWithQuestionOf(ReadOnlySpan<byte> questions, byte[] query)
+    {
+        ReadOnlySpan<byte> asked = query.AsSpan(HeaderLength);
+        int nameLength = NameLength(asked);
+        int questionLength = nameLength + 4;
+        return questions.Length >= questionLength
+            && Ascii.EqualsIgnoreCase(questions[..nameLength], asked[..nameLength])
+            && questions[nameLength..questionLength].SequenceEqual(asked[nameLength..questionLength]);
+    }
+
+    /// <summary>Gives the length of an uncompressed domain name, its terminating root label included.</summary>
+    private static int NameLength(ReadOnlySpan<byte> name)
+    {
+        int offset = 0;
+        while (name[offset] != 0)
+        {
+            offset += name[offset] + 1;
+        }
+
+        return offset + 1;
+    }
 
     private static bool IsTruncated(byte[] answer) =>
         (BinaryPrimitives.ReadUInt16BigEndian(answer.AsSpan(2)) & DnsHeader.TruncatedFlag) != 0;

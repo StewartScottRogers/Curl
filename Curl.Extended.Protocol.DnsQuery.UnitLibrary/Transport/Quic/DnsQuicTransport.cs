@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using Curl.Extended.Protocol.DnsQuery.Client;
+using Curl.Extended.Protocol.DnsQuery.Wire;
 using Curl.Protocol.Abstractions;
 using Curl.Quic;
 using Curl.Tls;
@@ -95,6 +96,7 @@ internal sealed class DnsQuicTransport(IDatagramConnector connector, ITlsProvide
     // The query with Message ID 0 (RFC 9250 section 4.2.1) behind its two-octet length prefix (section 4.2).
     private static byte[] Framed(byte[] query)
     {
+        query = DnsEdnsPadding.Pad(query);
         byte[] framed = new byte[LengthPrefixLength + query.Length];
         BinaryPrimitives.WriteUInt16BigEndian(framed, (ushort)query.Length);
         query.AsSpan(MessageIdLength).CopyTo(framed.AsSpan(LengthPrefixLength + MessageIdLength));

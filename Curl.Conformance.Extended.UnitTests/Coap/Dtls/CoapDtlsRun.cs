@@ -20,5 +20,23 @@ internal static class CoapDtlsRun
     public static Task<CurlRunResult> RunAsync(DtlsReferenceServer server, params string[] arguments) =>
         ExtendedConformanceHarness.RunAsync(InProcessCurl.RunAsync, [ReferenceRoute.Udp(Port, server)], ["-sS", .. arguments, Url], timeProvider: new TimerJumpingClock());
 
+    /// <summary>Runs as <see cref="RunAsync" /> does, but jumps the clock to the next pending timer whenever <paramref name="curlIsWaitingInVain" /> says so.</summary>
+    public static async Task<CurlRunResult> RunJumpingAsync(DtlsReferenceServer server, Func<bool> curlIsWaitingInVain, params string[] arguments)
+    {
+        TimerJumpingClock clock = new();
+        Task<CurlRunResult> run = ExtendedConformanceHarness.RunAsync(
+            InProcessCurl.RunAsync, [ReferenceRoute.Udp(Port, server)], ["-sS", .. arguments, Url], timeProvider: clock);
+        long deadline = Environment.TickCount64 + 30_000;
+        while (!run.IsCompleted && Environment.TickCount64 < deadline)
+        {
+            if (!curlIsWaitingInVain() || !clock.JumpToNextTimer())
+            {
+                await Task.Delay(1);
+            }
+        }
+
+        return await run.WaitAsync(TimeSpan.FromSeconds(30));
+    }
+
     public static CoapReferenceServer CoapServer(CoapResponder respond) => new(respond, new TimerJumpingClock());
 }

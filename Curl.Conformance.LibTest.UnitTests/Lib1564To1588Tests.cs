@@ -353,13 +353,19 @@ public sealed class Lib1564To1588Tests
     {
         ReadCallback? read = null;
         FollowLocation? seen = null;
-        var engine = new FakeCurlEngine { Performing = o => { read = o.Callbacks.Read; seen = o.Http.FollowLocation; return CurlCode.SendError; } };
+        string? method = null;
+        var engine = new FakeCurlEngine { Performing = o => { read = o.Callbacks.Read; seen = o.Http.FollowLocation; method = o.Transfer.CustomRequest; return CurlCode.SendError; } };
         var run = new PortRun(engine, testNumber, "http://x/1576");
 
         LibTestResult result = await new Lib1576().RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual((int)CurlCode.SendError, result.ExitCode);
         Assert.IsNotNull(read);
+        Assert.AreEqual("CURL", method);
+        byte[] buffer = new byte[100];
+        long uploaded = read(buffer);
+        Assert.AreEqual(Lib1576.Body.Length, uploaded);
+        CollectionAssert.AreEqual(Lib1576.Body.ToArray(), buffer[..Lib1576.Body.Length]);
         Assert.AreEqual(follow, seen);
     }
 

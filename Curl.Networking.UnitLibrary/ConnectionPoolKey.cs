@@ -52,14 +52,14 @@ internal sealed record ConnectionPoolKey(
 {
     /// <summary>
     /// Builds the key of <paramref name="target" />, or <see langword="null" /> when the
-    /// target has no <see cref="ConnectTarget.PoolScheme" /> and so is never pooled.
+    /// target has no <see cref="ConnectTarget.PoolScheme" /> or sets <see cref="ConnectTarget.IsNeverPooled" />, and so is never pooled.
     /// </summary>
     /// <param name="target">The target a connection is asked for.</param>
     /// <param name="configuration">The asking connector's configuration, or <see langword="null" /> for none.</param>
     /// <param name="connectTo">The asking connector's <c>--connect-to</c> mappings, or <see langword="null" /> for none.</param>
     /// <returns>The key, or <see langword="null" /> for a target that is never pooled.</returns>
     public static ConnectionPoolKey? Of(ConnectTarget target, object? configuration = null, ConnectToMappings? connectTo = null) =>
-        target.PoolScheme is null
+        target.PoolScheme is null || target.IsNeverPooled
             ? null
             : new ConnectionPoolKey(
                 target.PoolScheme.ToLowerInvariant(),

@@ -223,6 +223,21 @@ public sealed class S3HttpClientConnectionTests
     public async Task SendAsync_LineLongerThanTheLimit_FailsLineTooLong() =>
         await AssertFailureAsync(S3HttpFailure.LineTooLong, () => SendAsync("HTTP/1.1 200 OK\r\nX-Long: " + new string('a', S3HttpConnectionReader.MaxLineLength) + "\r\n\r\n"));
 
+    [TestMethod]
+    public async Task SendAsync_LineOfExactlyTheLimit_ReadsTheLine()
+    {
+        // The limit counts every byte before the LF, the CR included: "X-Long: " (8) + value + "\r" (1).
+        var value = new string('a', S3HttpConnectionReader.MaxLineLength - 9);
+
+        var response = await SendAsync("HTTP/1.1 200 OK\r\nX-Long: " + value + "\r\nContent-Length: 0\r\n\r\n");
+
+        Assert.AreEqual(200, response.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_LineOneByteOverTheLimit_FailsLineTooLong() =>
+        await AssertFailureAsync(S3HttpFailure.LineTooLong, () => SendAsync("HTTP/1.1 200 OK\r\nX-Long: " + new string('a', S3HttpConnectionReader.MaxLineLength - 8) + "\r\n\r\n"));
+
     private static S3HttpRequest Get() => new("GET", "/bucket/key", HostOnly);
 
     private static Task<S3HttpResponse> SendAsync(string recorded, int readSize = int.MaxValue) =>

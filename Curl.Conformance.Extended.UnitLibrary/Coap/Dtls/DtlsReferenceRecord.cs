@@ -15,6 +15,9 @@ public sealed record DtlsReferenceRecord(byte ContentType, ushort Epoch, ulong S
     /// <summary>The ChangeCipherSpec content type.</summary>
     public const byte ChangeCipherSpec = 20;
 
+    /// <summary>The Alert content type.</summary>
+    public const byte Alert = 21;
+
     /// <summary>The Handshake content type.</summary>
     public const byte Handshake = 22;
 

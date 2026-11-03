@@ -110,6 +110,20 @@ public sealed class Http3ServerTlsHandshakeTests
         AssertServerAlert(Drive(CurlQuicTlsSettings with { ApplicationProtocols = ["h2", "http/1.1"] }, ServerSettings), TlsAlertDescription.NoApplicationProtocol);
 
     [TestMethod]
+    public void Receive_ClientOffersOnlyDoqAgainstDoqSettings_CompletesWithDoq()
+    {
+        Exchange exchange = Drive(CurlQuicTlsSettings with { ApplicationProtocols = ["doq"] }, ServerSettings with { ApplicationProtocol = "doq" });
+
+        Assert.IsTrue(exchange.Client.IsComplete);
+        Assert.IsTrue(exchange.Server.IsComplete);
+        Assert.AreEqual("doq", exchange.Client.ApplicationProtocol);
+    }
+
+    [TestMethod]
+    public void Receive_ClientOffersOnlyH3AgainstDoqSettings_FailsWithNoApplicationProtocol() =>
+        AssertServerAlert(Drive(CurlQuicTlsSettings with { ApplicationProtocols = ["h3"] }, ServerSettings with { ApplicationProtocol = "doq" }), TlsAlertDescription.NoApplicationProtocol);
+
+    [TestMethod]
     public void Receive_NoApplicationProtocolExtension_FailsWithNoApplicationProtocol() =>
         AssertServerAlert(Drive(CurlQuicTlsSettings with { ApplicationProtocols = [] }, ServerSettings), TlsAlertDescription.NoApplicationProtocol);
 

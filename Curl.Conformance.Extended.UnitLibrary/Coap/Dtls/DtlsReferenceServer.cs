@@ -14,7 +14,8 @@ namespace Curl.Conformance.Extended.Coap.Dtls;
 /// </summary>
 /// <param name="application">The server the protected datagrams are for, such as a <see cref="CoapReferenceServer" />.</param>
 /// <param name="certificate">The server's RSA certificate with its private key.</param>
-public sealed class DtlsReferenceServer(IDatagramReferenceServer application, X509Certificate2 certificate) : IDatagramReferenceServer, IDisposable
+/// <param name="fault">How the hello flight, the server's Finished and the answers go on the wire; <see cref="DtlsReferenceFault.None" /> when omitted.</param>
+public sealed class DtlsReferenceServer(IDatagramReferenceServer application, X509Certificate2 certificate, DtlsReferenceFault? fault = null) : IDatagramReferenceServer, IDisposable
 {
     private const byte ClientHelloType = 1;
     private const byte ServerHelloType = 2;
@@ -29,6 +30,7 @@ public sealed class DtlsReferenceServer(IDatagramReferenceServer application, X5
     /// <summary>TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (RFC 5289).</summary>
     public const ushort CipherSuite = 0xC02F;
 
+    private readonly DtlsReferenceFault fault = fault ?? DtlsReferenceFault.None;
     private readonly Lock gate = new();
     private readonly List<DtlsReferenceRecord> received = [];
     private readonly List<byte[]> clientHelloCookies = [];
@@ -42,6 +44,7 @@ public sealed class DtlsReferenceServer(IDatagramReferenceServer application, X5
     private ulong plainSequenceNumber;
     private ulong protectedSequenceNumber;
     private ushort messageSequence;
+    private List<byte[]>? helloFlight;
 
     /// <summary>Gets the cookie the HelloVerifyRequest carries.</summary>
     public byte[] Cookie { get; } = RandomNumberGenerator.GetBytes(16);
@@ -139,19 +142,26 @@ public sealed class DtlsReferenceServer(IDatagramReferenceServer application, X5
         int cookieAt = 2 + RandomLength + 1 + body[2 + RandomLength];
         byte[] cookie = body.Slice(cookieAt + 1, body[cookieAt]).ToArray();
         clientHelloCookies.Add(cookie);
-        plainSequenceNumber = record.SequenceNumber;
+        plainSequenceNumber = Math.Max(plainSequenceNumber, record.SequenceNumber);
         if (!cookie.AsSpan().SequenceEqual(Cookie))
         {
             return [PlainRecord(DtlsReferenceRecord.Handshake, HandshakeMessage(HelloVerifyRequestType, messageSequence++, [0xFE, 0xFF, (byte)Cookie.Length, .. Cookie]))];
         }
 
-        clientRandom = body.Slice(2, RandomLength).ToArray();
-        transcript.AddRange(message);
+        // A ClientHello curl sends again because the flight was lost gets the same flight again (section 4.2.4).
+        helloFlight ??= BuildHelloFlight(message);
+        return [.. fault.SendHelloFlight(helloFlight, this)];
+    }
+
+    private List<byte[]> BuildHelloFlight(byte[] clientHello)
+    {
+        clientRandom = clientHello.AsSpan(HandshakeHeaderLength + 2, RandomLength).ToArray();
+        transcript.AddRange(clientHello);
         return [
-            FlightRecord(ServerHelloType, [0xFE, 0xFD, .. serverRandom, 0, CipherSuite >> 8, CipherSuite & 0xFF, 0, 0, 0]),
-            FlightRecord(CertificateType, [.. UInt24(certificate.RawData.Length + 3), .. UInt24(certificate.RawData.Length), .. certificate.RawData]),
-            FlightRecord(ServerKeyExchangeType, ServerKeyExchangeBody()),
-            FlightRecord(ServerHelloDoneType, []),
+            FlightMessage(ServerHelloType, [0xFE, 0xFD, .. serverRandom, 0, CipherSuite >> 8, CipherSuite & 0xFF, 0, 0, 0]),
+            FlightMessage(CertificateType, [.. UInt24(certificate.RawData.Length + 3), .. UInt24(certificate.RawData.Length), .. certificate.RawData]),
+            FlightMessage(ServerKeyExchangeType, ServerKeyExchangeBody()),
+            FlightMessage(ServerHelloDoneType, []),
         ];
     }
 
@@ -162,7 +172,7 @@ public sealed class DtlsReferenceServer(IDatagramReferenceServer application, X5
         byte[] parameters = [3, 0x00, 0x17, 65, 4, .. point.X!, .. point.Y!];
         using RSA key = certificate.GetRSAPrivateKey()!;
         byte[] signature = key.SignData([.. clientRandom, .. serverRandom, .. parameters], HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        return [.. parameters, 0x04, 0x01, (byte)(signature.Length >> 8), (byte)signature.Length, .. signature];
+        return [.. parameters, 0x04, 0x01, (byte)(signature.Length >> 8), (byte)signature.Length, .. fault.ServerKeyExchangeSignature(signature)];
     }
 
     /// <summary>Takes the client's ECDHE public value and derives the master secret and key block (RFC 5246 sections 8.1 and 6.3, RFC 5288 section 3).</summary>
@@ -192,7 +202,7 @@ public sealed class DtlsReferenceServer(IDatagramReferenceServer application, X5
             return AnswerClientFinished(plaintext);
         }
 
-        return [.. application.Answer(plaintext).Select(answer => ProtectedRecord(DtlsReferenceRecord.ApplicationData, answer.ToArray()))];
+        return [.. application.Answer(plaintext).SelectMany(answer => fault.SendApplicationAnswer(answer.ToArray(), this))];
     }
 
     /// <summary>Checks the client's Finished and answers with ChangeCipherSpec and the server's Finished (RFC 5246 section 7.4.9).</summary>
@@ -204,18 +214,33 @@ public sealed class DtlsReferenceServer(IDatagramReferenceServer application, X5
         byte[] verifyData = DtlsReferencePrf.Compute(masterSecret, "server finished", SHA256.HashData([.. transcript]), 12);
         return [
             PlainRecord(DtlsReferenceRecord.ChangeCipherSpec, [1]),
-            ProtectedRecord(DtlsReferenceRecord.Handshake, HandshakeMessage(FinishedType, messageSequence++, verifyData)),
+            ProtectedRecord(DtlsReferenceRecord.Handshake, HandshakeMessage(FinishedType, messageSequence++, fault.ServerFinishedVerifyData(verifyData))),
         ];
     }
 
-    private DtlsReferenceRecord FlightRecord(byte type, byte[] body)
+    /// <summary>Gives the next unprotected record of epoch 0.</summary>
+    /// <param name="contentType">The record's content type.</param>
+    /// <param name="fragment">The record's fragment.</param>
+    /// <returns>The record, under the next epoch 0 sequence number.</returns>
+    internal DtlsReferenceRecord PlainRecord(byte contentType, byte[] fragment) => new(contentType, 0, plainSequenceNumber++, fragment);
+
+    /// <summary>Gives the next protected record of epoch 1.</summary>
+    /// <param name="contentType">The record's content type.</param>
+    /// <param name="plaintext">The record's plaintext.</param>
+    /// <returns>The record, under the next epoch 1 sequence number.</returns>
+    internal DtlsReferenceRecord ProtectedRecord(byte contentType, byte[] plaintext) => ProtectedRecordAt(contentType, protectedSequenceNumber++, plaintext);
+
+    /// <summary>Gives a protected record of epoch 1 under a sequence number the caller chooses, even one already sent.</summary>
+    /// <param name="contentType">The record's content type.</param>
+    /// <param name="sequenceNumber">The record's sequence number.</param>
+    /// <param name="plaintext">The record's plaintext.</param>
+    /// <returns>The record.</returns>
+    internal DtlsReferenceRecord ProtectedRecordAt(byte contentType, ulong sequenceNumber, byte[] plaintext) => serverCipher.Seal(contentType, 1, sequenceNumber, plaintext);
+
+    private byte[] FlightMessage(byte type, byte[] body)
     {
         byte[] message = HandshakeMessage(type, messageSequence++, body);
         transcript.AddRange(message);
-        return PlainRecord(DtlsReferenceRecord.Handshake, message);
+        return message;
     }
-
-    private DtlsReferenceRecord PlainRecord(byte contentType, byte[] fragment) => new(contentType, 0, plainSequenceNumber++, fragment);
-
-    private DtlsReferenceRecord ProtectedRecord(byte contentType, byte[] plaintext) => serverCipher.Seal(contentType, 1, protectedSequenceNumber++, plaintext);
 }

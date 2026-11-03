@@ -28,5 +28,6 @@ BL-4608 measures Curl's `webtransport://` client (ADR-1089) against draft-ietf-w
 
 ## Consequences
 
-The client's present failures are listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`: every
-successful session ends in an `ObjectDisposedException` (BL-4633) and a server close is not read (BL-4634).
+When the ADR was written the client had two failures, tracked by BL-4633 (every successful session ended in an
+`ObjectDisposedException`) and BL-4634 (a server close was not read). Both are fixed, and
+`Curl.Conformance.Extended.UnitTests/KnownFailures.txt` lists no WebTransport case.

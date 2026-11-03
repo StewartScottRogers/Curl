@@ -1,3 +1,5 @@
+using Curl.Ssh.Authentication;
+
 namespace Curl.Extension.SshJump;
 
 [TestClass]
@@ -24,6 +26,21 @@ public sealed class SshJumpServicesTests
     }
 
     [TestMethod]
-    public void System_HasTheMachinesAgent() =>
-        Assert.IsNotNull(SshJumpServices.System.AgentConnector);
+    public void System_HasTheMachinesAgent()
+    {
+        ISshAgentConnector? connector = SshJumpServices.System.AgentConnector;
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.IsInstanceOfType<FirstReachableSshAgentConnector>(connector);
+            FirstReachableSshAgentConnector order = (FirstReachableSshAgentConnector)connector!;
+            Assert.HasCount(2, order.Connectors);
+            Assert.IsInstanceOfType<PageantSshAgentConnector>(order.Connectors[0]);
+            Assert.IsInstanceOfType<SystemSshAgentConnector>(order.Connectors[1]);
+        }
+        else
+        {
+            Assert.IsInstanceOfType<SystemSshAgentConnector>(connector);
+        }
+    }
 }

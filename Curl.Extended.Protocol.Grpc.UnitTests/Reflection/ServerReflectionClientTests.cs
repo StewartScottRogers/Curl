@@ -39,7 +39,7 @@ public sealed class ServerReflectionClientTests
         (GrpcHttp2Session session, ScriptedConnection connection) = await SessionAsync(Server(
             Headers(1, false, OkHeaders), Message(1, FilesResponse(GreeterFile)), Message(1, FilesResponse(MessagesFile)), Trailers(1, 0)));
 
-        GrpcProtoMethod method = await ServerReflectionClient.DescribeAsync(session, Greeter, null, CancellationToken.None);
+        GrpcProtoMethod method = await ServerReflectionClient.DescribeAsync(session, Greeter, GrpcRequestHeaderValues.None, CancellationToken.None);
 
         Assert.AreEqual(("helloworld.HelloRequest", "helloworld.HelloReply"), (method.Input.FullName, method.Output.FullName));
         List<byte[]> sent = await SentMessagesAsync(connection.Sent, 1);
@@ -54,11 +54,11 @@ public sealed class ServerReflectionClientTests
         (GrpcHttp2Session session, ScriptedConnection connection) = await SessionAsync(Server(
             Headers(1, false, OkHeaders), Message(1, FilesResponse(HelloWorldFile)), Message(1, FilesResponse()), Trailers(1, 0)));
 
-        await ServerReflectionClient.DescribeAsync(session, Greeter, TimeSpan.FromSeconds(1), CancellationToken.None);
+        await ServerReflectionClient.DescribeAsync(session, Greeter, new GrpcRequestHeaderValues(TimeSpan.FromSeconds(1), "curl/8.22.0", ["x-trace: abc"]), CancellationToken.None);
 
         (List<HeaderField> headers, bool isEndStreamSent) = await SentStreamAsync(connection.Sent);
         CollectionAssert.AreEqual(
-            new[] { ":method: POST", ":scheme: http", ":path: /grpc.reflection.v1.ServerReflection/ServerReflectionInfo", ":authority: example.com:50051", "te: trailers", "grpc-timeout: 1000000u", "content-type: application/grpc" },
+            new[] { ":method: POST", ":scheme: http", ":path: /grpc.reflection.v1.ServerReflection/ServerReflectionInfo", ":authority: example.com:50051", "grpc-timeout: 1000000u", "te: trailers", "content-type: application/grpc", "user-agent: curl/8.22.0", "x-trace: abc" },
             headers.Select(static field => $"{field.Name}: {field.Value}").ToArray());
         Assert.IsTrue(isEndStreamSent);
     }
@@ -69,7 +69,7 @@ public sealed class ServerReflectionClientTests
         (GrpcHttp2Session session, _) = await SessionAsync(Server(
             Headers(1, true, ":status", "200", "content-type", "application/grpc", "grpc-status", "12", "grpc-message", "unknown service grpc.reflection.v1.ServerReflection")));
 
-        GrpcClientException failure = await Assert.ThrowsExactlyAsync<GrpcClientException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, null, CancellationToken.None));
+        GrpcClientException failure = await Assert.ThrowsExactlyAsync<GrpcClientException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, GrpcRequestHeaderValues.None, CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.HttpReturnedError, failure.ExitCode);
         Assert.AreEqual(
@@ -82,7 +82,7 @@ public sealed class ServerReflectionClientTests
     {
         (GrpcHttp2Session session, _) = await SessionAsync(Server(Headers(1, false, OkHeaders), Message(1, ErrorResponse(5, "symbol not found: helloworld.Greeter"))));
 
-        GrpcClientException failure = await Assert.ThrowsExactlyAsync<GrpcClientException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, null, CancellationToken.None));
+        GrpcClientException failure = await Assert.ThrowsExactlyAsync<GrpcClientException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, GrpcRequestHeaderValues.None, CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.HttpReturnedError, failure.ExitCode);
         Assert.AreEqual("gRPC server reflection failed (error 5: symbol not found: helloworld.Greeter); give the method's .proto file with --grpc-proto", failure.Message);
@@ -93,7 +93,7 @@ public sealed class ServerReflectionClientTests
     {
         (GrpcHttp2Session session, _) = await SessionAsync(Server(Headers(1, false, OkHeaders)));
 
-        GrpcClientException failure = await Assert.ThrowsExactlyAsync<GrpcClientException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, null, CancellationToken.None));
+        GrpcClientException failure = await Assert.ThrowsExactlyAsync<GrpcClientException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, GrpcRequestHeaderValues.None, CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.Http2, failure.ExitCode);
         Assert.AreEqual("The server closed the HTTP/2 connection during gRPC server reflection", failure.Message);
@@ -105,7 +105,7 @@ public sealed class ServerReflectionClientTests
         (GrpcHttp2Session session, _) = await SessionAsync(Server(
             [new Http2Setting(Http2SettingIdentifier.InitialWindowSize, 0)], Headers(1, false, OkHeaders), Message(1, FilesResponse(GreeterFile))));
 
-        GrpcClientException failure = await Assert.ThrowsExactlyAsync<GrpcClientException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, null, CancellationToken.None));
+        GrpcClientException failure = await Assert.ThrowsExactlyAsync<GrpcClientException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, GrpcRequestHeaderValues.None, CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.Http2, failure.ExitCode);
         Assert.AreEqual("The server's HTTP/2 flow-control window did not take a server reflection request", failure.Message);
@@ -116,7 +116,7 @@ public sealed class ServerReflectionClientTests
     {
         (GrpcHttp2Session session, _) = await SessionAsync(Server(Headers(1, false, OkHeaders), Message(1, FilesResponse(GreeterFile)), Message(1, FilesResponse(HelloWorldFile))));
 
-        GrpcWireException failure = await Assert.ThrowsExactlyAsync<GrpcWireException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, null, CancellationToken.None));
+        GrpcWireException failure = await Assert.ThrowsExactlyAsync<GrpcWireException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, GrpcRequestHeaderValues.None, CancellationToken.None));
 
         Assert.AreEqual("The server's reflection reply for helloworld/messages.proto did not hold that file.", failure.Message);
     }
@@ -128,7 +128,7 @@ public sealed class ServerReflectionClientTests
     {
         (GrpcHttp2Session session, _) = await SessionAsync(Server(Headers(1, false, OkHeaders), Message(1, FilesResponse(HelloWorldFile)), Trailers(1, 0)));
 
-        GrpcClientException failure = await Assert.ThrowsExactlyAsync<GrpcClientException>(() => ServerReflectionClient.DescribeAsync(session, Greeter with { Service = service, Method = method }, null, CancellationToken.None));
+        GrpcClientException failure = await Assert.ThrowsExactlyAsync<GrpcClientException>(() => ServerReflectionClient.DescribeAsync(session, Greeter with { Service = service, Method = method }, GrpcRequestHeaderValues.None, CancellationToken.None));
 
         Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
         Assert.AreEqual(expected, failure.Message);
@@ -140,7 +140,7 @@ public sealed class ServerReflectionClientTests
         byte[] file = File("g.proto", string.Empty, "proto3", [], [Message("Empty", [])], [], [Service("Pinger", [("Ping", ".Empty", ".Empty")])]);
         (GrpcHttp2Session session, _) = await SessionAsync(Server(Headers(1, false, OkHeaders), Message(1, FilesResponse(file)), Trailers(1, 0)));
 
-        GrpcProtoMethod method = await ServerReflectionClient.DescribeAsync(session, Greeter with { Service = "Pinger", Method = "Ping" }, null, CancellationToken.None);
+        GrpcProtoMethod method = await ServerReflectionClient.DescribeAsync(session, Greeter with { Service = "Pinger", Method = "Ping" }, GrpcRequestHeaderValues.None, CancellationToken.None);
 
         Assert.AreEqual(("Empty", "Empty"), (method.Input.FullName, method.Output.FullName));
     }
@@ -151,7 +151,7 @@ public sealed class ServerReflectionClientTests
         byte[] file = File("g.proto", "helloworld", "proto3", [], [], [], [Service("Greeter", [("SayHello", ".helloworld.Missing", ".helloworld.Missing")])]);
         (GrpcHttp2Session session, _) = await SessionAsync(Server(Headers(1, false, OkHeaders), Message(1, FilesResponse(file)), Trailers(1, 0)));
 
-        GrpcWireException failure = await Assert.ThrowsExactlyAsync<GrpcWireException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, null, CancellationToken.None));
+        GrpcWireException failure = await Assert.ThrowsExactlyAsync<GrpcWireException>(() => ServerReflectionClient.DescribeAsync(session, Greeter, GrpcRequestHeaderValues.None, CancellationToken.None));
 
         Assert.StartsWith("The server's reflection files do not resolve: No message is named .helloworld.Missing.", failure.Message);
     }

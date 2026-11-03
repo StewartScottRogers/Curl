@@ -61,6 +61,32 @@ public sealed class KerberosKdcSocketTransportTests
     }
 
     [TestMethod]
+    public async Task ExchangeDatagramAsync_ReceiveFindsThePortClosed_ThrowsIOExceptionNamingTheKdc()
+    {
+        DatagramKdc kdc = new([]);
+        kdc.Channel.ReceiveFailure = new DatagramPortUnreachableException(System.Net.Sockets.SocketError.ConnectionReset, "Failed to connect");
+        KerberosKdcSocketTransport transport = new(kdc, new FakeConnector(), TimeSpan.FromSeconds(1), new ManualTimeProvider());
+
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => ExchangeDatagramAsync(transport, "kdc.example.test", 88, new byte[] { 0x01 }, CancellationToken.None));
+
+        StringAssert.Contains(failure.Message, "kdc.example.test port 88");
+        Assert.IsInstanceOfType<System.Net.Sockets.SocketException>(failure.InnerException);
+        Assert.IsTrue(kdc.Channel.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ExchangeDatagramAsync_SendFails_ThrowsIOExceptionNamingTheKdc()
+    {
+        DatagramKdc kdc = new([]);
+        kdc.Channel.SendFailure = new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.NetworkUnreachable);
+        KerberosKdcSocketTransport transport = new(kdc, new FakeConnector(), TimeSpan.FromSeconds(1), new ManualTimeProvider());
+
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => ExchangeDatagramAsync(transport, "kdc.example.test", 88, new byte[] { 0x01 }, CancellationToken.None));
+
+        StringAssert.Contains(failure.Message, "kdc.example.test port 88");
+    }
+
+    [TestMethod]
     public async Task ExchangeDatagramAsync_CallerCancels_ThrowsOperationCanceled()
     {
         DatagramKdc kdc = new(reply: null);
@@ -238,6 +264,10 @@ public sealed class KerberosKdcSocketTransportTests
 
     private sealed class KdcChannel(byte[]? reply) : IDatagramChannel
     {
+        public Exception? SendFailure { get; set; }
+
+        public Exception? ReceiveFailure { get; set; }
+
         public EndPoint ServerEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 88);
 
         public List<byte[]> Sent { get; } = [];
@@ -246,6 +276,11 @@ public sealed class KerberosKdcSocketTransportTests
 
         public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken)
         {
+            if (SendFailure is not null)
+            {
+                throw SendFailure;
+            }
+
             Assert.AreSame(ServerEndPoint, destination);
             Sent.Add(datagram.ToArray());
             return ValueTask.CompletedTask;
@@ -253,6 +288,11 @@ public sealed class KerberosKdcSocketTransportTests
 
         public async ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
         {
+            if (ReceiveFailure is not null)
+            {
+                throw ReceiveFailure;
+            }
+
             byte[] answer = reply ?? await NeverAsync(cancellationToken);
             answer.CopyTo(buffer);
             return new DatagramReceived(answer.Length, ServerEndPoint);

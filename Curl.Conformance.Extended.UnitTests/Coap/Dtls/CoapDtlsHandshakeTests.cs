@@ -15,8 +15,11 @@ public sealed class CoapDtlsHandshakeTests
     [SpecRequirement("Coap:RFC6347-4.2.1-1")]
     [SpecRequirement("Coap:RFC6347-4.1-1")]
     [SpecRequirement("Coap:RFC7252-9.1-1")]
+    [SpecRequirement("Coap:RFC6347-4.2.6-1")]
+    [SpecRequirement("Coap:RFC5246-7.4.7-1")]
+    [SpecRequirement("Coap:RFC5246-7.4.9-2")]
     public Task FullHandshake_TheSecondClientHelloEchoesTheCookieAndFinishedIsTheFirstRecordOfEpoch1() =>
-        CoapMessagingRun.CaseAsync(["Coap:RFC6347-4.2.1-1", "Coap:RFC6347-4.1-1", "Coap:RFC7252-9.1-1"], async () =>
+        CoapMessagingRun.CaseAsync(["Coap:RFC6347-4.2.1-1", "Coap:RFC6347-4.1-1", "Coap:RFC7252-9.1-1", "Coap:RFC6347-4.2.6-1", "Coap:RFC5246-7.4.7-1", "Coap:RFC5246-7.4.9-2"], async () =>
         {
             using X509Certificate2 certificate = ReferenceCertificate.CreateSelfSigned("localhost");
             using DtlsReferenceServer server = new(CoapDtlsRun.CoapServer((request, _) => [CoapResponses.Piggybacked(request, 0x45, "ok"u8.ToArray())]), certificate);

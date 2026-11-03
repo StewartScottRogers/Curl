@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using Curl.Kerberos;
 using Curl.Protocol.Abstractions;
 
@@ -36,6 +37,10 @@ public sealed class KerberosKdcSocketTransport(IDatagramConnector datagramConnec
                 byte[] buffer = new byte[MaximumDatagramLength];
                 DatagramReceived received = await channel.ReceiveAsync(buffer, linked.Token).ConfigureAwait(false);
                 return buffer[..received.Length];
+            }
+            catch (SocketException failure)
+            {
+                throw new IOException($"The KDC {host} port {port} could not be reached: {failure.Message}", failure);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {

@@ -105,6 +105,19 @@ public sealed class Cgr094Tests
         await result.Connection!.DisposeAsync();
     }
 
+    // A method of its own (AF-0533): a @SECLEVEL=0 command at index 0 of the cipher string
+    // still lowers the level, so no exclusion of another data row can hide this case.
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithCiphersStartingAtSecurityLevelZeroInTheOpenSslBuild_CompletesWithATls11Server()
+    {
+        var options = new TlsClientOptions(Insecure: true, MinimumVersion: TlsVersion.Tls11, Ciphers: "@SECLEVEL=0:ALL");
+
+        var result = await HandshakeWithTls11ServerAsync(options, OpenSslBuild);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        await result.Connection!.DisposeAsync();
+    }
+
     [TestMethod]
     [DataRow("DEFAULT@SECLEVEL=0:@SECLEVEL=1")]
     [DataRow("DEFAULT@SECLEVEL=1")]

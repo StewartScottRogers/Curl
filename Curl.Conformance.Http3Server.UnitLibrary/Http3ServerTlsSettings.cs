@@ -11,8 +11,11 @@ namespace Curl.Conformance.Http3Server;
 /// </summary>
 public sealed record Http3ServerTlsSettings
 {
-    /// <summary>The ALPN protocol the stand-in serves, and the only one it accepts.</summary>
-    public const string ApplicationProtocol = "h3";
+    /// <summary>The ALPN protocol served when <see cref="ApplicationProtocol" /> is not set: HTTP/3.</summary>
+    public const string DefaultApplicationProtocol = "h3";
+
+    /// <summary>Gets the ALPN protocol the stand-in serves and the only one it accepts; <c>h3</c> unless set (DoQ sets <c>doq</c>).</summary>
+    public string ApplicationProtocol { get; init; } = DefaultApplicationProtocol;
 
     /// <summary>Gets the DER certificates sent in the Certificate message, the server's own first.</summary>
     public required IReadOnlyList<byte[]> CertificateChain { get; init; }

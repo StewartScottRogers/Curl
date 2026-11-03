@@ -8,6 +8,12 @@ internal interface IDnsQueryTransport
     /// <summary>Gets the port a URL that names no port is queried on over this transport.</summary>
     int DefaultPort { get; }
 
+    /// <summary>
+    /// Gets whether the query is encoded with message ID 0 rather than a random one (RFC 5452 section 4): DNS over HTTPS
+    /// asks for ID 0 for cache friendliness (RFC 8484 section 4.1).
+    /// </summary>
+    bool QueriesWithMessageIdZero => false;
+
     /// <summary>Sends <paramref name="query" /> to the server and gives its answer.</summary>
     /// <param name="host">The server's host or address.</param>
     /// <param name="port">The server's port.</param>

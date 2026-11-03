@@ -64,7 +64,9 @@ public sealed partial class TcpConnectorQuicTests
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await using var connection = result.Connection!;
-        Assert.IsNotNull(opener.Opened.Single().Server!.Tls!.ClientCertificate);
+        var presented = opener.Opened.Single().Server!.Tls!.ClientCertificate!.CertificateList.Single();
+        Diagnostics.Diff("presented certificate", s_clientCertificate.RawData, presented.CertificateData);
+        CollectionAssert.AreEqual(s_clientCertificate.RawData, presented.CertificateData);
     }
 
     [TestMethod]

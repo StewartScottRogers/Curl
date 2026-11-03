@@ -1,6 +1,7 @@
 using Curl.Extended.Protocol.DnsQuery.Client;
 using Curl.Extended.Protocol.DnsQuery.Transport.Tls;
 using Curl.Extended.Protocol.DnsQuery.UnitTests.Wire;
+using Curl.Extended.Protocol.DnsQuery.Wire;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.DnsQuery.UnitTests.Transport.Tls;
@@ -41,8 +42,23 @@ public sealed class DnsTlsTransportTests
         byte[] answer = await new DnsTlsTransport(server, new HandshakingTlsProvider()).ExchangeAsync("dns.example", 853, Query, ContextOf());
 
         CollectionAssert.AreEqual(Answer, answer);
-        CollectionAssert.AreEqual(new byte[] { 0, (byte)Query.Length }.Concat(Query).ToArray(), server.TcpWritten.ToArray());
+        byte[] padded = DnsEdnsPadding.Pad(Query);
+        CollectionAssert.AreEqual(new byte[] { 0, (byte)padded.Length }.Concat(padded).ToArray(), server.TcpWritten.ToArray());
         Assert.AreEqual(1, server.Disposed);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_Rfc8310Section9_PadsTheQueryWithTheEdnsPaddingOption()
+    {
+        var server = new ScriptedDnsServer((_, _) => [], [.. DnsWire.UInt16(Answer.Length), .. Answer]);
+
+        await new DnsTlsTransport(server, new HandshakingTlsProvider()).ExchangeAsync("dns.example", 853, Query, ContextOf());
+
+        byte[] sent = server.TcpWritten.ToArray()[2..];
+        Assert.HasCount(128, sent);
+        CollectionAssert.AreEqual(new byte[] { 0, 1 }, sent[10..12]);
+        CollectionAssert.AreEqual(new byte[] { 0, 0, 41 }, sent[Query.Length..(Query.Length + 3)]);
+        CollectionAssert.AreEqual(new byte[] { 0, 12 }, sent[(Query.Length + 11)..(Query.Length + 13)]);
     }
 
     [TestMethod]

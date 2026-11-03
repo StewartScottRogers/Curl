@@ -132,6 +132,22 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_AGrpcsTargetAfterAnHttpsTransferToTheSameOrigin_OpensItsOwnConnection()
+    {
+        await using var pool = CreatePool();
+        await ReturnToPoolAsync(pool, Target(host: "h.example", port: 443, useTls: true, scheme: "https"));
+
+        var grpc = await pool.ConnectAsync(Target(host: "h.example", port: 443, useTls: true, scheme: "https") with { IsNeverPooled = true, ApplicationProtocols = ["h2"] }, CancellationToken.None);
+
+        Diagnostics.Act("inner connects", _inner.Targets.Count);
+        Diagnostics.Assert("inner connects", 2, _inner.Targets.Count);
+
+        Assert.HasCount(2, _inner.Targets);
+        Assert.IsFalse(grpc.IsReused);
+        Assert.IsFalse(_inner.Opened[0].IsDisposed);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_AfterAConnectionMarkedReusableIsDisposed_ReusesItWithoutConnecting()
     {
         await using var pool = CreatePool();

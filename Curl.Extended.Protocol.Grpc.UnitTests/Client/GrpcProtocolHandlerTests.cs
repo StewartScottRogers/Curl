@@ -30,13 +30,41 @@ public sealed class GrpcProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         (List<HeaderField> headers, byte[] data) = await SentRequestAsync(call.Connection.Sent);
         CollectionAssert.AreEqual(
-            new[] { ":method: POST", ":scheme: http", ":path: /helloworld.Greeter/SayHello", ":authority: example.com:50051", "te: trailers", "grpc-timeout: 2000000u", "content-type: application/grpc" },
+            new[] { ":method: POST", ":scheme: http", ":path: /helloworld.Greeter/SayHello", ":authority: example.com:50051", "grpc-timeout: 2000000u", "te: trailers", "content-type: application/grpc", "user-agent: curl/8.22.0" },
             headers.Select(static field => $"{field.Name}: {field.Value}").ToArray(),
             string.Join(" | ", headers.Select(static field => $"{field.Name}: {field.Value}")));
         CollectionAssert.AreEqual((byte[])[0, 0, 0, 0, 7, .. HelloWorld], data);
         Assert.AreEqual(("example.com", 50051, false), (call.Connector.Target!.Host, call.Connector.Target.Port, call.Connector.Target.UseTls));
         CollectionAssert.AreEqual(new[] { "h2" }, call.Connector.Target!.ApplicationProtocols!.ToArray());
         Assert.IsTrue(call.Connection.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UserAgentAndHeadersGiven_SendsThemAfterTheCallDefinition()
+    {
+        using var proto = new ProtoFixture();
+        var call = new Call(GrpcServerReply.Of(GrpcServerReply.Headers(true, ":status", "200", "content-type", "application/grpc", "grpc-status", "0")));
+        var http = new Curl.Protocol.Abstractions.HttpRequestOptions { UserAgent = "probe/1", Headers = ["X-Trace: abc", "trace-bin: AQI="] };
+
+        TransferResult result = await call.RunAsync(GreeterUrl, proto.GreeterPath, null, http: http);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        (List<HeaderField> headers, _) = await SentRequestAsync(call.Connection.Sent);
+        CollectionAssert.AreEqual(
+            new[] { "te: trailers", "content-type: application/grpc", "user-agent: probe/1", "x-trace: abc", "trace-bin: AQI" },
+            headers.Skip(4).Select(static field => $"{field.Name}: {field.Value}").ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BinaryMetadataNotBase64_FailsWithExit2()
+    {
+        using var proto = new ProtoFixture();
+        var call = new Call(GrpcServerReply.Of(GrpcServerReply.Headers(true, ":status", "200", "content-type", "application/grpc", "grpc-status", "0")));
+
+        TransferResult result = await call.RunAsync(GreeterUrl, proto.GreeterPath, null, http: new Curl.Protocol.Abstractions.HttpRequestOptions { Headers = ["trace-bin: ***"] });
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        Assert.AreEqual("The value of the gRPC metadata trace-bin is not base64", result.ErrorMessage);
     }
 
     [TestMethod]
@@ -93,6 +121,7 @@ public sealed class GrpcProtocolHandlerTests
         await call.RunAsync("grpcs://example.com/helloworld.Greeter/SayHello", proto.GreeterPath, "{}");
 
         Assert.AreEqual("https", call.Connector.Target!.PoolScheme);
+        Assert.IsTrue(call.Connector.Target.IsNeverPooled);
         CollectionAssert.AreEqual(new[] { "h2" }, call.Connector.Target.ApplicationProtocols!.ToArray());
     }
 
@@ -421,7 +450,7 @@ public sealed class GrpcProtocolHandlerTests
 
         public string Output => Encoding.UTF8.GetString(output.ToArray());
 
-        public async Task<TransferResult> RunAsync(string url, string protoPath, string? data, TimeSpan? maxTime = null)
+        public async Task<TransferResult> RunAsync(string url, string protoPath, string? data, TimeSpan? maxTime = null, Curl.Protocol.Abstractions.HttpRequestOptions? http = null)
         {
             var connector = new RecordingConnector(this, applicationProtocol);
             var context = new TransferContext
@@ -430,6 +459,7 @@ public sealed class GrpcProtocolHandlerTests
                 Output = output,
                 PostData = data is null ? null : Encoding.UTF8.GetBytes(data),
                 MaxTime = maxTime,
+                Http = http,
             };
             return await new GrpcProtocolHandler(connector).ExecuteAsync(new GrpcProtoContext(context, protoPath));
         }

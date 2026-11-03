@@ -17,18 +17,25 @@ public sealed class CoreParserAdversarialTests
     private static readonly DateTimeOffset Now = new(2026, 10, 7, 12, 0, 0, TimeSpan.Zero);
 
     [TestMethod]
-    [DataRow("0-9223372036854775806")]
-    [DataRow("9223372036854775807-9223372036854775807")]
-    [DataRow("-9223372036854775807")]
-    [DataRow("9223372036854775807-")]
-    [DataRow("0-0")]
-    [DataRow("-1")]
-    public void ByteRangeParser_PositionsAtTheLongLimit_NameARange(string rangeText)
+    [DataRow("0-9223372036854775806", 0L, 9223372036854775806L, null)]
+    [DataRow("9223372036854775807-9223372036854775807", 9223372036854775807L, 9223372036854775807L, null)]
+    [DataRow("-9223372036854775807", null, null, 9223372036854775807L)]
+    [DataRow("9223372036854775807-", 9223372036854775807L, null, null)]
+    [DataRow("0-0", 0L, 0L, null)]
+    [DataRow("-1", null, null, 1L)]
+    public void ByteRangeParser_PositionsAtTheLongLimit_NameARange(
+        string rangeText,
+        long? firstBytePosition,
+        long? lastBytePosition,
+        long? suffixLength)
     {
         bool parsed = ByteRangeParser.TryParse(rangeText, out ByteRange? range);
 
         Assert.IsTrue(parsed);
-        Assert.IsNotNull(range);
+        Assert.AreEqual(firstBytePosition, range?.FirstBytePosition);
+        Assert.AreEqual(lastBytePosition, range?.LastBytePosition);
+        Assert.AreEqual(suffixLength, range?.SuffixLength);
+        Assert.AreEqual(rangeText.Length > 0, range is not null);
     }
 
     [TestMethod]

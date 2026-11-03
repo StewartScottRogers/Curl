@@ -32,7 +32,11 @@ internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITra
 
     private const ushort Channel = 0;
 
-    private readonly Amqp1FrameChannel channel = new(transport, cancellationToken);
+    private readonly CancellationTokenSource exchangeStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+    private Amqp1FrameChannel? frameChannel;
+
+    private Amqp1FrameChannel channel => frameChannel ??= new(transport, exchangeStop.Token);
 
     private uint frameSize = MaxFrameSize;
 
@@ -52,11 +56,17 @@ internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITra
     internal async ValueTask RunAsync(NetworkCredential? credentials, string hostname, string containerId, string address, ReadOnlyMemory<byte>? body)
     {
         using var heartbeatStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        Task exchange = ExchangeAsync(credentials, hostname, containerId, address, body, heartbeatStop.Token);
-        await exchange.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        await heartbeatStop.CancelAsync().ConfigureAwait(false);
-        await heartbeats.ConfigureAwait(false);
-        await exchange.ConfigureAwait(false);
+        using (exchangeStop)
+        {
+            Task exchange = ExchangeAsync(credentials, hostname, containerId, address, body, heartbeatStop.Token);
+            await exchange.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            await heartbeatStop.CancelAsync().ConfigureAwait(false);
+            await heartbeats.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            // Only a failed heartbeat cancels the exchange when the caller did not: that failure is the result.
+            bool stoppedByHeartbeat = exchange.IsCanceled && !cancellationToken.IsCancellationRequested;
+            await (stoppedByHeartbeat ? heartbeats : Task.CompletedTask).ConfigureAwait(false);
+            await exchange.ConfigureAwait(false);
+        }
     }
 
     /// <summary>The exchange <see cref="RunAsync"/> runs, starting the empty frames once the peer's open asks for them.</summary>
@@ -125,6 +135,8 @@ internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITra
         if (open["idle-time-out"] is uint idleTimeOut && idleTimeOut > 0)
         {
             heartbeats = SendHeartbeatsAsync(TimeSpan.FromMilliseconds(idleTimeOut / 2.0), heartbeatStop);
+            _ = heartbeats.ContinueWith(_ => exchangeStop.Cancel(), CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         }
         await channel.SendAsync(Frame(Amqp1CompositeType.Begin,
             ("next-outgoing-id", 0u), ("incoming-window", SessionWindow), ("outgoing-window", SessionWindow))).ConfigureAwait(false);

@@ -25,6 +25,9 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
 
     private const int RandomLength = 32;
 
+    /// <summary>The AlertLevel of a fatal alert (RFC 5246 section 7.2).</summary>
+    private const byte FatalAlertLevel = 2;
+
     private static readonly HandshakeType[] ServerHelloFlight =
         [HandshakeType.ServerHello, HandshakeType.Certificate, HandshakeType.ServerKeyExchange, HandshakeType.ServerHelloDone];
 
@@ -211,10 +214,28 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
     {
         foreach (byte[] record in DtlsDatagramRecords.Split(datagram))
         {
-            if (openRecord(record, out DtlsRecordHeader header, out byte[] plaintext) && header.ContentType == TlsContentType.Handshake)
+            if (!openRecord(record, out DtlsRecordHeader header, out byte[] plaintext))
+            {
+                continue;
+            }
+
+            if (header.ContentType == TlsContentType.Handshake)
             {
                 DtlsDatagramRecords.HandshakeFragmentsOf(plaintext).ForEach(reader.Add);
             }
+            else if (header.ContentType == TlsContentType.Alert)
+            {
+                EndOnFatalAlert(plaintext);
+            }
+        }
+    }
+
+    /// <summary>Ends the handshake when the server sent a fatal alert (RFC 6347 section 4.2.7, RFC 5246 section 7.2); a warning alert, or one too short to read, is ignored.</summary>
+    private static void EndOnFatalAlert(byte[] alert)
+    {
+        if (alert is [FatalAlertLevel, byte description, ..])
+        {
+            throw new CoapException(CurlExitCode.SslConnectError, $"DTLS handshake failed: the server sent the fatal alert {(TlsAlertDescription)description}");
         }
     }
 

@@ -29,7 +29,7 @@ public sealed class EngineCompositionDnsServersIntegrationTests
         webServer.Start();
         int dnsPort = ((IPEndPoint)dnsServer.Client.LocalEndPoint!).Port;
         int webPort = ((IPEndPoint)webServer.LocalEndpoint).Port;
-        Task answering = AnswerOneQueryAsync(dnsServer);
+        Task<string> answering = AnswerOneQueryAsync(dnsServer);
         CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")), EasyOptionsFromCommandLine.NetworkOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")), EasyOptionsFromCommandLine.TlsOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")), EasyOptionsFromCommandLine.HttpOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")), EasyOptionsFromCommandLine.ProxyOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")), EasyOptionsFromCommandLine.AuthenticationOf(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}")));
 
         ConnectResult result;
@@ -38,25 +38,34 @@ public sealed class EngineCompositionDnsServersIntegrationTests
             result = await transports.TcpConnector.ConnectAsync(new ConnectTarget("bl694.example", webPort, false), CancellationToken.None);
         }
 
-        await answering;
+        string queriedName = await answering;
         Diagnostics.Act("exit code", result.ExitCode);
         Diagnostics.Act("error message", result.ErrorMessage);
         Diagnostics.Assert("connected", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection, result.ErrorMessage);
+        IPEndPoint dialled = (IPEndPoint)result.Connection.RemoteEndPoint!;
+        Diagnostics.Assert("queried name", "bl694.example", queriedName);
+        Assert.AreEqual("bl694.example", queriedName);
+        Diagnostics.Assert("dialled address", IPAddress.Loopback, dialled.Address);
+        Assert.AreEqual(IPAddress.Loopback, dialled.Address);
+        Assert.AreEqual(webPort, dialled.Port);
         await result.Connection.DisposeAsync();
     }
 
-    /// <summary>Answers one A query with 127.0.0.1: the query's header and question, flags 0x8180, one record.</summary>
-    private static async Task AnswerOneQueryAsync(UdpClient dnsServer)
+    /// <summary>Answers one A query with 127.0.0.1: the query's header and question, flags 0x8180, one record. Returns the dotted name asked.</summary>
+    private static async Task<string> AnswerOneQueryAsync(UdpClient dnsServer)
     {
         UdpReceiveResult received = await dnsServer.ReceiveAsync();
         byte[] query = received.Buffer;
         int questionEnd = 12;
+        List<string> labels = [];
         while (query[questionEnd] != 0)
         {
+            labels.Add(System.Text.Encoding.ASCII.GetString(query, questionEnd + 1, query[questionEnd]));
             questionEnd += 1 + query[questionEnd];
         }
 
+        string queriedName = string.Join('.', labels);
         questionEnd += 5;
         byte[] reply = [.. query.AsSpan(0, questionEnd), 0xC0, 0x0C, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 127, 0, 0, 1];
         reply[2] = 0x81;
@@ -65,6 +74,7 @@ public sealed class EngineCompositionDnsServersIntegrationTests
         reply[10] = 0;
         reply[11] = 0;
         await dnsServer.SendAsync(reply, received.RemoteEndPoint);
+        return queriedName;
     }
 
     private CommandLineOptions Parse(params string[] arguments)

@@ -2,7 +2,7 @@
 
 The DNS query extension (ADR-0999, ADR-1124, ADR-1140, ADR-1143, ADR-1148). Namespaces `Curl.Extended.Protocol.DnsQuery.Wire`,
 `Curl.Extended.Protocol.DnsQuery.Rendering`, `Curl.Extended.Protocol.DnsQuery.Client` and `Curl.Extended.Protocol.DnsQuery.Transport`. It
-references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers `Curl.Networking.UnitLibrary` (for
+references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers `Curl.Http2.UnitLibrary` (DoH over HTTP/2), `Curl.Networking.UnitLibrary` (for
 `SystemDnsServers`) and `Curl.Quic.UnitLibrary` (the DNS-over-QUIC client); never a `Curl.Protocol.*` library or another extension (not even `Curl.Extension.EncryptedDns`).
 
 - `Wire/` is the RFC 1035 message codec. `DnsQueryEncoder` writes a one-question query for any QTYPE and QCLASS;
@@ -25,7 +25,7 @@ references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers 
   over TLS, RFC 7858: port 853, the TLS provider's handshake, then TCP's framing), `Quic/DnsQuicTransport` (DNS
   over QUIC, RFC 9250: port 853, ALPN `doq`, one stream with Message ID 0 and FIN, the certificate judged by the TLS
   provider through `Quic/DnsQuicCertificateVerifier`) and `Https/DnsHttpsTransport` (DNS over HTTPS, RFC 8484: port 443,
-  the TLS provider's handshake, then `DohRequest`'s HTTP/1.1 POST to `/dns-query` and `DohResponseReader`'s read of the
+  the TLS provider's handshake offering ALPN `h2` then `http/1.1`; under `h2` `DohHttp2Exchange` POSTs the query on one HTTP/2 stream over `DohConnectionStream`, otherwise `DohRequest`'s HTTP/1.1 POST to `/dns-query` and `DohResponseReader`'s read of the
   200 `application/dns-message` body, chunked, by `Content-Length` or to the connection's end; `DohResponseHead` parses
   the status line and headers).
 

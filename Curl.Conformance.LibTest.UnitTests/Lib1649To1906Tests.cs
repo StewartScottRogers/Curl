@@ -131,7 +131,7 @@ public sealed class Lib1649To1906Tests
         Assert.AreEqual(0, result.ExitCode);
         Assert.HasCount(Lib1678.ImportCount, keys);
         Assert.IsTrue(keys.TrueForAll(key => key == "example.test:443"));
-        Assert.IsNotNull(engine.LastShare);
+        CollectionAssert.AreEqual(new[] { CurlLockData.SslSession }, engine.LastShare!.Shared);
         Assert.AreEqual(string.Empty, run.Error.ToString());
     }
 
@@ -361,7 +361,7 @@ public sealed class Lib1649To1906Tests
 
         Assert.AreEqual(0, result.ExitCode);
         Assert.AreEqual(2, waits);
-        Assert.IsNotNull(engine.LastShare);
+        CollectionAssert.AreEqual(new[] { CurlLockData.Cookie, CurlLockData.Cookie }, engine.LastShare!.Shared);
         Assert.IsNotNull(engine.Multi.Added);
     }
 

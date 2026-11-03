@@ -339,21 +339,71 @@ public sealed class WebTransportProtocolHandlerTests
 
     [TestMethod]
     [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
-    public async Task ExecuteAsync_Section6_SessionStreamEndsWithoutClose_TheExchangeStillCompletes()
+    public async Task ExecuteAsync_Section6_SessionStreamFinWithoutClose_EndsTheTransferAsAServerClose()
     {
+        ScriptedHttp3Connection connection = new() { EndsConnectAfterAnswer = true };
+
+        (TransferResult result, string output) = await RunAsync(connection, "webtransport://example.com/", "ok");
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("The server closed the WebTransport session: code 0, the CONNECT stream ended without a WT_CLOSE_SESSION", result.ErrorMessage);
+        Assert.AreEqual(string.Empty, output);
+        Assert.IsTrue(connection.BidirectionalStreams[0].IsWriteEnded, "the client answers with a FIN");
+    }
+
+    [TestMethod]
+    [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task ExecuteAsync_Section6_SessionStreamReset_EndsTheTransferAsAServerClose()
+    {
+        ScriptedHttp3Connection connection = new() { FailsConnectAfterAnswer = new IOException("stream reset") };
+
+        (TransferResult result, _) = await RunAsync(connection, "webtransport://example.com/", "ok");
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("The server closed the WebTransport session: code 0, the CONNECT stream was reset: stream reset", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task ExecuteAsync_OutputWriteFails_EndsWithExit23EvenWhenTheServerAlsoCloses()
+    {
+        byte[] close = new WebTransportCloseSession(7, "going away").ToCapsuleBytes();
         ScriptedHttp3Connection connection = new()
         {
             AnswerStream = (server, stream) =>
             {
-                server.BidirectionalStreams[0].EndReceiving();
                 Echo(server, stream);
+                server.BidirectionalStreams[0].Receive(new Http3DataFrame(close).ToBytes());
             },
         };
 
-        (TransferResult result, string output) = await RunAsync(connection, "webtransport://example.com/", "ok");
+        TransferResult result = await new WebTransportProtocolHandler((_, _) => ValueTask.FromResult<IMultiplexedConnection>(connection))
+            .ExecuteAsync(Context("webtransport://example.com/", "ok", new FailingStream()));
 
-        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual("ok", output);
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+    }
+
+    [TestMethod]
+    [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task ExecuteAsync_TransferCancelledMidExchange_IsNotRelabelledAsAServerClose()
+    {
+        using CancellationTokenSource cancellation = new();
+        ScriptedHttp3Connection connection = new() { AnswerStream = (_, _) => cancellation.Cancel() };
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("webtransport://example.com/"),
+            PostData = "ok"u8.ToArray(),
+            Output = new MemoryStream(),
+            CancellationToken = cancellation.Token,
+        };
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await new WebTransportProtocolHandler((_, _) => ValueTask.FromResult<IMultiplexedConnection>(connection)).ExecuteAsync(context));
+    }
+
+    private sealed class FailingStream : MemoryStream
+    {
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) => throw new IOException("disk full");
     }
 
     private static void Echo(ScriptedHttp3Connection server, InMemoryMultiplexedStream stream)
@@ -370,7 +420,7 @@ public sealed class WebTransportProtocolHandlerTests
         return (result, Encoding.UTF8.GetString(output.ToArray()));
     }
 
-    private static TransferContext Context(string url, string? data, MemoryStream output) => new()
+    private static TransferContext Context(string url, string? data, Stream output) => new()
     {
         Url = CurlUrl.Parse(url),
         PostData = data is null ? null : Encoding.UTF8.GetBytes(data),

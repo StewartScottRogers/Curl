@@ -26,6 +26,20 @@ internal sealed class HandshakingTlsProvider : ITlsProvider
         return ValueTask.FromResult(Failure ?? ConnectResult.Connected(plaintext));
     }
 
+    /// <summary>Gets the protocol ALPN selects, or <see langword="null" /> when the server selects none.</summary>
+    public string? ApplicationProtocol { get; init; }
+
+    /// <summary>Gets the protocols the client offered through ALPN, or <see langword="null" /> before an ALPN handshake.</summary>
+    public IReadOnlyList<string>? OfferedApplicationProtocols { get; private set; }
+
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, ITransferEvents events, IReadOnlyList<string> applicationProtocols, CancellationToken cancellationToken)
+    {
+        OfferedApplicationProtocols = applicationProtocols;
+        TargetHost = targetHost;
+        OnHandshake();
+        return ValueTask.FromResult(Failure ?? ConnectResult.Connected(plaintext, null, applicationProtocol: ApplicationProtocol));
+    }
+
     public ServerCertificateChainVerdict VerifyServerCertificateChain(IReadOnlyList<ReadOnlyMemory<byte>> certificates, string targetHost)
     {
         Certificates = certificates;
