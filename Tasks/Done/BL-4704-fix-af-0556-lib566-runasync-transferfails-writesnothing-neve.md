@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4704 — Fix AF-0556: Lib566 RunAsync_TransferFails_WritesNothing never checks that nothing was written
 
@@ -52,3 +52,4 @@ Test now also asserts run.OutputText is empty and the Content-Length file is nev
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Lib566 failure test now asserts empty output and no file written.
