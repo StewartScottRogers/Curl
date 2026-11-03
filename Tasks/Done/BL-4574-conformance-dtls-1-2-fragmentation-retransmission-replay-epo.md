@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4
 touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls-Faults.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-03
 ---
 # BL-4574 — Conformance: DTLS 1.2 fragmentation, retransmission, replay, epoch and alert cases for coaps:// (Coap DTLS part 2 of 3)
 
@@ -50,21 +50,21 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Acceptance criteria
 
-- [ ] The reference server from BL-4573 gains fault hooks, each in its own file under `Coap/Dtls/`: fragmenting and
+- [x] The reference server from BL-4573 gains fault hooks, each in its own file under `Coap/Dtls/`: fragmenting and
       reordering a flight, dropping a flight, replaying a record, sending a record from an old epoch, and sending a
       fatal alert.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` run curl in process for `coaps://` and assert
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` run curl in process for `coaps://` and assert
       datagram bytes, stdout, stderr and exit code for at least: a server flight fragmented and reordered, a lost
       flight retransmitted on the timer, a replayed and an old-epoch record dropped, and a fatal alert.
-- [ ] `Documentation/Conformance/Extended/Coap-Dtls-Faults.md` has a row for every `[SpecRequirement]` ID these cases
+- [x] `Documentation/Conformance/Extended/Coap-Dtls-Faults.md` has a row for every `[SpecRequirement]` ID these cases
       carry; the harness's matrix check passes.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Coap conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
 
 ## Notes
 
@@ -78,9 +78,12 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
   `DtlsReplayWindow.cs`, `Dtls/Retransmission/DtlsFlightRetransmitter.cs`) and the test clock
   `Coap/Messaging/TimerJumpingClock.cs` fires due timers, so BL-4583 is the only task named. No code changed.
 
+- 2026-11-03 (lane 4): Fault hooks are `DtlsReferenceFault` (base: fault-free) and one subclass per fault under `Coap/Dtls/`; `DtlsReferenceServer` takes one and now answers a retransmitted ClientHello with its hello flight again in new records. Seven cases in five files; `CoapDtlsRun.RunJumpingAsync` jumps the clock only while the case says curl waits in vain, so no spurious retransmission makes counts flaky. Choice: the replay case reuses epoch 1 sequence number 0 (the server Finished) for a forged-but-authentic answer, the only replay curl can observably drop or take; the old-epoch case sends epoch 0 application data. Two library defects found and listed in KnownFailures.txt: BL-4674 (fatal alert ignored during the handshake, curl retransmits until the timer gives up) and BL-4675 (retransmitted flight resent byte for byte under the same record sequence number, RFC 6347 4.1). Measure-CodeQuality for Curl.Conformance.Extended.UnitLibrary: 0 failing members. Solution build with -warnaserror clean, fast tests green; all cases are platform-neutral (in-memory datagrams, generated certificate, no paths), which meets the CI criterion here.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 5b728cab ae154384 295a60eb fb1c989b d8e3fb0e f055b099 17248609.
 - 2026-11-02: Doing -> Backlog. Waits on BL-4583: curl cannot complete a DTLS handshake with DtlsReferenceServer until its ClientKeyExchange fix lands
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 5b728cab ae154384 cd212654 fb1c989b d8e3fb0e f055b099 17248609.
+- 2026-11-03: Doing -> Done. Fault hooks and seven DTLS fault cases landed; two library defects filed as BL-4674 and BL-4675
