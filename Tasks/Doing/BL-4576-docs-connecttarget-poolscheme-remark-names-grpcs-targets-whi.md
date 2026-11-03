@@ -33,3 +33,4 @@ its connection reusable. BL-4562's `touches` did not name the Abstractions file,
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 2b95d9b1 d71d6599.
