@@ -1,8 +1,8 @@
 using Curl.Core;
-using Curl.Extension.Abstractions;
-using Curl.Extension.Composition;
 using Curl.Extended.Protocol.DnsQuery.Client;
 using Curl.Extended.Protocol.DnsQuery.UnitTests.Transport;
+using Curl.Extension.Abstractions;
+using Curl.Extension.Composition;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.DnsQuery.UnitTests.Client;
