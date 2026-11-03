@@ -65,7 +65,7 @@ ADR-1143, ADR-1148). A defect in the library is listed in `KnownFailures.txt` wi
 - Decision (sensible default): curl's DoH client sends POST only, so "DoH GET" is covered by asserting the request is
   a POST with no `dns=` parameter, the GET base64url row is `n/a` (RFC 8484 section 4.1 leaves the method to the
   client), and `DohReferenceServerTests` drives the server with a GET directly.
-- Known failures filed: BL-4684 (DoH DNS ID 0, RFC 8484 4.1), BL-4685 (EDNS(0) Padding, RFC 8310 9), BL-4686
+- Known failures filed: BL-4688 (DoH DNS ID 0, RFC 8484 4.1), BL-4689 (EDNS(0) Padding, RFC 8310 9), BL-4690
   (DoH over HTTP/2, RFC 8484 5.2). Every other case passes.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` 0 failing members (first run
   found `DohReferenceServer.ServeAsync` at complexity 12; split into `ReadUntilAsync`). `dotnet build Curl.slnx
@@ -77,4 +77,4 @@ ADR-1143, ADR-1148). A defect in the library is listed in `KnownFailures.txt` wi
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 5453e041 b23c8ea5 f3c72898 d8e3fb0e 627fbee3 17248609.
-- 2026-11-03: Doing -> Done. dns:// DoT and DoH measured against RFC 7858, 8310 and 8484 with 9 cases; 3 known failures filed as BL-4684..BL-4686
+- 2026-11-03: Doing -> Done. dns:// DoT and DoH measured against RFC 7858, 8310 and 8484 with 9 cases; 3 known failures filed as BL-4688..BL-4690

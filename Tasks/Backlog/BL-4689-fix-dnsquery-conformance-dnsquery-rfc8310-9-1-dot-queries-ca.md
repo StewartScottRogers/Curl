@@ -1,5 +1,5 @@
 ---
-id: BL-4685
+id: BL-4689
 title: Fix DnsQuery conformance: DnsQuery:RFC8310-9-1 (DoT queries carry EDNS(0) Padding)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4685 — Fix DnsQuery conformance: DnsQuery:RFC8310-9-1 (DoT queries carry EDNS(0) Padding)
+# BL-4689 — Fix DnsQuery conformance: DnsQuery:RFC8310-9-1 (DoT queries carry EDNS(0) Padding)
 
 ## Goal
 

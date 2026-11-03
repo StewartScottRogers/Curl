@@ -1,5 +1,5 @@
 ---
-id: BL-4686
+id: BL-4690
 title: Fix DnsQuery conformance: DnsQuery:RFC8484-5.2-1 (DoH over HTTP/2)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4686 — Fix DnsQuery conformance: DnsQuery:RFC8484-5.2-1 (DoH over HTTP/2)
+# BL-4690 — Fix DnsQuery conformance: DnsQuery:RFC8484-5.2-1 (DoH over HTTP/2)
 
 ## Goal
 

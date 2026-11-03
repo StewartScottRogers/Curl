@@ -1,5 +1,5 @@
 ---
-id: BL-4684
+id: BL-4688
 title: Fix DnsQuery conformance: DnsQuery:RFC8484-4.1-2 (DoH queries use DNS ID 0)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4684 — Fix DnsQuery conformance: DnsQuery:RFC8484-4.1-2 (DoH queries use DNS ID 0)
+# BL-4688 — Fix DnsQuery conformance: DnsQuery:RFC8484-4.1-2 (DoH queries use DNS ID 0)
 
 ## Goal
 
