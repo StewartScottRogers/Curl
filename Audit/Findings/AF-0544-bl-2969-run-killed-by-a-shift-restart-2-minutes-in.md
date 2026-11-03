@@ -3,8 +3,8 @@ id: AF-0544
 title: BL-2969 run killed by a shift restart 2 minutes in; the new shift gave it to the wrong lane and it stayed orphaned in Doing
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2969:unfinished-run
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
