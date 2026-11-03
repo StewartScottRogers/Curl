@@ -52,3 +52,4 @@ Scope: section 6 (`coap` URI, Uri-Host, Uri-Port, Uri-Path, Uri-Query compositio
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 488e7695 151e64b3 d503fe2c fb1c989b d8e3fb0e ef6c9026.
