@@ -132,7 +132,7 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
         Require(
             DtlsServerKeyExchangeSignature.Verify(leaf, keyExchange.SignatureAlgorithm!.Value, keyExchange.BuildSignedContent(clientRandom, hello.Random), keyExchange.Signature!),
             "the server's ServerKeyExchange signature does not verify with its certificate's key");
-        byte[] clientKeyExchange = new Tls12ClientKeyExchange(Tls12KeyExchange.Ecdhe, [(byte)clientShare.PublicKey.Length, .. clientShare.PublicKey]).Encode()[HandshakeMessage.HeaderLength..];
+        byte[] clientKeyExchange = new Tls12ClientKeyExchange(Tls12KeyExchange.Ecdhe, clientShare.PublicKey).Encode()[HandshakeMessage.HeaderLength..];
         byte[] keyExchangeFragment = new DtlsHandshakeMessage(HandshakeType.ClientKeyExchange, nextMessageSequence++, clientKeyExchange).TranscriptBytes();
         transcript.AddRange(keyExchangeFragment);
         // RFC 7627 section 4: the session hash covers the transcript through ClientKeyExchange.

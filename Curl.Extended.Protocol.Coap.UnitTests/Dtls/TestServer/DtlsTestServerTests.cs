@@ -98,7 +98,7 @@ public sealed class DtlsTestServerTests
         byte[] preMasterSecret = clientShare.ComputeSharedSecret(((Tls12EcdheParameters)serverKeyExchange.Parameters).PublicKey)!;
         byte[] masterSecret = TlsPrf.Sha256.ComputeMasterSecret(preMasterSecret, ClientRandom, server.ServerRandom);
         Tls12KeyBlock keys = DtlsKeyBlock.Derive(masterSecret, ClientRandom, server.ServerRandom);
-        byte[] keyExchangeBody = new Tls12ClientKeyExchange(Tls12KeyExchange.Ecdhe, [(byte)clientShare.PublicKey.Length, .. clientShare.PublicKey]).Encode()[HandshakeMessage.HeaderLength..];
+        byte[] keyExchangeBody = new Tls12ClientKeyExchange(Tls12KeyExchange.Ecdhe, clientShare.PublicKey).Encode()[HandshakeMessage.HeaderLength..];
         byte[] keyExchangeFragment = HandshakeFragmentOf(keyExchangeBody, 2, HandshakeType.ClientKeyExchange);
         transcript.AddRange(keyExchangeFragment);
         byte[] verifyData = TlsPrf.Sha256.ComputeClientVerifyData(masterSecret, SHA256.HashData(transcript.ToArray()));
