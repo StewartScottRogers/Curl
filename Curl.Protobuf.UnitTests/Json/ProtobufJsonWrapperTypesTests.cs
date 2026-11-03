@@ -44,7 +44,7 @@ public sealed class ProtobufJsonWrapperTypesTests
         var message = Parse("""{"i32":0,"s":""}""");
 
         Assert.AreEqual("""{"i32":0,"s":""}""", ProtobufJsonFormatter.Format(message, indented: false));
-        Assert.AreEqual(ProtobufJsonError.None, ProtobufJsonConverter.TryConvertJsonToBinary(Wrapped, Encoding.UTF8.GetBytes("""{"i32":0}"""), out var binary));
+        Assert.AreEqual(ProtobufJsonError.None, ProtobufJsonConverter.ConvertJsonToBinary(Wrapped, Encoding.UTF8.GetBytes("""{"i32":0}"""), out var binary));
         Assert.AreEqual("1A00", Convert.ToHexString(binary!));
     }
 

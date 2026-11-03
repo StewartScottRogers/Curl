@@ -120,7 +120,7 @@ public sealed class Lib526Tests
     [TestMethod]
     [DataRow(527)]
     [DataRow(532)]
-    public async Task RunAsync_ASecondAddThatFails_FailsWithTestErrMulti(int testNumber)
+    public async Task RunAsync_ASecondAddThatFails_FailsWithTestErrMultiAndCleansUpEveryEasyHandle(int testNumber)
     {
         var engine = new FakeCurlEngine();
         engine.Multi.PerformResults.Enqueue((CurlMultiCode.Ok, 1));
@@ -131,6 +131,7 @@ public sealed class Lib526Tests
 
         Assert.AreEqual((int)LibTestErrorCodes.Multi, result.ExitCode);
         Assert.Contains("Advancing to URL 1\n", run.Error.ToString());
+        Assert.AreEqual(Lib526.HandleCount, engine.DisposedEasyCount);
     }
 
     [TestMethod]

@@ -33,6 +33,20 @@ public sealed class CodeGenerationTransferHookTests
         Assert.IsLessThan(program.IndexOf("http://h/two", StringComparison.Ordinal), program.IndexOf("http://h/one", StringComparison.Ordinal));
     }
 
+    // File.ReadAllTextAsync strips a byte order mark, so the bytes are read raw (AF-0598).
+    [TestMethod]
+    public async Task ExecuteAsync_WritesTheFile_AsUtf8WithoutAByteOrderMark()
+    {
+        var path = Path.Combine(directory, "out.ps1");
+        var hook = new CodeGenerationTransferHook([new CodeFile(path, PowerShellScript.For)]);
+
+        await hook.ExecuteAsync(Context("http://h/"), _ => ValueTask.FromResult(new TransferResult(CurlExitCode.Ok, 0)));
+
+        var bytes = await File.ReadAllBytesAsync(path);
+        var expected = new System.Text.UTF8Encoding(false).GetBytes(PowerShellScript.For([GeneratedRequest.From(Context("http://h/"))]));
+        CollectionAssert.AreEqual(expected, bytes);
+    }
+
     // curl --libcurl warns "Failed to open <file> to write libcurl code" and still runs the transfer.
     [TestMethod]
     public async Task ExecuteAsync_AFileItCannotWrite_LogsItAndStillRunsTheTransfer()

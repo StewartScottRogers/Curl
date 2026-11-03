@@ -321,6 +321,8 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
         Assert.AreEqual(Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\nRCPT TO:<e@f>\r\nDATA\r\nQUIT\r\n", run.Sent);
         Diagnostics.AssertValues("error message", "DATA failed: 554", run.Result.ErrorMessage);
         Assert.AreEqual("DATA failed: 554", run.Result.ErrorMessage);
+        Diagnostics.AssertValues("exit code", CurlExitCode.SendError, run.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
     }
 
     private static MailRequestOptions Mail() => new() { From = "a@b", Recipients = ["c@d"] };

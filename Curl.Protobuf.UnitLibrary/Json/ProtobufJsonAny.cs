@@ -23,7 +23,7 @@ internal static class ProtobufJsonAny
     public static bool IsAny(DynamicMessageType type) => type.FullName == AnyName;
 
     /// <summary>Reads an Any from its JSON object; the object's nesting has already been counted in <paramref name="depth" />.</summary>
-    public static ProtobufJsonError TryRead(JsonElement element, DynamicMessage any, int depth)
+    public static ProtobufJsonError Read(JsonElement element, DynamicMessage any, int depth)
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
@@ -36,11 +36,11 @@ internal static class ProtobufJsonAny
             return element.EnumerateObject().Any() ? ProtobufJsonError.InvalidValue : ProtobufJsonError.None;
         }
 
-        return TryReadTyped(element, typeUrl, any, depth);
+        return ReadTyped(element, typeUrl, any, depth);
     }
 
     // Reads an Any whose object has an "@type" member.
-    private static ProtobufJsonError TryReadTyped(JsonElement element, JsonElement typeUrl, DynamicMessage any, int depth)
+    private static ProtobufJsonError ReadTyped(JsonElement element, JsonElement typeUrl, DynamicMessage any, int depth)
     {
         if (typeUrl.ValueKind != JsonValueKind.String)
         {
@@ -54,7 +54,7 @@ internal static class ProtobufJsonAny
         }
 
         var embedded = new DynamicMessage(embeddedType!);
-        var error = TryReadEmbedded(element, embedded, depth);
+        var error = ReadEmbedded(element, embedded, depth);
         if (error == ProtobufJsonError.None)
         {
             any.SetSingular(any.Type.FindField(1)!, url);
@@ -99,7 +99,7 @@ internal static class ProtobufJsonAny
         return slash >= 0 && anyType.Catalogue.TryGetMessageType(url[(slash + 1)..], out type);
     }
 
-    private static ProtobufJsonError TryReadEmbedded(JsonElement element, DynamicMessage embedded, int depth)
+    private static ProtobufJsonError ReadEmbedded(JsonElement element, DynamicMessage embedded, int depth)
     {
         var valueForm = HasValueForm(embedded.Type);
         var error = ProtobufJsonError.None;
@@ -108,8 +108,8 @@ internal static class ProtobufJsonAny
         {
             var member = members.Current;
             error = member.Name == TypeMember ? ProtobufJsonError.None
-                : !valueForm ? ProtobufJsonParser.TryReadMember(member, embedded, depth)
-                : member.Name == ValueMember ? ProtobufJsonParser.TryReadMessageValue(member.Value, embedded, depth)
+                : !valueForm ? ProtobufJsonParser.ReadMember(member, embedded, depth)
+                : member.Name == ValueMember ? ProtobufJsonParser.ReadMessageValue(member.Value, embedded, depth)
                 : ProtobufJsonError.UnknownField;
         }
 
@@ -119,7 +119,7 @@ internal static class ProtobufJsonAny
     private static DynamicMessage DecodeEmbedded(DynamicMessageType anyType, string url, byte[] value)
     {
         DynamicMessage? embedded = null;
-        if (!TryResolve(anyType, url, out var type) || DynamicMessageDecoder.TryDecode(type!, value, out embedded) != ProtobufDecodeError.None)
+        if (!TryResolve(anyType, url, out var type) || DynamicMessageDecoder.Decode(type!, value, out embedded) != ProtobufDecodeError.None)
         {
             throw new FormatException($"The Any's value is not a message of the type {url} names.");
         }

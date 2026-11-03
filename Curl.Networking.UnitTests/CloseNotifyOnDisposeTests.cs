@@ -40,6 +40,32 @@ public sealed class CloseNotifyOnDisposeTests
         Assert.IsTrue(plaintext.IsDisposed);
     }
 
+    // SslStream itself refuses a second shutdown, so the wire cannot tell a second attempt;
+    // each attempt starts its close_notify bound on the connection's clock, which can (AF-0606).
+    [TestMethod]
+    public async Task DisposeAsync_OfAnSslStreamConnectionCalledTwice_TriesToSendCloseNotifyOnlyOnce()
+    {
+        using var certificate = CreateServerCertificate();
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var sslStream = new SslStream(client, false, (_, _, _, _) => true);
+        await using var serverStream = new SslStream(server);
+        var serverTask = serverStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions { ServerCertificate = certificate });
+        await sslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions { TargetHost = "localhost" });
+        await serverTask;
+        var plaintext = new StallingConnection();
+        var clock = new TimerCountingTimeProvider();
+        var connection = new SslStreamConnection(sslStream, new ConnectionStream(plaintext), plaintext, null, string.Empty, clearsTls: false)
+        {
+            CloseNotifyTimeout = s_bound,
+            TimeProvider = clock,
+        };
+
+        await connection.DisposeAsync().AsTask().WaitAsync(s_generousWait);
+        await connection.DisposeAsync().AsTask().WaitAsync(s_generousWait);
+
+        Assert.AreEqual(1, clock.TimersCreated, "Disposing a second time tried to send close_notify again.");
+    }
+
     [TestMethod]
     public async Task DisposeAsync_OfAnSslStreamConnectionWhoseStreamDisposalThrows_StillDisposesTheTransport()
     {
@@ -116,6 +142,20 @@ public sealed class CloseNotifyOnDisposeTests
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
         public override void SetLength(long value) => throw new NotSupportedException();
+    }
+
+    // The system clock, counting the timers created on it.
+    private sealed class TimerCountingTimeProvider : TimeProvider
+    {
+        private int _timersCreated;
+
+        public int TimersCreated => Volatile.Read(ref _timersCreated);
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            Interlocked.Increment(ref _timersCreated);
+            return System.CreateTimer(callback, state, dueTime, period);
+        }
     }
 
     private sealed class ThrowingOnDisposeStream : MemoryStream

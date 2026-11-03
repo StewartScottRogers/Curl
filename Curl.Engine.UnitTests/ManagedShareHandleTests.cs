@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
@@ -105,6 +106,46 @@ public sealed class ManagedShareHandleTests
             "Share", .. Repeat(connect, 1),
         ];
         CollectionAssert.AreEqual(expected, calls.Where(call => call != "Cookie" && call != "Dns").ToArray());
+    }
+
+    [TestMethod]
+    public async Task Cleanup_RefusedInUse_KeepsTheSharedConnectionsOpenForTheAttachedTransfer()
+    {
+        CloseCountingConnector connector = new(new ScriptedConnector([Encoding.ASCII.GetBytes(KeepsAlive), Encoding.ASCII.GetBytes(KeepsAlive)]));
+        await using ManagedCurlEngine engine = CreateEngine(connector);
+        IShareHandle share = engine.CreateShare();
+        share.Share(CurlLockData.Connect);
+        await using IEasyTransfer easy = engine.CreateEasy();
+
+        CurlCode opening = await PerformAsync(easy, "http://h/a", share);
+        CurlShareCode refused = share.Cleanup();
+        CurlCode reusing = await PerformAsync(easy, "http://h/b", share);
+
+        Assert.AreEqual(CurlCode.Ok, opening);
+        Assert.AreEqual(CurlShareCode.InUse, refused);
+        Assert.AreEqual(CurlCode.Ok, reusing);
+        Assert.AreEqual(0, connector.Closed, "a refused cleanup leaves the shared connection open and idle for reuse");
+    }
+
+    [TestMethod]
+    public async Task Cleanup_Ok_ClosesTheSharedConnections()
+    {
+        CloseCountingConnector connector = new(new ScriptedConnector([Encoding.ASCII.GetBytes(KeepsAlive)]));
+        await using ManagedCurlEngine engine = CreateEngine(connector);
+        IShareHandle share = engine.CreateShare();
+        share.Share(CurlLockData.Connect);
+        IEasyTransfer easy = engine.CreateEasy();
+        CurlCode opening = await PerformAsync(easy, "http://h/a", share);
+        await easy.DisposeAsync();
+        int closedBeforeCleanup = connector.Closed;
+
+        CurlShareCode cleaned = share.Cleanup();
+        await connector.FirstClosed.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.AreEqual(CurlCode.Ok, opening);
+        Assert.AreEqual(0, closedBeforeCleanup);
+        Assert.AreEqual(CurlShareCode.Ok, cleaned);
+        Assert.AreEqual(1, connector.Closed);
     }
 
     [TestMethod]
@@ -476,14 +517,19 @@ public sealed class ManagedShareHandleTests
 
     private static async Task<CurlCode> PerformAsync(ManagedCurlEngine engine, string url, IShareHandle share)
     {
-        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
+        await using IEasyTransfer easy = engine.CreateEasy();
+        return await PerformAsync(easy, url, share);
+    }
+
+    private static async Task<CurlCode> PerformAsync(IEasyTransfer easy, string url, IShareHandle share)
+    {
         easy.Options = new EasyOptions
         {
             Network = new EasyNetworkOptions { Url = url },
             Http = new EasyHttpOptions { CookieFiles = ["none.txt"] },
             Behaviour = new EasyBehaviourOptions { Share = share },
         };
-        easy.Host = new EasyTransferHost(new NoFileSystem(), Stream.Null, () => Stream.Null, NoDiagnosticLog.Instance, RunsOnWindows: false, AltSvcUsesOverHttp: false);
+        ((ManagedEasyTransfer)easy).Host = new EasyTransferHost(new NoFileSystem(), Stream.Null, () => Stream.Null, NoDiagnosticLog.Instance, RunsOnWindows: false, AltSvcUsesOverHttp: false);
         return await easy.PerformAsync(CancellationToken.None);
     }
 
@@ -512,6 +558,47 @@ public sealed class ManagedShareHandleTests
         {
             Opened++;
             return inner.ConnectAsync(target, cancellationToken);
+        }
+    }
+
+    /// <summary>Counts the connections its inner connector opened that were closed, and signals the first close.</summary>
+    private sealed class CloseCountingConnector(IConnector inner) : IConnector
+    {
+        private int closed;
+
+        public int Closed => Volatile.Read(ref closed);
+
+        public TaskCompletionSource FirstClosed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
+        {
+            ConnectResult result = await inner.ConnectAsync(target, cancellationToken);
+            return ConnectResult.Connected(new CloseCountingConnection(result.Connection!, this));
+        }
+
+        private void RecordClose()
+        {
+            Interlocked.Increment(ref closed);
+            FirstClosed.TrySetResult();
+        }
+
+        private sealed class CloseCountingConnection(IConnection inner, CloseCountingConnector owner) : IConnection
+        {
+            public bool IsSecure => inner.IsSecure;
+
+            public EndPoint? RemoteEndPoint => inner.RemoteEndPoint;
+
+            public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) => inner.ReadAsync(buffer, cancellationToken);
+
+            public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => inner.WriteAsync(buffer, cancellationToken);
+
+            public ValueTask FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+
+            public ValueTask DisposeAsync()
+            {
+                owner.RecordClose();
+                return inner.DisposeAsync();
+            }
         }
     }
 

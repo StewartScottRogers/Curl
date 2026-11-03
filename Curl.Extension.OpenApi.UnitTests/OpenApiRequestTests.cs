@@ -51,10 +51,12 @@ public sealed class OpenApiRequestTests
         CollectionAssert.AreEqual(new[] { "https://x/items/1" }, Arguments(Operation("get", "/api", Id), "https://x", ("id", "1")).ToArray());
 
     [TestMethod]
-    public void Arguments_ValueForNoParameterWithoutARequestBody_FailsWithExit2() =>
-        Assert.AreEqual(
-            "openapi: operation op has no parameter or request body for colour",
-            Assert.ThrowsExactly<ArgumentExpansionException>(() => Arguments(Operation("get", "http://h", Id), null, ("id", "1"), ("colour", "red"))).Message);
+    public void Arguments_ValueForNoParameterWithoutARequestBody_FailsWithExit2()
+    {
+        var failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => Arguments(Operation("get", "http://h", Id), null, ("id", "1"), ("colour", "red")));
+        Assert.AreEqual("openapi: operation op has no parameter or request body for colour", failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+    }
 
     [TestMethod]
     [DataRow("get", false, new[] { "http://h/items/1" })]

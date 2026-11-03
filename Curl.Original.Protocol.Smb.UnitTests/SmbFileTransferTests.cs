@@ -244,6 +244,7 @@ public sealed partial class SmbFileTransferTests
             Transfer(connection, new FailingOutputStream(new IOException("gone"))), connection, SmbRecordedExchange.Host, DownloadPath());
 
         Diagnostics.Diff("error message", "Failure writing output to destination, passed 11 returned 0", result.ErrorMessage ?? string.Empty);
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
         Assert.AreEqual("Failure writing output to destination, passed 11 returned 0", result.ErrorMessage);
     }
 

@@ -203,7 +203,7 @@ public sealed class ProtobufReader
     }
 
     /// <summary>Reads the varints of a packed repeated field's bytes into <paramref name="values" />.</summary>
-    public static ProtobufDecodeError TryReadPackedVarints(ReadOnlyMemory<byte> payload, ICollection<ulong> values)
+    public static ProtobufDecodeError ReadPackedVarints(ReadOnlyMemory<byte> payload, ICollection<ulong> values)
     {
         ArgumentNullException.ThrowIfNull(values);
         var reader = new ProtobufReader(payload);
@@ -222,7 +222,7 @@ public sealed class ProtobufReader
     }
 
     /// <summary>Reads the fixed32 values of a packed repeated field's bytes into <paramref name="values" />.</summary>
-    public static ProtobufDecodeError TryReadPackedFixed32(ReadOnlyMemory<byte> payload, ICollection<uint> values)
+    public static ProtobufDecodeError ReadPackedFixed32(ReadOnlyMemory<byte> payload, ICollection<uint> values)
     {
         ArgumentNullException.ThrowIfNull(values);
         var reader = new ProtobufReader(payload);
@@ -241,7 +241,7 @@ public sealed class ProtobufReader
     }
 
     /// <summary>Reads the fixed64 values of a packed repeated field's bytes into <paramref name="values" />.</summary>
-    public static ProtobufDecodeError TryReadPackedFixed64(ReadOnlyMemory<byte> payload, ICollection<ulong> values)
+    public static ProtobufDecodeError ReadPackedFixed64(ReadOnlyMemory<byte> payload, ICollection<ulong> values)
     {
         ArgumentNullException.ThrowIfNull(values);
         var reader = new ProtobufReader(payload);

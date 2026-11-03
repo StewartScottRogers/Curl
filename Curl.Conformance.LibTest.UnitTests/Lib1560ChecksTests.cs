@@ -332,6 +332,40 @@ public sealed class Lib1560ChecksTests
     }
 
     [TestMethod]
+    public void Huge_EachUrl_MakesOnlyItsOwnPartHuge()
+    {
+        var refusedAll = new Run(new FakeCurlEngine { UrlSetResult = CurlUrlCode.BadScheme });
+        string big = Lib1560Checks.BigPart;
+
+        refusedAll.Checks.Huge();
+
+        Assert.AreEqual(
+            $"URL 1: failed to parse [c://{big}:c@c/c?c#c]\n"
+            + $"URL 2: failed to parse [c://c:{big}@c/c?c#c]\n"
+            + $"URL 3: failed to parse [c://c:c@{big}/c?c#c]\n"
+            + $"URL 4: failed to parse [c://c:c@c/{big}?c#c]\n"
+            + $"URL 5: failed to parse [c://c:c@c/c?{big}#c]\n"
+            + $"URL 6: failed to parse [c://c:c@c/c?c#{big}]\n",
+            refusedAll.Output.ToString());
+    }
+
+    [TestMethod]
+    public void Huge_SchemeParsed_WritesTheUrlWithOnlyAHugeScheme()
+    {
+        var parsedScheme = new Run(new FakeCurlEngine
+        {
+            CreatingUrl = () => new ScriptedUrlHandle
+            {
+                Getting = part => (CurlUrlCode.Ok, part == CurlUrlPart.Path ? "/" + Lib1560Checks.BigPart : Lib1560Checks.BigPart),
+            },
+        });
+
+        parsedScheme.Checks.Huge();
+
+        Assert.AreEqual($"URL 0: failed to parse [{Lib1560Checks.BigPart}://c:c@c/c?c#c]\n", parsedScheme.Output.ToString());
+    }
+
+    [TestMethod]
     public void SchemeGuess_SchemeDiffers_WritesEachMismatch()
     {
         var run = new Run();

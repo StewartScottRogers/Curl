@@ -14,7 +14,7 @@ namespace Curl.Extended.Protocol.DnsQuery.Transport.Quic;
 /// stream with FIN (sections 4.2 and 4.2.1). The answer is handed back with the query's own message ID, so the caller
 /// matches it as for any transport. An answer whose Message ID is not 0 or that is not exactly one length-prefixed
 /// message closes the connection with DOQ_PROTOCOL_ERROR and is exit 8; otherwise the connection closes with
-/// DOQ_NO_ERROR (sections 4.3 and 4.5).
+/// DOQ_NO_ERROR (sections 4.3 and 4.5). A query to UDP port 53 is refused unsent with exit 7 (section 4.1.1, ADR-1233).
 /// </summary>
 /// <param name="connector">Opens the UDP datagram channel to the server.</param>
 /// <param name="tlsProvider">Judges the certificate chain the server presents.</param>
@@ -25,6 +25,12 @@ internal sealed class DnsQuicTransport(IDatagramConnector connector, ITlsProvide
 
     /// <summary>The port RFC 9250 section 4.1.1 assigns to DNS over QUIC.</summary>
     public const int Port = 853;
+
+    /// <summary>The UDP port RFC 9250 section 4.1.1 forbids DNS over QUIC to use: a query to it is refused unsent.</summary>
+    public const int ForbiddenPort = 53;
+
+    /// <summary>The message a query to <see cref="ForbiddenPort" /> fails with, exit 7 (ADR-1233).</summary>
+    public const string ForbiddenPortMessage = "DNS over QUIC must not use UDP port 53 (RFC 9250 section 4.1.1)";
 
     /// <summary>DOQ_NO_ERROR (RFC 9250 section 4.3): the connection closes normally.</summary>
     public const long NoError = 0x0;
@@ -52,6 +58,11 @@ internal sealed class DnsQuicTransport(IDatagramConnector connector, ITlsProvide
     /// <inheritdoc />
     public async ValueTask<byte[]> ExchangeAsync(string host, int port, byte[] query, ITransferContext context)
     {
+        if (port == ForbiddenPort)
+        {
+            throw new DnsQueryException(CurlExitCode.CouldntConnect, ForbiddenPortMessage);
+        }
+
         DatagramOpenResult open = await connector.OpenAsync(host, port, context.CancellationToken).ConfigureAwait(false);
         if (open.Channel is not { } channel)
         {

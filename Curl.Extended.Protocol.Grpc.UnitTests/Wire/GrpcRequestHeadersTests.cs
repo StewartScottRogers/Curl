@@ -84,6 +84,55 @@ public sealed class GrpcRequestHeadersTests
     }
 
     [TestMethod]
+    public void Build_RemovingHAfterWhichAnotherH_DoesNotThrowAndKeepsTheMetadata()
+    {
+        var headers = GrpcRequestHeaders.Build(Greeter, new GrpcRequestHeaderValues(null, null, ["te:", "x-trace: abc"]));
+
+        Assert.IsFalse(headers.Any(static header => header.Key == "te"));
+        Assert.AreEqual(new KeyValuePair<string, string>("x-trace", "abc"), headers[^1]);
+    }
+
+    [TestMethod]
+    public void Build_RemovingHThenRepeatedMetadata_SendsBothEntriesInOrder()
+    {
+        var headers = GrpcRequestHeaders.Build(Greeter, new GrpcRequestHeaderValues(null, "curl/8.22.0", ["user-agent:", "x-a: 1", "x-a: 2"]));
+
+        CollectionAssert.AreEqual(
+            new[] { "x-a: 1", "x-a: 2" },
+            headers.Where(static header => header.Key == "x-a").Select(static header => $"{header.Key}: {header.Value}").ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("Connection: keep-alive", "connection")]
+    [DataRow("Keep-Alive: timeout=5", "keep-alive")]
+    [DataRow("Proxy-Connection: keep-alive", "proxy-connection")]
+    [DataRow("Transfer-Encoding: chunked", "transfer-encoding")]
+    [DataRow("Upgrade: h2c", "upgrade")]
+    public void Build_ConnectionSpecificH_IsNotSent(string entry, string name)
+    {
+        var headers = GrpcRequestHeaders.Build(Greeter, new GrpcRequestHeaderValues(null, null, [entry]));
+
+        Assert.IsFalse(headers.Any(header => header.Key == name));
+    }
+
+    [TestMethod]
+    public void Build_TeOtherThanTrailers_IsNotSentAndTrailersStays()
+    {
+        var headers = GrpcRequestHeaders.Build(Greeter, new GrpcRequestHeaderValues(null, null, ["TE: gzip"]));
+
+        Assert.AreEqual(new KeyValuePair<string, string>("te", "trailers"), headers[4]);
+        Assert.AreEqual(1, headers.Count(static header => header.Key == "te"));
+    }
+
+    [TestMethod]
+    public void Build_TeTrailersInH_IsSent()
+    {
+        var headers = GrpcRequestHeaders.Build(Greeter, new GrpcRequestHeaderValues(null, null, ["TE: Trailers"]));
+
+        Assert.AreEqual(new KeyValuePair<string, string>("te", "Trailers"), headers[4]);
+    }
+
+    [TestMethod]
     public void Build_CustomHeaderNamingAPseudoHeader_IsNotSent()
     {
         var headers = GrpcRequestHeaders.Build(Greeter, new GrpcRequestHeaderValues(null, null, [":path: /x"]));

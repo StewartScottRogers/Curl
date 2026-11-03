@@ -17,7 +17,7 @@ which the type URL names but no field of the Any type reaches. Conformance cases
 
 - Every `DynamicMessageType` carries the `DynamicTypeCatalogue` it came from (`Catalogue`), and the catalogue gains
   `TryGetMessageType`. The embedded type is the type URL's last path segment, looked up in the Any type's catalogue,
-  so a gRPC call resolves it among the descriptors server reflection or `--proto` files loaded, without changing any
+  so a gRPC call resolves it among the descriptors server reflection or `--grpc-proto` files loaded, without changing any
   caller.
 - The well-known types written under `"value"` are Timestamp, Duration, the nine wrappers, FieldMask, Struct, Value,
   ListValue and Any itself; every other type, Empty included, puts its fields beside `"@type"`.

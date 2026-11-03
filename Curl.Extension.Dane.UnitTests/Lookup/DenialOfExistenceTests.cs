@@ -108,6 +108,15 @@ public sealed class DenialOfExistenceTests
     }
 
     [TestMethod]
+    public void ProvesNameError_Nsec3MatchesOnlyTheNameItself_IsNotItsOwnClosestEncloser_Rfc5155Section8_3()
+    {
+        DnsResourceRecord nameItself = SignedTree.Nsec3("example.", SignedTree.HashOf("a.example."), HighestHash, types: [DnssecRecordType.Rrsig]);
+        DnsResourceRecord covering = SignedTree.Nsec3("example.", LowestHash, HighestHash);
+
+        Assert.IsFalse(DenialOfExistence.ProvesNameError(Name("a.example."), [nameItself, covering]));
+    }
+
+    [TestMethod]
     [DataRow((byte)2, (ushort)1)]
     [DataRow(Nsec3Hash.Sha1Algorithm, (ushort)151)]
     public void ProvesNoData_Nsec3WithUnknownHashOrTooManyIterations_IsIgnored_Rfc9276Section3_2(byte hashAlgorithm, ushort iterations)
@@ -134,5 +143,27 @@ public sealed class DenialOfExistenceTests
         DnsResourceRecord covering = SignedTree.Nsec3("example.", LowestHash, HighestHash);
 
         Assert.IsTrue(DenialOfExistence.ProvesNoCloserMatch(Name("a.b.example."), 1, [nsec, covering]));
+    }
+
+    [TestMethod]
+    public void ProvesNoCloserMatch_Nsec3CoversOnlyTheNextCloserName_IsTrue_Rfc5155Section8_8()
+    {
+        byte[] nextCloserHash = SignedTree.HashOf("b.example.");
+        byte[] ownerHash = [.. nextCloserHash[..^1], (byte)(nextCloserHash[^1] - 1)];
+        byte[] nextHash = [.. nextCloserHash[..^1], (byte)(nextCloserHash[^1] + 1)];
+        DnsResourceRecord covering = SignedTree.Nsec3("example.", ownerHash, nextHash);
+
+        Assert.IsTrue(DenialOfExistence.ProvesNoCloserMatch(Name("a.b.example."), 1, [covering]));
+    }
+
+    [TestMethod]
+    public void ProvesNoCloserMatch_Nsec3CoversOnlyAnotherAncestor_IsFalse_Rfc5155Section8_8()
+    {
+        byte[] apexHash = SignedTree.HashOf("example.");
+        byte[] ownerHash = [.. apexHash[..^1], (byte)(apexHash[^1] - 1)];
+        byte[] nextHash = [.. apexHash[..^1], (byte)(apexHash[^1] + 1)];
+        DnsResourceRecord covering = SignedTree.Nsec3("example.", ownerHash, nextHash);
+
+        Assert.IsFalse(DenialOfExistence.ProvesNoCloserMatch(Name("a.b.example."), 1, [covering]));
     }
 }

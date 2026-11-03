@@ -148,10 +148,12 @@ internal sealed class SessionTicketRecordDetector
     }
 
     // The index after the run of records from first whose plaintext is exactly the read, or -1.
+    // A run holds at least its first record, so first must name a queued record: asking past
+    // the queue is a fault, not a run that accounts for nothing (BL-4771).
     private int RunEndAccountingFor(int first, int plaintextRead)
     {
-        int plaintext = 0;
-        int index = first;
+        int plaintext = _plaintextLengths[first];
+        int index = first + 1;
         for (; index < _plaintextLengths.Count && plaintext < plaintextRead; index++)
         {
             plaintext += _plaintextLengths[index];

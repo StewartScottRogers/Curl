@@ -20,8 +20,10 @@ curl's own DoH resolver (`--doh-url`) goes through its HTTP stack and so uses HT
   ignores trailers. Any other selection, or none, keeps the HTTP/1.1 request unchanged.
 - It uses the shared layer `Curl.Http2.UnitLibrary` (frames, flow control, HPACK) rather than hand-written frames, as
   the gRPC extension does; `DohConnectionStream` presents the `IConnection` as the `Stream` that layer runs on. A
-  stream that ends, or a connection that closes, before the answer is exit 56, like HTTP/1.1's early close; an HTTP/2
-  protocol error from the layer propagates as the HTTP/1.1 path's I/O errors do.
+  stream that ends, or a connection that closes, before the answer is exit 56, like HTTP/1.1's early close; an RST_STREAM, a GOAWAY and a
+  connection that closes mid-frame are exit 56 as well; an HTTP/2 protocol error or malformed HPACK block is exit 8
+  (a weird server reply, as for a malformed HTTP/1.1 head), and an answer over 65535 octets is exit 8 with the
+  HTTP/1.1 path's message, checked before the DATA is buffered (BL-4730).
 - The conformance side adds `DohHttp2ReferenceServer`: on a plain TCP route it serves TLS selecting ALPN `h2` (a TLS
   route's front end offers no ALPN) and serves HTTP/2 through `GrpcReferenceServer`'s session with a service that
   answers each ended stream with a DNS reply. `DohReferenceServer` stays HTTP/1.1 on a TLS route, so the HTTP/1.1

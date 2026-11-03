@@ -142,6 +142,7 @@ public sealed class ReceivedPublishCases
             null, Mqtt5PublishSubscribeBytes.Publish(0, 0, "t", System.Text.Encoding.ASCII.GetBytes(payload)), PublishSubscribeRun.NormalDisconnect);
 
         PublishSubscribeRun.AssertSucceeded(result, payload);
-        Assert.IsNotNull(broker.Connect);
+        const int maximumPacketSizeProperty = 0x27;
+        CollectionAssert.DoesNotContain(broker.Connect!.PropertyIdentifiers.ToList(), maximumPacketSizeProperty);
     }
 }

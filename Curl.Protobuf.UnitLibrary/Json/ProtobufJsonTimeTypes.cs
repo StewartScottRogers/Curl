@@ -33,7 +33,7 @@ internal static class ProtobufJsonTimeTypes
     }
 
     /// <summary>Reads the string form of a Timestamp or Duration into the message.</summary>
-    public static ProtobufJsonError TryRead(JsonElement element, DynamicMessage message)
+    public static ProtobufJsonError Read(JsonElement element, DynamicMessage message)
     {
         if (element.ValueKind != JsonValueKind.String)
         {

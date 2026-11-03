@@ -1280,3 +1280,4 @@ Each option and the specific reason it lost.
 | [1230](ADR-1230-dns-over-tls-queries-carry-edns-padding.md) | DNS over TLS queries carry EDNS(0) Padding to a 128-octet block (BL-4689) | Accepted | 2026-11-03 |
 | [1231](ADR-1231-dns-over-https-prefers-http2-through-alpn.md) | DNS over HTTPS prefers HTTP/2 through ALPN (BL-4690) | Accepted | 2026-11-03 |
 | [1232](ADR-1232-protojson-any-resolves-its-type-in-the-catalogue.md) | ProtoJSON Any resolves its type URL in the message type's catalogue (BL-4720) | Accepted | 2026-11-03 |
+| [1233](ADR-1233-dns-over-quic-refuses-udp-port-53-with-exit-7.md) | DNS over QUIC refuses UDP port 53 with exit 7 (BL-4723) | Accepted | 2026-11-03 |

@@ -98,7 +98,7 @@ public sealed class ProtobufWriterTests
 
         CollectionAssert.AreEqual(new byte[] { 0x22, 0x06, 0x03, 0x8E, 0x02, 0x9E, 0xA7, 0x05 }, writer.ToArray());
         var values = new List<ulong>();
-        Assert.AreEqual(ProtobufDecodeError.None, ProtobufReader.TryReadPackedVarints(writer.ToArray().AsMemory(2), values));
+        Assert.AreEqual(ProtobufDecodeError.None, ProtobufReader.ReadPackedVarints(writer.ToArray().AsMemory(2), values));
         CollectionAssert.AreEqual(new ulong[] { 3, 270, 86942 }, values);
     }
 
@@ -134,7 +134,7 @@ public sealed class ProtobufWriterTests
 
         CollectionAssert.AreEqual(new byte[] { 0x2A, 0x08, 0x01, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF }, writer.ToArray());
         var values = new List<uint>();
-        Assert.AreEqual(ProtobufDecodeError.None, ProtobufReader.TryReadPackedFixed32(writer.ToArray().AsMemory(2), values));
+        Assert.AreEqual(ProtobufDecodeError.None, ProtobufReader.ReadPackedFixed32(writer.ToArray().AsMemory(2), values));
         CollectionAssert.AreEqual(new uint[] { 1, 0xFFFFFFFF }, values);
     }
 
@@ -146,7 +146,7 @@ public sealed class ProtobufWriterTests
 
         CollectionAssert.AreEqual(new byte[] { 0x32, 0x08, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, writer.ToArray());
         var values = new List<ulong>();
-        Assert.AreEqual(ProtobufDecodeError.None, ProtobufReader.TryReadPackedFixed64(writer.ToArray().AsMemory(2), values));
+        Assert.AreEqual(ProtobufDecodeError.None, ProtobufReader.ReadPackedFixed64(writer.ToArray().AsMemory(2), values));
         CollectionAssert.AreEqual(new ulong[] { 2 }, values);
     }
 

@@ -47,6 +47,12 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Notes
 
+- Cause found: the factory's own steps worked (Linux failed 01:41:03Z, run ended 01:43:56Z, BL-4596 filed 01:46:45Z, fix integrated 02:02:41Z, run 41562433776 cancelled 02:05:35Z, green 02:18:35Z), but filing and the cancel each waited out the CI watch's 3-minute heartbeat. That lanes test only on Windows (the finding's root) cannot change in the factory; what can is how fast the watch reacts once CI is red.
+- Fix: 5469c7711, pushed to work/dark-factory 2026-11-03 11:02:16 Arizona (18:02:16Z). While the newest run the watch read is red, it looks every minute instead of every heartbeat (`Get-CiWatchEveryMinutes`, `$CiRedWatchMinutes = 1`, DarkFactory/CiWatch.ps1), so a failure is filed, and a landed fix's running run cancelled, within a minute. The same commit keeps the cancel prompt: it replaces BL-4717's first rule (cancel only once the running run has failed, which would have let run 41562433776 run on) with one that skips only fixes naming a commit the running run already holds. `-TestCiWatch` 93/93 and `-TestHeartbeat` PASS under Windows PowerShell 5.1 and pwsh 7.
+- Evidence still owed: the window starts at 2026-11-03T18:02:16Z and needs shift logs and CI runs after it, so the task waits in Backlog for an interactive session to run the measurement.
+
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-03: Doing -> Backlog. Fix landed (5469c7711 at 2026-11-03 11:02 Arizona); the post-fix measurement needs shift logs and CI runs after it, so it waits in Backlog per its criterion.

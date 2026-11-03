@@ -466,6 +466,43 @@ public sealed class TransferProgressRecorderTests
     }
 
     [TestMethod]
+    public void Constructor_WithOnlyALiveWriter_RedrawsTheStatusLineEachSecondWithNoData()
+    {
+        ManualTimerTimeProvider timerClock = new();
+        List<string> written = [];
+        TransferProgressRecorder recorder = new(timerClock, writeLive: written.Add);
+        recorder.ReportTransferStarted();
+        int linesBefore = recorder.StatusLines.Split('\r').Length;
+        int writesBefore = written.Count;
+        Diagnostics.Arrange("meter / reports", "live writer, no bar / started; then 1000 ms with no data");
+
+        timerClock.Advance(1000);
+        int linesAfter = recorder.StatusLines.Split('\r').Length;
+        Diagnostics.Act("lines added / writes added", $"{linesAfter - linesBefore} / {written.Count - writesBefore}");
+
+        Diagnostics.Assert("lines added / writes added", "1 / 1", $"{linesAfter - linesBefore} / {written.Count - writesBefore}");
+        Assert.AreEqual(1, linesAfter - linesBefore);
+        Assert.AreEqual(1, written.Count - writesBefore);
+    }
+
+    [TestMethod]
+    public void Constructor_WithOnlyAProgressBar_RedrawsTheStatusLineEachSecondWithNoData()
+    {
+        ManualTimerTimeProvider timerClock = new();
+        TransferProgressRecorder recorder = new(timerClock, new ProgressBarRecorder(timerClock, 0, 79));
+        recorder.ReportTransferStarted();
+        int linesBefore = recorder.StatusLines.Split('\r').Length;
+        Diagnostics.Arrange("meter / reports", "bar, no live writer / started; then 1000 ms with no data");
+
+        timerClock.Advance(1000);
+        int linesAfter = recorder.StatusLines.Split('\r').Length;
+        Diagnostics.Act("lines added", $"{linesAfter - linesBefore}");
+
+        Diagnostics.Assert("lines added", "1", $"{linesAfter - linesBefore}");
+        Assert.AreEqual(1, linesAfter - linesBefore);
+    }
+
+    [TestMethod]
     public void ReportUploaded_InAParallelRun_PassesTheBytesOnToItsShareOfTheCombinedMeter()
     {
         ParallelTransferProgress share = new ParallelProgressMeter(new ManualTimerTimeProvider(), new WriteGate(), _ => { }).AddTransfer();

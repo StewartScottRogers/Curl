@@ -414,6 +414,21 @@ public sealed class Lib751To1398Tests
     }
 
     [TestMethod]
+    public async Task Lib1396_EscapesAnEmptyInputToAnEmptyAnswerWithoutAborting()
+    {
+        var run = new PortRun(new FakeCurlEngine(), 1396);
+        var check = new LibTestAssertions(run.Error);
+        CurlLibrary library = CurlGlobal.Init(run.Context.Engine!);
+        (byte[], int, byte[])[] escapeRows = [([0], 0, [])];
+
+        await Lib1396.TestAsync(run.Context, check, library, [], escapeRows);
+
+        Assert.AreEqual(0, check.Failures);
+        Assert.AreEqual(string.Empty, run.Error.ToString());
+        Assert.AreEqual("curl_easy_escape test 0 DONE ()\n", run.OutputText);
+    }
+
+    [TestMethod]
     public async Task Lib1398_FormatsEveryCallAsUpstreamExpects()
     {
         var run = new PortRun(null, 1398);

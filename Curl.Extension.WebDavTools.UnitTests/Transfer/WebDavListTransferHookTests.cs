@@ -63,6 +63,7 @@ public sealed class WebDavListTransferHookTests
     {
         var result = await new WebDavListTransferHook().ExecuteAsync(Context(new MemoryStream()), _ => ValueTask.FromResult(TransferResult.Success(0)));
 
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
         Assert.AreEqual("The server answered PROPFIND with 0, not 207 Multistatus", result.ErrorMessage);
     }
 

@@ -24,7 +24,7 @@ internal static class SmbReadResponse
     /// <param name="received">Every byte received for the message, as curl counts <c>got</c>.</param>
     /// <param name="data">The data, when the response is accepted; empty for a read at the end of the file.</param>
     /// <returns><see langword="null" /> when the response is accepted, else the error message.</returns>
-    public static string? TryGetData(byte[] received, out ReadOnlyMemory<byte> data)
+    public static string? ReadDataOrRefusal(byte[] received, out ReadOnlyMemory<byte> data)
     {
         data = ReadOnlyMemory<byte>.Empty;
         if (received.Length < MinimumLength || SmbMessageHeader.ReadStatus(received) != 0)

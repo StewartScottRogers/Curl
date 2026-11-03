@@ -47,6 +47,13 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Notes
 
+- Cause found: run 41567287491 (0afc799c) failed its Build and test jobs on all three platforms by 02:54Z, and the real fix 8fa866b82 had landed at 02:46Z. Run 41570033273 (9cefafda, started 03:05Z) held that fix and had no failed job, but the coordinator cancelled it at 03:28Z "for lacking the CI fix BL-4604, BL-4605" - tasks filed at 02:55Z, after the fix, that closed with nothing to change. `Stop-CiRunWithoutFix` counted any CI-fix task reaching Done as a fix the running run lacked, so green waited for run 41572448811 (03:41:55Z). The other cancelled runs were pending runs replaced by newer pushes, which is how ci.yml works on this branch.
+- First fix: 28cbd2dfb (2026-11-03 10:51:22 Arizona) cancelled a running run for lacking a fix only once it had failed. Superseded by 5469c7711 (BL-4716), because it would have delayed AF-0568's cancel of run 41562433776, which had not failed yet.
+- Fix: 5469c7711, pushed to work/dark-factory 2026-11-03 11:02:16 Arizona (18:02:16Z). `Stop-CiRunWithoutFix` counts a CI fix as one the running run lacks unless its "Doing -> Done." line names a commit the running commit already holds (`Test-CiFixAlreadyIn`, DarkFactory/CiWatch.ps1), as BL-4604 and BL-4605 did ("already dropped by 8fa866b82"), so run 41570033273 would not have been cancelled. The watch also looks every minute while CI is red (BL-4716). `-TestCiWatch`: 93/93 PASS under Windows PowerShell 5.1 and pwsh 7.
+- Evidence still owed: the window starts at 2026-11-03T18:02:16Z and needs shift logs and CI runs after it, so the task waits in Backlog for an interactive session to run the measurement.
+
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-03: Doing -> Backlog. Fix landed (28cbd2dfb at 2026-11-03 10:51 Arizona); the post-fix measurement needs shift logs and CI runs after it, so it waits in Backlog per its criterion.

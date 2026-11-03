@@ -44,7 +44,7 @@ public sealed class ProtobufJsonStructTypesTests
     [TestMethod]
     public void Struct_Null_IsANullValueEncodedAsKindZero()
     {
-        Assert.AreEqual(ProtobufJsonError.None, ProtobufJsonConverter.TryConvertJsonToBinary(Holder, Encoding.UTF8.GetBytes("""{"meta":{"a":null}}"""), out var binary));
+        Assert.AreEqual(ProtobufJsonError.None, ProtobufJsonConverter.ConvertJsonToBinary(Holder, Encoding.UTF8.GetBytes("""{"meta":{"a":null}}"""), out var binary));
 
         // meta (1) { fields (1) { key "a", value (2) { null_value (1) = 0 } } }
         Assert.AreEqual("0A090A070A016112020800", Convert.ToHexString(binary!));

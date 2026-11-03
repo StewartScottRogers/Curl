@@ -27,17 +27,17 @@ public static class ProtobufJsonParser
         using (document)
         {
             var parsed = new DynamicMessage(type);
-            var error = TryReadRoot(document!.RootElement, parsed);
+            var error = ReadRoot(document!.RootElement, parsed);
             message = error == ProtobufJsonError.None ? parsed : null;
             return error;
         }
     }
 
-    private static ProtobufJsonError TryReadRoot(JsonElement root, DynamicMessage message)
+    private static ProtobufJsonError ReadRoot(JsonElement root, DynamicMessage message)
     {
         try
         {
-            return TryReadMessage(root, message, 0);
+            return ReadMessage(root, message, 0);
         }
         catch (InvalidOperationException)
         {
@@ -60,7 +60,7 @@ public static class ProtobufJsonParser
         }
     }
 
-    private static ProtobufJsonError TryReadMessage(JsonElement element, DynamicMessage message, int depth)
+    private static ProtobufJsonError ReadMessage(JsonElement element, DynamicMessage message, int depth)
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
@@ -69,7 +69,7 @@ public static class ProtobufJsonParser
 
         foreach (var member in element.EnumerateObject())
         {
-            var error = TryReadMember(member, message, depth);
+            var error = ReadMember(member, message, depth);
             if (error != ProtobufJsonError.None)
             {
                 return error;
@@ -80,13 +80,13 @@ public static class ProtobufJsonParser
     }
 
     /// <summary>Reads one JSON member into the field it names, rejecting a member that names no field.</summary>
-    internal static ProtobufJsonError TryReadMember(JsonProperty member, DynamicMessage message, int depth)
+    internal static ProtobufJsonError ReadMember(JsonProperty member, DynamicMessage message, int depth)
     {
         var field = ProtobufJsonNames.FindField(message.Type, member.Name);
-        return field is null ? ProtobufJsonError.UnknownField : TryReadField(member.Value, message, field, depth);
+        return field is null ? ProtobufJsonError.UnknownField : ReadField(member.Value, message, field, depth);
     }
 
-    private static ProtobufJsonError TryReadField(JsonElement element, DynamicMessage message, DynamicField field, int depth)
+    private static ProtobufJsonError ReadField(JsonElement element, DynamicMessage message, DynamicField field, int depth)
     {
         if (element.ValueKind == JsonValueKind.Null && !ProtobufJsonStructTypes.AcceptsNull(field))
         {
@@ -96,15 +96,15 @@ public static class ProtobufJsonParser
 
         if (field.IsMap)
         {
-            return TryReadMap(element, message.Map(field), field.MessageType!, depth);
+            return ReadMap(element, message.Map(field), field.MessageType!, depth);
         }
 
         if (field.IsRepeated)
         {
-            return TryReadRepeated(element, message.Repeated(field), field, depth);
+            return ReadRepeated(element, message.Repeated(field), field, depth);
         }
 
-        var error = TryReadValue(element, field, depth, out var value);
+        var error = ReadValue(element, field, depth, out var value);
         if (error == ProtobufJsonError.None)
         {
             message.SetSingular(field, value!);
@@ -113,7 +113,7 @@ public static class ProtobufJsonParser
         return error;
     }
 
-    private static ProtobufJsonError TryReadRepeated(JsonElement element, List<object> items, DynamicField field, int depth)
+    private static ProtobufJsonError ReadRepeated(JsonElement element, List<object> items, DynamicField field, int depth)
     {
         if (element.ValueKind != JsonValueKind.Array)
         {
@@ -124,14 +124,14 @@ public static class ProtobufJsonParser
         using var elements = element.EnumerateArray();
         while (error == ProtobufJsonError.None && elements.MoveNext())
         {
-            error = TryReadValue(elements.Current, field, depth, out var item);
+            error = ReadValue(elements.Current, field, depth, out var item);
             items.Add(item!);
         }
 
         return error;
     }
 
-    private static ProtobufJsonError TryReadMap(JsonElement element, Dictionary<object, object> map, DynamicMessageType entryType, int depth)
+    private static ProtobufJsonError ReadMap(JsonElement element, Dictionary<object, object> map, DynamicMessageType entryType, int depth)
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
@@ -144,60 +144,60 @@ public static class ProtobufJsonParser
         using var members = element.EnumerateObject();
         while (error == ProtobufJsonError.None && members.MoveNext())
         {
-            error = ProtobufJsonScalars.TryReadMapKey(members.Current.Name, keyField.Kind, out var key);
+            error = ProtobufJsonScalars.ReadMapKey(members.Current.Name, keyField.Kind, out var key);
             object? value = null;
-            error = error == ProtobufJsonError.None ? TryReadValue(members.Current.Value, valueField, depth, out value) : error;
+            error = error == ProtobufJsonError.None ? ReadValue(members.Current.Value, valueField, depth, out value) : error;
             map[key ?? string.Empty] = value!;
         }
 
         return error;
     }
 
-    private static ProtobufJsonError TryReadValue(JsonElement element, DynamicField field, int depth, out object? value)
+    private static ProtobufJsonError ReadValue(JsonElement element, DynamicField field, int depth, out object? value)
     {
         if (field.Kind == DynamicValueKind.Message)
         {
             var nested = new DynamicMessage(field.MessageType!);
             value = nested;
-            return TryReadMessageValue(element, nested, depth);
+            return ReadMessageValue(element, nested, depth);
         }
 
         if (ProtobufJsonStructTypes.IsNullValue(field))
         {
-            return ProtobufJsonStructTypes.TryReadNullValue(element, field, out value);
+            return ProtobufJsonStructTypes.ReadNullValue(element, field, out value);
         }
 
         return field.Kind == DynamicValueKind.Enum
-            ? ProtobufJsonScalars.TryReadEnum(element, field.EnumType!, out value)
-            : ProtobufJsonScalars.TryRead(element, field.Kind, out value);
+            ? ProtobufJsonScalars.ReadEnum(element, field.EnumType!, out value)
+            : ProtobufJsonScalars.Read(element, field.Kind, out value);
     }
 
     /// <summary>A well-known type from its own JSON form, or any other message from an object.</summary>
-    internal static ProtobufJsonError TryReadMessageValue(JsonElement element, DynamicMessage nested, int depth)
+    internal static ProtobufJsonError ReadMessageValue(JsonElement element, DynamicMessage nested, int depth)
     {
         if (ProtobufJsonTimeTypes.HasStringForm(nested.Type))
         {
-            return ProtobufJsonTimeTypes.TryRead(element, nested);
+            return ProtobufJsonTimeTypes.Read(element, nested);
         }
 
         if (ProtobufJsonWrapperTypes.IsWrapper(nested.Type))
         {
-            return ProtobufJsonWrapperTypes.TryRead(element, nested);
+            return ProtobufJsonWrapperTypes.Read(element, nested);
         }
 
         if (ProtobufJsonFieldMask.IsFieldMask(nested.Type))
         {
-            return ProtobufJsonFieldMask.TryRead(element, nested);
+            return ProtobufJsonFieldMask.Read(element, nested);
         }
 
         if (ProtobufJsonStructTypes.IsStructType(nested.Type))
         {
-            return ProtobufJsonStructTypes.TryRead(element, nested, depth);
+            return ProtobufJsonStructTypes.Read(element, nested, depth);
         }
 
-        return depth >= ProtobufReader.MaximumDepth ? ProtobufJsonError.NestingTooDeep : TryReadObjectMessage(element, nested, depth + 1);
+        return depth >= ProtobufReader.MaximumDepth ? ProtobufJsonError.NestingTooDeep : ReadObjectMessage(element, nested, depth + 1);
     }
 
-    private static ProtobufJsonError TryReadObjectMessage(JsonElement element, DynamicMessage nested, int depth) =>
-        ProtobufJsonAny.IsAny(nested.Type) ? ProtobufJsonAny.TryRead(element, nested, depth) : TryReadMessage(element, nested, depth);
+    private static ProtobufJsonError ReadObjectMessage(JsonElement element, DynamicMessage nested, int depth) =>
+        ProtobufJsonAny.IsAny(nested.Type) ? ProtobufJsonAny.Read(element, nested, depth) : ReadMessage(element, nested, depth);
 }

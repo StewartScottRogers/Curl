@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Curl.Extended.Protocol.DnsQuery.Client;
 using Curl.Extended.Protocol.DnsQuery.Wire;
@@ -71,7 +72,7 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
     {
         for (int attempt = 0; attempt < Attempts; attempt++)
         {
-            await channel.SendAsync(query, channel.ServerEndPoint, context.CancellationToken).ConfigureAwait(false);
+            await SendQueryAsync(channel, query, context).ConfigureAwait(false);
             if (await ReceiveAnswerAsync(channel, query, context).ConfigureAwait(false) is { } answer)
             {
                 return answer;
@@ -79,6 +80,19 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
         }
 
         throw new DnsQueryException(CurlExitCode.OperationTimedOut, $"The DNS server sent no answer to {Attempts} queries over UDP");
+    }
+
+    /// <summary>Sends the query once; a socket error (a refusal after a datagram was received, say) ends with exit 55.</summary>
+    private static async ValueTask SendQueryAsync(IDatagramChannel channel, byte[] query, ITransferContext context)
+    {
+        try
+        {
+            await channel.SendAsync(query, channel.ServerEndPoint, context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (SocketException exception)
+        {
+            throw new DnsQueryException(CurlExitCode.SendError, $"Failed sending the query over UDP: {exception.Message}");
+        }
     }
 
     /// <summary>Waits one attempt's time for the answer, and gives <see langword="null" /> when none came.</summary>
@@ -101,6 +115,10 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
         catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
         {
             return null;
+        }
+        catch (SocketException exception)
+        {
+            throw new DnsQueryException(CurlExitCode.RecvError, $"Failed receiving the answer over UDP: {exception.Message}");
         }
     }
 

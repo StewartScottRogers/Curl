@@ -73,17 +73,51 @@ public sealed class DohHttp2ExchangeTests
         CollectionAssert.AreEqual(DohRequest.Encode("h", 443, DnsEdnsPadding.Pad(Query)), server.TcpWritten.ToArray());
     }
 
-    private static async Task<CurlExitCode> FailureOfAsync(HeaderField[] responseHeaders, bool isEndStream)
-    {
-        var server = new ScriptedDnsServer((_, _) => [],
-        [
-            .. Frame(Http2FrameFactory.CreateSettings([])),
-            .. Frame(Http2FrameFactory.CreateHeaders(1, new HpackEncoder().Encode(responseHeaders), isEndStream, isEndHeaders: true)),
-        ]);
+    [TestMethod]
+    public async Task ExchangeAsync_ServerResetsTheStream_FailsWithExit56() =>
+        Assert.AreEqual(CurlExitCode.RecvError, (await FailureAfterSettingsAsync(Frame(Http2FrameFactory.CreateRstStream(1, Http2ErrorCode.RefusedStream)))).ExitCode);
 
-        DnsQueryException failure = await Assert.ThrowsExactlyAsync<DnsQueryException>(async () =>
+    [TestMethod]
+    public async Task ExchangeAsync_ServerSendsGoAway_FailsWithExit56() =>
+        Assert.AreEqual(CurlExitCode.RecvError, (await FailureAfterSettingsAsync(Frame(Http2FrameFactory.CreateGoAway(0, Http2ErrorCode.EnhanceYourCalm, Array.Empty<byte>())))).ExitCode);
+
+    [TestMethod]
+    public async Task ExchangeAsync_ConnectionClosesMidFrame_FailsWithExit56() =>
+        Assert.AreEqual(CurlExitCode.RecvError, (await FailureAfterSettingsAsync(Frame(Http2FrameFactory.CreateData(1, Answer, isEndStream: true)).AsSpan(0, 12).ToArray())).ExitCode);
+
+    [TestMethod]
+    public async Task ExchangeAsync_HeaderBlockIsNotValidHpack_FailsWithExit8() =>
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, (await FailureAfterSettingsAsync(Frame(Http2FrameFactory.CreateHeaders(1, new byte[] { 0x80 }, isEndStream: false, isEndHeaders: true)))).ExitCode);
+
+    [TestMethod]
+    public async Task ExchangeAsync_ServerBreaksTheHttp2Protocol_FailsWithExit8() =>
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, (await FailureAfterSettingsAsync(Frame(Http2FrameFactory.CreateData(0, Answer, isEndStream: false)))).ExitCode);
+
+    [TestMethod]
+    public async Task ExchangeAsync_DataFramesTotalMoreThan65535Octets_FailsWithExit8BeforeBufferingThem()
+    {
+        byte[] block = new HpackEncoder().Encode([new(":status", "200"), new("content-type", "application/dns-message")]);
+        byte[] frames = [.. Frame(Http2FrameFactory.CreateHeaders(1, block, isEndStream: false, isEndHeaders: true))];
+        for (int sent = 0; sent < 5; sent++)
+        {
+            frames = [.. frames, .. Frame(Http2FrameFactory.CreateData(1, new byte[16384], isEndStream: false))];
+        }
+
+        DnsQueryException failure = await FailureAfterSettingsAsync(frames);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure.ExitCode);
+        StringAssert.Contains(failure.Message, "longer than a DNS message's 65535 octets", StringComparison.Ordinal);
+    }
+
+    private static async Task<CurlExitCode> FailureOfAsync(HeaderField[] responseHeaders, bool isEndStream) =>
+        (await FailureAfterSettingsAsync(Frame(Http2FrameFactory.CreateHeaders(1, new HpackEncoder().Encode(responseHeaders), isEndStream, isEndHeaders: true)))).ExitCode;
+
+    private static async Task<DnsQueryException> FailureAfterSettingsAsync(byte[] frames)
+    {
+        var server = new ScriptedDnsServer((_, _) => [], [.. Frame(Http2FrameFactory.CreateSettings([])), .. frames]);
+
+        return await Assert.ThrowsExactlyAsync<DnsQueryException>(async () =>
             await new DnsHttpsTransport(server, new HandshakingTlsProvider { ApplicationProtocol = "h2" }).ExchangeAsync("h", 443, Query, ContextOf()));
-        return failure.ExitCode;
     }
 
     private static byte[] Frame(Http2Frame frame) => Http2FrameCodec.Serialize(frame);
