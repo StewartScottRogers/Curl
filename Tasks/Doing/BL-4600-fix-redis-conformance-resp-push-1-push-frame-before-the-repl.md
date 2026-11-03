@@ -32,3 +32,4 @@ Found by BL-4490: `RedisFramingCases.Push_BeforeTheReply_IsNotTakenForTheReply` 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: b758e75e 75d02dc0 81c79471 591bd22b.
