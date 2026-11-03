@@ -3,8 +3,8 @@ id: AF-0560
 title: Surviving mutant: -H "Content-Type" with -F can throw IndexOutOfRangeException without a test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/MultipartFormPartMapping.cs:RequestContentTypeOf-gt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/MultipartFormPartMapping.cs:66:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
