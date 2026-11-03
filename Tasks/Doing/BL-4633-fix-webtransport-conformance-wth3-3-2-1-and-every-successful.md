@@ -32,3 +32,4 @@ Found by BL-4608's conformance cases (`Curl.Conformance.Extended.UnitTests/WebTr
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 30fb7192 bd7a9132 1b3db0b2 e6dffd78.
