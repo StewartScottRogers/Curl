@@ -1,5 +1,5 @@
 ---
-id: BL-4781
+id: BL-4783
 title: Read a failed CI run whose gh run view --log-failed prints nothing as an empty log, not an unreadable one, so the CI watch files or traces it
 priority: High
 assignee: Claude
@@ -11,7 +11,7 @@ requirement: none
 created: 2026-11-03
 completed: 2026-11-03
 ---
-# BL-4781 — Read a failed CI run whose gh run view --log-failed prints nothing as an empty log, not an unreadable one, so the CI watch files or traces it
+# BL-4783 — Read a failed CI run whose gh run view --log-failed prints nothing as an empty log, not an unreadable one, so the CI watch files or traces it
 
 ## Goal
 

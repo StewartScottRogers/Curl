@@ -516,7 +516,7 @@ function Read-CiRunLog {
     # array when gh exits 0 and prints nothing (a run failed by a job's timeout-minutes or a job
     # that never got a runner), $null only when gh exits non-zero. Each branch assigns $log
     # itself: an if statement's output is unrolled, so `$log = if ...` turned an empty log into
-    # $null, read as unreadable on every heartbeat (BL-4781). -Gh stands in for gh in -TestCiWatch.
+    # $null, read as unreadable on every heartbeat (BL-4783). -Gh stands in for gh in -TestCiWatch.
     param([string]$Id, [string]$JobId, [scriptblock]$Gh = { gh @args 2>$null })
     if ($JobId) { $log = @(& $Gh run view $Id --job $JobId --log | ForEach-Object { "$_" }) }
     else { $log = @(& $Gh run view $Id --log-failed | ForEach-Object { "$_" }) }
@@ -1252,14 +1252,14 @@ if ($TestCiWatch) {
     $emptyRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":901,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() })
     & $check 'a failed run with an empty log is filed by the run (AF-0178)' '1|job unknown job step unknown step' `
         "$($emptyRuns.Count)|$($emptyRuns[0].Failures[0].Key)"
-    # BL-4781: the default reader itself, through a stand-in gh. Runs 41715208450 and 41723085402
+    # BL-4783: the default reader itself, through a stand-in gh. Runs 41715208450 and 41723085402
     # printed nothing with exit 0 and were read as unreadable on every heartbeat.
     $silentGh = Read-CiRunLog -Id 41723085402 -Gh { $global:LASTEXITCODE = 0 }
-    & $check 'gh printing nothing with exit 0 is an empty log, not unreadable (BL-4781)' 'False|0' "$($null -eq $silentGh)|$(@($silentGh).Count)"
+    & $check 'gh printing nothing with exit 0 is an empty log, not unreadable (BL-4783)' 'False|0' "$($null -eq $silentGh)|$(@($silentGh).Count)"
     $failingGh = Read-CiRunLog -Id 41723085402 -Gh { $global:LASTEXITCODE = 1 }
-    & $check 'gh exiting non-zero is unreadable (BL-4781)' 'True' "$($null -eq $failingGh)"
+    & $check 'gh exiting non-zero is unreadable (BL-4783)' 'True' "$($null -eq $failingGh)"
     $jobGh = Read-CiRunLog -Id 7 -JobId 8 -Gh { $global:LASTEXITCODE = 0; "args $($args -join ' ')" }
-    & $check 'a job log is read by its job id, one line kept as one line (BL-4781)' '1|args run view 7 --job 8 --log' "$(@($jobGh).Count)|$($jobGh[0])"
+    & $check 'a job log is read by its job id, one line kept as one line (BL-4783)' '1|args run view 7 --job 8 --log' "$(@($jobGh).Count)|$($jobGh[0])"
     $noRunner = '{"jobs":[{"name":"ok","conclusion":"success","steps":[{"conclusion":"success"}]},{"name":"Pack","conclusion":"cancelled","steps":[]}]}'
     $ran = '{"jobs":[{"name":"Pack","conclusion":"cancelled","steps":[]},{"name":"T","conclusion":"failure","steps":[{"conclusion":"failure"}]}]}'
     $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
