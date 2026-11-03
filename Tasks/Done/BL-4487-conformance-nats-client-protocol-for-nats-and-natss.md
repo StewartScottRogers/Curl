@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Nats, Curl.Conformance.Extended.UnitTests/Nats, Documentation/Conformance/Extended/Nats.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4487 — Conformance: NATS client protocol for nats:// and natss://
 
@@ -46,20 +46,20 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Nats.md` gives every requirement of the client protocol that binds a client
+- [x] `Documentation/Conformance/Extended/Nats.md` gives every requirement of the client protocol that binds a client
       a `Nats:` ID mapped to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Nats/` run curl in process for `nats://` and `natss://` and
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Nats/` run curl in process for `nats://` and `natss://` and
       assert wire bytes, stdout, stderr and exit code for at least: CONNECT fields for user/password, token and none,
       a publish over `max_payload`, a PING from the server answered with PONG, `-ERR` at connect and after PUB, MSG
       and HMSG with payloads containing CR LF, `?count=N` with UNSUB, request/reply with a unique inbox, a subject
       with a wildcard or empty token refused, and INFO split across reads.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Nats conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Nats/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Nats/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
@@ -67,3 +67,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: f369708b eb1aead7 96eae08c d8e3fb0e 3a5499b1 ef6c9026.
+- 2026-11-02: Doing -> Done. NATS matrix and 20 cases in place; NATS-SUBJ-1 listed for BL-4583
