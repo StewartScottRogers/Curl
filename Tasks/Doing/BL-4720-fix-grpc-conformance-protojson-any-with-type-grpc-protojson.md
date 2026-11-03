@@ -39,3 +39,4 @@ wrapper or Struct needs that task's forms. Spec: <https://protobuf.dev/programmi
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: c55e2f87 3578e965 e3a4fd8b.
