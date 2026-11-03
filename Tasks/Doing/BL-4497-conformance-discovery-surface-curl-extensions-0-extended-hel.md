@@ -69,3 +69,4 @@ A defect found in a host or an extension is listed in `KnownFailures.txt` with a
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: fcbc98ea 1574b18b fe617ef5 d8e3fb0e 46eaa437 ef6c9026.
