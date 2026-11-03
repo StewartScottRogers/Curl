@@ -41,3 +41,4 @@ ADR-1216 pins exit 56 on a server close; keep that.
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: f310805a 37cb756b c09bc496 370ef6b5 e5bbbb16.
