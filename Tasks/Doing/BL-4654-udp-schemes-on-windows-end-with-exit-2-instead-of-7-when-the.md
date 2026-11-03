@@ -30,3 +30,4 @@ Found by BL-4612 running Curl.Console's curl.exe: `curl -sS coap://localhost:1/x
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 01bb1e05 8a80dee3.
