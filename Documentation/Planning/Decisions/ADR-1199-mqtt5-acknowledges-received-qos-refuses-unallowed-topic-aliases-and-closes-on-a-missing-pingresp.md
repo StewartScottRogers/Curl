@@ -26,5 +26,6 @@ MQTT-4.6.0-2, MQTT-4.6.0-3), accepts a Topic Alias although its CONNECT sends no
 
 ## Consequences
 
-The cases stay in `KnownFailures.txt` under BL-4580, BL-4581 and BL-4582 until each fix lands; each fix adds a
-focused unit test in `Curl.Extended.Protocol.Mqtt5.UnitTests` (ADR-0482).
+The cases were listed in `KnownFailures.txt` until BL-4580, BL-4581 and BL-4582 landed their fixes; those tasks are
+Done and the file no longer lists them. Each fix added a focused unit test in
+`Curl.Extended.Protocol.Mqtt5.UnitTests` (ADR-0482).

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions/ADR-1199-mqtt5-acknowledges-received-qos-refuses-unallowed-topic-aliases-and-closes-on-a-missing-pingresp.md]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4646 — Fix AF-0540: ADR-1199 says its MQTT 5 cases stay in KnownFailures.txt under BL-4580, BL-4581 and BL-4582; the file lists them under BL-4573, BL-4574 and BL-4575
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+BL-4580, BL-4581 and BL-4582 are Done and KnownFailures.txt no longer lists the MQTT 5 cases, so ADR-1199 now says that in the past tense. Docs-only change; no code touched, so build and tests are unaffected.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. ADR-1199 Consequences now names the Done tasks and says the file no longer lists the cases
