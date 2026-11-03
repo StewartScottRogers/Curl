@@ -38,3 +38,4 @@ Split from BL-4614 (itself split from BL-4496, which holds the whole plan; read 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 70861bb4 ac6109d4 2bf36aee fe617ef5 be674468 9438adeb ef6c9026.
