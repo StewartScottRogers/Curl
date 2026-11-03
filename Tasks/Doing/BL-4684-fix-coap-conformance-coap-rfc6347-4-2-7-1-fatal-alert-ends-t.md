@@ -32,3 +32,4 @@ Found by BL-4574. RFC 6347 section 4.2.7 and RFC 5246 section 7.2: on a fatal al
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: ec597836 a91ff38c 2ea521fc fdc35bd6.
