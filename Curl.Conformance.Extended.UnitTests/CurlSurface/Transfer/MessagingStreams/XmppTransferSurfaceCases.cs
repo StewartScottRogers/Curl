@@ -181,10 +181,13 @@ public sealed class XmppTransferSurfaceCases
     private static int Port(string scheme) => scheme == "xmpps" ? 5223 : 5222;
 
     // The connection line every transfer's -v writes (curl 8.22.0 measured with Record-CurlExchange.ps1: "* Established
-    // connection to localhost (127.0.0.1 port N) from ..."), and for xmpps a TLS line after it: the Schannel build's
-    // "* schannel: ..." on Windows, the OpenSSL build's "* SSL connection using TLSv1..." elsewhere.
+    // connection to localhost (127.0.0.1 port N) from ..."), and for xmpps a TLS line: the Schannel build's
+    // "* schannel: ..." after it on Windows, the OpenSSL build's "* SSL connection using TLSv1..." before it elsewhere,
+    // as the handshake writes that line and the Established line waits for the whole chain (BL-4662).
     private static string[] VerboseLines(string scheme) => scheme == "xmpps"
-        ? ["* Established connection to localhost (127.0.0.1 port 5223) from ", OperatingSystem.IsWindows() ? "* schannel: " : "* SSL connection using TLSv1."]
+        ? (OperatingSystem.IsWindows()
+            ? ["* Established connection to localhost (127.0.0.1 port 5223) from ", "* schannel: "]
+            : ["* SSL connection using TLSv1.", "* Established connection to localhost (127.0.0.1 port 5223) from "])
         : ["* Established connection to localhost (127.0.0.1 port 5222) from "];
 
     private static TransferSurfaceRoute Route(string scheme, Func<System.Xml.Linq.XElement, IReadOnlyList<string>> answer)
