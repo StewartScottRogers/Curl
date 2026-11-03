@@ -31,3 +31,4 @@ Found by BL-4681: `DnsOverHttpsCases.Https_Query_CarriesDnsId0` (`DnsQuery:RFC84
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 1d7d20d2 4d2f7efb 4b59311c.
