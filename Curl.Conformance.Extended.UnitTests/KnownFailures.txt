@@ -3,7 +3,6 @@
 # A listed ID that no test carries fails RequirementChecks. Lines merge by union, so add or remove only whole lines.
 Coap:RFC6347-4.1-3 BL-4685
 
-DnsQuery:RFC8484-5.2-1 BL-4686
 Grpc:ProtoJson-Any-1 BL-4720
 Grpc:ProtoJson-Any-2 BL-4720
 Grpc:ProtoJson-Struct-1 BL-4719
