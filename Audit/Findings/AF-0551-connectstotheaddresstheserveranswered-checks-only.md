@@ -3,8 +3,8 @@ id: AF-0551
 title: ConnectsToTheAddressTheServerAnswered checks only that a connection exists
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.IntegrationTests/EngineCompositionDnsServersIntegrationTests.cs:CreateTransports_WithDnsServersOnLoopback_ConnectsToTheAddressTheServerAnswered:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.IntegrationTests/EngineCompositionDnsServersInte
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
