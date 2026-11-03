@@ -35,3 +35,4 @@ The last part of BL-4468: BL-4520, BL-4521 and BL-4522 add the endpoint and the 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 3b081890 2108d112 d8e3fb0e ef6c9026 c0e24372.
