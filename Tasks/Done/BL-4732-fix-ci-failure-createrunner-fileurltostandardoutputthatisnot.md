@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests, Curl.Console]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4732 — Fix CI failure CreateRunner_FileUrlToStandardOutputThatIsNotATerminal_WritesTheProgressMeter on Linux
 
@@ -36,3 +36,4 @@ Lanes test only on Windows, so reproduce with `gh run view 41655977963 --log-fai
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 78fcb206.
+- 2026-11-03: Doing -> Done. Progress meter composition test tolerates a timer refresh line on slow runners
