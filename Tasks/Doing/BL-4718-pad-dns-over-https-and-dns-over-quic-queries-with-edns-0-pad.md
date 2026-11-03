@@ -22,10 +22,12 @@ BL-4689 added `Wire/DnsEdnsPadding.Pad` and calls it from `Transport/Tls/DnsTlsT
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Extended.Protocol.DnsQuery.UnitTests` shows a DoH query body and a DoQ stream payload each 128 octets long with ARCOUNT 1 and an OPT record whose first option is Padding (code 12).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` is green, and the library stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 (`Measure-CodeQuality.ps1`).
+- [x] A unit test in `Curl.Extended.Protocol.DnsQuery.UnitTests` shows a DoH query body and a DoQ stream payload each 128 octets long with ARCOUNT 1 and an OPT record whose first option is Padding (code 12).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` is green, and the library stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 (`Measure-CodeQuality.ps1`).
 
 ## Notes
+
+Padding added in DnsHttpsTransport (before either HTTP version) and DnsQuicTransport.Framed; ADR-1230 bullet updated. Quality run: 0 failing members.
 
 ## Log
 

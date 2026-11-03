@@ -22,8 +22,9 @@ the conformance case `DnsQuery:RFC8310-9-1` failed. Upstream curl has no `dns:` 
 - `DnsTlsTransport` pads the query it is handed just before it frames and sends it. The handler and the other
   transports are unchanged: the message ID and the question are the handler's, and only the octets on the TLS wire
   grow.
-- DNS over HTTPS and DNS over QUIC are encrypted too, and RFC 8467 section 4.1 covers them. They are left unpadded
-  here and their padding is follow-up work, because this task touches only the DoT transport and the wire codec.
+- DNS over HTTPS and DNS over QUIC are encrypted too, and RFC 8467 section 4.1 covers them. `DnsHttpsTransport` pads the
+  query before it writes the POST body (HTTP/2 and HTTP/1.1 alike); `DnsQuicTransport` pads it when it frames the stream
+  payload, after the message ID is rewritten to 0 (BL-4718). The padded body and payload are 128 octets, as for DoT.
 
 ## Consequences
 

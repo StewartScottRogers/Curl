@@ -1,4 +1,5 @@
 using Curl.Extended.Protocol.DnsQuery.Client;
+using Curl.Extended.Protocol.DnsQuery.Wire;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.DnsQuery.Transport.Https;
@@ -28,6 +29,7 @@ internal sealed class DnsHttpsTransport(IConnector connector, ITlsProvider tlsPr
     /// <inheritdoc />
     public async ValueTask<byte[]> ExchangeAsync(string host, int port, byte[] query, ITransferContext context)
     {
+        byte[] padded = DnsEdnsPadding.Pad(query);
         ConnectResult tcp = await connector.ConnectAsync(new ConnectTarget(host, port, UseTls: false), context.CancellationToken).ConfigureAwait(false);
         if (tcp.Connection is not { } plaintext)
         {
@@ -45,10 +47,10 @@ internal sealed class DnsHttpsTransport(IConnector connector, ITlsProvider tlsPr
         {
             if (tls.ApplicationProtocol == DohHttp2Exchange.Protocol)
             {
-                return await DohHttp2Exchange.ExchangeAsync(secure, host, port, query, context.CancellationToken).ConfigureAwait(false);
+                return await DohHttp2Exchange.ExchangeAsync(secure, host, port, padded, context.CancellationToken).ConfigureAwait(false);
             }
 
-            await secure.WriteAsync(DohRequest.Encode(host, port, query), context.CancellationToken).ConfigureAwait(false);
+            await secure.WriteAsync(DohRequest.Encode(host, port, padded), context.CancellationToken).ConfigureAwait(false);
             await secure.FlushAsync(context.CancellationToken).ConfigureAwait(false);
             return await DohResponseReader.ReadAnswerAsync(secure, context.CancellationToken).ConfigureAwait(false);
         }

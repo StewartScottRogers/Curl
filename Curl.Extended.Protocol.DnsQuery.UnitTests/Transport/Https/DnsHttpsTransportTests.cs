@@ -4,6 +4,7 @@ using Curl.Extended.Protocol.DnsQuery.Transport;
 using Curl.Extended.Protocol.DnsQuery.Transport.Https;
 using Curl.Extended.Protocol.DnsQuery.UnitTests.Transport.Tls;
 using Curl.Extended.Protocol.DnsQuery.UnitTests.Wire;
+using Curl.Extended.Protocol.DnsQuery.Wire;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.DnsQuery.UnitTests.Transport.Https;
@@ -49,8 +50,21 @@ public sealed class DnsHttpsTransportTests
         Assert.AreEqual(0, writtenAtHandshake);
         Assert.AreEqual("dns.example", tls.TargetHost);
         Assert.AreEqual(("tcp", "dns.example", 443), server.Opened.Single());
-        CollectionAssert.AreEqual(DohRequest.Encode("dns.example", 443, Query), server.TcpWritten.ToArray());
+        CollectionAssert.AreEqual(DohRequest.Encode("dns.example", 443, DnsEdnsPadding.Pad(Query)), server.TcpWritten.ToArray());
         Assert.AreEqual(1, server.Disposed);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_Rfc8467Section4_1_PostsAQueryPaddedTo128OctetsWithAPaddingOption()
+    {
+        var server = new ScriptedDnsServer((_, _) => [], ResponseOf(Answer));
+
+        await new DnsHttpsTransport(server, new HandshakingTlsProvider()).ExchangeAsync("dns.example", 443, Query, ContextOf());
+
+        byte[] body = server.TcpWritten.ToArray()[^128..];
+        CollectionAssert.AreEqual(DnsEdnsPadding.Pad(Query), body);
+        CollectionAssert.AreEqual(new byte[] { 0, 1 }, body[10..12]);
+        CollectionAssert.AreEqual(new byte[] { 0, 12 }, body[(Query.Length + 11)..(Query.Length + 13)]);
     }
 
     [TestMethod]

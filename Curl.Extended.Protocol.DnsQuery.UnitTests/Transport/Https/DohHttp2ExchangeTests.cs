@@ -3,6 +3,7 @@ using Curl.Extended.Protocol.DnsQuery.Client;
 using Curl.Extended.Protocol.DnsQuery.Transport.Https;
 using Curl.Extended.Protocol.DnsQuery.UnitTests.Transport.Tls;
 using Curl.Extended.Protocol.DnsQuery.UnitTests.Wire;
+using Curl.Extended.Protocol.DnsQuery.Wire;
 using Curl.Http2;
 using Curl.Protocol.Abstractions;
 
@@ -43,7 +44,7 @@ public sealed class DohHttp2ExchangeTests
         byte[] written = [.. server.TcpWritten];
         StringAssert.StartsWith(Encoding.ASCII.GetString(written), Preface);
         CollectionAssert.AreEqual(
-            new[] { ":method: POST", ":scheme: https", ":authority: dns.example:8443", ":path: /dns-query", "accept: application/dns-message", "content-type: application/dns-message", $"content-length: {Query.Length}" },
+            new[] { ":method: POST", ":scheme: https", ":authority: dns.example:8443", ":path: /dns-query", "accept: application/dns-message", "content-type: application/dns-message", $"content-length: {DnsEdnsPadding.Pad(Query).Length}" },
             RequestHeadersOf(written).Select(static field => $"{field.Name}: {field.Value}").ToArray());
         Assert.AreEqual(1, server.Disposed);
     }
@@ -69,7 +70,7 @@ public sealed class DohHttp2ExchangeTests
         byte[] answer = await new DnsHttpsTransport(server, new HandshakingTlsProvider()).ExchangeAsync("h", 443, Query, ContextOf());
 
         CollectionAssert.AreEqual(Answer, answer);
-        CollectionAssert.AreEqual(DohRequest.Encode("h", 443, Query), server.TcpWritten.ToArray());
+        CollectionAssert.AreEqual(DohRequest.Encode("h", 443, DnsEdnsPadding.Pad(Query)), server.TcpWritten.ToArray());
     }
 
     private static async Task<CurlExitCode> FailureOfAsync(HeaderField[] responseHeaders, bool isEndStream)
