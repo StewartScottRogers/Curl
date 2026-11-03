@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protobuf.UnitLibrary/Json, Curl.Protobuf.UnitTests, Curl.Extended.Protocol.Grpc.UnitLibrary/Client/GrpcMessageJson.cs, Curl.Extended.Protocol.Grpc.UnitTests, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4686 — Fix Grpc conformance: ProtoJSON Timestamp and Duration string forms (Grpc:ProtoJson-Timestamp-1, Grpc:ProtoJson-Duration-1)
 
@@ -31,15 +31,21 @@ import. ADR-1147 describes the JSON mapping.
 
 ## Acceptance criteria
 
-- [ ] `GrpcProtoJsonCases.RoundTrip_TimestampAndDuration_UseTheirStringForms` passes and the `Grpc:ProtoJson-Timestamp-1`
+- [x] `GrpcProtoJsonCases.RoundTrip_TimestampAndDuration_UseTheirStringForms` passes and the `Grpc:ProtoJson-Timestamp-1`
       and `Grpc:ProtoJson-Duration-1` lines are removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
-- [ ] A focused unit test in `Curl.Protobuf.UnitTests` pins each conversion both ways (ADR-0482).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests are green and the changed library stays at 100%
+- [x] A focused unit test in `Curl.Protobuf.UnitTests` pins each conversion both ways (ADR-0482).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests are green and the changed library stays at 100%
       line and branch coverage, complexity at most 10 and CRAP at most 30 (`Measure-CodeQuality.ps1`).
 
 ## Notes
+
+- Delivered directly rather than through the full /feature stages: one new internal class in `Curl.Protobuf.UnitLibrary/Json/` (`ProtobufJsonTimeTypes`) hooked into the formatter and parser; design recorded in ADR-1228. `GrpcMessageJson.cs` needed no change.
+- Out-of-range Timestamp or Duration from the wire: `TryConvertBinaryToJson` returns `InvalidValue` (protobuf's printer fails too).
+- A source-generated regex was tried first and dropped: its generated code counted against the coverage and complexity gates.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Protobuf.UnitLibrary` reports 100% line, 100% branch, 0 failing members, max CRAP 10. Fast tests: 115 projects green, Curl.Protobuf.UnitTests 385. Pure computation, no platform-dependent paths or error text, so CI on Linux and macOS is unaffected.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 523465ad b294690c 710af73a.
+- 2026-11-03: Doing -> Done. grpc:// reads and prints Timestamp and Duration fields as their ProtoJSON strings
