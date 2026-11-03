@@ -35,3 +35,4 @@ The last part of BL-4572's split. Add a sequences section writer under `Curl.Con
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 99c0a8f4 e84b974d 0fc765d5 914c30cc 8ac986e4.
