@@ -34,3 +34,4 @@ BL-4615 ran curl's generic transfer options through `Curl.Console` in process ag
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 0f217622 af799a50 a3b784ac.
