@@ -1,11 +1,3 @@
 # Extended conformance cases known to fail (BL-4502): one '<requirement id> BL-####' per line, any order.
 # A listed case passes while it still fails and fails once it passes: then remove its line.
 # A listed ID that no test carries fails RequirementChecks. Lines merge by union, so add or remove only whole lines.
-CurlSurface:FailWithBody-Gs-1 BL-4621
-CurlSurface:FailWithBody-Az-1 BL-4620
-CurlSurface:FailWithBody-Abfs-1 BL-4620
-CurlSurface:FailWithBody-Abfss-1 BL-4620
-WebTransport:WTH3-6-2 BL-4624
-CurlSurface:FailWithBody-S3-1 BL-4622
-CurlSurface:FailWithBody-Oci-1 BL-4623
-CurlSurface:Verbose-Oci-1 BL-4623
