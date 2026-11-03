@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Xmpp, Curl.Conformance.Extended.UnitTests/Xmpp, Documentation/Conformance/Extended/Xmpp.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4495 — Conformance: XMPP RFC 6120 stream, STARTTLS and SASL and RFC 6121 for xmpp://
 
@@ -43,25 +43,31 @@ filed High task `Fix Xmpp conformance: <requirement>` (pipeline feature; touches
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Xmpp.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of this scope that
+- [x] `Documentation/Conformance/Extended/Xmpp.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of this scope that
       binds a client an `Xmpp:` ID mapped to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Xmpp/` run curl in process for `xmpp://` and `xmpps://` and assert
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Xmpp/` run curl in process for `xmpp://` and `xmpps://` and assert
       stream bytes, stdout, stderr and exit code for at least: the stream header, STARTTLS offered as required and as
       optional, the stream restarted after TLS and after SASL, each SASL mechanism with the server's preference order,
       SCRAM with a bad server signature, `<failure/>` with each condition, resource binding with a server-assigned
       resource, a message stanza, a disco query and its result, a stanza error, a stream error, and a stanza split
       across reads.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Xmpp conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Xmpp/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Xmpp/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
 
 ## Notes
+
+- XmppReferenceServer (Curl.Conformance.Extended.UnitLibrary/Xmpp/) is written from RFC 6120: BCL XmlReader per stream, SslStream after <proceed/> over the Mqtt5 DelegatingDuplexStream (reused, not copied), server-side SCRAM (XmppReferenceScram) that checks the client proof and signs with the RFC 5802 server key; it records every first-level element curl sent so cases read what curl sent behind TLS.
+- 35 matrix rows in Documentation/Conformance/Extended/Xmpp.md (server-only ones n/a); 24 cases in XmppStreamCases, XmppSaslCases and XmppStanzaCases (11 failure conditions as DataRows). Every case passes, so KnownFailures.txt is unchanged and no fix task was filed.
+- Decision (sensible default): the mechanism-not-offered path is left unmeasured, since curl then sends no <auth/> and the server has nothing to answer; it is not in the criteria list.
+- Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary: 0 failing members. Solution build -warnaserror clean, fast tests green on Windows; cases use only localhost URLs, in-memory connections and a generated certificate, so they are platform-neutral (CI on Linux and macOS by that).
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 4627d5c2 7980b442 5ea4def2 d8e3fb0e 3c91bcaf 17248609.
+- 2026-11-02: Doing -> Done. xmpp:// and xmpps:// measured against RFC 6120/6121, SASL RFCs and XEP-0030 with a reference server; all 24 cases pass
