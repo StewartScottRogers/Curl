@@ -60,9 +60,15 @@ function Get-OrphanAction {
     # refuse, saying why, when a lane branch holds commits beyond the shift branch, since
     # which lane's work they are cannot be told. -DirtyLanes are the lanes not already
     # adopted whose worktrees have uncommitted work; -LaneBranchesAhead the factory/lane-<n>
-    # branches with commits the shift branch lacks.
-    param([string]$Id, [string[]]$ParkedBranches, [int[]]$DirtyLanes, [string[]]$LaneBranchesAhead = @())
+    # branches with commits the shift branch lacks. -LaneLastTask maps a lane to the task its
+    # newest run log names (Get-LaneLastRunTask): a dirty lane whose last run was $Id is
+    # adopted, and one whose last run was another task holds that task's work, never $Id's,
+    # so it is no candidate (BL-4650, AF-0544: lane 1 adopted lane 2's task over its own work).
+    param([string]$Id, [string[]]$ParkedBranches, [int[]]$DirtyLanes, [string[]]$LaneBranchesAhead = @(), [hashtable]$LaneLastTask = @{})
     $dirty = @($DirtyLanes | Where-Object { $_ })
+    $own = @($dirty | Where-Object { $LaneLastTask[[int]$_] -eq $Id })
+    if ($own.Count) { return [pscustomobject]@{ Action = 'adopt'; Lane = $own[0]; Branch = ''; Why = '' } }
+    $dirty = @($dirty | Where-Object { -not $LaneLastTask[[int]$_] })
     if ($dirty.Count -eq 1) { return [pscustomobject]@{ Action = 'adopt'; Lane = $dirty[0]; Branch = ''; Why = '' } }
     if ($dirty.Count -gt 1) {
         return [pscustomobject]@{ Action = 'refuse'; Lane = 0; Branch = ''; Why = "$Id is in Doing and held by no lane, and lanes $($dirty -join ', ') have uncommitted work; which one is its work cannot be told" }
@@ -74,6 +80,18 @@ function Get-OrphanAction {
         return [pscustomobject]@{ Action = 'refuse'; Lane = 0; Branch = ''; Why = "$Id is in Doing and held by no lane, no parked branch factory/$Id-lane-* exists, and lane branches $($ahead -join ', ') have commits beyond the shift branch, or git could not say; which one is its work cannot be told" }
     }
     return [pscustomobject]@{ Action = 'backlog'; Lane = 0; Branch = ''; Why = '' }
+}
+
+function Get-LaneLastRunTask {
+    # The task lane $N ran last, by its newest run log in $Dir (BL-<id>-<stamp>-L<n>.jsonl, or
+    # its -resumed run), or '' when the lane has none. Get-OrphanAction reads it to tell whose
+    # work a dirty lane worktree holds (BL-4650).
+    param([int]$N, [string]$Dir = $LogDir)
+    $pattern = '^(BL-\d+)-\d{8}-\d{6}-L' + $N + '(-resumed)?\.jsonl$'
+    $newest = Get-ChildItem $Dir -Filter "BL-*-L$N*.jsonl" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match $pattern } |
+        Sort-Object LastWriteTimeUtc | Select-Object -Last 1
+    if ($newest -and $newest.Name -match $pattern) { return $Matches[1] }
+    return ''
 }
 
 $UnknownLaneBranches = '(git could not say which lane branches are ahead)'
@@ -236,6 +254,18 @@ if ($TestPark) {
             Set-Content -Path (Join-Path $repo 'half-done.txt') -Value 'half'
             $a = Get-OrphanAction -Id 'BL-002' -ParkedBranches (Get-ParkedBranches 'BL-002' $repo) -DirtyLanes @(@(9) | Where-Object { Test-WorktreeDirty $repo })
             "$($a.Action) $($a.Lane)" })
+        ,@('an orphan is not adopted by the one dirty lane whose last run was another task (AF-0544)', "backlog ''", {
+            $a = Get-OrphanAction -Id 'BL-2969' -ParkedBranches @() -DirtyLanes @(1) -LaneLastTask @{ 1 = 'BL-4507' }
+            "$($a.Action) '$($a.Branch)'" })
+        ,@('an orphan is adopted by the dirty lane whose last run was it, over a dirty lane with no run log', 'adopt 2', {
+            $a = Get-OrphanAction -Id 'BL-2969' -ParkedBranches @() -DirtyLanes @(1, 2) -LaneLastTask @{ 2 = 'BL-2969' }
+            "$($a.Action) $($a.Lane)" })
+        ,@('a lane''s last run task is named by its newest run log, resumed runs included, and is empty with none', 'BL-7 BL-9 ''''', {
+            $logs = Join-Path $temp 'runlogs'; New-Item -ItemType Directory -Force -Path $logs | Out-Null
+            $old = Join-Path $logs 'BL-5-20261102-083146-L1.jsonl'; Set-Content $old 'x'; (Get-Item $old).LastWriteTimeUtc = [datetime]'2026-11-02T10:00:00Z'
+            $new = Join-Path $logs 'BL-7-20261102-083146-L1-resumed.jsonl'; Set-Content $new 'x'; (Get-Item $new).LastWriteTimeUtc = [datetime]'2026-11-02T11:00:00Z'
+            Set-Content (Join-Path $logs 'BL-9-20261102-083146-L12.jsonl') 'x'
+            "$(Get-LaneLastRunTask 1 $logs) $(Get-LaneLastRunTask 12 $logs) '$(Get-LaneLastRunTask 3 $logs)'" })
         ,@('an orphan with no work anywhere goes to Backlog with no branch', "backlog ''", {
             $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches (Get-ParkedBranches 'BL-003' $repo) -DirtyLanes @() -LaneBranchesAhead (Get-LaneBranchesAhead 'work' $repo)
             "$($a.Action) '$($a.Branch)'" })

@@ -266,13 +266,16 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             $dirty = @(1..16 | Where-Object { -not $adopt.ContainsKey($_) -and (Test-WorktreeDirty (Join-Path $LanesDir "lane-$_")) })
             $returned = @()
             $laneBranchesAhead = @(Get-LaneBranchesAhead $branch $Root)
+            $laneLastTask = @{}
+            foreach ($n in $dirty) { $laneLastTask[[int]$n] = Get-LaneLastRunTask $n }
             foreach ($id in $orphans) {
-                $action = Get-OrphanAction -Id $id -ParkedBranches (Get-ParkedBranches $id) -DirtyLanes $dirty -LaneBranchesAhead $laneBranchesAhead
+                $action = Get-OrphanAction -Id $id -ParkedBranches (Get-ParkedBranches $id) -DirtyLanes $dirty -LaneBranchesAhead $laneBranchesAhead -LaneLastTask $laneLastTask
                 if ($action.Action -eq 'refuse') { Stop-ShiftStart $action.Why; exit 1 }
                 if ($action.Action -eq 'adopt') {
                     $adopt[$action.Lane] = $id
                     $dirty = @($dirty | Where-Object { $_ -ne $action.Lane })
-                    Write-Trace $id 'adopt' "held by no lane; lane $($action.Lane)'s worktree has uncommitted work, so that lane resumes it" 'Yellow'
+                    $whose = if ($laneLastTask[[int]$action.Lane] -eq $id) { 'its last run was this task' } else { 'no run log says whose it is' }
+                    Write-Trace $id 'adopt' "held by no lane; lane $($action.Lane)'s worktree has uncommitted work ($whose), so that lane resumes it" 'Yellow'
                     continue
                 }
                 $returnReason = if ($action.Branch) { "Returned from Doing at shift start: no lane held it and no lane worktree had uncommitted work. The work is on branch $($action.Branch); start with git cherry-pick --no-commit $($action.Branch) and fix it." }
