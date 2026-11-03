@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/TerminalPemPassPhrasePrompt.cs]
+touches: [Curl.Networking.UnitLibrary/TerminalPemPassPhrasePrompt.cs, Curl.Networking.UnitTests/TerminalPemPassPhrasePromptTests.cs]
 requirement: none
 created: 2026-11-03
 completed:
@@ -41,10 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: `ReadConsoleLine` now takes its console as parameters (`inputRedirected`, a `TextReader` and an internal `ReadConsoleKey(bool intercept)` delegate) and is covered; the private `ReadProcessConsoleLine`, excluded under ADR-0083, only passes `Console.IsInputRedirected`, `Console.In` and `Console.ReadKey`. The mutated `readKey(intercept: true)` loop initialiser is still on line 44 of member `ReadConsoleLine`, so the finding's site and member still name it.
+- New `TerminalPemPassPhrasePromptTests` checks that every key read, the first included, is intercepted, and that redirected input reads one line and no key. Added that new test file to `touches` (a new file, no other task holds it).
+- Reproduction: a lane may not run `Audit/Tools`, so the mutant was applied by hand (line 44's first `intercept: true` -> `false`): `ReadConsoleLine_FromConsole_InterceptsEveryKeyIncludingTheFirst` failed (killed), and the file was restored. The re-audit runs the finding's own command.
+- `dotnet build` clean; fast tests: 115 test projects passed, none failed. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members. Platform-neutral: the tests use no file system, path or OS text.
 
 ## Log
 
