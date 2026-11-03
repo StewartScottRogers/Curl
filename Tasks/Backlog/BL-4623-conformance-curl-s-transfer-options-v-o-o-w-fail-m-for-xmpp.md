@@ -4,7 +4,7 @@ title: Conformance: curl's transfer options (-v, -o, -O, -w, --fail, -m) for xmp
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463, BL-4620]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463, BL-4625]
 touches: [Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/MessagingStreams/XmppTransferSurfaceCases.cs, Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
@@ -20,7 +20,7 @@ Curl's generic transfer options behave for `xmpp`, `xmpps` as curl's manual says
 
 Schemes: `xmpp`, `xmpps`.
 
-Use the runner BL-4620 adds. There is no XMPP reference server yet: script the stream negotiation the Xmpp extension (`Curl.Extended.Protocol.Xmpp.UnitLibrary`, its ADRs and `CLAUDE.md`) needs with `ScriptedReferenceServer` in the case file.
+Use the runner BL-4625 adds. There is no XMPP reference server yet: script the stream negotiation the Xmpp extension (`Curl.Extended.Protocol.Xmpp.UnitLibrary`, its ADRs and `CLAUDE.md`) needs with `ScriptedReferenceServer` in the case file.
 
 Split from BL-4614 (itself split from BL-4496, which holds the whole plan; read its Context). Part of the extended-protocol conformance plan Stewart approved on 2026-11-02: follow `Documentation/Conformance/Extended/README.md` (harness `ExtendedConformanceHarness.RunAsync`, `ScriptedReferenceServer`/`ScriptedDatagramServer` for canned server bytes, `ReferenceRoute.Tcp`/`Tls`/`Udp`, and a fake `TimeProvider` for `-m` as in `Curl.Conformance.Extended.UnitTests/Harness/ExtendedCurlRunTimeoutTests.cs`). Take the schemes from each library's `*Extension.cs`, not from this text, if they differ. Expected values come from curl's manual page for curl 8.22.0 (curl.se/docs/manpage.html, "-w", "--fail", "-m", "EXIT CODES") and from each extension's ADRs and `CLAUDE.md`; where an extension's ADR deliberately differs, the case pins the ADR's answer and names it. Requirement IDs are `CurlSurface:<option>-<n>`, rows in `Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams.md` (one table, `| ID | Level | Requirement | Covered by |`). One case file per scheme family in `Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/MessagingStreams/`, never a central switch. A defect in an extension library or the engine is listed in `KnownFailures.txt` with a filed High task `Fix <Name> conformance: <requirement>` (pipeline feature; touches that library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a focused unit test pins the fix (ADR-0482), the line is removed).
 
