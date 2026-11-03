@@ -173,6 +173,10 @@ public sealed class CommandLineNumberTests
         CommandLineRefusal? refusal = ParseMinusOneOrMore("--max-redirs", "2147483648", WindowsLongMaximum, out long number);
 
         Assert.IsNotNull(refusal);
+        CollectionAssert.AreEqual(
+            new[] { "curl: option --max-redirs: expected a proper numerical parameter", CommandLineRefusal.TryHelpLine },
+            refusal.StandardErrorLines.ToArray());
+        Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);
         Diagnostics.Assert("number", 0L, number);
         Assert.AreEqual(0L, number);
     }
