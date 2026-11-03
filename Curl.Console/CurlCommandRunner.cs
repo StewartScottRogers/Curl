@@ -463,6 +463,12 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private Stream? standardErrorFile;
 
+    /// <summary>
+    /// The full path of <see cref="standardErrorFile" />, which on Windows an <c>--etag-save</c> naming the
+    /// same file cannot open (ADR-1217); <see langword="null" /> when no <c>--stderr</c> file is open.
+    /// </summary>
+    private string? standardErrorFileFullPath;
+
     /// <summary>The encoding of standard error lines that echo command-line text (a refused command line, a <c>-T</c> or <c>-o</c> file that cannot be opened): the system ANSI code page on Windows, in which that text was read (ADR-0840, BL-3893, BL-3544), and UTF-8 elsewhere.</summary>
     private readonly Encoding commandLineEchoEncoding = CredentialEncoding.ForPlatform(runsOnWindows);
 
@@ -1134,6 +1140,7 @@ internal sealed class CurlCommandRunner(
         WriteFailureIgnoringStream errorFile = new(file);
         standardError = errorFile;
         standardErrorFile = errorFile;
+        standardErrorFileFullPath = Path.GetFullPath(redirect.File);
         processStandardError = errorFile;
     }
 
@@ -1147,6 +1154,7 @@ internal sealed class CurlCommandRunner(
         {
             await standardErrorFile.DisposeAsync().ConfigureAwait(false);
             standardErrorFile = null;
+            standardErrorFileFullPath = null;
         }
     }
 
@@ -2886,10 +2894,7 @@ internal sealed class CurlCommandRunner(
             return await ReportCannotCreateDirectoryAsync(options, failure).ConfigureAwait(false);
         }
 
-        FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(saveFile, FileWriteMode.Append, DeferredOutputFileStream.CreateMode, CancellationToken.None)
-            .ConfigureAwait(false);
-        if (opened.Content is not { } created)
+        if (await CreateEtagSaveFileAsync(saveFile).ConfigureAwait(false) is not { } created)
         {
             await WriteWarningUnlessSilentAsync(options, $"Warning: Failed creating file for saving etags: \"{saveFile}\". Skip this transfer")
                 .ConfigureAwait(false);
@@ -2900,6 +2905,37 @@ internal sealed class CurlCommandRunner(
         Running.SaveEtag = (etagLine, cancellationToken) => SaveEtagToFileAsync(saveFile, etagLine, cancellationToken);
         return null;
     }
+
+    /// <summary>
+    /// Opens the <c>--etag-save</c> file for appending, creating it when it is missing, unless on Windows
+    /// it is the open <c>--stderr</c> file (<see cref="IsOpenStandardErrorFileOnWindows" />).
+    /// </summary>
+    /// <param name="saveFile">The <c>--etag-save</c> file.</param>
+    /// <returns>The opened file, or <see langword="null" /> when it cannot be opened.</returns>
+    private async Task<Stream?> CreateEtagSaveFileAsync(string saveFile)
+    {
+        if (IsOpenStandardErrorFileOnWindows(saveFile))
+        {
+            return null;
+        }
+
+        FileOpenResult opened = await fileSystem
+            .OpenForWriteAsync(saveFile, FileWriteMode.Append, DeferredOutputFileStream.CreateMode, CancellationToken.None)
+            .ConfigureAwait(false);
+        return opened.Content;
+    }
+
+    /// <summary>
+    /// Tells whether, on Windows, <paramref name="path" /> names the file an <c>--stderr</c> holds open,
+    /// which curl 8.22.0's Schannel build cannot open again for <c>--etag-save</c>, so it skips the
+    /// transfer and exits 26 (AF-0538, ADR-1217). Windows paths compare without regard to case.
+    /// </summary>
+    /// <param name="path">The <c>--etag-save</c> file.</param>
+    /// <returns><see langword="true" /> when the run is on Windows and the file is the open <c>--stderr</c> file.</returns>
+    private bool IsOpenStandardErrorFileOnWindows(string path) =>
+        runsOnWindows
+        && standardErrorFileFullPath is { } held
+        && string.Equals(Path.GetFullPath(path), held, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Writes an <c>--etag-save -</c> ETag line to standard output, among the header and body bytes.</summary>
     /// <param name="etagLine">The ETag and its line feed.</param>

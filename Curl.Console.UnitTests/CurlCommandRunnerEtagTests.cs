@@ -229,6 +229,57 @@ public sealed class CurlCommandRunnerEtagTests
     }
 
     [TestMethod]
+    [DataRow("--etag-save", "F.TXT", "--stderr", "f.txt")]
+    [DataRow("--stderr", "f.txt", "--etag-save", "f.txt")]
+    public async Task RunAsync_EtagSaveNamingTheStderrFileOnWindows_WarnsIntoItSkipsTheTransferAndExits26(
+        string first, string firstValue, string second, string secondValue)
+    {
+        Diagnostics.Arrange("platform", "Windows");
+        RecordingProtocolHandler http = Answering(Ok);
+
+        int exitCode = await RunAsync([first, firstValue, second, secondValue, Url], http, runsOnWindows: true);
+
+        string stderrFile = WrittenText("f.txt").Replace("\r\n", "\n", StringComparison.Ordinal);
+        Diagnostics.Assert("exit code", (int)CurlExitCode.ReadError, exitCode);
+        Diagnostics.Assert("transfers started", 0, http.Contexts.Count);
+        Diagnostics.Assert("f.txt", "Warning: Failed creating file for saving etags ... curl: no transfer performed", stderrFile);
+        Assert.AreEqual((int)CurlExitCode.ReadError, exitCode);
+        Assert.IsEmpty(http.Contexts);
+        Assert.StartsWith("Warning: Failed creating file for saving etags: \"", stderrFile);
+        Assert.EndsWith("curl: no transfer performed\n", stderrFile);
+    }
+
+    [TestMethod]
+    [DataRow(false, "f.txt")]
+    [DataRow(true, "other.txt")]
+    [DataRow(true, "-")]
+    public async Task RunAsync_EtagSaveBesideAStderrItCanOpen_PerformsTheTransfer(bool runsOnWindows, string stderrTarget)
+    {
+        Diagnostics.Arrange("platform is Windows", runsOnWindows);
+        RecordingProtocolHandler http = Answering(Ok, "Content-Length: 2");
+
+        int exitCode = await RunAsync(["-s", "--stderr", stderrTarget, "--etag-save", "f.txt", Url], http, runsOnWindows);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("transfers started", 1, http.Contexts.Count);
+        Assert.AreEqual(0, exitCode);
+        Assert.HasCount(1, http.Contexts);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EtagSaveOnWindowsWithNoStderrFile_PerformsTheTransfer()
+    {
+        RecordingProtocolHandler http = Answering(Ok, "Content-Length: 2");
+
+        int exitCode = await RunAsync(["-s", "--etag-save", "f.txt", Url], http, runsOnWindows: true);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("transfers started", 1, http.Contexts.Count);
+        Assert.AreEqual(0, exitCode);
+        Assert.HasCount(1, http.Contexts);
+    }
+
+    [TestMethod]
     [DataRow("-s", "")]
     [DataRow("-sS", "curl: no transfer performed")]
     public async Task RunAsync_EtagSaveFileCannotBeCreatedWhileSilent_HidesTheWarning(string silent, string expectedLine)
@@ -461,7 +512,7 @@ public sealed class CurlCommandRunnerEtagTests
 
     private string WrittenText(string path) => Encoding.ASCII.GetString(files.Written[path].ToArray());
 
-    private async Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler)
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler, bool runsOnWindows = false)
     {
         Diagnostics.Arrange("command line", string.Join(" ", arguments));
         CurlCommandRunner runner = new(
@@ -471,7 +522,7 @@ public sealed class CurlCommandRunnerEtagTests
             standardOutput,
             standardError,
             new MemoryStream(),
-            runsOnWindows: false,
+            runsOnWindows: runsOnWindows,
             outputPaths: files);
 
         int exitCode;
