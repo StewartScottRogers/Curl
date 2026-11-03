@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Comment-only fix: StompProtocolHandler.cs:70 now cites ADR-1220; StompClientFlow.cs:47 says SendContentType is the default, overridden by -H (ADR-1220). Build clean, Stomp fast tests green. No code change, so no quality run.
 
 ## Log
 
