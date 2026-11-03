@@ -214,6 +214,53 @@ public sealed class Mqtt5ClientFlowTests
         Assert.IsFalse(connection.Writes.Exists(write => write.AsSpan().SequenceEqual(PingRequest)));
     }
 
+    [TestMethod]
+    public async Task RunAsync_ReceivedQos1Publishes_AreEachAcknowledgedWithAPubackInOrder()
+    {
+        byte[] disconnect = new Mqtt5Disconnect { ReasonCode = Mqtt5ReasonCode.NormalDisconnection }.ToBytes();
+        ScriptedMqtt5Connection connection = new(
+            [.. ConnAck(), .. SubAck(Mqtt5ReasonCode.GrantedQos0), .. QosPublish(Mqtt5QualityOfService.AtLeastOnce, 7, "one,"), .. QosPublish(Mqtt5QualityOfService.AtLeastOnce, 3, "two"), .. disconnect]);
+        var output = new MemoryStream();
+
+        await new Mqtt5ClientFlow(connection, output, NoTransferProgress.Instance, TimeProvider.System, CancellationToken.None).RunAsync(new Mqtt5Connect(), "t", null);
+
+        Assert.AreEqual("one,two", System.Text.Encoding.UTF8.GetString(output.ToArray()));
+        Assert.HasCount(4, connection.Writes);
+        CollectionAssert.AreEqual(new byte[] { 0x40, 0x02, 0x00, 0x07 }, connection.Writes[2]);
+        CollectionAssert.AreEqual(new byte[] { 0x40, 0x02, 0x00, 0x03 }, connection.Writes[3]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ReceivedQos2Publish_IsAcknowledgedWithPubrecAndItsPubrelWithPubcomp()
+    {
+        byte[] disconnect = new Mqtt5Disconnect { ReasonCode = Mqtt5ReasonCode.NormalDisconnection }.ToBytes();
+        byte[] release = new Mqtt5PublishResponse(Mqtt5PacketType.PubRel) { PacketIdentifier = 9 }.ToBytes();
+        ScriptedMqtt5Connection connection = new(
+            [.. ConnAck(), .. SubAck(Mqtt5ReasonCode.GrantedQos0), .. QosPublish(Mqtt5QualityOfService.ExactlyOnce, 9, "once"), .. release, .. disconnect]);
+        var output = new MemoryStream();
+
+        await new Mqtt5ClientFlow(connection, output, NoTransferProgress.Instance, TimeProvider.System, CancellationToken.None).RunAsync(new Mqtt5Connect(), "t", null);
+
+        Assert.AreEqual("once", System.Text.Encoding.UTF8.GetString(output.ToArray()));
+        Assert.HasCount(4, connection.Writes);
+        CollectionAssert.AreEqual(new byte[] { 0x50, 0x02, 0x00, 0x09 }, connection.Writes[2]);
+        CollectionAssert.AreEqual(new byte[] { 0x70, 0x02, 0x00, 0x09 }, connection.Writes[3]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PubackWhileSubscribed_EndsWithWeirdServerReply()
+    {
+        byte[] acknowledgement = new Mqtt5PublishResponse(Mqtt5PacketType.PubAck) { PacketIdentifier = 4 }.ToBytes();
+
+        Mqtt5ClientException failure = await RunFailingAsync(new ScriptedMqtt5Connection([.. ConnAck(), .. SubAck(Mqtt5ReasonCode.GrantedQos0), .. acknowledgement]));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure.ExitCode);
+        Assert.AreEqual(Mqtt5ClientMessages.WeirdServerReply, failure.Message);
+    }
+
+    private static byte[] QosPublish(Mqtt5QualityOfService qualityOfService, ushort packetIdentifier, string payload) =>
+        new Mqtt5Publish { QualityOfService = qualityOfService, PacketIdentifier = packetIdentifier, TopicName = "t", Payload = System.Text.Encoding.UTF8.GetBytes(payload) }.ToBytes();
+
     private static readonly byte[] PingRequest = new Mqtt5Ping(Mqtt5PacketType.PingReq).ToBytes();
 
     private static async Task<Mqtt5ClientException> RunFailingAsync(ScriptedMqtt5Connection connection, string? body = null, string topic = "t")

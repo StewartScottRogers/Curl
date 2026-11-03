@@ -6,7 +6,8 @@ namespace Curl.Extended.Protocol.Mqtt5.Client;
 
 /// <summary>
 /// curl's <c>mqtt://</c> flow in MQTT 5 over any byte transport: CONNECT and CONNACK, then with a body PUBLISH and
-/// DISCONNECT, otherwise SUBSCRIBE, SUBACK and each PUBLISH payload written to the output until the server sends
+/// DISCONNECT, otherwise SUBSCRIBE, SUBACK and each PUBLISH payload written to the output, a QoS 1 PUBLISH answered with
+/// PUBACK and a QoS 2 one with PUBREC and its PUBREL with PUBCOMP (ADR-1199), until the server sends
 /// DISCONNECT. A failure reason code ends the transfer as ADR-1049 maps it. While it waits for messages it sends a
 /// PINGREQ every half of the Server Keep Alive a CONNACK returns, on <paramref name="timeProvider"/>.
 /// </summary>
@@ -175,23 +176,48 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
     private Task DelayUntilNextPing(TimeSpan? pingInterval, CancellationToken stopPings) =>
         Task.Delay(pingInterval ?? Timeout.InfiniteTimeSpan, timeProvider, stopPings);
 
-    /// <summary>Writes a PUBLISH's payload and accepts a PINGRESP; returns whether the packet was the closing DISCONNECT.</summary>
+    /// <summary>
+    /// Writes a PUBLISH's payload and acknowledges it by its QoS, answers a PUBREL with PUBCOMP and accepts a PINGRESP;
+    /// returns whether the packet was the closing DISCONNECT (ADR-1199).
+    /// </summary>
     private async ValueTask<bool> WriteSubscribedPacketAsync(Mqtt5Packet packet)
     {
         switch (packet)
         {
             case Mqtt5Publish publish:
                 await WriteOutputAsync(publish.Payload).ConfigureAwait(false);
-                return false;
-            case Mqtt5Ping { PacketType: Mqtt5PacketType.PingResp }:
+                await AcknowledgeAsync(publish).ConfigureAwait(false);
                 return false;
             case Mqtt5Disconnect disconnect:
                 ThrowIfFailure("DISCONNECT", disconnect.ReasonCode);
                 return true;
             default:
-                throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.WeirdServerReply, Mqtt5ReasonCode.ProtocolError);
+                await AnswerReleaseOrAcceptPingResponseAsync(packet).ConfigureAwait(false);
+                return false;
         }
     }
+
+    /// <summary>Answers a PUBREL with PUBCOMP (MQTT-4.3.3-11) and accepts a PINGRESP; any other packet is a Protocol Error.</summary>
+    private ValueTask AnswerReleaseOrAcceptPingResponseAsync(Mqtt5Packet packet) => packet switch
+    {
+        Mqtt5PublishResponse { PacketType: Mqtt5PacketType.PubRel } release => SendPublishResponseAsync(Mqtt5PacketType.PubComp, release.PacketIdentifier),
+        Mqtt5Ping { PacketType: Mqtt5PacketType.PingResp } => ValueTask.CompletedTask,
+        _ => throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.WeirdServerReply, Mqtt5ReasonCode.ProtocolError),
+    };
+
+    /// <summary>
+    /// Answers a QoS 1 PUBLISH with PUBACK and a QoS 2 PUBLISH with PUBREC, in the short form: Reason Code Success and no
+    /// properties (MQTT-4.3.2-4, MQTT-4.3.3-8, MQTT-4.6.0-2). A QoS 0 PUBLISH is not acknowledged.
+    /// </summary>
+    private ValueTask AcknowledgeAsync(Mqtt5Publish publish) => publish.QualityOfService switch
+    {
+        Mqtt5QualityOfService.AtLeastOnce => SendPublishResponseAsync(Mqtt5PacketType.PubAck, publish.PacketIdentifier),
+        Mqtt5QualityOfService.ExactlyOnce => SendPublishResponseAsync(Mqtt5PacketType.PubRec, publish.PacketIdentifier),
+        _ => ValueTask.CompletedTask,
+    };
+
+    private ValueTask SendPublishResponseAsync(Mqtt5PacketType packetType, ushort packetIdentifier) =>
+        channel.SendAsync(new Mqtt5PublishResponse(packetType) { PacketIdentifier = packetIdentifier, ReasonCode = Mqtt5ReasonCode.Success });
 
     private async ValueTask WriteOutputAsync(byte[] payload)
     {
