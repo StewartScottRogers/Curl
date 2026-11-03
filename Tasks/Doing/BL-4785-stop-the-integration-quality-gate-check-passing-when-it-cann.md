@@ -39,3 +39,4 @@ Found by the shift-end review of 2026-11-03 (silent-failure-hunter, Important), 
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: d6bb2f4f 3d5d9b50 bb98ace9 19b6af10 c809f201.
