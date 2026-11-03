@@ -32,3 +32,4 @@ Found by BL-4608's case `WebTransportCloseTests.ServerClose_WithCodeAndMessage_E
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 4f61f264 bd7a9132 79f20796 e6dffd78.
