@@ -20,10 +20,17 @@ choose any project to read (BL-1368):
 powershell -NoProfile -File Audit/Tools/Find-WeakTests.ps1 -Root <audited tree> -OutFile <temp folder>\weak-tests.json
 ```
 
-It lists candidates of six kinds: `ignored-test` (`[Ignore]` or `Assert.Inconclusive`),
+It lists candidates of seven kinds: `ignored-test` (`[Ignore]` or `Assert.Inconclusive`),
+`commented-test` (a whole `[TestMethod]` commented out, so it no longer runs),
 `no-assertion` (no assertion once comments are removed), `weak-assertion`, `unasserted-fake-value`,
-`commented-assertion` and `name-lies` (a name with `ExitsWith<N>` or `ThrowsExit<N>` whose body never mentions N or its
-`CurlExitCode`, or `_Throws<X>` whose body never mentions X). `weak-assertion` is judged per
+`commented-assertion` and `name-lies`: a name that states a number as its outcome - straight after
+`ExitsWith`, `ExitsWithCode`, `Exits`, `ExitCode`, `Exit`, `ThrowsExit`, `FailsWith`, `Returns`,
+`Status`, `Code` and the like, so `..._ExitsWithCode<N>` and `..._Returns<N>` as well as
+`..._ExitsWith<N>` - whose body, `DataRow`s and the helpers it calls never mention N, its
+`CurlExitCode` member or its `HttpStatusCode` member; or `_Throws<X>` whose body and helpers never
+mention X. Every `name-lies` candidate is read against the assertion that does check the outcome:
+a test whose name states one number while its body asserts another is filed, whatever else it
+checks. `weak-assertion` is judged per
 assertion, not only per test: a test whose every assertion is `IsNotNull` or an `IsTrue` of a
 length, count or `Any()` above zero; a weak assertion that is the only check of its variable
 while the test's other assertions check other values (an exact `AreEqual` on the bytes weakened
@@ -63,6 +70,12 @@ These are mechanical, so apply them as written:
 - A `weak-assertion` that is the only check of its value is filed when the test's name says what
   that value holds or where it comes from (`_ReadsTheHomeGatewayFile`, `_ReturnsTheBody`,
   `_UsesTheProxy`): `IsNotNull` cannot tell the right value from a wrong one.
+- A `name-lies` candidate whose name states a number (an exit code, a status) is filed
+  (`name-lies`, High) unless you quote the assertion, in the test or a helper it calls, that checks
+  that same number (`checked-exactly`, or `scanner-misread` naming the helper). An assertion of a
+  different number is not that quote: it is the finding.
+- A `commented-test` candidate is filed (`ignored-test`) unless the same test, under the same name,
+  still runs elsewhere in the file (quote it).
 - In your summary's method table, give the dismissals counted by reason. The number of candidates you report as read must equal the triage file's line count.
 
 ## 1. Test names against bodies
@@ -167,7 +180,7 @@ Follow the key rule in [Report-Format.md](Report-Format.md). Use these kinds:
 | `weak-assertion` | Step 2 (and step 0's `weak-assertion` and `unasserted-fake-value` candidates): an assertion too weak to catch the stated bug. |
 | `commented-assertion` | Step 0: an assertion commented out, with no other assertion checking its outcome. |
 | `no-assertion` | Step 2: a test with no assertion. |
-| `ignored-test` | Step 2: `[Ignore]` or `Assert.Inconclusive`. |
+| `ignored-test` | Step 2: `[Ignore]` or `Assert.Inconclusive`, or a whole test commented out (step 0's `commented-test`). |
 | `swallowed-failure` | Step 2: a catch-all that hides the failure. |
 | `surviving-mutant` | Step 3: a mutant no test killed. Its `<what>` is `<member>-<operator word>` (the tool's `member`; `eq`, `ne`, `lt`, `gt`, `le`, `ge`, `and`, `or`, `plus1`, `minus1`, `true`, `false`, `not`), not a line number. |
 

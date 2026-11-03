@@ -38,11 +38,26 @@
                       Enable/Disable, Allow/Deny, Allow/Refuse, Accept/Reject, Valid/Invalid,
                       Lock/Unlock (TryWrite documented "Tries to read")
 
+    Body and callers. A doc need not use the name's word at all ("true for a sample+tls URL"), so a
+    state name renamed to its opposite can pass both checks above; what the member returns and how
+    its callers read it still show it. For every prefixed bool member:
+
+      body-polarity-mismatch    a key word with a negating prefix (Untrusted = Un + trusted, as above)
+                                whose body names the root (TrustedScheme) and never the word itself,
+                                and does not turn the condition round (no !, is not, == false,
+                                false or Not/No/Non/Never word); and the reverse, a key word of four
+                                letters or more whose body names only its prefixed opposite
+                                (IsEncrypted => mode == UnencryptedMode)
+      caller-polarity-mismatch  such a negatively named member that a caller in the same project
+                                reads as its opposite: Name(x) ? <the root's value> : <another value>
+                                (IsUntrusted(url) ? TrustedDefaultPort : DefaultPort)
+
     A candidate is not yet a finding: the auditor reads each and files those that are wrong.
     Prints JSON: membersScanned (the prefixed bool members), namesScanned (every documented
     member the antonym check read) and one object per candidate with file (repository-relative),
-    line, member, kind (polarity-mismatch or antonym-mismatch), the name and doc polarity or the
-    opposed words, and the doc.
+    line, member, kind (polarity-mismatch, antonym-mismatch, body-polarity-mismatch or
+    caller-polarity-mismatch), the name and doc polarity or the opposed words, and the doc, the
+    body or the callers as read.
 
 .PARAMETER Root
     The tree to scan. Default: the repository holding this script.
@@ -52,7 +67,7 @@
 
 .PARAMETER SelfTest
     Scan Audit/Tools/Fixtures/boolean-names and check exactly the planted members are found, the
-    polarity and the antonym mismatches both.
+    polarity, antonym, body and caller mismatches all.
 #>
 param(
     [string]$Root,
@@ -185,17 +200,96 @@ function Get-Members([string]$Path) {
         $doc = @(); $j = $i - 1
         while ($j -ge 0 -and $lines[$j] -match '^\s*\[') { $j-- }
         while ($j -ge 0 -and $lines[$j] -match '^\s*///') { $doc = @($lines[$j]) + $doc; $j-- }
-        $members += [pscustomobject]@{ Name = $name; Line = $i + 1; Doc = (Get-DocText $doc); HasDoc = [bool]$doc.Count; Public = $lines[$i] -match '^\s*public\b' }
+        $members += [pscustomobject]@{ Name = $name; Line = $i + 1; Doc = (Get-DocText $doc); HasDoc = [bool]$doc.Count; Public = $lines[$i] -match '^\s*public\b'; Body = (Get-MemberBody $lines $i) }
     }
     return $members
+}
+
+function Get-OppositeWords([string]$Name) {
+    # A state name's key word and its opposite, when one is the other with a negating prefix:
+    # IsUntrusted -> (untrusted, trusted), IsTrusted -> (trusted, untrusted); $null for any other name.
+    if ($Name -cnotmatch '^(?:Is|Has|Can|Should|Are|Was)[A-Z]') { return $null }
+    $word = Get-KeyWord $Name
+    if ($word -match $NegatingPrefix) { return [pscustomobject]@{ Word = $word; Opposite = $Matches[2]; Negative = $true } }
+    if ($word.Length -ge 4) { return [pscustomobject]@{ Word = $word; Opposite = $null; Negative = $false } }
+    return $null
+}
+
+function Get-IdentifierWords([string]$Code) {
+    # The camel-case words of every identifier and string in the code, lower case:
+    # TrustedScheme -> trusted, scheme; "tls" -> tls.
+    return @([regex]::Matches($Code, '[A-Za-z_]\w*') | ForEach-Object { Get-NameWords $_.Value })
+}
+
+function Test-Negates([string]$Code) {
+    # Whether the code turns a condition round: !, is not, == false, or a Not/No/Non word.
+    return ($Code -match '!|\bis\s+not\b|==\s*false\b|\bfalse\b') -or ($Code -cmatch '\b(?:Not|No|Non|Never)[A-Z]')
+}
+
+function Get-BodyPolarityMismatch([string]$Name, [string]$Body) {
+    # A state name whose body tests the opposite word without turning it round: IsUntrusted =>
+    # Scheme == TrustedScheme, IsValid => Invalid.Count > 0. The body says what the member returns,
+    # so a name renamed to its opposite contradicts it even when the doc never uses the word.
+    $o = Get-OppositeWords $Name
+    if (-not $o -or -not $Body -or (Test-Negates $Body)) { return '' }
+    $words = @(Get-IdentifierWords $Body)
+    if ($words -contains $o.Word) { return '' }
+    if ($o.Negative) {
+        if ($words -contains $o.Opposite) { return "$($o.Word) vs $($o.Opposite)" }
+        return ''
+    }
+    foreach ($prefix in 'un', 'in', 'im', 'il', 'ir', 'dis', 'non') {
+        if ($words -contains "$prefix$($o.Word)") { return "$($o.Word) vs $prefix$($o.Word)" }
+    }
+    return ''
+}
+
+function Get-CallerPolarityMismatches([string]$Name, [string[]]$Texts) {
+    # Callers that read a negatively named member as its opposite: Name(x) ? TrustedDefaultPort :
+    # DefaultPort picks the root word's value when the name says the reverse.
+    $o = Get-OppositeWords $Name
+    if (-not $o -or -not $o.Negative) { return @() }
+    $found = @()
+    $pattern = "(?<!!)\b$([regex]::Escape($Name))\b(?:\s*\((?:[^()]|\([^()]*\))*\))?\s*\?\s*([^:;?]+?)\s*:\s*([^;,)]+)"
+    foreach ($t in $Texts) {
+        foreach ($m in [regex]::Matches($t, $pattern)) {
+            $whenTrue = @(Get-IdentifierWords $m.Groups[1].Value)
+            $whenFalse = @(Get-IdentifierWords $m.Groups[2].Value)
+            if ($whenTrue -contains $o.Opposite -and $whenTrue -notcontains $o.Word -and $whenFalse -notcontains $o.Opposite) {
+                $found += ($m.Value -replace '\s+', ' ').Trim()
+            }
+        }
+    }
+    return @($found | Select-Object -Unique)
+}
+
+function Get-MemberBody([string[]]$Lines, [int]$Index) {
+    # A member's body from its declaration line: an expression body to its semicolon, or a block to
+    # its closing brace; '' for an auto-property or an abstract member.
+    $text = ($Lines[$Index..([Math]::Min($Lines.Length - 1, $Index + 60))]) -join "`n"
+    $arrow = $text.IndexOf('=>'); $brace = $text.IndexOf('{')
+    if ($arrow -ge 0 -and ($brace -lt 0 -or $arrow -lt $brace)) {
+        $end = $text.IndexOf(';', $arrow)
+        if ($end -lt 0) { return '' }
+        return $text.Substring($arrow + 2, $end - $arrow - 2)
+    }
+    if ($brace -lt 0) { return '' }
+    $depth = 0
+    for ($i = $brace; $i -lt $text.Length; $i++) {
+        if ($text[$i] -eq '{') { $depth++ }
+        elseif ($text[$i] -eq '}') { $depth--; if ($depth -eq 0) { $body = $text.Substring($brace + 1, $i - $brace - 1); if ($body -match '^\s*get\s*;') { return '' }; return $body } }
+    }
+    return ''
 }
 
 function Invoke-Scan([string]$Tree) {
     $candidates = @(); $scanned = 0; $named = 0
     $projects = @(Get-ChildItem -LiteralPath $Tree -Directory | Where-Object { $_.Name -like '*.UnitLibrary' -or $_.Name -eq 'Curl.Console' })
     foreach ($project in $projects) {
-        foreach ($file in @(Get-ChildItem -LiteralPath $project.FullName -Recurse -Filter '*.cs' -File | Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' })) {
-            $relative = $file.FullName.Substring($Tree.Length).TrimStart('\', '/') -replace '\\', '/'
+        $files = @(Get-ChildItem -LiteralPath $project.FullName -Recurse -Filter '*.cs' -File | Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' })
+        $negatives = @()
+        foreach ($file in $files) {
+            $relative =$file.FullName.Substring($Tree.Length).TrimStart('\', '/') -replace '\\', '/'
             foreach ($m in @(Get-DocumentedMembers $file.FullName)) {
                 $named++
                 $opposed = Get-AntonymMismatch $m.Name $m.Doc
@@ -203,6 +297,9 @@ function Invoke-Scan([string]$Tree) {
             }
             foreach ($m in @(Get-Members $file.FullName)) {
                 $scanned++
+                $opposedBody = Get-BodyPolarityMismatch $m.Name $m.Body
+                if ($opposedBody) { $candidates += [ordered]@{ file = $relative; line = $m.Line; member = $m.Name; kind = 'body-polarity-mismatch'; words = $opposedBody; text = ($m.Body -replace '\s+', ' ').Trim() } }
+                if ((Get-OppositeWords $m.Name).Negative) { $negatives += [pscustomobject]@{ File = $relative; Line = $m.Line; Name = $m.Name } }
                 $nameNegative = $m.Name -cmatch $NegativeName
                 $docNegative = (Get-MainClause $m.Doc) -match $NegativeDoc
                 # A member without a doc is the compiler's to catch (CS1591 is an error here), not this scan's.
@@ -214,6 +311,14 @@ function Invoke-Scan([string]$Tree) {
                 }
             }
         }
+        # Callers in the same project of each negatively named member (IsUntrusted, IsInvalid).
+        if ($negatives.Count) {
+            $texts = @($files | ForEach-Object { [IO.File]::ReadAllText($_.FullName) })
+            foreach ($n in $negatives) {
+                $calls = @(Get-CallerPolarityMismatches $n.Name $texts)
+                if ($calls.Count) { $candidates += [ordered]@{ file = $n.File; line = $n.Line; member = $n.Name; kind = 'caller-polarity-mismatch'; words = (Get-OppositeWords $n.Name | ForEach-Object { "$($_.Word) vs $($_.Opposite)" }); text = ($calls -join ' | ') } }
+            }
+        }
     }
     return [ordered]@{ membersScanned = $scanned; namesScanned = $named; candidates = $candidates }
 }
@@ -223,14 +328,19 @@ if ($SelfTest) {
     $got = @($r.candidates | ForEach-Object { "$($_.member):$($_.kind)" } | Sort-Object) -join '|'
     $want = @('LacksScheme:polarity-mismatch', 'IsComplete:polarity-mismatch',
         'IsInvalid:antonym-mismatch', 'IsValid:antonym-mismatch', 'TryWrite:antonym-mismatch', 'Decode:antonym-mismatch',
-        'Enable:antonym-mismatch', 'IsAllowed:antonym-mismatch', 'Open:antonym-mismatch') | Sort-Object
+        'Enable:antonym-mismatch', 'IsAllowed:antonym-mismatch', 'Open:antonym-mismatch',
+        'IsUntrusted:body-polarity-mismatch', 'IsUntrusted:caller-polarity-mismatch', 'IsEncrypted:body-polarity-mismatch') | Sort-Object
     $failed = 0
     function Check([string]$Name, [bool]$Ok, [string]$Detail) { if (-not $Ok) { $script:failed++ }; Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Detail" }
     Check 'exactly the mismatched members are found, an undocumented one is not' ($got -eq ($want -join '|')) $got
-    Check 'every prefixed bool member is scanned, and no other' ($r.membersScanned -eq 11) "members $($r.membersScanned)"
+    Check 'every prefixed bool member is scanned, and no other' ($r.membersScanned -eq 15) "members $($r.membersScanned)"
     $invalid = @($r.candidates | Where-Object { $_.member -eq 'IsInvalid' })[0]
     Check 'an antonym candidate names the opposed words and the doc' ($invalid.words -eq 'invalid vs valid' -and $invalid.text -eq 'true when the value is valid.') "$($invalid.words) '$($invalid.text)'"
     Check 'word forms count: written, decoding, denies' ((Test-DocNames 'it was written' 'write') -and (Test-DocNames 'while decoding' 'decode') -and (Test-DocNames 'the server denies it' 'deny') -and -not (Test-DocNames 'the reader is ready' 'write')) 'forms'
+    $body = @($r.candidates | Where-Object { $_.member -eq 'IsUntrusted' -and $_.kind -eq 'body-polarity-mismatch' })[0]
+    Check 'a body that tests the opposite word names both and quotes the body' ($body.words -eq 'untrusted vs trusted' -and $body.text -eq 'string.Equals(scheme, TrustedScheme, System.StringComparison.Ordinal)') "$($body.words) '$($body.text)'"
+    $caller = @($r.candidates | Where-Object { $_.member -eq 'IsUntrusted' -and $_.kind -eq 'caller-polarity-mismatch' })[0]
+    Check 'a caller that picks the opposite word''s value when the member is true is quoted' ($caller.text -eq 'IsUntrusted(scheme) ? TrustedPort : PlainPort') $caller.text
     $lacks = @($r.candidates | Where-Object { $_.member -eq 'LacksScheme' })[0]
     Check 'a candidate carries its file, line and the doc as read' ($lacks.file -eq 'Sample.UnitLibrary/UrlTool.cs' -and $lacks.line -gt 0 -and $lacks.text -eq 'true when the URL names its own scheme.') "$($lacks.file):$($lacks.line) '$($lacks.text)'"
     exit $(if ($failed) { 1 } else { 0 })
