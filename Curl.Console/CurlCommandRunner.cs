@@ -465,7 +465,7 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// The full path of <see cref="standardErrorFile" />, which on Windows an <c>--etag-save</c> naming the
-    /// same file cannot open (ADR-1217); <see langword="null" /> when no <c>--stderr</c> file is open.
+    /// same file cannot open (ADR-1221); <see langword="null" /> when no <c>--stderr</c> file is open.
     /// </summary>
     private string? standardErrorFileFullPath;
 
@@ -2928,7 +2928,7 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Tells whether, on Windows, <paramref name="path" /> names the file an <c>--stderr</c> holds open,
     /// which curl 8.22.0's Schannel build cannot open again for <c>--etag-save</c>, so it skips the
-    /// transfer and exits 26 (AF-0538, ADR-1217). Windows paths compare without regard to case.
+    /// transfer and exits 26 (AF-0538, ADR-1221). Windows paths compare without regard to case.
     /// </summary>
     /// <param name="path">The <c>--etag-save</c> file.</param>
     /// <returns><see langword="true" /> when the run is on Windows and the file is the open <c>--stderr</c> file.</returns>

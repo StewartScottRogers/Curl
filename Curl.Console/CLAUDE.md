@@ -105,7 +105,7 @@ the lines pile up, one per transfer of the group, as curl's do. `--etag-save` th
 file for appending (kept as it is) or chooses standard output for `-`; `EtagSaveStream` watches the
 header lines and replaces the file with the value of each `ETag` of a 200-399 response. A save file
 that cannot be created skips the transfer - no report, no `-w` - and a run whose every transfer was
-skipped ends with `curl: no transfer performed` and exit 26 (BL-619 Notes). On Windows a save file naming the file a `--stderr` holds open is such a file, as curl's Schannel build cannot open it again (ADR-1217, BL-4644).
+skipped ends with `curl: no transfer performed` and exit 26 (BL-619 Notes). On Windows a save file naming the file a `--stderr` holds open is such a file, as curl's Schannel build cannot open it again (ADR-1221, BL-4644).
 
 Under `--alt-svc <file>` each `http` or `https` transfer gets its own `Curl.Engine` `AltSvcTransferCache` (an
 `AltSvcCache` from `Curl.Core`, ADR-0175), as curl gives each transfer's handle one: the file is read

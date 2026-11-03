@@ -1,4 +1,4 @@
-# ADR-1217: `--etag-save` naming the open `--stderr` file skips the transfer on Windows
+# ADR-1221: `--etag-save` naming the open `--stderr` file skips the transfer on Windows
 
 - Status: Accepted
 - Date: 2026-11-02

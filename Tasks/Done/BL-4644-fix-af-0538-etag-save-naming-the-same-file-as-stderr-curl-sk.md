@@ -46,7 +46,7 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
-- Fix: `CurlCommandRunner` keeps the full path of the open `--stderr` file; on Windows an `--etag-save` whose full path matches it (case-insensitive) takes the existing "Failed creating file for saving etags" skip path (exit 26, no request). Off Windows the transfer goes ahead, as a POSIX `fopen` of an already open file succeeds. `PhysicalFileSystem`'s write sharing is left alone because `%output{file}`, `-D` and the trace files depend on it. Decision recorded in ADR-1217.
+- Fix: `CurlCommandRunner` keeps the full path of the open `--stderr` file; on Windows an `--etag-save` whose full path matches it (case-insensitive) takes the existing "Failed creating file for saving etags" skip path (exit 26, no request). Off Windows the transfer goes ahead, as a POSIX `fopen` of an already open file succeeds. `PhysicalFileSystem`'s write sharing is left alone because `%output{file}`, `-D` and the trace files depend on it. Decision recorded in ADR-1221.
 - Widened `touches` to `Curl.Console.UnitTests/CurlCommandRunnerEtagTests.cs` for the focused unit tests; no task in Doing on origin/work/dark-factory names it.
 - Measured 2026-11-02 with the finding's reproduction (Debug build of Curl.Console): curl and Curl both exit 26, request.bin is 0 bytes for both, and f.txt holds the same warning and `curl: no transfer performed` lines in both.
 - Measure-CodeQuality.ps1 -Library Curl.Console: 100% line, 100% branch, 0 failing members. The first run found PrepareEtagSaveFileAsync at complexity 12, so the open moved into CreateEtagSaveFileAsync.
