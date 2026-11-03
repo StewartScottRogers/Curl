@@ -1,5 +1,5 @@
 ---
-id: BL-4602
+id: BL-4603
 title: Fix Amqp1 conformance: Core-2.7.5-2 and Core-2.7.5-3, a transfer on an unattached handle or with a changed delivery-id
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4602 — Fix Amqp1 conformance: Core-2.7.5-2 and Core-2.7.5-3, a transfer on an unattached handle or with a changed delivery-id
+# BL-4603 — Fix Amqp1 conformance: Core-2.7.5-2 and Core-2.7.5-3, a transfer on an unattached handle or with a changed delivery-id
 
 ## Goal
 

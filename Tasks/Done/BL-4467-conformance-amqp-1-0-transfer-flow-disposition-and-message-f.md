@@ -67,7 +67,7 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 - The container's encoder writes no maps, so the bare-message case writes its application-properties and footer as
   map8 bytes by hand (the encoder is BL-4466's file, outside this task's touches).
 - Failures found: curl ignores a transfer's handle and a continuation's delivery-id (Core-2.7.5-2, Core-2.7.5-3).
-  Both are listed in KnownFailures.txt with the filed High task BL-4602.
+  Both are listed in KnownFailures.txt with the filed High task BL-4603.
 - Decided (a sensible default): a receive from a source that holds no message is pinned as the -m timeout, exit 28,
   writing nothing. Curl never asks to drain, so the specification requires no earlier end.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` reports 0 failing members;
@@ -78,4 +78,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: e803da13 376daac0 9fbc674d d8e3fb0e 4f9c4ee1 ef6c9026.
-- 2026-11-02: Doing -> Done. amqp1:// transfer, flow, disposition and message format measured by 13 cases with a matrix; 2 known failures filed as BL-4602
+- 2026-11-02: Doing -> Done. amqp1:// transfer, flow, disposition and message format measured by 13 cases with a matrix; 2 known failures filed as BL-4603
