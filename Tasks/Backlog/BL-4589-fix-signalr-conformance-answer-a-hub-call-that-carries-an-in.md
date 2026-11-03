@@ -1,5 +1,5 @@
 ---
-id: BL-4583
+id: BL-4589
 title: Fix SignalR conformance: answer a hub call that carries an invocation id with a Completion
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4583 — Fix SignalR conformance: answer a hub call that carries an invocation id with a Completion
+# BL-4589 — Fix SignalR conformance: answer a hub call that carries an invocation id with a Completion
 
 ## Goal
 

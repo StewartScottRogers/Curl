@@ -63,7 +63,7 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 ## Notes
 - Specs measured at dotnet/aspnetcore `main`: the library cites no tag (named in the matrix).
 - Two cases fail on the extension library and are listed in `KnownFailures.txt`: `SignalR:HUB-Invocation-3`
-  (BL-4583, a hub call with an invocation id gets no Completion) and `SignalR:RFC6455-1.4-1` (BL-4584, no
+  (BL-4589, a hub call with an invocation id gets no Completion) and `SignalR:RFC6455-1.4-1` (BL-4590, no
   WebSocket Close frame when the session ends).
 - `SignalRReferenceFrame.TryRead` was at complexity 14; the payload length and unmasking moved to their own
   private methods. `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary`: 0 failing members.
@@ -74,4 +74,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 0d3075a4 d0dc803a cf3940fa d8e3fb0e 95f0eb06 ef6c9026.
-- 2026-11-02: Doing -> Done. SignalR conformance matrix and cases for signalr:// and signalrs:// land; two library defects filed as BL-4583 and BL-4584
+- 2026-11-02: Doing -> Done. SignalR conformance matrix and cases for signalr:// and signalrs:// land; two library defects filed as BL-4589 and BL-4590

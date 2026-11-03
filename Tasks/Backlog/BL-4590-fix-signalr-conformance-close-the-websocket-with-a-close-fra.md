@@ -1,5 +1,5 @@
 ---
-id: BL-4584
+id: BL-4590
 title: Fix SignalR conformance: close the WebSocket with a Close frame when the session ends
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4584 — Fix SignalR conformance: close the WebSocket with a Close frame when the session ends
+# BL-4590 — Fix SignalR conformance: close the WebSocket with a Close frame when the session ends
 
 ## Goal
 
