@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4696 — Fix AF-0548: Lib1591/1598 checks the trailer callback only for null
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only change, so done directly rather than through the feature stages and with no Measure-CodeQuality run (no production code changed). Lib1591And1598_SendTheTrailerHeaderAndCallbackAndAnswerTheirCode now invokes the captured trailer callback and asserts it returns Ok and adds exactly the two trailers. Reproduction finds no match; dotnet build clean, fast tests green.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Lib1591/1598 test invokes the trailer callback and asserts its two trailers

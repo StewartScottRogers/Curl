@@ -121,7 +121,10 @@ public sealed class Lib1589To1648Tests
 
         Assert.AreEqual((int)CurlCode.SendError, result.ExitCode);
         Assert.AreEqual(Lib1591.TrailerHeader, headers![0]);
-        Assert.IsNotNull(trailer);
+        var trailers = new List<string>();
+        TrailerResult trailerResult = trailer!(trailers);
+        Assert.AreEqual(TrailerResult.Ok, trailerResult);
+        CollectionAssert.AreEqual(new[] { "my-super-awesome-trailer: trail1", "my-other-awesome-trailer: trail2" }, trailers);
     }
 
     [TestMethod]
