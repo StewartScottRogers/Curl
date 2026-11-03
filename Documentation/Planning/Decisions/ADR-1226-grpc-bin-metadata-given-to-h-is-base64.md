@@ -1,4 +1,4 @@
-# ADR-1225: A `-bin` metadata value given to `-H` on a gRPC call is read as base64
+# ADR-1226: A `-bin` metadata value given to `-H` on a gRPC call is read as base64
 
 Status: Accepted. Date: 2026-11-03. Decided by Claude under Stewart's delegation (BL-4533).
 

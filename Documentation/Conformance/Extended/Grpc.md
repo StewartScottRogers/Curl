@@ -24,7 +24,7 @@ This matrix holds the request and unary call rows (BL-4530, BL-4533) and the fra
 | Grpc:Http2-Tls-1 | MUST | gRPC over TLS runs as HTTP/2 `h2`, negotiated with ALPN. | GrpcTlsCases.Grpcs_ServerSelectsH2_OffersAlpnH2AndMakesTheCallOverTls |
 | Grpc:Http2-Request-7 | MUST | With no Message-Encoding (`grpc-encoding`) header, every request Compressed-Flag is 0. | GrpcRequestHeaderCases.MessageEncoding_NotSent_EveryCompressedFlagIsZero |
 | Grpc:Http2-Request-8 | MUST | Custom-Metadata goes as request headers: `-H "x-trace: abc"` reaches the server as `x-trace: abc`. | GrpcRequestHeaderCases.CustomMetadata_GivenWithH_IsSentAsARequestHeader |
-| Grpc:Http2-Request-9 | MUST | A Binary-Header (key ending `-bin`) value is base64 encoded (ADR-1225: `-H` takes it as base64). | GrpcRequestHeaderCases.BinaryMetadata_GivenWithH_IsSentBase64Encoded |
+| Grpc:Http2-Request-9 | MUST | A Binary-Header (key ending `-bin`) value is base64 encoded (ADR-1226: `-H` takes it as base64). | GrpcRequestHeaderCases.BinaryMetadata_GivenWithH_IsSentBase64Encoded |
 | Grpc:Http2-Request-10 | SHOULD | A Binary-Header value is emitted un-padded. | GrpcRequestHeaderCases.BinaryMetadata_PaddedInput_IsSentUnpadded |
 | Grpc:Http2-Request-11 | SHOULD | Timeout is sent immediately after the reserved (`:`) headers, and Call-Definition headers before Custom-Metadata. | GrpcRequestHeaderCases.HeaderOrder_TimeoutAndMetadata_TimeoutFollowsThePseudoHeadersAndMetadataComesLast |
 | Grpc:Http2-Request-12 | SHOULD | A client provides a structured `user-agent` (the specification: "recommended"). | GrpcRequestHeaderCases.UserAgent_NotGiven_AUserAgentIsSent |

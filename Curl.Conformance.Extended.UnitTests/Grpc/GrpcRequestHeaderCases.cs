@@ -9,7 +9,7 @@ namespace Curl.Conformance.Extended.UnitTests.Grpc;
 /// <c>grpc-encoding</c> means every Compressed-Flag is 0, <c>-H</c> custom metadata reaches the server, a <c>-bin</c>
 /// key's value goes base64 (un-padded), <c>grpc-timeout</c> follows the pseudo-headers and Call-Definition precedes
 /// Custom-Metadata, and a <c>user-agent</c> is sent. A <c>-bin</c> value given to <c>-H</c> is read as base64, the
-/// bytes it encodes being the metadata (ADR-1225).
+/// bytes it encodes being the metadata (ADR-1226).
 /// </summary>
 [TestClass]
 public sealed class GrpcRequestHeaderCases
