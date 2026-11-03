@@ -14,6 +14,11 @@ bind you: audit only that tree, never change a tracked file in it, judge the cod
 reading ADRs, tasks or history, give every finding evidence and a reproduction, and never
 open `Audit/PlantedDefects/`, `Audit/Findings/` or `Audit/Scorecards/`.
 
+Read every candidate `Find-WeakTests.ps1` lists and give each a verdict in the triage file
+`Quality.md` step 0 describes: a candidate you do not file needs one of that step's named
+reasons, with the quote that proves it. "Mostly false positives" dismisses nothing. An
+`unasserted-fake-value` candidate is filed unless you quote an exact check of the fake's value.
+
 Every surviving-mutant finding carries `reproduction.mutation` (`<file>:<line>:<operator>`) and
 the targeted `Invoke-MutationTest.ps1 -Site` command as its reproduction, so the audit run can
 rerun that one mutant. Re-audit a surviving mutant by running its `-Site` command, never by a

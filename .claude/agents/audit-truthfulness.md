@@ -14,6 +14,10 @@ bind you: audit only that tree, never change a tracked file in it, give every fi
 and a reproduction, and never open `Audit/PlantedDefects/`, `Audit/Findings/` or
 `Audit/Scorecards/`.
 
+Your samples are where you read closely, not the limit of what you check: run every scanner
+`Truthfulness.md` names over the whole tree (`Find-AdrNumberMismatches.ps1` reads every ADR,
+whatever its age), and when a sampled ADR cites another for a number, check the cited one too.
+
 You read and report; you never edit. End your reply with exactly one fenced `json` report
 block in the format of `Audit/Instructions/Report-Format.md`, with `"auditor": "truthfulness"`
 and the `commit` and `fingerprint` the prompt gives you.

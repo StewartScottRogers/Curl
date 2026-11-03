@@ -20,9 +20,9 @@ choose any project to read (BL-1368):
 powershell -NoProfile -File Audit/Tools/Find-WeakTests.ps1 -Root <audited tree> -OutFile <temp folder>\weak-tests.json
 ```
 
-It lists candidates of five kinds: `ignored-test` (`[Ignore]` or `Assert.Inconclusive`),
-`no-assertion` (no assertion once comments are removed), `weak-assertion`, `commented-assertion`
-and `name-lies` (a name with `ExitsWith<N>` or `ThrowsExit<N>` whose body never mentions N or its
+It lists candidates of six kinds: `ignored-test` (`[Ignore]` or `Assert.Inconclusive`),
+`no-assertion` (no assertion once comments are removed), `weak-assertion`, `unasserted-fake-value`,
+`commented-assertion` and `name-lies` (a name with `ExitsWith<N>` or `ThrowsExit<N>` whose body never mentions N or its
 `CurlExitCode`, or `_Throws<X>` whose body never mentions X). `weak-assertion` is judged per
 assertion, not only per test: a test whose every assertion is `IsNotNull` or an `IsTrue` of a
 length, count or `Any()` above zero; a weak assertion that is the only check of its variable
@@ -31,11 +31,39 @@ to `IsNotNull` beside a kept exit-code check); and an `IsNotNull` of a value tha
 null (a `ToString`, `GetString`, `Substring` or `string.Join` result, an interpolated string, a
 `new` expression, a `.Length` or `.Count`). `commented-assertion` is an `Assert.`,
 `CollectionAssert.` or `StringAssert.` call commented out inside the test, whatever assertions
-remain: the outcome it checked is no longer checked by it. Read every candidate's test: file the
-ones that really are what the scan says, under steps 1 and 2's kinds, and say in your summary how
-many candidates you read and how many you filed. A candidate is not a finding until you have read
-it; for a `commented-assertion`, check whether any other assertion still checks that outcome, and
-file it when none does.
+remain: the outcome it checked is no longer checked by it. `unasserted-fake-value` is the sharp
+form of a weak check that is the only check of its value: the test's fakes return an exact string
+(a lambda's or a switch arm's result, a `return "..."`) and no assertion mentions it, not even
+inside a longer expected value - the test arranges the outcome and never looks at it. Read every
+candidate's test: file the ones that really are what the scan says, under steps 1 and 2's kinds,
+and say in your summary how many candidates you read and how many you filed. A candidate is not a
+finding until you have read it; for a `commented-assertion`, check whether any other assertion
+still checks that outcome, and file it when none does.
+
+### Triage: a reason for every candidate you do not file
+
+A scan with hundreds of candidates invites dismissing them as a class ("mostly false positives").
+Never do that; a class is not a reason. Write one line per candidate to
+`<temp folder>\weak-tests-triage.tsv` - file, test, kind, `filed` or `dismissed`, reason, and the
+quoted evidence - and dismiss only for one of these reasons, quoting what proves it:
+
+| Reason | Quote |
+| --- | --- |
+| `checked-exactly` | the assertion (or the assert helper's line) in this test that checks the value exactly |
+| `name-promises-only-existence` | the words of the name that promise only that something exists, is stored or does not throw (`_IsStoredWithoutRefusal`, `_DoesNotThrow`), never its content |
+| `scanner-misread` | what the scanner misread: a brace in a string, a helper it did not see assert, a joiner word after `Throws` |
+| `value-cannot-matter` | why no value of it could be wrong: an opaque handle, an instance only compared by reference elsewhere |
+
+These are mechanical, so apply them as written:
+
+- An `unasserted-fake-value` candidate is filed (`weak-assertion`, Medium) unless you quote an
+  exact check of the fake's value (`checked-exactly`). A name that reads, returns, uses, takes,
+  writes, sends or gives something promises its content, so `name-promises-only-existence` does
+  not dismiss it.
+- A `weak-assertion` that is the only check of its value is filed when the test's name says what
+  that value holds or where it comes from (`_ReadsTheHomeGatewayFile`, `_ReturnsTheBody`,
+  `_UsesTheProxy`): `IsNotNull` cannot tell the right value from a wrong one.
+- In your summary's method table, give the dismissals counted by reason. The number of candidates you report as read must equal the triage file's line count.
 
 ## 1. Test names against bodies
 Beyond step 0's candidates, for each `.UnitTests` project in scope (the prompt names them; by default the twins of the
@@ -136,7 +164,7 @@ Follow the key rule in [Report-Format.md](Report-Format.md). Use these kinds:
 | Kind | Finding |
 | --- | --- |
 | `name-lies` | Step 1: the name promises what the body does not assert. |
-| `weak-assertion` | Step 2: an assertion too weak to catch the stated bug. |
+| `weak-assertion` | Step 2 (and step 0's `weak-assertion` and `unasserted-fake-value` candidates): an assertion too weak to catch the stated bug. |
 | `commented-assertion` | Step 0: an assertion commented out, with no other assertion checking its outcome. |
 | `no-assertion` | Step 2: a test with no assertion. |
 | `ignored-test` | Step 2: `[Ignore]` or `Assert.Inconclusive`. |
@@ -147,7 +175,8 @@ Follow the key rule in [Report-Format.md](Report-Format.md). Use these kinds:
 
 - **High** - a surviving mutant that changes an exit code, output bytes or request bytes: a
   bug of that kind would reach users unnoticed.
-- **Medium** - a test whose name lies about what it checks; a commented-out assertion that
+- **Medium** - a test whose name lies about what it checks; an `unasserted-fake-value` test,
+  whose fake's exact value nothing checks; a commented-out assertion that
   leaves its outcome unchecked; a surviving mutant in a decision that does not reach output
   directly.
 - **Low** - a weak but not wrong assertion; an ignored test; a swallowed failure in setup code.
