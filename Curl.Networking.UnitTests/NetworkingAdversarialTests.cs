@@ -1,5 +1,7 @@
 using System.Net;
 
+using Curl.Protocol.Abstractions;
+
 using Curl.Testing;
 
 namespace Curl.Networking;
@@ -462,6 +464,7 @@ public sealed class NetworkingAdversarialTests
         var overrides = ResolveOverrides.Parse(["good:80:1.1.1.1", entry, "after:80:2.2.2.2"]);
 
         Assert.AreEqual($"Could not parse CURLOPT_RESOLVE entry '{entry}'", overrides.ParseError);
+        Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, overrides.ParseFailureCodeWith(new ConnectToMappings([], hidesIpv6: false).Map("good", 80)));
         Assert.HasCount(1, overrides.Entries);
         Assert.IsNull(overrides.Find("after", 80));
     }
