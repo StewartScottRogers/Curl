@@ -24,6 +24,6 @@ public static class AzureStorageExtension
     public static IProtocolHandler CreateHandler(ProtocolHandlerServices services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        return new AzureStorageProtocolHandler(services.Connector, services.ReadEnvironmentVariable ?? Environment.GetEnvironmentVariable, DefaultBlockSize);
+        return new AzureStorageProtocolHandler(services.Connector, services.ReadEnvironmentVariable ?? Environment.GetEnvironmentVariable, DefaultBlockSize, AzureBlobOperations.MaxBlockCount);
     }
 }

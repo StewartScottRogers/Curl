@@ -1260,3 +1260,4 @@ Each option and the specific reason it lost.
 | [1210](ADR-1210-socketio-ends-with-exit-56-when-no-ping-arrives.md) | Socket.IO ends with exit 56 when no ping arrives within the open packet's `pingInterval` + `pingTimeout`, on the transfer's clock (BL-4598) | Accepted | 2026-11-02 |
 | [1211](ADR-1211-s3-signing-conformance-sends-the-nearest-request-to-each-example.md) | S3 signing conformance sends the nearest request to each example (BL-4499) | Accepted | 2026-11-02 |
 | [1212](ADR-1212-socketio-sends-no-packet-over-maxpayload.md) | Socket.IO sends no packet over the open packet's `maxPayload` and ends with exit 55 instead (BL-4599) | Accepted | 2026-11-02 |
+| [1213](ADR-1213-azure-block-upload-stays-within-50000-blocks.md) | An Azure Storage block upload stays within 50,000 blocks: the block grows when the length is known, else exit 63 (BL-4611) | Accepted | 2026-11-02 |
