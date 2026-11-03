@@ -30,7 +30,7 @@ public sealed class TlsCases
         Assert.AreEqual(60, result.ExitCode, Encoding.UTF8.GetString(result.StandardError));
         StringAssert.StartsWith(Encoding.UTF8.GetString(result.StandardError), "curl: (60) ");
         Assert.IsEmpty(result.StandardOutput);
-        Assert.IsNotNull(server.HandshakeFailure);
+        Assert.IsTrue(server.CurlRefusedTheCertificate);
     }
 
     [TestMethod]
@@ -53,7 +53,7 @@ public sealed class TlsCases
     }
 
     [TestMethod]
-    public async Task RefusalServer_HandshakeCurlCompletes_FailsTheRun()
+    public async Task RefusalServer_CurlSendsMqttOverTheRefusedCertificate_FailsTheRun()
     {
         using X509Certificate2 certificate = ReferenceCertificate.CreateSelfSigned("localhost");
         Mqtt5TlsRefusalServer server = new(certificate);
@@ -61,6 +61,6 @@ public sealed class TlsCases
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(
             async () => await ExtendedConformanceHarness.RunAsync(Curl, [ReferenceRoute.Tcp(Port, server)], ["-sS", "-k", "-m", "10", "mqtt5s://localhost/t", "-d", "hi"]));
 
-        Assert.IsNull(server.HandshakeFailure);
+        Assert.IsFalse(server.CurlRefusedTheCertificate);
     }
 }
