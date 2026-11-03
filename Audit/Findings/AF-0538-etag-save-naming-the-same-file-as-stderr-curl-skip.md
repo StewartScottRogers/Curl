@@ -3,8 +3,8 @@ id: AF-0538
 title: --etag-save naming the same file as --stderr: curl skips the transfer and exits 26, Curl sends the request and exits 0
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Console/CurlCommandRunner.cs:--etag-save:exit-code
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ New-Item -ItemType Directory -Force $env:TEMP/af-etag | Out-Null; $f = Join-Path
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
