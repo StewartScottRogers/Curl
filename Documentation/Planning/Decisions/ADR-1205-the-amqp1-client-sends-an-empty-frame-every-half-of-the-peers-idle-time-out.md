@@ -1,4 +1,4 @@
-# ADR-1202 — The AMQP 1.0 client sends an empty frame every half of the peer's idle-time-out
+# ADR-1205 — The AMQP 1.0 client sends an empty frame every half of the peer's idle-time-out
 
 - **Status:** Accepted
 - **Date:** 2026-11-02
