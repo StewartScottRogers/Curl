@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TerminalPemPassPhrasePrompt.cs, Curl.Networking.UnitTests/TerminalPemPassPhrasePromptTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4640 — Fix AF-0534: Surviving mutant: the PEM pass phrase prompt can echo the first typed key to the terminal without a test failing
 
@@ -55,3 +55,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. The PEM pass phrase prompt's key reading is injectable and a test kills the intercept mutant
