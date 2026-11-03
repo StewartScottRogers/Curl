@@ -41,3 +41,4 @@ and each continuation's delivery-id (null or equal to the first's; otherwise fai
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: c967bfea 4cc8864f 3862b628 914c30cc.
