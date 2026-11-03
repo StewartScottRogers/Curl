@@ -36,3 +36,4 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 9ed6878f f27a8f90 fe617ef5 be674468 9438adeb ef6c9026.
