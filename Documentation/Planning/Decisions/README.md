@@ -1274,3 +1274,4 @@ Each option and the specific reason it lost.
 | [1224](ADR-1224-closed-udp-port-is-exit-7.md) | A closed UDP port ends a `coap`, `dns` or `webtransport` transfer with exit 7 (BL-4654) | Accepted | 2026-11-03 |
 | [1225](ADR-1225-dns-udp-reply-must-carry-the-query-question.md) | A `dns://` reply over UDP must carry the query's question, QNAME compared without regard to case (BL-4673) | Accepted | 2026-11-03 |
 | [1226](ADR-1226-grpc-bin-metadata-given-to-h-is-base64.md) | A `-bin` metadata value given to `-H` on a gRPC call is read as base64 and sent un-padded (BL-4533) | Accepted | 2026-11-03 |
+| [1227](ADR-1227-grpc-request-headers-carry-h-and-user-agent.md) | A gRPC call sends `-H` as Custom-Metadata, `-A` or curl's own `user-agent`, and `grpc-timeout` straight after the pseudo-headers (BL-4674) | Accepted | 2026-11-03 |
