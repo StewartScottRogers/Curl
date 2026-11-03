@@ -21,7 +21,7 @@ gRPC, so there is no curl output to measure; the rules follow the specification 
   at most 315,576,000,000 seconds, an optional "." and 1 to 9 digits, then "s". Any other string is
   `InvalidValue`, any other JSON kind `WrongType`.
 - A value outside its type's range (from the wire) has no JSON form: `ProtobufJsonFormatter.Format` throws
-  `FormatException`, which `ProtobufJsonConverter.TryConvertBinaryToJson` reports as `InvalidValue`, as protobuf's
+  `FormatException`, which `ProtobufJsonConverter.ConvertBinaryToJson` reports as `InvalidValue`, as protobuf's
   printer fails rather than printing a wrong time.
 - Parsing is by hand with `DateTime.TryParseExact` and `TimeSpan.TryParseExact`, not a source-generated regex,
   whose generated code would fall under the library's coverage and complexity gates.

@@ -42,7 +42,7 @@ internal static class DynamicTestTypes
 
     public static DynamicMessage Decode(string name, string hex)
     {
-        var error = DynamicMessageDecoder.TryDecode(Type(name), Convert.FromHexString(hex), out var message);
+        var error = DynamicMessageDecoder.Decode(Type(name), Convert.FromHexString(hex), out var message);
         Assert.AreEqual(Wire.ProtobufDecodeError.None, error);
         return message!;
     }

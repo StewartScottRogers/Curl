@@ -41,5 +41,5 @@ Protocol Buffers support, and the conversion must never throw for bad input.
 
 ## Consequences
 
-The extensions convert with `ProtobufJsonConverter.TryConvertJsonToBinary` and `TryConvertBinaryToJson`
+The extensions convert with `ProtobufJsonConverter.ConvertJsonToBinary` and `ConvertBinaryToJson`
 and print the error they get; no JSON input can make the library throw.

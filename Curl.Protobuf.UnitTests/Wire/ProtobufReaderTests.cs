@@ -183,9 +183,9 @@ public sealed class ProtobufReaderTests
     [TestMethod]
     public void TryReadPacked_TruncatedElement_IsTheElementsError()
     {
-        Assert.AreEqual(ProtobufDecodeError.TruncatedVarint, ProtobufReader.TryReadPackedVarints(new byte[] { 0x01, 0x80 }, new List<ulong>()));
-        Assert.AreEqual(ProtobufDecodeError.TruncatedFixed, ProtobufReader.TryReadPackedFixed32(new byte[5], new List<uint>()));
-        Assert.AreEqual(ProtobufDecodeError.TruncatedFixed, ProtobufReader.TryReadPackedFixed64(new byte[9], new List<ulong>()));
+        Assert.AreEqual(ProtobufDecodeError.TruncatedVarint, ProtobufReader.ReadPackedVarints(new byte[] { 0x01, 0x80 }, new List<ulong>()));
+        Assert.AreEqual(ProtobufDecodeError.TruncatedFixed, ProtobufReader.ReadPackedFixed32(new byte[5], new List<uint>()));
+        Assert.AreEqual(ProtobufDecodeError.TruncatedFixed, ProtobufReader.ReadPackedFixed64(new byte[9], new List<ulong>()));
     }
 
     private static byte[] NestedGroups(int depth)

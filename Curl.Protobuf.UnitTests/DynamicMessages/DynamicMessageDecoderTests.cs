@@ -30,7 +30,7 @@ public sealed class DynamicMessageDecoderTests
     [DataRow("Maps", "0A021096", ProtobufDecodeError.TruncatedVarint, DisplayName = "malformed map entry")]
     public void TryDecode_MalformedInput_IsTheTypedErrorAndNoMessage(string typeName, string hex, ProtobufDecodeError expected)
     {
-        var error = DynamicMessageDecoder.TryDecode(Type(typeName), Convert.FromHexString(hex), out var message);
+        var error = DynamicMessageDecoder.Decode(Type(typeName), Convert.FromHexString(hex), out var message);
 
         Assert.AreEqual(expected, error);
         Assert.IsNull(message);
@@ -47,7 +47,7 @@ public sealed class DynamicMessageDecoderTests
             payload = writer.ToArray();
         }
 
-        var error = DynamicMessageDecoder.TryDecode(Type("Outer"), payload, out var message);
+        var error = DynamicMessageDecoder.Decode(Type("Outer"), payload, out var message);
 
         Assert.AreEqual(ProtobufDecodeError.NestingTooDeep, error);
         Assert.IsNull(message);
@@ -56,7 +56,7 @@ public sealed class DynamicMessageDecoderTests
     [TestMethod]
     public void TryDecode_EmptyInput_IsAnEmptyMessage()
     {
-        var error = DynamicMessageDecoder.TryDecode(Type("Test1"), ReadOnlyMemory<byte>.Empty, out var message);
+        var error = DynamicMessageDecoder.Decode(Type("Test1"), ReadOnlyMemory<byte>.Empty, out var message);
 
         Assert.AreEqual(ProtobufDecodeError.None, error);
         Assert.IsFalse(message!.HasValue("a"));

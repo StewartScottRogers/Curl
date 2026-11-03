@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protobuf.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4774 — Fix AF-0610: Curl.Protobuf's Try... methods (TryConvertJsonToBinary, TryDecode, TryRead and others) return an error enum, not bool; AF-0539 renamed only TryParse
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Renamed all 45 `Try...` methods returning a Protobuf*Error to the plain verb (`ConvertJsonToBinary`, `Decode`, `Read...`), updated tests, Curl.Protobuf.UnitLibrary/CLAUDE.md, ADR-1120 and ADR-1228. Reproduction gives 0; solution builds; Protobuf and Grpc fast tests green; Measure-CodeQuality for Curl.Protobuf.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Renamed the 45 Try... methods returning an error enum; reproduction gives 0

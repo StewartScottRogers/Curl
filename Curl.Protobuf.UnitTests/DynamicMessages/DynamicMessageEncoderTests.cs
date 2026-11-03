@@ -256,6 +256,6 @@ public sealed class DynamicMessageEncoderTests
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => DynamicMessageEncoder.Write(null!, Message("Test1")));
         Assert.ThrowsExactly<ArgumentNullException>(() => DynamicMessageEncoder.Write(new ProtobufWriter(), null!));
-        Assert.ThrowsExactly<ArgumentNullException>(() => DynamicMessageDecoder.TryDecode(null!, ReadOnlyMemory<byte>.Empty, out _));
+        Assert.ThrowsExactly<ArgumentNullException>(() => DynamicMessageDecoder.Decode(null!, ReadOnlyMemory<byte>.Empty, out _));
     }
 }

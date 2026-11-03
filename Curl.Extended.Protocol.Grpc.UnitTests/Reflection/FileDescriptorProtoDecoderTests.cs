@@ -139,7 +139,7 @@ public sealed class FileDescriptorProtoDecoderTests
         ReflectedProtoFile file = FileDescriptorProtoDecoder.Decode(File("p.proto", "p", "proto3", [], [outer], [], []));
         var catalogue = new DynamicTypeCatalogue([file.Descriptor]);
 
-        ProtobufJsonError error = ProtobufJsonConverter.TryConvertJsonToBinary(catalogue.GetMessageType("p.Outer"), "{\"inner\":{\"tags\":{\"x\":\"A\"}}}"u8.ToArray(), out byte[]? binary);
+        ProtobufJsonError error = ProtobufJsonConverter.ConvertJsonToBinary(catalogue.GetMessageType("p.Outer"), "{\"inner\":{\"tags\":{\"x\":\"A\"}}}"u8.ToArray(), out byte[]? binary);
 
         Assert.AreEqual(ProtobufJsonError.None, error);
         Assert.IsNotNull(binary);
