@@ -45,10 +45,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only change, so done directly rather than through the full feature pipeline, and no Measure-CodeQuality run: no production code changed. For_GivesTheExtensionsTheRunsEnvironmentReader now drives For through a recording factory and asserts Assert.AreSame(reader, seen!.ReadEnvironmentVariable), with the assertion on line 40, inside the reproduction's 7-line context. The duplicate For_HandsEachExtensionFactoryServicesCarryingTheGivenReader was folded into it. The catalogue count check it used to make is now For_WithTheCatalogue_GivesOneHandlerPerEntry.
 
 ## Log
 

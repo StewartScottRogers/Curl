@@ -33,26 +33,17 @@ public sealed class ExtensionProtocolHandlersTests
     public void For_GivesTheExtensionsTheRunsEnvironmentReader()
     {
         Func<string, string?> reader = _ => null;
+        ProtocolHandlerServices? seen = null;
 
-        IEnumerable<IProtocolHandler> handlers = ExtensionProtocolHandlers.For(reader)!(Services);
+        _ = ExtensionProtocolHandlers.For(reader, [services => { seen = services; return new SchemeOnlyHandler("x"); }])!(Services).ToList();
 
-        Assert.HasCount(ExtensionCatalogue.Entries.Count, handlers);
+        Assert.AreSame(reader, seen!.ReadEnvironmentVariable);
         Assert.IsNull(Services.ReadEnvironmentVariable);
     }
 
     [TestMethod]
-    public void For_HandsEachExtensionFactoryServicesCarryingTheGivenReader()
-    {
-        Func<string, string?> reader = _ => null;
-        List<ProtocolHandlerServices> seen = [];
-        Func<ProtocolHandlerServices, IProtocolHandler> factory = services => { seen.Add(services); return new SchemeOnlyHandler("x"); };
-
-        _ = ExtensionProtocolHandlers.For(reader, [factory, factory])!(Services).ToList();
-
-        Assert.HasCount(2, seen);
-        Assert.AreSame(reader, seen[0].ReadEnvironmentVariable);
-        Assert.AreSame(reader, seen[1].ReadEnvironmentVariable);
-    }
+    public void For_WithTheCatalogue_GivesOneHandlerPerEntry() =>
+        Assert.HasCount(ExtensionCatalogue.Entries.Count, ExtensionProtocolHandlers.For(_ => null)!(Services));
 
     [TestMethod]
     public void For_WithNoReader_Throws() =>
