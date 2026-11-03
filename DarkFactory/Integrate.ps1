@@ -101,6 +101,77 @@ function Repair-IntegrationBreak {
     return ''
 }
 
+function Get-GatedLibraries {
+    # The projects held to the quality gates (CLAUDE.md "Quality gates": every *.UnitLibrary,
+    # Curl.Console, Curl.Api, Libcurl and Curl.Mcp) whose C# files -Paths (repo-relative, as
+    # git diff --name-only names them) change, each once, sorted.
+    param([string[]]$Paths)
+    return @($Paths | Where-Object { "$_" -match '^(Curl\.[^/\\]+\.UnitLibrary|Curl\.Console|Curl\.Api|Libcurl|Curl\.Mcp)[/\\].*\.cs$' -and "$_" -notmatch '[/\\](bin|obj)[/\\]' } |
+        ForEach-Object { ("$_" -split '[/\\]')[0] } | Sort-Object -Unique)
+}
+
+function Get-QualityGateMisses {
+    # The members Measure-CodeQuality.ps1's -JsonPath report (-Report, parsed) lists outside a
+    # gate whose source file is one of -ChangedPaths (repo-relative), as "<member> (<file>:
+    # <fails>)" lines. A member outside a gate in a file the task left alone is not the task's:
+    # it was on the shared branch before, and CI already shows it.
+    param($Report, [string[]]$ChangedPaths, [string]$RepoRoot)
+    $changed = @{}
+    foreach ($path in $ChangedPaths) { $changed[("$path" -replace '\\', '/').ToLowerInvariant()] = $true }
+    $root = ($RepoRoot -replace '\\', '/').TrimEnd('/') + '/'
+    foreach ($member in @($Report.failing | Where-Object { $_ })) {
+        $file = "$($member.file)" -replace '\\', '/'
+        if ($file.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { $file = $file.Substring($root.Length) }
+        if (-not $changed.ContainsKey($file.ToLowerInvariant())) { continue }
+        "$($member.member) ($file`: $(@($member.fails) -join ', '))"
+    }
+}
+
+function Test-QualityGates {
+    # '' when no member of a file this lane's commits change (against -Base) is outside a
+    # quality gate, by Measure-CodeQuality.ps1 run for the gated libraries they touch; else why.
+    # Lanes ran the measure in their run and judged its failures another task's (BL-4545 left
+    # Amqp1ReferenceContainer.Accepts and AnswerAsync to BL-4546, and CI's quality job was red
+    # 52 minutes, AF-0543), so the shift measures before it integrates (BL-4649). A measure
+    # that writes no report (a build or test failure) is left to Test-Green. -Measure (libraries,
+    # report path -> runs it) stands in for the script in -TestIntegrateLock.
+    param([string]$Id, [string]$Base, [scriptblock]$Measure)
+    $changed = @(& git -C $Root diff --name-only "$Base...HEAD" 2>$null | Where-Object { $_ })
+    $libraries = @(Get-GatedLibraries $changed)
+    if (-not $libraries.Count) { return '' }
+    if (-not $Measure) {
+        $Measure = {
+            param([string[]]$Libraries, [string]$JsonPath)
+            & (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'Measure-CodeQuality.ps1') -Library ($Libraries -join ',') -JsonPath $JsonPath 2>&1 | Out-Null
+        }
+    }
+    $json = Join-Path ([IO.Path]::GetTempPath()) "df-quality-$Lane-$PID.json"
+    Remove-Item $json -ErrorAction SilentlyContinue
+    Write-Trace $Id 'quality' "measuring $($libraries -join ', ') before integrating"
+    & $Measure -Libraries $libraries -JsonPath $json
+    if (-not (Test-Path $json)) { Write-Trace $Id 'quality' 'the measure wrote no report; left to the build and tests' 'DarkYellow'; return '' }
+    try { $report = Get-Content $json -Raw | ConvertFrom-Json } catch { return '' } finally { Remove-Item $json -ErrorAction SilentlyContinue }
+    $misses = @(Get-QualityGateMisses -Report $report -ChangedPaths $changed -RepoRoot $Root)
+    if (-not $misses.Count) { Write-Trace $Id 'quality' "gates met in the files it changed ($($libraries -join ', '))"; return '' }
+    return "quality gates missed by $($misses.Count) member(s) of files it changed: $(Get-Short ($misses -join '; ') 300)"
+}
+
+function Repair-QualityGates {
+    # One repair run for a finished task whose commits leave members outside a quality gate
+    # (Test-QualityGates), before the integrate lock. '' once the gates are met, or why not.
+    param([string]$Id, [string]$Red)
+    Write-Trace $Id 'repair' "$Red; one run to meet the gates" 'DarkYellow'
+    Set-HeartbeatStep @('repair', 'quality gates')
+    Invoke-TaskRun -Id $Id -Text $QualityRepairPrompt.Replace('{RED}', $Red) -Deny $LaneForbidden -Suffix '-quality' -Minutes 30 | Out-Null
+    if (Test-WorktreeDirty $Root) {
+        Invoke-Git @('add', '-A') | Out-Null
+        Invoke-Git @('commit', '-q', '-m', "fix: meet the quality gates for $Id") | Out-Null
+    }
+    $still = Test-QualityGates -Id $Id -Base 'FETCH_HEAD'
+    if ($still) { return "$still, still after a repair run" }
+    return ''
+}
+
 function Invoke-RebaseOntoShared {
     # Fetches the shared branch and rebases this lane's commits onto it. Returns 'clean',
     # 'conflict' (git stopped on conflicts and the rebase is still in progress), 'fetch failed'
@@ -213,6 +284,15 @@ function Invoke-Integrate {
     if ((Invoke-RebaseOntoShared -Unlocked) -eq 'conflict') {
         $resolves++
         if (-not (Resolve-RebaseConflictUnlocked -Id $Id)) { return $unsettled }
+    }
+    # The quality gates CI's quality job applies, for the files this lane's commits change,
+    # measured before the lock so no other lane waits on it (BL-4649); FETCH_HEAD is the
+    # shared branch the rebase above put them on.
+    if ($State -eq 'Done' -or -not (Test-IncomingIsBoardOnly 'FETCH_HEAD' 'HEAD')) {
+        Write-Heartbeat 'integrate' 'quality gates before the lock'
+        $quality = Test-QualityGates -Id $Id -Base 'FETCH_HEAD'
+        if ($quality -and $State -eq 'Done') { $quality = Repair-QualityGates -Id $Id -Red $quality }
+        if ($quality) { return $quality }
     }
     $attempt = 0
     # A CI fix goes before the ordinary integrations waiting for the lock (ADR-1158).
@@ -383,6 +463,35 @@ if ($TestIntegrateLock) {
                 & $laneRequeues 'Backlog' 'Tasks\Backlog\BL-001-requeued-{0}.md' })
             ,@('a requeued run''s code that goes red on the shared branch is not pushed, and gets no repair run', "'build failed after rebasing onto the other lanes' work' 1 verifies, lane work shared: False", {
                 & $laneRequeues 'Backlog' 'requeued-red-{0}.txt' 'build failed' })
+            ,@('the gated libraries are the *.UnitLibrary, Console, Api, Libcurl and Mcp projects whose C# files change', 'Curl.Api Curl.Foo.UnitLibrary Libcurl', {
+                "$(Get-GatedLibraries @('Curl.Foo.UnitLibrary/A.cs', 'Curl.Foo.UnitTests/ATests.cs', 'Libcurl/x/B.cs', 'Curl.Api/C.cs', 'Curl.Foo.UnitLibrary/obj/D.cs', 'Curl.Foo.UnitLibrary/README.md', 'Tasks/Done/BL-1.md'))" })
+            ,@('a member outside a gate in a file the lane changed fails the quality check; one in a file it left alone does not (AF-0543)', "Curl.Foo.UnitLibrary 'quality gates missed by 1 member(s) of files it changed: Container.Accepts (Curl.Foo.UnitLibrary/Container.cs: complexity 12 > 10)'", {
+                & $fresh
+                New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Curl.Foo.UnitLibrary') | Out-Null
+                Set-Content -Path (Join-Path $repo 'Curl.Foo.UnitLibrary\Container.cs') -Value 'class Container { }'
+                git -C $repo add -A 2>&1 | Out-Null; git -C $repo commit -q -m container 2>&1 | Out-Null
+                $script:measured = ''
+                $measure = {
+                    param([string[]]$Libraries, [string]$JsonPath)
+                    $script:measured = $Libraries -join ','
+                    $failing = @(@{ library = 'Curl.Foo.UnitLibrary'; member = 'Container.Accepts'; file = (Join-Path $repo 'Curl.Foo.UnitLibrary\Container.cs'); fails = @('complexity 12 > 10') },
+                        @{ library = 'Curl.Foo.UnitLibrary'; member = 'Old.Parse'; file = (Join-Path $repo 'Curl.Foo.UnitLibrary\Old.cs'); fails = @('branch 50% < 100%') })
+                    @{ failing = $failing } | ConvertTo-Json -Depth 5 | Set-Content -Path $JsonPath
+                }
+                $r = Test-QualityGates -Id 'BL-001' -Base 'origin/work' -Measure $measure 6>$null
+                & $fresh
+                "$script:measured '$r'" })
+            ,@('a lane whose commits change no gated library is not measured', "'' not measured", {
+                & $fresh
+                Set-Content -Path (Join-Path $repo 'notes-gate.txt') -Value 'x'
+                git -C $repo add -A 2>&1 | Out-Null; git -C $repo commit -q -m notes 2>&1 | Out-Null
+                $script:measured = ''
+                $r = Test-QualityGates -Id 'BL-001' -Base 'origin/work' -Measure { param($Libraries, $JsonPath) $script:measured = 'measured' } 6>$null
+                & $fresh
+                "'$r' $(if ($script:measured) { 'measured' } else { 'not measured' })" })
+            ,@('a run''s code that misses a quality gate is not pushed (BL-4649)', "'quality gates missed by 1 member(s)' 0 verifies, lane work shared: False", {
+                function Test-QualityGates { param([string]$Id, [string]$Base) 'quality gates missed by 1 member(s)' }
+                & $laneRequeues 'Backlog' 'requeued-quality-{0}.txt' })
             ,@('both task prompts commit a Backlog or Blocked run''s finished, tested code rather than leave it to the stash', 'True True False False', {
                 $commits = 'Commit with it, by logical unit as in rule {0}, every code change that is complete in'
                 $tested = 'covered by its own tests so CI''s'

@@ -315,7 +315,11 @@
                  resolves in all, and only a rebase made under the lock is pushed
                  (BL-2967). -TestIntegrateLock proves it. A finished task whose build or tests go red on the rebased
                  tree gets one headless repair run there, still holding the lock,
-                 traced as "repair" (AF-0051). Work that still will not integrate is pushed to its own branch,
+                 traced as "repair" (AF-0051). Before taking the lock, commits that change a
+                 C# file of a project held to the quality gates are measured with
+                 Measure-CodeQuality.ps1 for those libraries, traced as "quality"; a member of
+                 a file they changed outside a gate gets one headless repair run for a
+                 finished task, and otherwise does not integrate (BL-4649, AF-0543). Work that still will not integrate is pushed to its own branch,
                  factory/<ID>-lane-<n>-<stamp>, and the task goes back to Backlog on the
                  shared branch, retried for several minutes; a park whose move is never
                  pushed is in the lane's summary and the end-of-shift report (BL-1071).
