@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463, BL-4
 touches: [Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/Silent, Documentation/Conformance/Extended/CurlSurface-Transfer-Silent.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-03
 ---
 # BL-4618 — Conformance: curl's -s and -S and the transfer-surface scheme coverage check for every extended scheme
 
@@ -24,13 +24,13 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/CurlSurface-Transfer-Silent.md` lists `-s` and `-S` for every extended scheme with a `CurlSurface:` ID mapped to a test or to `n/a: <reason>`, and the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/Silent/` run curl in process for every scheme and assert stdout, stderr and exit code, naming the manual-page source.
-- [ ] A test fails when a scheme some extension registers has no row for one of BL-4496's checks in the `CurlSurface-Transfer*.md` matrices, and passes on the tree.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with the ID of its filed High `Fix <Name> conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no test needs `TestCategory=Integration`, opens a real socket or starts a real process.
-- [ ] `Curl.Conformance.Extended.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`), if this task changes it.
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] `Documentation/Conformance/Extended/CurlSurface-Transfer-Silent.md` lists `-s` and `-S` for every extended scheme with a `CurlSurface:` ID mapped to a test or to `n/a: <reason>`, and the harness's matrix check passes.
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/Silent/` run curl in process for every scheme and assert stdout, stderr and exit code, naming the manual-page source.
+- [x] A test fails when a scheme some extension registers has no row for one of BL-4496's checks in the `CurlSurface-Transfer*.md` matrices, and passes on the tree.
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with the ID of its filed High `Fix <Name> conformance: ...` task; the known-failures check passes.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no test needs `TestCategory=Integration`, opens a real socket or starts a real process.
+- [x] `Curl.Conformance.Extended.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`), if this task changes it.
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
@@ -38,3 +38,4 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 
 - 2026-11-02: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 5651b77e d71a6e84 d2c886c2 fe617ef5 be674468 9438adeb ef6c9026.
+- 2026-11-03: Doing -> Done. Silent -s/-S cases for every extended scheme and the transfer-surface scheme coverage check pass
