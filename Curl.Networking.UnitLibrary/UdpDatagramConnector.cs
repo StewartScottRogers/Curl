@@ -146,7 +146,7 @@ public sealed class UdpDatagramConnector : IDatagramConnector
         var channel = OpenFirstAvailable(addresses, destination.Port);
         return channel is null
             ? OpenFailure(host, port, destination, openStarted)
-            : Opened(channel);
+            : Opened(new PortUnreachableReportingDatagramChannel(channel, () => FailedToConnectMessage(host, port, destination, openStarted)));
     }
 
     /// <summary>
@@ -190,11 +190,20 @@ public sealed class UdpDatagramConnector : IDatagramConnector
 
     private DatagramOpenResult OpenFailure(string host, int port, ConnectDestination destination, long openStarted)
     {
-        var elapsedMilliseconds = (long)_timeProvider.GetElapsedTime(openStarted).TotalMilliseconds;
-        var via = destination.IsMapped ? $" via {destination.Host}:{destination.Port}" : string.Empty;
-        var message = $"Failed to connect to {host}:{port}{via} after {elapsedMilliseconds} ms: Could not connect to server";
+        var message = FailedToConnectMessage(host, port, destination, openStarted);
         _log.Failed(DiagnosticLogComponents.Connect, CurlExitCode.CouldntConnect, message);
         return DatagramOpenResult.Failed(CurlExitCode.CouldntConnect, message);
+    }
+
+    /// <summary>
+    /// curl's exit 7 text for <paramref name="host" />: no socket could be opened for it, or its port
+    /// answered the first datagram with an ICMP port unreachable (BL-4654).
+    /// </summary>
+    private string FailedToConnectMessage(string host, int port, ConnectDestination destination, long openStarted)
+    {
+        var elapsedMilliseconds = (long)_timeProvider.GetElapsedTime(openStarted).TotalMilliseconds;
+        var via = destination.IsMapped ? $" via {destination.Host}:{destination.Port}" : string.Empty;
+        return $"Failed to connect to {host}:{port}{via} after {elapsedMilliseconds} ms: Could not connect to server";
     }
 
     private IDatagramChannel? OpenFirstAvailable(IReadOnlyList<IPAddress> addresses, int port)

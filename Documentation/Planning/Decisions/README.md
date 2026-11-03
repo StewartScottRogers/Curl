@@ -1271,3 +1271,4 @@ Each option and the specific reason it lost.
 | [1221](ADR-1221-etag-save-naming-the-open-stderr-file-skips-the-transfer-on-windows.md) | `--etag-save` naming the open `--stderr` file skips the transfer on Windows (BL-4644) | Accepted | 2026-11-02 |
 | [1222](ADR-1222-coap-transfer-surface-verbose-and-timeout-lines.md) | The CoAP transfer surface pins the DTLS verbose line and a connect-phase timeout for coaps (BL-4627) | Accepted | 2026-11-03 |
 | [1223](ADR-1223-coaps-verbose-names-the-dtls-cipher-as-openssl-does.md) | `-v` on coaps names the DTLS cipher suite as OpenSSL does, after a connection line from the UDP channel (BL-4667) | Accepted | 2026-11-03 |
+| [1224](ADR-1224-closed-udp-port-is-exit-7.md) | A closed UDP port ends a `coap`, `dns` or `webtransport` transfer with exit 7 (BL-4654) | Accepted | 2026-11-03 |
