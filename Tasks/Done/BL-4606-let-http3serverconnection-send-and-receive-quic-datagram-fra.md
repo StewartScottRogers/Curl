@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Http3Server.UnitLibrary/Http3ServerConnection.cs, Curl.Conformance.Http3Server.UnitTests/Http3ServerConnectionDatagramTests.cs, Curl.Conformance.Http3Server.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4606 — Let Http3ServerConnection send and receive QUIC DATAGRAM frames (RFC 9221) for the WebTransport reference server
 
@@ -35,3 +35,4 @@ Split from BL-4494 (WebTransport conformance). The frame switch in `Curl.Conform
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 7cbc8046 103b7afc 286a1d56 481bd9fe.
+- 2026-11-02: Doing -> Done. Datagram send and receive built, tested, 100% covered
