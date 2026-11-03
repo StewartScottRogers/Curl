@@ -1,5 +1,5 @@
 ---
-id: BL-4783
+id: BL-4787
 title: Finish the ProtobufReader TryRead rename and make Curl.Protobuf CLAUDE.md and test names true
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4783 — Finish the ProtobufReader TryRead rename and make Curl.Protobuf CLAUDE.md and test names true
+# BL-4787 — Finish the ProtobufReader TryRead rename and make Curl.Protobuf CLAUDE.md and test names true
 
 ## Goal
 

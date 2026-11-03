@@ -1,5 +1,5 @@
 ---
-id: BL-4782
+id: BL-4786
 title: Let a closed UDP port escape the CoAP and DNS UDP socket-error catches as exit 7
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4782 — Let a closed UDP port escape the CoAP and DNS UDP socket-error catches as exit 7
+# BL-4786 — Let a closed UDP port escape the CoAP and DNS UDP socket-error catches as exit 7
 
 ## Goal
 
