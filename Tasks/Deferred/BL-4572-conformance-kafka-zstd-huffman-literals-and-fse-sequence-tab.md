@@ -43,10 +43,10 @@ Repeat_Mode. Cases go in `Curl.Conformance.Extended.UnitTests/Kafka/Compression/
 
 ## Notes
 
-- Split for size before any code (2026-11-02): a hand-built FSE encoder, a Huffman encoder and two sets of curl cases, each held to 100% coverage, do not fit one run. BL-4611 (FSE encoder), BL-4612 (Huffman literals cases, depends on BL-4611) and BL-4613 (FSE sequences cases and the matrix mapping, the rest, depends on both) carry every acceptance criterion between them. No other task names BL-4572 in depends-on.
+- Split for size before any code (2026-11-02): a hand-built FSE encoder, a Huffman encoder and two sets of curl cases, each held to 100% coverage, do not fit one run. BL-4620 (FSE encoder), BL-4621 (Huffman literals cases, depends on BL-4620) and BL-4622 (FSE sequences cases and the matrix mapping, the rest, depends on both) carry every acceptance criterion between them. No other task names BL-4572 in depends-on.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 99c0a8f4 d822d055 0fc765d5 914c30cc c1434b50.
-- 2026-11-02: Doing -> Deferred. Split into BL-4611, BL-4612, BL-4613
+- 2026-11-02: Doing -> Deferred. Split into BL-4620, BL-4621, BL-4622
