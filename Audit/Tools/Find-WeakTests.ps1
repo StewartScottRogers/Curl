@@ -33,10 +33,19 @@
                          an Assert.*, CollectionAssert.* or StringAssert.* call commented out
                          with // or /* */ inside the test, whether or not other assertions
                          remain: the outcome it checked is no longer checked (PD-003)
-      name-lies         a name ending _ExitsWith<N> (or ...ExitsWith<N><Words>) whose body never
-                         mentions N or the CurlExitCode member that equals N; or a name with
-                         Throws<X> whose body never mentions X (X is the name's ...Exception
-                         word, or the camel-case word after Throws)
+      name-lies         a name that states a number as its outcome - straight after ExitsWith,
+                         ExitsWithCode, Exits, ExitCode, Exit, ThrowsExit, FailsWith(Exit), Returns,
+                         ReturnsStatus, Status, Code, Gives, Yields, Answers or RespondsWith, and not
+                         after Not or Than (ExitsWithCode9, Returns404, FailsWithExit28) - whose body,
+                         DataRows and called helpers never mention N, the CurlExitCode member that
+                         equals N or the HttpStatusCode member that does; or a name with Throws<X>
+                         whose body and called helpers never mention X (X is the name's ...Exception
+                         word, or the camel-case word after Throws). Helpers are the methods of the
+                         same test project the test calls, two calls deep, so a check left to
+                         AssertRefused(...) counts. A number glued to another word (Http2, Sha256)
+                         is part of a name, not an outcome
+      commented-test    a whole test commented out: a // [TestMethod] (or one inside /* */) with a
+                         commented-out signature after it, so the test no longer runs at all
 
     A candidate is not yet a finding: the auditor reads each one and files those that are real.
     Prints JSON: one object per candidate with file (repository-relative), line (the method's
@@ -51,7 +60,8 @@
 .PARAMETER SelfTest
     Scan Audit/Tools/Fixtures/weak-tests (a UnitTests and an IntegrationTests project) and check every kind is found, and nothing else:
     an all-weak test, a weakened assertion beside a stronger one, an IsNotNull of a value that cannot
-    be null and a commented-out assertion among others included.
+    be null, a commented-out assertion, a number stated after ExitsWithCode and Returns, a check left
+    to a helper, a commented-out test and "*/*" in strings among others included.
 #>
 param(
     [string]$Root,
@@ -82,48 +92,106 @@ function Remove-Comments([string]$Text) {
     return [regex]::Replace($Text, $pattern, { param($m) if ($m.Value.StartsWith('//') -or $m.Value.StartsWith('/*')) { [regex]::Replace($m.Value, '[^\r\n]', ' ') } else { $m.Value } })
 }
 
-function Get-TestMethods([string]$Path) {
+function Get-MethodBody([string]$Clean, [int]$OpenParen) {
+    # From a method's opening parenthesis in comment-blanked text: the range of its body, a block in
+    # braces or an expression body (=> ...;), as @(start, length); $null when it has none (abstract).
+    $depth = 0; $close = -1
+    for ($i = $OpenParen; $i -lt $Clean.Length; $i++) {
+        if ($Clean[$i] -eq '(') { $depth++ }
+        elseif ($Clean[$i] -eq ')') { $depth--; if ($depth -eq 0) { $close = $i; break } }
+    }
+    if ($close -lt 0) { return $null }
+    $start = $close + 1
+    while ($start -lt $Clean.Length -and [char]::IsWhiteSpace($Clean[$start])) { $start++ }
+    # A where clause or a base/this call may stand between the parameters and the body.
+    while ($start -lt $Clean.Length -and $Clean[$start] -notin '{', '=', ';') { $start++ }
+    $end = -1
+    if ($start + 1 -lt $Clean.Length -and $Clean[$start] -eq '=' -and $Clean[$start + 1] -eq '>') {
+        $depth = 0
+        for ($i = $start; $i -lt $Clean.Length; $i++) {
+            if ($Clean[$i] -in '(', '{', '[') { $depth++ } elseif ($Clean[$i] -in ')', '}', ']') { $depth-- }
+            elseif ($Clean[$i] -eq ';' -and $depth -eq 0) { $end = $i; break }
+        }
+    }
+    elseif ($start -lt $Clean.Length -and $Clean[$start] -eq '{') {
+        $depth = 0
+        for ($i = $start; $i -lt $Clean.Length; $i++) {
+            if ($Clean[$i] -eq '{') { $depth++ }
+            elseif ($Clean[$i] -eq '}') { $depth--; if ($depth -eq 0) { $end = $i; break } }
+        }
+    }
+    if ($end -lt 0) { return $null }
+    return @($start, ($end - $start + 1))
+}
+
+function Get-TestMethods([string]$Path, [hashtable]$Helpers) {
     # Each [TestMethod]/[DataTestMethod]: its name, the line of its signature, its attributes, its
-    # body with comments blanked, and its raw body with the comments.
+    # body with comments blanked, and its raw body with the comments. With -Helpers, every other
+    # method of the file with an access modifier or static (a test's helper) is added to it,
+    # name -> comment-blanked bodies, so a check a test leaves to a helper can be followed.
     $text = [IO.File]::ReadAllText($Path)
+    $clean = Remove-Comments $text
     $methods = @()
     $signature = '(?ms)((?:^[ \t]*\[[^\]\r\n]*\][ \t]*\r?\n)+)[ \t]*(?:public|internal)\s+(?:static\s+)?(?:async\s+)?(?:Task|void)\s+(\w+)\s*\('
     foreach ($m in [regex]::Matches($text, $signature)) {
         $attributes = $m.Groups[1].Value
         if ($attributes -notmatch '\[(?:Data)?TestMethod\b') { continue }
-        # Past the parameter list: a body in braces, or an expression body (=> ...;).
-        $raw = $text.Substring($m.Index + $m.Length - 1)
-        $rest = Remove-Comments $raw
-        $depth = 0; $close = -1
-        for ($i = 0; $i -lt $rest.Length; $i++) {
-            if ($rest[$i] -eq '(') { $depth++ }
-            elseif ($rest[$i] -eq ')') { $depth--; if ($depth -eq 0) { $close = $i; break } }
-        }
-        if ($close -lt 0) { continue }
-        $after = $rest.Substring($close + 1)
-        $start = $after.Length - $after.TrimStart().Length
-        $end = -1
-        if ($after.Substring($start).StartsWith('=>')) {
-            $depth = 0
-            for ($i = $start; $i -lt $after.Length; $i++) {
-                if ($after[$i] -in '(', '{', '[') { $depth++ } elseif ($after[$i] -in ')', '}', ']') { $depth-- }
-                elseif ($after[$i] -eq ';' -and $depth -eq 0) { $end = $i; break }
-            }
-        }
-        elseif ($after.Substring($start).StartsWith('{')) {
-            $depth = 0
-            for ($i = $start; $i -lt $after.Length; $i++) {
-                if ($after[$i] -eq '{') { $depth++ }
-                elseif ($after[$i] -eq '}') { $depth--; if ($depth -eq 0) { $end = $i; break } }
-            }
-        }
-        if ($end -lt 0) { continue }
-        $body = $after.Substring($start, $end - $start + 1)
-        $rawBody = $raw.Substring($close + 1 + $start, $end - $start + 1)
+        $range = Get-MethodBody $clean ($m.Index + $m.Length - 1)
+        if (-not $range) { continue }
+        $body = $clean.Substring($range[0], $range[1])
+        $rawBody = $text.Substring($range[0], $range[1])
         $line = ($text.Substring(0, $m.Groups[2].Index) -split "`n").Count
         $methods += [pscustomobject]@{ Name = $m.Groups[2].Value; Line = $line; Attributes = $attributes; Body = $body; RawBody = $rawBody }
     }
+    if ($null -ne $Helpers) {
+        $helper = '(?m)^[ \t]*(?:(?:public|internal|private|protected|static|async|override|virtual|sealed|new|unsafe)\s+)+[\w<>\[\],?.]+(?:\s*\([^()]*\))?\s+(\w+)\s*(?:<[^>()]*>)?\s*\('
+        foreach ($m in [regex]::Matches($clean, $helper)) {
+            $range = Get-MethodBody $clean ($m.Index + $m.Length - 1)
+            if (-not $range) { continue }
+            $name = $m.Groups[1].Value
+            $Helpers[$name] = "$($Helpers[$name])`n$($clean.Substring($m.Index, $range[0] + $range[1] - $m.Index))"
+        }
+    }
     return $methods
+}
+
+function Get-CommentedOutTests([string]$Path) {
+    # A whole test commented out: a // [TestMethod] (or [DataTestMethod]) line, or one inside a
+    # /* */ block, named by the first commented-out method signature after it.
+    $text = [IO.File]::ReadAllText($Path)
+    $found = @()
+    # Real /* */ comments only: string literals are matched first, so "*/*" in a string opens none.
+    $blocks = @([regex]::Matches($text, '"(?:\\.|[^"\\])*"|@"(?:""|[^"])*"|''(?:\\.|[^''\\])*''|//[^\r\n]*|/\*[\s\S]*?\*/') |
+        Where-Object { $_.Value.StartsWith('/*') } | ForEach-Object { $_.Value })
+    $lineComments = '(?m)^[ \t]*//[ \t]*\[(?:Data)?TestMethod\b[^\r\n]*\r?\n(?:[ \t]*//[^\r\n]*\r?\n)*?[ \t]*//[^\r\n]*?\b(?:void|Task)\s+(\w+)\s*\('
+    foreach ($m in [regex]::Matches($text, $lineComments)) {
+        $found += [pscustomobject]@{ Name = $m.Groups[1].Value; Line = ($text.Substring(0, $m.Index) -split "`n").Count }
+    }
+    foreach ($b in $blocks) {
+        foreach ($m in [regex]::Matches($b, '\[(?:Data)?TestMethod\b[\s\S]*?\b(?:void|Task)\s+(\w+)\s*\(')) {
+            $found += [pscustomobject]@{ Name = $m.Groups[1].Value; Line = ($text.Substring(0, $text.IndexOf($b)) -split "`n").Count }
+        }
+    }
+    return $found
+}
+
+function Get-TextWithHelpers([string]$Text, [hashtable]$Helpers, [int]$Depth = 2) {
+    # The text with the bodies of the helpers it calls, and theirs, $Depth calls deep: a test that
+    # leaves its exit-code check to AssertRefused(...) is read with AssertRefused's body.
+    if ($null -eq $Helpers -or -not $Helpers.Count) { return $Text }
+    $seen = @{}; $all = $Text; $frontier = $Text
+    for ($d = 0; $d -lt $Depth; $d++) {
+        $next = ''
+        foreach ($call in [regex]::Matches($frontier, '\b([A-Za-z_]\w*)\s*(?:<[^<>()]*>)?\s*\(')) {
+            $n = $call.Groups[1].Value
+            if ($seen.ContainsKey($n) -or -not $Helpers.ContainsKey($n)) { continue }
+            $seen[$n] = $true
+            $next += "`n$($Helpers[$n])"
+        }
+        if (-not $next) { break }
+        $all += $next; $frontier = $next
+    }
+    return $all
 }
 
 function Get-FirstArgument([string]$Arguments) {
@@ -178,7 +246,20 @@ function Get-UnassertedFakeValues([string]$Body, $Asserts) {
     return @($returned | Where-Object { $assertText.IndexOf($_, [StringComparison]::Ordinal) -lt 0 })
 }
 
-function Get-Candidates($Method, [hashtable]$ExitCodes) {
+$script:HttpStatusNames = @([Enum]::GetNames([Net.HttpStatusCode]))
+
+function Get-StatedNumbers([string]$Name) {
+    # The numbers a test name states as its outcome: a number straight after an outcome word -
+    # ExitsWith, ExitsWithCode, ExitsWithExit, Exits, ExitCode, Exit, ThrowsExit, FailsWith,
+    # Returns, ReturnsStatus, Status, StatusCode, Code, Gives, Yields, Answers, RespondsWith - so a
+    # renamed ExitsWithCode9 is read as well as ExitsWith9. A number glued to any other word
+    # (Http2, Sha256, Base64, Rfc7230, Port8080) is part of a name, not an outcome, and NotExit15 or\n    # ThanExit15 states what the test does not end with.
+    $outcome = '(?<!Not|Than)(ExitsWith(?:Code|Exit)?|ExitWith(?:Code)?|ExitCode|Exits|Exit|ThrowsExit|FailsWith(?:Exit|Code)?|Returns(?:Status(?:Code)?|Code)?|StatusCode|Status|Code|Gives|Yields|Answers|RespondsWith)(\d+)(?!\d)'
+    return @([regex]::Matches($Name, $outcome) | ForEach-Object { [pscustomobject]@{ Words = $_.Groups[1].Value; Number = [int]$_.Groups[2].Value } } |
+        Group-Object Number | ForEach-Object { $_.Group[0] })
+}
+
+function Get-Candidates($Method, [hashtable]$ExitCodes, [hashtable]$Helpers) {
     $found = @()
     $body = $Method.Body
     $name = $Method.Name
@@ -218,27 +299,28 @@ function Get-Candidates($Method, [hashtable]$ExitCodes) {
     }
     $commented = @([regex]::Matches($Method.RawBody, '(?://|/\*)\s*((?:Assert|CollectionAssert|StringAssert)\.\w+\s*\([^\r\n]*)') | ForEach-Object { $_.Groups[1].Value.Trim() })
     if ($commented.Count) { $found += @{ kind = 'commented-assertion'; detail = "commented out: $($commented -join ' | ')" } }
-    if ($name -match 'ExitsWith(\d+)') {
-        $n = [int]$Matches[1]
+    # A number the name states as the outcome - ExitsWith23, ExitsWithCode9, ThrowsExit6, ExitCode3,
+    # Returns404, Status200, FailsWith28 - must appear in the body or its DataRows, as itself, as the
+    # CurlExitCode member that equals it, or as the HttpStatusCode member that equals it.
+    foreach ($stated in @(Get-StatedNumbers $name)) {
+        $n = $stated.Number
+        $text = "$($Method.Attributes)`n$(Get-TextWithHelpers $body $Helpers)"
         $members = @($ExitCodes.Keys | Where-Object { $ExitCodes[$_] -eq $n })
-        $named = ($body -match "\b$n\b") -or @($members | Where-Object { $body -match "CurlExitCode\.$_\b" }).Count
-        if (-not $named) { $found += @{ kind = 'name-lies'; detail = "name says exit $n; the body never mentions $n$(if ($members) { ' or CurlExitCode.' + ($members -join '/') })" } }
+        $statuses = @($script:HttpStatusNames | Where-Object { [int][Net.HttpStatusCode]$_ -eq $n })
+        $named = ($text -match "\b$n\b") -or @($members | Where-Object { $text -match "CurlExitCode\.$_\b" }).Count -or @($statuses | Where-Object { $text -match "HttpStatusCode\.$_\b" }).Count
+        if (-not $named) {
+            $alternatives = @(@($members | ForEach-Object { "CurlExitCode.$_" }) + @($statuses | ForEach-Object { "HttpStatusCode.$_" }))
+            $found += @{ kind = 'name-lies'; detail = "name says $($stated.Words)$n; the body never mentions $n$(if ($alternatives.Count) { ' or ' + ($alternatives -join '/') })" }
+        }
     }
     # Throws as the outcome (_Throws...), naming an exception: its ...Exception word, or the
     # camel-case word after it unless that word joins a clause (WriteThrowsUnderSilent and
-    # _ThrowsAndLeavesTheQueue promise no exception type).
-    # _ThrowsExit<N> promises an exit code through the exception: N must appear, as for ExitsWith.
+    # _ThrowsAndLeavesTheQueue promise no exception type). _ThrowsExit<N> is read above.
     $joiners = '(?:And|Or|Under|When|If|Unless|While|On|For|With|After|Before|Then|But|Without|Only|Again|Once|Naming|The|Its|It|A|An|Exit)(?=[A-Z_0-9]|$)'
-    if ($name -match '_ThrowsExit(\d+)') {
-        $n = [int]$Matches[1]
-        $members = @($ExitCodes.Keys | Where-Object { $ExitCodes[$_] -eq $n })
-        $named = ($body -match "\b$n\b") -or @($members | Where-Object { $body -match "CurlExitCode\.$_\b" }).Count
-        if (-not $named) { $found += @{ kind = 'name-lies'; detail = "name says ThrowsExit$n; the body never mentions $n$(if ($members) { ' or CurlExitCode.' + ($members -join '/') })" } }
-    }
     $x = if ($name -match '_Throws([A-Z]\w*?Exception)') { $Matches[1] }
          elseif ($name -match "_Throws(?!$joiners)([A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)?)") { $Matches[1] }
          else { $null }
-    if ($x -and $body -notmatch [regex]::Escape($x)) { $found += @{ kind = 'name-lies'; detail = "name says Throws$x; the body never mentions $x" } }
+    if ($x -and (Get-TextWithHelpers $body $Helpers) -notmatch [regex]::Escape($x)) { $found += @{ kind = 'name-lies'; detail = "name says Throws$x; the body never mentions $x" } }
     return $found
 }
 
@@ -247,12 +329,18 @@ function Invoke-Scan([string]$Tree) {
     $candidates = @(); $tests = 0; $projects = 0
     foreach ($project in @(Get-ChildItem -LiteralPath $Tree -Directory | Where-Object { $_.Name -like '*.UnitTests' -or $_.Name -like '*.IntegrationTests' } | Sort-Object Name)) {
         $projects++
+        # Every file of the project first, so a helper in another file of a partial class is known.
+        $helpers = @{}; $found = @()
         foreach ($file in @(Get-ChildItem -LiteralPath $project.FullName -Recurse -Filter '*.cs' -File | Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' })) {
-            foreach ($method in @(Get-TestMethods $file.FullName)) {
-                $tests++
-                foreach ($c in @(Get-Candidates $method $exitCodes)) {
-                    $candidates += [ordered]@{ file = $file.FullName.Substring($Tree.Length).TrimStart('\', '/') -replace '\\', '/'; line = $method.Line; test = $method.Name; kind = $c.kind; detail = $c.detail }
-                }
+            foreach ($method in @(Get-TestMethods $file.FullName $helpers)) { $found += [pscustomobject]@{ File = $file; Method = $method } }
+            foreach ($c in @(Get-CommentedOutTests $file.FullName)) {
+                $candidates += [ordered]@{ file = $file.FullName.Substring($Tree.Length).TrimStart('\', '/') -replace '\\', '/'; line = $c.Line; test = $c.Name; kind = 'commented-test'; detail = 'a [TestMethod] commented out, so the test no longer runs' }
+            }
+        }
+        foreach ($f in $found) {
+            $tests++
+            foreach ($c in @(Get-Candidates $f.Method $exitCodes $helpers)) {
+                $candidates += [ordered]@{ file = $f.File.FullName.Substring($Tree.Length).TrimStart('\', '/') -replace '\\', '/'; line = $f.Method.Line; test = $f.Method.Name; kind = $c.kind; detail = $c.detail }
             }
         }
     }
@@ -275,18 +363,23 @@ if ($SelfTest) {
         'Encode_Header_WritesTheBytes:weak-assertion',
         'Format_Count_WritesTheDigits:weak-assertion',
         'Transfer_Timeout_SetsTheCode:commented-assertion',
-        'Rewrite_EmptyPath_ReadsTheConfiguredFile:unasserted-fake-value'
+        'Rewrite_EmptyPath_ReadsTheConfiguredFile:unasserted-fake-value',
+        'Parse_DeepNesting_ExitsWithCode9:name-lies',
+        'Get_MissingPage_Returns404:name-lies',
+        'Close_Twice_IsHarmless:commented-test'
     ) | Sort-Object
     $failed = 0
     function Check([string]$Name, [bool]$Ok, [string]$Detail) { if (-not $Ok) { $script:failed++ }; Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Detail" }
     Check 'every planted kind is found, and nothing else' (($got -join '|') -eq ($want -join '|')) ($got -join ', ')
-    Check 'tests and projects are counted' ($r.testsScanned -eq 18 -and $r.projectsScanned -eq 2) "tests $($r.testsScanned), projects $($r.projectsScanned)"
+    Check 'tests and projects are counted' ($r.testsScanned -eq 25 -and $r.projectsScanned -eq 2) "tests $($r.testsScanned), projects $($r.projectsScanned)"
     $detail = { param($Test) "$(@($r.candidates | Where-Object { $_.test -eq $Test -and $_.kind -ne 'no-assertion' })[0].detail)" }
     Check 'a fake value no assertion checks is named' ((& $detail 'Rewrite_EmptyPath_ReadsTheConfiguredFile') -eq 'Assert.IsNotNull(url) is the only check of url, and no assertion checks the value the test''s fakes return: "http://127.0.0.1:9"') (& $detail 'Rewrite_EmptyPath_ReadsTheConfiguredFile')
     Check 'a weakened assertion beside a stronger one names the value only it checks' ((& $detail 'Encode_Header_WritesTheBytes') -eq 'Assert.IsNotNull(bytes) is the only check of bytes; the other assertions check other values') (& $detail 'Encode_Header_WritesTheBytes')
     Check 'an IsNotNull of a value that cannot be null says so' ((& $detail 'Format_Count_WritesTheDigits') -eq 'Assert.IsNotNull(count.ToString()) checks a value that cannot be null') (& $detail 'Format_Count_WritesTheDigits')
     Check 'a commented-out assertion is quoted' ((& $detail 'Transfer_Timeout_SetsTheCode') -eq 'commented out: Assert.AreEqual(28, code);') (& $detail 'Transfer_Timeout_SetsTheCode')
     Check 'values that can and cannot be null' ((Test-NeverNull 'Encoding.UTF8.GetString(stream.ToArray())') -and (Test-NeverNull '$"a{b}"') -and (Test-NeverNull 'string.Join(",", x)') -and (Test-NeverNull 'list.Count') -and (Test-NeverNull 'new byte[2]') -and -not (Test-NeverNull 'result') -and -not (Test-NeverNull 'map.GetValueOrDefault(k)') -and -not (Test-NeverNull 'new X().Message')) 'GetString, interpolation, Join, Count, new; not a variable, a lookup or a member of a new object'
+    Check 'a number the name states after any outcome word is checked' ((& $detail 'Parse_DeepNesting_ExitsWithCode9') -eq 'name says ExitsWithCode9; the body never mentions 9') (& $detail 'Parse_DeepNesting_ExitsWithCode9')
+    Check 'outcome numbers are read after their words, not glued to names or negated' ((@(Get-StatedNumbers 'X_Http2Sha256_ExitsWithCode9AndReturns404NotExit15' | ForEach-Object { $_.Number }) -join ',') -eq '9,404') (@(Get-StatedNumbers 'X_Http2Sha256_ExitsWithCode9AndReturns404NotExit15' | ForEach-Object { $_.Number }) -join ',')
     $line = @($r.candidates | Where-Object { $_.test -eq 'RunAsync_SaveFails_ExitsWith23' })[0]
     Check 'a candidate names its file and signature line' ($line.file -eq 'Sample.UnitTests/SampleTests.cs' -and $line.line -gt 0) "$($line.file):$($line.line)"
     exit $(if ($failed) { 1 } else { 0 })
