@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/SocketIo, Curl.Conformance.Extended.UnitTests/SocketIo, Documentation/Conformance/Extended/SocketIo.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4492 — Conformance: Engine.IO v4 and Socket.IO v5 over WebSocket for socketio:// and socketios://
 
@@ -44,21 +44,21 @@ fixed here, but a defect in the extension library is listed in `KnownFailures.tx
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/SocketIo.md` gives every requirement of Engine.IO v4, Socket.IO v5 and the
+- [x] `Documentation/Conformance/Extended/SocketIo.md` gives every requirement of Engine.IO v4, Socket.IO v5 and the
       RFC 6455 client rules relied on that binds a client a `SocketIo:` ID mapped to a test or to `n/a: <reason>`;
       the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/SocketIo/` run curl in process for `socketio://` and `socketios://`
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/SocketIo/` run curl in process for `socketio://` and `socketios://`
       and assert the upgrade request, frames, stdout, stderr and exit code for at least: the `open` packet and its
       fields, the server ping answered with pong and a missed ping timing out on the injected clock, CONNECT to the
       default and a named namespace, CONNECT_ERROR, an EVENT emitted and one received, an ACK, a DISCONNECT from the
       server, a binary event, and a message over `maxPayload`.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix SocketIo conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/SocketIo/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/SocketIo/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
@@ -66,3 +66,4 @@ fixed here, but a defect in the extension library is listed in `KnownFailures.tx
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: c277b35d 2d3da0c3 c4413a47 d8e3fb0e fcb5b1c7 ef6c9026.
+- 2026-11-02: Doing -> Done. socketio:// and socketios:// measured against Engine.IO v4, Socket.IO v5 and RFC 6455 with a full matrix; three failures filed as BL-4595 to BL-4597
