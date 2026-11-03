@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4735 — Fix AF-0571: Received_MessageLargerThan64KiB checks the CONNECT only for null, not that it announces no Maximum Packet Size
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now asserts the CONNECT's property identifiers do not contain 0x27 (Maximum Packet Size) in place of the bare null check; the reproduction finds no match. Test-only change in Curl.Conformance.Extended.UnitTests, platform-neutral; its fast tests pass (1719 passed, 1 skipped).
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Test asserts the CONNECT carries no Maximum Packet Size property; reproduction finds no match, fast tests green
