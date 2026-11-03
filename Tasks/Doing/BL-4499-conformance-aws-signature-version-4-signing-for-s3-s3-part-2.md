@@ -66,3 +66,4 @@ High task `Fix S3 conformance: <requirement>` (pipeline feature; touches the lib
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 5081addd b8b2e0a0 94856415 d8e3fb0e 3a7c1703 ef6c9026.
