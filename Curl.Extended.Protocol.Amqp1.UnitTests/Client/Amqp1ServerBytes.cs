@@ -57,9 +57,9 @@ internal static class Amqp1ServerBytes
 
     public static byte[] Closed => [.. Detach(), .. End(), .. Close()];
 
-    public static byte[] Transfer(byte[] payload, bool more = false, bool settled = false) =>
+    public static byte[] Transfer(byte[] payload, bool more = false, bool settled = false, uint handle = 0, uint? deliveryId = 3) =>
         Amqp1FrameCodec.Write(Amqp1Frame.ForPerformative(0, Amqp1Composite.Create(Amqp1CompositeType.Transfer,
-            ("handle", 0u), ("delivery-id", 3u), ("delivery-tag", new byte[] { 9 }), ("message-format", 0u), ("settled", settled), ("more", more)), payload));
+            ("handle", handle), ("delivery-id", deliveryId), ("delivery-tag", new byte[] { 9 }), ("message-format", 0u), ("settled", settled), ("more", more)), payload));
 
     public static byte[] Message(params Amqp1Section[] sections) => Amqp1MessageCodec.Write(sections);
 

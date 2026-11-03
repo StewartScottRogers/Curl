@@ -187,11 +187,16 @@ internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITra
         await channel.SendAsync(Frame(Amqp1CompositeType.Flow,
             ("next-incoming-id", nextIncomingId), ("incoming-window", SessionWindow), ("next-outgoing-id", 0u),
             ("outgoing-window", SessionWindow), ("handle", Handle), ("delivery-count", 0u), ("link-credit", 1u))).ConfigureAwait(false);
-        var (first, payload) = await ReceiveAsync(Amqp1CompositeType.Transfer).ConfigureAwait(false);
+        var (first, payload) = await ReceiveTransferAsync().ConfigureAwait(false);
         List<ReadOnlyMemory<byte>> payloads = [payload];
         for (var transfer = first; true.Equals(transfer["more"]);)
         {
-            (transfer, payload) = await ReceiveAsync(Amqp1CompositeType.Transfer).ConfigureAwait(false);
+            (transfer, payload) = await ReceiveTransferAsync().ConfigureAwait(false);
+            if (transfer["delivery-id"] is { } deliveryId && !deliveryId.Equals(first["delivery-id"]))
+            {
+                throw Amqp1ClientMessages.DeliveryIdChanged(first["delivery-id"], deliveryId);
+            }
+
             payloads.Add(payload);
         }
 
@@ -205,6 +210,23 @@ internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITra
         {
             await WriteSectionAsync(section).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// The next transfer, which must be on the one handle the flow attached: a transfer on any other handle ends the
+    /// session with error amqp:session:unattached-handle (Part 2 sections 2.7.5 and 2.8.16) and fails the transfer.
+    /// </summary>
+    private async ValueTask<(Amqp1Composite Performative, ReadOnlyMemory<byte> Payload)> ReceiveTransferAsync()
+    {
+        var (transfer, payload) = await ReceiveAsync(Amqp1CompositeType.Transfer).ConfigureAwait(false);
+        if (!Handle.Equals(transfer["handle"]))
+        {
+            await channel.SendAsync(Frame(Amqp1CompositeType.End, ("error", Amqp1Composite.Create(Amqp1CompositeType.Error,
+                ("condition", new Amqp1Symbol(Amqp1ClientMessages.UnattachedHandleCondition))).ToDescribed()))).ConfigureAwait(false);
+            throw Amqp1ClientMessages.UnattachedHandle(transfer["handle"]);
+        }
+
+        return (transfer, payload);
     }
 
     private async ValueTask WriteSectionAsync(Amqp1Section section)

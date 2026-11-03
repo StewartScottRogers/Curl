@@ -30,6 +30,20 @@ internal static class Amqp1ClientMessages
     internal static Amqp1ClientException Unexpected(Amqp1CompositeType actual, Amqp1CompositeType expected) =>
         new(CurlExitCode.WeirdServerReply, $"Weird server reply: AMQP 1.0 {actual} where {expected} was expected");
 
+    /// <summary>The session error condition for a frame on a handle the endpoint never attached (Part 2 section 2.8.16).</summary>
+    internal const string UnattachedHandleCondition = "amqp:session:unattached-handle";
+
+    /// <summary>The peer sent a transfer on <paramref name="handle"/>, which the flow never attached: a weird server reply.</summary>
+    internal static Amqp1ClientException UnattachedHandle(object? handle) =>
+        new(CurlExitCode.WeirdServerReply, $"Weird server reply: AMQP 1.0 transfer on unattached handle {handle}");
+
+    /// <summary>
+    /// A continuation transfer carried delivery-id <paramref name="changed"/> where the delivery's first transfer
+    /// carried <paramref name="first"/> (Part 2 section 2.7.5): a weird server reply.
+    /// </summary>
+    internal static Amqp1ClientException DeliveryIdChanged(object? first, object changed) =>
+        new(CurlExitCode.WeirdServerReply, $"Weird server reply: AMQP 1.0 continuation transfer changed delivery-id {first} to {changed}");
+
     /// <summary>The peer does not offer <paramref name="mechanism"/>: login denied.</summary>
     internal static Amqp1ClientException MechanismNotOffered(Amqp1Symbol mechanism) =>
         new(CurlExitCode.LoginDenied, $"AMQP 1.0 server does not offer the SASL {mechanism.Value} mechanism");

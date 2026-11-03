@@ -85,6 +85,51 @@ public sealed class Amqp1ClientFlowTests
     }
 
     [TestMethod]
+    public async Task RunAsync_NoBodyTransferOnUnattachedHandle_EndsTheSessionWithUnattachedHandleAndWritesNothing_Part2Section2_7_5()
+    {
+        MemoryStream output = new();
+        ScriptedAmqp1Connection connection = new([.. Authenticated, .. Opened(false), .. Transfer(DataMessage("hello"), handle: 7)]);
+
+        var failure = await RunAsync(connection, output);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure!.ExitCode);
+        Assert.AreEqual("Weird server reply: AMQP 1.0 transfer on unattached handle 7", failure.Message);
+        Assert.AreEqual(0, output.Length);
+        Assert.AreEqual("header,sasl-init,header,open,begin,attach,flow,end", Names(connection));
+        var error = Amqp1Composite.Read(Written(connection)[^1].Performative!["error"]);
+        Assert.AreEqual(Amqp1CompositeType.Error, error.Type);
+        Assert.AreEqual(new Amqp1Symbol("amqp:session:unattached-handle"), error["condition"]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NoBodyContinuationChangesTheDeliveryId_FailsWithWeirdServerReplyAndWritesNothing_Part2Section2_7_5()
+    {
+        var message = DataMessage("hello");
+        MemoryStream output = new();
+        ScriptedAmqp1Connection connection = new([
+            .. Authenticated, .. Opened(false), .. Transfer(message[..4], more: true, deliveryId: 0), .. Transfer(message[4..], deliveryId: 1)]);
+
+        var failure = await RunAsync(connection, output);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure!.ExitCode);
+        Assert.AreEqual("Weird server reply: AMQP 1.0 continuation transfer changed delivery-id 0 to 1", failure.Message);
+        Assert.AreEqual(0, output.Length);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NoBodyContinuationOmitsTheDeliveryId_WritesTheMessage_Part2Section2_7_5()
+    {
+        var message = DataMessage("hello");
+        MemoryStream output = new();
+        ScriptedAmqp1Connection connection = new([
+            .. Authenticated, .. Opened(false), .. Transfer(message[..4], more: true), .. Transfer(message[4..], deliveryId: null), .. Closed]);
+
+        Assert.IsNull(await RunAsync(connection, output));
+
+        Assert.AreEqual("hello", Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
     public async Task RunAsync_NoBodyPresettledValueAndSequence_WritesTheirBodiesAndSendsNoDisposition_Part3Section3_2()
     {
         var message = Message(
