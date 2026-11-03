@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Conformance/Extended/CurlSurface-Transfer.md]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4670 — Split Documentation/Conformance/Extended/CurlSurface-Transfer.md so tasks touching it can run in parallel
 
@@ -36,3 +36,4 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 479e898e 09e557e8 a0b49a29.
+- 2026-11-03: Doing -> Done. Old CurlSurface-Transfer.md already split; narrowed BL-4618 and BL-4646 touches, hotspot count 0
