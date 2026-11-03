@@ -40,6 +40,45 @@ public sealed class DnsUdpTransportTests
     }
 
     [TestMethod]
+    public async Task ExchangeAsync_ResponsesWithAnotherQuestion_AreIgnoredAndTheMatchingOneTaken()
+    {
+        // RFC 5452 section 9.1: only a response whose question is the query's is accepted.
+        byte[] otherName = ResponseWithQuestion("example.net", 1, 1);
+        byte[] otherType = ResponseWithQuestion("example.com", 28, 1);
+        byte[] otherClass = ResponseWithQuestion("example.com", 1, 3);
+        byte[] cutShort = [.. Answer[..20]];
+        var server = new ScriptedDnsServer((_, _) => [otherName, otherType, otherClass, cutShort, Answer], []);
+
+        byte[] answer = await new DnsUdpTransport(server, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider()));
+
+        CollectionAssert.AreEqual(Answer, answer);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_ResponseWhoseQuestionDiffersOnlyInCase_IsTaken()
+    {
+        // RFC 5452 section 9.1: QNAME is compared without regard to ASCII case.
+        byte[] mixedCase = ResponseWithQuestion("ExAmPlE.CoM", 1, 1);
+        var server = new ScriptedDnsServer((_, _) => [mixedCase], []);
+
+        byte[] answer = await new DnsUdpTransport(server, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider()));
+
+        CollectionAssert.AreEqual(mixedCase, answer);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_ResponseWithNoQuestionSection_IsTaken()
+    {
+        // ADR-1225: as dig, a response with no question (a FORMERR, say) is checked by its ID alone.
+        byte[] noQuestion = new DnsWire().Header(0x1234, 0x8181, 0, 0, 0, 0).ToArray();
+        var server = new ScriptedDnsServer((_, _) => [noQuestion], []);
+
+        byte[] answer = await new DnsUdpTransport(server, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider()));
+
+        CollectionAssert.AreEqual(noQuestion, answer);
+    }
+
+    [TestMethod]
     public async Task ExchangeAsync_FirstQueryUnanswered_SendsItAgain()
     {
         var server = new ScriptedDnsServer((send, _) => send == 2 ? [Answer] : [], []);
@@ -141,6 +180,9 @@ public sealed class DnsUdpTransportTests
         CollectionAssert.AreEqual(Answer, answer);
         Assert.IsNull(events.Opened);
     }
+
+    private static byte[] ResponseWithQuestion(string name, int type, int recordClass) =>
+        new DnsWire().Header(0x1234, 0x8180, 1, 0, 0, 0).Question(DnsWire.Name(name), type, recordClass).ToArray();
 
     private static TransferContext ContextOf(TimeProvider clock, CancellationToken cancellationToken = default, ITransferEvents? events = null) =>
         new() { Url = CurlUrl.Parse("dns://h/example.com"), Output = new MemoryStream(), TimeProvider = clock, CancellationToken = cancellationToken, Events = events ?? NoTransferEvents.Instance };

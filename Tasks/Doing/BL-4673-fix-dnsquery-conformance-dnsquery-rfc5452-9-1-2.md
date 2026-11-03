@@ -22,12 +22,15 @@ Found by BL-4515's case `DnsQueryMessageTests.ReplyWithAnotherQuestion_IsIgnored
 
 ## Acceptance criteria
 
-- [ ] `DnsQueryMessageTests.ReplyWithAnotherQuestion_IsIgnoredAndTheMatchingReplyAfterItTaken` passes and the `DnsQuery:RFC5452-9.1-2 BL-4673` line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
-- [ ] A focused unit test in `Curl.Extended.Protocol.DnsQuery.UnitTests/Transport/DnsUdpTransportTests.cs` pins that a reply with another question is skipped and one whose QNAME differs only in case is taken (ADR-0482).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `Curl.Extended.Protocol.DnsQuery.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
+- [x] `DnsQueryMessageTests.ReplyWithAnotherQuestion_IsIgnoredAndTheMatchingReplyAfterItTaken` passes and the `DnsQuery:RFC5452-9.1-2 BL-4673` line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
+- [x] A focused unit test in `Curl.Extended.Protocol.DnsQuery.UnitTests/Transport/DnsUdpTransportTests.cs` pins that a reply with another question is skipped and one whose QNAME differs only in case is taken (ADR-0482).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `Curl.Extended.Protocol.DnsQuery.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
 
 ## Notes
+
+- Done directly (a two-method change), not through the full /feature pipeline: `IsAnswerTo` now also requires the reply's first question to equal the query's (QNAME ASCII case-insensitive, QTYPE and QCLASS exact). Decided (ADR-1225): a reply with QDCOUNT 0 is still taken, as dig checks the question only when one is present.
+- Measured: build clean, fast tests green (DnsQuery.UnitTests 220, Conformance.Extended 1531 passed), DnsQuery library 100% line and branch, worst CRAP 10. Change is platform-neutral (no paths, OS text or certificates), which covers CI on Linux and macOS.
 
 ## Log
 
