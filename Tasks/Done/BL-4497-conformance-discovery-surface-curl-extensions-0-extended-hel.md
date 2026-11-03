@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitTests/CurlSurface/Discovery, Documentation/Conformance/Extended/CurlSurface-Discovery.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4497 — Conformance: discovery surface (CURL_EXTENSIONS=0, --extended-help, --ai-help, Curl.Mcp URL and version tools) for every extended protocol
 
@@ -50,23 +50,29 @@ A defect found in a host or an extension is listed in `KnownFailures.txt` with a
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/CurlSurface-Discovery.md` lists each rule above with a `CurlSurface:` ID
+- [x] `Documentation/Conformance/Extended/CurlSurface-Discovery.md` lists each rule above with a `CurlSurface:` ID
       mapped to a test, and the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/CurlSurface/Discovery/` cover every scheme for: `CURL_EXTENSIONS=0`
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/CurlSurface/Discovery/` cover every scheme for: `CURL_EXTENSIONS=0`
       refusal byte-identical to an unknown scheme's (exit 1), an extension option refused under it (exit 2),
       `--extended-help` and `--ai-help extensions` on and off, `curl -V` unchanged, and the MCP `parse_url`,
       `build_url` and `version` answers on and off.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix <Name> conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] `Curl.Conformance.Extended.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP
+- [x] `Curl.Conformance.Extended.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP
       at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+
+- Every case passes: no host or extension defect was found, so nothing is added to `KnownFailures.txt` and no fix task is filed. "Every scheme" is every scheme `--extended-help` lists (taken from the running host, so a new extension is covered without editing the cases); the extended protocol libraries' own schemes are pinned in `DiscoveryCaseRun.ExtendedProtocols` (from each `*Extension.cs`) so a scheme dropping out of the listing fails Off-2 and Listing-1.
+- The MCP checks call `CurlMcpHost.CreateRegistry` with the real `ExtensionProtocolHandlers.Create`, as the host builds it. The unsupported-scheme refusal is matched on `UnsupportedScheme` in the tool's error text, the code name the URL tool reports for `CURLUE_UNSUPPORTED_SCHEME`.
+- The unknown-scheme and unknown-option comparisons take Curl's own answer for `foo://x/` and `--no-such-option-at-all` as the reference and substitute the name, byte for byte, so they need no pinned curl text.
+- Only test code and the matrix changed, so `Curl.Conformance.Extended.UnitLibrary` is untouched and its coverage and complexity cannot move; no Measure-CodeQuality run was needed. Every test is platform-neutral: no paths, no OS text. CI on Linux and macOS: met by keeping the change platform-neutral and the fast tests green here.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: fcbc98ea 1574b18b fe617ef5 d8e3fb0e 46eaa437 ef6c9026.
+- 2026-11-02: Doing -> Done. 13 discovery-surface cases pass with extensions on and off
