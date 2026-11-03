@@ -13,3 +13,5 @@ WebTransport:WTH3-6-1 BL-4623
 WebTransport:WTH3-6-3 BL-4623
 WebTransport:RFC9297-3.2-1 BL-4623
 WebTransport:WTH3-6-2 BL-4624
+CurlSurface:Verbose-Redis-1 BL-4645
+CurlSurface:Verbose-Rediss-1 BL-4645
