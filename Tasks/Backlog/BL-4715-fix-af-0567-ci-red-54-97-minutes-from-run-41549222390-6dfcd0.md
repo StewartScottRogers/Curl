@@ -47,7 +47,11 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Notes
 
+- Fix: 3edbb1559, pushed to work/dark-factory 2026-11-03 10:44:04 Arizona (17:44:04Z). A shift start no longer refuses over an orphan whose work cannot be told apart (the refusals at 17:25 and 17:40 on 2026-11-02 that kept the CI watch off until 17:54): it moves the task to Blocked and starts, after copying every lane branch ahead of the shift branch to a parked `factory/<ID>-lane-<n>-<stamp>` branch; the Blocked reason names the copies and the dirty lanes whose work each starting lane stashes (`Get-OrphanBlockReason` in DarkFactory/Park.ps1, called from DarkFactory/ShiftCoordinator.ps1). With 7ecfdd99f and BL-4650's 3a15c59d1, fewer tasks reach that state at all. `-TestPark`: 22/22 PASS under Windows PowerShell 5.1 and pwsh 7.
+- Evidence still owed: the window starts at 2026-11-03T17:44:04Z and needs shift logs and CI runs written after it, so the task waits in Backlog for an interactive session to run the measurement.
+
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-03: Doing -> Backlog. Fix landed (3edbb1559 at 2026-11-03 10:44 Arizona); the post-fix measurement needs shift logs written after it, so it waits in Backlog per its criterion.
