@@ -5,11 +5,6 @@ Coap:RFC6347-4.1-3 BL-4685
 
 Grpc:ProtoJson-Any-1 BL-4720
 Grpc:ProtoJson-Any-2 BL-4720
-Grpc:ProtoJson-Struct-1 BL-4719
-Grpc:ProtoJson-Struct-2 BL-4719
-Grpc:ProtoJson-Wrappers-1 BL-4719
-Grpc:ProtoJson-Wrappers-2 BL-4719
-Grpc:ProtoJson-FieldMask-1 BL-4719
 DnsQuery:RFC9250-5.4-1 BL-4719
 DnsQuery:RFC9250-4.1.1-2 BL-4720
 Grpc:ProtoJson-Struct-1 BL-4721
