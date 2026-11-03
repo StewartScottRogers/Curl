@@ -44,6 +44,22 @@ public sealed class RedisProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("subscribe", ">3\r\n$9\r\nsubscribe\r\n$4\r\nchan\r\n:1\r\n")]
+    [DataRow("SUBSCRIBE", ">3\r\n$9\r\nsubscribe\r\n$4\r\nchan\r\n:1\r\n")]
+    [DataRow("subscribe", ">2\r\n$7\r\nmessage\r\n$1\r\nx\r\n>0\r\n>3\r\n$9\r\nsubscribe\r\n$4\r\nchan\r\n:1\r\n")]
+    public async Task ExecuteAsync_SubscribeAnsweredByAPush_WritesTheConfirmation(string command, string push)
+    {
+        ScriptedRedisConnection connection = ScriptedRedisConnection.Replaying(HelloReply, push);
+        MemoryStream output = new();
+
+        TransferResult result = await ExecuteAsync(connection, $"redis://cache/{command}/chan", output);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsTrue(output.Length > 0);
+        StringAssert.Contains(Encoding.UTF8.GetString(output.ToArray()), "chan");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_DatabaseInThePath_SelectsItBeforeTheCommand()
     {
         ScriptedRedisConnection connection = ScriptedRedisConnection.Replaying(HelloReply, "+OK\r\n", ":1\r\n");

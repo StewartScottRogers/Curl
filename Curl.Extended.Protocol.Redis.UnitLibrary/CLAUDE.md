@@ -13,7 +13,9 @@ the base class library. The handler is registered by one line in `ExtensionCatal
 - `RedisUrlCommand` reads the URL path `/[db]/command/argument/...`; `-d` appends one more argument.
 - `RedisClientFlow` runs `HELLO 3` (with `AUTH` from `--user` or the URL), `SELECT` when the path names a database,
   then the command, writing its reply; a server that refuses `HELLO` (not with `NOAUTH` or `WRONGPASS`) is spoken to
-  in RESP2, with `AUTH` first when there are credentials (ADR-1208). `RedisClientMessages` holds the error texts and `RedisClientException` carries
+  in RESP2, with `AUTH` first when there are credentials (ADR-1208). Push frames before a reply are dropped, except that
+  the push whose first element names a `SUBSCRIBE`, `PSUBSCRIBE`, `SSUBSCRIBE`, `UNSUBSCRIBE`, `PUNSUBSCRIBE` or
+  `SUNSUBSCRIBE` command is that command's reply (BL-4679). `RedisClientMessages` holds the error texts and `RedisClientException` carries
   the exit code.
 
 `Wire/` (namespace `Curl.Extended.Protocol.Redis.Wire`):

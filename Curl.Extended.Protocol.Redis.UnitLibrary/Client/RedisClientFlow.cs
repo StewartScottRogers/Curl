@@ -16,6 +16,10 @@ internal sealed class RedisClientFlow(IConnection transport, Stream output, ITra
     /// <summary>The user name <c>HELLO</c>'s <c>AUTH</c> sends when only a password is given, as <c>AUTH password</c> means.</summary>
     internal const string DefaultUserName = "default";
 
+    private static readonly HashSet<string> PushAnsweredCommands = new(
+        ["SUBSCRIBE", "PSUBSCRIBE", "SSUBSCRIBE", "UNSUBSCRIBE", "PUNSUBSCRIBE", "SUNSUBSCRIBE"],
+        StringComparer.OrdinalIgnoreCase);
+
     private readonly RespReplyReader reader = new(transport, cancellationToken);
 
     /// <summary>The bytes written to the output so far.</summary>
@@ -95,24 +99,32 @@ internal sealed class RedisClientFlow(IConnection transport, Stream output, ITra
             throw new RedisClientException(CurlExitCode.SendError, RedisClientMessages.SendFailed(command));
         }
 
-        return await ReceiveAsync().ConfigureAwait(false);
+        return await ReceiveAsync(command).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Reads the command's reply, dropping every push frame before it: pushes are out of band and never a
-    /// command's reply (RESP3 "Push type", BL-4600).
+    /// command's reply (RESP3 "Push type", BL-4600). The one exception: after <c>HELLO 3</c> the server answers
+    /// <c>SUBSCRIBE</c>, <c>PSUBSCRIBE</c>, <c>SSUBSCRIBE</c>, <c>UNSUBSCRIBE</c>, <c>PUNSUBSCRIBE</c> and
+    /// <c>SUNSUBSCRIBE</c> only with a push frame whose first element names the command, and that frame is the
+    /// reply (BL-4679).
     /// </summary>
-    private async ValueTask<RespReply> ReceiveAsync()
+    private async ValueTask<RespReply> ReceiveAsync(string command)
     {
         RespReply reply;
         do
         {
             reply = await ReceiveFrameAsync().ConfigureAwait(false);
         }
-        while (reply.Kind == RespReplyKind.Push);
+        while (reply.Kind == RespReplyKind.Push && !IsPushReplyTo(reply, command));
 
         return reply;
     }
+
+    private static bool IsPushReplyTo(RespReply push, string command) =>
+        PushAnsweredCommands.Contains(command)
+        && push.Elements.Count > 0
+        && string.Equals(push.Elements[0].Text, command, StringComparison.OrdinalIgnoreCase);
 
     private async ValueTask<RespReply> ReceiveFrameAsync()
     {
