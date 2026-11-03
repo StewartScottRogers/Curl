@@ -44,9 +44,12 @@ internal sealed class StompClientFlow(IConnection transport, Stream output, ITra
         await WriteMessagesUntilClosedAsync().ConfigureAwait(false);
     }
 
-    /// <summary>Gives the <c>SEND</c> frame for <paramref name="body"/>, with its <c>content-length</c> so the body may hold NUL.</summary>
+    /// <summary>The <c>content-type</c> every <c>SEND</c> frame carries (ADR-1209): the body is bytes as given, of no declared type.</summary>
+    internal const string SendContentType = "application/octet-stream";
+
+    /// <summary>Gives the <c>SEND</c> frame for <paramref name="body"/>, with its <c>content-length</c> so the body may hold NUL, and its <c>content-type</c>.</summary>
     internal static StompFrame SendFrame(string destination, ReadOnlyMemory<byte> body) =>
-        new("SEND", [new("destination", destination), new("content-length", body.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))], body.ToArray());
+        new("SEND", [new("destination", destination), new("content-length", body.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)), new("content-type", SendContentType)], body.ToArray());
 
     private async ValueTask SendAsync(StompFrame frame)
     {

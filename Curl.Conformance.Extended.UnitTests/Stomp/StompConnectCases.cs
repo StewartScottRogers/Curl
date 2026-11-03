@@ -24,7 +24,7 @@ public sealed class StompConnectCases
         CurlRunResult result = await StompRun.RunAsync(StompRun.PublishAnswered(), "-d", "hi", "stomp://localhost/q");
 
         StompRun.AssertExit(result, 0, string.Empty);
-        Assert.AreEqual(StompRun.PlainConnect + "SEND\ndestination:/q\ncontent-length:2\n\nhi\0" + StompRun.Disconnect, StompRun.ClientText(result));
+        Assert.AreEqual(StompRun.PlainConnect + "SEND\ndestination:/q\ncontent-length:2\ncontent-type:application/octet-stream\n\nhi\0" + StompRun.Disconnect, StompRun.ClientText(result));
     }
 
     [TestMethod]
@@ -112,6 +112,6 @@ public sealed class StompConnectCases
         CurlRunResult result = await StompRun.RunTlsAsync(StompRun.PublishAnswered(), "-d", "hi", "stomps://localhost/q");
 
         StompRun.AssertExit(result, 0, string.Empty);
-        Assert.AreEqual(StompRun.PlainConnect + "SEND\ndestination:/q\ncontent-length:2\n\nhi\0" + StompRun.Disconnect, StompRun.ClientText(result));
+        Assert.AreEqual(StompRun.PlainConnect + "SEND\ndestination:/q\ncontent-length:2\ncontent-type:application/octet-stream\n\nhi\0" + StompRun.Disconnect, StompRun.ClientText(result));
     }
 }

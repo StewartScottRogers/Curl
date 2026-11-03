@@ -23,7 +23,7 @@ public sealed class StompSendCases
             CurlRunResult result = await StompRun.RunAsync(StompRun.PublishAnswered(), "--data-binary", "@" + body, "stomp://localhost/q");
 
             StompRun.AssertExit(result, 0, string.Empty);
-            StringAssert.Contains(StompRun.ClientText(result), "SEND\ndestination:/q\ncontent-length:3\n\na\0b\0" + StompRun.Disconnect);
+            StringAssert.Contains(StompRun.ClientText(result), "SEND\ndestination:/q\ncontent-length:3\ncontent-type:application/octet-stream\n\na\0b\0" + StompRun.Disconnect);
         }
         finally
         {
@@ -38,7 +38,7 @@ public sealed class StompSendCases
         CurlRunResult result = await StompRun.RunAsync(StompRun.PublishAnswered(), "-d", "hi", "stomp://localhost/a%3Ab%5Cc");
 
         StompRun.AssertExit(result, 0, string.Empty);
-        StringAssert.Contains(StompRun.ClientText(result), "SEND\ndestination:/a\\cb\\\\c\ncontent-length:2\n\n");
+        StringAssert.Contains(StompRun.ClientText(result), "SEND\ndestination:/a\\cb\\\\c\ncontent-length:2\ncontent-type:application/octet-stream\n\n");
     }
 
     [TestMethod]

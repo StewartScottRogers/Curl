@@ -22,7 +22,7 @@ public sealed class StompProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
-            new[] { ConnectFrame, "SEND\ndestination:/queue/a\ncontent-length:2\n\nhi\0", "DISCONNECT\nreceipt:disconnect\n\n\0" },
+            new[] { ConnectFrame, "SEND\ndestination:/queue/a\ncontent-length:2\ncontent-type:application/octet-stream\n\nhi\0", "DISCONNECT\nreceipt:disconnect\n\n\0" },
             connection.WrittenText.ToArray());
         Assert.IsTrue(connection.IsDisposed);
     }
