@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4
 touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls-Remaining.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-03
 ---
 # BL-4575 — Conformance: DTLS 1.2 and RFC 7252 section 9.1 requirement matrix for coaps:// (Coap DTLS part 3 of 3)
 
@@ -50,22 +50,29 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Coap-Dtls-Remaining.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 6347
+- [x] `Documentation/Conformance/Extended/Coap-Dtls-Remaining.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 6347
       (and the RFC 5246 handshake rules it inherits) and RFC 7252 section 9.1 that binds a client an `Coap:` ID mapped
       to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Every requirement the cases of BL-4573 and BL-4574 do not yet cover gets its own case in
+- [x] Every requirement the cases of BL-4573 and BL-4574 do not yet cover gets its own case in
       `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` (for example the `coaps` default port 5684) or an `n/a` reason.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Coap conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
 
 ## Notes
+
+- Matrix `Coap-Dtls-Remaining.md` has 40 rows: the client requirements of RFC 6347, the RFC 5246 handshake and RFC 7252 section 9.1 that `Coap-Dtls-Handshake.md` and `Coap-Dtls-Faults.md` do not hold; server-only rules and features curl does not offer (PSK, raw public keys, renegotiation, resumption, client certificates; ADR-1078) are `n/a` with their reason.
+- New cases: `CoapDtlsClientHelloTests` (second ClientHello repeats the first, DTLS 1.2 version, null compression, message_seq numbering and the ChangeCipherSpec byte), `CoapDtlsInvalidRecordTests` (a record with a bad tag is dropped silently), `CoapDtlsFinishedTests` (a wrong server Finished ends with exit 35 and no request), `CoapDtlsServerKeyExchangeTests` (a wrong ServerKeyExchange signature ends with exit 35 before the ClientKeyExchange). New server faults `DtlsReferenceCorruptRecordFault`, `DtlsReferenceWrongFinishedFault`, `DtlsReferenceWrongSignatureFault`, on two new `DtlsReferenceFault` hooks (`ServerFinishedVerifyData`, `ServerKeyExchangeSignature`). `CoapDtlsHandshakeTests.FullHandshake_...` now also carries RFC6347-4.2.6-1, RFC5246-7.4.7-1 and RFC5246-7.4.9-2, which its existing asserts (record order, the server checking the client Finished) already prove.
+- Every new case passes, so `KnownFailures.txt` is unchanged.
+- Choice: RFC 6347 section 4.2.4 timer values (1 s initial, doubling) are `n/a`, because the harness clock jumps to the next timer whatever its due time, so the wire shows only that the timer fired.
+- Checks: `dotnet build Curl.slnx -warnaserror` clean; fast tests green (Curl.Conformance.Extended.UnitTests 1704 passed, 1 skipped); `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary`: 0 failing members. All tests are pure in-memory datagram exchanges with no paths or OS text, so they are platform-neutral.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 0a41ffcb 4ba2aa1f fb1c989b d8e3fb0e f055b099 17248609.
+- 2026-11-03: Doing -> Done. coaps:// DTLS 1.2 requirement matrix complete, with ClientHello, invalid record, Finished and ServerKeyExchange cases
