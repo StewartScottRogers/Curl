@@ -134,7 +134,7 @@ public sealed class Http3ServerTlsHandshake(Http3ServerTlsSettings settings, ITl
         TlsDecodeResult<ClientHello> decoded = ClientHello.Decode(message.Body);
         Http3ServerClientOffer.Require(decoded.Succeeded, decoded.Alert.GetValueOrDefault());
         ClientHello hello = decoded.Value;
-        Http3ServerClientOffer offer = Http3ServerClientOffer.Parse(hello);
+        Http3ServerClientOffer offer = Http3ServerClientOffer.Parse(hello, settings.ApplicationProtocol);
         Tls13CipherSuite suite = settings.CipherSuites
             .Where(hello.CipherSuites.Contains)
             .Select(Tls13CipherSuite.Find)
@@ -235,7 +235,7 @@ public sealed class Http3ServerTlsHandshake(Http3ServerTlsSettings settings, ITl
     {
         byte[] encryptedExtensions = new EncryptedExtensions(
         [
-            ApplicationLayerProtocolNegotiationExtension.Encode([Http3ServerTlsSettings.ApplicationProtocol]),
+            ApplicationLayerProtocolNegotiationExtension.Encode([settings.ApplicationProtocol]),
             QuicTransportParametersExtension.Encode(settings.QuicTransportParameters),
         ]).Encode();
         transcript!.Append(encryptedExtensions);

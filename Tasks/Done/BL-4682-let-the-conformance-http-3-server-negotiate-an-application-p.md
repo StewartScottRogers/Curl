@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Http3Server.UnitLibrary/Http3ServerTlsSettings.cs, Curl.Conformance.Http3Server.UnitLibrary/Http3ServerClientOffer.cs, Curl.Conformance.Http3Server.UnitLibrary/Http3ServerTlsHandshake.cs, Curl.Conformance.Http3Server.UnitTests/Http3ServerTlsHandshakeTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4682 — Let the conformance HTTP/3 server negotiate an application protocol other than h3 (for DoQ's doq)
 
@@ -28,20 +28,22 @@ Every other reader of the const (`grep -rn "Http3ServerTlsSettings.ApplicationPr
 
 ## Acceptance criteria
 
-- [ ] `Http3ServerTlsSettings` takes the application protocol to negotiate, defaulting to `h3`; the client offer check
+- [x] `Http3ServerTlsSettings` takes the application protocol to negotiate, defaulting to `h3`; the client offer check
       and EncryptedExtensions use the configured value.
-- [ ] A test in `Curl.Conformance.Http3Server.UnitTests` completes a handshake with a client offering only `doq`
+- [x] A test in `Curl.Conformance.Http3Server.UnitTests` completes a handshake with a client offering only `doq`
       against settings configured with `doq`, and another shows a client offering only `h3` is refused with
       `no_application_protocol` by such settings.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `Curl.Conformance.Http3Server.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `Curl.Conformance.Http3Server.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and
       CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
 
 ## Notes
 
 - Filed by BL-4474's split (2026-11-03).
+- `Http3ServerTlsSettings.ApplicationProtocol` is now an `init` property (default `DefaultApplicationProtocol` = "h3"); `Http3ServerClientOffer.Parse` takes the protocol. Quality run: 0 failing members. Windows-only run; change is platform-neutral.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b8557455 54f47c96 914c30cc 9541d988.
+- 2026-11-03: Doing -> Done. Http3ServerTlsSettings.ApplicationProtocol configurable, tests and quality green
