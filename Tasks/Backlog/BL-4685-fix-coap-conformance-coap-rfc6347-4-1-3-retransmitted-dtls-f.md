@@ -1,5 +1,5 @@
 ---
-id: BL-4675
+id: BL-4685
 title: Fix Coap conformance: Coap:RFC6347-4.1-3 retransmitted DTLS flight under new record sequence numbers
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4675 — Fix Coap conformance: Coap:RFC6347-4.1-3 retransmitted DTLS flight under new record sequence numbers
+# BL-4685 — Fix Coap conformance: Coap:RFC6347-4.1-3 retransmitted DTLS flight under new record sequence numbers
 
 ## Goal
 

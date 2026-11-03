@@ -1,5 +1,5 @@
 ---
-id: BL-4674
+id: BL-4684
 title: Fix Coap conformance: Coap:RFC6347-4.2.7-1 fatal alert ends the DTLS handshake
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4674 — Fix Coap conformance: Coap:RFC6347-4.2.7-1 fatal alert ends the DTLS handshake
+# BL-4684 — Fix Coap conformance: Coap:RFC6347-4.2.7-1 fatal alert ends the DTLS handshake
 
 ## Goal
 
