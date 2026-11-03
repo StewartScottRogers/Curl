@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Smb.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4773 — Fix AF-0609: SmbReadResponse.TryGetData is named Try... but returns string? (null on success, error text on failure), not bool
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Renamed SmbReadResponse.TryGetData to ReadDataOrRefusal (it returns the refusal text, null on success); caller and tests updated. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Renamed TryGetData to ReadDataOrRefusal; build and fast tests green

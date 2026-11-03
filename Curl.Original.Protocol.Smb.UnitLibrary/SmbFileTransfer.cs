@@ -137,7 +137,7 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
                 return (ReceiveFailure(reply) with { BytesTransferred = offset }, true);
             }
 
-            if (SmbReadResponse.TryGetData(read, out ReadOnlyMemory<byte> data) is { } refused)
+            if (SmbReadResponse.ReadDataOrRefusal(read, out ReadOnlyMemory<byte> data) is { } refused)
             {
                 return (TransferResult.Failure(CurlExitCode.RecvError, refused, offset), false);
             }
