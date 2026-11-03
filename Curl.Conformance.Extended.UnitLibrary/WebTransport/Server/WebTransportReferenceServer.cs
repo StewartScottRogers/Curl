@@ -145,7 +145,7 @@ public sealed class WebTransportReferenceServer(Http3ServerTlsSettings tlsSettin
         List<Http3Setting> settings = [];
         settings.AddRange(script.SendEnableConnectProtocol ? [new Http3Setting(Http3SettingIdentifier.EnableConnectProtocol, 1)] : []);
         settings.AddRange(script.SendH3Datagram ? [new Http3Setting(Http3SettingIdentifier.H3Datagram, 1)] : []);
-        settings.AddRange(script.MaxSessions is { } maximum ? [new Http3Setting(WebTransportCodepoints.MaxSessionsSetting, maximum)] : []);
+        settings.AddRange(script.WebTransportEnabled is { } enabled ? [new Http3Setting(WebTransportCodepoints.EnabledSetting, enabled)] : []);
         connection.Write(connection.OpenUnidirectionalStream(), [(byte)Http3UnidirectionalStreamType.Control, .. new Http3SettingsFrame(settings).ToBytes()], endStream: false);
     }
 

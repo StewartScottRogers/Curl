@@ -9,8 +9,8 @@ public sealed record WebTransportServerScript
     /// <summary>Gets a value indicating whether SETTINGS carries SETTINGS_H3_DATAGRAM = 1.</summary>
     public bool SendH3Datagram { get; init; } = true;
 
-    /// <summary>Gets the SETTINGS_WT_MAX_SESSIONS value to send, or null to leave the setting out.</summary>
-    public long? MaxSessions { get; init; } = 1;
+    /// <summary>Gets the SETTINGS_WT_ENABLED value to send, or null to leave the setting out.</summary>
+    public long? WebTransportEnabled { get; init; } = 1;
 
     /// <summary>Gets the <c>:status</c> of the CONNECT response; a status outside 2xx ends the stream.</summary>
     public string ConnectStatus { get; init; } = "200";

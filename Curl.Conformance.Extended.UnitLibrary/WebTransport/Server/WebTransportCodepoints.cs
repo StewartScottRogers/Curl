@@ -12,6 +12,6 @@ public static class WebTransportCodepoints
     /// <summary>The type of the WT_CLOSE_SESSION capsule.</summary>
     public const long CloseSessionCapsule = 0x2843;
 
-    /// <summary>The identifier of SETTINGS_WT_MAX_SESSIONS.</summary>
-    public const long MaxSessionsSetting = 0x14e9cd29;
+    /// <summary>The identifier of SETTINGS_WT_ENABLED (section 9.2), whose value 1 offers WebTransport.</summary>
+    public const long EnabledSetting = 0x2c7cf000;
 }

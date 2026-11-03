@@ -14,13 +14,13 @@ public sealed class WebTransportReferenceServerTests
         using var server = WebTransportTestClient.CreateServer(new WebTransportServerScript());
         using var client = WebTransportTestClient.Connect(server);
 
-        CollectionAssert.AreEqual(new long[] { 0x08, 1, 0x33, 1, WebTransportCodepoints.MaxSessionsSetting, 1 }, ServerSettings(client));
+        CollectionAssert.AreEqual(new long[] { 0x08, 1, 0x33, 1, WebTransportCodepoints.EnabledSetting, 1 }, ServerSettings(client));
     }
 
     [TestMethod]
     public void Answer_EverySettingLeftOut_SendsAnEmptySettingsFrame()
     {
-        using var server = WebTransportTestClient.CreateServer(new WebTransportServerScript { SendEnableConnectProtocol = false, SendH3Datagram = false, MaxSessions = null });
+        using var server = WebTransportTestClient.CreateServer(new WebTransportServerScript { SendEnableConnectProtocol = false, SendH3Datagram = false, WebTransportEnabled = null });
         using var client = WebTransportTestClient.Connect(server);
 
         Assert.IsEmpty(ServerSettings(client));
