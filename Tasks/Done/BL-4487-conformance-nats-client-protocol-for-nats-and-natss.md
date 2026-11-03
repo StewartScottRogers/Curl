@@ -67,4 +67,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: f369708b eb1aead7 96eae08c d8e3fb0e 3a5499b1 ef6c9026.
-- 2026-11-02: Doing -> Done. NATS matrix and 20 cases in place; NATS-SUBJ-1 listed for BL-4583
+- 2026-11-02: Doing -> Done. NATS matrix and 20 cases in place; NATS-SUBJ-1 listed for BL-4602

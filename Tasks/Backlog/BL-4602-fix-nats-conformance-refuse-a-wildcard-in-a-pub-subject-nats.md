@@ -1,5 +1,5 @@
 ---
-id: BL-4583
+id: BL-4602
 title: Fix Nats conformance: refuse a wildcard in a PUB subject (NATS-SUBJ-1)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4583 — Fix Nats conformance: refuse a wildcard in a PUB subject (NATS-SUBJ-1)
+# BL-4602 — Fix Nats conformance: refuse a wildcard in a PUB subject (NATS-SUBJ-1)
 
 ## Goal
 
