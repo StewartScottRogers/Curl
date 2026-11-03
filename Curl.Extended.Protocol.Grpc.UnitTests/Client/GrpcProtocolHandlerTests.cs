@@ -219,12 +219,47 @@ public sealed class GrpcProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(Http2ErrorCode.NoError, 13, "INTERNAL")]
+    [DataRow(Http2ErrorCode.ProtocolError, 13, "INTERNAL")]
+    [DataRow(Http2ErrorCode.InternalError, 13, "INTERNAL")]
+    [DataRow(Http2ErrorCode.FlowControlError, 13, "INTERNAL")]
+    [DataRow(Http2ErrorCode.SettingsTimeout, 13, "INTERNAL")]
+    [DataRow(Http2ErrorCode.FrameSizeError, 13, "INTERNAL")]
+    [DataRow(Http2ErrorCode.RefusedStream, 14, "UNAVAILABLE")]
+    [DataRow(Http2ErrorCode.Cancel, 1, "CANCELLED")]
+    [DataRow(Http2ErrorCode.CompressionError, 13, "INTERNAL")]
+    [DataRow(Http2ErrorCode.ConnectError, 13, "INTERNAL")]
+    [DataRow(Http2ErrorCode.EnhanceYourCalm, 8, "RESOURCE_EXHAUSTED")]
+    [DataRow(Http2ErrorCode.InadequateSecurity, 7, "PERMISSION_DENIED")]
+    public async Task ExecuteAsync_RstStream_FailsWithExit22AndTheStatusItsErrorCodeMapsTo(Http2ErrorCode errorCode, int code, string name)
+    {
+        using var proto = new ProtoFixture();
+        var call = new Call(GrpcServerReply.Of(Http2FrameFactory.CreateRstStream(1, errorCode)));
+
+        TransferResult result = await call.RunAsync(GreeterUrl, proto.GreeterPath, "{}");
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual($"grpc-status {code} ({name}): HTTP/2 stream 1 was reset by the peer: {errorCode}.", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow(Http2ErrorCode.NoError)]
+    [DataRow(Http2ErrorCode.InternalError)]
+    public async Task ExecuteAsync_GoAwayBeforeTheCallsStream_FailsWithExit22AndUnavailable(Http2ErrorCode errorCode)
+    {
+        using var proto = new ProtoFixture();
+        var call = new Call(GrpcServerReply.Of(Http2FrameFactory.CreateGoAway(0, errorCode, ReadOnlyMemory<byte>.Empty)));
+
+        TransferResult result = await call.RunAsync(GreeterUrl, proto.GreeterPath, "{}");
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual($"grpc-status 14 (UNAVAILABLE): HTTP/2 GOAWAY from the peer: {errorCode}, last stream 0.", result.ErrorMessage);
+    }
+    [TestMethod]
     public async Task ExecuteAsync_Http2Failures_FailWithExit16()
     {
         byte[][] replies =
         [
-            GrpcServerReply.Of(Http2FrameFactory.CreateRstStream(1, Http2ErrorCode.InternalError)),
-            GrpcServerReply.Of(Http2FrameFactory.CreateGoAway(0, Http2ErrorCode.InternalError, ReadOnlyMemory<byte>.Empty)),
             GrpcServerReply.Of(Http2FrameFactory.CreateHeaders(1, new byte[] { 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF }, isEndStream: false, isEndHeaders: true)),
             [.. GrpcServerReply.Of(), 0, 0, 7, (byte)Http2FrameType.Ping, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7],
             [.. GrpcServerReply.Of(), 0, 0, 9],
