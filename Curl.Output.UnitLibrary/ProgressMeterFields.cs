@@ -80,12 +80,14 @@ public static class ProgressMeterFields
     }
 
     /// <summary>
-    /// Computes an average speed in bytes per second as <c>trspeed</c> does, without
-    /// overflowing: under one microsecond the size counts as sent in one.
+    /// Computes an average speed in bytes per second as <c>trspeed</c> does: under one
+    /// microsecond the size counts as sent in one. Only that branch can overflow, as
+    /// curl's does (a size of 9,223,372,036,855 bytes or more wraps there); the other
+    /// branches cap at <see cref="long.MaxValue" />.
     /// </summary>
     /// <param name="size">The bytes.</param>
     /// <param name="microseconds">The time they took.</param>
-    /// <returns>The speed, capped at <see cref="long.MaxValue" />.</returns>
+    /// <returns>The speed in bytes per second.</returns>
     public static long Speed(long size, long microseconds)
     {
         if (microseconds < 1)

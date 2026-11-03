@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4775 — Fix AF-0611: ProgressMeterFields.Speed's doc says it computes 'without overflowing' and caps at long.MaxValue; the under-one-microsecond branch multiplies unchecked
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Decision: fixed the doc, not the arithmetic, since the code matches curl trspeed. The doc now says only the sub-microsecond branch can overflow, as curl's does. Fast tests of Curl.Output.UnitTests pass (896).
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Doc corrected
