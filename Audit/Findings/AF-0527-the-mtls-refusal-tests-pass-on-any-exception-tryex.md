@@ -3,8 +3,8 @@ id: AF-0527
 title: The mTLS refusal tests pass on any exception: TryExchangeAsync turns every failure into null, the value the refusal tests assert
 auditor: quality
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_0025.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-02_1724.md, 2026-11-03_0025.md).
 key: quality:Curl.Conformance.UnitTests/HttpsServerConnectorTests.Mtls.cs:ConnectAsync_MtlsPortWithoutAClientCertificate_FailsTheHandshake:swallowed-failure
 reproduction: none
 task: BL-4511
@@ -13,9 +13,9 @@ found: 2026-11-02
 found-at: 4698726450f0ce3447bd6790d0bf9c59787bae95
 scorecard: 2026-11-02_0645.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: consecutive
+closed-by: 2026-11-02_1724.md, 2026-11-03_0025.md
 ---
 # AF-0527 - The mTLS refusal tests pass on any exception: TryExchangeAsync turns every failure into null, the value the refusal tests assert
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Conformance.UnitTests/HttpsServerConnectorTests.Mtls.cs
 ## Re-audits
 
 - 2026-11-02 | 2026-11-02_1724.md | reproduces: no | Ran the reproduction: Select-String -Pattern 'catch \(Exception\)' on Curl.Conformance.UnitTests/HttpsServerConnectorTests.Mtls.cs found no match. TryExchangeAsync now has 'catch (Exception exception) when (exception is AuthenticationException or IOException)', and its comment says any other exception escapes and fails the test (AF-0527). The catch-all that turned every failure into null is gone.
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: no | Select-String for 'catch \(Exception\)' (followed by ')') found no match; TryExchangeAsync now has 'catch (Exception exception) when (exception is AuthenticationException or IOException)', so any other exception escapes and fails the test.
 
 ## Log
 
 - 2026-11-02: filed proposed.
 - 2026-11-02: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_0025.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-02_1724.md, 2026-11-03_0025.md).
