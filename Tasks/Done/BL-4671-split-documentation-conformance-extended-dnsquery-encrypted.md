@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Conformance/Extended/DnsQuery-Encrypted.md]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4671 — Split Documentation/Conformance/Extended/DnsQuery-Encrypted.md so tasks touching it can run in parallel
 
@@ -44,3 +44,4 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 18bc5fbd ae3d4f52 a0b49a29.
+- 2026-11-03: Doing -> Done. Nothing to split: DnsQuery-Encrypted.md does not exist and only BL-4474 touches it
