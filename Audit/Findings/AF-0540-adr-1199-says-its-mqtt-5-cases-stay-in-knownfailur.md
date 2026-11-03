@@ -3,8 +3,8 @@ id: AF-0540
 title: ADR-1199 says its MQTT 5 cases stay in KnownFailures.txt under BL-4580, BL-4581 and BL-4582; the file lists them under BL-4573, BL-4574 and BL-4575
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1199-mqtt5-acknowledges-received-qos-refuses-unallowed-topic-aliases-and-closes-on-a-missing-pingresp.md:KnownFailures-task-ids:stale-adr
 reproduction: none
 task: BL-4646
@@ -13,9 +13,9 @@ found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_1017.md
 ---
 # AF-0540 - ADR-1199 says its MQTT 5 cases stay in KnownFailures.txt under BL-4580, BL-4581 and BL-4582; the file lists them under BL-4573, BL-4574 and BL-4575
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Conformance.Extended.UnitTests/KnownFailures.txt -Patte
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_0025.md | reproduces: no | Ran the reproduction: no match. Curl.Conformance.Extended.UnitTests/KnownFailures.txt lists no MQTT case under any task (its 4 lines are BL-4621..BL-4623 CurlSurface cases), so the cases are no longer filed under BL-4573..BL-4575. The MQTT 5 fixes appear to have landed (Mqtt5PublishResponse.cs and Topic Alias handling exist in Curl.Extended.Protocol.Mqtt5.UnitLibrary). ADR-1199's 'stay ... until each fix lands' is conditional and no longer contradicted.
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | Ran Select-String -Path Curl.Conformance.Extended.UnitTests/KnownFailures.txt -Pattern 'BL-458[012]|MQTT-4.3.2-4|MQTT5-3.3.2.3.4-1|MQTT5-3.1.2.10-1': no match. ADR-1199 line 29 now says the cases 'were listed in KnownFailures.txt until BL-4580, BL-4581 and BL-4582 landed their fixes', which matches the file.
 
 ## Log
 
 - 2026-11-02: filed proposed.
 - 2026-11-02: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces.

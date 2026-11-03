@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: yes | The given reproduction shows the 34.63-minute spell from 41560119555 and BL-4596 (Mqtt5s_UntrustedCertificate) on Linux and macOS. The same cause crossed the rule in this window: run 41655977963 (85f7b9d8) failed CreateRunner_FileUrlToStandardOutputThatIsNotATerminal_WritesTheProgressMeter on Linux only, a test that passed on lanes' Windows runs (lane 1 3132/3132 pass). The spell started 2026-11-03T15:01:02Z and lasted 95 minutes, still red at window end (BL-4732, lane 1, 08:02-08:05 MST).
+
 ## Log
 
 - 2026-11-03: filed proposed.

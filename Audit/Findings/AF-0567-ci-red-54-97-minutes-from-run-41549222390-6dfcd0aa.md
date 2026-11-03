@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: yes | The given reproduction shows the 54.97-minute spell from 41549222390 and the 'refuse ... BL-2969 is in Doing and held by no lane' lines at 17:25:01 and 17:40:37. In this window the same main cause returned: run 41632220793 (27b710a0) went red at 12:19:28Z on stale known-failure lines for the ProtoJSON RoundTrip tests kept by a merge. BL-4724, 'Already fixed by 1df901115'; BL-4726, 'its stale Know~'. The spell lasted 44.7 minutes, over the 30-minute rule. The late-filing part did not recur: the tasks were filed 1 minute after the run, and this window's logs have no 'refuse' phase.
+
 ## Log
 
 - 2026-11-03: filed proposed.

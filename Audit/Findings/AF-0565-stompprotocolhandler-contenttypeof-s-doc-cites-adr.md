@@ -3,8 +3,8 @@ id: AF-0565
 title: StompProtocolHandler.ContentTypeOf's doc cites ADR-1210 (Socket.IO pings) for the -H content-type rule that ADR-1220 decides
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompProtocolHandler.cs:ContentTypeOf:false-doc-comment
 reproduction: none
 task: BL-4713
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_1017.md
 ---
 # AF-0565 - StompProtocolHandler.ContentTypeOf's doc cites ADR-1210 (Socket.IO pings) for the -H content-type rule that ADR-1220 decides
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompProtoco
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | Ran the reproduction: StompProtocolHandler.cs:70 now reads 'Gives the content-type for the SEND frame (ADR-1220)', and ADR-1220-stomp-send-takes-the-content-type-a-h-header-gives.md exists. ADR-1210's first line is the Socket.IO ping ADR, which is no longer cited.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces.

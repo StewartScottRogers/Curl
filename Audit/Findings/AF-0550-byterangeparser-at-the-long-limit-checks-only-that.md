@@ -42,6 +42,8 @@ Select-String -Path Curl.Core.UnitTests/CoreParserAdversarialTests.cs -Pattern '
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | No match for Assert.IsNotNull(range); the long-limit tests assert Assert.AreEqual(ByteRange.Bounded(0, 1), range) and Assert.AreEqual(ByteRange.FromOffset(5), range).
+
 ## Log
 
 - 2026-11-03: filed proposed.

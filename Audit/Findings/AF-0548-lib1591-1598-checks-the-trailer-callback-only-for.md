@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1589To1648Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | No match for Assert.IsNotNull(trailer); the test calls trailer!(trailers) and asserts TrailerResult.Ok and the two trailer lines.
+
 ## Log
 
 - 2026-11-03: filed proposed.

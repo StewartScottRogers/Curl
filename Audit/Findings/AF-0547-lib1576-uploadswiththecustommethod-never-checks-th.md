@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | Lib1576_UploadsWithTheCustomMethodAndAnswersItsCode now asserts Assert.AreEqual("CURL", method) and calls read(buffer), asserting the uploaded length and bytes.
+
 ## Log
 
 - 2026-11-03: filed proposed.

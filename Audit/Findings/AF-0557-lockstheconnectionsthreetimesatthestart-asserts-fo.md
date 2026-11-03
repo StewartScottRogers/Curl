@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.UnitTests/ManagedShareHandleTests.cs -Pattern 'L
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | Neither pattern matches: the test is now ..._LocksTheConnectionsThreeTimesToTakeThePoolAndOnceWhenDone and asserts Assert.AreEqual(3 + 1, locks, ...), matching its name.
+
 ## Log
 
 - 2026-11-03: filed proposed.

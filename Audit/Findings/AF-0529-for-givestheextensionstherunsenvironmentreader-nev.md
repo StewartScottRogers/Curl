@@ -43,6 +43,7 @@ Select-String -Path Curl.Extension.Composition.UnitTests/ExtensionProtocolHandle
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_0025.md | reproduces: yes | The test body is unchanged: 'Assert.HasCount(ExtensionCatalogue.Entries.Count, handlers); Assert.IsNull(Services.ReadEnvironmentVariable);'. It still never checks that the reader reaches the extensions. A separate test, For_HandsEachExtensionFactoryServicesCarryingTheGivenReader, now covers the behaviour, but this test's name still promises what its body does not check.
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | Select-String context now shows Assert.AreSame(reader, seen!.ReadEnvironmentVariable); after the For call: the reader is checked to reach the extensions.
 
 ## Log
 

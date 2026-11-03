@@ -42,6 +42,8 @@ Select-String -Path Curl.Extension.SshJump.UnitTests/SshJumpServicesTests.cs -Pa
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | System_HasTheMachinesAgent asserts the connector types: FirstReachableSshAgentConnector of Pageant then System on Windows, SystemSshAgentConnector elsewhere.
+
 ## Log
 
 - 2026-11-03: filed proposed.
