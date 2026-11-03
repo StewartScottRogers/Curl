@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.Dane.UnitLibrary]
+touches: [Curl.Extension.Dane.UnitLibrary, Curl.Extension.Dane.UnitTests/Lookup/DenialOfExistenceTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4758 — Fix AF-0594: Surviving mutant: the NSEC3 no-closer-match proof can test the wrong ancestor without a test failing
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Widened `touches` to `Curl.Extension.Dane.UnitTests/Lookup/DenialOfExistenceTests.cs`, because the fix is a test. No other Doing task on origin/work/dark-factory names a Dane project.
+- Added two tests. `ProvesNoCloserMatch_Nsec3CoversOnlyTheNextCloserName_IsTrue_Rfc5155Section8_8` uses an NSEC3 whose range is the next closer name's hash (b.example.) plus or minus one, so it covers nothing else. `ProvesNoCloserMatch_Nsec3CoversOnlyAnotherAncestor_IsFalse_Rfc5155Section8_8` covers only the apex hash and must not prove the match.
+- The lane may not run the audit office's mutation tool, so the mutant was checked by hand. With `signatureLabels - 1` at `DenialOfExistence.cs:66` the first new test fails (killed). With production restored all three ProvesNoCloserMatch tests pass. There is no production change, so no quality run was needed. `dotnet build` is clean (0 warnings) and the fast tests are green. The re-audit closes the finding.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Tests kill the NSEC3 no-closer-match wrong-ancestor mutant
