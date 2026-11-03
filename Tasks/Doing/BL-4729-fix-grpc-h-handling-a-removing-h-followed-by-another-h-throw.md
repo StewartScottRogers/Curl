@@ -38,3 +38,4 @@ Simplest fix: apply the `-H` overrides to a separate call-definition list, then 
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 4ed83a1b 8cd5f741 bc5004fd a963b8b4.
