@@ -31,3 +31,4 @@ Found by BL-4523: the client stages fixed 8 MiB blocks (`AzureStorageExtension.D
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 3da8d675 a3a71d08 d5034162.
