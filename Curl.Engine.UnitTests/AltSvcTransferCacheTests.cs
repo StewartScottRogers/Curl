@@ -115,6 +115,47 @@ public sealed class AltSvcTransferCacheTests
         Assert.IsNull(actual.AltSvcRoute);
     }
 
+    /// <summary>
+    /// An entry naming the origin's own host and port prefers its version: without a version option an
+    /// <c>h3</c> entry races HTTP/3 against TCP as <c>--http3</c> does, while an <c>h2</c> or <c>h1</c>
+    /// entry leaves the requested version and starts no QUIC attempt (measured; AF-0536).
+    /// </summary>
+    [TestMethod]
+    [DataRow("h3", HttpVersionPreference.Http3, DisplayName = "h3 entry races HTTP/3")]
+    [DataRow("h2", HttpVersionPreference.Http11, DisplayName = "h2 entry keeps the version")]
+    [DataRow("h1", HttpVersionPreference.Http11, DisplayName = "h1 entry keeps the version")]
+    public async Task ApplyTo_EntryForTheSameHostAndPortWithNoVersionOption_PrefersHttp3OnlyForAnH3Entry(string alpn, HttpVersionPreference expected)
+    {
+        string header = $"{alpn}=\":443\"";
+        Diagnostics.Arrange("alt-svc header", header);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System);
+        cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), header, System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
+
+        HttpVersionPreference actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions()).Version;
+        Diagnostics.Act("version", actual);
+
+        Diagnostics.Assert("version", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    /// <summary>
+    /// With <c>--http3</c> an <c>h2</c> entry for the origin itself leaves the requested HTTP/3 as it is,
+    /// rather than the plain <c>h3</c> rule deciding (AF-0536).
+    /// </summary>
+    [TestMethod]
+    public async Task ApplyTo_H2EntryForTheSameHostAndPortUnderHttp3_KeepsHttp3()
+    {
+        Diagnostics.Arrange("alt-svc header", "h2=\":443\"");
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty, HttpVersion = HttpVersion.Http3 }, [], new UnusedFileSystem(), TimeProvider.System);
+        cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), "h2=\":443\"", System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
+
+        HttpVersionPreference actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions()).Version;
+        Diagnostics.Act("version", actual);
+
+        Diagnostics.Assert("version", HttpVersionPreference.Http3, actual);
+        Assert.AreEqual(HttpVersionPreference.Http3, actual);
+    }
+
     /// <summary>A file system the cache must never touch: an empty <c>--alt-svc</c> name reads and writes nothing.</summary>
     private sealed class UnusedFileSystem : IFileSystem
     {
