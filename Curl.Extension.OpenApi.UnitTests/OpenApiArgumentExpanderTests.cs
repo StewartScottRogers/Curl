@@ -106,6 +106,7 @@ public sealed class OpenApiArgumentExpanderTests
 
         ArgumentExpansionException failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => new OpenApiArgumentExpander().ArgumentsFor(claimed, ContextOf(("pets.json", PetStore))));
 
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
         Assert.AreEqual("openapi: one --operation per --openapi", failure.Message);
     }
 
