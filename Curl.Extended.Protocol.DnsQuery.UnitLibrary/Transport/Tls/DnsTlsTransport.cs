@@ -1,5 +1,6 @@
 using Curl.Extended.Protocol.DnsQuery.Client;
 using Curl.Extended.Protocol.DnsQuery.Transport.Tcp;
+using Curl.Extended.Protocol.DnsQuery.Wire;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.DnsQuery.Transport.Tls;
@@ -8,7 +9,8 @@ namespace Curl.Extended.Protocol.DnsQuery.Transport.Tls;
 /// Sends a query over DNS over TLS (RFC 7858): opens a TCP connection to the server, port 853 by default (section
 /// 3.1), runs the TLS handshake through curl's TLS provider before any DNS message is sent, checking the certificate
 /// against the server's host (section 3.2), then sends the query and reads its answer each with the two-octet length
-/// prefix of DNS over TCP (section 3.3).
+/// prefix of DNS over TCP (section 3.3). The query carries the EDNS(0) Padding option (RFC 7830), padded to a multiple
+/// of 128 octets as RFC 8310 section 9 and RFC 8467 section 4.1 recommend (ADR-1230).
 /// </summary>
 /// <param name="connector">Opens the plaintext TCP connection.</param>
 /// <param name="tlsProvider">Runs the TLS handshake over it.</param>
@@ -38,7 +40,7 @@ internal sealed class DnsTlsTransport(IConnector connector, ITlsProvider tlsProv
 
         await using (secure.ConfigureAwait(false))
         {
-            return await DnsTcpTransport.ExchangeOverAsync(secure, query, context.CancellationToken).ConfigureAwait(false);
+            return await DnsTcpTransport.ExchangeOverAsync(secure, DnsEdnsPadding.Pad(query), context.CancellationToken).ConfigureAwait(false);
         }
     }
 }
