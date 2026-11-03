@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Notes
 
+ADR-1224 line 15 now states the first-datagram limit (BL-4675). Docs only; no code touched.
+
 ## Log
 
 - 2026-11-03: Created.
