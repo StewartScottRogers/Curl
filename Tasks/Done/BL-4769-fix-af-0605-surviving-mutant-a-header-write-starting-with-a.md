@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests/HeaderLineTeeStreamTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4769 — Fix AF-0605: Surviving mutant: a header write starting with a bare LF can be taken as one line without a test failing
 
@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. A header write starting with a bare LF is pinned to take the LF as its first line, killing AF-0605's mutant
