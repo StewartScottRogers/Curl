@@ -3,8 +3,8 @@ id: AF-0540
 title: ADR-1199 says its MQTT 5 cases stay in KnownFailures.txt under BL-4580, BL-4581 and BL-4582; the file lists them under BL-4573, BL-4574 and BL-4575
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-1199-mqtt5-acknowledges-received-qos-refuses-unallowed-topic-aliases-and-closes-on-a-missing-pingresp.md:KnownFailures-task-ids:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.Extended.UnitTests/KnownFailures.txt -Patte
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
