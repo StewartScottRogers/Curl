@@ -1,4 +1,4 @@
-# ADR-1214: The realtime transfer surface pins in-band errors as exit 22 under `--fail`, and `webtransport` waits for its reference server
+# ADR-1215: The realtime transfer surface pins in-band errors as exit 22 under `--fail`, and `webtransport` waits for its reference server
 
 - Status: Accepted
 - Date: 2026-11-02
