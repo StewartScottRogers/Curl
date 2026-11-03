@@ -35,3 +35,4 @@ given by the user, else a default such as `application/octet-stream`) and record
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 93082f85 b218f3b4 e3a4fd8b.
