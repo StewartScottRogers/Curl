@@ -66,6 +66,26 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
         return new StompFrame("CONNECT", headers, []);
     }
 
+    /// <summary>
+    /// Gives the <c>content-type</c> for the <c>SEND</c> frame (ADR-1210): the value of the last <c>-H "content-type: ..."</c>
+    /// in <paramref name="headers"/> (name matched without regard to case), or <see cref="StompClientFlow.SendContentType"/>
+    /// when there is none or its value is empty.
+    /// </summary>
+    internal static string ContentTypeOf(IReadOnlyList<string>? headers)
+    {
+        string contentType = StompClientFlow.SendContentType;
+        foreach (string header in headers ?? [])
+        {
+            int colon = header.IndexOf(':', StringComparison.Ordinal);
+            if (colon > 0 && header.AsSpan(0, colon).Trim().Equals("content-type", StringComparison.OrdinalIgnoreCase) && header.AsSpan(colon + 1).Trim().Length > 0)
+            {
+                contentType = header[(colon + 1)..].Trim();
+            }
+        }
+
+        return contentType;
+    }
+
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context, string destination)
     {
         ConnectResult connect = await connector.ConnectAsync(TargetOf(context), context.CancellationToken).ConfigureAwait(false);
@@ -80,7 +100,7 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
             var flow = new StompClientFlow(connection, context.Output, context.Progress, context.CancellationToken);
             try
             {
-                await flow.RunAsync(ConnectFor(context.Url.Host, context.Credentials), destination, context.PostData).ConfigureAwait(false);
+                await flow.RunAsync(ConnectFor(context.Url.Host, context.Credentials), destination, context.PostData, ContentTypeOf(context.Http?.Headers)).ConfigureAwait(false);
                 return TransferResult.Success(flow.BytesWritten);
             }
             catch (StompClientException failure)
