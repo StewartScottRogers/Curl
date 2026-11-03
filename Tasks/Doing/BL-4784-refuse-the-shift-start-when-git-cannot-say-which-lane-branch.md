@@ -27,12 +27,14 @@ Found by the shift-end review of 2026-11-03 (silent-failure-hunter, Important), 
 
 ## Acceptance criteria
 
-- [ ] When `$laneBranchesAhead -contains $UnknownLaneBranches`, the shift start stops with a message that names the failed git query, as it did before BL-4715.
-- [ ] A refusal with known lane branches is still Blocked, with its candidates kept, and the shift carries on.
-- [ ] A factory self-test (`RunDarkFactory.ps1 -Test*`) covers both cases.
-- [ ] ADR-1234 states the exception.
+- [x] When `$laneBranchesAhead -contains $UnknownLaneBranches`, the shift start stops with a message that names the failed git query, as it did before BL-4715.
+- [x] A refusal with known lane branches is still Blocked, with its candidates kept, and the shift carries on.
+- [x] A factory self-test (`RunDarkFactory.ps1 -Test*`) covers both cases.
+- [x] ADR-1234 states the exception.
 
 ## Notes
+
+Get-UnknownLaneBranchesRefusal (Park.ps1) is checked in ShiftCoordinator before the orphan loop; -TestPark covers unknown and known cases. Known-branch Blocked path already covered by the AF-0567 test.
 
 ## Log
 

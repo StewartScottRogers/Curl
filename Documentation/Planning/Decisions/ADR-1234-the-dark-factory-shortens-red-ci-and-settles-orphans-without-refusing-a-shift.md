@@ -35,7 +35,10 @@ The audit of 2026-11-02 (audit-process findings AF-0541 to AF-0544 and AF-0567 t
   own `lanes-<stamp>` folder as the previous shift's (7ecfdd99f). A task in Doing held by no lane is adopted
   only by a lane whose newest run log names it. When its owner still cannot be told, the task goes to
   `Blocked` (lane branches with unpushed commits copied first to `factory/<ID>-lane-<n>-<stamp>`, named in the
-  reason) and the shift starts, instead of refusing.
+  reason) and the shift starts, instead of refusing. One exception still refuses the start: when git cannot
+  say which lane branches are ahead of the shift branch (`Get-LaneBranchesAhead` returns
+  `$UnknownLaneBranches`), starting the lanes could destroy an orphan's only copy of its work with nothing
+  kept, so `Stop-ShiftStart` names the failed git query (BL-4784).
 
 ## Consequences
 

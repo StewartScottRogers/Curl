@@ -267,6 +267,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             $dirty = @(1..16 | Where-Object { -not $adopt.ContainsKey($_) -and (Test-WorktreeDirty (Join-Path $LanesDir "lane-$_")) })
             $returned = @()
             $laneBranchesAhead = @(Get-LaneBranchesAhead $branch $Root)
+            $unknownBranches = Get-UnknownLaneBranchesRefusal $laneBranchesAhead
+            if ($unknownBranches) { Stop-ShiftStart $unknownBranches; exit 1 }
             $laneLastTask = @{}
             foreach ($n in $dirty) { $laneLastTask[[int]$n] = Get-LaneLastRunTask $n }
             foreach ($id in $orphans) {

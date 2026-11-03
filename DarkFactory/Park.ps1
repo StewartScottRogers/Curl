@@ -132,6 +132,16 @@ function Get-LaneBranchesAhead {
     return $ahead
 }
 
+function Get-UnknownLaneBranchesRefusal {
+    # The reason a shift start stops when -LaneBranchesAhead holds $UnknownLaneBranches (git's
+    # query failed, so unpushed lane commits may exist that nothing could keep), or '' when
+    # git answered. Only an orphan Get-OrphanAction cannot place among known branches is
+    # Blocked and carried on (BL-4784, ADR-1234).
+    param([string[]]$LaneBranchesAhead = @())
+    if ($LaneBranchesAhead -notcontains $UnknownLaneBranches) { return '' }
+    return "git could not say which lane branches are ahead of origin/$branch (git for-each-ref or git rev-list failed); starting the lanes would reset branches that may hold an orphan's only copy of its work"
+}
+
 function Invoke-ReleaseClaim {
     # A lane that claimed task $Id and is past the shift's end before starting it returns the
     # claim to Backlog on the shared branch, so no task is left in Doing held by no lane
@@ -256,6 +266,10 @@ if ($TestPark) {
             $ahead = @(Get-LaneBranchesAhead 'no-such-branch' $repo)
             $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches @() -DirtyLanes @() -LaneBranchesAhead $ahead
             "$(if ($ahead -contains $UnknownLaneBranches) { 'unknown' } else { "'$ahead'" }) $($a.Action)" })
+        ,@('a failed lane-branch query stops the shift start naming the git query; known branches do not', 'stops naming git, known continue', {
+            $r = Get-UnknownLaneBranchesRefusal (Get-LaneBranchesAhead 'no-such-branch' $repo)
+            $k = Get-UnknownLaneBranchesRefusal @('factory/lane-9')
+            "$(if ($r -match 'git could not say which lane branches are ahead.*git rev-list') { 'stops naming git' } else { "'$r'" }), $(if ($k -eq '') { 'known continue' } else { 'known stop' })" })
         ,@('a park that cannot push says so for the summary', 'BL-002 PARK NOT PUSHED, still in Doing, branch kept', {
             git -C $repo remote set-url origin (Join-Path $temp 'gone.git') 2>&1 | Out-Null
             # The git failures it traces are expected here, so they are not printed.
