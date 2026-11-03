@@ -3,8 +3,8 @@ id: AF-0531
 title: Surviving mutant: a zero-size callback MIME part can lose its known length without a test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/MultipartFormPartMapping.cs:ContentLengthOf-ge:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/MultipartFormPartMapping.cs:116:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
