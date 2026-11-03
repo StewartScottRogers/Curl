@@ -108,6 +108,15 @@ public sealed class DenialOfExistenceTests
     }
 
     [TestMethod]
+    public void ProvesNameError_Nsec3MatchesOnlyTheNameItself_IsNotItsOwnClosestEncloser_Rfc5155Section8_3()
+    {
+        DnsResourceRecord nameItself = SignedTree.Nsec3("example.", SignedTree.HashOf("a.example."), HighestHash, types: [DnssecRecordType.Rrsig]);
+        DnsResourceRecord covering = SignedTree.Nsec3("example.", LowestHash, HighestHash);
+
+        Assert.IsFalse(DenialOfExistence.ProvesNameError(Name("a.example."), [nameItself, covering]));
+    }
+
+    [TestMethod]
     [DataRow((byte)2, (ushort)1)]
     [DataRow(Nsec3Hash.Sha1Algorithm, (ushort)151)]
     public void ProvesNoData_Nsec3WithUnknownHashOrTooManyIterations_IsIgnored_Rfc9276Section3_2(byte hashAlgorithm, ushort iterations)
