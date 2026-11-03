@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/Cgr094Tests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-02
 ---
 # BL-4639 — Fix AF-0533: Surviving mutant: @SECLEVEL=0 at the start of --ciphers can stop being recognised without a test failing
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added Curl.Networking.UnitTests/Cgr094Tests.cs to touches: the fix is a test (no task in Doing names it). The mutant is killed by a new data row `@SECLEVEL=0:ALL` (the command at index 0; not `@SECLEVEL=0:DEFAULT`, since OpenSSL expands DEFAULT only at the start, so that list has no suite and is exit 59, which Curl already matches) on the OpenSSL-build TLS 1.1 handshake test; OpenSSL accepts a @SECLEVEL command anywhere in the cipher string, so curl completes that handshake too. No production change. Lanes cannot run the mutation tool, so the mutant was applied by hand (`at >= 0` to `at > 0`), the new row was seen to fail, and the mutant was reverted.
+- First criterion: checked with the same mutant (`>=` to `>` at HandBuiltTlsProvider.cs:201): Cgr094Tests now fails on the new row (killed) and passes without it. Second: `dotnet build` clean, fast tests green on Windows; the test is platform-neutral (in-memory TLS 1.1 server, OpenSSL build named explicitly).
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-02: Doing -> Done. A cipher string starting with @SECLEVEL=0 is pinned by a test, so the AF-0533 mutant is killed
