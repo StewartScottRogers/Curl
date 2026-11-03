@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4753 — Fix AF-0589: ExecuteAsync_AllowFailsThenDataRefused_IsExit55 never checks exit 55
 
@@ -52,3 +52,4 @@ Added the exit-code assertion (SendError, 55) to the test; Smtp tests pass (405 
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Added the SendError exit-code assertion; Smtp tests green.
