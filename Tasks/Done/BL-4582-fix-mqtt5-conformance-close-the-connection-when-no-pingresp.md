@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Mqtt5.UnitLibrary/Client/Mqtt5ClientFlow.cs, Curl.Extended.Protocol.Mqtt5.UnitTests/Client, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4582 — Fix Mqtt5 conformance: close the connection when no PINGRESP answers a PINGREQ (MQTT5-3.1.2.10-1)
 
@@ -38,3 +38,4 @@ behaviour is decided in ADR-1199. The change lands in `Curl.Extended.Protocol.Mq
 
 - 2026-11-02: Created by BL-4485.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: d0700123 7b580d6c 73c2678e.
+- 2026-11-02: Doing -> Done. mqtt5:// closes with DISCONNECT 0x8D and exit 8 when no PINGRESP answers a PINGREQ before the next falls due
