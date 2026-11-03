@@ -27,5 +27,12 @@ standard error and, per connection or datagram channel, the bytes each side sent
   `GrpcReferenceCall` (decoded header list, DATA frames) and sends the `GrpcReferenceReply` of the first
   `IGrpcReferenceService` that answers; a case scripts its reply with `GrpcScriptedService`, and another
   service (such as reflection in `Grpc/Reflection/`) is its own `IGrpcReferenceService`.
-- It references `Curl.Protocol.Abstractions`, `Curl.Networking`, `Curl.Conformance.UnitLibrary`
-  and the shared layers only, never an extension (`VerifyExtensionIsolation`).
+- `WebTransport/Server/` (BL-4607) is a WebTransport over HTTP/3 server written from
+  draft-ietf-webtrans-http3-16 on `Curl.Conformance.Http3Server.UnitLibrary`'s `Http3ServerConnection`
+  (never from `Curl.Extended.Protocol.WebTransport`). `WebTransportReferenceServer` is an
+  `IDatagramReferenceServer`; its `WebTransportServerScript` chooses the SETTINGS sent, the CONNECT
+  status, the stream and datagram echoes and a `WT_CLOSE_SESSION`, and it records the client's SETTINGS,
+  CONNECT fields, streams, datagrams, capsules and CONNECT FIN.
+- It references `Curl.Protocol.Abstractions`, `Curl.Networking`, `Curl.Conformance.UnitLibrary`,
+  `Curl.Conformance.Http3Server.UnitLibrary` and the shared layers only, never an extension
+  (`VerifyExtensionIsolation`).

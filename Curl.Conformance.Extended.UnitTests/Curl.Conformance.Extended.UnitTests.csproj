@@ -19,6 +19,8 @@
     <!-- The cases run curl in process through InProcessCurl, and the curl-surface checks reach Curl.Mcp (BL-4462). -->
     <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
     <ProjectReference Include="..\Curl.Mcp\Curl.Mcp.csproj" />
+    <!-- The WebTransport reference server's tests drive it with Curl.Quic's client state (BL-4607). -->
+    <ProjectReference Include="..\Curl.Conformance.Http3Server.UnitLibrary\Curl.Conformance.Http3Server.UnitLibrary.csproj" />
   </ItemGroup>
 
 </Project>

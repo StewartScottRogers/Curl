@@ -11,6 +11,8 @@
     <ProjectReference Include="..\Curl.Conformance.UnitLibrary\Curl.Conformance.UnitLibrary.csproj" />
     <!-- HpackEncoder, HpackDecoder and the HTTP/2 frame codec carry the gRPC reference server (BL-4530). -->
     <ProjectReference Include="..\Curl.Http2.UnitLibrary\Curl.Http2.UnitLibrary.csproj" />
+    <!-- Http3ServerConnection, with Curl.Quic, Curl.Http3 and Curl.Tls behind it, carries the WebTransport reference server (BL-4607). -->
+    <ProjectReference Include="..\Curl.Conformance.Http3Server.UnitLibrary\Curl.Conformance.Http3Server.UnitLibrary.csproj" />
   </ItemGroup>
 
 </Project>
