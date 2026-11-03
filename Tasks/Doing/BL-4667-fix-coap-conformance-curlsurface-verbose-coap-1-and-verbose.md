@@ -38,3 +38,4 @@ on every platform, the line curl's OpenSSL build writes for a DTLS session (`SSL
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: c68daaae f35502d1 44307beb 914c30cc.
