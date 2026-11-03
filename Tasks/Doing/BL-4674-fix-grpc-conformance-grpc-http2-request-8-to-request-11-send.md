@@ -40,3 +40,4 @@ user-agent, use `-A` when given, else curl's default `curl/<version>` as the HTT
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: bf9be453 40477fdb eb9bb0e6.
