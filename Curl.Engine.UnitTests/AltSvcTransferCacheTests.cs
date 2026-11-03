@@ -98,6 +98,29 @@ public sealed class AltSvcTransferCacheTests
     }
 
     /// <summary>
+    /// A connection to another host, for an entry learned over HTTP/2, keeps the requested HTTP/2 when the
+    /// entry names <c>h2</c> and switches <c>--http3</c> to HTTP/3 alone when it names <c>h3</c>, so which ALPN the switch
+    /// compares decides the request's version (AF-0561).
+    /// </summary>
+    [TestMethod]
+    [DataRow(HttpVersion.Http2, "h2", HttpVersionPreference.Http2, DisplayName = "--http2, h2 entry from h2 keeps HTTP/2")]
+    [DataRow(HttpVersion.Http3, "h3", HttpVersionPreference.Http3Only, DisplayName = "--http3, h3 entry from h2 switches to HTTP/3 alone")]
+    public async Task ApplyTo_EntryForAnotherHostLearnedOverHttp2_SwitchesVersionOnlyWhenTheAlpnDiffers(HttpVersion requested, string alpn, HttpVersionPreference expected)
+    {
+        string header = $"{alpn}=\"other.test:8443\"";
+        Diagnostics.Arrange("alt-svc header", header);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty, HttpVersion = requested }, [], new UnusedFileSystem(), TimeProvider.System);
+        cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), header, System.Net.HttpVersion.Version20, DateTimeOffset.UtcNow);
+
+        HttpRequestOptions actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions());
+        Diagnostics.Act("version", actual.Version);
+
+        Diagnostics.Assert("version", expected, actual.Version);
+        Assert.AreEqual(expected, actual.Version);
+        Assert.AreEqual("h2", actual.AltSvcRoute?.OriginAlpn);
+    }
+
+    /// <summary>
     /// An entry whose alternative is the origin's own host and port dials no alternative: the
     /// connection gets no route, only the alternative's version (AF-0314).
     /// </summary>
