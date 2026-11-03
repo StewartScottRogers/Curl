@@ -68,7 +68,23 @@ internal sealed class RedisClientFlow(IConnection transport, Stream output, ITra
         return await ReceiveAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Reads the command's reply, dropping every push frame before it: pushes are out of band and never a
+    /// command's reply (RESP3 "Push type", BL-4600).
+    /// </summary>
     private async ValueTask<RespReply> ReceiveAsync()
+    {
+        RespReply reply;
+        do
+        {
+            reply = await ReceiveFrameAsync().ConfigureAwait(false);
+        }
+        while (reply.Kind == RespReplyKind.Push);
+
+        return reply;
+    }
+
+    private async ValueTask<RespReply> ReceiveFrameAsync()
     {
         try
         {

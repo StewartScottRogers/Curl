@@ -10,6 +10,5 @@ Grpc:Http2-GoAway-1 BL-4591
 SocketIo:EIO-Heartbeat-2 BL-4595
 SocketIo:EIO-MaxPayload-1 BL-4596
 SocketIo:RFC6455-5.5.1-1 BL-4597
-Redis:RESP-Push-1 BL-4583
 Redis:HELLO-2 BL-4584
 Redis:RESP2-Null-2 BL-4584

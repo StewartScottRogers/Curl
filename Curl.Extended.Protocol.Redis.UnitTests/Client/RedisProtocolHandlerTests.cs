@@ -32,6 +32,18 @@ public sealed class RedisProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_PushFramesBeforeTheReply_AreDroppedAndTheReplyIsWritten()
+    {
+        ScriptedRedisConnection connection = ScriptedRedisConnection.Replaying(HelloReply, ">2\r\n+message\r\n+hello\r\n>1\r\n:1\r\n+OK\r\n");
+        MemoryStream output = new();
+
+        TransferResult result = await ExecuteAsync(connection, "redis://cache/PING", output);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("OK\n", Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_DatabaseInThePath_SelectsItBeforeTheCommand()
     {
         ScriptedRedisConnection connection = ScriptedRedisConnection.Replaying(HelloReply, "+OK\r\n", ":1\r\n");
