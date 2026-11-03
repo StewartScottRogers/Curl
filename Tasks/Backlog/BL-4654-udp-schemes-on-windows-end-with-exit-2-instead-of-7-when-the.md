@@ -1,5 +1,5 @@
 ---
-id: BL-4630
+id: BL-4654
 title: UDP schemes on Windows end with exit 2 instead of 7 when the port is closed
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4630 — UDP schemes on Windows end with exit 2 instead of 7 when the port is closed
+# BL-4654 — UDP schemes on Windows end with exit 2 instead of 7 when the port is closed
 
 ## Goal
 

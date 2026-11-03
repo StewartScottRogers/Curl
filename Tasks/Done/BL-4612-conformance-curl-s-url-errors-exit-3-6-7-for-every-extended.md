@@ -35,7 +35,7 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 
 - Plan: one case file per extension in `CurlSurface/Transfer/UrlErrors/` (its schemes as data rows), shared `UrlErrorChecks` and `UrlErrorScheme`; no reference server, a stand-in process starter (no program starts) and a clock that never moves. 37 schemes, 178 cases, 185 matrix rows (7 `n/a`).
 - Measured real curl 8.22.0 with Record-CurlExchange.ps1 for `http://` URLs of the same shapes and pinned that text for every scheme; decisions in ADR-1216 (s3/gs reach 6 and 7 through their endpoint variable; az/abfs/abfss exit 6 n/a; UDP refused text is the harness connector's; mcp+stdio and the helper scheme, checked as `demo`, check only exit 3).
-- Failures filed and listed in KnownFailures.txt: BL-4628 (harness datagram connector ignores `.invalid`, so coap, coaps, dns, webtransport give exit 7 not 6) and BL-4629 (oci prefixes its exit 6 and 7 text). Also found outside the harness: BL-4630 (a closed UDP port on Windows gives exit 2 via the real socket).
+- Failures filed and listed in KnownFailures.txt: BL-4652 (harness datagram connector ignores `.invalid`, so coap, coaps, dns, webtransport give exit 7 not 6) and BL-4653 (oci prefixes its exit 6 and 7 text). Also found outside the harness: BL-4654 (a closed UDP port on Windows gives exit 2 via the real socket).
 - Curl.Conformance.Extended.UnitLibrary is not changed by this task, so its coverage criterion holds unchanged (no quality run needed). Tests are platform-neutral: no paths in expected text; the helper file name follows PluginRun's `.cmd` rule. CI on Linux/macOS: platform-neutral and fast tests green here.
 - `dotnet build Curl.slnx -warnaserror` clean; `dotnet test --filter "TestCategory!=Integration"` green (115 test projects passed).
 
@@ -43,4 +43,4 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 33eff2c7 e6993618 fe617ef5 be674468 9438adeb ef6c9026.
-- 2026-11-02: Doing -> Done. Every extended scheme's URL errors (exit 3, 6, 7) are checked in process; failures listed under BL-4628 and BL-4629
+- 2026-11-02: Doing -> Done. Every extended scheme's URL errors (exit 3, 6, 7) are checked in process; failures listed under BL-4652 and BL-4653

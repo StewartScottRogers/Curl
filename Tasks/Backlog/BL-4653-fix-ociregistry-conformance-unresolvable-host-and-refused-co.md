@@ -1,5 +1,5 @@
 ---
-id: BL-4629
+id: BL-4653
 title: Fix OciRegistry conformance: unresolvable host and refused connection write curl's own error text
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4629 — Fix OciRegistry conformance: unresolvable host and refused connection write curl's own error text
+# BL-4653 — Fix OciRegistry conformance: unresolvable host and refused connection write curl's own error text
 
 ## Goal
 

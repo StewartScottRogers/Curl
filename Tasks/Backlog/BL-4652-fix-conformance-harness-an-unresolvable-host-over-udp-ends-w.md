@@ -1,5 +1,5 @@
 ---
-id: BL-4628
+id: BL-4652
 title: Fix conformance harness: an unresolvable host over UDP ends with exit 6
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4628 — Fix conformance harness: an unresolvable host over UDP ends with exit 6
+# BL-4652 — Fix conformance harness: an unresolvable host over UDP ends with exit 6
 
 ## Goal
 
