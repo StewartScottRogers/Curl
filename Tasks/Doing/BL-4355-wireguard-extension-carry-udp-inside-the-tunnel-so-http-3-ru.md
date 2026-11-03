@@ -41,3 +41,4 @@ BL-4147 (ADR-1159) carries TCP alone and replaces curl's datagram connector with
 - 2026-10-30: Doing -> Backlog. Waits on BL-4357 (Engine: the in-memory dialing runner's QUIC dialer must use the hook's datagram connector) for its HTTP/3 end-to-end test; UDP through the tunnel is done in the stashed working tree
 - 2026-10-30: Backlog -> Deferred. Over its cost cap; split into BL-4371 (UDP in the tunnel) and BL-4372 (HTTP/3 end-to-end test)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 954a2d25 6291ef19 62dbae4c 3d836d5e.
