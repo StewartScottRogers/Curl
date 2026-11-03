@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4746 — Fix AF-0582: WithNoSessionId_OffersNoSessionAndLeavesTheCacheAlone checks the kept session only for null
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now checks the kept session is the cached one: its ticket and ticket age add match the session the cache was given, and a second Take finds nothing, so a handshake that replaced or added a session fails. Test-only change, so no quality run; platform-neutral (no paths, OS text or certificates). Curl.Networking.UnitTests fast tests: 4018 passed, 0 failed.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. The no-sessionid test compares the kept session with the cached one

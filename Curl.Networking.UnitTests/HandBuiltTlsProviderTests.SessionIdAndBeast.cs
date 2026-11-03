@@ -12,6 +12,10 @@ public sealed partial class HandBuiltTlsProviderTests
 {
     private const string ResumedHost = "example.com";
 
+    private const uint CachedTicketAgeAdd = 5;
+
+    private static readonly byte[] CachedTicket = [7, 1, 2];
+
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithASessionInTheRunsCache_OffersItToResume()
     {
@@ -57,8 +61,10 @@ public sealed partial class HandBuiltTlsProviderTests
         Diagnostics.Assert("offers pre_shared_key", false, ExtensionTypes(hello).Contains(TlsExtensionType.PreSharedKey));
         CollectionAssert.DoesNotContain(ExtensionTypes(hello), TlsExtensionType.PreSharedKey);
         var keptSession = sessions.Take(PeerKeyOf(options));
-        Diagnostics.Assert("session kept in the cache", true, keptSession is not null);
-        Assert.IsNotNull(keptSession, "--no-sessionid neither takes nor keeps a session");
+        Diagnostics.Assert("kept session ticket", Convert.ToHexString(CachedTicket), keptSession is null ? "none" : Convert.ToHexString(keptSession.Ticket));
+        CollectionAssert.AreEqual(CachedTicket, keptSession?.Ticket, "--no-sessionid neither takes nor replaces the cached session");
+        Assert.AreEqual(CachedTicketAgeAdd, keptSession!.TicketAgeAdd, "the cache still holds the session it was given");
+        Assert.IsNull(sessions.Take(PeerKeyOf(options)), "the handshake added no session beside the cached one");
     }
 
     [TestMethod]
@@ -83,7 +89,7 @@ public sealed partial class HandBuiltTlsProviderTests
     private static TlsSessionCache CacheHoldingASessionFor(TlsClientOptions options)
     {
         var sessions = new TlsSessionCache(TimeProvider.System);
-        TlsSessionRecord session = new(0x0304, 0x1301, new byte[32], new byte[32], [7, 1, 2], 7200, 5, 0, TimeProvider.System.GetUtcNow())
+        TlsSessionRecord session = new(0x0304, 0x1301, new byte[32], new byte[32], CachedTicket, 7200, CachedTicketAgeAdd, 0, TimeProvider.System.GetUtcNow())
         {
             ServerName = ResumedHost,
             ApplicationProtocol = "http/1.1",
