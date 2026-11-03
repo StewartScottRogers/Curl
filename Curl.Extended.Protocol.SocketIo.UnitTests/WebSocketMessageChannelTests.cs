@@ -49,6 +49,19 @@ public sealed class WebSocketMessageChannelTests
 
         Assert.IsNull(await channel.ReceiveTextAsync(CancellationToken.None));
         Assert.IsNull(await channel.ReceiveTextAsync(CancellationToken.None));
+        CollectionAssert.AreEqual(new[] { "8:" }, connection.SentFrames());
+    }
+
+    [TestMethod]
+    public async Task ReceiveTextAsync_ACloseFrame_IsAnsweredOnceWithACloseEchoingItsStatusCode()
+    {
+        ScriptedConnection connection = new(ScriptedConnection.ServerFrame(WsOpcode.Close, "\u0003hagain"));
+        WebSocketMessageChannel channel = new(connection, new ZeroRandomSource(), ScriptedConnection.ServerFrame(WsOpcode.Close, "\u0003hbye"));
+
+        Assert.IsNull(await channel.ReceiveTextAsync(CancellationToken.None));
+        Assert.IsNull(await channel.ReceiveTextAsync(CancellationToken.None));
+
+        CollectionAssert.AreEqual(new[] { "8:\u0003h" }, connection.SentFrames());
     }
 
     [TestMethod]
