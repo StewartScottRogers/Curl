@@ -9,6 +9,7 @@ touches: [Curl.Conformance.Extended.UnitLibrary/DnsQuery, Curl.Conformance.Exten
 requirement: none
 created: 2026-11-02
 completed:
+---
 # BL-4514 — Conformance: DnsQuery reference DNS server over UDP and TCP, record-type and URL cases (BL-4473 part 1 of 3)
 
 ## Goal

@@ -24,11 +24,13 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 ## Acceptance criteria
 
-- [ ] The per-case or per-stand-in content of `Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams.md` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
-- [ ] After the waiting tasks' `touches` (BL-4514, BL-4515, BL-4516, BL-4624, BL-4627, BL-4646, BL-4656) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams.md`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The per-case or per-stand-in content of `Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams.md` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
+- [x] After the waiting tasks' `touches` (BL-4514, BL-4515, BL-4516, BL-4624, BL-4627, BL-4646, BL-4656) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams.md`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Split by scheme family, as the Brokers pages are: `CurlSurface-Transfer-MessagingStreams-{Redis,Xmpp,Mqtt5,Coap}.md`, each with the shared intro and its own rows; the old page is gone (the matrix check requires rows in every page, so no index page). BL-4624 now touches `...-Dns.md` (new page for its rows), BL-4656 `...-Redis.md`, BL-4646 its one ADR. BL-4514, BL-4515 and BL-4516 lacked their front matter closing `---`, so the board read them as touching everything; fixed. `hotspots` now lists nothing for these pages. ADR-1222 citation updated. Fast tests of Curl.Conformance.Extended.UnitTests green.
 
 ## Log
 

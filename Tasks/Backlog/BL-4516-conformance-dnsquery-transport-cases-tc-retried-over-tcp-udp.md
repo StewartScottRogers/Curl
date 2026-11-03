@@ -9,6 +9,7 @@ touches: [Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryTransportTests.cs
 requirement: none
 created: 2026-11-02
 completed:
+---
 # BL-4516 — Conformance: DnsQuery transport cases - TC retried over TCP, UDP retries and give-up, matrix completion (BL-4473 part 3 of 3)
 
 ## Goal

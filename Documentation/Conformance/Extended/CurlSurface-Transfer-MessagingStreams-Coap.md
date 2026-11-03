@@ -1,0 +1,37 @@
+# CurlSurface: curl's transfer options for the coap and coaps schemes
+
+curl's generic transfer options - `-v`, `-o`, `-O`, `-w`, `--fail`, `--fail-with-body` and `-m` - checked for each
+messaging and stream scheme through the real command line, in process, against the scheme's canned server
+(`TransferSurfaceCaseRun` in `Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/MessagingStreams/`, one case
+file per scheme family). Expected values come from curl 8.22.0's manual page (curl.se/docs/manpage.html: "-v", "-o",
+"-O", "-w", "--fail", "-m", "EXIT CODES") and, where an extension deliberately differs, from its ADR, named in the row.
+Every run is on a clock the check drives, so `%{time_total}` is `0.000000` and `-m` ends at the deadline with no real
+wait. TLS schemes run with `-k` against a fresh self-signed certificate. IDs are `CurlSurface:<option>-<Scheme>-<n>`.
+
+`coap` (UDP port 5683) and `coaps` (DTLS 1.2 on UDP port 5684, `-k`) send `GET` for `coap://localhost/hello` to the
+CoAP reference server, which answers with a piggybacked 2.05 Content of `hello` (5 bytes) or a 4.04 Not Found of
+`missing`. Unlike the other messaging schemes, CoAP maps a 4.xx or 5.xx response to exit 22 under `--fail`, as an HTTP
+error status is (RFC 7252 section 5.9, ADR-1222). curl 8.22.0 has no CoAP, so `-v` expects the connection line every
+transfer writes and, for `coaps`, the OpenSSL build's DTLS line on every platform; a `coaps` `-m` timeout before the
+handshake finishes is curl's connect-phase message (ADR-1222).
+
+| ID | Level | Requirement | Covered by |
+|----|-------|-------------|------------|
+| CurlSurface:Verbose-Coap-1 | MUST | `-v` on a `coap` transfer writes `* Established connection to localhost (127.0.0.1 port 5683) from ...` to standard error, and only the reply to standard output; exit 0. | CoapTransferSurfaceCases.Verbose_SuccessfulGet_WritesConnectionLinesToStandardErrorAndOnlyTheReplyToStandardOutput |
+| CurlSurface:Output-Coap-1 | MUST | `-o file` on a `coap` transfer writes the reply to the file in a temporary directory and nothing to standard output or standard error; exit 0. | CoapTransferSurfaceCases.Output_File_WritesTheReplyToTheFileAndNothingToStandardOutput |
+| CurlSurface:RemoteName-Coap-1 | MUST | `--output-dir dir -O` on a `coap` transfer writes the reply to `dir/hello`, the URL's last path segment, and nothing to standard output; exit 0. | CoapTransferSurfaceCases.RemoteName_WritesTheReplyToAFileNamedForTheUrlsLastSegment |
+| CurlSurface:WriteOut-Coap-1 | MUST | `-w` after a successful `coap` transfer writes `%{exitcode}` 0, an empty `%{errormsg}`, `%{url}` and `%{url_effective}` as given, `%{scheme}` `coap`, `%{remote_ip}` 127.0.0.1, `%{remote_port}` 5683, `%{size_download}` 5 and `%{time_total}` 0.000000 on the injected clock, after the reply. | CoapTransferSurfaceCases.WriteOut_SuccessfulGet_WritesEveryVariableAfterTheReply |
+| CurlSurface:WriteOut-Coap-2 | MUST | `--fail -w` after a `coap` 4.04 response writes `%{exitcode}` 22 and `%{errormsg}` `The requested URL returned error: 4.04`, `%{size_download}` 0, and standard error the same message; exit 22. | CoapTransferSurfaceCases.WriteOut_NotFoundUnderFail_WritesExitCode22AndTheErrorMessage |
+| CurlSurface:Fail-Coap-1 | MUST | `--fail` on a `coap` 4.04 response exits 22 (the CoAP library maps a 4.xx or 5.xx response as an HTTP error status, ADR-1222), standard error `curl: (22) The requested URL returned error: 4.04`, nothing on standard output. | CoapTransferSurfaceCases.Fail_NotFound_Exits22AndWritesNothing |
+| CurlSurface:FailWithBody-Coap-1 | MUST | `--fail-with-body` on a `coap` 4.04 response exits 22 with the same standard error and writes the response payload to standard output. | CoapTransferSurfaceCases.FailWithBody_NotFound_Exits22AndWritesTheBody |
+| CurlSurface:Fail-Coap-2 | MUST | `--fail` on a successful `coap` transfer changes nothing: the reply on standard output, exit 0. | CoapTransferSurfaceCases.Fail_SuccessfulGet_WritesTheReplyAndExits0 |
+| CurlSurface:MaxTime-Coap-1 | MUST | `-m 5` on a `coap` transfer whose server never answers exits 28 at the deadline on the injected clock, standard error `curl: (28) Operation timed out after 5000 milliseconds with 0 bytes received`, nothing on standard output. | CoapTransferSurfaceCases.MaxTime_ServerNeverAnswers_Exits28AtTheDeadline |
+| CurlSurface:Verbose-Coaps-1 | MUST | `-v` on a `coaps` transfer writes `* Established connection to localhost (127.0.0.1 port 5684) from ...` to standard error, then a line starting `* SSL connection using DTLSv1.2` on every platform (ADR-1222), and only the reply to standard output; exit 0. | CoapTransferSurfaceCases.Verbose_SuccessfulGet_WritesConnectionLinesToStandardErrorAndOnlyTheReplyToStandardOutput |
+| CurlSurface:Output-Coaps-1 | MUST | `-o file` on a `coaps` transfer writes the reply to the file in a temporary directory and nothing to standard output or standard error; exit 0. | CoapTransferSurfaceCases.Output_File_WritesTheReplyToTheFileAndNothingToStandardOutput |
+| CurlSurface:RemoteName-Coaps-1 | MUST | `--output-dir dir -O` on a `coaps` transfer writes the reply to `dir/hello`, the URL's last path segment, and nothing to standard output; exit 0. | CoapTransferSurfaceCases.RemoteName_WritesTheReplyToAFileNamedForTheUrlsLastSegment |
+| CurlSurface:WriteOut-Coaps-1 | MUST | `-w` after a successful `coaps` transfer writes `%{exitcode}` 0, an empty `%{errormsg}`, `%{url}` and `%{url_effective}` as given, `%{scheme}` `coaps`, `%{remote_ip}` 127.0.0.1, `%{remote_port}` 5684, `%{size_download}` 5 and `%{time_total}` 0.000000 on the injected clock, after the reply. | CoapTransferSurfaceCases.WriteOut_SuccessfulGet_WritesEveryVariableAfterTheReply |
+| CurlSurface:WriteOut-Coaps-2 | MUST | `--fail -w` after a `coaps` 4.04 response writes `%{exitcode}` 22 and `%{errormsg}` `The requested URL returned error: 4.04`, `%{size_download}` 0, and standard error the same message; exit 22. | CoapTransferSurfaceCases.WriteOut_NotFoundUnderFail_WritesExitCode22AndTheErrorMessage |
+| CurlSurface:Fail-Coaps-1 | MUST | `--fail` on a `coaps` 4.04 response exits 22 (the CoAP library maps a 4.xx or 5.xx response as an HTTP error status, ADR-1222), standard error `curl: (22) The requested URL returned error: 4.04`, nothing on standard output. | CoapTransferSurfaceCases.Fail_NotFound_Exits22AndWritesNothing |
+| CurlSurface:FailWithBody-Coaps-1 | MUST | `--fail-with-body` on a `coaps` 4.04 response exits 22 with the same standard error and writes the response payload to standard output. | CoapTransferSurfaceCases.FailWithBody_NotFound_Exits22AndWritesTheBody |
+| CurlSurface:Fail-Coaps-2 | MUST | `--fail` on a successful `coaps` transfer changes nothing: the reply on standard output, exit 0. | CoapTransferSurfaceCases.Fail_SuccessfulGet_WritesTheReplyAndExits0 |
+| CurlSurface:MaxTime-Coaps-1 | MUST | `-m 5` on a `coaps` transfer whose server never answers exits 28 at the deadline on the injected clock, standard error `curl: (28) Connection timed out after 5000 milliseconds`, the handshake being in the connect phase (ADR-1222), nothing on standard output. | CoapTransferSurfaceCases.MaxTime_ServerNeverAnswers_Exits28AtTheDeadline |

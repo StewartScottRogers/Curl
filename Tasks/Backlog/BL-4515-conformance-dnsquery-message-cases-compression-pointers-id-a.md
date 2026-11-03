@@ -9,6 +9,7 @@ touches: [Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryMessageTests.cs, 
 requirement: none
 created: 2026-11-02
 completed:
+---
 # BL-4515 — Conformance: DnsQuery message cases - compression pointers, ID and question matching, RCODEs (BL-4473 part 2 of 3)
 
 ## Goal

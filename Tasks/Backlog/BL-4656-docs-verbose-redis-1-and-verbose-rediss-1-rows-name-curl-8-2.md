@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4623]
-touches: [Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams.md]
+touches: [Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams-Redis.md]
 requirement: none
 created: 2026-11-02
 completed:

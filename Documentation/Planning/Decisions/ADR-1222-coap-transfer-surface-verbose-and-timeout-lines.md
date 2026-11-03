@@ -9,7 +9,7 @@ Decided by Claude under Stewart's delegation.
 ## Context
 
 BL-4627 checks curl's generic transfer options for `coap` and `coaps`
-(`Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams.md`). curl 8.22.0 has no CoAP, so there is
+(`Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams-Coap.md`). curl 8.22.0 has no CoAP, so there is
 no real curl to measure for two answers: which TLS line `-v` writes for a DTLS session, and what `-m` says when the
 DTLS handshake never finishes. The other TLS schemes' cases match the platform curl's TLS line (`* schannel: ` on
 Windows, `* SSL connection using TLSv1.` on the OpenSSL build). Curl's DTLS 1.2 is built by hand
