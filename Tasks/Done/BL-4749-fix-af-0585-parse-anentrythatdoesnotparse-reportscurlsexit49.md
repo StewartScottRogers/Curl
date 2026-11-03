@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4749 — Fix AF-0585: Parse_AnEntryThatDoesNotParse_ReportsCurlsExit49Message never checks exit 49
 
@@ -52,3 +52,4 @@ Added the ParseFailureCodeWith exit-49 assertion to the test (ResolveOverridesTe
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Exit-49 assertion added; Networking fast tests pass
