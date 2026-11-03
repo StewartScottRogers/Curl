@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.CodeGeneration.UnitLibrary, Curl.Extension.CodeGeneration.UnitTests/PowerShellScriptTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4761 — Fix AF-0597: Surviving mutant: -L --max-redirs 0 can generate -MaximumRedirection 2147483647 without a test failing
 
@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Test pins -L --max-redirs 0 to -MaximumRedirection 0, killing the AF-0597 mutant
