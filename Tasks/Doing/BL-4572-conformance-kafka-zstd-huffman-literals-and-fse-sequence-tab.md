@@ -46,3 +46,4 @@ Repeat_Mode. Cases go in `Curl.Conformance.Extended.UnitTests/Kafka/Compression/
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 99c0a8f4 d822d055 0fc765d5 914c30cc c1434b50.
