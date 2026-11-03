@@ -185,6 +185,7 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
         switch (packet)
         {
             case Mqtt5Publish publish:
+                ThrowIfTopicAlias(publish);
                 await WriteOutputAsync(publish.Payload).ConfigureAwait(false);
                 await AcknowledgeAsync(publish).ConfigureAwait(false);
                 return false;
@@ -194,6 +195,21 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
             default:
                 await AnswerReleaseOrAcceptPingResponseAsync(packet).ConfigureAwait(false);
                 return false;
+        }
+    }
+
+    /// <summary>
+    /// Refuses a PUBLISH carrying a Topic Alias: curl's CONNECT sends no Topic Alias Maximum, so the server may send none
+    /// (MQTT5-3.3.2.3.4-1). It is answered by DISCONNECT 0x94 Topic Alias invalid and exit 8, nothing of it written (ADR-1199).
+    /// </summary>
+    private static void ThrowIfTopicAlias(Mqtt5Publish publish)
+    {
+        if (publish.Properties.Any(property => property.Identifier == Mqtt5PropertyIdentifier.TopicAlias))
+        {
+            throw new Mqtt5ClientException(
+                CurlExitCode.WeirdServerReply,
+                Mqtt5ClientMessages.MalformedPacket("PUBLISH has a Topic Alias above the Topic Alias Maximum 0."),
+                Mqtt5ReasonCode.TopicAliasInvalid);
         }
     }
 

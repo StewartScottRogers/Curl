@@ -1,7 +1,6 @@
 # Extended conformance cases known to fail (BL-4502): one '<requirement id> BL-####' per line, any order.
 # A listed case passes while it still fails and fails once it passes: then remove its line.
 # A listed ID that no test carries fails RequirementChecks. Lines merge by union, so add or remove only whole lines.
-Mqtt5:MQTT5-3.3.2.3.4-1 BL-4574
 Mqtt5:MQTT5-3.1.2.10-1 BL-4575
 Amqp1:Core-2.4.3-2 BL-4584
 Amqp1:Core-2.6.5-1 BL-4585

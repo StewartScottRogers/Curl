@@ -162,6 +162,26 @@ public sealed class Mqtt5ClientFlowTests
     }
 
     [TestMethod]
+    public async Task RunAsync_PublishWithTopicAlias_WritesNothingAndIsAnsweredByDisconnect0x94()
+    {
+        byte[] aliased = new Mqtt5Publish
+        {
+            TopicName = "t",
+            Payload = "abc"u8.ToArray(),
+            Properties = [Mqtt5Property.FromInteger(Mqtt5PropertyIdentifier.TopicAlias, 1)],
+        }.ToBytes();
+        var connection = new ScriptedMqtt5Connection([.. ConnAck(), .. SubAck(Mqtt5ReasonCode.GrantedQos0), .. aliased]);
+        using var output = new MemoryStream();
+        var flow = new Mqtt5ClientFlow(connection, output, NoTransferProgress.Instance, TimeProvider.System, CancellationToken.None);
+
+        Mqtt5ClientException failure = await Assert.ThrowsExactlyAsync<Mqtt5ClientException>(async () => await flow.RunAsync(new Mqtt5Connect(), "t", null));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure.ExitCode);
+        Assert.AreEqual(0, output.Length);
+        CollectionAssert.AreEqual(new Mqtt5Disconnect { ReasonCode = Mqtt5ReasonCode.TopicAliasInvalid }.ToBytes(), connection.Writes[^1]);
+    }
+
+    [TestMethod]
     public async Task RunAsync_OutputFails_EndsWithWriteError()
     {
         ScriptedMqtt5Connection connection = new([.. ConnAck(), .. SubAck(Mqtt5ReasonCode.GrantedQos0), .. Publish("abc")]);
