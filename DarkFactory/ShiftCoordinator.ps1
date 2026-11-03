@@ -249,7 +249,9 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # A coordinator taking over a shift (-TakeOverShift) keeps that shift's running lanes, so
     # nothing in Doing is a previous shift's to adopt.
     if ($stuck.Count -and -not $TakeOverShift) {
-        $previous = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
+        # This shift's own lanes-<stamp> folder already exists (its coordinator stamp is written
+        # before this check), and is empty of lane state, so it is never the previous shift.
+        $previous = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne "lanes-$Stamp" } | Sort-Object Name | Select-Object -Last 1
         if ($previous) {
             $prevStamp = $previous.Name.Substring(6)
             foreach ($n in 1..16) {
