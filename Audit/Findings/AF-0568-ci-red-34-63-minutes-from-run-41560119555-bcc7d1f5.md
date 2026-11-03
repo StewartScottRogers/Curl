@@ -3,8 +3,8 @@ id: AF-0568
 title: CI red 34.63 minutes from run 41560119555 (bcc7d1f5): MQTT 5 conformance test Mqtt5s_UntrustedCertificate_IsRefusedBeforeAnyMqttWithExit60 failed on Linux and macOS
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:ci-run-41560119555:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
