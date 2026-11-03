@@ -14,7 +14,15 @@ namespace Curl.Conformance.Extended.UnitTests.Kafka.Compression.Entropy.Literals
 [TestClass]
 public sealed class KafkaZstdHuffmanLiteralsTests
 {
-    private const string Requirement = "Kafka:RFC8878-3.1.1.3.1-2";
+    private const string OneStream = "Kafka:RFC8878-3.1.1.3.1-2";
+
+    private const string FourStreams = "Kafka:RFC8878-3.1.1.3.1-3";
+
+    private const string FseCompressedWeights = "Kafka:RFC8878-3.1.1.3.1-4";
+
+    private const string Treeless = "Kafka:RFC8878-3.1.1.3.1-5";
+
+    private const string TreelessWithNoTree = "Kafka:RFC8878-3.1.1.3.1-6";
 
     /// <summary>' ' and 'd' weight 1, 'b' 2, 'n' 3 (implied), 'a' 4: 16 cells, codes of 1 to 4 bits.</summary>
     internal static KafkaReferenceHuffmanTree BananaTree()
@@ -34,9 +42,9 @@ public sealed class KafkaZstdHuffmanLiteralsTests
     private static byte[] Block(byte[] literalsSection) => KafkaReferenceLiteralsSectionWriter.BlockOfLiteralsOnly(literalsSection);
 
     [TestMethod]
-    [SpecRequirement(Requirement)]
+    [SpecRequirement(OneStream)]
     public Task Fetch_HuffmanLiteralsInOneStreamWithDirectWeights_WritesTheRecord() =>
-        Known.RunCaseAsync([Requirement], async () =>
+        Known.RunCaseAsync([OneStream], async () =>
         {
             KafkaReferenceHuffmanTree tree = BananaTree();
             byte[] value = Ascii("a banana bandana");
@@ -46,9 +54,9 @@ public sealed class KafkaZstdHuffmanLiteralsTests
         });
 
     [TestMethod]
-    [SpecRequirement(Requirement)]
+    [SpecRequirement(FourStreams)]
     public Task Fetch_HuffmanLiteralsInFourStreams_WritesTheRecord() =>
-        Known.RunCaseAsync([Requirement], async () =>
+        Known.RunCaseAsync([FourStreams], async () =>
         {
             KafkaReferenceHuffmanTree tree = BananaTree();
             byte[] value = Ascii("a banana and a bandana and a bad nan");
@@ -58,9 +66,9 @@ public sealed class KafkaZstdHuffmanLiteralsTests
         });
 
     [TestMethod]
-    [SpecRequirement(Requirement)]
+    [SpecRequirement(FseCompressedWeights)]
     public Task Fetch_HuffmanLiteralsWithFseCompressedWeights_WritesTheRecord() =>
-        Known.RunCaseAsync([Requirement], async () =>
+        Known.RunCaseAsync([FseCompressedWeights], async () =>
         {
             KafkaReferenceHuffmanTree tree = BananaTree();
             byte[] value = Ascii("banana bandana");
@@ -70,9 +78,9 @@ public sealed class KafkaZstdHuffmanLiteralsTests
         });
 
     [TestMethod]
-    [SpecRequirement(Requirement)]
+    [SpecRequirement(Treeless)]
     public Task Fetch_TreelessLiteralsReusingThePreviousBlocksTree_WritesTheRecord() =>
-        Known.RunCaseAsync([Requirement], async () =>
+        Known.RunCaseAsync([Treeless], async () =>
         {
             KafkaReferenceHuffmanTree tree = BananaTree();
             byte[] first = Ascii("a banana ");
@@ -85,9 +93,9 @@ public sealed class KafkaZstdHuffmanLiteralsTests
         });
 
     [TestMethod]
-    [SpecRequirement(Requirement)]
+    [SpecRequirement(TreelessWithNoTree)]
     public Task Fetch_TreelessLiteralsWithNoEarlierTree_FailsWithWeirdServerReply() =>
-        Known.RunCaseAsync([Requirement], async () =>
+        Known.RunCaseAsync([TreelessWithNoTree], async () =>
         {
             byte[] value = Ascii("no tree yet");
             byte[] block = Block(KafkaReferenceLiteralsSectionWriter.Treeless(BananaTree(), Ascii("banana"), fourStreams: false));

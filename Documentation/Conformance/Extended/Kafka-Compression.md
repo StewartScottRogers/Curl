@@ -13,7 +13,9 @@ client library: gzip through the BCL's `GZipStream`; Snappy and LZ4 through `Kaf
 `KafkaReferenceLz4FrameWriter`, greedy encoders written from the format documents (Snappy with every copy written at
 the one offset width a case names); zstd through `KafkaReferenceZstdFrameWriter`, which lays a frame out block by
 block as the case says, its compressed block written by hand from RFC 8878 with raw literals and RLE sequence codes
-(the case's comment spells out each sequence). Checksums are XXH32 and XXH64 (`KafkaReferenceXxHash`, pinned to the
+(the case's comment spells out each sequence), or with Huffman-coded literals (`KafkaReferenceLiteralsSectionWriter`,
+`Entropy/Huffman/`) or FSE-coded sequences in Predefined_Mode, FSE_Compressed_Mode and Repeat_Mode
+(`KafkaReferenceSequencesSectionWriter`, `Entropy/Sequences/`), both on the reference FSE encoder in `Entropy/Fse/`. Checksums are XXH32 and XXH64 (`KafkaReferenceXxHash`, pinned to the
 published vectors).
 
 | ID | Level | Requirement | Covered by |
@@ -60,9 +62,17 @@ published vectors).
 | Kafka:RFC8878-3.1.1.2-3 | MUST | A Compressed_Block is a literals section and a sequences section. | KafkaZstdTests.Fetch_CompressedBlockWithRepeatOffsets_WritesTheRecord |
 | Kafka:RFC8878-3.1.1.2-4 | MUST | Blocks follow one another until the one with Last_Block set. | KafkaZstdTests.Fetch_RleBlockBetweenRawBlocks_WritesTheRecord |
 | Kafka:RFC8878-3.1.1.3.1-1 | MUST | A Raw_Literals_Block holds the literals as they are, its size in the literals section header. | KafkaZstdTests.Fetch_CompressedBlockWithRepeatOffsets_WritesTheRecord |
-| Kafka:RFC8878-3.1.1.3.1-2 | MUST | Compressed_Literals_Block and Treeless_Literals_Block hold Huffman-coded literals in one or four streams, with the tree described or reused. | n/a: the reference has no Huffman encoder yet; the cases are BL-4572's |
+| Kafka:RFC8878-3.1.1.3.1-2 | MUST | A Compressed_Literals_Block describes its Huffman tree (here with direct weights) and holds the literals in one stream. | KafkaZstdHuffmanLiteralsTests.Fetch_HuffmanLiteralsInOneStreamWithDirectWeights_WritesTheRecord |
+| Kafka:RFC8878-3.1.1.3.1-3 | MUST | With Size_Format 1 the literals are in four streams behind a six-byte jump table. | KafkaZstdHuffmanLiteralsTests.Fetch_HuffmanLiteralsInFourStreams_WritesTheRecord |
+| Kafka:RFC8878-3.1.1.3.1-4 | MUST | A tree description may give the weights FSE-compressed. | KafkaZstdHuffmanLiteralsTests.Fetch_HuffmanLiteralsWithFseCompressedWeights_WritesTheRecord |
+| Kafka:RFC8878-3.1.1.3.1-5 | MUST | A Treeless_Literals_Block reuses the Huffman tree of the frame's previous compressed block. | KafkaZstdHuffmanLiteralsTests.Fetch_TreelessLiteralsReusingThePreviousBlocksTree_WritesTheRecord |
+| Kafka:RFC8878-3.1.1.3.1-6 | MUST | A Treeless_Literals_Block with no earlier tree in the frame is corrupt. | KafkaZstdHuffmanLiteralsTests.Fetch_TreelessLiteralsWithNoEarlierTree_FailsWithWeirdServerReply |
 | Kafka:RFC8878-3.1.1.3.2-1 | MUST | The sequences section header gives Number_of_Sequences and Symbol_Compression_Modes; RLE_Mode gives each code as one byte. | KafkaZstdTests.Fetch_CompressedBlockWithRepeatOffsets_WritesTheRecord |
-| Kafka:RFC8878-3.1.1.3.2-2 | MUST | Predefined_Mode, FSE_Compressed_Mode and Repeat_Mode decode each code with the default, described or previous FSE table. | n/a: the reference has no FSE encoder yet; the cases are BL-4572's |
+| Kafka:RFC8878-3.1.1.3.2-2 | MUST | Predefined_Mode decodes a code with its default FSE distribution. | KafkaZstdFseSequencesTests.Fetch_SequencesInPredefinedMode_WritesTheRecord |
+| Kafka:RFC8878-3.1.1.3.2-3 | MUST | FSE_Compressed_Mode decodes a code with the FSE table described after the sequences section header. | KafkaZstdFseSequencesTests.Fetch_SequencesInFseCompressedMode_WritesTheRecord |
+| Kafka:RFC8878-3.1.1.3.2-4 | MUST | Repeat_Mode decodes a code with the table the frame's previous compressed block used. | KafkaZstdFseSequencesTests.Fetch_SequencesInRepeatModeReusingThePreviousBlocksTables_WritesTheRecord |
+| Kafka:RFC8878-3.1.1.3.2-5 | MUST | Repeat_Mode with no earlier table in the frame is corrupt. | KafkaZstdFseSequencesTests.Fetch_SequencesInRepeatModeWithNoEarlierTable_FailsWithBadZstdData |
+| Kafka:RFC8878-3.1.1.3.2-6 | MUST | Each of the three codes has its own mode, so one block may mix Repeat_Mode, Predefined_Mode and FSE_Compressed_Mode. | KafkaZstdFseSequencesTests.Fetch_SequencesMixingRepeatPredefinedAndFseCompressedModes_WritesTheRecord |
 | Kafka:RFC8878-3.1.1.4-1 | MUST | Each sequence copies its literals, then its match, and the literals left after the last sequence end the block. | KafkaZstdTests.Fetch_CompressedBlockWithRepeatOffsets_WritesTheRecord |
 | Kafka:RFC8878-3.1.1.5-1 | MUST | An offset value of 1 to 3 names a repeat offset, starting from 1, 4 and 8, and using one moves it to the front. | KafkaZstdTests.Fetch_CompressedBlockWithRepeatOffsets_WritesTheRecord |
 | Kafka:RFC8878-3.1.2-1 | MUST | A skippable frame (magic 0x184D2A5?, a 4-byte size and that many bytes) is skipped. | KafkaZstdTests.Fetch_SkippableFrameThenFrameWithContentChecksum_WritesEveryRecord |
