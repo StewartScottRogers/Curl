@@ -63,7 +63,10 @@ library's `.UnitTests` pins the fix (ADR-0482), the `KnownFailures.txt` line is 
 
 ## Notes
 
+- 2026-11-02 (lane 6): Split before any edit. `Http3ServerConnection`'s frame switch has no QUIC DATAGRAM handling, so the WebTransport datagram cases cannot run on it yet (BL-4603). Building a WebTransport over HTTP/3 reference server from the spec, plus the matrix and the nine or more cases at 100% coverage, is too much for one run. The work is now BL-4603 (Http3Server datagrams), BL-4604 (the reference server in `WebTransport/Server/`, depends on BL-4603) and BL-4605 (the matrix, cases and known failures, carrying this task's criteria, depends on both). No other live task named BL-4494 in `depends-on`.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 06fab208 b8e0bf7a feec4e2a d8e3fb0e b686519a 17248609.
+- 2026-11-02: Doing -> Deferred. Split into BL-4603, BL-4604, BL-4605
