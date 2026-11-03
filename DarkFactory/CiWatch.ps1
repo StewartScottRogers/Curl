@@ -598,6 +598,21 @@ function ConvertTo-CiDateTime {
     return [datetime]::Parse("$Value", [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AdjustToUniversal).ToLocalTime()
 }
 
+function Get-CiActiveRuns {
+    # The run holding -Listed's branch's concurrency slot (Running) and the newest run waiting
+    # behind it (Waiting), each $null when there is none. -Listed is gh's run list, newest
+    # first. GitHub reports a run waiting on the concurrency group as 'pending', but the run
+    # holding the slot reads 'queued', not 'in_progress', while any of its jobs waits for a
+    # runner (run 41489970818 on 2026-11-02: its macOS job waited 84 minutes), so the holder is
+    # the oldest unfinished run that is not 'pending', whatever its status (BL-4647, AF-0541).
+    param([object[]]$Listed)
+    $open = @($Listed | Where-Object { $_ -and $_.status -and $_.status -ne 'completed' })
+    $holding = @($open | Where-Object { $_.status -ne 'pending' })
+    $running = if ($holding.Count) { $holding[-1] } else { $null }
+    $waiting = @($open | Where-Object { -not $running -or "$($_.databaseId)" -ne "$($running.databaseId)" })[0]
+    return [pscustomobject]@{ Running = $running; Waiting = $waiting }
+}
+
 function Get-CiRunningRun {
     # The CI run on the branch that is still running, as a run Get-CiVerdicts reads (Id, Sha,
     # FinishedAt, Failures), once a job of it has failed with a failing test or build error in
@@ -610,7 +625,7 @@ function Get-CiRunningRun {
     # `gh run view --json jobs` JSON) and -ReadJobLog (a job id -> its log lines, $null when
     # unreadable) stand in for gh in -TestCiWatch.
     param([object[]]$Listed, [scriptblock]$ListJobs, [scriptblock]$ReadJobLog)
-    $running = @($Listed | Where-Object { $_ -and $_.status -eq 'in_progress' })[0]
+    $running = (Get-CiActiveRuns $Listed).Running
     if (-not $running) { return $null }
     if (-not $ListJobs) {
         $ListJobs = { param([string]$Id) $json = (gh run view $Id --json jobs 2>$null) -join "`n"; if ($LASTEXITCODE -ne 0) { return $null }; return $json }
@@ -686,8 +701,9 @@ function Stop-CiRunWithoutFix {
     param([object[]]$Listed, [object[]]$Runs, [string]$Repo, [scriptblock]$CancelRun)
     $newest = @($Runs)[0]
     if (-not $newest -or -not @($newest.Failures | Where-Object { $_ }).Count) { return '' }
-    $running = @($Listed | Where-Object { $_ -and $_.status -eq 'in_progress' })[0]
-    $waiting = @($Listed | Where-Object { $_ -and $_.status -in 'queued', 'pending', 'waiting', 'requested' })[0]
+    $active = Get-CiActiveRuns $Listed
+    $running = $active.Running
+    $waiting = $active.Waiting
     if (-not $running -or -not $waiting) { return '' }
     $id = "$($running.databaseId)"
     $decided = "cancel $id $($waiting.databaseId)"
@@ -760,7 +776,7 @@ function Invoke-CiWatch {
     if ($null -eq $runs) { return }
     $listed = @($script:CiWatch.Listed)
     $cancelled = ''
-    if (@($listed | Where-Object { $_ -and $_.status -in 'queued', 'pending', 'waiting', 'requested' }).Count) {
+    if ((Get-CiActiveRuns $listed).Waiting) {
         git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) { Write-CiRunLine -Key 'fetch' -Line "git fetch origin $Branch failed (exit $LASTEXITCODE): a run is waiting but cannot be compared with the running one" }
         else { $script:CiWatch.Logged.Remove('fetch') }
@@ -1411,6 +1427,16 @@ if ($TestCiWatch) {
     & $check 'a failed job log that stays unreadable is traced on the first call only' '1|1|False' "$tracedFirst|$($traced.Count - $tracedBefore)|$($traced -like '*has failed jobs but no failing*' -as [bool])"
     & $check 'a running run with no failed job is not read' 'True' "$($null -eq (Get-CiRunningRun -Listed $listedRunning -ListJobs { param($Id) '{"jobs":[{"databaseId":9,"name":"x","status":"in_progress","conclusion":""}]}' } -ReadJobLog $jobLog))"
     & $check 'no running run, nothing read' 'True' "$($null -eq (Get-CiRunningRun -Listed @([pscustomobject]@{ databaseId = 1; status = 'completed'; conclusion = 'failure'; headSha = 'x' }) -ListJobs { param($Id) throw 'not called' } -ReadJobLog $jobLog))"
+    # BL-4647 (AF-0541): the run holding the concurrency slot is the oldest unfinished run not
+    # 'pending', even when it reads 'queued' because a job of it waits for a runner.
+    $activeOf = { param([object[]]$Listed) $a = Get-CiActiveRuns $Listed; "$(if ($a.Running) { $a.Running.databaseId } else { '-' })/$(if ($a.Waiting) { $a.Waiting.databaseId } else { '-' })" }
+    $run = { param([long]$Id, [string]$Status) [pscustomobject]@{ databaseId = $Id; status = $Status; conclusion = ''; headSha = 'abcdef1234' } }
+    & $check 'a queued holder with a pending run behind it: running 82, waiting 83' '82/83' (& $activeOf @((& $run 83 'pending'), (& $run 82 'queued'), (& $run 81 'completed')))
+    & $check 'an in_progress holder with a newer queued run: running 84, waiting 85' '84/85' (& $activeOf @((& $run 85 'queued'), (& $run 84 'in_progress')))
+    & $check 'a lone queued run holds the slot and nothing waits' '88/-' (& $activeOf @((& $run 88 'queued')))
+    & $check 'only a pending run: nothing holds the slot, it waits' '-/89' (& $activeOf @((& $run 89 'pending'), (& $run 80 'completed')))
+    $queuedEarly = Get-CiRunningRun -Listed @((& $run 91 'pending'), (& $run 90 'queued')) -ListJobs { param($Id) if ($Id -eq '90') { $jobsJson } } -ReadJobLog $jobLog
+    & $check 'a failed job of a holder that reads queued is read now' '90|test1173:' "$($queuedEarly.Id)|$(@($queuedEarly.Failures)[0].Key)"
     # BL-3456: a running run without the CI fix a waiting run carries is cancelled, only while CI is red.
     $fixTemp = Join-Path ([IO.Path]::GetTempPath()) "df-ci-cancel-$PID"
     try {
@@ -1447,7 +1473,10 @@ if ($TestCiWatch) {
         & $check 'no git ran for the decided pair' '0' "$script:gitCalls"
         & $check 'green: nothing cancelled, the red spell would be hidden' '' (Stop-CiRunWithoutFix -Listed (& $pair $shaFix '81') -Runs $greenRuns -Repo $fixTemp -CancelRun $cancel)
         & $check 'no waiting run: nothing cancelled' '' (Stop-CiRunWithoutFix -Listed @((& $pair $shaFix '82')[1]) -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
-        & $check 'gh cancelled only run 78' '78' ($script:cancelledIds -join ',')
+        # BL-4647 (AF-0541): the run holding the slot reads 'queued' while a job waits for a runner.
+        $queuedHolder = @([pscustomobject]@{ databaseId = 87; status = 'pending'; headSha = $shaFix }, [pscustomobject]@{ databaseId = 86; status = 'queued'; headSha = $shaRunning })
+        & $check 'red, the holder reads queued while a job waits for a runner, and the waiting run carries the fix: the holder is cancelled' '86' (Stop-CiRunWithoutFix -Listed $queuedHolder -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
+        & $check 'gh cancelled only runs 78 and 86' '78,86' ($script:cancelledIds -join ',')
     } finally { Remove-Item -Recurse -Force -Path $fixTemp -ErrorAction SilentlyContinue }
     exit $(if ($script:ciTestFailed) { 1 } else { 0 })
 }
