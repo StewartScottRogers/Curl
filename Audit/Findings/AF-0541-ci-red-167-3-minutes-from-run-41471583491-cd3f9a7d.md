@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:41471583491:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-4647
+tasks: BL-4647
 found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md

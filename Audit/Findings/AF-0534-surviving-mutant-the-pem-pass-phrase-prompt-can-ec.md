@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/TerminalPemPassPhrasePrompt.cs:ReadConsoleLine-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TerminalPemPassPhrasePrompt.cs:44:true
-task: none
-tasks:
+task: BL-4640
+tasks: BL-4640
 found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md

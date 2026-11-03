@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/ConnectionCache.cs:CloseIdleToMakeRoomAsync-minus1:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ConnectionCache.cs:123:-1
-task: none
-tasks:
+task: BL-4638
+tasks: BL-4638
 found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md

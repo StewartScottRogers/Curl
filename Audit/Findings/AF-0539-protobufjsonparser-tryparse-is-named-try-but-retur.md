@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Curl.Protobuf.UnitLibrary/Json/ProtobufJsonParser.cs:ProtobufJsonParser.TryParse:misleading-name
 reproduction: none
-task: none
-tasks:
+task: BL-4645
+tasks: BL-4645
 found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md

@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-1199-mqtt5-acknowledges-received-qos-refuses-unallowed-topic-aliases-and-closes-on-a-missing-pingresp.md:KnownFailures-task-ids:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-4646
+tasks: BL-4646
 found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md
