@@ -3,8 +3,8 @@ id: AF-0552
 title: BuildsTheDispatcherOverASocketCallbackPool checks the dispatcher only for null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitTests/ManagedEasyTransferTests.Sockets.cs:CreateDispatcher_SocketCallbackSet_BuildsTheDispatcherOverASocketCallbackPool:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitTests/ManagedEasyTransferTests.Sockets.cs -P
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
