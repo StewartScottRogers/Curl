@@ -1276,3 +1276,4 @@ Each option and the specific reason it lost.
 | [1226](ADR-1226-grpc-bin-metadata-given-to-h-is-base64.md) | A `-bin` metadata value given to `-H` on a gRPC call is read as base64 and sent un-padded (BL-4533) | Accepted | 2026-11-03 |
 | [1227](ADR-1227-grpc-request-headers-carry-h-and-user-agent.md) | A gRPC call sends `-H` as Custom-Metadata, `-A` or curl's own `user-agent`, and `grpc-timeout` straight after the pseudo-headers (BL-4674) | Accepted | 2026-11-03 |
 | [1228](ADR-1228-protojson-timestamp-and-duration-are-strings.md) | ProtoJSON writes and reads `google.protobuf.Timestamp` and `Duration` as their string forms (BL-4686) | Accepted | 2026-11-03 |
+| [1228](ADR-1228-dns-over-https-queries-carry-dns-id-0.md) | DNS over HTTPS queries carry DNS ID 0 (BL-4688) | Accepted | 2026-11-03 |

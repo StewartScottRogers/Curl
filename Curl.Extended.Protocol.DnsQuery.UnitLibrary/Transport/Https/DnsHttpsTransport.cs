@@ -6,7 +6,7 @@ namespace Curl.Extended.Protocol.DnsQuery.Transport.Https;
 /// <summary>
 /// Sends a query over DNS over HTTPS (RFC 8484, ADR-1148): opens a TCP connection to the server, port 443 by default,
 /// runs the TLS handshake through curl's TLS provider checking the certificate against the server's host (section 5),
-/// POSTs the query to <c>/dns-query</c> as <c>application/dns-message</c> over HTTP/1.1 (section 4.1) and reads the
+/// POSTs the query to <c>/dns-query</c> as <c>application/dns-message</c> over HTTP/1.1 with DNS ID 0 (section 4.1) and reads the
 /// 200 answer's body (section 4.2).
 /// </summary>
 /// <param name="connector">Opens the plaintext TCP connection.</param>
@@ -18,6 +18,9 @@ internal sealed class DnsHttpsTransport(IConnector connector, ITlsProvider tlsPr
 
     /// <inheritdoc />
     public int DefaultPort => Port;
+
+    /// <summary>Gets true: a DoH query carries DNS ID 0 for cache friendliness (RFC 8484 section 4.1).</summary>
+    public bool QueriesWithMessageIdZero => true;
 
     /// <inheritdoc />
     public async ValueTask<byte[]> ExchangeAsync(string host, int port, byte[] query, ITransferContext context)

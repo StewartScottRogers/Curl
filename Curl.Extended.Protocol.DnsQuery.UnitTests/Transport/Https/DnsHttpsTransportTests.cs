@@ -23,6 +23,10 @@ public sealed class DnsHttpsTransportTests
         Assert.AreEqual(443, new DnsHttpsTransport(new ScriptedDnsServer((_, _) => [], []), new HandshakingTlsProvider()).DefaultPort);
 
     [TestMethod]
+    public void QueriesWithMessageIdZero_Rfc8484Section4_1_IsTrue() =>
+        Assert.IsTrue(((IDnsQueryTransport)new DnsHttpsTransport(new ScriptedDnsServer((_, _) => [], []), new HandshakingTlsProvider())).QueriesWithMessageIdZero);
+
+    [TestMethod]
     public void TransportOf_Https_GivesTheDnsOverHttpsTransport()
     {
         var server = new ScriptedDnsServer((_, _) => [], []);

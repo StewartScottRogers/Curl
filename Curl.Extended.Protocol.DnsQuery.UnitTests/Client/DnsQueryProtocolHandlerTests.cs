@@ -61,6 +61,23 @@ public sealed class DnsQueryProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DnsTransportHttps_Rfc8484Section4_1_QueriesWithDnsId0AndAcceptsTheAnswersId0()
+    {
+        byte[] answerWithIdZero = [0, 0, .. Answer.AsSpan(2)];
+        var server = new ScriptedDnsServer((_, _) => [], [.. Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nContent-Length: {answerWithIdZero.Length}\r\n\r\n"), .. answerWithIdZero]);
+        var handler = new DnsQueryProtocolHandler(new(server, server, new HandshakingTlsProvider(), null!), () => [], _ => [0x12, 0x34]);
+        var output = new MemoryStream();
+
+        TransferResult result = await handler.ExecuteAsync(new DnsQueryContext(ContextOf("dns://h/example.com", output), "https", json: false));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string request = Encoding.ASCII.GetString(server.TcpWritten.ToArray());
+        int body = request.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4;
+        Assert.AreEqual("\0\0", request.Substring(body, 2), "RFC 8484 section 4.1: the DoH query's DNS ID is 0");
+        Assert.StartsWith(";; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 0\n", Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NoServerInTheUrl_QueriesTheSystemsFirstDnsServer()
     {
         var server = new ScriptedDnsServer((_, _) => [Answer], []);
