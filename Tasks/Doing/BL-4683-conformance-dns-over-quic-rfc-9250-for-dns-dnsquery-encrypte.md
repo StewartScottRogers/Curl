@@ -56,3 +56,4 @@ scripted application error code (`Close(code)`), or answer with a scripted non-z
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 21a4291a 19f3f6e9 f3c72898 d8e3fb0e 627fbee3 17248609.
