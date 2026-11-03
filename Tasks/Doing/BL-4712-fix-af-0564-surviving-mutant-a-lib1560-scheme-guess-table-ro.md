@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-11-03: Doing -> Backlog. Waits on BL-4695, whose touches hold Curl.Conformance.LibTest.UnitTests, where the table-pinning test Lib1560TablesTests.cs must go
+- 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
