@@ -8,7 +8,7 @@ depends-on: [BL-4623]
 touches: [Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams-Redis.md]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-03
 ---
 # BL-4656 — Docs: Verbose-Redis-1 and Verbose-Rediss-1 rows name curl 8.22's Established connection line
 
@@ -22,8 +22,8 @@ BL-4651 measured real curl 8.22.0 (`Record-CurlExchange.ps1`, `-sv http://localh
 
 ## Acceptance criteria
 
-- [ ] Both rows say `-v` writes `* Established connection to localhost (127.0.0.1 port 6379) from ...` to standard error (the rediss row keeps its TLS line text); no `Connected to localhost` is left in the file.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests are green.
+- [x] Both rows say `-v` writes `* Established connection to localhost (127.0.0.1 port 6379) from ...` to standard error (the rediss row keeps its TLS line text); no `Connected to localhost` is left in the file.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests are green.
 
 ## Notes
 
@@ -31,3 +31,4 @@ BL-4651 measured real curl 8.22.0 (`Record-CurlExchange.ps1`, `-sv http://localh
 
 - 2026-11-02: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: a063ab12 e3a4fd8b.
+- 2026-11-03: Doing -> Done. Verbose-Redis-1 and Verbose-Rediss-1 rows name curl 8.22's Established connection line
