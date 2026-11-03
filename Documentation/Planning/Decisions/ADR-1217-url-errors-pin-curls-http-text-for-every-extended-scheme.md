@@ -1,4 +1,4 @@
-# ADR-1216: URL errors pin curl's `http://` text for every extended scheme
+# ADR-1217: URL errors pin curl's `http://` text for every extended scheme
 
 - Status: Accepted
 - Date: 2026-11-02
