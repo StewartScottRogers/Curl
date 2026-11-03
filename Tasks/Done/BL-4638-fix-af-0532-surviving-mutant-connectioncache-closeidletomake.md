@@ -49,7 +49,7 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - Added `Curl.Networking.UnitTests/ConnectionCacheTests.cs` to `touches`: the mutant survives because no Networking test calls `CloseIdleToMakeRoomAsync` (only `Curl.Engine.UnitTests/Cgr150Tests.cs` did), and the reproduction runs `Curl.Networking.UnitTests`. No task in Doing on `origin/work/dark-factory` names a Networking path.
 - Fix: two tests in `ConnectionCacheTests` - `CloseIdleToMakeRoomAsync_ThreeIdleAndOneLeasedForANewHost_ClosesTheOldestIdleUntilFewerThanTheLimitRemain` (limits 1 to 5, closing 3, 3, 2, 1, 0 of the three idle connections, oldest first, never the leased one) and `CloseIdleToMakeRoomAsync_AnIdleConnectionToTheSameHostWaits_ClosesNone` (the reusable branch, host compared ignoring case). Production code is unchanged, so no quality run was needed.
 - Reproduction: a lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant (`Math.Max(limit - 1, 0)` -> `Math.Max(limit - -1, 0)` at ConnectionCache.cs:123) was applied by hand: 4 of the 5 data rows failed (killed); reverted, all 16 ConnectionCacheTests pass.
-- Fast tests: one unrelated failure, `Amqp1SendCases.Credit_ContainerGrantsNoneFor300ms_CurlWaitsThenSends`, passed when run alone; filed as BL-4655. The new tests use no file system, path or OS text, so they are platform-neutral.
+- Fast tests: one unrelated failure, `Amqp1SendCases.Credit_ContainerGrantsNoneFor300ms_CurlWaitsThenSends`, passed when run alone; filed as BL-4661. The new tests use no file system, path or OS text, so they are platform-neutral.
 
 ## Log
 

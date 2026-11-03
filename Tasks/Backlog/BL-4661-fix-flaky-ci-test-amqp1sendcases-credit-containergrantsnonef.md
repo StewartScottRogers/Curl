@@ -1,5 +1,5 @@
 ---
-id: BL-4655
+id: BL-4661
 title: Fix flaky CI test Amqp1SendCases.Credit_ContainerGrantsNoneFor300ms_CurlWaitsThenSends
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4655 — Fix flaky CI test Amqp1SendCases.Credit_ContainerGrantsNoneFor300ms_CurlWaitsThenSends
+# BL-4661 — Fix flaky CI test Amqp1SendCases.Credit_ContainerGrantsNoneFor300ms_CurlWaitsThenSends
 
 ## Goal
 
