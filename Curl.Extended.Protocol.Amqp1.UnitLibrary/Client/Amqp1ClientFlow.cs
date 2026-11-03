@@ -14,8 +14,10 @@ namespace Curl.Extended.Protocol.Amqp1.Client;
 /// (split across frames by the peer's max-frame-size) and waits for the accepted outcome (Part 3 section 3.4).
 /// Otherwise it attaches as receiver from the address as source, grants one credit, reads the one message, settles it
 /// accepted and writes its body to the output. Then detach, end and close. Failures end as ADR-1062 maps them.
+/// When the peer's open carries an idle-time-out, an empty frame goes out every half of it, timed on
+/// <paramref name="timeProvider"/>, until the flow ends (Part 2 section 2.4.5).
 /// </summary>
-internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
+internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITransferProgress progress, TimeProvider timeProvider, CancellationToken cancellationToken)
 {
     /// <summary>The session's incoming and outgoing window, in transfers.</summary>
     internal const uint SessionWindow = 2048;
@@ -38,6 +40,8 @@ internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITra
 
     private uint linkCredit;
 
+    private Task heartbeats = Task.CompletedTask;
+
     /// <summary>The body bytes written to the output so far.</summary>
     internal long BytesWritten { get; private set; }
 
@@ -47,12 +51,23 @@ internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITra
     /// </summary>
     internal async ValueTask RunAsync(NetworkCredential? credentials, string hostname, string containerId, string address, ReadOnlyMemory<byte>? body)
     {
+        using var heartbeatStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task exchange = ExchangeAsync(credentials, hostname, containerId, address, body, heartbeatStop.Token);
+        await exchange.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        await heartbeatStop.CancelAsync().ConfigureAwait(false);
+        await heartbeats.ConfigureAwait(false);
+        await exchange.ConfigureAwait(false);
+    }
+
+    /// <summary>The exchange <see cref="RunAsync"/> runs, starting the empty frames once the peer's open asks for them.</summary>
+    private async Task ExchangeAsync(NetworkCredential? credentials, string hostname, string containerId, string address, ReadOnlyMemory<byte>? body, CancellationToken heartbeatStop)
+    {
         try
         {
             await Amqp1SaslNegotiation.NegotiateAsync(channel, credentials, hostname).ConfigureAwait(false);
             await channel.SendHeaderAsync(Amqp1ProtocolHeader.AmqpProtocolId).ConfigureAwait(false);
             await channel.ReceiveHeaderAsync(Amqp1ProtocolHeader.AmqpProtocolId).ConfigureAwait(false);
-            await OpenSessionAsync(hostname, containerId).ConfigureAwait(false);
+            await OpenSessionAsync(hostname, containerId, heartbeatStop).ConfigureAwait(false);
             await AttachAsync(address, isSender: body is not null).ConfigureAwait(false);
             await (body is { } message ? SendMessageAsync(message) : ReceiveMessageAsync()).ConfigureAwait(false);
             await CloseAsync().ConfigureAwait(false);
@@ -84,12 +99,33 @@ internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITra
     private static object Terminus(Amqp1CompositeType type, string? address) =>
         (address is null ? Amqp1Composite.Create(type) : Amqp1Composite.Create(type, ("address", address))).ToDescribed();
 
-    private async ValueTask OpenSessionAsync(string hostname, string containerId)
+    /// <summary>Sends an empty frame every <paramref name="interval"/> until <paramref name="stop"/> is cancelled.</summary>
+    private async Task SendHeartbeatsAsync(TimeSpan interval, CancellationToken stop)
+    {
+        try
+        {
+            while (true)
+            {
+                await Task.Delay(interval, timeProvider, stop).ConfigureAwait(false);
+                await channel.SendAsync(Amqp1Frame.Heartbeat()).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The flow has ended or was cancelled; its own outcome stands.
+        }
+    }
+
+    private async ValueTask OpenSessionAsync(string hostname, string containerId, CancellationToken heartbeatStop)
     {
         await channel.SendAsync(Frame(Amqp1CompositeType.Open,
             ("container-id", containerId), ("hostname", hostname), ("max-frame-size", MaxFrameSize))).ConfigureAwait(false);
         var (open, _) = await ReceiveAsync(Amqp1CompositeType.Open).ConfigureAwait(false);
         frameSize = open["max-frame-size"] is uint peerSize ? Math.Min(peerSize, MaxFrameSize) : MaxFrameSize;
+        if (open["idle-time-out"] is uint idleTimeOut && idleTimeOut > 0)
+        {
+            heartbeats = SendHeartbeatsAsync(TimeSpan.FromMilliseconds(idleTimeOut / 2.0), heartbeatStop);
+        }
         await channel.SendAsync(Frame(Amqp1CompositeType.Begin,
             ("next-outgoing-id", 0u), ("incoming-window", SessionWindow), ("outgoing-window", SessionWindow))).ConfigureAwait(false);
         var (begin, _) = await ReceiveAsync(Amqp1CompositeType.Begin).ConfigureAwait(false);

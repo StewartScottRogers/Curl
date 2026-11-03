@@ -20,7 +20,32 @@ internal sealed class ScriptedAmqp1Connection(params byte[][] chunks) : IConnect
 
     public bool IsDisposed { get; private set; }
 
-    public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    /// <summary>The zero-based read that waits for <see cref="ReleaseHeldRead"/> before it returns, if any.</summary>
+    public int? HoldsRead { get; init; }
+
+    private readonly TaskCompletionSource released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private readonly TaskCompletionSource held = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private int readCount;
+
+    /// <summary>Completes once the read <see cref="HoldsRead"/> names is waiting.</summary>
+    public Task ReadHeld => held.Task;
+
+    public void ReleaseHeldRead() => released.TrySetResult();
+
+    public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        if (readCount++ == HoldsRead)
+        {
+            held.TrySetResult();
+            await released.Task.ConfigureAwait(false);
+        }
+
+        return await ReadNextChunkAsync(buffer).ConfigureAwait(false);
+    }
+
+    private ValueTask<int> ReadNextChunkAsync(Memory<byte> buffer)
     {
         if (FailsReads)
         {

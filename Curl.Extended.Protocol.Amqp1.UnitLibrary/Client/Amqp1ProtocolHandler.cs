@@ -79,7 +79,7 @@ public sealed class Amqp1ProtocolHandler : IProtocolHandler
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            var flow = new Amqp1ClientFlow(connection, context.Output, context.Progress, context.CancellationToken);
+            var flow = new Amqp1ClientFlow(connection, context.Output, context.Progress, context.TimeProvider, context.CancellationToken);
             try
             {
                 await flow.RunAsync(context.Credentials, context.Url.IdnHost, $"curl-{Guid.NewGuid():N}", address, await RequestBodyAsync(context).ConfigureAwait(false)).ConfigureAwait(false);

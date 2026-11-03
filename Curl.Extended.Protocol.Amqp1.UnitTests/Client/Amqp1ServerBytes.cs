@@ -28,8 +28,8 @@ internal static class Amqp1ServerBytes
     public static byte[] Performative(Amqp1CompositeType type, params (string, object?)[] fields) =>
         Amqp1FrameCodec.Write(Amqp1Frame.ForPerformative(0, Amqp1Composite.Create(type, fields)));
 
-    public static byte[] Open(uint? maxFrameSize = null) =>
-        Performative(Amqp1CompositeType.Open, ("container-id", "broker"), ("max-frame-size", maxFrameSize));
+    public static byte[] Open(uint? maxFrameSize = null, uint? idleTimeOut = null) =>
+        Performative(Amqp1CompositeType.Open, ("container-id", "broker"), ("max-frame-size", maxFrameSize), ("idle-time-out", idleTimeOut));
 
     public static byte[] Begin => Performative(Amqp1CompositeType.Begin,
         ("remote-channel", (ushort)0), ("next-outgoing-id", 7u), ("incoming-window", 100u), ("outgoing-window", 100u));

@@ -179,11 +179,56 @@ public sealed class Amqp1ClientFlowTests
 
     private static string Text(object? value) => Encoding.UTF8.GetString(Amqp1ClientFlow.OutputBytesOf(value));
 
-    private static async Task<Amqp1ClientException?> RunAsync(ScriptedAmqp1Connection connection, Stream output, string? body = null)
+    [TestMethod]
+    public async Task RunAsync_PeerIdleTimeOut1000ms_SendsAnEmptyFrameEvery500msWhileWaitingForTheOutcome_Part2Section2_4_5()
+    {
+        ManualAmqp1TimeProvider clock = new();
+        ScriptedAmqp1Connection connection = new(
+            [.. Authenticated, .. Open(idleTimeOut: 1000), .. Begin, .. Attach(true), .. Flow(1)],
+            [.. Disposition(State(Amqp1CompositeType.Accepted)), .. Closed])
+        { HoldsRead = 1 };
+
+        Task<Amqp1ClientException?> run = RunAsync(connection, new MemoryStream(), "hi", clock);
+        await connection.ReadHeld;
+        await clock.TimerCreated.WaitAsync();
+        clock.Advance(TimeSpan.FromMilliseconds(499));
+        int beforeHalf = Heartbeats(connection);
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+        await clock.TimerCreated.WaitAsync();
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        await clock.TimerCreated.WaitAsync();
+        connection.ReleaseHeldRead();
+        var failure = await run;
+
+        Assert.IsNull(failure);
+        Assert.AreEqual(0, beforeHalf);
+        Assert.AreEqual(2, Heartbeats(connection));
+        int transfer = connection.Writes.FindIndex(write => write.Length > Heartbeat.Length && Amqp1FrameCodec.TryRead(write, out var frame, out _) && frame!.ReadBody().Performative?.Type == Amqp1CompositeType.Transfer);
+        Assert.AreEqual(2, connection.Writes.Skip(transfer).Count(write => write.AsSpan().SequenceEqual(Heartbeat)));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PeerIdleTimeOutZero_SendsNoEmptyFrames_Part2Section2_4_5()
+    {
+        ManualAmqp1TimeProvider clock = new();
+        ScriptedAmqp1Connection connection = new([.. Authenticated, .. Open(idleTimeOut: 0), .. Begin, .. Attach(true), .. Flow(1),
+            .. Disposition(State(Amqp1CompositeType.Accepted)), .. Closed]);
+
+        var failure = await RunAsync(connection, new MemoryStream(), "hi", clock);
+
+        Assert.IsNull(failure);
+        Assert.AreEqual(0, clock.TimerCreated.CurrentCount);
+        Assert.AreEqual(0, Heartbeats(connection));
+    }
+
+    private static int Heartbeats(ScriptedAmqp1Connection connection) =>
+        connection.Writes.ToArray().Count(write => write.AsSpan().SequenceEqual(Heartbeat));
+
+    private static async Task<Amqp1ClientException?> RunAsync(ScriptedAmqp1Connection connection, Stream output, string? body = null, TimeProvider? clock = null)
     {
         try
         {
-            await new Amqp1ClientFlow(connection, output, NoTransferProgress.Instance, CancellationToken.None)
+            await new Amqp1ClientFlow(connection, output, NoTransferProgress.Instance, clock ?? TimeProvider.System, CancellationToken.None)
                 .RunAsync(null, "broker", "c", "q", body is null ? (ReadOnlyMemory<byte>?)null : Encoding.UTF8.GetBytes(body));
             return null;
         }

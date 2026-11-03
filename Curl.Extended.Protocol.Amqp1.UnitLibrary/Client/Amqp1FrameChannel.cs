@@ -5,11 +5,14 @@ namespace Curl.Extended.Protocol.Amqp1.Client;
 
 /// <summary>
 /// Sends and receives AMQP 1.0 protocol headers and whole frames over an <see cref="IConnection"/>, plain or TLS.
+/// Writes go out one at a time, so an empty frame sent while idle never interleaves with another frame.
 /// A fault in what the peer sends raises <see cref="Amqp1MalformedEncodingException"/>.
 /// </summary>
 internal sealed class Amqp1FrameChannel(IConnection transport, CancellationToken cancellationToken)
 {
     private const int ReadSize = 4096;
+
+    private readonly SemaphoreSlim writeGate = new(1, 1);
 
     private byte[] buffer = new byte[ReadSize];
 
@@ -62,6 +65,7 @@ internal sealed class Amqp1FrameChannel(IConnection transport, CancellationToken
 
     private async ValueTask WriteAsync(byte[] bytes)
     {
+        await writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             await transport.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
@@ -70,6 +74,10 @@ internal sealed class Amqp1FrameChannel(IConnection transport, CancellationToken
         catch (IOException)
         {
             throw new Amqp1ClientException(CurlExitCode.SendError, Amqp1ClientMessages.SendFailed);
+        }
+        finally
+        {
+            writeGate.Release();
         }
     }
 
