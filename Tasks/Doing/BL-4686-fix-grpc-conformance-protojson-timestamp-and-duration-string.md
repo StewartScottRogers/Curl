@@ -42,3 +42,4 @@ import. ADR-1147 describes the JSON mapping.
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 523465ad b294690c 710af73a.
