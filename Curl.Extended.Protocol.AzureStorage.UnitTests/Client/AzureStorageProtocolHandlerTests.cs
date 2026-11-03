@@ -139,6 +139,43 @@ public sealed class AzureStorageProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ErrorWithFailWithBody_WritesTheErrorBodyAndFailsWithExit22()
+    {
+        string body = "<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.</Message></Error>";
+        MemoryStream output = new();
+        TransferContext context = Context("az://account/c/b", output, fail: HttpFailMode.FailWithBody);
+
+        TransferResult result = await Handler(new QueuedAzureStorageConnector(QueuedAzureStorageConnector.Reply(body, status: "404 Not Found"))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(body, Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ErrorWithFail_WritesNothingAndFailsWithExit22()
+    {
+        string body = """{"error":{"code":"PathNotFound","message":"The specified path does not exist."}}""";
+        MemoryStream output = new();
+        TransferContext context = Context("abfs://fs@account/f", output, fail: HttpFailMode.Fail);
+
+        TransferResult result = await Handler(new QueuedAzureStorageConnector(QueuedAzureStorageConnector.Reply(body, status: "404 Not Found"))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(0, output.Length);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Url_HandsTheTransfersEventsToTheConnectorForVerbosesConnectionLine()
+    {
+        QueuedAzureStorageConnector connector = new(QueuedAzureStorageConnector.Reply("x"));
+        TransferContext context = Context("abfss://fs@account/f", new MemoryStream());
+
+        await Handler(connector).ExecuteAsync(context);
+
+        Assert.AreSame(context.Events, connector.Targets.Single().Events);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_DfsErrorWithAJsonErrorBody_FailsWithExit22NamingTheCode()
     {
         string body = """{"error":{"code":"PathNotFound","message":"The specified path does not exist."}}""";
@@ -286,13 +323,13 @@ public sealed class AzureStorageProtocolHandlerTests
     private static AzureStorageProtocolHandler Handler(QueuedAzureStorageConnector connector, string? sas = null, int maxBlockCount = AzureBlobOperations.MaxBlockCount) =>
         new(connector, name => name == "AZURE_STORAGE_SAS_TOKEN" ? sas : null, 8, maxBlockCount);
 
-    private static TransferContext Context(string url, Stream output, string? upload = null, string? bearer = null, Stream? uploadStream = null) => new()
+    private static TransferContext Context(string url, Stream output, string? upload = null, string? bearer = null, Stream? uploadStream = null, HttpFailMode fail = HttpFailMode.None) => new()
     {
         Url = CurlUrl.Parse(url),
         Output = output,
         Upload = uploadStream ?? (upload is null ? null : new MemoryStream(Encoding.UTF8.GetBytes(upload))),
         TimeProvider = new FixedTimeProvider(),
-        Http = bearer is null ? null : new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = bearer },
+        Http = bearer is null && fail == HttpFailMode.None ? null : new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = bearer, Fail = fail },
     };
 
     private static string Blob(string name) =>

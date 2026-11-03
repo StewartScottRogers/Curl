@@ -61,7 +61,9 @@ internal sealed class AzureStorageClient(IConnector connector, ITransferContext 
             AzureStorageHttpResponse response = await new AzureStorageHttpClientConnection(connection).SendAsync(request, context.CancellationToken);
             if (response.StatusCode >= 300)
             {
-                throw ErrorOf(response.StatusCode, await ReadTextAsync(response));
+                string errorBody = await ReadTextAsync(response);
+                await WriteErrorBodyAsync(errorBody);
+                throw ErrorOf(response.StatusCode, errorBody);
             }
 
             return await readResponse(response);
@@ -75,6 +77,20 @@ internal sealed class AzureStorageClient(IConnector connector, ITransferContext 
     {
         using StreamReader reader = new(response.Body, Encoding.UTF8);
         return await reader.ReadToEndAsync(context.CancellationToken);
+    }
+
+    /// <summary>
+    /// Writes an error response's body to the transfer's output when <c>--fail-with-body</c> is given, as curl writes the
+    /// body before it fails (manual, "--fail-with-body"); with <c>--fail</c> or neither it writes nothing.
+    /// </summary>
+    /// <param name="errorBody">The error response's body.</param>
+    /// <returns>A task that completes when the body is written, or at once when it is not.</returns>
+    private async Task WriteErrorBodyAsync(string errorBody)
+    {
+        if (context.Http?.Fail == HttpFailMode.FailWithBody)
+        {
+            await context.Output.WriteAsync(Encoding.UTF8.GetBytes(errorBody), context.CancellationToken);
+        }
     }
 
     /// <summary>Copies a response body to <paramref name="output"/>.</summary>
