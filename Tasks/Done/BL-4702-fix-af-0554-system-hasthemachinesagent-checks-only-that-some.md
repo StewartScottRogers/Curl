@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.SshJump.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4702 — Fix AF-0554: System_HasTheMachinesAgent checks only that some agent connector exists
 
@@ -52,3 +52,4 @@ Test-only change: System_HasTheMachinesAgent now asserts the platform choice (Pa
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. System_HasTheMachinesAgent asserts connector types per platform
