@@ -31,3 +31,4 @@ Found by BL-4625: `RedisTransferSurfaceCases.Verbose_SuccessfulGet_WritesConnect
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 8b13c440 5eadf492 64c8e888.
