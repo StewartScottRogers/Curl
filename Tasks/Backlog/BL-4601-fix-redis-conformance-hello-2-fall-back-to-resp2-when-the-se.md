@@ -1,5 +1,5 @@
 ---
-id: BL-4584
+id: BL-4601
 title: Fix Redis conformance: HELLO-2 fall back to RESP2 when the server refuses HELLO 3
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4584 — Fix Redis conformance: HELLO-2 fall back to RESP2 when the server refuses HELLO 3
+# BL-4601 — Fix Redis conformance: HELLO-2 fall back to RESP2 when the server refuses HELLO 3
 
 ## Goal
 

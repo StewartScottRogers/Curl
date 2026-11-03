@@ -1,5 +1,5 @@
 ---
-id: BL-4583
+id: BL-4600
 title: Fix Redis conformance: RESP-Push-1 push frame before the reply is not taken for the reply
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4583 — Fix Redis conformance: RESP-Push-1 push frame before the reply is not taken for the reply
+# BL-4600 — Fix Redis conformance: RESP-Push-1 push frame before the reply is not taken for the reply
 
 ## Goal
 

@@ -73,8 +73,8 @@ focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), the `Kn
   the server's own edges. Matrix: `Documentation/Conformance/Extended/Redis.md`, 39 rows, 3 `n/a`.
 - Choice: stderr expectations are written with `\n` and compared with `Environment.NewLine`, as the other protocols'
   cases do, so they hold on every platform. Printed text follows ADR-1079 and is pinned as measured.
-- Known failures (filed High): `Redis:RESP-Push-1` BL-4583 (a push frame before the reply is printed as the reply);
-  `Redis:HELLO-2` and `Redis:RESP2-Null-2` BL-4584 (an error to `HELLO 3` fails with exit 8 instead of going on in RESP2).
+- Known failures (filed High): `Redis:RESP-Push-1` BL-4600 (a push frame before the reply is printed as the reply);
+  `Redis:HELLO-2` and `Redis:RESP2-Null-2` BL-4601 (an error to `HELLO 3` fails with exit 8 instead of going on in RESP2).
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary`: 0 failing members.
   `dotnet build Curl.slnx -warnaserror` clean; fast tests green; Curl.Conformance.Extended.UnitTests 565 passed.
   CI on Linux and macOS: the cases use no path, drive letter or OS text, so they are platform-neutral.
@@ -82,4 +82,4 @@ focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), the `Kn
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 990b7c72 e36b79d3 0e3b4bcc d8e3fb0e 46790798 ef6c9026.
-- 2026-11-02: Doing -> Done. Redis conformance matrix, reference server and cases landed; 3 known failures filed as BL-4583, BL-4584
+- 2026-11-02: Doing -> Done. Redis conformance matrix, reference server and cases landed; 3 known failures filed as BL-4600, BL-4601
