@@ -16,7 +16,7 @@ public sealed class DtlsFlightRetransmitterTests
         DtlsFlightRetransmitter retransmitter = new(Recording(sent), clock);
 
         await Assert.ThrowsExactlyAsync<TimeoutException>(async () =>
-            await retransmitter.SendFlightAsync(Flight, Never<int>, CancellationToken.None));
+            await retransmitter.SendFlightAsync(() => Flight, Never<int>, CancellationToken.None));
 
         CollectionAssert.AreEqual(
             new[] { 1, 2, 4, 8, 16, 32, 60, 60, 60, 60, 60, 60, 60 }.Select(s => TimeSpan.FromSeconds(s)).ToArray(),
@@ -31,7 +31,7 @@ public sealed class DtlsFlightRetransmitterTests
         DtlsFlightRetransmitter retransmitter = new(Recording(sent), new ImmediateTimeProvider());
 
         await Assert.ThrowsExactlyAsync<TimeoutException>(async () =>
-            await retransmitter.SendFlightAsync(Flight, Never<int>, CancellationToken.None));
+            await retransmitter.SendFlightAsync(() => Flight, Never<int>, CancellationToken.None));
 
         byte[][] datagrams = [.. sent];
         for (int index = 0; index < datagrams.Length; index += 2)
@@ -60,11 +60,26 @@ public sealed class DtlsFlightRetransmitterTests
             },
             clock);
 
-        string answer = await retransmitter.SendFlightAsync(Flight, _ => reply.Task, CancellationToken.None);
+        string answer = await retransmitter.SendFlightAsync(() => Flight, _ => reply.Task, CancellationToken.None);
 
         Assert.AreEqual("ServerHello", answer);
         Assert.HasCount(2 * Flight.Length, sent);
         CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2) }, clock.DueTimes.ToArray());
+    }
+
+    [TestMethod]
+    public async Task SendFlightAsync_Rfc6347Section4_1_SealsTheFlightAfreshForEachResendSoEachGoesUnderANewSequenceNumber()
+    {
+        ConcurrentQueue<byte[]> sent = new();
+        DtlsFlightRetransmitter retransmitter = new(Recording(sent), new ImmediateTimeProvider());
+        byte sequenceNumber = 0;
+
+        await Assert.ThrowsExactlyAsync<TimeoutException>(async () =>
+            await retransmitter.SendFlightAsync(() => [new byte[] { sequenceNumber++ }], Never<int>, CancellationToken.None));
+
+        CollectionAssert.AreEqual(
+            Enumerable.Range(0, DtlsFlightRetransmitter.MaximumRetransmissions + 1).Select(n => (byte)n).ToArray(),
+            sent.Select(datagram => datagram[0]).ToArray());
     }
 
     [TestMethod]
@@ -73,7 +88,7 @@ public sealed class DtlsFlightRetransmitterTests
         ConcurrentQueue<byte[]> sent = new();
         DtlsFlightRetransmitter retransmitter = new(Recording(sent), new ImmediateTimeProvider());
 
-        int answer = await retransmitter.SendFlightAsync(Flight, _ => Task.FromResult(7), CancellationToken.None);
+        int answer = await retransmitter.SendFlightAsync(() => Flight, _ => Task.FromResult(7), CancellationToken.None);
 
         Assert.AreEqual(7, answer);
         Assert.HasCount(Flight.Length, sent);
@@ -94,7 +109,7 @@ public sealed class DtlsFlightRetransmitterTests
 
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
             await retransmitter.SendFlightAsync(
-                Flight,
+                () => Flight,
                 token =>
                 {
                     replyToken = token;

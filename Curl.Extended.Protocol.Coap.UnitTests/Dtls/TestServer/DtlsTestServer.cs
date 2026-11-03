@@ -278,6 +278,12 @@ internal sealed class DtlsTestServer : IDisposable
 
     private List<byte[]> ReceiveClientFinished(byte[] plaintext)
     {
+        if (HandshakeComplete)
+        {
+            // A retransmitted Finished comes under a new record sequence number (RFC 6347 section 4.1): answer it with the Finished flight again (section 4.2.4).
+            return flights[DtlsServerFlight.Finished];
+        }
+
         DtlsHandshakeFragment fragment = DtlsHandshakeFragment.Decode(plaintext, out _);
         byte[] expected = TlsPrf.Sha256.ComputeClientVerifyData(masterSecret, SHA256.HashData(transcript.ToArray()));
         if (fragment.Header.MessageType != HandshakeType.Finished || !fragment.Body.AsSpan().SequenceEqual(expected))

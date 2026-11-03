@@ -100,7 +100,7 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
         {
             DtlsHandshakeMessage hello = new(HandshakeType.ClientHello, nextMessageSequence++, DtlsClientHello.Encode(clientRandom, cookie, targetHost));
             List<DtlsHandshakeMessage> flight = await SendFlightAsync(
-                [Epoch0Record(TlsContentType.Handshake, hello.TranscriptBytes())],
+                () => [Epoch0Record(TlsContentType.Handshake, hello.TranscriptBytes())],
                 type => type is DtlsHelloVerifyRequest.MessageType or HandshakeType.ServerHelloDone,
                 cancellationToken).ConfigureAwait(false);
             if (flight[^1].MessageType != DtlsHelloVerifyRequest.MessageType)
@@ -174,7 +174,7 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
             byte[] finishedFragment = new DtlsHandshakeMessage(HandshakeType.Finished, nextMessageSequence++, verifyData).TranscriptBytes();
             transcript.AddRange(finishedFragment);
             List<DtlsHandshakeMessage> flight = await SendFlightAsync(
-                [Epoch0Record(TlsContentType.Handshake, keyExchangeFragment), Epoch0Record(TlsContentType.ChangeCipherSpec, [1]), protector.Protect(TlsContentType.Handshake, finishedFragment)],
+                () => [Epoch0Record(TlsContentType.Handshake, keyExchangeFragment), Epoch0Record(TlsContentType.ChangeCipherSpec, [1]), protector.Protect(TlsContentType.Handshake, finishedFragment)],
                 type => type == HandshakeType.Finished,
                 cancellationToken).ConfigureAwait(false);
             byte[] expected = TlsPrf.Sha256.ComputeServerVerifyData(masterSecret, SHA256.HashData([.. transcript]));
@@ -188,8 +188,8 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
         }
     }
 
-    private async ValueTask<List<DtlsHandshakeMessage>> SendFlightAsync(IReadOnlyList<ReadOnlyMemory<byte>> flight, Func<HandshakeType, bool> endsServerFlight, CancellationToken cancellationToken) =>
-        await retransmitter.SendFlightAsync(flight, stop => ReadServerFlightAsync(endsServerFlight, stop), cancellationToken).ConfigureAwait(false);
+    private async ValueTask<List<DtlsHandshakeMessage>> SendFlightAsync(Func<IReadOnlyList<ReadOnlyMemory<byte>>> sealFlight, Func<HandshakeType, bool> endsServerFlight, CancellationToken cancellationToken) =>
+        await retransmitter.SendFlightAsync(sealFlight, stop => ReadServerFlightAsync(endsServerFlight, stop), cancellationToken).ConfigureAwait(false);
 
     /// <summary>Reads datagrams until the server's flight ends with a message <paramref name="endsServerFlight" /> accepts.</summary>
     private async Task<List<DtlsHandshakeMessage>> ReadServerFlightAsync(Func<HandshakeType, bool> endsServerFlight, CancellationToken cancellationToken)
