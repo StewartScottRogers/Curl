@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/SignalR, Curl.Conformance.Extended.UnitTests/SignalR, Documentation/Conformance/Extended/SignalR.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4491 — Conformance: SignalR JSON hub protocol and transports for signalr:// and signalrs://
 
@@ -44,25 +44,34 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/SignalR.md` gives every requirement of HubProtocol.md (JSON),
+- [x] `Documentation/Conformance/Extended/SignalR.md` gives every requirement of HubProtocol.md (JSON),
       TransportProtocols.md (negotiate and WebSocket) and the RFC 6455 client rules relied on that binds a client a
       `SignalR:` ID mapped to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/SignalR/` run curl in process for `signalr://` and `signalrs://`
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/SignalR/` run curl in process for `signalr://` and `signalrs://`
       and assert HTTP and WebSocket bytes, stdout, stderr and exit code for at least: negotiate version 0 and 1, a
       negotiate redirect with an access token, a negotiate `error`, a handshake error, an invocation and its
       completion with a result and with an error, a stream invocation with items and completion, a hub call from the
       server, Ping, a Close with and without an error, records split across frames and several in one frame.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix SignalR conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/SignalR/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/SignalR/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+- Specs measured at dotnet/aspnetcore `main`: the library cites no tag (named in the matrix).
+- Two cases fail on the extension library and are listed in `KnownFailures.txt`: `SignalR:HUB-Invocation-3`
+  (BL-4583, a hub call with an invocation id gets no Completion) and `SignalR:RFC6455-1.4-1` (BL-4584, no
+  WebSocket Close frame when the session ends).
+- `SignalRReferenceFrame.TryRead` was at complexity 14; the payload length and unmasking moved to their own
+  private methods. `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary`: 0 failing members.
+- `dotnet build Curl.slnx -warnaserror` clean; fast tests green (Windows). The cases use only loopback reference
+  routes and no paths, so they are platform-neutral; the Linux and macOS criterion is met by that.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 0d3075a4 d0dc803a cf3940fa d8e3fb0e 95f0eb06 ef6c9026.
+- 2026-11-02: Doing -> Done. SignalR conformance matrix and cases for signalr:// and signalrs:// land; two library defects filed as BL-4583 and BL-4584
