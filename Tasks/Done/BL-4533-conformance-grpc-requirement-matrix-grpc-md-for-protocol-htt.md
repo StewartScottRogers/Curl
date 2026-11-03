@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4530, BL-4
 touches: [Documentation/Conformance/Extended/Grpc.md, Curl.Conformance.Extended.UnitTests/Grpc/GrpcRequestHeaderCases.cs, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-03
 ---
 # BL-4533 — Conformance: gRPC requirement matrix Grpc.md for PROTOCOL-HTTP2.md, remaining request-header cases and quality gate (Grpc part 1d)
 
@@ -33,14 +33,14 @@ Builds on BL-4530 (server, unary case), BL-4531 (response cases) and BL-4532 (fr
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Grpc.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
+- [x] `Documentation/Conformance/Extended/Grpc.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
       PROTOCOL-HTTP2.md that binds a client a `Grpc:` ID mapped to a test or to `n/a: <reason>`, links to
       `Grpc-Reflection.md` (BL-4478), and the harness's matrix check passes.
-- [ ] `Curl.Conformance.Extended.UnitTests/Grpc/GrpcRequestHeaderCases.cs` covers the request-header requirements no
+- [x] `Curl.Conformance.Extended.UnitTests/Grpc/GrpcRequestHeaderCases.cs` covers the request-header requirements no
       other Grpc case carries (`grpc-encoding`, custom metadata, `-bin` base64 metadata).
-- [ ] Every failing case is fixed here or listed in `KnownFailures.txt` with the ID of its filed High
+- [x] Every failing case is fixed here or listed in `KnownFailures.txt` with the ID of its filed High
       `Fix Grpc conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests are green; no package added; tests
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests are green; no package added; tests
       platform-neutral.
 ## Notes
 
@@ -64,9 +64,12 @@ Builds on BL-4530 (server, unary case), BL-4531 (response cases) and BL-4532 (fr
   GOAWAY before closing (server). `Grpc-Reflection.md` does not exist yet (BL-4478 in Backlog); link it anyway, as
   the criterion asks.
 
+- 2026-11-03 (lane 3): Added `GrpcRequestHeaderCases` (Grpc:Http2-Request-7 to 12) and Grpc.md rows for them plus n/a rows (Request-13 to 15, Response-7, Response-8, Compression-1, GoAway-2); Grpc.md links Grpc-Responses.md, Grpc-Transport.md and Grpc-Reflection.md (the last not yet written, BL-4478). Request-7 (no grpc-encoding, every Compressed-Flag 0) passes; Request-8 to 12 fail as measured and are listed in KnownFailures.txt under filed High BL-4674. Decided `-H "<key>-bin: <value>"` reads the value as base64 and sends it un-padded, as grpcurl and grpc-go do: ADR-1225. The user-agent case asks only for a non-empty `user-agent` (the spec only recommends a structure). Platform-neutral: temp directory via Directory.CreateTempSubdirectory, loopback in process, no OS text. `dotnet build Curl.slnx -warnaserror` clean, fast tests green (Curl.Conformance.Extended.UnitTests 1537 passed). No production code changed, so no quality run.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 123b988a abb71175 36ff140a 3af8a194.
 - 2026-11-02: Doing -> Backlog. Waits on BL-4585: the reference server cannot yet send RST_STREAM, GOAWAY or PING, which the client requirements in the matrix need
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 123b988a abb71175 36ff140a 3af8a194.
+- 2026-11-03: Doing -> Done. Grpc.md maps every client requirement of PROTOCOL-HTTP2.md; request-header cases added, failures listed under BL-4674
