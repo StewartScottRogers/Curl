@@ -38,3 +38,4 @@ and mqtt5 transfer-surface cases measured). `DnsUdpTransport.ExchangeAsync` open
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 7bcaef45 a09d4a4a 81704b3f 914c30cc.
