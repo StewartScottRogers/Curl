@@ -30,16 +30,18 @@ Found by the shift-end review of 2026-11-03 (silent-failure-hunter, code-reviewe
 
 ## Acceptance criteria
 
-- [ ] Each of these, sent by a scripted HTTP/2 peer, ends in a `DnsQueryException` with the stated exit code (one unit test each in `DohHttp2ExchangeTests`):
+- [x] Each of these, sent by a scripted HTTP/2 peer, ends in a `DnsQueryException` with the stated exit code (one unit test each in `DohHttp2ExchangeTests`):
   - RST_STREAM: 56
   - GOAWAY: 56
   - the connection closed mid-frame: 56
   - a malformed HPACK block: 8, or 16 if the ADR records it
   - an HTTP/2 protocol error: 8, or 16 if the ADR records it
-- [ ] An answer whose DATA frames total more than 65535 octets fails with exit 8 and the same message `DohResponseReader` uses, before more than 65535 octets are buffered (unit test).
-- [ ] ADR-1231 states the error mapping the code applies.
-- [ ] `dotnet build` is clean, the fast tests pass, and the library keeps 100% line and branch coverage.
+- [x] An answer whose DATA frames total more than 65535 octets fails with exit 8 and the same message `DohResponseReader` uses, before more than 65535 octets are buffered (unit test).
+- [x] ADR-1231 states the error mapping the code applies.
+- [x] `dotnet build` is clean, the fast tests pass, and the library keeps 100% line and branch coverage.
 ## Notes
+
+- Decided: HPACK and HTTP/2 protocol errors are exit 8 (not 16), recorded in ADR-1231. Reset, GOAWAY and mid-frame close are exit 56. The 65535 check sits in `AppendWithinLimit` to stay under the complexity gate. Quality run for the library: 0 failing members, 100% line and branch.
 
 ## Log
 
