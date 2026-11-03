@@ -6,5 +6,7 @@ CurlSurface:unresolvable-host-coap-1 BL-4628
 CurlSurface:unresolvable-host-coaps-1 BL-4628
 CurlSurface:unresolvable-host-dns-1 BL-4628
 CurlSurface:unresolvable-host-webtransport-1 BL-4628
+CurlSurface:Verbose-Redis-1 BL-4645
+CurlSurface:Verbose-Rediss-1 BL-4645
 CurlSurface:unresolvable-host-oci-1 BL-4629
 CurlSurface:connection-refused-oci-1 BL-4629
