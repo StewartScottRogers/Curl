@@ -3,8 +3,8 @@ id: AF-0542
 title: CI red 56.5 minutes from run 41516637939 (6ada3366): MQTT 5 CONNECT and Frame_Malformed conformance tests
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:41516637939:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
