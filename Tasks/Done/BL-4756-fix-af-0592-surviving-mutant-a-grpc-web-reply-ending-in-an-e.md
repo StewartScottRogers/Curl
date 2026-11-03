@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.GrpcWeb.UnitLibrary, Curl.Extension.GrpcWeb.UnitTests/GrpcWebFramingTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4756 — Fix AF-0592: Surviving mutant: a gRPC-Web reply ending in an empty frame can be refused as cut short without a test failing
 
@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Tests for bodies ending in a zero-length data or trailers frame kill the AF-0592 mutant
