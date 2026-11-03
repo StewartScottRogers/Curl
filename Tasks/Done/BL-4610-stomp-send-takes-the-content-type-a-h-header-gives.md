@@ -28,10 +28,10 @@ ADR-1209 (BL-4609) gives every SEND `content-type:application/octet-stream` and 
 
 ## Notes
 
-ADR-1217 amends ADR-1209. Last matching -H wins; empty value ignored. Quality run: 0 failing members. Dotnet build of the test project (-warnaserror) clean, 61 tests green.
+ADR-1220 amends ADR-1209. Last matching -H wins; empty value ignored. Quality run: 0 failing members. Dotnet build of the test project (-warnaserror) clean, 61 tests green.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 9eb1466c 42b9926e e3a4fd8b.
-- 2026-11-02: Doing -> Done. SEND takes -H content-type; ADR-1217
+- 2026-11-02: Doing -> Done. SEND takes -H content-type; ADR-1220

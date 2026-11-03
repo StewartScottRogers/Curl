@@ -1267,4 +1267,4 @@ Each option and the specific reason it lost.
 | [1217](ADR-1217-url-errors-pin-curls-http-text-for-every-extended-scheme.md) | URL errors pin curl's `http://` text for every extended scheme (BL-4612) | Accepted | 2026-11-02 |
 | [1218](ADR-1218-kafka-transfer-surface-pins-broker-errors-as-exit-8-under-fail.md) | The Kafka transfer surface pins broker errors as exit 8 under `--fail` (BL-4630) | Accepted | 2026-11-02 |
 | [1219](ADR-1219-amqp1-transfer-surface-pins-exit-78-under-fail.md) | The AMQP 1.0 transfer surface pins a refused link's exit 78 under `--fail` (BL-4629) | Accepted | 2026-11-02 |
-| [1217](ADR-1217-stomp-send-takes-the-content-type-a-h-header-gives.md) | STOMP SEND takes the content-type a -H header gives (BL-4610) | Accepted | 2026-11-02 |
+| [1220](ADR-1220-stomp-send-takes-the-content-type-a-h-header-gives.md) | STOMP SEND takes the content-type a -H header gives (BL-4610) | Accepted | 2026-11-02 |

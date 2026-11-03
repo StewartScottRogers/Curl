@@ -1,4 +1,4 @@
-# ADR-1217: STOMP SEND takes the content-type a -H header gives
+# ADR-1220: STOMP SEND takes the content-type a -H header gives
 
 - Status: Accepted
 - Date: 2026-11-02
