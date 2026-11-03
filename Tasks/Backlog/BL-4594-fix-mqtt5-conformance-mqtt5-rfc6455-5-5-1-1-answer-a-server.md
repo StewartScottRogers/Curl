@@ -1,5 +1,5 @@
 ---
-id: BL-4584
+id: BL-4594
 title: Fix Mqtt5 conformance: Mqtt5:RFC6455-5.5.1-1 (answer a server Close frame with a Close frame)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4584 — Fix Mqtt5 conformance: Mqtt5:RFC6455-5.5.1-1 (answer a server Close frame with a Close frame)
+# BL-4594 — Fix Mqtt5 conformance: Mqtt5:RFC6455-5.5.1-1 (answer a server Close frame with a Close frame)
 
 ## Goal
 

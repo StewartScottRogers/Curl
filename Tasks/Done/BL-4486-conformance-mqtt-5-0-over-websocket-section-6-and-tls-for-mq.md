@@ -66,11 +66,11 @@ library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a 
 - Decision (default taken): the refusal server catches any exception from the TLS accept, because Schannel ends the stream (IOException) where OpenSSL alerts (AuthenticationException); the refused-certificate case pins only exit 60 and the "curl: (60) " prefix, since the text differs by platform.
 - Measured Curl itself (an extension, so no upstream curl to match): wrong Accept and missing mqtt subprotocol exit 8, non-101 exit 22 "Refused WebSocket upgrade: 404", a text frame exit 56 "Failure when receiving data from the peer", a server Close exit 56 "Connection disconnected"; masked and RSV-bit server frames are refused. Stderr is compared with its line end trimmed (
  on Windows).
-- Known failures filed: BL-4583 (RFC6455-4.1-9/-10: reply without Upgrade or Connection is accepted), BL-4584 (RFC6455-5.5.1-1: no Close frame sent back).
+- Known failures filed: BL-4593 (RFC6455-4.1-9/-10: reply without Upgrade or Connection is accepted), BL-4594 (RFC6455-5.5.1-1: no Close frame sent back).
 - Criteria: dotnet build Curl.slnx -warnaserror clean; fast tests of the whole solution green (556 in Curl.Conformance.Extended.UnitTests); Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary: 0 failing members after splitting TakeFrom and AnswersTo. CI on Linux and macOS: tests are platform-neutral (no paths; TLS text not pinned).
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 02a9beb4 743ad980 28fcee0c d8e3fb0e eadcd4e4 17248609.
-- 2026-11-02: Doing -> Done. mqtt5+ws:// and mqtt5s:// are measured against MQTT 5.0 chapters 5 and 6 and RFC 6455 in Mqtt5-Transports.md; three gaps filed as BL-4583 and BL-4584
+- 2026-11-02: Doing -> Done. mqtt5+ws:// and mqtt5s:// are measured against MQTT 5.0 chapters 5 and 6 and RFC 6455 in Mqtt5-Transports.md; three gaps filed as BL-4593 and BL-4594

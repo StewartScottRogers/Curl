@@ -27,8 +27,8 @@ its own; the statements binding a server, an extension or a fragmenting sender a
 | Mqtt5:RFC6455-4.1-6 | MUST | The request has `Sec-WebSocket-Version: 13`. | WebSocketCases.Handshake_RequestUpgradesTheMqttPathOfferingTheMqttSubprotocol |
 | Mqtt5:RFC6455-4.1-7 | MAY | The request may have an Origin header field. | n/a: curl is no browser client and sends none |
 | Mqtt5:RFC6455-4.1-8 | MUST | A status other than 101 is handled as HTTP; curl fails the upgrade with exit 22. | WebSocketCases.Handshake_NotSwitchingProtocols_FailsBeforeAnyFrameWithExit22 |
-| Mqtt5:RFC6455-4.1-9 | MUST | A reply without `Upgrade: websocket` fails the WebSocket connection (BL-4583). | WebSocketCases.Handshake_ReplyWithoutUpgradeWebsocket_FailsBeforeAnyFrame |
-| Mqtt5:RFC6455-4.1-10 | MUST | A reply without `Connection: Upgrade` fails the WebSocket connection (BL-4583). | WebSocketCases.Handshake_ReplyWithoutConnectionUpgrade_FailsBeforeAnyFrame |
+| Mqtt5:RFC6455-4.1-9 | MUST | A reply without `Upgrade: websocket` fails the WebSocket connection (BL-4593). | WebSocketCases.Handshake_ReplyWithoutUpgradeWebsocket_FailsBeforeAnyFrame |
+| Mqtt5:RFC6455-4.1-10 | MUST | A reply without `Connection: Upgrade` fails the WebSocket connection (BL-4593). | WebSocketCases.Handshake_ReplyWithoutConnectionUpgrade_FailsBeforeAnyFrame |
 | Mqtt5:RFC6455-4.1-11 | MUST | A Sec-WebSocket-Accept other than the key's derived value fails the connection. | WebSocketCases.Handshake_WrongAccept_FailsBeforeAnyFrameWithExit8 |
 | Mqtt5:RFC6455-4.1-12 | MUST | A reply selecting no offered subprotocol, or one not offered, fails the connection. | WebSocketCases.Handshake_ReplyWithoutTheMqttSubprotocol_FailsBeforeAnyFrameWithExit8 |
 | Mqtt5:RFC6455-4.1-13 | MUST | A reply with an extension the client did not offer fails the connection. | n/a: curl offers no extension and the handler reads no Sec-WebSocket-Extensions; an extension's frames then break the RSV rule below |
@@ -39,7 +39,7 @@ its own; the statements binding a server, an extension or a fragmenting sender a
 | Mqtt5:RFC6455-5.3-1 | MUST | Each frame's masking key is a fresh, unpredictable value. | WebSocketCases.Frames_EveryClientFrameIsAMaskedFinalBinaryFrameWithAFreshKey |
 | Mqtt5:RFC6455-5.4-1 | MUST | A fragmented message is a first frame with FIN clear, continuation frames and a final one with FIN set. | WebSocketCases.Frames_PacketSplitOverFramesAndPacketsSharingAFrame_AreReadAsOneStream |
 | Mqtt5:RFC6455-5.4-2 | MUST NOT | Control frames are not fragmented and carry at most 125 bytes. | n/a: binds the sender; curl's only control frame is a Pong echoing a Ping's payload |
-| Mqtt5:RFC6455-5.5.1-1 | MUST | An endpoint that receives a Close frame sends a Close frame in response (BL-4584). | WebSocketCases.Frames_CloseFromTheServer_IsAnsweredWithACloseFrame |
+| Mqtt5:RFC6455-5.5.1-1 | MUST | An endpoint that receives a Close frame sends a Close frame in response (BL-4594). | WebSocketCases.Frames_CloseFromTheServer_IsAnsweredWithACloseFrame |
 | Mqtt5:RFC6455-5.5.1-2 | MUST NOT | No data frame is sent after a Close frame. | n/a: curl sends no Close frame of its own (see 5.5.1-1) |
 | Mqtt5:RFC6455-5.5.2-1 | MUST | An endpoint that receives a Ping sends a Pong with the same payload. | WebSocketCases.Frames_PingFromTheServer_IsAnsweredWithAMaskedPongCarryingItsPayload |
 | Mqtt5:MQTT5-5.4.5-1 | SHOULD | A client authenticates the server with TLS: curl refuses a certificate it cannot verify with exit 60. | TlsCases.Mqtt5s_UntrustedCertificate_IsRefusedBeforeAnyMqttWithExit60 |

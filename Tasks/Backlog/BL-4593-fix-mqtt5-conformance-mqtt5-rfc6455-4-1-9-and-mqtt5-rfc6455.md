@@ -1,5 +1,5 @@
 ---
-id: BL-4583
+id: BL-4593
 title: Fix Mqtt5 conformance: Mqtt5:RFC6455-4.1-9 and Mqtt5:RFC6455-4.1-10 (upgrade reply without Upgrade or Connection)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4583 — Fix Mqtt5 conformance: Mqtt5:RFC6455-4.1-9 and Mqtt5:RFC6455-4.1-10 (upgrade reply without Upgrade or Connection)
+# BL-4593 — Fix Mqtt5 conformance: Mqtt5:RFC6455-4.1-9 and Mqtt5:RFC6455-4.1-10 (upgrade reply without Upgrade or Connection)
 
 ## Goal
 
