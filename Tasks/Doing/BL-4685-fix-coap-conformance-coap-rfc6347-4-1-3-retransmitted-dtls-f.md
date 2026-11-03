@@ -36,3 +36,4 @@ Found by BL-4574. RFC 6347 section 4.1 (and 4.1.2.6): each record has its own se
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 4772c294 a91ff38c cab5d64d fdc35bd6.
 - 2026-11-03: Doing -> Backlog. Needs Curl.Extended.Protocol.Coap.UnitLibrary/Dtls/Handshake/DtlsClientHandshake.cs, which BL-4684 (in Doing) holds; waits on BL-4684
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 4772c294 a91ff38c cab5d64d fdc35bd6.
