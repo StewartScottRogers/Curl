@@ -64,3 +64,4 @@ filed High task `Fix Xmpp conformance: <requirement>` (pipeline feature; touches
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 4627d5c2 7980b442 5ea4def2 d8e3fb0e 3c91bcaf 17248609.
