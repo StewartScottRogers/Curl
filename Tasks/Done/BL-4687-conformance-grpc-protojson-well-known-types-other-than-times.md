@@ -39,5 +39,5 @@ Format"; a case that fails goes in `KnownFailures.txt` with a filed High `Fix Gr
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 74ac21ad 3006bacd e3a4fd8b.
-- 2026-11-03: Cases written; 7 known failures filed as BL-4719 and BL-4720.
-- 2026-11-03: Doing -> Done. Every ProtoJSON well-known type other than Timestamp and Duration has a Grpc:ProtoJson- row and case; the failures are listed for BL-4719 and BL-4720
+- 2026-11-03: Cases written; 7 known failures filed as BL-4721 and BL-4720.
+- 2026-11-03: Doing -> Done. Every ProtoJSON well-known type other than Timestamp and Duration has a Grpc:ProtoJson- row and case; the failures are listed for BL-4721 and BL-4720

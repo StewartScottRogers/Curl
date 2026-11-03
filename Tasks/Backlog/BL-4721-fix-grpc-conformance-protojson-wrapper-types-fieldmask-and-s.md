@@ -1,5 +1,5 @@
 ---
-id: BL-4719
+id: BL-4721
 title: Fix Grpc conformance: ProtoJSON wrapper types, FieldMask and Struct/Value/ListValue forms (Grpc:ProtoJson-Wrappers-1, Grpc:ProtoJson-Wrappers-2, Grpc:ProtoJson-FieldMask-1, Grpc:ProtoJson-Struct-1, Grpc:ProtoJson-Struct-2)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4719 — Fix Grpc conformance: ProtoJSON wrapper types, FieldMask and Struct/Value/ListValue forms (Grpc:ProtoJson-Wrappers-1, Grpc:ProtoJson-Wrappers-2, Grpc:ProtoJson-FieldMask-1, Grpc:ProtoJson-Struct-1, Grpc:ProtoJson-Struct-2)
+# BL-4721 — Fix Grpc conformance: ProtoJSON wrapper types, FieldMask and Struct/Value/ListValue forms (Grpc:ProtoJson-Wrappers-1, Grpc:ProtoJson-Wrappers-2, Grpc:ProtoJson-FieldMask-1, Grpc:ProtoJson-Struct-1, Grpc:ProtoJson-Struct-2)
 
 ## Goal
 

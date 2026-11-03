@@ -4,7 +4,7 @@ title: Fix Grpc conformance: ProtoJSON Any with @type (Grpc:ProtoJson-Any-1, Grp
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4719]
+depends-on: [BL-4721]
 touches: [Curl.Protobuf.UnitLibrary/Json, Curl.Protobuf.UnitTests/Json, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-03
@@ -23,7 +23,7 @@ protobuf's ProtoJSON format requires.
 BL-4687 measured this in `Curl.Conformance.Extended.UnitTests/Grpc/Reflection/GrpcProtoJsonWellKnownCases.cs`
 (`RoundTrip_AnyOfAMessage_IsTheTypeUrlBesideTheMessagesFields`, `RoundTrip_AnyOfAWellKnownType_PutsItsJsonFormInValue`):
 curl rejects each `-d` (exit code not 0). The embedded type is the type URL's last path segment, resolved among the
-descriptors reflection loaded. Depends on BL-4719: both add to `Curl.Protobuf.UnitLibrary/Json`, and an Any of a
+descriptors reflection loaded. Depends on BL-4721: both add to `Curl.Protobuf.UnitLibrary/Json`, and an Any of a
 wrapper or Struct needs that task's forms. Spec: <https://protobuf.dev/programming-guides/json/>.
 
 ## Acceptance criteria
