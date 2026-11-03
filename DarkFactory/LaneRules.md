@@ -61,7 +61,7 @@ to the same gates. Never a package, never an ADR that decides a feature stays ou
 Flat: every project is a directory immediately under the repository root. No `src/`,
 no `tests/`. `Documentation/` and `Tasks/` are shared projects; `data/` is never read or
 modified; never edit anything under `bin/`, `obj/` or `.vs/`.
-- Production library `Curl.<Area>.UnitLibrary`, curl's own protocols `Curl.Original.Protocol.<Name>.UnitLibrary` in `/Original/Protocols/<Name>/` (ADR-1176); their contracts stay `Curl.Protocol.Abstractions`.
+- Production library `Curl.<Area>.UnitLibrary`, curl's own protocols `Curl.Original.Protocol.<Name>.UnitLibrary` in `/Original/Protocols/<Name>/` (ADR-1176); their contracts stay `Curl.Protocol.Abstractions`. A task that adds a protocol library, original or extended, also adds its row to `Documentation/Protocols.md` and its scheme to the Protocols section of the root `README.md`.
 - Extensions (what Curl adds beyond upstream curl, ADR-0999): `Curl.Extension.<Name>.UnitLibrary`,
   in `/Extended/Features/<Name>/` in `Curl.slnx`, or for one that serves its own URL scheme
   `Curl.Extended.Protocol.<Name>.UnitLibrary` in `/Extended/Protocols/<Name>/` (ADR-1177, ADR-1178) (one single-line `<Folder>` holding both projects, added directly
@@ -69,7 +69,8 @@ modified; never edit anything under `bin/`, `obj/` or `.vs/`.
   `Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs`. It references only
   `Curl.Protocol.Abstractions`, the shared layers and `Curl.Extension.Abstractions`; nothing but the
   hosts and the extensions references it (the build enforces both). It never changes curl's
-  behaviour, and is tested against its specification, not against curl.
+  behaviour, and is tested against its specification, not against curl. An extended protocol's task
+  also adds its row to `Documentation/Protocols.md` and its scheme to README's Protocols section.
 - Tests: the same name with `.UnitTests`; Integration tests with `.IntegrationTests`.
 - Exceptions: `Curl.Console` (the executable), `Curl.Api` and `Libcurl` (programming
   interfaces), `Curl.Mcp` (MCP server host). `Curl.Api.UnitTests` tests `Curl.Api` and

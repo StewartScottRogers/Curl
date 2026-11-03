@@ -331,7 +331,9 @@ Curl/
 - Production library: `Curl.<Area>.UnitLibrary`, curl's own protocols `Curl.Original.Protocol.<Name>.UnitLibrary`
   (ADR-1176; their shared contracts stay `Curl.Protocol.Abstractions`),
   extensions `Curl.Extension.<Name>.UnitLibrary`, or `Curl.Extended.Protocol.<Name>.UnitLibrary`
-  for one that serves its own URL scheme (see "Extensions" below).
+  for one that serves its own URL scheme (see "Extensions" below). A task that adds a protocol
+  library, original or extended, also adds its row to `Documentation/Protocols.md` and its scheme
+  to the Protocols section of the root `README.md`.
 - Tests: the same name with `.UnitTests` instead of `.UnitLibrary`.
 - Integration tests, once an area has any: the same name with `.IntegrationTests`
   instead of `.UnitLibrary` (ADR-0421).
@@ -384,7 +386,9 @@ What Curl adds beyond upstream curl - a scheme or feature curl does not have - i
 - Each is `Curl.Extension.<Name>.UnitLibrary` with its `.UnitTests`; one that serves its own URL
   scheme (an `ExtensionCatalogue.cs` handler) is an *extended protocol*,
   `Curl.Extended.Protocol.<Name>.UnitLibrary` (ADR-1177). Each is registered by one line in
-  `Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs` (a shared list file).
+  `Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs` (a shared list file). An extended
+  protocol's task also adds its row to `Documentation/Protocols.md` and its scheme to the Protocols
+  section of the root `README.md`.
 - It joins the solution with exactly one line in `Curl.slnx`, directly under the marker comment in the
   Extended section: a single-line `<Folder Name="/Extended/Features/<Name>/">` (`/Extended/Protocols/<Name>/`
   for an extended protocol) holding both `<Project/>`
