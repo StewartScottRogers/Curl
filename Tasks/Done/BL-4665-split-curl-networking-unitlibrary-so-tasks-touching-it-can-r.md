@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4665 — Split Curl.Networking.UnitLibrary so tasks touching it can run in parallel
 
@@ -36,3 +36,4 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 30f5b0a2 bd718253 a0b49a29.
+- 2026-11-03: Doing -> Done. Library already one type per file; narrowed BL-4640 and BL-4654 touches to their own files
