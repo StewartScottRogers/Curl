@@ -374,6 +374,47 @@ function Get-ReadyCiFixTaskId {
     return ''
 }
 
+function Get-CiFixTestName {
+    # The failing test a CI-fix title names, by its method name alone ("Fix CI failure <test> on
+    # ...", or a lane's "Fix flaky CI test <Class>.<test>"), or '' for a title that names no
+    # test (a job, a build): Connect_WithoutCredentials_... from either form (BL-4648).
+    param([string]$Title)
+    if ($Title -notmatch '^Fix (?:CI failure|flaky CI test) (\S+)') { return '' }
+    $name = @("$($Matches[1])".TrimEnd(':', ',', ';') -split '\.')[-1]
+    if ($name -cnotmatch '^(?:\w*_\w*|test\d+)$') { return '' }
+    return $name
+}
+
+function Get-CiFixDuplicateOf {
+    # The live CI-fix task that already covers the test CI-fix task -Id names, or '': one in
+    # Doing first, else the oldest in Backlog older than -Id. -Tasks are the CI-fix tasks in
+    # Backlog and Doing, as objects with Id, Title and State. On 2026-11-02 BL-4543 (the CI
+    # watch's) and BL-4544 and BL-4547 (two lanes' "Fix flaky CI test" for the same MQTT 5
+    # test) were all claimed, three fix runs for one test (AF-0542, BL-4648).
+    param([string]$Id, [object[]]$Tasks)
+    $mine = @($Tasks | Where-Object { $_ -and $_.Id -eq $Id })[0]
+    if (-not $mine) { return '' }
+    $name = Get-CiFixTestName $mine.Title
+    if (-not $name) { return '' }
+    $number = { param([string]$TaskId) [int]($TaskId -replace '^BL-', '') }
+    $same = @($Tasks | Where-Object { $_ -and $_.Id -ne $Id -and $_.State -in 'Backlog', 'Doing' -and (Get-CiFixTestName $_.Title) -ceq $name })
+    $doing = @($same | Where-Object { $_.State -eq 'Doing' } | Sort-Object { & $number $_.Id })[0]
+    if ($doing) { return $doing.Id }
+    $older = @($same | Where-Object { (& $number $_.Id) -lt (& $number $Id) } | Sort-Object { & $number $_.Id })[0]
+    if ($older) { return $older.Id }
+    return ''
+}
+
+function Get-LiveCiFixTasks {
+    # The CI-fix tasks in Tasks\Backlog and Tasks\Doing of $Root, for Get-CiFixDuplicateOf.
+    foreach ($state in 'Backlog', 'Doing') {
+        foreach ($file in @(Get-ChildItem (Join-Path $Root "Tasks\$state") -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Where-Object { Test-CiFixFileName $_.Name })) {
+            $m = Select-String -LiteralPath $file.FullName -Pattern '^title:\s*(.+)$' | Select-Object -First 1
+            [pscustomobject]@{ Id = (Get-TaskIdFromFileName $file.Name); Title = $(if ($m) { $m.Matches[0].Groups[1].Value.Trim() } else { '' }); State = $state }
+        }
+    }
+}
+
 function Invoke-Claim {
     # Returns @{ Id = 'BL-###' } on success, or @{ Wait = $true } when every ready task
     # overlaps work in progress (or nothing is ready but a lane-eligible task in Doing may
@@ -467,6 +508,20 @@ function Invoke-Claim {
             }
             # With the usage stop on, only a CI fix is claimed (AF-0308); any other task waits.
             if ($CiFixOnly -and -not (Test-CiFixTitle (Get-TaskTitle $id))) { return @{ None = $true } }
+            # One fix task per failing test (BL-4648): a CI fix whose test a live CI fix already
+            # names is Deferred as its duplicate, not claimed for a second fix run.
+            $dupOf = if (Test-CiFixTitle (Get-TaskTitle $id)) { Get-CiFixDuplicateOf -Id $id -Tasks @(Get-LiveCiFixTasks) } else { '' }
+            if ($dupOf) {
+                $test = Get-CiFixTestName (Get-TaskTitle $id)
+                Invoke-Board @('move', '-Id', $id, '-To', 'Deferred', '-Reason', "Duplicate of $dupOf, the live CI fix for the same failing test $test; deferred at claim so one fix run covers it. Back to Backlog only if $test still fails once $dupOf is Done.") | Out-Null
+                if ((Get-TaskState $id) -eq 'Deferred') {
+                    Invoke-Git @('add', '-A', 'Tasks') | Out-Null
+                    Invoke-Git @('commit', '-q', '-m', "chore(tasks): defer $id, a duplicate of $dupOf for $test", '-m', $SkipCiNote) | Out-Null
+                    if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { Write-Trace $id 'dup' "deferred: $dupOf already fixes $test" 'Yellow' }
+                }
+                $skipNow += $id; $Skip = @($Skip) + $id
+                continue
+            }
             $moved = (Invoke-Board @('move', '-Id', $id, '-To', 'Doing')) -join ' '
             # A refusal over a shared ID is a refusal even when the task's twin is already in
             # Doing: Get-TaskState finds the twin, and lane 2 once took that for its own claim
@@ -645,6 +700,14 @@ if ($TestClaimDuplicates) {
             ,@('the claimed task is in Doing on the shared branch', 'True', "$(@($shared | Where-Object { $_ -match 'Tasks/Doing/' }).Count -eq 1)")
             ,@('a shared ID whose twin is in Doing is renumbered, not taken for a claim (AF-0386)', 'True True', "$($twinClaim.Id -and $twinClaim.Id -ne 'BL-020') $($twinB -match "^Tasks/Doing/$($twinClaim.Id)-twin-b\.md$")")
             ,@('the shift-end review push renumbers a task ID the branch already had (AF-0386)', "'' True True", "'$reviewPush' $($reviewTask -match '^Tasks/Backlog/BL-0(2[1-9]|[3-9]\d)-review-finding\.md$') $($liveIds.Count -eq @($liveIds | Select-Object -Unique).Count)")
+            ,@('a CI-fix title names its test by method name, from the watch''s or a lane''s form, and a job title names none', 'Connect_X_Y Connect_X_Y test1173 ''''', "$(Get-CiFixTestName 'Fix CI failure Connect_X_Y on Linux and macOS') $(Get-CiFixTestName 'Fix flaky CI test Mqtt5ConnectTests.Connect_X_Y') $(Get-CiFixTestName 'Fix CI failure test1173: on Linux') '$(Get-CiFixTestName 'Fix CI failure job Quality gates (windows-latest) step Measure on Windows')'")
+            ,@('a lane''s flaky-test task for a test a CI fix in Doing names is its duplicate, and so is a younger Backlog one (AF-0542)', 'BL-4543 BL-10 '''' ''''', $(
+                $mqtt = @([pscustomobject]@{ Id = 'BL-4543'; Title = 'Fix CI failure Connect_X_Y on Linux and macOS and Windows'; State = 'Doing' },
+                    [pscustomobject]@{ Id = 'BL-4544'; Title = 'Fix flaky CI test Mqtt5ConnectTests.Connect_X_Y'; State = 'Backlog' },
+                    [pscustomobject]@{ Id = 'BL-4547'; Title = 'Fix flaky CI test Mqtt5ConnectTests.Connect_X_Y'; State = 'Backlog' },
+                    [pscustomobject]@{ Id = 'BL-4548'; Title = 'Fix CI failure Frame_Malformed_Z on Linux'; State = 'Backlog' })
+                $backlogOnly = @([pscustomobject]@{ Id = 'BL-10'; Title = 'Fix CI failure A_B on Linux'; State = 'Backlog' }, [pscustomobject]@{ Id = 'BL-12'; Title = 'Fix flaky CI test C.A_B'; State = 'Backlog' })
+                "$(Get-CiFixDuplicateOf -Id 'BL-4544' -Tasks $mqtt) $(Get-CiFixDuplicateOf -Id 'BL-12' -Tasks $backlogOnly) '$(Get-CiFixDuplicateOf -Id 'BL-10' -Tasks $backlogOnly)' '$(Get-CiFixDuplicateOf -Id 'BL-4548' -Tasks $mqtt)'"))
             ,@('a failed dedupe or a failed renumber commit pushes nothing and names the reason (BL-3491)', "True True False True True", "$($dedupePush -match 'dedupe failed') $($commitPush -match 'git commit failed') $failPushed $(@($failTrace | Where-Object { $_ -match 'dedupe failed \(exit 1\): dedupe broke' }).Count -eq 1) $(@($failTrace | Where-Object { $_ -match 'BL-090' }).Count -eq 0)")
         )
         foreach ($case in $cases) {
