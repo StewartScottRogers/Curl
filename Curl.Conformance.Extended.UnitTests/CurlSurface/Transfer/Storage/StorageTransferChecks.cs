@@ -108,13 +108,8 @@ internal static class StorageTransferChecks
             SilentStorageServer server = new();
             Task<CurlRunResult> run = RunAsync(target, server, ["-m", MaxTimeSeconds.ToString(CultureInfo.InvariantCulture), target.ObjectUrl], clock);
             await server.RequestReceived.WaitAsync(TimeSpan.FromSeconds(30));
-            for (int second = 0; second <= MaxTimeSeconds && !run.IsCompleted; second++)
-            {
-                clock.Advance(TimeSpan.FromSeconds(1));
-                await Task.Yield();
-            }
-
-            CurlRunResult result = await run.WaitAsync(TimeSpan.FromSeconds(30));
+            // Until the run ends, not for -m + 1 seconds: curl may reach a clock timer only after the deadline (BL-4663).
+            CurlRunResult result = await MaxTimeDeadlineRun.AdvanceUntilDoneAsync(run, clock.Advance);
 
             string standardError = Text(result.StandardError);
             Assert.AreEqual(28, result.ExitCode, standardError);

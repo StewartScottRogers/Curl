@@ -104,13 +104,8 @@ internal static class RealtimeTransferChecks
 
             Task<CurlRunResult> run = RunAsync(scheme, server, arguments, clock);
             await server.Reached.WaitAsync(TimeSpan.FromSeconds(30));
-            for (int second = 0; second <= MaxTimeSeconds && !run.IsCompleted; second++)
-            {
-                clock.Advance(TimeSpan.FromSeconds(1));
-                await Task.Yield();
-            }
-
-            CurlRunResult result = await run.WaitAsync(TimeSpan.FromSeconds(30));
+            // Until the run ends, not for -m + 1 seconds: curl may reach a clock timer only after the deadline (BL-4663).
+            CurlRunResult result = await MaxTimeDeadlineRun.AdvanceUntilDoneAsync(run, clock.Advance);
             string error = Text(result.StandardError);
             Assert.AreEqual(28, result.ExitCode, error);
             StringAssert.StartsWith(error, "curl: (28) ", "manual, EXIT CODES 28");

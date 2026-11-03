@@ -26,13 +26,9 @@ internal static class ProcessTransferRun
         Task<CurlRunResult> run = ExtendedConformanceHarness.RunAsync(
             InProcessCurl.RunAsync, [], ["-sS", "-m", MaxTimeSeconds.ToString(CultureInfo.InvariantCulture), url], starter, environment, clock);
         await starter.Reading.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
-        for (int second = 0; second <= MaxTimeSeconds * 2 && !run.IsCompleted; second++)
-        {
-            clock.Advance(TimeSpan.FromSeconds(1));
-            await Task.Yield();
-        }
 
-        return await run.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        // Until the run ends, not for a fixed number of seconds: curl may reach a clock timer only after the deadline (BL-4663).
+        return await MaxTimeDeadlineRun.AdvanceUntilDoneAsync(run, clock.Advance, cancellationToken);
     }
 
     public static string Text(byte[] bytes) => Encoding.UTF8.GetString(bytes);

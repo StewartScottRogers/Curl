@@ -42,13 +42,10 @@ internal static class TransferSurfaceCaseRun
         using TransferSurfaceRouteInstance instance = route.Start(server);
         Task<CurlRunResult> run = RunAsync(instance, ["-sS", "-m", seconds.ToString(System.Globalization.CultureInfo.InvariantCulture), url], clock);
         await server.FirstByteReceived.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
-        for (int second = 0; second <= seconds && !run.IsCompleted; second++)
-        {
-            clock.Advance(TimeSpan.FromSeconds(1));
-            await Task.Yield();
-        }
 
-        return await run.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        // Advance until the run ends, not for -m + 1 seconds: curl may reach a clock timer only after the clock has
+        // passed the deadline (BL-4663, MaxTimeDeadlineRun's remarks).
+        return await MaxTimeDeadlineRun.AdvanceUntilDoneAsync(run, clock.Advance, cancellationToken);
     }
 
     /// <summary>Checks the run's exit code, standard output and standard error, naming <paramref name="requirement" /> and the expected value's source.</summary>
