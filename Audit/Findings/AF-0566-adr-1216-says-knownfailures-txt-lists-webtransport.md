@@ -3,8 +3,8 @@ id: AF-0566
 title: ADR-1216 says KnownFailures.txt lists WebTransport's failures BL-4633 and BL-4634; the file has no WebTransport line
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-1216-webtransport-conformance-pins-wt-enabled-and-exit-56-on-server-close.md:KnownFailures-listing:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.Extended.UnitTests/KnownFailures.txt -Patte
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
