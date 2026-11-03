@@ -2,7 +2,6 @@
 # A listed case passes while it still fails and fails once it passes: then remove its line.
 # A listed ID that no test carries fails RequirementChecks. Lines merge by union, so add or remove only whole lines.
 WebTransport:WTH3-6-2 BL-4624
-Mqtt5:MQTT5-3.1.2.10-1 BL-4575
 CurlSurface:Verbose-Az-1 BL-4620
 CurlSurface:FailWithBody-Az-1 BL-4620
 CurlSurface:Verbose-Abfs-1 BL-4620
