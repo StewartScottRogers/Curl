@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4768 — Fix AF-0604: Surviving mutant: curl_share_cleanup can dispose the shared connections when it refuses and keep them when it succeeds without a test failing
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix is tests only: `ManagedShareHandleTests` gains `Cleanup_RefusedInUse_KeepsTheSharedConnectionsOpenForTheAttachedTransfer` (a refused cleanup leaves the attached transfer's idle shared connection open and reused) and `Cleanup_Ok_ClosesTheSharedConnections` (a successful one closes it), over a `CloseCountingConnector` that counts closed connections. `ManagedShareHandle.cs` is unchanged, so no quality run was needed.
+- A lane cannot run `Audit/Tools/Invoke-MutationTest.ps1` (audit paths are off limits), so the mutant was applied by hand at `ManagedShareHandle.cs:102` (`==` to `!=`): both new tests failed, so it is killed, and the original line was put back. The re-audit runs the tool itself.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. curl_share_cleanup's dispose-on-Ok mutant is killed by two ManagedShareHandleTests
