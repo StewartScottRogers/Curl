@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Curl.Extended.Protocol.OciRegistry.Http;
 using Curl.Protocol.Abstractions;
 
@@ -31,6 +32,31 @@ internal sealed class OciPullFlow(OciRegistrySession session)
 
         response = await FollowRedirectsAsync(response, url, accept, cancellationToken);
         return response.StatusCode is >= 200 and < 300 ? response.Body : throw OciRegistryError.From(response);
+    }
+
+    /// <summary>
+    /// Checks that a blob pulled by <paramref name="digest"/> hashes to it (OCI Image Specification, descriptor,
+    /// "Digests"), after any redirect, so tampered content never reaches the output (ADR-1202). The registered
+    /// algorithms <c>sha256</c> and <c>sha512</c> are checked; a digest of another algorithm passes unchecked, as the
+    /// specification allows for an unrecognised algorithm that meets the grammar.
+    /// </summary>
+    /// <param name="digest">The URL's digest, <c>algorithm:encoded</c>.</param>
+    /// <param name="body">The pulled content.</param>
+    /// <returns><paramref name="body"/>, when it matches the digest.</returns>
+    /// <exception cref="OciTransferException">The content does not hash to the digest (exit 8).</exception>
+    public static byte[] VerifyDigest(string digest, byte[] body)
+    {
+        var colon = digest.IndexOf(':', StringComparison.Ordinal);
+        var algorithm = digest[..colon];
+        byte[]? hash = algorithm switch
+        {
+            "sha256" => SHA256.HashData(body),
+            "sha512" => SHA512.HashData(body),
+            _ => null,
+        };
+        return hash is null || Convert.ToHexStringLower(hash) == digest[(colon + 1)..]
+            ? body
+            : throw new OciTransferException(CurlExitCode.WeirdServerReply, $"The pulled content does not match its digest {digest}.");
     }
 
     private async Task<OciHttpResponse> FollowRedirectsAsync(OciHttpResponse response, Uri url, string accept, CancellationToken cancellationToken)

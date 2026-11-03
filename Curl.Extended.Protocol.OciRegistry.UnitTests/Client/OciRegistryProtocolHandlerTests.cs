@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using Curl.Extended.Protocol.OciRegistry.Http;
 using Curl.Protocol.Abstractions;
@@ -35,11 +36,11 @@ public sealed class OciRegistryProtocolHandlerTests
     {
         var connector = new SequenceConnector(SequenceConnector.Respond("200 OK", "blob"));
 
-        var (result, output) = await PullAsync(connector, "oci://reg.example:5000/alpine@sha256:abc");
+        var (result, output) = await PullAsync(connector, "oci://reg.example:5000/alpine@" + Sha256Of("blob"));
 
         Assert.AreEqual("blob", output);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        StringAssert.StartsWith(connector[0].Written, "GET /v2/alpine/blobs/sha256:abc HTTP/1.1\r\n");
+        StringAssert.StartsWith(connector[0].Written, "GET /v2/alpine/blobs/" + Sha256Of("blob") + " HTTP/1.1\r\n");
         Assert.Contains("Accept: */*\r\n", connector[0].Written);
         Assert.AreEqual(5000, connector.Targets[0].Port);
     }
@@ -123,7 +124,7 @@ public sealed class OciRegistryProtocolHandlerTests
             SequenceConnector.Respond("307 Temporary Redirect\r\nLocation: https://storage.example/b?sig=1"),
             SequenceConnector.Respond("200 OK", "blob"));
 
-        var (result, output) = await PullAsync(connector, "oci://reg.example/alpine@sha256:abc");
+        var (result, output) = await PullAsync(connector, "oci://reg.example/alpine@" + Sha256Of("blob"));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("blob", output);
@@ -137,7 +138,7 @@ public sealed class OciRegistryProtocolHandlerTests
     {
         var connector = new SequenceConnector(SequenceConnector.Respond("302 Found\r\nLocation: /other"), SequenceConnector.Respond("200 OK", "x"));
 
-        var (result, _) = await PullAsync(connector, "oci://reg.example/alpine@sha256:abc");
+        var (result, _) = await PullAsync(connector, "oci://reg.example/alpine@" + Sha256Of("x"));
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         StringAssert.StartsWith(connector[1].Written, "GET /other HTTP/1.1\r\n");
@@ -173,6 +174,65 @@ public sealed class OciRegistryProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
     }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BlobWhoseContentDoesNotMatchItsDigest_FailsAsWeirdServerReplyWritingNothing()
+    {
+        var digest = Sha256Of("expected");
+        var connector = new SequenceConnector(SequenceConnector.Respond("200 OK", "tampered"));
+
+        var (result, output) = await PullAsync(connector, "oci://reg.example/alpine@" + digest);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual($"The pulled content does not match its digest {digest}.", result.ErrorMessage);
+        Assert.AreEqual(string.Empty, output);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RedirectedBlobWhoseContentDoesNotMatchItsDigest_FailsAsWeirdServerReply()
+    {
+        var connector = new SequenceConnector(
+            SequenceConnector.Respond("307 Temporary Redirect\r\nLocation: https://storage.example/b"),
+            SequenceConnector.Respond("200 OK", "tampered"));
+
+        var (result, output) = await PullAsync(connector, "oci://reg.example/alpine@" + Sha256Of("expected"));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual(string.Empty, output);
+    }
+
+    [TestMethod]
+    [DataRow("blob", CurlExitCode.Ok, "blob")]
+    [DataRow("tampered", CurlExitCode.WeirdServerReply, "")]
+    public async Task ExecuteAsync_BlobBySha512Digest_ChecksTheSha512Hash(string content, CurlExitCode expected, string expectedOutput)
+    {
+        var digest = "sha512:" + Convert.ToHexStringLower(SHA512.HashData(Encoding.UTF8.GetBytes("blob")));
+
+        var (result, output) = await PullAsync(new SequenceConnector(SequenceConnector.Respond("200 OK", content)), "oci://reg.example/alpine@" + digest);
+
+        Assert.AreEqual(expected, result.ExitCode);
+        Assert.AreEqual(expectedOutput, output);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BlobByDigestOfAnUnrecognisedAlgorithm_WritesTheContentUnchecked()
+    {
+        var (result, output) = await PullAsync(new SequenceConnector(SequenceConnector.Respond("200 OK", "blob")), "oci://reg.example/alpine@multihash+base58:abc");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("blob", output);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ManifestByTag_IsNotCheckedAgainstAnyDigest()
+    {
+        var (result, output) = await PullAsync(new SequenceConnector(SequenceConnector.Respond("200 OK", "sha256 does not apply")), "oci://reg.example/alpine:1");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("sha256 does not apply", output);
+    }
+
+    private static string Sha256Of(string content) => "sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
 
     private static async Task<(TransferResult Result, string Output)> PullAsync(SequenceConnector connector, string url, NetworkCredential? credentials = null)
     {

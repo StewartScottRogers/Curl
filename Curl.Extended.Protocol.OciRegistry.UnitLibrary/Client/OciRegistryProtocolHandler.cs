@@ -7,7 +7,7 @@ namespace Curl.Extended.Protocol.OciRegistry.Client;
 /// <summary>
 /// Serves <c>oci://registry[:port]/name[:tag]</c> and <c>oci://registry[:port]/name@digest</c> over HTTPS, port 443 by
 /// default: without <c>-T</c> it pulls the manifest or blob the path names (<see cref="OciPullReference"/>) through
-/// <see cref="OciPullFlow"/> (ADR-1093); with <c>-T</c> it pushes the upload as that manifest, or as that blob once its
+/// <see cref="OciPullFlow"/> (ADR-1093), refusing a blob that does not hash to its digest (ADR-1202); with <c>-T</c> it pushes the upload as that manifest, or as that blob once its
 /// SHA-256 digest matches the URL's, through <see cref="OciPushFlow"/> (ADR-1097). Either way it writes the final
 /// response's body to the output.
 /// </summary>
@@ -48,8 +48,7 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
         {
             var body = context.Upload is { } upload
                 ? await PushAsync(context, session, reference, upload)
-                : await new OciPullFlow(session).PullAsync(
-                    RegistryUrl(context, reference.ApiPath), reference.IsBlob ? BlobMediaTypes : ManifestMediaTypes, context.CancellationToken);
+                : await PullAsync(context, session, reference);
             await context.Output.WriteAsync(body, context.CancellationToken);
             return TransferResult.Success(body.Length);
         }
@@ -57,6 +56,14 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
         {
             return TransferResult.Failure(failure.ExitCode, failure.Message);
         }
+    }
+
+    // A blob pulled by digest is checked against it (ADR-1202); a manifest pulled by tag has no digest to check.
+    private static async Task<byte[]> PullAsync(ITransferContext context, OciRegistrySession session, OciPullReference reference)
+    {
+        var body = await new OciPullFlow(session).PullAsync(
+            RegistryUrl(context, reference.ApiPath), reference.IsBlob ? BlobMediaTypes : ManifestMediaTypes, context.CancellationToken);
+        return reference.IsBlob ? OciPullFlow.VerifyDigest(reference.Reference, body) : body;
     }
 
     private static async Task<byte[]> PushAsync(ITransferContext context, OciRegistrySession session, OciPullReference reference, Stream upload)
