@@ -30,3 +30,4 @@ Found by BL-4683: `DnsOverQuicCases.Quic_Query_IsPaddedWithTheEdnsPaddingOption`
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: af9ddcbf af7fc95c.
