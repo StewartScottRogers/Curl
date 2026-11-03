@@ -242,7 +242,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # Tasks in Doing are only allowed when a previous shift's lane holds each of them and that
     # lane is dead - a shift stopped mid-task, or killed while waiting for tokens. Those lanes
     # are adopted: their worktrees are left as they are and they resume the task. An orphan,
-    # held by no lane, is settled by Get-OrphanAction (BL-1071). An interactive-only task
+    # held by no lane, is settled by Get-OrphanAction (BL-1071), and one it cannot place is
+    # Blocked with its candidate work kept, never a refused shift (BL-4715). An interactive-only task
     # (lane: no) in Doing is an interactive session's, so it is left alone (BL-2069).
     $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Where-Object { -not (Test-InteractiveOnlyTask $_.FullName) } | ForEach-Object { Get-TaskIdFromFileName $_.Name })
     $adopt = @{}
@@ -270,7 +271,16 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             foreach ($n in $dirty) { $laneLastTask[[int]$n] = Get-LaneLastRunTask $n }
             foreach ($id in $orphans) {
                 $action = Get-OrphanAction -Id $id -ParkedBranches (Get-ParkedBranches $id) -DirtyLanes $dirty -LaneBranchesAhead $laneBranchesAhead -LaneLastTask $laneLastTask
-                if ($action.Action -eq 'refuse') { Stop-ShiftStart $action.Why; exit 1 }
+                if ($action.Action -eq 'refuse') {
+                    # One orphan never stops the shift, or its CI watch with it (BL-4715): it is
+                    # Blocked, with every candidate for its work kept and named.
+                    $blockReason = Get-OrphanBlockReason -Id $id -Why $action.Why -DirtyLanes $dirty -LaneBranchesAhead $laneBranchesAhead
+                    Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', $blockReason) | Out-Null
+                    if ((Get-TaskState $id) -ne 'Blocked') { Stop-ShiftStart "$($action.Why), and moving it to Blocked failed"; exit 1 }
+                    $returned += $id
+                    Write-Trace $id 'block' "held by no lane, and its work cannot be told apart: $($action.Why); Blocked, candidates kept" 'Yellow'
+                    continue
+                }
                 if ($action.Action -eq 'adopt') {
                     $adopt[$action.Lane] = $id
                     $dirty = @($dirty | Where-Object { $_ -ne $action.Lane })
@@ -287,14 +297,14 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             }
             if ($returned.Count) {
                 git -C $Root add -A Tasks 2>&1 | Out-Null
-                git -C $Root commit -q -m "chore(tasks): return $($returned -join ', ') to Backlog - in Doing and held by no lane" -m $SkipCiNote 2>&1 | Out-Null
+                git -C $Root commit -q -m "chore(tasks): settle $($returned -join ', ') - in Doing and held by no lane" -m $SkipCiNote 2>&1 | Out-Null
                 # The push takes the integrate lock like every lane's, so it cannot land in the
                 # middle of a lane's verify and cost that lane its push (BL-3060).
                 $boardLock = Enter-Lock
                 try { git -C $Root push -q origin "HEAD:$branch" 2>&1 | Out-Null } finally { $boardLock.Dispose() }
                 if ($LASTEXITCODE -ne 0) {
                     git -C $Root reset -q --hard "origin/$branch" 2>&1 | Out-Null
-                    Stop-ShiftStart "$($returned -join ', ') in Doing and held by no lane; returning them to Backlog could not be pushed to origin/$branch"; exit 1
+                    Stop-ShiftStart "$($returned -join ', ') in Doing and held by no lane; moving them to Backlog or Blocked could not be pushed to origin/$branch"; exit 1
                 }
             }
         }

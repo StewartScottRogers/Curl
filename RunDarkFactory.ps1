@@ -152,9 +152,11 @@
     each) and the lane resumes its task from the work in its worktree, first integrating
     any finished commits it had not pushed. A new shift adopts a stopped shift's lanes the
     same way instead of refusing to start over their tasks in Doing. A task in Doing that
-    no lane holds (BL-1071) is adopted by the one lane worktree with uncommitted work, or,
-    when none has any and a parked factory/<ID>-lane-* branch holds its work, returned to
-    Backlog; anything else refuses to start, and every refusal raises the alarm, so the
+    no lane holds (BL-1071) is adopted by the lane worktree with uncommitted work whose newest
+    run log names it, or the one dirty lane with no run log (BL-4650); when none has any and
+    a parked factory/<ID>-lane-* branch holds its work, or no work for it exists, it returns to
+    Backlog; one whose work cannot be told apart is Blocked, every candidate kept, rather than
+    refusing the shift (BL-4715). Any other trouble refuses to start, and every refusal raises the alarm, so the
     factory never stops without saying why. A coordinator whose clean checkout is only
     behind origin/<branch> fast-forwards it and starts (BL-1141); one that is ahead of it
     or has diverged from it refuses. A run that dies on
@@ -575,8 +577,8 @@ param(
     [switch]$TestLaneMarker,
     # Prove, on a throwaway repository, that a park pushes its move to Backlog or reports
     # that it could not, how shift start settles a task in Doing held by no lane (adopted,
-    # or back to Backlog when no work for it exists, refused only when a lane branch holds
-    # commits beyond the shift branch), that a claim past the shift's end is released to
+    # or back to Backlog when no work for it exists, Blocked with its candidates kept when a
+    # lane branch holds commits beyond the shift branch), that a claim past the shift's end is released to
     # Backlog, and that a refused start raises the alarm (BL-1071, BL-4347), and exit.
     [switch]$TestPark,
     # Prove, on a throwaway repository, that a claim applies its task's own shift stash and

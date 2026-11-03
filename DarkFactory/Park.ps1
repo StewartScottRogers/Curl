@@ -82,6 +82,26 @@ function Get-OrphanAction {
     return [pscustomobject]@{ Action = 'backlog'; Lane = 0; Branch = ''; Why = '' }
 }
 
+function Get-OrphanBlockReason {
+    # An orphan Get-OrphanAction cannot place goes to Blocked rather than refusing the shift
+    # (BL-4715, AF-0567: two refused starts over BL-2969 kept the CI watch off for 32 minutes).
+    # Its candidate work is kept first, since starting lanes resets their branches and stashes
+    # their worktrees: each lane branch in -LaneBranchesAhead is copied to
+    # factory/<Id>-lane-<n>-<Stamp>, a parked branch Get-ParkedBranches finds. Returns the
+    # Blocked reason, naming -Why, the copies and where each dirty lane's work goes.
+    param([string]$Id, [string]$Why, [int[]]$DirtyLanes = @(), [string[]]$LaneBranchesAhead = @(), [string]$Repo = $Root, [string]$ForStamp = $Stamp)
+    $kept = @()
+    foreach ($ref in @($LaneBranchesAhead | Where-Object { $_ -match '^factory/lane-(\d+)$' })) {
+        $copy = "factory/$Id-lane-$($Matches[1])-$ForStamp"
+        git -C $Repo branch -f $copy $ref 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) { $kept += "$ref is kept as $copy" } else { $kept += "$ref could not be copied (git branch failed); its reflog still holds it" }
+    }
+    $dirty = @($DirtyLanes | Where-Object { $_ })
+    if ($dirty.Count) { $kept += "uncommitted work of lane $($dirty -join ', ') is stashed when each lane starts (git stash list: darkfactory lane-<n> before $ForStamp)" }
+    $where = if ($kept.Count) { " Kept: $($kept -join '; ')." } else { '' }
+    return "Blocked at shift start instead of refusing the shift: $Why.$where Claude (an interactive session) finds the task's work among these, moves it to Backlog naming it, or Backlog with no work."
+}
+
 function Get-LaneLastRunTask {
     # The task lane $N ran last, by its newest run log in $Dir (BL-<id>-<stamp>-L<n>.jsonl, or
     # its -resumed run), or '' when the lane has none. Get-OrphanAction reads it to tell whose
@@ -277,6 +297,11 @@ if ($TestPark) {
             git -C $repo checkout -q work 2>&1 | Out-Null
             $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches @() -DirtyLanes @() -LaneBranchesAhead (Get-LaneBranchesAhead 'work' $repo)
             "$($a.Action) $(if ($a.Why -match 'lane branches (factory/lane-9) have commits') { "lane branches $($Matches[1])" } else { $a.Why })" })
+        ,@('an orphan that cannot be placed is Blocked, not a refused shift: the lane branch is kept as a parked branch and the dirty lanes named (AF-0567)', 'kept factory/BL-003-lane-9-test parked lanes 2, 3 named Blocked instead of refusing', {
+            $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches @() -DirtyLanes @() -LaneBranchesAhead (Get-LaneBranchesAhead 'work' $repo)
+            $why = Get-OrphanBlockReason -Id 'BL-003' -Why $a.Why -DirtyLanes @(2, 3) -LaneBranchesAhead (Get-LaneBranchesAhead 'work' $repo) -Repo $repo -ForStamp 'test'
+            $same = (git -C $repo rev-parse 'factory/BL-003-lane-9-test' 2>$null) -eq (git -C $repo rev-parse 'factory/lane-9' 2>$null)
+            "$(if ($same -and $why -match 'kept as (factory/BL-003-lane-9-test)') { "kept $($Matches[1])" } else { "'$why'" }) $(if ((Get-ParkedBranches 'BL-003' $repo) -contains 'factory/BL-003-lane-9-test') { 'parked' } else { 'not parked' }) $(if ($why -match 'lane (2, 3) is stashed') { "lanes $($Matches[1]) named" } else { 'lanes not named' }) $(if ($why -match '^Blocked at shift start instead of refusing the shift') { 'Blocked instead of refusing' } else { 'no' })" })
         ,@('a refused start raises the alarm with its reason', 'SHIFT REFUSED  BL-003 is in Doing', {
             $script:Alarmed = @()
             Stop-ShiftStart -Why 'BL-003 is in Doing' -Notify $quiet
