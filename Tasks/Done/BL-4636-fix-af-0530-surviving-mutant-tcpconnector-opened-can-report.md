@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-02
 ---
 # BL-4636 — Fix AF-0530: Surviving mutant: TcpConnector.Opened can report every fresh connection as reused without a test failing
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Curl.Networking.UnitTests/TcpConnectorTests.FreshConnection.cs`: a plain and a TLS connect each assert `ConnectResult.IsReused` is false, covering both callers of `Opened`. A lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (`isReused: true` at TcpConnector.cs:2369): both new tests failed, so it is killed; the value was then put back. No production code changed. Platform-neutral: fakes only, no paths or sockets.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-02: Doing -> Done. Fresh connections pinned as not reused on the plain and TLS paths; mutant killed
