@@ -21,6 +21,14 @@
                          value that cannot be null (a ToString, GetString, Substring, Trim,
                          Replace, string.Join/Format/Concat or similar call, an interpolated
                          string, a new expression or a .Length/.Count value)
+      unasserted-fake-value
+                         the sharper form of a weak check that is the only check of its value:
+                         the test's fakes return an exact string (a lambda's result, a switch
+                         arm's, or a return "...") that no assertion mentions, so the test
+                         arranges the outcome its name promises and never looks at it (audit
+                         20261102-172448 dismissed one among 120 weak-assertion candidates).
+                         Listed instead of weak-assertion for that value; the quality method files
+                         it unless an assertion that checks the value exactly is quoted
       commented-assertion
                          an Assert.*, CollectionAssert.* or StringAssert.* call commented out
                          with // or /* */ inside the test, whether or not other assertions
@@ -157,6 +165,19 @@ function Test-NeverNull([string]$Expression) {
     return $false
 }
 
+function Get-UnassertedFakeValues([string]$Body, $Asserts) {
+    # The string literals the test's fakes return - a lambda's result (path => "x", or
+    # path => path == "p" ? "x" : null, or a switch arm "k" => "x") or a return "x" - that no
+    # assertion mentions, not even inside a longer expected value. A fake that hands the code an
+    # exact value the test never checks is the test arranging an outcome and not looking at it.
+    $returned = @([regex]::Matches($Body, '=>\s*(?:(?:(?!=>)[^;{}])*?\?\s*)?@?"((?:\\.|[^"\\])*)"|\breturn\s+@?"((?:\\.|[^"\\])*)"') |
+        ForEach-Object { if ($_.Groups[1].Success) { $_.Groups[1].Value } else { $_.Groups[2].Value } } |
+        Where-Object { $_.Length -ge 4 } | Select-Object -Unique)
+    if (-not $returned.Count) { return @() }
+    $assertText = (@($Asserts | ForEach-Object { $_.Args }) + @([regex]::Matches($Body, '\b(?:Assert\w+|Expect\w*|Verify\w*)\s*\([^;]*') | ForEach-Object { $_.Value })) -join "`n"
+    return @($returned | Where-Object { $assertText.IndexOf($_, [StringComparison]::Ordinal) -lt 0 })
+}
+
 function Get-Candidates($Method, [hashtable]$ExitCodes) {
     $found = @()
     $body = $Method.Body
@@ -169,6 +190,7 @@ function Get-Candidates($Method, [hashtable]$ExitCodes) {
     if (-not $hasExpected -and $body -notmatch $assertPattern) { $found += @{ kind = 'no-assertion'; detail = 'no assertion once comments are removed' } }
     elseif ($asserts.Count -and -not $hasExpected) {
         $weakDetails = @()
+        $arrangedDetails = @()
         $weak = @($asserts | Where-Object { Test-WeakAssertion $_ })
         $other = $body -match '\bThrows(?:Exactly)?(?:Async)?\b|\b(?:Expect|Verify)\w*\s*\(|\bAssert\w+\s*\('
         if ($weak.Count -eq $asserts.Count -and -not $other) { $weakDetails += "only $(@($weak | ForEach-Object { 'Assert.' + $_.Kind } | Select-Object -Unique) -join ', ')" }
@@ -176,11 +198,19 @@ function Get-Candidates($Method, [hashtable]$ExitCodes) {
             # Per assertion: a weak check that is the only check of its value, beside stronger
             # assertions of other values (PD-001 keeps the exit-code check and weakens the bytes').
             $strongText = (@($asserts | Where-Object { -not (Test-WeakAssertion $_) } | ForEach-Object { $_.Args }) + @([regex]::Matches($body, '\b(?:Assert\w+|Expect\w*|Verify\w*)\s*\([^;]*') | ForEach-Object { $_.Value })) -join "`n"
+            $unasserted = @(Get-UnassertedFakeValues $body $asserts)
             foreach ($w in $weak) {
                 $root = Get-RootIdentifier $w.Args
-                if ($root -and $strongText -notmatch "\b$([regex]::Escape($root))\b") { $weakDetails += "Assert.$($w.Kind)($(Get-FirstArgument $w.Args)) is the only check of $root; the other assertions check other values" }
+                if ($root -and $strongText -notmatch "\b$([regex]::Escape($root))\b") {
+                    $only = "Assert.$($w.Kind)($(Get-FirstArgument $w.Args)) is the only check of $root"
+                    # The sharper case (audit 20261102-172448 dismissed one among 120 weak candidates):
+                    # the test arranges a fake that returns an exact value, and nothing asserts that value.
+                    if ($unasserted.Count) { $arrangedDetails += "$only, and no assertion checks the value$(if ($unasserted.Count -gt 1) { 's' }) the test's fakes return: $(@($unasserted | ForEach-Object { '"' + $_ + '"' }) -join ', ')" }
+                    else { $weakDetails += "$only; the other assertions check other values" }
+                }
             }
         }
+        if ($arrangedDetails.Count) { $found += @{ kind = 'unasserted-fake-value'; detail = ($arrangedDetails | Select-Object -Unique) -join '; ' } }
         foreach ($n in @($asserts | Where-Object { $_.Kind -eq 'IsNotNull' -and (Test-NeverNull (Get-FirstArgument $_.Args)) })) {
             $weakDetails += "Assert.IsNotNull($(Get-FirstArgument $n.Args)) checks a value that cannot be null"
         }
@@ -244,13 +274,15 @@ if ($SelfTest) {
         'Retry_WithoutMaxTime_IsNeverAbandoned:ignored-test',
         'Encode_Header_WritesTheBytes:weak-assertion',
         'Format_Count_WritesTheDigits:weak-assertion',
-        'Transfer_Timeout_SetsTheCode:commented-assertion'
+        'Transfer_Timeout_SetsTheCode:commented-assertion',
+        'Rewrite_EmptyPath_ReadsTheConfiguredFile:unasserted-fake-value'
     ) | Sort-Object
     $failed = 0
     function Check([string]$Name, [bool]$Ok, [string]$Detail) { if (-not $Ok) { $script:failed++ }; Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Detail" }
     Check 'every planted kind is found, and nothing else' (($got -join '|') -eq ($want -join '|')) ($got -join ', ')
-    Check 'tests and projects are counted' ($r.testsScanned -eq 16 -and $r.projectsScanned -eq 2) "tests $($r.testsScanned), projects $($r.projectsScanned)"
+    Check 'tests and projects are counted' ($r.testsScanned -eq 18 -and $r.projectsScanned -eq 2) "tests $($r.testsScanned), projects $($r.projectsScanned)"
     $detail = { param($Test) "$(@($r.candidates | Where-Object { $_.test -eq $Test -and $_.kind -ne 'no-assertion' })[0].detail)" }
+    Check 'a fake value no assertion checks is named' ((& $detail 'Rewrite_EmptyPath_ReadsTheConfiguredFile') -eq 'Assert.IsNotNull(url) is the only check of url, and no assertion checks the value the test''s fakes return: "http://127.0.0.1:9"') (& $detail 'Rewrite_EmptyPath_ReadsTheConfiguredFile')
     Check 'a weakened assertion beside a stronger one names the value only it checks' ((& $detail 'Encode_Header_WritesTheBytes') -eq 'Assert.IsNotNull(bytes) is the only check of bytes; the other assertions check other values') (& $detail 'Encode_Header_WritesTheBytes')
     Check 'an IsNotNull of a value that cannot be null says so' ((& $detail 'Format_Count_WritesTheDigits') -eq 'Assert.IsNotNull(count.ToString()) checks a value that cannot be null') (& $detail 'Format_Count_WritesTheDigits')
     Check 'a commented-out assertion is quoted' ((& $detail 'Transfer_Timeout_SetsTheCode') -eq 'commented out: Assert.AreEqual(28, code);') (& $detail 'Transfer_Timeout_SetsTheCode')
