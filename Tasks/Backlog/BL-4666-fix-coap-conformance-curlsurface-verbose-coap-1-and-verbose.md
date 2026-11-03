@@ -1,5 +1,5 @@
 ---
-id: BL-4664
+id: BL-4666
 title: Fix Coap conformance: CurlSurface:Verbose-Coap-1 and Verbose-Coaps-1
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4664 — Fix Coap conformance: CurlSurface:Verbose-Coap-1 and Verbose-Coaps-1
+# BL-4666 — Fix Coap conformance: CurlSurface:Verbose-Coap-1 and Verbose-Coaps-1
 
 ## Goal
 
