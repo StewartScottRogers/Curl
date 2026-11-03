@@ -30,3 +30,4 @@ Found by BL-4651 on lane 9 (2026-11-02): it failed once in `dotnet test Curl.sln
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 9b8f5809 e3a4fd8b.
