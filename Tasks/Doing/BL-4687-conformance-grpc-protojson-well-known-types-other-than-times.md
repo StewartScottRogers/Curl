@@ -38,3 +38,4 @@ Format"; a case that fails goes in `KnownFailures.txt` with a filed High `Fix Gr
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 74ac21ad 3006bacd e3a4fd8b.
