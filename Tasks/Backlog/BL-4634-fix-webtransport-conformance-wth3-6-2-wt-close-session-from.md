@@ -1,16 +1,16 @@
 ---
-id: BL-4624
+id: BL-4634
 title: Fix WebTransport conformance: WTH3-6-2 WT_CLOSE_SESSION from the server ends the transfer
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4623]
+depends-on: [BL-4633]
 touches: [Curl.Extended.Protocol.WebTransport.UnitLibrary, Curl.Extended.Protocol.WebTransport.UnitTests, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4624 — Fix WebTransport conformance: WTH3-6-2 WT_CLOSE_SESSION from the server ends the transfer
+# BL-4634 — Fix WebTransport conformance: WTH3-6-2 WT_CLOSE_SESSION from the server ends the transfer
 
 ## Goal
 
@@ -18,7 +18,7 @@ When the server sends `WT_CLOSE_SESSION` on the CONNECT stream, curl ends the tr
 
 ## Context
 
-Found by BL-4608's case `WebTransportCloseTests.ServerClose_WithCodeAndMessage_EndsTheTransferWithExit56AndTheClientSendsOnlyFin` (`WebTransport:WTH3-6-2`, listed in `KnownFailures.txt`). `WebTransportSession` never reads the CONNECT stream after the response, so a server close leaves the transfer waiting on its bidirectional stream until `-m` (exit 28 today). The exit code and text are the case's choice (BL-4608 Notes): 56 as for any session the peer ends early, the message carrying the code and the UTF-8 reason. Depends on BL-4623, which fixes the crash after a session and touches the same files.
+Found by BL-4608's case `WebTransportCloseTests.ServerClose_WithCodeAndMessage_EndsTheTransferWithExit56AndTheClientSendsOnlyFin` (`WebTransport:WTH3-6-2`, listed in `KnownFailures.txt`). `WebTransportSession` never reads the CONNECT stream after the response, so a server close leaves the transfer waiting on its bidirectional stream until `-m` (exit 28 today). The exit code and text are the case's choice (BL-4608 Notes): 56 as for any session the peer ends early, the message carrying the code and the UTF-8 reason. Depends on BL-4633, which fixes the crash after a session and touches the same files.
 
 ## Acceptance criteria
 

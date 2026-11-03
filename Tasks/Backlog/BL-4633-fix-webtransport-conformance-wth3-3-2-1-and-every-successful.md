@@ -1,5 +1,5 @@
 ---
-id: BL-4623
+id: BL-4633
 title: Fix WebTransport conformance: WTH3-3.2-1 and every successful session crash closing a disposed QUIC connection
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4623 — Fix WebTransport conformance: WTH3-3.2-1 and every successful session crash closing a disposed QUIC connection
+# BL-4633 — Fix WebTransport conformance: WTH3-3.2-1 and every successful session crash closing a disposed QUIC connection
 
 ## Goal
 

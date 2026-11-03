@@ -24,9 +24,9 @@ BL-4608 measures Curl's `webtransport://` client (ADR-1089) against draft-ietf-w
    ends early) and `curl: (56) The server closed the WebTransport session: code <code>, <message>`; the client
    closes its side of the CONNECT stream with a FIN and sends no capsule of its own. The case
    `WebTransportCloseTests.ServerClose_WithCodeAndMessage_EndsTheTransferWithExit56AndTheClientSendsOnlyFin` pins
-   it; BL-4624 implements it.
+   it; BL-4634 implements it.
 
 ## Consequences
 
 The client's present failures are listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`: every
-successful session ends in an `ObjectDisposedException` (BL-4623) and a server close is not read (BL-4624).
+successful session ends in an `ObjectDisposedException` (BL-4633) and a server close is not read (BL-4634).
