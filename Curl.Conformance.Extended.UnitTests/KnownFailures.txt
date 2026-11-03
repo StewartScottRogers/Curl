@@ -1,5 +1,4 @@
 # Extended conformance cases known to fail (BL-4502): one '<requirement id> BL-####' per line, any order.
 # A listed case passes while it still fails and fails once it passes: then remove its line.
 # A listed ID that no test carries fails RequirementChecks. Lines merge by union, so add or remove only whole lines.
-CurlSurface:Verbose-Dns-1 BL-4672
 DnsQuery:RFC5452-9.1-2 BL-4673
