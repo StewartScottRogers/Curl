@@ -31,3 +31,4 @@ RFC 6455 section 5.5.1: an endpoint that receives a Close frame and has not sent
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: e3f74df3 150bac4e ff8cc365.
