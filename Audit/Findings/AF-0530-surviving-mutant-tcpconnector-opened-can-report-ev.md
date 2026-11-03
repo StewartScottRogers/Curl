@@ -3,8 +3,8 @@ id: AF-0530
 title: Surviving mutant: TcpConnector.Opened can report every fresh connection as reused without a test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.cs:Opened-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.cs:2369:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
