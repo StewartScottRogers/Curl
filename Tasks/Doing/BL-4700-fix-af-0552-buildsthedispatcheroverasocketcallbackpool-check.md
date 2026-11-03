@@ -41,10 +41,14 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The dispatcher test now drives a transfer through `ManagedCurlEngine.CreateDispatcher` itself (engine built with it as its dispatcher factory) to `http://127.0.0.1:1/` with an open-socket callback answering `CURL_SOCKET_BAD`: it asserts exit 7 with `SocketCallbackConnector`'s text and that the callback was called once with `IpConnection`. A pool without the `SocketCallbackConnector` would dial and never call it. Chose behaviour over reflection because the pool's inner connector is not exposed and `touches` is the test project only; the refusal comes before any socket is made, so it stays a unit test.
+- The connect-only connector assertions moved to their own test, `CreateConnectOnlyConnector_SocketCallbackSetOrNot_WrapsTheTcpConnectorOnlyWhenSet`, so each test checks what its name says.
+- Test-only change, no production code, so no quality run. Platform-neutral (loopback IP literal, no OS text pinned). Curl.Engine.UnitTests fast tests: 2960 passed.
 
 ## Log
 

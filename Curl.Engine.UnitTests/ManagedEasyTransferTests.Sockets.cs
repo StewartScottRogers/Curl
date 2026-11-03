@@ -63,12 +63,29 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public void CreateDispatcher_SocketCallbackSet_BuildsTheDispatcherOverASocketCallbackPool()
+    public async Task CreateDispatcher_SocketCallbackSet_BuildsTheDispatcherOverASocketCallbackPool()
+    {
+        // The production dispatcher's pool asks the open-socket callback before its TcpConnector dials, so its
+        // refusal fails the transfer with no socket opened; a pool without the SocketCallbackConnector would dial
+        // and never call it (AF-0552).
+        List<string> calls = [];
+        await using ManagedCurlEngine engine = new(TimeProvider.System, (options, shared, cookies) => ManagedCurlEngine.CreateDispatcher(options, shared, cookies));
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = SocketCallbackOptions(calls, CurlSocket.Bad, SocketOptionResult.Ok) with { Network = new EasyNetworkOptions { Url = "http://127.0.0.1:1/" } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.CouldntConnect, code);
+        StringAssert.EndsWith(easy.ErrorText, " ms: " + SocketCallbackConnector.CouldntConnectText);
+        CollectionAssert.AreEqual(new[] { "open IpConnection" }, calls);
+    }
+
+    [TestMethod]
+    public void CreateConnectOnlyConnector_SocketCallbackSetOrNot_WrapsTheTcpConnectorOnlyWhenSet()
     {
         ManagedEngineSharedState shared = new(TimeProvider.System, _ => string.Empty);
         EasyOptions options = new() { Callbacks = new() { CloseSocket = _ => 0 } };
 
-        Assert.IsNotNull(ManagedCurlEngine.CreateDispatcher(options, shared, cookieStore: null));
         Assert.IsInstanceOfType<SocketCallbackConnector>(ManagedCurlEngine.CreateConnectOnlyConnector(options, shared));
         Assert.IsInstanceOfType<TcpConnector>(ManagedCurlEngine.CreateConnectOnlyConnector(new EasyOptions(), shared));
     }
