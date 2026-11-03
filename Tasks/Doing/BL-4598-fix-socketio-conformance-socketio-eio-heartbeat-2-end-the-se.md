@@ -22,11 +22,15 @@ Engine.IO v4 heartbeat: the client must consider the connection closed when the 
 
 ## Acceptance criteria
 
-- [ ] `SocketIoEngineIoCases.MissedPing_EndsTheConnectionAfterPingIntervalPlusPingTimeoutOnTheInjectedClock` passes as a plain case: the `SocketIo:EIO-Heartbeat-2 BL-4595` line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` and the known-failures check passes.
-- [ ] A focused unit test in `Curl.Extended.Protocol.SocketIo.UnitTests` pins the fix (ADR-0482).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests are green, and the library stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 (`Measure-CodeQuality.ps1`).
+- [x] `SocketIoEngineIoCases.MissedPing_EndsTheConnectionAfterPingIntervalPlusPingTimeoutOnTheInjectedClock` passes as a plain case: the `SocketIo:EIO-Heartbeat-2 BL-4595` line is removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` and the known-failures check passes.
+- [x] A focused unit test in `Curl.Extended.Protocol.SocketIo.UnitTests` pins the fix (ADR-0482).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests are green, and the library stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 (`Measure-CodeQuality.ps1`).
 
 ## Notes
+
+- Done directly (small, one-class change) rather than through the full /feature agent chain, to stay within the run's budget.
+- `SocketIoSession` reads `pingInterval` + `pingTimeout` from the open packet and waits for each ping on the transfer's `TimeProvider` (a `CancellationTokenSource` on that clock, restarted by each ping); a missed ping ends with exit 56 (ADR-1209, decided by Claude under Stewart's delegation). A handshake without both fields sets no heartbeat.
+- Unit tests: `SocketIoSessionTests` (ManualClock fake, `ScriptedConnection.WaitsAtEnd`). Conformance known-failure line removed; Curl.Conformance.Extended.UnitTests 778 passed. Measure-CodeQuality for the library: 0 failing members. Full `dotnet build Curl.slnx -warnaserror` clean, fast tests green. Platform-neutral (no paths, OS text or certificates).
 
 ## Log
 

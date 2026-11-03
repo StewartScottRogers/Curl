@@ -1257,3 +1257,4 @@ Each option and the specific reason it lost.
 | [1207](ADR-1207-oci-pulls-the-manifest-under-a-digest-the-registry-holds-no-blob-under.md) | OCI pulls the manifest under a digest the registry holds no blob under, after the blob request is answered 404 (BL-4592) | Accepted | 2026-11-02 |
 | [1208](ADR-1208-redis-falls-back-to-resp2-when-the-server-refuses-hello.md) | Redis falls back to RESP2 when the server refuses HELLO, authenticating with AUTH (BL-4601) | Accepted | 2026-11-02 |
 | [1209](ADR-1209-stomp-send-carries-content-type-application-octet-stream.md) | STOMP SEND carries content-type application/octet-stream (BL-4609) | Accepted | 2026-11-02 |
+| [1209](ADR-1209-socketio-ends-with-exit-56-when-no-ping-arrives.md) | Socket.IO ends with exit 56 when no ping arrives within the open packet's `pingInterval` + `pingTimeout`, on the transfer's clock (BL-4598) | Accepted | 2026-11-02 |
