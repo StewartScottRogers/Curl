@@ -31,3 +31,4 @@ Found by BL-4528's AMQP 1.0 conformance cases against `Amqp1ReferenceContainer` 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: c69ba9e4 1342c1dc a834f96f.
