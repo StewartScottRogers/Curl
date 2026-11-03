@@ -7,7 +7,7 @@ requirements that bind a client; BL-4525 adds section 3.1's extended option enco
 (request/response semantics, `Coap/RequestResponse/`); BL-4526 adds section 5.9 (response codes as curl reports them, with and without `-f` and `-i`), section 6 (`coap` URIs
 and the Uri-* options, `Coap/UriAndResponse/`) and section 12 (the registries a client uses), which completes the
 matrix for RFC 7252. RFC 7959 and RFC 7641 are in [Coap-BlockwiseObserve.md](Coap-BlockwiseObserve.md) and `coaps://`
-(RFC 7252 section 9) in [Coap-Dtls.md](Coap-Dtls.md). Where the
+(RFC 7252 section 9) in [Coap-Dtls-Handshake.md](Coap-Dtls-Handshake.md). Where the
 RFC states a rule of the retransmission algorithm without a keyword, the Level says "(unkeyworded)".
 
 | ID | Level | Requirement | Covered by |
@@ -68,7 +68,7 @@ RFC states a rule of the retransmission algorithm without a keyword, the Level s
 | Coap:RFC7252-5.9-2 | (unkeyworded) | A response code the client does not recognise is treated as the generic code of its class (4.00 or 5.00). | CoapResponseCodeTests.ErrorResponse_WithFail_EndsWithExit22AndWritesNothing |
 | Coap:RFC7252-5.9-3 | SHOULD | A 4.xx or 5.xx response carries a diagnostic payload. | n/a: binds the server that answers; curl writes whatever payload the response carries (CoapResponseCodeTests.ErrorResponse_WithoutFail_IsWrittenWithExit0) |
 | Coap:RFC7252-6.1-1 | (unkeyworded) | A `coap` URI without a port, or with an empty one, means UDP port 5683. | CoapUriOptionTests.Port_IsTheDestinationAndNoUriPortIsSent |
-| Coap:RFC7252-6.2-1 | MUST, MUST NOT | The `coaps` URI scheme, its default port 5684 and DTLS. | n/a: `coaps://` is BL-4472's, see [Coap-Dtls.md](Coap-Dtls.md) |
+| Coap:RFC7252-6.2-1 | MUST, MUST NOT | The `coaps` URI scheme, its default port 5684 and DTLS. | n/a: `coaps://` is BL-4472's, see [Coap-Dtls-Handshake.md](Coap-Dtls-Handshake.md) |
 | Coap:RFC7252-6.3-1 | (unkeyworded) | Normalisation and comparison of `coap` URIs (case of scheme and host, default port, percent-encoding). | CoapUriOptionTests.HostPathSegmentsAndQueryArguments_AreSentAsUriOptionsPercentDecoded |
 | Coap:RFC7252-6.4-1 | (unkeyworded) | Unless the host is an IP literal, Uri-Host is the host, lowercased and percent-decoded. | CoapUriOptionTests.HostPathSegmentsAndQueryArguments_AreSentAsUriOptionsPercentDecoded |
 | Coap:RFC7252-6.4-2 | (unkeyworded) | Uri-Port is included only when the URI's port differs from the request's destination UDP port; the default port is never sent. | CoapUriOptionTests.Port_IsTheDestinationAndNoUriPortIsSent |

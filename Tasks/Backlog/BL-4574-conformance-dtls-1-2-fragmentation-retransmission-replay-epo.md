@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4573, BL-4583]
-touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
+touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls-Faults.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
@@ -46,7 +46,7 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 `Fix Coap conformance: <requirement>` (pipeline feature; touches the library, its `.UnitTests` and
 `KnownFailures.txt`; criteria: the case passes, a focused unit test in the library's `.UnitTests` pins the fix
 (ADR-0482), the `KnownFailures.txt` line is removed). Every `[SpecRequirement]` ID a case carries gets its row in
-`Documentation/Conformance/Extended/Coap-Dtls.md` in the same task, so the matrix check stays green between parts.
+`Documentation/Conformance/Extended/Coap-Dtls-Faults.md` in the same task, so the matrix check stays green between parts.
 
 ## Acceptance criteria
 
@@ -56,7 +56,7 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 - [ ] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` run curl in process for `coaps://` and assert
       datagram bytes, stdout, stderr and exit code for at least: a server flight fragmented and reordered, a lost
       flight retransmitted on the timer, a replayed and an old-epoch record dropped, and a fatal alert.
-- [ ] `Documentation/Conformance/Extended/Coap-Dtls.md` has a row for every `[SpecRequirement]` ID these cases
+- [ ] `Documentation/Conformance/Extended/Coap-Dtls-Faults.md` has a row for every `[SpecRequirement]` ID these cases
       carry; the harness's matrix check passes.
 - [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Coap conformance: ...` task; the known-failures check passes.

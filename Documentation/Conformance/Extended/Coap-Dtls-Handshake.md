@@ -1,4 +1,4 @@
-# CoAP requirement matrix (DTLS 1.2, RFC 6347 and RFC 7252 section 9.1)
+# CoAP requirement matrix (DTLS 1.2 handshake, RFC 6347 and RFC 7252 section 9.1)
 
 Curl's `coaps://` client (`Curl.Extended.Protocol.Coap.UnitLibrary`, `Dtls/` and `Secure/DtlsDatagramChannel`)
 measured against RFC 6347 and RFC 7252 section 9.1 by the cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/`,
@@ -7,7 +7,7 @@ from RFC 6347 and RFC 5246 that answers a ClientHello without its cookie with a 
 handshake under TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 with a self-signed RSA certificate, and passes each protected
 application data record to `CoapReferenceServer`. This part (BL-4573) holds the cookie exchange, the epochs, the
 certificate check and the protected exchange; the server's fault hooks (fragmenting, reordering, dropping,
-replaying, alerting) and their requirements follow in BL-4574. A row whose case fails is listed in
+replaying, alerting) and their requirements follow in BL-4574 (`Coap-Dtls-Faults.md`) and BL-4575 (`Coap-Dtls-Remaining.md`). A row whose case fails is listed in
 `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with its fix task.
 
 | ID | Level | Requirement | Covered by |

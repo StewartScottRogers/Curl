@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4573, BL-4574]
-touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
+touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls-Remaining.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
@@ -46,11 +46,11 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 `Fix Coap conformance: <requirement>` (pipeline feature; touches the library, its `.UnitTests` and
 `KnownFailures.txt`; criteria: the case passes, a focused unit test in the library's `.UnitTests` pins the fix
 (ADR-0482), the `KnownFailures.txt` line is removed). Every `[SpecRequirement]` ID a case carries gets its row in
-`Documentation/Conformance/Extended/Coap-Dtls.md` in the same task, so the matrix check stays green between parts.
+`Documentation/Conformance/Extended/Coap-Dtls-Remaining.md` in the same task, so the matrix check stays green between parts.
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Coap-Dtls.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 6347
+- [ ] `Documentation/Conformance/Extended/Coap-Dtls-Remaining.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 6347
       (and the RFC 5246 handshake rules it inherits) and RFC 7252 section 9.1 that binds a client an `Coap:` ID mapped
       to a test or to `n/a: <reason>`; the harness's matrix check passes.
 - [ ] Every requirement the cases of BL-4573 and BL-4574 do not yet cover gets its own case in
