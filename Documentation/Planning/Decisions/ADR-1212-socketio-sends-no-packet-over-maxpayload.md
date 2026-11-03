@@ -1,4 +1,4 @@
-# ADR-1211: Socket.IO sends no packet over the open packet's maxPayload and ends with exit 55
+# ADR-1212: Socket.IO sends no packet over the open packet's maxPayload and ends with exit 55
 
 - Status: Accepted
 - Date: 2026-11-02

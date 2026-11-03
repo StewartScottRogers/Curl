@@ -5,7 +5,7 @@ namespace Curl.Extended.Protocol.SocketIo;
 
 /// <summary>
 /// Engine.IO v4 "Heartbeat": the session ends when no ping arrives within <c>pingInterval</c> + <c>pingTimeout</c> (ADR-1210);
-/// and the open packet's <c>maxPayload</c>: no packet over it is sent (ADR-1211).
+/// and the open packet's <c>maxPayload</c>: no packet over it is sent (ADR-1212).
 /// </summary>
 [TestClass]
 public sealed class SocketIoSessionTests

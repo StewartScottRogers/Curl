@@ -28,7 +28,7 @@ Engine.IO v4: maxPayload in the open packet bounds what the server accepts. Sock
 
 ## Notes
 
-- Decided by Claude under Stewart's delegation (ADR-1211): the session reads `maxPayload` from the open packet (no limit when absent or not a whole non-negative number), measures every packet it sends (connect, event, ack, pong) as the UTF-8 bytes of the whole Engine.IO packet including its type, sends one of exactly `maxPayload` bytes, and ends a longer one with exit 55 (`CURLE_SEND_ERROR`) and `Socket.IO packet of <n> bytes is over the server's maxPayload of <m> bytes`. Upstream curl has no Socket.IO, so nothing to measure.
+- Decided by Claude under Stewart's delegation (ADR-1212): the session reads `maxPayload` from the open packet (no limit when absent or not a whole non-negative number), measures every packet it sends (connect, event, ack, pong) as the UTF-8 bytes of the whole Engine.IO packet including its type, sends one of exactly `maxPayload` bytes, and ends a longer one with exit 55 (`CURLE_SEND_ERROR`) and `Socket.IO packet of <n> bytes is over the server's maxPayload of <m> bytes`. Upstream curl has no Socket.IO, so nothing to measure.
 - Pinned by `SocketIoSessionTests.MaxPayloadOf_Handshake_IsMaxPayloadOrUnlimited`, `RunAsync_EventOverMaxPayload_IsNotSentAndFailsWithExit55` and `RunAsync_EventOfExactlyMaxPayload_IsSent`. `SocketIo:EIO-MaxPayload-1` removed from KnownFailures.txt; the SocketIo conformance cases and known-failures check pass (35/35).
 - `dotnet build Curl.slnx -warnaserror` clean, fast tests green (115 projects); `Measure-CodeQuality.ps1 -Library Curl.Extended.Protocol.SocketIo.UnitLibrary`: 0 failing members. The change is platform-neutral (no paths, OS errors or certificates), which meets the CI-on-every-platform part.
 
@@ -36,4 +36,4 @@ Engine.IO v4: maxPayload in the open packet bounds what the server accepts. Sock
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: d4fdcd17 150bac4e ff8cc365.
-- 2026-11-02: Doing -> Done. Socket.IO sends no packet over maxPayload; ends with exit 55 (ADR-1211)
+- 2026-11-02: Doing -> Done. Socket.IO sends no packet over maxPayload; ends with exit 55 (ADR-1212)
