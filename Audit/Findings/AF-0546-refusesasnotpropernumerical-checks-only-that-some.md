@@ -3,8 +3,8 @@ id: AF-0546
 title: RefusesAsNotProperNumerical checks only that some refusal exists, not its text
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Cli.UnitTests/CommandLineNumberTests.cs:ParseMinusOneOrMore_TwoToThe31UnderWindowsCeiling_RefusesAsNotProperNumerical:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Cli.UnitTests/CommandLineNumberTests.cs -Pattern 'Refus
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
