@@ -3,8 +3,8 @@ id: AF-0549
 title: Lib1678 checks the shared session cache only for null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1649To1906Tests.cs:Lib1678_LibraryWithSslsExport_ImportsThePacket64TimesOverASharedSessionCache:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1649To1906Tests.cs -Pa
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
