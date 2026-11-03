@@ -31,3 +31,4 @@ Found by BL-4681: `DnsOverTlsCases.Tls_Query_IsPaddedWithTheEdnsPaddingOption` (
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 1d7d20d2 4d2f7efb 4b59311c.
