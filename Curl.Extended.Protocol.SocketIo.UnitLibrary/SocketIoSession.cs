@@ -9,7 +9,7 @@ namespace Curl.Extended.Protocol.SocketIo;
 /// <c>open</c> packet it connects to its namespace (Socket.IO "Connection to a namespace"), emits its
 /// event once the server confirms, answers each <c>ping</c> with a <c>pong</c> (Engine.IO
 /// "Heartbeat") and ends with exit 56 when no ping arrives within the open packet's
-/// <c>pingInterval</c> + <c>pingTimeout</c> on the transfer's clock (ADR-1209), writes each event received as its JSON array and a newline, acknowledges each event
+/// <c>pingInterval</c> + <c>pingTimeout</c> on the transfer's clock (ADR-1210), writes each event received as its JSON array and a newline, acknowledges each event
 /// that asks for it with an empty array, and ends when the server disconnects or closes.
 /// </summary>
 /// <param name="channel">The WebSocket messages.</param>

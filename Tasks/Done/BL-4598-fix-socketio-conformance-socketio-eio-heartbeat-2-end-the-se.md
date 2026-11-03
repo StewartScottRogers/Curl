@@ -29,7 +29,7 @@ Engine.IO v4 heartbeat: the client must consider the connection closed when the 
 ## Notes
 
 - Done directly (small, one-class change) rather than through the full /feature agent chain, to stay within the run's budget.
-- `SocketIoSession` reads `pingInterval` + `pingTimeout` from the open packet and waits for each ping on the transfer's `TimeProvider` (a `CancellationTokenSource` on that clock, restarted by each ping); a missed ping ends with exit 56 (ADR-1209, decided by Claude under Stewart's delegation). A handshake without both fields sets no heartbeat.
+- `SocketIoSession` reads `pingInterval` + `pingTimeout` from the open packet and waits for each ping on the transfer's `TimeProvider` (a `CancellationTokenSource` on that clock, restarted by each ping); a missed ping ends with exit 56 (ADR-1210, decided by Claude under Stewart's delegation). A handshake without both fields sets no heartbeat.
 - Unit tests: `SocketIoSessionTests` (ManualClock fake, `ScriptedConnection.WaitsAtEnd`). Conformance known-failure line removed; Curl.Conformance.Extended.UnitTests 778 passed. Measure-CodeQuality for the library: 0 failing members. Full `dotnet build Curl.slnx -warnaserror` clean, fast tests green. Platform-neutral (no paths, OS text or certificates).
 
 ## Log

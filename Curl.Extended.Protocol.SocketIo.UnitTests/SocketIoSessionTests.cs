@@ -3,7 +3,7 @@ using Curl.WebSocket;
 
 namespace Curl.Extended.Protocol.SocketIo;
 
-/// <summary>Engine.IO v4 "Heartbeat": the session ends when no ping arrives within <c>pingInterval</c> + <c>pingTimeout</c> (ADR-1209).</summary>
+/// <summary>Engine.IO v4 "Heartbeat": the session ends when no ping arrives within <c>pingInterval</c> + <c>pingTimeout</c> (ADR-1210).</summary>
 [TestClass]
 public sealed class SocketIoSessionTests
 {

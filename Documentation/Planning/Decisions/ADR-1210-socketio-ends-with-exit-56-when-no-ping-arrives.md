@@ -1,4 +1,4 @@
-# ADR-1209: Socket.IO ends with exit 56 when no ping arrives within pingInterval + pingTimeout
+# ADR-1210: Socket.IO ends with exit 56 when no ping arrives within pingInterval + pingTimeout
 
 - Status: Accepted
 - Date: 2026-11-02
