@@ -24,6 +24,20 @@ internal static class NatsSubject
             : throw new NatsException(CurlExitCode.UrlMalformat, $"NATS subject \"{subject}\" holds whitespace or an empty token");
     }
 
+    /// <summary>
+    /// Refuses a subject that holds a wildcard token, <c>*</c> or <c>&gt;</c>, for a publish or a request:
+    /// the NATS client protocol does not allow wildcards in a PUB subject ("Protocol conventions").
+    /// </summary>
+    /// <param name="subject">The subject the transfer would publish to.</param>
+    /// <exception cref="NatsException">The subject holds a wildcard token.</exception>
+    public static void RefuseWildcardToPublish(string subject)
+    {
+        if (subject.Split('.').Any(token => token is "*" or ">"))
+        {
+            throw new NatsException(CurlExitCode.UrlMalformat, $"NATS subject \"{subject}\" holds a wildcard, which a publish cannot name");
+        }
+    }
+
     private static bool IsValid(string subject) =>
         !subject.Any(char.IsWhiteSpace) && !subject.Split('.').Any(token => token.Length == 0);
 }

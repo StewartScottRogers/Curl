@@ -41,6 +41,11 @@ public sealed class NatsProtocolHandler(IConnector connector, Func<string> newIn
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
     {
         NatsRequest request = NatsRequest.Of(context.Url, context.PostData);
+        if (request.Kind != NatsRequestKind.Subscribe)
+        {
+            NatsSubject.RefuseWildcardToPublish(request.Subject);
+        }
+
         CurlUrl url = context.Url;
         bool isSecure = string.Equals(url.Scheme, SecureScheme, StringComparison.OrdinalIgnoreCase);
         var target = new ConnectTarget(url.IdnHost, url.Port >= 0 ? url.Port : DefaultPort, isSecure)

@@ -82,6 +82,24 @@ public sealed class NatsWireTests
         Assert.AreEqual(subject, NatsSubject.Of(CurlUrl.Parse(url)));
 
     [TestMethod]
+    [DataRow("orders.*")]
+    [DataRow("orders.>")]
+    [DataRow("*")]
+    public void RefuseWildcardToPublish_AWildcardToken_FailsWithExit3(string subject)
+    {
+        NatsException failure = Assert.ThrowsExactly<NatsException>(() => NatsSubject.RefuseWildcardToPublish(subject));
+
+        Assert.AreEqual(CurlExitCode.UrlMalformat, failure.ExitCode);
+        Assert.AreEqual($"NATS subject \"{subject}\" holds a wildcard, which a publish cannot name", failure.Message);
+    }
+
+    [TestMethod]
+    [DataRow("orders.new")]
+    [DataRow("a*b.c>d")]
+    public void RefuseWildcardToPublish_NoWildcardToken_DoesNotThrow(string subject) =>
+        NatsSubject.RefuseWildcardToPublish(subject);
+
+    [TestMethod]
     [DataRow("nats://h/", NatsMessages.NoSubject)]
     [DataRow("nats://h/a%20b", "NATS subject \"a b\" holds whitespace or an empty token")]
     [DataRow("nats://h/a..b", "NATS subject \"a..b\" holds whitespace or an empty token")]
