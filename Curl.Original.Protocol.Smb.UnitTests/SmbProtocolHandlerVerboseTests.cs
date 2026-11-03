@@ -109,10 +109,11 @@ public sealed class SmbProtocolHandlerVerboseTests
     [TestMethod]
     public async Task ExecuteAsync_FileUnderNoBody_ReportsTheDataThenShuttingDownWithNoLineForExit8()
     {
-        string[] transcript = await RunAsync(SmbRecordedExchange.DownloadUrl, User, DownloadReplies(), noBody: true);
+        (string[] transcript, TransferResult result) = await RunWithResultAsync(SmbRecordedExchange.DownloadUrl, User, DownloadReplies(), noBody: true);
 
         Diagnostics.Diff("transcript", string.Join(" | ", new[] { "<= hello world", "* shutting down connection #0" }), string.Join(" | ", transcript));
         CollectionAssert.AreEqual(new[] { "<= hello world", "* shutting down connection #0" }, transcript);
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
     }
 
     [TestMethod]
@@ -141,6 +142,10 @@ public sealed class SmbProtocolHandlerVerboseTests
         RunAsync(url, credentials, replies, noBody: false);
 
     private async Task<string[]> RunAsync(
+        string url, NetworkCredential? credentials, byte[][] replies, bool noBody = false, long? maxFileSize = null) =>
+        (await RunWithResultAsync(url, credentials, replies, noBody, maxFileSize)).Transcript;
+
+    private async Task<(string[] Transcript, TransferResult Result)> RunWithResultAsync(
         string url, NetworkCredential? credentials, byte[][] replies, bool noBody = false, long? maxFileSize = null)
     {
         var events = new TranscriptTransferEvents();
@@ -155,14 +160,14 @@ public sealed class SmbProtocolHandlerVerboseTests
         };
 
         var connection = new ScriptedConnection(replies);
-        await RunHandlerAsync(connection, context);
+        TransferResult result = await RunHandlerAsync(connection, context);
         Diagnostics.ActTranscript(events.Transcript);
 
-        return [.. events.Transcript];
+        return ([.. events.Transcript], result);
     }
 
     // Runs the handler over the scripted connection, writing the context and replies before and the result and bytes sent after.
-    private async Task RunHandlerAsync(ScriptedConnection connection, TransferContext context)
+    private async Task<TransferResult> RunHandlerAsync(ScriptedConnection connection, TransferContext context)
     {
         Diagnostics.ArrangeContext(context);
         Diagnostics.ArrangeReplies(connection);
@@ -174,6 +179,8 @@ public sealed class SmbProtocolHandlerVerboseTests
 
         Diagnostics.ActResult(result);
         Diagnostics.ActSent(connection);
+
+        return result;
     }
 
     private static SmbProtocolHandler Handler(ScriptedConnection connection) =>
