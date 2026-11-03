@@ -609,6 +609,31 @@ public sealed class Lib666To695Tests
     }
 
     [TestMethod]
+    public async Task Lib677Exchange_ASendOfNothingWithTheCommandHalfSent_SendsTheWholeCommandAgain()
+    {
+        var clock = new ManualTimeProvider(DateTimeOffset.UnixEpoch);
+        var connection = new FakeConnectOnlyConnection();
+        connection.Sends.Enqueue((CurlCode.Ok, 3));
+        connection.Sends.Enqueue((CurlCode.Ok, 0));
+        var engine = new FakeCurlEngine { ConnectOnly = connection, Info = new TransferInfo { ActiveSocket = 5 } };
+        engine.Multi.ExtraSocketEvents = CurlWaitEvents.PollIn | CurlWaitEvents.PollOut;
+        engine.Multi.Waiting = () => clock.Advance(TimeSpan.FromSeconds(1));
+        await using CurlLibrary library = CurlGlobal.Init(engine);
+        await using CurlMulti multi = library.MultiInit();
+        await using CurlEasy easy = library.EasyInit();
+        _ = multi.AddHandle(easy);
+        var run = new PortRun(engine, 677, "imap://x/677");
+        var exchange = new Lib677.Exchange(run.Steps, multi, easy, run.Context);
+
+        engine.Multi.DoneResult = CurlCode.Ok;
+        Assert.IsTrue(await exchange.RunAsync(clock, CancellationToken.None));
+        engine.Multi.DoneResult = CurlCode.Ok;
+        Assert.IsTrue(await exchange.RunAsync(clock, CancellationToken.None));
+
+        Assert.AreEqual("A1 " + Lib677.TestCommand, connection.Sent.ToString());
+    }
+
+    [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
     public async Task Lib677Exchange_AFailedPerformOrADoneMessageWithoutASocket_GoesToTheCleanup(bool failPerform)
