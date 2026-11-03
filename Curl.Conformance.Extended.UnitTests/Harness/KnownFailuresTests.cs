@@ -101,6 +101,19 @@ public sealed class KnownFailuresTests
     }
 
     [TestMethod]
+    public async Task RunCaseAsync_ListedCaseFailsAnInconclusiveAssertion_Passes()
+    {
+        await KnownFailures.Parse(List).RunCaseAsync(["Coap:A-2"], () => throw new AssertInconclusiveException("derived from UnitTestAssertException"));
+    }
+
+    [TestMethod]
+    public async Task RunCaseAsync_ListedCaseThrowsSomethingOtherThanAFailedAssertion_Fails()
+    {
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            KnownFailures.Parse(List).RunCaseAsync(["Coap:A-2"], () => throw new InvalidOperationException("crashed")));
+    }
+
+    [TestMethod]
     public async Task RunCaseAsync_ListedCasePasses_FailsAskingForItsLineToBeRemoved()
     {
         KnownFailurePassedException exception = await Assert.ThrowsExactlyAsync<KnownFailurePassedException>(() =>
