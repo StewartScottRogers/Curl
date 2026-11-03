@@ -60,3 +60,4 @@ ADR-1143, ADR-1148). A defect in the library is listed in `KnownFailures.txt` wi
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 5453e041 b23c8ea5 f3c72898 d8e3fb0e 627fbee3 17248609.
