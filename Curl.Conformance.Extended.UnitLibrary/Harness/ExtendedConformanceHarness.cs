@@ -14,7 +14,7 @@ public static class ExtendedConformanceHarness
 {
     /// <summary>Runs <paramref name="arguments" /> through <paramref name="curl" /> against <paramref name="routes" />.</summary>
     /// <param name="curl">The curl entry point, such as <c>Curl.Console</c>'s <c>InProcessCurl.RunAsync</c>.</param>
-    /// <param name="routes">The reference servers, one per port and transport; every host name resolves to 127.0.0.1.</param>
+    /// <param name="routes">The reference servers, one per port and transport; every host name resolves to 127.0.0.1 but one under <c>.invalid</c>, which does not resolve.</param>
     /// <param name="arguments">The command line, without the program name.</param>
     /// <param name="environment">The whole environment curl sees; none when <see langword="null" />.</param>
     /// <param name="timeProvider">The clock every timer of the run runs on, so a test drives <c>-m</c> with a fake one and no real wait; <see cref="TimeProvider.System" /> when <see langword="null" />.</param>
@@ -43,7 +43,7 @@ public static class ExtendedConformanceHarness
     /// started by <paramref name="processStarter" /> and looked for in the environment it reads, so no real process starts (ADR-1184).
     /// </summary>
     /// <param name="curl">The curl entry point, <c>Curl.Console</c>'s <c>InProcessCurl.RunAsync</c> overload that takes a process starter.</param>
-    /// <param name="routes">The reference servers, one per port and transport; every host name resolves to 127.0.0.1.</param>
+    /// <param name="routes">The reference servers, one per port and transport; every host name resolves to 127.0.0.1 but one under <c>.invalid</c>, which does not resolve.</param>
     /// <param name="arguments">The command line, without the program name.</param>
     /// <param name="processStarter">The stand-in that starts the programs the extension handlers run.</param>
     /// <param name="environment">The whole environment curl sees; none when <see langword="null" />.</param>
@@ -84,7 +84,7 @@ public static class ExtendedConformanceHarness
             standardOutput,
             standardError,
             new ReferenceTcpDialer(routes, run),
-            new LoopbackDnsResolver(),
+            new ReferenceDnsResolver(),
             new ReferenceDatagramConnector(routes, run),
             name => variables.GetValueOrDefault(name),
             timeProvider ?? TimeProvider.System).ConfigureAwait(false);
@@ -92,10 +92,14 @@ public static class ExtendedConformanceHarness
         return new CurlRunResult(exitCode, standardOutput.ToArray(), standardError.ToArray(), exchanges);
     }
 
-    // Every host name is the reference servers' host.
-    private sealed class LoopbackDnsResolver : IDnsResolver
+    // Every host name is the reference servers' host, except one under RFC 6761's reserved .invalid
+    // name, which never resolves, so a case reaches curl's exit 6 (ADR-1213).
+    private sealed class ReferenceDnsResolver : IDnsResolver
     {
         public ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>
-            ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Loopback]);
+            ValueTask.FromResult<IReadOnlyList<IPAddress>>(IsUnderInvalid(host) ? [] : [IPAddress.Loopback]);
+
+        private static bool IsUnderInvalid(string host) =>
+            ("." + host.TrimEnd('.')).EndsWith(".invalid", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -27,7 +27,10 @@ command line and returns a `CurlRunResult`:
   `InProcessCurl.RunAsync`, which the library cannot reference.
 - `routes` are the reference servers, each a `ReferenceRoute.Tcp`, `ReferenceRoute.Tls` (with a
   certificate; `ReferenceCertificate.CreateSelfSigned` makes one curl accepts under `-k`) or
-  `ReferenceRoute.Udp` on a port. Every host name resolves to 127.0.0.1. No socket is opened.
+  `ReferenceRoute.Udp` on a port. Every host name resolves to 127.0.0.1 except one under RFC 6761's
+  reserved `.invalid` name (`cache.invalid`, `x.y.invalid`), which does not resolve: a case that wants
+  curl's exit 6 ("Could not resolve host: <name>") names such a host (ADR-1213). A port no route
+  serves refuses the connection (exit 7). No socket is opened.
 - `environment` is the whole environment curl sees; none when not given.
 - `timeProvider` is the clock every timer of the run runs on, `-m`, `-y` and `--connect-timeout`
   among them; `TimeProvider.System` when not given. A test drives a timeout with a fake clock and no

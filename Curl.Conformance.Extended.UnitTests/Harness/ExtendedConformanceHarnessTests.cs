@@ -79,6 +79,25 @@ public sealed class ExtendedConformanceHarnessTests
     }
 
     [TestMethod]
+    public async Task RunAsync_HostUnderInvalid_FailsToResolve()
+    {
+        CurlRunResult result = await ExtendedConformanceHarness.RunAsync(Curl, [RedisPong(RedisPort)], ["-sS", "redis://cache.invalid/PING"]);
+
+        Assert.AreEqual(6, result.ExitCode);
+        Assert.AreEqual("curl: (6) Could not resolve host: cache.invalid" + Environment.NewLine, Encoding.UTF8.GetString(result.StandardError));
+        Assert.AreEqual(0, result.Exchanges.Count);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HostWithInvalidOnlyAsAnInnerLabel_ResolvesToTheReferenceServers()
+    {
+        CurlRunResult result = await ExtendedConformanceHarness.RunAsync(Curl, [RedisPong(RedisPort)], ["-s", "redis://invalid.example/PING"]);
+
+        Assert.AreEqual(0, result.ExitCode, Encoding.UTF8.GetString(result.StandardError));
+        Assert.AreEqual("PONG\n", Encoding.Latin1.GetString(result.StandardOutput));
+    }
+
+    [TestMethod]
     public async Task RunAsync_RedisPingOverTls_RecordsThePlaintextBehindTheHandshake()
     {
         using X509Certificate2 certificate = ReferenceCertificate.CreateSelfSigned("localhost");
