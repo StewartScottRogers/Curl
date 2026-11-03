@@ -4,6 +4,3 @@
 Mqtt5:MQTT5-3.1.2.10-1 BL-4575
 SocketIo:EIO-Heartbeat-2 BL-4595
 SocketIo:EIO-MaxPayload-1 BL-4596
-Stomp:STOMP12-ContentType-1 BL-4603
-Amqp1:Core-2.7.5-2 BL-4602
-Amqp1:Core-2.7.5-3 BL-4602
