@@ -1,5 +1,5 @@
 ---
-id: BL-4611
+id: BL-4619
 title: Conformance harness: let a run name host names that do not resolve, so curl exits 6
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4611 — Conformance harness: let a run name host names that do not resolve, so curl exits 6
+# BL-4619 — Conformance harness: let a run name host names that do not resolve, so curl exits 6
 
 ## Goal
 

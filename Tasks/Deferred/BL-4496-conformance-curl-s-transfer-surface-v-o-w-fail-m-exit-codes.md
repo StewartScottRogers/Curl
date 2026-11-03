@@ -69,10 +69,10 @@ line is removed).
 
 ## Notes
 
-- 2026-11-02 (lane 16): Split for size before any code: about 37 schemes times 13 checks is several runs. Exit 6 needs harness work first (the harness resolves every host to 127.0.0.1), filed as BL-4611. Parts: BL-4612 URL errors (3, 6, 7) for every scheme; BL-4613 brokers, BL-4614 mqtt5/redis/xmpp/coap/dns, BL-4615 storage, BL-4616 grpc/signalr/socketio/webtransport/mcp, BL-4617 mcp+stdio and curl-proto (transfer options -v, -o, -O, -w, --fail, -m), each in its own part matrix `CurlSurface-Transfer-<Part>.md` (part matrices hold `CurlSurface:` IDs, BL-4476) so they run in parallel; BL-4618 (the rest: -s/-S, `CurlSurface-Transfer.md` and a scheme-coverage check) depends on all of them. No other live task named BL-4496 in depends-on.
+- 2026-11-02 (lane 16): Split for size before any code: about 37 schemes times 13 checks is several runs. Exit 6 needs harness work first (the harness resolves every host to 127.0.0.1), filed as BL-4619. Parts: BL-4612 URL errors (3, 6, 7) for every scheme; BL-4613 brokers, BL-4614 mqtt5/redis/xmpp/coap/dns, BL-4615 storage, BL-4616 grpc/signalr/socketio/webtransport/mcp, BL-4617 mcp+stdio and curl-proto (transfer options -v, -o, -O, -w, --fail, -m), each in its own part matrix `CurlSurface-Transfer-<Part>.md` (part matrices hold `CurlSurface:` IDs, BL-4476) so they run in parallel; BL-4618 (the rest: -s/-S, `CurlSurface-Transfer.md` and a scheme-coverage check) depends on all of them. No other live task named BL-4496 in depends-on.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: fd060db8 ba635b0b fe617ef5 be674468 46eaa437 ef6c9026.
-- 2026-11-02: Doing -> Deferred. Split into BL-4611, BL-4612, BL-4613, BL-4614, BL-4615, BL-4616, BL-4617, BL-4618
+- 2026-11-02: Doing -> Deferred. Split into BL-4619, BL-4612, BL-4613, BL-4614, BL-4615, BL-4616, BL-4617, BL-4618

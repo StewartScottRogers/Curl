@@ -4,7 +4,7 @@ title: Conformance: curl's URL errors (exit 3, 6, 7) for every extended scheme
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463, BL-4611]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463, BL-4619]
 touches: [Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/UrlErrors, Documentation/Conformance/Extended/CurlSurface-Transfer-UrlErrors.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
@@ -18,7 +18,7 @@ Every extended scheme fails a malformed URL with exit 3, an unresolvable host wi
 
 ## Context
 
-For every scheme in each extension library's `*Extension.cs` (BL-4496 lists them, including `mcp+stdio` and `curl-proto-<scheme>`, which use the stand-in process starter where they get that far): a malformed URL (bad port, bad percent-encoding, a space) gives exit 3; an unresolvable host gives exit 6 (the harness feature BL-4611 adds); a port with no route gives exit 7. One shared data-driven test with one row file per scheme, or one case file per scheme, in `Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/UrlErrors/`; never a central switch. Rows go in the part matrix `CurlSurface-Transfer-UrlErrors.md` with `CurlSurface:` IDs (a `CurlSurface-<Part>.md` holds `CurlSurface:` IDs, BL-4476); a check that does not apply (no host in `mcp+stdio`) is `n/a: <reason>`. Where an extension's ADR deliberately differs, the case pins the ADR's answer and names it. A defect in an extension library or the engine goes in `KnownFailures.txt` with a filed High `Fix <Name> conformance: <requirement>` task (pipeline feature; touches that library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a focused unit test pins the fix (ADR-0482), the line is removed).
+For every scheme in each extension library's `*Extension.cs` (BL-4496 lists them, including `mcp+stdio` and `curl-proto-<scheme>`, which use the stand-in process starter where they get that far): a malformed URL (bad port, bad percent-encoding, a space) gives exit 3; an unresolvable host gives exit 6 (the harness feature BL-4619 adds); a port with no route gives exit 7. One shared data-driven test with one row file per scheme, or one case file per scheme, in `Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/UrlErrors/`; never a central switch. Rows go in the part matrix `CurlSurface-Transfer-UrlErrors.md` with `CurlSurface:` IDs (a `CurlSurface-<Part>.md` holds `CurlSurface:` IDs, BL-4476); a check that does not apply (no host in `mcp+stdio`) is `n/a: <reason>`. Where an extension's ADR deliberately differs, the case pins the ADR's answer and names it. A defect in an extension library or the engine goes in `KnownFailures.txt` with a filed High `Fix <Name> conformance: <requirement>` task (pipeline feature; touches that library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a focused unit test pins the fix (ADR-0482), the line is removed).
 
 Split from BL-4496 (the transfer surface for every extended protocol), which holds the whole plan; read its Context. Part of the extended-protocol conformance plan Stewart approved on 2026-11-02: follow `Documentation/Conformance/Extended/README.md`.
 
