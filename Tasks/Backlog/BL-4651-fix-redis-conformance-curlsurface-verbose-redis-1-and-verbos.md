@@ -1,5 +1,5 @@
 ---
-id: BL-4645
+id: BL-4651
 title: Fix Redis conformance: CurlSurface:Verbose-Redis-1 and Verbose-Rediss-1 (-v writes no connection or TLS lines)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4645 — Fix Redis conformance: CurlSurface:Verbose-Redis-1 and Verbose-Rediss-1 (-v writes no connection or TLS lines)
+# BL-4651 — Fix Redis conformance: CurlSurface:Verbose-Redis-1 and Verbose-Rediss-1 (-v writes no connection or TLS lines)
 
 ## Goal
 
