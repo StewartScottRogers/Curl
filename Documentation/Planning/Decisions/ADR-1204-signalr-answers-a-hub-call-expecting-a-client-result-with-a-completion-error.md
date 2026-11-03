@@ -1,4 +1,4 @@
-# ADR-1202: The signalr:// client answers a hub call that expects a client result with a Completion error
+# ADR-1204: The signalr:// client answers a hub call that expects a client result with a Completion error
 
 - Status: Accepted
 - Date: 2026-11-02

@@ -29,7 +29,7 @@ Found by BL-4491: `SignalRHubProtocolCases.HubCallWithAnInvocationId_IsAnsweredW
 
 ## Notes
 
-- Plan: `SignalRHubSession.AcceptAsync` sends a type 3 Completion carrying the Invocation's `invocationId` and the error "Client didn't provide a result." (ASP.NET Core .NET client's text) after writing the call line; ADR-1202 records the choice. The Completion is written inline in `SignalRHubSession` (`RefusalOf`) so `HubMessageWriter`, outside touches, stays unchanged.
+- Plan: `SignalRHubSession.AcceptAsync` sends a type 3 Completion carrying the Invocation's `invocationId` and the error "Client didn't provide a result." (ASP.NET Core .NET client's text) after writing the call line; ADR-1204 records the choice. The Completion is written inline in `SignalRHubSession` (`RefusalOf`) so `HubMessageWriter`, outside touches, stays unchanged.
 - Pinned by `SignalRProtocolHandlerTests.WithoutData_HubCallWithInvocationId_IsAnsweredWithACompletionError_HubProtocolInvocationAndCompletion`; the conformance case passes with the KnownFailures line removed (42 SignalR/known-failure conformance tests green).
 - Measure-CodeQuality.ps1 -Library Curl.Extended.Protocol.SignalR.UnitLibrary: 0 failing members. Full fast run: 115 test projects passed. The change is platform-neutral (no paths, OS errors or certificates), which covers CI on Linux and macOS.
 
