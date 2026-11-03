@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/KerberosKdcSocketTransport.cs, Curl.Networking.UnitTests/KerberosKdcSocketTransportTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4676 — Turn a KDC's closed UDP port into an IOException so the next KDC is tried
 
@@ -28,13 +28,17 @@ Fix it inside `KerberosKdcSocketTransport.ExchangeDatagramAsync`: turn a `Socket
 
 ## Acceptance criteria
 
-- [ ] `KerberosKdcSocketTransportTests` has a test where the datagram channel's receive throws `DatagramPortUnreachableException` and `ExchangeDatagramAsync` throws `IOException`.
-- [ ] No `SocketException` escapes `ExchangeDatagramAsync`, from send or receive.
-- [ ] `dotnet build` is clean and the fast tests of `Curl.Networking.UnitTests` and `Curl.Kerberos.UnitTests` pass.
+- [x] `KerberosKdcSocketTransportTests` has a test where the datagram channel's receive throws `DatagramPortUnreachableException` and `ExchangeDatagramAsync` throws `IOException`.
+- [x] No `SocketException` escapes `ExchangeDatagramAsync`, from send or receive.
+- [x] `dotnet build` is clean and the fast tests of `Curl.Networking.UnitTests` and `Curl.Kerberos.UnitTests` pass.
 
 ## Notes
+
+- `ExchangeDatagramAsync` now turns a `SocketException` from send or receive into an `IOException` naming the KDC host and port (inner exception kept). Tests: receive throwing `DatagramPortUnreachableException`, send throwing `SocketException`. Networking fast tests (4015) and Kerberos (781) pass.
+- Measure-CodeQuality.ps1 could not measure: its build picked up lane-4 files (CS0414 in lane-4 PortUnreachableReportingDatagramChannel, not this lane). The change adds one catch clause, so complexity stays far below 10; both branches are covered by the new tests.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 0f3fc340 76d54b12 24ec0abc.
+- 2026-11-03: Doing -> Done. KDC socket errors become IOException; tests added
