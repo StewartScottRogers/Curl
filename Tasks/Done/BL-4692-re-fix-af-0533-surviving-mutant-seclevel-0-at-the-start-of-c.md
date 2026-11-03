@@ -50,6 +50,9 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- The re-audit (2026-11-03_0025) ran at 00:25, before BL-4639's test commit 0b22fd7f3 (00:59) landed, so it measured a tree without the `@SECLEVEL=0:ALL` row. To keep the case from hiding behind an exclusion of the shared data-row method (`-ExcludeBaselineFailures` drops a failing test by name), it now also has a test method of its own: `Cgr094Tests.AuthenticateAsClientAsync_WithCiphersStartingAtSecurityLevelZeroInTheOpenSslBuild_CompletesWithATls11Server`. Added Curl.Networking.UnitTests/Cgr094Tests.cs to touches (no task in Doing on origin/work/dark-factory names it). No production change.
+- First criterion: lanes cannot run Audit/Tools, so the mutant (`at >= 0` to `at > 0` at HandBuiltTlsProvider.cs:201) was applied by hand: both the new method and the existing row failed (`unsupported protocol`), so it is killed; then the mutant was reverted. Second: `dotnet build` clean (0 warnings), fast tests green on Windows; the test is platform-neutral (in-memory TLS 1.1 server, OpenSSL build named explicitly).
+
 ## Log
 
 - 2026-11-03: Created.
