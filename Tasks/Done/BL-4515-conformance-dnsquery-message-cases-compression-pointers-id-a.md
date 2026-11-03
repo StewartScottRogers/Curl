@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514]
 touches: [Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryMessageTests.cs, Documentation/Conformance/Extended/DnsQuery.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-03
 ---
 # BL-4515 — Conformance: DnsQuery message cases - compression pointers, ID and question matching, RCODEs (BL-4473 part 2 of 3)
 
@@ -26,20 +26,25 @@ Follow `Documentation/Conformance/Extended/README.md` (harness: `ExtendedConform
 
 ## Acceptance criteria
 
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryMessageTests.cs` run against BL-4514's reference server and assert stdout, stderr and exit code for: a reply using compression pointers (RFC 1035 4.1.4), a forward pointer refused and a looping pointer refused.
-- [ ] Cases cover a reply with a wrong ID ignored and a reply with a wrong question ignored (RFC 5452), the right reply after it accepted.
-- [ ] Cases cover each RCODE 0 to 5 (NOERROR, FORMERR, SERVFAIL, NXDOMAIN, NOTIMP, REFUSED) and its output and exit code.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with the ID of its filed High `Fix DnsQuery conformance: ...` task; the known-failures check passes.
-- [ ] Every `[SpecRequirement]` the new cases carry is a row of `Documentation/Conformance/Extended/DnsQuery.md` and the harness's matrix check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no test needs `TestCategory=Integration`.
-- [ ] Code added under `Curl.Conformance.Extended.UnitLibrary/DnsQuery/` is at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryMessageTests.cs` run against BL-4514's reference server and assert stdout, stderr and exit code for: a reply using compression pointers (RFC 1035 4.1.4), a forward pointer refused and a looping pointer refused.
+- [x] Cases cover a reply with a wrong ID ignored and a reply with a wrong question ignored (RFC 5452), the right reply after it accepted.
+- [x] Cases cover each RCODE 0 to 5 (NOERROR, FORMERR, SERVFAIL, NXDOMAIN, NOTIMP, REFUSED) and its output and exit code.
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with the ID of its filed High `Fix DnsQuery conformance: ...` task; the known-failures check passes.
+- [x] Every `[SpecRequirement]` the new cases carry is a row of `Documentation/Conformance/Extended/DnsQuery.md` and the harness's matrix check passes.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no test needs `TestCategory=Integration`.
+- [x] Code added under `Curl.Conformance.Extended.UnitLibrary/DnsQuery/` is at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
 - 2026-11-03 (BL-4669): Added the front matter's missing closing `---`; without it the board read no fields and took `touches` as `*`, so this task overlapped every other one.
+- 2026-11-03 (lane 2): Added `DnsQueryMessageTests` (11 cases over UDP against BL-4514's reference server; the pointer and wrong-question replies are raw messages built in the test). Ten pass; `DnsQuery:RFC5452-9.1-2` (a reply with the query's ID but another question is taken) fails because `DnsUdpTransport.IsAnswerTo` checks only the ID and QR bit: listed in `KnownFailures.txt` with BL-4673 (High) filed to fix it.
+- Decision (sensible default): RCODEs 1 to 5 are pinned as written with exit 0, as `DnsQueryProtocolHandler` documents (dig's behaviour); a refused pointer is exit 8 with the reader's message. stderr is compared with CRLF folded to LF, since curl ends the line with the platform's newline.
+- No code was added under `Curl.Conformance.Extended.UnitLibrary/DnsQuery/` (the reference server's `Raw` reply covered every case), so the coverage criterion holds with nothing to measure; no production library changed, so no quality run was needed.
+- Platform-neutral: no paths or OS text; the CI criterion is met by that and the fast tests green here.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: fc789e3a 4d7739ea edd18b6d f3c72898 738dab01 d8e3fb0e 929e00c1 ef6c9026.
+- 2026-11-03: Doing -> Done. DnsQuery message cases: compression pointers, ID and question matching, RCODEs 0-5; wrong-question case known-failing under BL-4673

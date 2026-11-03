@@ -27,3 +27,14 @@ RFC 3596, RFC 2782, RFC 8659, RFC 3597 and RFC 4501, through the reference DNS s
 | DnsQuery:RFC4501-2-2 | MUST | The URI's `CLASS=` element sets the query's QCLASS; elements are separated by `;`. | DnsQueryUrlTests.ClassElement_WithType_SetsTheQclassAndQtype |
 | DnsQuery:RFC4501-2-3 | MUST | The URI's authority names the server queried, and its port the port. | DnsQueryUrlTests.Authority_WithAPort_IsTheServerQueried |
 | DnsQuery:RFC4501-2-4 | MUST | The authority's server and port hold whichever transport carries the query. | DnsQueryUrlTests.Authority_OverTcp_IsQueriedWithATwoOctetLengthPrefix |
+| DnsQuery:RFC1035-4.1.4-4 | MUST | A name made of labels then a pointer, and a pointer to such a name, are read as the whole name. | DnsQueryMessageTests.Reply_WithAPointerToAPointerAfterALabel_IsReadAsTheWholeName |
+| DnsQuery:RFC1035-4.1.4-5 | MUST | A compression pointer to a later offset than its own is refused: exit 8, no output. | DnsQueryMessageTests.Reply_WithAPointerForwardToALaterName_IsRefused |
+| DnsQuery:RFC1035-4.1.4-6 | MUST | A compression pointer to itself is refused rather than followed forever: exit 8, no output. | DnsQueryMessageTests.Reply_WithAPointerToItself_IsRefusedRatherThanFollowedForever |
+| DnsQuery:RFC5452-9.1-1 | MUST | A UDP reply whose ID is not the query's is ignored and the matching reply after it taken. | DnsQueryMessageTests.ReplyWithAnotherId_IsIgnoredAndTheMatchingReplyAfterItTaken |
+| DnsQuery:RFC5452-9.1-2 | MUST | A UDP reply whose question is not the query's is ignored and the matching reply after it taken. | DnsQueryMessageTests.ReplyWithAnotherQuestion_IsIgnoredAndTheMatchingReplyAfterItTaken |
+| DnsQuery:RFC1035-4.1.1-3 | MUST | RCODE 0 is written as `status: NOERROR` with the answers, exit 0. | DnsQueryMessageTests.ResponseCode0_NoError_IsWrittenWithItsAnswersAndExit0 |
+| DnsQuery:RFC1035-4.1.1-4 | MUST | RCODE 1 is written as `status: FORMERR`, exit 0 as dig does. | DnsQueryMessageTests.ResponseCode1_FormatError_IsWrittenAsFormerrWithExit0 |
+| DnsQuery:RFC1035-4.1.1-5 | MUST | RCODE 2 is written as `status: SERVFAIL`, exit 0 as dig does. | DnsQueryMessageTests.ResponseCode2_ServerFailure_IsWrittenAsServfailWithExit0 |
+| DnsQuery:RFC1035-4.1.1-6 | MUST | RCODE 3 is written as `status: NXDOMAIN`, exit 0 as dig does. | DnsQueryMessageTests.ResponseCode3_NameError_IsWrittenAsNxdomainWithExit0 |
+| DnsQuery:RFC1035-4.1.1-7 | MUST | RCODE 4 is written as `status: NOTIMP`, exit 0 as dig does. | DnsQueryMessageTests.ResponseCode4_NotImplemented_IsWrittenAsNotimpWithExit0 |
+| DnsQuery:RFC1035-4.1.1-8 | MUST | RCODE 5 is written as `status: REFUSED`, exit 0 as dig does. | DnsQueryMessageTests.ResponseCode5_Refused_IsWrittenAsRefusedWithExit0 |
