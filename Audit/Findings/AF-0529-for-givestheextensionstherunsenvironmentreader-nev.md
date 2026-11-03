@@ -1,0 +1,48 @@
+---
+id: AF-0529
+title: For_GivesTheExtensionsTheRunsEnvironmentReader never checks that the reader reaches the extensions
+auditor: quality
+severity: Medium
+status: accepted
+reason: 
+key: quality:Curl.Extension.Composition.UnitTests/ExtensionProtocolHandlersTests.cs:For_GivesTheExtensionsTheRunsEnvironmentReader:name-lies
+reproduction: none
+task: BL-4635
+tasks: BL-4635
+found: 2026-11-02
+found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
+scorecard: 2026-11-02_1724.md
+duplicate-of:
+closed:
+closed-how:
+closed-by:
+---
+# AF-0529 - For_GivesTheExtensionsTheRunsEnvironmentReader never checks that the reader reaches the extensions
+
+## Summary
+
+Medium finding from the quality auditor at `Curl.Extension.Composition.UnitTests/ExtensionProtocolHandlersTests.cs:33`: For_GivesTheExtensionsTheRunsEnvironmentReader never checks that the reader reaches the extensions. Reported by an auditor flagged unreliable in 2026-11-02_1724.md.
+
+## Evidence
+
+Location: `Curl.Extension.Composition.UnitTests/ExtensionProtocolHandlersTests.cs:33`
+
+The test's only assertions are Assert.HasCount(ExtensionCatalogue.Entries.Count, handlers) and Assert.IsNull(Services.ReadEnvironmentVariable), the latter checking the caller's own unchanged services record. Neither looks at the services the handler factories receive. Production ExtensionProtocolHandlers.For builds 'services => Create(services with { ReadEnvironmentVariable = readEnvironmentVariable })' (BL-4534). Replacing that with 'services => Create(services)' would drop the run's environment for every extension, and this test, whose name promises exactly that hand-over, would still pass. CreateFrom_BuildsEachHandlerOverTheServicesInOrder calls CreateFrom directly, not For, so nothing checks the hand-over.
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+Select-String -Path Curl.Extension.Composition.UnitTests/ExtensionProtocolHandlersTests.cs -Pattern 'For_GivesTheExtensionsTheRunsEnvironmentReader' -Context 0,7
+```
+
+- Expected: An assertion that the services handed to each extension factory carry the given reader (Assert.AreSame(reader, seen.ReadEnvironmentVariable)).
+- Actual: Only Assert.HasCount(ExtensionCatalogue.Entries.Count, handlers); and Assert.IsNull(Services.ReadEnvironmentVariable);
+
+## Re-audits
+
+## Log
+
+- 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.

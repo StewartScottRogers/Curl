@@ -42,6 +42,8 @@ powershell -NoProfile -Command ". ./DarkFactory/ModelChoice.ps1; 'Curl.Ssh.UnitL
 
 ## Re-audits
 
+- 2026-11-02 | 2026-11-02_1724.md | reproduces: no | Ran the reproduction: it printed True. DarkFactory/ModelChoice.ps1:9 is now $OpusLibraries = 'Curl.Cryptography', 'Curl.Tls', 'Curl.Quic', 'Curl.Kerberos', 'Curl.Ntlm', 'Curl.Ssh', 'Curl.Original.Protocol.Ssh', so Curl.Ssh.UnitLibrary/KeyExchange/Curve25519SshKeyExchange.cs matches $OpusLibraryPattern. RunDarkFactory.ps1's help (lines 116-118) lists Curl.Ssh too.
+
 ## Log
 
 - 2026-11-02: filed proposed.
