@@ -3,8 +3,8 @@ id: AF-0532
 title: Surviving mutant: ConnectionCache.CloseIdleToMakeRoomAsync can be off by two on the connection limit without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/ConnectionCache.cs:CloseIdleToMakeRoomAsync-minus1:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ConnectionCache.cs:123:-1
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
