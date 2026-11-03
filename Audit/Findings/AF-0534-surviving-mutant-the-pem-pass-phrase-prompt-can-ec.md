@@ -3,8 +3,8 @@ id: AF-0534
 title: Surviving mutant: the PEM pass phrase prompt can echo the first typed key to the terminal without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TerminalPemPassPhrasePrompt.cs:ReadConsoleLine-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TerminalPemPassPhrasePrompt.cs:44:true
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
