@@ -65,3 +65,4 @@ fixed here, but a defect in the extension library is listed in `KnownFailures.tx
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 8272e82f 081e4f29 010a29e2 d8e3fb0e 32c763d1 ef6c9026.
