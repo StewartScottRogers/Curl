@@ -3,8 +3,8 @@ id: AF-0565
 title: StompProtocolHandler.ContentTypeOf's doc cites ADR-1210 (Socket.IO pings) for the -H content-type rule that ADR-1220 decides
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompProtocolHandler.cs:ContentTypeOf:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompProtoco
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
