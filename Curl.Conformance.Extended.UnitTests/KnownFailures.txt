@@ -23,3 +23,5 @@ OciRegistry:DIST-PullManifests-2 BL-4584
 Mqtt5:RFC6455-4.1-9 BL-4583
 Mqtt5:RFC6455-4.1-10 BL-4583
 Mqtt5:RFC6455-5.5.1-1 BL-4584
+Grpc:Http2-Errors-1 BL-4591
+Grpc:Http2-GoAway-1 BL-4591

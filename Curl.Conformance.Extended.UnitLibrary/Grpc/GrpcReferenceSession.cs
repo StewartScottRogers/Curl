@@ -19,6 +19,8 @@ internal sealed class GrpcReferenceSession(ReferenceConnection connection, IRead
 
     private readonly List<byte> headerBlock = [];
 
+    private readonly List<GrpcReferencePing> pings = [];
+
     private bool headerBlockEndsStream;
 
     /// <summary>Serves the connection until the client closes it.</summary>
@@ -37,8 +39,20 @@ internal sealed class GrpcReferenceSession(ReferenceConnection connection, IRead
     }
 
     private Task ReceiveAsync(Http2Frame frame, CancellationToken cancellationToken) => frame.HasFlag(Http2FrameFlags.Acknowledgement) && frame.StreamId == 0
-        ? Task.CompletedTask
+        ? ReceiveAcknowledgementAsync(frame)
         : ReceiveUnacknowledgedAsync(frame, cancellationToken);
+
+    // A PING acknowledgement is offered to every PING the server sent, which records it when it echoes that PING's payload.
+    private Task ReceiveAcknowledgementAsync(Http2Frame frame)
+    {
+        if (frame.Type == Http2FrameType.Ping)
+        {
+            ulong echoed = Http2FramePayloadParser.ParsePing(frame);
+            pings.ForEach(ping => ping.RecordEcho(echoed));
+        }
+
+        return Task.CompletedTask;
+    }
 
     // A SETTINGS or PING acknowledgement (flag 0x1 on stream 0) needs no answer; the same bit on a stream frame is END_STREAM.
     private Task ReceiveUnacknowledgedAsync(Http2Frame frame, CancellationToken cancellationToken) => frame.Type switch
@@ -104,6 +118,21 @@ internal sealed class GrpcReferenceSession(ReferenceConnection connection, IRead
     }
 
     private async Task SendReplyAsync(int streamId, GrpcReferenceReply reply, CancellationToken cancellationToken)
+    {
+        if (reply.PingBeforeReply is { } ping)
+        {
+            pings.Add(ping);
+            await WriteAsync(Http2FrameFactory.CreatePing(ping.Payload, isAcknowledgement: false), cancellationToken).ConfigureAwait(false);
+        }
+
+        await (reply.ResetCode is { } errorCode
+            ? WriteAsync(Http2FrameFactory.CreateRstStream(streamId, errorCode), cancellationToken)
+            : reply.GoAwayLastStreamId is { } lastStreamId
+                ? WriteAsync(Http2FrameFactory.CreateGoAway(lastStreamId, Http2ErrorCode.NoError, ReadOnlyMemory<byte>.Empty), cancellationToken)
+                : SendResponseAsync(streamId, reply, cancellationToken)).ConfigureAwait(false);
+    }
+
+    private async Task SendResponseAsync(int streamId, GrpcReferenceReply reply, CancellationToken cancellationToken)
     {
         if (reply.IsTrailersOnly)
         {

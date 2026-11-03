@@ -128,6 +128,44 @@ public sealed class GrpcReferenceServerTests
     }
 
     [TestMethod]
+    public async Task ServeAsync_ResetReply_SendsRstStreamWithItsErrorCodeOnly()
+    {
+        (_, List<Http2Frame> sent) = await ServeAsync(EndedRequest(), new GrpcScriptedService(MethodPath, GrpcReferenceReply.Reset(Http2ErrorCode.RefusedStream)));
+
+        Assert.HasCount(2, sent);
+        Assert.AreEqual((Http2FrameType.RstStream, 1), (sent[1].Type, sent[1].StreamId));
+        CollectionAssert.AreEqual(new byte[] { 0, 0, 0, 7 }, sent[1].Payload.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ServeAsync_GoAwayReply_SendsGoAwayWithItsLastStreamIdOnly()
+    {
+        (_, List<Http2Frame> sent) = await ServeAsync(EndedRequest(), new GrpcScriptedService(MethodPath, GrpcReferenceReply.GoAway(0)));
+
+        Assert.HasCount(2, sent);
+        Assert.AreEqual((Http2FrameType.GoAway, 0), (sent[1].Type, sent[1].StreamId));
+        CollectionAssert.AreEqual(new byte[8], sent[1].Payload.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow(0x0102030405060708UL, true)]
+    [DataRow(9UL, false)]
+    public async Task ServeAsync_PingBeforeReply_SendsThePingFirstAndRecordsWhetherItWasEchoed(ulong acknowledged, bool isEchoed)
+    {
+        GrpcReferencePing ping = new(0x0102030405060708);
+        GrpcReferenceReply reply = GrpcReferenceReply.Ok() with { PingBeforeReply = ping };
+        byte[] client = Join(EndedRequest(), Http2FrameCodec.Serialize(Http2FrameFactory.CreatePing(acknowledged, isAcknowledgement: true)));
+
+        (_, List<Http2Frame> sent) = await ServeAsync(client, new GrpcScriptedService(MethodPath, reply));
+
+        Assert.AreEqual(Http2FrameType.Ping, sent[1].Type);
+        Assert.IsFalse(sent[1].HasFlag(Http2FrameFlags.Acknowledgement));
+        Assert.AreEqual(ping.Payload, Http2FramePayloadParser.ParsePing(sent[1]));
+        Assert.AreEqual(Http2FrameType.Headers, sent[2].Type);
+        Assert.AreEqual(isEchoed, ping.IsEchoed);
+    }
+
+    [TestMethod]
     public void TrailersOnly_WithoutMessage_CarriesGrpcStatusOnly()
     {
         GrpcReferenceReply reply = GrpcReferenceReply.TrailersOnly(5);
@@ -164,6 +202,9 @@ public sealed class GrpcReferenceServerTests
 
         return (server, sent);
     }
+
+    private static byte[] EndedRequest() =>
+        Join(Preface, Http2FrameCodec.Serialize(Http2FrameFactory.CreateHeaders(1, new HpackEncoder().Encode([new(":path", MethodPath)]), isEndStream: true, isEndHeaders: true)));
 
     private static byte[] Join(params byte[][] parts) => [.. parts.SelectMany(static part => part)];
 
