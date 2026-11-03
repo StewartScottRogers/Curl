@@ -12,3 +12,8 @@ Grpc:ProtoJson-Wrappers-2 BL-4719
 Grpc:ProtoJson-FieldMask-1 BL-4719
 DnsQuery:RFC9250-5.4-1 BL-4719
 DnsQuery:RFC9250-4.1.1-2 BL-4720
+Grpc:ProtoJson-Struct-1 BL-4721
+Grpc:ProtoJson-Struct-2 BL-4721
+Grpc:ProtoJson-Wrappers-1 BL-4721
+Grpc:ProtoJson-Wrappers-2 BL-4721
+Grpc:ProtoJson-FieldMask-1 BL-4721
