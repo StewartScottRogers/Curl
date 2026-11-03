@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4781 — Fix CI failure IdleTimeout_ContainerAsks1000msAndWaits2500_CurlSendsEmptyFrames on Windows
 
@@ -44,3 +44,4 @@ Lanes test only on Windows, so reproduce with `gh run view 41735630431 --log-fai
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b62019a4.
+- 2026-11-03: Doing -> Done. The idle time-out case asks for one empty frame; the 500 ms cadence stays pinned on a fake TimeProvider.
