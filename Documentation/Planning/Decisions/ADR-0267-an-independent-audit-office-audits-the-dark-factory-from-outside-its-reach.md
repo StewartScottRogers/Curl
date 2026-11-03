@@ -108,6 +108,17 @@ that scorecard.
 > (`Find-HelpDefaultMismatches.ps1`), antonym renames (`Find-BooleanNameMismatches.ps1`) and
 > every number in each sampled ADR. A plant is kept or changed only by whether the method it is
 > planted for can reach it, never to raise a catch rate.
+>
+> **Amended again 2026-11-02 (audit 20261102-172448), decided by Claude under Stewart's
+> delegation:** two auditors still missed. The quality scan listed the weakened test, but among
+> 335 candidates (120 weak assertions) the auditor filed none, judging them "mostly scanner false
+> positives"; so the scan now lists the sharp case on its own (`unasserted-fake-value`: a fake
+> returns an exact value no assertion checks), the method files that kind unless an exact check is
+> quoted, and every dismissed candidate needs a named reason in a triage file. The truthfulness
+> auditor read the 10 newest ADRs and the plant sat in the 11th, which one of the 10 cited for the
+> very exit code; so every ADR is now scanned for exit codes stated two ways
+> (`Find-AdrNumberMismatches.ps1`: a code name beside another number, a Decision that leaves its
+> title's code), and an ADR a sampled ADR cites for a number is checked too.
 
 ### 5. Scorecard and cadence
 
