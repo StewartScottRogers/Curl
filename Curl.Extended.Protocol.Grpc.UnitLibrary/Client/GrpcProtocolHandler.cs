@@ -168,6 +168,7 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
         {
             ApplicationProtocols = ["h2"],
             PoolScheme = secure ? "https" : null,
+            IsNeverPooled = secure,
             Proxy = context.Proxy,
             Events = context.Events,
             DiagnosticLog = context.DiagnosticLog,

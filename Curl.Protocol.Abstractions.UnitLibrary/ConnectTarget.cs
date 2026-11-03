@@ -102,9 +102,22 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// so does a target that sets <c>https</c> only so its TLS handshake offers
     /// <see cref="ApplicationProtocols" /> and never marks its connection reusable (the gRPC
     /// extension's <c>grpcs://</c> target, ADR-1197). Every other protocol leaves it
-    /// <see langword="null" />.
+    /// <see langword="null" />. Such a target also sets <see cref="IsNeverPooled" />, so it
+    /// neither takes an idle <c>https</c> connection to the same origin nor shares one.
     /// </remarks>
     public string? PoolScheme { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the connection is kept out of the pool in both
+    /// directions even though <see cref="PoolScheme" /> is set: it is never served from the
+    /// pool, never shared as a multiplexed connection and never put back.
+    /// </summary>
+    /// <remarks>
+    /// The gRPC extension's <c>grpcs://</c> target sets it with <c>PoolScheme = "https"</c>
+    /// (ADR-1197), so a pooled <c>https://</c> connection to the same host and port is not
+    /// handed to a gRPC call.
+    /// </remarks>
+    public bool IsNeverPooled { get; init; }
 
     /// <summary>
     /// Gets how a plain connection's I/O is written as curl's TCP filter lines when the connector

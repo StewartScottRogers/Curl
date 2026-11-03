@@ -121,6 +121,7 @@ public sealed class GrpcProtocolHandlerTests
         await call.RunAsync("grpcs://example.com/helloworld.Greeter/SayHello", proto.GreeterPath, "{}");
 
         Assert.AreEqual("https", call.Connector.Target!.PoolScheme);
+        Assert.IsTrue(call.Connector.Target.IsNeverPooled);
         CollectionAssert.AreEqual(new[] { "h2" }, call.Connector.Target.ApplicationProtocols!.ToArray());
     }
 

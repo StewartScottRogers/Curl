@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Grpc.UnitLibrary/Client/GrpcProtocolHandler.cs, Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcProtocolHandlerTests.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectTarget.cs, Curl.Networking.UnitLibrary/ConnectionPoolKey.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/ConnectionPoolKeyTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4680 — Keep a grpcs target from taking a pooled https connection to the same origin
 
@@ -28,14 +28,17 @@ Fix options: a separate `ConnectTarget` flag that asks for the ALPN offer withou
 
 ## Acceptance criteria
 
-- [ ] A unit test runs an `https://` transfer and then a `grpcs://` transfer to the same host and port over one `PoolingConnector` and shows the gRPC transfer opens its own connection (it is neither reused nor shared).
-- [ ] The test `ExecuteAsync_Grpcs_TargetsHttpsPoolSchemeSoTheHandshakeOffersAlpnH2` (or its renamed successor) still shows the handshake offers `h2`.
-- [ ] The `ConnectTarget.PoolScheme` doc comment and ADR-1197 say what the code now does.
-- [ ] `dotnet build` is clean and the fast tests of the Grpc, Networking and Console unit test projects pass.
+- [x] A unit test runs an `https://` transfer and then a `grpcs://` transfer to the same host and port over one `PoolingConnector` and shows the gRPC transfer opens its own connection (it is neither reused nor shared).
+- [x] The test `ExecuteAsync_Grpcs_TargetsHttpsPoolSchemeSoTheHandshakeOffersAlpnH2` (or its renamed successor) still shows the handshake offers `h2`.
+- [x] The `ConnectTarget.PoolScheme` doc comment and ADR-1197 say what the code now does.
+- [x] `dotnet build` is clean and the fast tests of the Grpc, Networking and Console unit test projects pass.
 
 ## Notes
+
+- Chose a new `ConnectTarget.IsNeverPooled` flag (makes `ConnectionPoolKey.Of` return null) over a distinct `grpcs` pool scheme: the https checks in TcpConnector and four extension connectors stay untouched. ADR-1197 amended. Quality run for Networking, Abstractions, Grpc: 0 failing members; Console fast tests 3132 passed.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: dd58c80d 6e9eca2d e5c5f6d5 15cd56ef.
+- 2026-11-03: Doing -> Done. A grpcs target no longer takes or shares a pooled https connection (IsNeverPooled); still offers h2
