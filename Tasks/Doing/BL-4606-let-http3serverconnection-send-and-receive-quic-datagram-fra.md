@@ -22,12 +22,14 @@ Split from BL-4494 (WebTransport conformance). The frame switch in `Curl.Conform
 
 ## Acceptance criteria
 
-- [ ] `Http3ServerConnection` queues every DATAGRAM frame the client sends, in arrival order, readable through a public method (for example `AcceptDatagram()`, returning the payload or null).
-- [ ] `Http3ServerConnection` has a public method that sends one DATAGRAM frame in the next 1-RTT packet, and throws `InvalidOperationException` when the client did not advertise `max_datagram_frame_size` or the payload exceeds it.
-- [ ] Unit tests in `Curl.Conformance.Http3Server.UnitTests/Http3ServerConnectionDatagramTests.cs` pin both directions against the Curl.Quic client; the library stays at 100% line and branch coverage and complexity at most 10 (`Measure-CodeQuality.ps1 -Library Curl.Conformance.Http3Server.UnitLibrary`).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; the library's `CLAUDE.md` names the datagram support.
+- [x] `Http3ServerConnection` queues every DATAGRAM frame the client sends, in arrival order, readable through a public method (for example `AcceptDatagram()`, returning the payload or null).
+- [x] `Http3ServerConnection` has a public method that sends one DATAGRAM frame in the next 1-RTT packet, and throws `InvalidOperationException` when the client did not advertise `max_datagram_frame_size` or the payload exceeds it.
+- [x] Unit tests in `Curl.Conformance.Http3Server.UnitTests/Http3ServerConnectionDatagramTests.cs` pin both directions against the Curl.Quic client; the library stays at 100% line and branch coverage and complexity at most 10 (`Measure-CodeQuality.ps1 -Library Curl.Conformance.Http3Server.UnitLibrary`).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; the library's `CLAUDE.md` names the datagram support.
 
 ## Notes
+
+- Server now advertises max_datagram_frame_size 1200 in DefaultTransportParameters (needed so a client may send datagrams). API: AcceptDatagram(), SendDatagram(ReadOnlySpan<byte>). ReceiveFrame split to stay under complexity 10. Quality run: 100%/100%, 0 failing. Fast tests green (68).
 
 ## Log
 

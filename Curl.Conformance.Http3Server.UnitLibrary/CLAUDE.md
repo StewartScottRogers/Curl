@@ -82,3 +82,5 @@ in-process Curl's QUIC through the injected `IDatagramConnector`.
   answers wait for receives and come from `ServerEndPoint`. `Http3ServerConnector` (internal)
   opens a fresh connection and session per open, whatever the port; `UpstreamHttp3ServerFactory.Create(backend, tlsSettings)`
   is the public way in.
+
+- `Http3ServerConnection` carries QUIC DATAGRAM frames (RFC 9221, BL-4606): it advertises `max_datagram_frame_size` 1200, queues the client's frames for `AcceptDatagram()` and sends one with `SendDatagram` (refused when the client did not advertise the parameter or the frame exceeds it). A WebTransport reference server builds on it.
