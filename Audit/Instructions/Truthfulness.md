@@ -44,7 +44,13 @@ of any type, for a name renamed to its opposite while its doc kept the old sense
 (`antonym-mismatch`): `IsInvalid` documented "true when the value is valid", `TryWrite`
 documented "Tries to read", `Decode` documented "Encodes" - negating prefixes (`In-`, `Un-`,
 `Dis-`, `Non-`, `Im-`) on a state's name, and the pairs Read/Write, Encode/Decode, Open/Close,
-Enable/Disable, Allow/Deny, Allow/Refuse, Accept/Reject, Valid/Invalid and Lock/Unlock. Read each
+Enable/Disable, Allow/Deny, Allow/Refuse, Accept/Reject, Valid/Invalid and Lock/Unlock. A doc
+need not use the name's word at all, so the scan also reads each state name's body and callers:
+`body-polarity-mismatch` is a name with a negating prefix whose body tests the root word and never
+turns it round (`IsUntrusted => scheme == TrustedScheme`), or a name whose body names only its
+prefixed opposite; `caller-polarity-mismatch` is a negatively named member a caller reads as its
+opposite (`IsUntrusted(x) ? TrustedPort : PlainPort`). A body or caller candidate is a finding unless
+the code shows the name is right after all. Read each
 candidate's code: when the name, the doc or the code says the opposite of the other two, that is
 a finding (`misleading-name`). Say in your summary how many candidates you read and filed; they
 count toward `method.names`.
@@ -72,10 +78,14 @@ powershell -NoProfile -File Audit/Tools/Find-AdrNumberMismatches.ps1 -Root <audi
 It lists `exit-name-mismatch` (an exit number beside a curl code name whose value in
 `CurlExitCode.cs` is another number: "exits 9 (`CURLE_WEIRD_SERVER_REPLY`)", which is 8) and
 `title-exit-mismatch` (a title that names its exit code while the Decision states one the title
-does not). Read every candidate, whatever its ADR's age, against the ADR's other sentences and the
+does not), and `exit-not-in-code` (a Decision whose exit codes the code it names in backticks all
+produces but one, with or without a code name beside that one). Read every candidate, whatever its
+ADR's age, against the ADR's other sentences and the
 code: an `exit-name-mismatch` is a finding unless the scan misread the sentence; a
 `title-exit-mismatch` is one when the Decision gives a different code for the outcome the title
-names (not when it names a second outcome's code). File the true ones as `stale-adr`, High (a
+names (not when it names a second outcome's code); an `exit-not-in-code` is one when that exit is
+stated for an outcome the named code handles and raises with another code (read the throw site).
+File the true ones as `stale-adr`, High (a
 wrong exit code). Say in your summary how many candidates you read and filed.
 
 Then take the 10 most recent ADRs in `Documentation/Planning/Decisions/` whose status is Accepted.
