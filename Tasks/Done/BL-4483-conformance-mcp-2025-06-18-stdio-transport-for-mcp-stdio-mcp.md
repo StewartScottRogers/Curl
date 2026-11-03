@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4482, BL-4
 touches: [Curl.Conformance.Extended.UnitLibrary/McpClient/Stdio, Curl.Conformance.Extended.UnitTests/McpClient/Stdio, Documentation/Conformance/Extended/McpClient-Stdio.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4483 — Conformance: MCP 2025-06-18 stdio transport for mcp+stdio:// (McpClient part 2 of 2)
 
@@ -43,20 +43,20 @@ defect in the extension library is listed in `KnownFailures.txt` with a filed Hi
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/McpClient-Stdio.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
+- [x] `Documentation/Conformance/Extended/McpClient-Stdio.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
       the stdio transport and shutdown that binds a client a `McpClient:` ID mapped to a test or to `n/a: <reason>`;
       the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/McpClient/Stdio/` run curl in process against the stand-in
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/McpClient/Stdio/` run curl in process against the stand-in
       process and assert the program name and arguments started, the bytes written to its stdin, stdout, stderr and
       exit code for at least: list and call, each message one line with no embedded newline, server log lines on
       its stderr, a server that exits early, a server that writes a non-JSON line, and stdin closed at the end.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix McpClient conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration` and none starts a real process.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/McpClient/Stdio/` is at 100% line and branch
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/McpClient/Stdio/` is at 100% line and branch
       coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
@@ -68,9 +68,12 @@ defect in the extension library is listed in `KnownFailures.txt` with a filed Hi
   through the harness's new parameter; the stand-in (`McpClient/Stdio/`) wraps `McpReferenceToolServer` over an
   in-memory stdin/stdout pair and records the program, arguments, stdin bytes and its own stderr lines.
 
+- 2026-11-02 (lane 4, second claim): BL-4577 done, so the cases pass `McpStdioReferenceProcessStarter` through `ExtendedConformanceHarness.RunAsync(..., processStarter)`. The stand-in (`McpClient/Stdio/McpStdioReferenceProcess`) serves `McpReferenceToolServer` over two in-memory `System.IO.Pipelines` pipes (BCL), logs one stderr line per message, records program, arguments and stdin lines, and its `McpStdioServerBehaviour` makes it exit early, write a non-JSON line or ignore a closed stdin. Eight cases, all passing; nothing listed in KnownFailures.txt. Decided (sensible default, no ADR needed): the specification leaves the client's reaction to an early exit or a non-JSON stdout line open, so the cases pin what Curl does (exit 8, CURLE_WEIRD_SERVER_REPLY, as ADR-1190 does for other malformed replies) and carry no requirement ID; the grace-period case runs on the system clock (5 s) because the stdio session's grace timer is real. Shutdown-2 notes that Curl kills in one step (no separate SIGTERM in .NET's Process.Kill). Measure-CodeQuality for Curl.Conformance.Extended.UnitLibrary: 0 failing members. Build of Curl.slnx -warnaserror clean; fast tests: 53499 passed, 0 failed. Tests are platform-neutral (no paths, OS text or real processes), which meets the Linux/macOS criterion here.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 887016a3 b03319d6 14e1c865 add6527d 0c609014 ef6c9026.
 - 2026-11-02: Doing -> Backlog. Waits on BL-4577: in-process curl and the conformance harness cannot yet take a stand-in extension process starter
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 887016a3 b03319d6 14e1c865 add6527d 0c609014 ef6c9026.
+- 2026-11-02: Doing -> Done. mcp+stdio:// is measured against MCP 2025-06-18 stdio and shutdown through in-process curl and an in-memory stand-in server: 8 cases, matrix mapped, none failing
