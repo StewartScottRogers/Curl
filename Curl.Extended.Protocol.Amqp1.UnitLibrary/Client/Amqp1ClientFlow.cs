@@ -250,13 +250,19 @@ internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITra
     /// <summary>
     /// The next performative of type <paramref name="expected"/>, passing over flow frames the flow does not wait for
     /// but keeping the link credit each grants.
-    /// A detach, end or close carrying an error, or any other performative, ends the transfer.
+    /// A detach, end or close carrying an error, or any other performative, ends the transfer; a close the flow did
+    /// not ask for is first answered with a close (Part 2 section 2.4.3).
     /// </summary>
     private async ValueTask<(Amqp1Composite Performative, ReadOnlyMemory<byte> Payload)> ReceiveAsync(Amqp1CompositeType expected)
     {
         while (true)
         {
             var (performative, payload) = await channel.ReceiveAsync().ConfigureAwait(false);
+            if (performative.Type == Amqp1CompositeType.Close && expected != Amqp1CompositeType.Close)
+            {
+                await channel.SendAsync(Frame(Amqp1CompositeType.Close)).ConfigureAwait(false);
+            }
+
             if (IsAwaited(performative, expected))
             {
                 return (performative, payload);

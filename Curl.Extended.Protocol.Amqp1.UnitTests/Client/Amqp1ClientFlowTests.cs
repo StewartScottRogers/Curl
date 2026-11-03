@@ -132,6 +132,19 @@ public sealed class Amqp1ClientFlowTests
     }
 
     [TestMethod]
+    public async Task RunAsync_CloseWithErrorAfterAttach_AnswersWithCloseAndReportsTheError_Part2Section2_4_3()
+    {
+        ScriptedAmqp1Connection connection = new([.. Authenticated, .. Opened(true), .. Close(Error(new Amqp1Symbol("amqp:internal-error"), "bye"))]);
+
+        var failure = await RunAsync(connection, new MemoryStream(), "hi");
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure!.ExitCode);
+        Assert.AreEqual("AMQP 1.0 close error: amqp:internal-error: bye", failure.Message);
+        Assert.AreEqual("header,sasl-init,header,open,begin,attach,close", Names(connection));
+        Assert.IsNull(Written(connection)[^1].Performative!["error"]);
+    }
+
+    [TestMethod]
     public async Task RunAsync_UnexpectedPerformative_EndsWithWeirdServerReply()
     {
         ScriptedAmqp1Connection connection = new([.. Authenticated, .. Open(), .. End()]);
