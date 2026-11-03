@@ -32,3 +32,4 @@ Found by BL-4488: `OciPullCases.ManifestPull_ByDigest_GetsTheManifestUnderItsDig
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 5c0d0d92 e1f099c7 8368df41.
