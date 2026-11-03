@@ -3,8 +3,8 @@ id: AF-0525
 title: UrlRejectionText's summary names only the IDNA failure as printed without 'URL rejected: ', but UrlTooLong and UrlAtLengthLimit are too
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-02_1724.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-02_0645.md, 2026-11-02_1724.md).
 key: truthfulness:Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:UrlRejectionText:false-doc-comment
 reproduction: none
 task: BL-4461
@@ -13,9 +13,9 @@ found: 2026-11-01
 found-at: 379ec9aa19ade61c2ce4cb9ee9b729c5aa926fc5
 scorecard: 2026-11-01_1801.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-02
+closed-how: consecutive
+closed-by: 2026-11-02_0645.md, 2026-11-02_1724.md
 ---
 # AF-0525 - UrlRejectionText's summary names only the IDNA failure as printed without 'URL rejected: ', but UrlTooLong and UrlAtLengthLimit are too
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs -Pattern 
 ## Re-audits
 
 - 2026-11-02 | 2026-11-02_0645.md | reproduces: no | Ran the reproduction: 'except for a host IDNA cannot convert' no longer matches; only line 45 (rejection is CurlUrlRejection.IdnConversionFailed or CurlUrlRejection.UrlTooLong or CurlUrlRejection.UrlAtLengthLimit) matches. UrlRejectionText's summary (TransferPerformer.Setup.cs:30-37) now names all three rejections printed without the prefix: a host IDNA cannot convert (CURLE_URL_MALFORMAT's text), a URL too long (CURLE_BAD_FUNCTION_ARGUMENT's) and a URL at the length limit (CURLE_OUT_OF_MEMORY's), matching IsBareText.
+- 2026-11-02 | 2026-11-02_1724.md | reproduces: no | Ran the reproduction. Only line 45 matched ('rejection is CurlUrlRejection.IdnConversionFailed or CurlUrlRejection.UrlTooLong or CurlUrlRejection.UrlAtLengthLimit;'). The old summary phrase 'except for a host IDNA cannot convert' no longer matches. UrlRejectionText's summary (lines 30-37) now reads 'except for the three rejections curl 8.22.0 reports with their code's own text and no prefix: a host IDNA cannot convert (...), a URL too long (...) and a URL at the length limit (...)', which agrees with IsBareText.
 
 ## Log
 
 - 2026-11-01: filed proposed.
 - 2026-11-02: proposed -> accepted.
+- 2026-11-02: accepted -> closed. Re-audit 2026-11-02_1724.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-02_0645.md, 2026-11-02_1724.md).

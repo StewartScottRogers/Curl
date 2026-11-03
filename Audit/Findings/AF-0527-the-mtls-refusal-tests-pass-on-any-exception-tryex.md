@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.UnitTests/HttpsServerConnectorTests.Mtls.cs
 
 ## Re-audits
 
+- 2026-11-02 | 2026-11-02_1724.md | reproduces: no | Ran the reproduction: Select-String -Pattern 'catch \(Exception\)' on Curl.Conformance.UnitTests/HttpsServerConnectorTests.Mtls.cs found no match. TryExchangeAsync now has 'catch (Exception exception) when (exception is AuthenticationException or IOException)', and its comment says any other exception escapes and fails the test (AF-0527). The catch-all that turned every failure into null is gone.
+
 ## Log
 
 - 2026-11-02: filed proposed.
