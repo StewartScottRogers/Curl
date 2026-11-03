@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514, BL-4515]
-touches: [Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryTransportTests.cs, Curl.Conformance.Extended.UnitLibrary/DnsQuery, Documentation/Conformance/Extended/DnsQuery.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
+touches: [Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryTransportTests.cs, Curl.Conformance.Extended.UnitLibrary/DnsQuery/Transport, Documentation/Conformance/Extended/DnsQuery.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
@@ -35,6 +35,8 @@ Follow `Documentation/Conformance/Extended/README.md` (harness: `ExtendedConform
 - [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+
+- 2026-11-03 (BL-4669): Added the front matter's missing closing `---`; without it the board read no fields and took `touches` as `*`, so this task overlapped every other one. Narrowed `touches` from `Curl.Conformance.Extended.UnitLibrary/DnsQuery` to `Curl.Conformance.Extended.UnitLibrary/DnsQuery/Transport`: any transport stand-in this task adds under `Curl.Conformance.Extended.UnitLibrary/DnsQuery/Transport/` (the reference server in `DnsQuery/Reference/` takes cases without edits, BL-4514), so it no longer covers `DnsQuery/Encrypted/` (BL-4474's).
 
 ## Log
 

@@ -37,6 +37,8 @@ Follow `Documentation/Conformance/Extended/README.md` (harness: `ExtendedConform
 
 ## Notes
 
+- 2026-11-03 (BL-4669): Added the front matter's missing closing `---`; without it the board read no fields and took `touches` as `*`, so this task overlapped every other one.
+
 ## Log
 
 - 2026-11-02: Created.

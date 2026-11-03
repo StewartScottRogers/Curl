@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
-touches: [Curl.Conformance.Extended.UnitLibrary/DnsQuery, Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryRecordTypeTests.cs, Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryUrlTests.cs, Documentation/Conformance/Extended/DnsQuery.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
+touches: [Curl.Conformance.Extended.UnitLibrary/DnsQuery/Reference, Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryRecordTypeTests.cs, Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryUrlTests.cs, Documentation/Conformance/Extended/DnsQuery.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
 completed:
@@ -37,6 +37,8 @@ Follow `Documentation/Conformance/Extended/README.md` (harness: `ExtendedConform
 - [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+
+- 2026-11-03 (BL-4669): Added the front matter's missing closing `---`; without it the board read no fields and took `touches` as `*`, so this task overlapped every other one. Narrowed `touches` from `Curl.Conformance.Extended.UnitLibrary/DnsQuery` to `Curl.Conformance.Extended.UnitLibrary/DnsQuery/Reference`: Reference DNS server under `Curl.Conformance.Extended.UnitLibrary/DnsQuery/Reference/`, so it no longer covers `DnsQuery/Encrypted/` (BL-4474's).
 
 ## Log
 
