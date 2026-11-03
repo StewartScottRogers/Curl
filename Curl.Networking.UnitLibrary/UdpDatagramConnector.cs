@@ -197,7 +197,8 @@ public sealed class UdpDatagramConnector : IDatagramConnector
 
     /// <summary>
     /// curl's exit 7 text for <paramref name="host" />: no socket could be opened for it, or its port
-    /// answered the first datagram with an ICMP port unreachable (BL-4654).
+    /// answered the first datagram with an ICMP port unreachable (BL-4654). Only a refusal before the channel
+    /// has received any datagram is reported this way; a refusal after the server has answered is left to the handler (BL-4675).
     /// </summary>
     private string FailedToConnectMessage(string host, int port, ConnectDestination destination, long openStarted)
     {

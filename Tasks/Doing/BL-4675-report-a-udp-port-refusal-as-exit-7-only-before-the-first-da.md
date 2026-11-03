@@ -28,12 +28,14 @@ Fix: translate the refusal only until the channel has received its first datagra
 
 ## Acceptance criteria
 
-- [ ] `PortUnreachableReportingDatagramChannelTests` has a test where a receive succeeds and a later receive fails with `ConnectionRefused`, and the plain `SocketException` (not `DatagramPortUnreachableException`) escapes.
-- [ ] The existing test for a refusal before any datagram still gives `DatagramPortUnreachableException` with curl's exit 7 text.
-- [ ] The wrapper's doc comment and `UdpDatagramConnector.FailedToConnectMessage`'s say which refusals they cover.
-- [ ] `dotnet build` is clean and the fast tests of `Curl.Networking.UnitTests` and `Curl.Engine.UnitTests` pass.
+- [x] `PortUnreachableReportingDatagramChannelTests` has a test where a receive succeeds and a later receive fails with `ConnectionRefused`, and the plain `SocketException` (not `DatagramPortUnreachableException`) escapes.
+- [x] The existing test for a refusal before any datagram still gives `DatagramPortUnreachableException` with curl's exit 7 text.
+- [x] The wrapper's doc comment and `UdpDatagramConnector.FailedToConnectMessage`'s say which refusals they cover.
+- [x] `dotnet build` is clean and the fast tests of `Curl.Networking.UnitTests` and `Curl.Engine.UnitTests` pass.
 
 ## Notes
+
+- Decided: `Translated` (not a catch filter) decides per exception, so the async methods carry no branch; `_hasReceived` is set after the first successful receive, and after it both send and receive failures pass through as the plain `SocketException`. New test `ReceiveAsync_RefusedAfterAnAnswer_PassesTheSocketExceptionThrough`. Curl.Networking quality run: 100% line and branch, no failing member. Networking and Engine fast tests green.
 
 ## Log
 
