@@ -36,3 +36,4 @@ Fix: for those commands, take the push frame whose first element names the comma
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 15c90db3 a53abaf5 ff509599 711bad4c.
