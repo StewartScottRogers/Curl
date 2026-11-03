@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4545, BL-4
 touches: [Curl.Conformance.Extended.UnitLibrary/Amqp1/Messaging, Curl.Conformance.Extended.UnitTests/Amqp1/Messaging, Documentation/Conformance/Extended/Amqp1-Messaging.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4467 — Conformance: AMQP 1.0 transfer, flow, disposition and message format for amqp1:// (Amqp1 part 2 of 2)
 
@@ -42,24 +42,40 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Amqp1-Messaging.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
+- [x] `Documentation/Conformance/Extended/Amqp1-Messaging.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
       this scope that binds a client an `Amqp1:` ID and maps it to a test or to `n/a: <reason>`; the harness's matrix
       check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Amqp1/Messaging/` run curl in process and assert wire bytes,
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Amqp1/Messaging/` run curl in process and assert wire bytes,
       stdout, stderr and exit code for at least: a send waiting for credit, a send settled by accepted, rejected,
       released and modified, a transfer split over several frames (`more`), a receive of `data`, `amqp-value` and
       several `data` sections, a receive with no message, and a delivery-id or handle the server gets wrong.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Amqp1 conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Amqp1/Messaging/` is at 100% line and branch
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Amqp1/Messaging/` is at 100% line and branch
       coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
+
+- Plan: two link behaviours behind `IAmqp1ReferenceLinkBehaviour` in `Curl.Conformance.Extended.UnitLibrary/Amqp1/Messaging/`:
+  `Amqp1ReferenceReceivingLink` for a send (zero credit, then credit after a delay; counts transfers before the grant;
+  settles with the outcome a case chooses) and `Amqp1ReferenceSendingLink` for a receive (answers curl's flow with
+  scripted transfers), plus `Amqp1ReferenceMessage` (section and outcome descriptors, a transfer builder, encode and
+  decode). The cases are in `Amqp1SendCases` and `Amqp1ReceiveCases`; `Amqp1ReferenceLinksTests` covers the branches curl never reaches.
+- The container's encoder writes no maps, so the bare-message case writes its application-properties and footer as
+  map8 bytes by hand (the encoder is BL-4466's file, outside this task's touches).
+- Failures found: curl ignores a transfer's handle and a continuation's delivery-id (Core-2.7.5-2, Core-2.7.5-3).
+  Both are listed in KnownFailures.txt with the filed High task BL-4602.
+- Decided (a sensible default): a receive from a source that holds no message is pinned as the -m timeout, exit 28,
+  writing nothing. Curl never asks to drain, so the specification requires no earlier end.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary` reports 0 failing members;
+  `dotnet build Curl.slnx -warnaserror` is clean; the fast tests are green (115 test projects). The tests use no
+  paths, files or OS text, so they are platform-neutral. CI on Linux and macOS is left to the shift's CI watch.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: e803da13 376daac0 9fbc674d d8e3fb0e 4f9c4ee1 ef6c9026.
+- 2026-11-02: Doing -> Done. amqp1:// transfer, flow, disposition and message format measured by 13 cases with a matrix; 2 known failures filed as BL-4602
