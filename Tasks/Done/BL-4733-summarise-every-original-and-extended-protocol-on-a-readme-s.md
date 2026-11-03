@@ -9,7 +9,7 @@ touches: [README.md, Documentation/Protocols.md, CLAUDE.md, DarkFactory/LaneRule
 lane: no
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4733 — Summarise every Original and Extended protocol on a README section and a Documentation/Protocols.md page
 
@@ -23,11 +23,11 @@ Stewart, 2026-11-03: "update the readme.md file for github to reflect both the O
 
 ## Acceptance criteria
 
-- [ ] README.md has a `## Protocols` section after `## What Curl is` listing the Original protocols' URL schemes and the Extended protocols' URL schemes, saying Extended ones are switched off by `CURL_EXTENSIONS=0`, and linking to `Documentation/Protocols.md`.
-- [ ] `Documentation/Protocols.md` has an Original table with one row per `Curl.Original.Protocol.*.UnitLibrary` folder (16) and an Extended table with one row per `Curl.Extended.Protocol.*.UnitLibrary` folder (20); each row gives the URL scheme(s) the handler accepts, one line on what it does, the specification it follows, a link to its library folder, and how it is tested.
-- [ ] Every scheme listed is one the library's handler actually accepts (checked against the handler code, not the folder name).
-- [ ] `CLAUDE.md` ("Extensions" and protocol naming) and `DarkFactory/LaneRules.md` both say a task adding a protocol library also adds its row to `Documentation/Protocols.md` and its scheme to README's Protocols section.
-- [ ] `dotnet build` is clean.
+- [x] README.md has a `## Protocols` section after `## What Curl is` listing the Original protocols' URL schemes and the Extended protocols' URL schemes, saying Extended ones are switched off by `CURL_EXTENSIONS=0`, and linking to `Documentation/Protocols.md`.
+- [x] `Documentation/Protocols.md` has an Original table with one row per `Curl.Original.Protocol.*.UnitLibrary` folder (16) and an Extended table with one row per `Curl.Extended.Protocol.*.UnitLibrary` folder (20); each row gives the URL scheme(s) the handler accepts, one line on what it does, the specification it follows, a link to its library folder, and how it is tested.
+- [x] Every scheme listed is one the library's handler actually accepts (checked against the handler code, not the folder name).
+- [x] `CLAUDE.md` ("Extensions" and protocol naming) and `DarkFactory/LaneRules.md` both say a task adding a protocol library also adds its row to `Documentation/Protocols.md` and its scheme to README's Protocols section.
+- [x] `dotnet build` is clean.
 
 ## Notes
 
@@ -35,3 +35,4 @@ Stewart, 2026-11-03: "update the readme.md file for github to reflect both the O
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 112db8be ac8dafdb f02ca305 6b23aa00 42b24d12.
+- 2026-11-03: Doing -> Done. README Protocols section and Documentation/Protocols.md written; schemes checked against each handler's SupportedSchemes; build clean.
