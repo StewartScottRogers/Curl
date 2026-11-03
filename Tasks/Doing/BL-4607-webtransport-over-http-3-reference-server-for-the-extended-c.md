@@ -42,3 +42,4 @@ For the cases to assert, the server records what the client sent: its SETTINGS, 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: e94cd203 608d7561 fcf7a6c0 8466658a.
