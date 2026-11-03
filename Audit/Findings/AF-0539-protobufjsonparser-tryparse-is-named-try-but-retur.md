@@ -3,8 +3,8 @@ id: AF-0539
 title: ProtobufJsonParser.TryParse is named Try... but returns a ProtobufJsonError enum, not bool
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Protobuf.UnitLibrary/Json/ProtobufJsonParser.cs:ProtobufJsonParser.TryParse:misleading-name
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Protobuf.UnitLibrary/Json/ProtobufJsonParser.cs -Patter
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
