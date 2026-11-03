@@ -4,7 +4,7 @@ title: Conformance: DTLS 1.2 fragmentation, retransmission, replay, epoch and al
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4573]
+depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4524, BL-4573, BL-4583]
 touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Extended.UnitTests/Coap/Dtls, Documentation/Conformance/Extended/Coap-Dtls.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
@@ -68,7 +68,18 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Notes
 
+- 2026-11-02 (lane 16, resumed run, before any edit): waits on BL-4583. Every case this task needs (a fragmented and
+  reordered flight, a lost flight retransmitted, a replayed and an old-epoch record dropped, a fatal alert after the
+  handshake) needs curl to complete a handshake with `DtlsReferenceServer`, and it cannot: the client's
+  ClientKeyExchange carries the ECDHE point with two length prefixes, which is why BL-4573's five cases are in
+  `KnownFailures.txt` (listed against BL-4577 there, a mislabel BL-4583 removes). BL-4583 (in Doing) fixes it.
+  Writing cases now would leave them unverifiable and listed as known failures that BL-4583's lane would turn red
+  when they start passing. The prerequisites in the library all exist (`Dtls/Wire/DtlsHandshakeReassembly.cs`,
+  `DtlsReplayWindow.cs`, `Dtls/Retransmission/DtlsFlightRetransmitter.cs`) and the test clock
+  `Coap/Messaging/TimerJumpingClock.cs` fires due timers, so BL-4583 is the only task named. No code changed.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 5b728cab ae154384 295a60eb fb1c989b d8e3fb0e f055b099 17248609.
+- 2026-11-02: Doing -> Backlog. Waits on BL-4583: curl cannot complete a DTLS handshake with DtlsReferenceServer until its ClientKeyExchange fix lands
