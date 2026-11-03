@@ -34,3 +34,4 @@ Split from BL-4613 (the broker schemes' part of BL-4496, the transfer surface fo
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 94caf871 4a81acb9 fe617ef5 be674468 9438adeb ef6c9026.
