@@ -9,7 +9,7 @@ namespace Curl.Extended.Protocol.SocketIo;
 /// <c>open</c> packet it connects to its namespace (Socket.IO "Connection to a namespace"), emits its
 /// event once the server confirms, answers each <c>ping</c> with a <c>pong</c> (Engine.IO
 /// "Heartbeat") and ends with exit 56 when no ping arrives within the open packet's
-/// <c>pingInterval</c> + <c>pingTimeout</c> on the transfer's clock (ADR-1210), writes each event received as its JSON array and a newline, acknowledges each event
+/// <c>pingInterval</c> + <c>pingTimeout</c> on the transfer's clock (ADR-1210), sends no packet over the open packet's <c>maxPayload</c> and ends with exit 55 instead (ADR-1211), writes each event received as its JSON array and a newline, acknowledges each event
 /// that asks for it with an empty array, and ends when the server disconnects or closes.
 /// </summary>
 /// <param name="channel">The WebSocket messages.</param>
@@ -39,6 +39,8 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
 
     private TimeSpan heartbeatTimeout = Timeout.InfiniteTimeSpan;
 
+    private long maxPayload = long.MaxValue;
+
     /// <summary>
     /// Gives how long the client waits for the next ping, the open packet's <c>pingInterval</c> plus
     /// <c>pingTimeout</c> in milliseconds (capped at the longest a timer can wait), or
@@ -46,24 +48,37 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
     /// </summary>
     /// <param name="handshake">The open packet's JSON handshake, the packet type left out.</param>
     /// <returns>The heartbeat timeout.</returns>
-    internal static TimeSpan HeartbeatTimeoutOf(string handshake)
+    internal static TimeSpan HeartbeatTimeoutOf(string handshake) =>
+        ReadHandshake(handshake, Timeout.InfiniteTimeSpan, root =>
+            root.TryGetProperty("pingInterval", out JsonElement interval) && root.TryGetProperty("pingTimeout", out JsonElement timeout)
+            && interval.TryGetUInt32(out uint intervalMilliseconds) && timeout.TryGetUInt32(out uint timeoutMilliseconds)
+                ? TimeSpan.FromMilliseconds(Math.Min((long)intervalMilliseconds + timeoutMilliseconds, uint.MaxValue - 1L))
+                : Timeout.InfiniteTimeSpan);
+
+    /// <summary>
+    /// Gives the longest packet the server accepts, the open packet's <c>maxPayload</c> in bytes, or
+    /// <see cref="long.MaxValue" /> when the handshake does not give it as a whole non-negative number (ADR-1211).
+    /// </summary>
+    /// <param name="handshake">The open packet's JSON handshake, the packet type left out.</param>
+    /// <returns>The most UTF-8 bytes one Engine.IO packet the client sends may have, its type included.</returns>
+    internal static long MaxPayloadOf(string handshake) =>
+        ReadHandshake(handshake, long.MaxValue, root =>
+            root.TryGetProperty("maxPayload", out JsonElement maxPayload) && maxPayload.TryGetInt64(out long bytes) && bytes >= 0 ? bytes : long.MaxValue);
+
+    private static T ReadHandshake<T>(string handshake, T fallback, Func<JsonElement, T> read)
     {
         try
         {
             using JsonDocument document = JsonDocument.Parse(handshake);
-            JsonElement root = document.RootElement;
-            return root.TryGetProperty("pingInterval", out JsonElement interval) && root.TryGetProperty("pingTimeout", out JsonElement timeout)
-                && interval.TryGetUInt32(out uint intervalMilliseconds) && timeout.TryGetUInt32(out uint timeoutMilliseconds)
-                ? TimeSpan.FromMilliseconds(Math.Min((long)intervalMilliseconds + timeoutMilliseconds, uint.MaxValue - 1L))
-                : Timeout.InfiniteTimeSpan;
+            return read(document.RootElement);
         }
         catch (JsonException)
         {
-            return Timeout.InfiniteTimeSpan;
+            return fallback;
         }
         catch (InvalidOperationException)
         {
-            return Timeout.InfiniteTimeSpan;
+            return fallback;
         }
     }
 
@@ -71,7 +86,8 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
     /// <param name="cancellationToken">Cancels the session.</param>
     /// <returns>How many bytes were written to the output.</returns>
     /// <exception cref="SocketIoException">
-    /// The server refused the namespace, closed before connecting to it, or sent no ping within the heartbeat timeout.
+    /// The server refused the namespace, closed before connecting to it, sent no ping within the heartbeat timeout,
+    /// or a packet to send is over the open packet's <c>maxPayload</c>.
     /// </exception>
     public async ValueTask<long> RunAsync(CancellationToken cancellationToken)
     {
@@ -109,6 +125,7 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
     private ValueTask OpenedAsync(string handshake, CancellationToken cancellationToken)
     {
         heartbeatTimeout = HeartbeatTimeoutOf(handshake);
+        maxPayload = MaxPayloadOf(handshake);
         heartbeat.CancelAfter(heartbeatTimeout);
         return SendPacketAsync(new SocketIoPacket(SocketIoPacketType.Connect, namespaceName, null, string.Empty), cancellationToken);
     }
@@ -116,7 +133,7 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
     private ValueTask PingedAsync(string payload, CancellationToken cancellationToken)
     {
         heartbeat.CancelAfter(heartbeatTimeout);
-        return channel.SendTextAsync(EngineIoPong + payload, cancellationToken);
+        return SendTextAsync(EngineIoPong + payload, cancellationToken);
     }
 
     private ValueTask AcceptPacketAsync(SocketIoPacket? packet, CancellationToken cancellationToken) =>
@@ -172,5 +189,13 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
     }
 
     private ValueTask SendPacketAsync(SocketIoPacket packet, CancellationToken cancellationToken) =>
-        channel.SendTextAsync(EngineIoMessage + packet.Encode(), cancellationToken);
+        SendTextAsync(EngineIoMessage + packet.Encode(), cancellationToken);
+
+    private ValueTask SendTextAsync(string text, CancellationToken cancellationToken)
+    {
+        int length = Encoding.UTF8.GetByteCount(text);
+        return length <= maxPayload
+            ? channel.SendTextAsync(text, cancellationToken)
+            : throw new SocketIoException(CurlExitCode.SendError, $"Socket.IO packet of {length} bytes is over the server's maxPayload of {maxPayload} bytes");
+    }
 }
