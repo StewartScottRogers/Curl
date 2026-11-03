@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.CodeGeneration.UnitLibrary]
+touches: [Curl.Extension.CodeGeneration.UnitLibrary, Curl.Extension.CodeGeneration.UnitTests/GeneratedRequestTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4760 — Fix AF-0596: Surviving mutant: -H ':x' can put a header with an empty name into generated code without a test failing
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `From_HLineStartingWithAColon_GivesNoField` to `Curl.Extension.CodeGeneration.UnitTests/GeneratedRequestTests.cs`: `-H ":x"` gives no field. `touches` widened to that test file (no other task in Doing on origin/work/dark-factory names it), since the fix is the test that kills the mutant; production code is unchanged.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (`colon > 0` -> `colon >= 0` in `AddGiven`): the new test failed against it and passed once reverted, which is the reproduction's expected outcome, killed.
+- `dotnet build` clean; fast tests green across the solution (no `Failed!` line); CodeGeneration tests 32/32. No production code changed, so no quality run.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. A test now kills the colon >= 0 mutant in AddGiven: -H ':x' gives no field
