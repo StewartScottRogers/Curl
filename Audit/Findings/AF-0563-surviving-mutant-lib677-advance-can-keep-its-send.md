@@ -3,8 +3,8 @@ id: AF-0563
 title: Surviving mutant: Lib677.Advance can keep its send position after a zero-length send without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib677.cs:Advance-gt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib677.cs:188:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
