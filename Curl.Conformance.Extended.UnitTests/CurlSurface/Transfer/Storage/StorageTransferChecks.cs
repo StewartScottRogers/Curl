@@ -30,10 +30,12 @@ internal static class StorageTransferChecks
             string standardError = Text(result.StandardError);
             Assert.AreEqual(0, result.ExitCode, standardError);
             CollectionAssert.AreEqual(target.Body, result.StandardOutput);
-            StringAssert.Contains(standardError, $"* Connected to {target.Host} (127.0.0.1) port {StorageTransferTarget.Port}");
-            StringAssert.Contains(standardError, TlsVerbosePrefix);
+            StringAssert.Contains(standardError, $"* Established connection to {target.Host} (127.0.0.1 port {StorageTransferTarget.Port}) from ", standardError);
+            StringAssert.Contains(standardError, TlsVerbosePrefix, standardError);
         });
 
+    // curl 8.22.0 tells a connection as "* Established connection to <host> (<address> port <port>) from <local address>
+    // port <local port>" (measured for BL-4651); the local port varies, so -v checks only the part before it.
     // curl's TLS lines follow its build: Schannel's ("* schannel: ...") on Windows, OpenSSL's elsewhere.
     private static string TlsVerbosePrefix => OperatingSystem.IsWindows() ? "* schannel: " : "* SSL connection using ";
 
