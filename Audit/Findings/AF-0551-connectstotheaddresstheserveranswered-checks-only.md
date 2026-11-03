@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.IntegrationTests/EngineCompositionDnsServersInte
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | Beside Assert.IsNotNull(result.Connection, ...) the test now asserts Assert.AreEqual(IPAddress.Loopback, dialled.Address) and Assert.AreEqual(webPort, dialled.Port).
+
 ## Log
 
 - 2026-11-03: filed proposed.

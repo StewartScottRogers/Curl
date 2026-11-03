@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.Extended.UnitLibrary/Harness/KnownFailures.
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | KnownFailures.cs now has catch (Exception exception) when (IsAssertionFailure(exception)), so the pattern 'catch \(Exception\)' finds nothing and a crash still fails; KnownFailures.txt has no ^CurlSurface line (only comments).
+
 ## Log
 
 - 2026-11-03: filed proposed.

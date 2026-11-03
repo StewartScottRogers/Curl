@@ -3,8 +3,8 @@ id: AF-0569
 title: CI red 35.15 minutes from run 41567287491 (0afc799c), all of it after the fix 8fa866b82 had landed: 8 newer runs were cancelled before one finished, and two CI-fix tasks were filed after the fix
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces.
 key: process:logs:ci-run-41567287491:ci-red
 reproduction: none
 task: BL-4717
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_1017.md
 ---
 # AF-0569 - CI red 35.15 minutes from run 41567287491 (0afc799c), all of it after the fix 8fa866b82 had landed: 8 newer runs were cancelled before one finished, and two CI-fix tasks were filed after the fix
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | The given reproduction shows the 35.15-minute spell from 41567287491 and the fix 8fa866b82 at 2026-11-02T19:46:28-07:00. In this window part of the pattern recurs: fix 1df901115 (05:11 MST) had its run 41633887707 cancelled, and BL-4724/BL-4725 were filed at 05:20 for failures it had already fixed. But the red spell from 41632220793 (44.7 minutes) was mostly not post-fix: a QUIC regression from 62178b13 kept it red until fixes at 05:45-05:47 MST. CI was green 17 minutes after the last fix, with 2 runs cancelled. No spell spent more than 30 minutes red after its fix had landed.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces.

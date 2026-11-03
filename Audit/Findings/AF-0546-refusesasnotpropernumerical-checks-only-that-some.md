@@ -42,6 +42,8 @@ Select-String -Path Curl.Cli.UnitTests/CommandLineNumberTests.cs -Pattern 'Refus
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | Every RefusesAsNotProperNumerical test now asserts the refusal text with CollectionAssert.AreEqual(new[] { "curl: option --...: expected a proper numerical parameter", TryHelpLine }, refusal.StandardErrorLines...) and most the exit code FailedInit.
+
 ## Log
 
 - 2026-11-03: filed proposed.

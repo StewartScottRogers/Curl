@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1649To1906Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | No match for Assert.IsNotNull(engine.LastShare) in Lib1649To1906Tests.cs; line 134 asserts CollectionAssert.AreEqual(new[] { CurlLockData.SslSession }, engine.LastShare!.Shared).
+
 ## Log
 
 - 2026-11-03: filed proposed.

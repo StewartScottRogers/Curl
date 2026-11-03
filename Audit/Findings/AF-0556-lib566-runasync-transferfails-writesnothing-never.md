@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs -Patt
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | RunAsync_TransferFails_WritesNothing asserts Assert.AreEqual(string.Empty, run.OutputText) and Assert.IsFalse(File.Exists(path)).
+
 ## Log
 
 - 2026-11-03: filed proposed.
