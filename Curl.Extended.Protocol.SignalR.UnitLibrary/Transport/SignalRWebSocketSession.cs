@@ -16,6 +16,9 @@ internal sealed class SignalRWebSocketSession(IConnection connection, BufferedCo
 {
     private const int StatusCodeLength = 2;
 
+    // The status code 1000, normal closure (RFC 6455 section 7.4.1), in network byte order.
+    private static readonly byte[] NormalClosure = [0x03, 0xE8];
+
     private readonly WsFrameDecoder decoder = new(recordsRuns: true);
 
     private readonly HubFrameSplitter splitter = new();
@@ -28,6 +31,18 @@ internal sealed class SignalRWebSocketSession(IConnection connection, BufferedCo
     /// <summary>Sends <paramref name="message"/>, one or more hub protocol records, as one masked text frame.</summary>
     public Task SendTextAsync(ReadOnlyMemory<byte> message, CancellationToken cancellationToken) =>
         SendFrameAsync(WsOpcode.Text, message.Span.ToArray(), cancellationToken);
+
+    /// <summary>
+    /// Starts the WebSocket closing handshake with a Close frame carrying status 1000, normal closure (RFC 6455
+    /// sections 1.4 and 7.1.2), unless the server already sent its Close, which this session has answered.
+    /// </summary>
+    public async Task CloseAsync(CancellationToken cancellationToken)
+    {
+        if (!IsClosed)
+        {
+            await SendFrameAsync(WsOpcode.Close, NormalClosure, cancellationToken);
+        }
+    }
 
     /// <summary>
     /// Reads the next hub protocol record, without its 0x1E, from the server's text frames; <see langword="null"/>

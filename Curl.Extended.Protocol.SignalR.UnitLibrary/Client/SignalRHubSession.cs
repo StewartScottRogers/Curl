@@ -13,7 +13,8 @@ namespace Curl.Extended.Protocol.SignalR.Client;
 /// hub sends that curl shows: the call's Completion result, each of its StreamItems, and each Invocation the hub makes
 /// as the JSON array <c>["target", args...]</c>. Curl implements no client methods, so it answers an Invocation that
 /// carries an <c>invocationId</c> (a client result) with a Completion whose error is <see cref="NoClientResultError"/>
-/// (ADR-1204). It ends at the call's Completion, a Close message or the WebSocket's close.
+/// (ADR-1204). It ends at the call's Completion, a Close message or the WebSocket's close, and at the first two
+/// starts the WebSocket closing handshake with a Close frame (RFC 6455 section 1.4).
 /// </summary>
 /// <param name="session">The upgraded WebSocket.</param>
 /// <param name="callRecord">The Invocation or StreamInvocation record <see cref="SignalRCall"/> gave, or <see langword="null"/>.</param>
@@ -49,6 +50,7 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
         {
         }
 
+        await session.CloseAsync(cancellationToken);
         return bytesWritten;
     }
 

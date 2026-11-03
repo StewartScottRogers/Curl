@@ -38,6 +38,7 @@ public sealed class SignalRProtocolHandlerTests
         StringAssert.StartsWith(webSocket.WrittenText, "GET /chat?room=a&id=tok HTTP/1.1\r\n");
         StringAssert.Contains(webSocket.WrittenText, HandshakeRequest);
         StringAssert.Contains(webSocket.WrittenText, "{\"type\":1,\"invocationId\":\"1\",\"target\":\"Add\",\"arguments\":[1,2]}\u001e");
+        CollectionAssert.AreEqual(new byte[] { 0x88, 0x82, 0, 0, 0, 0, 0x03, 0xE8 }, webSocket.Written[^8..]);
         Assert.IsTrue(webSocket.IsDisposed);
         Assert.AreEqual(("example.com", 5000, false), (connector.Targets[0].Host, connector.Targets[0].Port, connector.Targets[0].UseTls));
         Assert.AreEqual(("example.com", 5000, false), (connector.Targets[1].Host, connector.Targets[1].Port, connector.Targets[1].UseTls));
