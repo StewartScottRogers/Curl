@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.WebDavTools.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4744 — Fix AF-0580: WebDavList ExecuteAsync_ASuccessWithNoReport_FailsWithExit22 never checks exit 22
 
@@ -52,3 +52,4 @@ Added the missing ExitCode assertion (HttpReturnedError); 99 WebDavTools tests p
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Added missing exit code assertion
