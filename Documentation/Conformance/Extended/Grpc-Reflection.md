@@ -7,7 +7,7 @@ measured against protobuf's "ProtoJSON Format" (<https://protobuf.dev/programmin
 "is" emitted and "is accepted", not with RFC 2119 words; this matrix reads each such rule as a MUST and keeps SHOULD
 where the guide says "should". Part 1, the request and the unary call, is [Grpc.md](Grpc.md).
 
-The cases are `GrpcReflectionCases` and `GrpcProtoJsonCases` in `Curl.Conformance.Extended.UnitTests/Grpc/Reflection/`.
+The cases are `GrpcReflectionCases`, `GrpcProtoJsonCases` and `GrpcProtoJsonWellKnownCases` in `Curl.Conformance.Extended.UnitTests/Grpc/Reflection/`.
 They run against `GrpcReferenceServer` with `GrpcReflectionService` (`Curl.Conformance.Extended.UnitLibrary/Grpc/Reflection/`),
 which serves serialized `FileDescriptorProto`s the cases write by hand. The reference server sends one reply per call,
 so the reflection service answers the whole stream once the first request arrives: the requested file, then the
@@ -48,4 +48,11 @@ printed JSON with its whitespace removed.
 | Grpc:ProtoJson-Unknown-1 | SHOULD | The parser rejects unknown fields by default. | GrpcProtoJsonCases.Parse_UnknownField_IsRejectedBeforeTheCall |
 | Grpc:ProtoJson-Timestamp-1 | MUST | `google.protobuf.Timestamp` is an RFC 3339 string, emitted Z-normalized. | GrpcProtoJsonCases.RoundTrip_TimestampAndDuration_UseTheirStringForms |
 | Grpc:ProtoJson-Duration-1 | MUST | `google.protobuf.Duration` is a string of seconds ending in `s`, emitted with 0, 3, 6 or 9 fractional digits. | GrpcProtoJsonCases.RoundTrip_TimestampAndDuration_UseTheirStringForms |
-| Grpc:ProtoJson-WellKnown-1 | MUST | `Any`, `Struct`, `Value`, `ListValue`, `NullValue`, the wrapper types, `FieldMask` and `Empty` use their own JSON forms. | n/a: not measured here; BL-4687 adds their cases and replaces this row |
+| Grpc:ProtoJson-Any-1 | MUST | `google.protobuf.Any` holding an ordinary message is a JSON object with the type URL under `"@type"` beside the embedded message's own fields. | GrpcProtoJsonWellKnownCases.RoundTrip_AnyOfAMessage_IsTheTypeUrlBesideTheMessagesFields |
+| Grpc:ProtoJson-Any-2 | MUST | An `Any` holding a well-known type with a special JSON form carries that form under `"value"` beside `"@type"`. | GrpcProtoJsonWellKnownCases.RoundTrip_AnyOfAWellKnownType_PutsItsJsonFormInValue |
+| Grpc:ProtoJson-Struct-1 | MUST | `google.protobuf.Struct` is a JSON object whose members are its fields. | GrpcProtoJsonWellKnownCases.RoundTrip_StructValueAndListValue_AreAnyJsonObjectValueAndArray |
+| Grpc:ProtoJson-Struct-2 | MUST | `google.protobuf.Value` is any JSON value, `ListValue` a JSON array, and `NullValue` JSON `null`. | GrpcProtoJsonWellKnownCases.RoundTrip_StructValueAndListValue_AreAnyJsonObjectValueAndArray |
+| Grpc:ProtoJson-Wrappers-1 | MUST | Each wrapper type (`DoubleValue` to `BytesValue`) is the JSON form of the value it wraps. | GrpcProtoJsonWellKnownCases.RoundTrip_WrapperTypes_AreTheWrappedValuesAndKeepAZero |
+| Grpc:ProtoJson-Wrappers-2 | MUST | A present wrapper is emitted even when it wraps its type's default value. | GrpcProtoJsonWellKnownCases.RoundTrip_WrapperTypes_AreTheWrappedValuesAndKeepAZero |
+| Grpc:ProtoJson-FieldMask-1 | MUST | `google.protobuf.FieldMask` is one string of its paths in lowerCamelCase, joined by commas. | GrpcProtoJsonWellKnownCases.RoundTrip_FieldMask_IsOneStringOfLowerCamelCasePaths |
+| Grpc:ProtoJson-Empty-1 | MUST | `google.protobuf.Empty` is an empty JSON object. | GrpcProtoJsonWellKnownCases.RoundTrip_Empty_IsAnEmptyObject |
