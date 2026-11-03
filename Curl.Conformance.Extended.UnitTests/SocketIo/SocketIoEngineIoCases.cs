@@ -77,15 +77,13 @@ public sealed class SocketIoEngineIoCases
                 InProcessCurl.RunAsync, [ReferenceRoute.Tcp(Port, server)], ["-sS", "-m", "100", Url], timeProvider: clock);
             try
             {
+                // The client arms its heartbeat on the open packet, before it sends its connect packet, so once
+                // the server holds that packet the ping wait is armed and moving the clock past it ends the run.
                 await WaitForAsync(() => server.ClientPackets.Count > 0);
-                for (int tenth = 0; tenth < 25 && !run.IsCompleted; tenth++)
-                {
-                    clock.Advance(TimeSpan.FromMilliseconds(100));
-                    await Task.Delay(10, TestContext.CancellationToken);
-                }
+                clock.Advance(TimeSpan.FromMilliseconds(2000));
+                CurlRunResult result = await run.WaitAsync(TimeSpan.FromSeconds(30), TestContext.CancellationToken);
 
-                Assert.IsTrue(run.IsCompleted, "The client ends the connection once pingInterval + pingTimeout pass with no ping.");
-                Assert.AreNotEqual(28, (await run).ExitCode, "The run ends on the ping timeout, not on -m.");
+                Assert.AreNotEqual(28, result.ExitCode, "The run ends on the ping timeout after pingInterval + pingTimeout, not on -m.");
             }
             finally
             {
