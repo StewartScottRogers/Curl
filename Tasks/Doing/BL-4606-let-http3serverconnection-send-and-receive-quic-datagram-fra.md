@@ -32,3 +32,4 @@ Split from BL-4494 (WebTransport conformance). The frame switch in `Curl.Conform
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 7cbc8046 103b7afc 286a1d56 481bd9fe.
