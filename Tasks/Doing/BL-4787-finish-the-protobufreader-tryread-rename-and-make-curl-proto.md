@@ -37,3 +37,4 @@ Found by the shift-end review of 2026-11-03 (type-design-analyzer and code-revie
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: f2dccc66 c00f8bdd e1629282 3d836d5e.
