@@ -61,7 +61,15 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Notes
 
+- 2026-11-03 (lane 2): split for size before any code. The sizing pass found three pieces of work that do not fit
+  one run: DoT and DoH cases with a DoH HTTP responder and the RFC 7858/8310/8484 matrix (BL-4674); a DoQ reference
+  server, which needs `Curl.Conformance.Http3Server.UnitLibrary` to negotiate ALPN `doq` instead of its hard-coded
+  `h3` const (`Http3ServerTlsSettings.ApplicationProtocol`, read by `Http3ServerClientOffer` and
+  `Http3ServerTlsHandshake`) (BL-4675); and the DoQ cases and RFC 9250 rows (BL-4676, depends on BL-4674 and
+  BL-4675). No task outside Done names BL-4474 in its `depends-on`.
+
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 6df4d420 7e22ddf2 f3c72898 d8e3fb0e 627fbee3 17248609.
+- 2026-11-03: Doing -> Deferred. Split into BL-4674, BL-4675, BL-4676
