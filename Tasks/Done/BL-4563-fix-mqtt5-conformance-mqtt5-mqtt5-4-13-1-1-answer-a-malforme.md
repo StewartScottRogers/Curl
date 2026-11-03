@@ -37,7 +37,7 @@ Depends on BL-4560, which changes `Mqtt5ClientFlow.cs` too.
 
 ## Notes
 
-- Plan (direct, no architect: one seam): `Mqtt5ClientException` carries an optional DISCONNECT reason code; `Mqtt5PacketChannel` passes on `Mqtt5MalformedPacketException.ReasonCode`, `Mqtt5ClientFlow` gives an unexpected packet Protocol Error 0x82, and `RunAsync` sends DISCONNECT with that code (best effort) before rethrowing. Recorded in ADR-1198.
+- Plan (direct, no architect: one seam): `Mqtt5ClientException` carries an optional DISCONNECT reason code; `Mqtt5PacketChannel` passes on `Mqtt5MalformedPacketException.ReasonCode`, `Mqtt5ClientFlow` gives an unexpected packet Protocol Error 0x82, and `RunAsync` sends DISCONNECT with that code (best effort) before rethrowing. Recorded in ADR-1201.
 - Widened `touches` with `Curl.Conformance.Extended.UnitTests/Mqtt5/ConnackCases.cs`: two of its cases (`Connack_ReservedAcknowledgeFlagSet_IsAMalformedPacketWithExit8`, `Connack_PropertyTwice_IsRefusedWithExit8`) pinned "sent only CONNECT" for a malformed CONNACK, which this task's goal replaces with CONNECT then DISCONNECT 0x81 (reserved flags) or 0x82 (a property twice, a Protocol Error by section 3.2.2.3). No task in Doing on origin/work/dark-factory named that file.
 - The KnownFailures lines carried BL-4562, not BL-4563; the four `Mqtt5:` lines were removed as the criterion says.
 - Default taken: a refusal by reason code (failing CONNACK, SUBACK, DISCONNECT) and Session Present send no DISCONNECT, since they are not malformed packets or protocol errors in the stream.

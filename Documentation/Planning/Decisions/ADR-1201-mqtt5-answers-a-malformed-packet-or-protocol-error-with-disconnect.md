@@ -1,4 +1,4 @@
-# ADR-1198: The mqtt5:// client answers a Malformed Packet or a Protocol Error with DISCONNECT 0x81 or 0x82
+# ADR-1201: The mqtt5:// client answers a Malformed Packet or a Protocol Error with DISCONNECT 0x81 or 0x82
 
 - Status: Accepted
 - Date: 2026-11-02

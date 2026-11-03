@@ -42,7 +42,7 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
 
     /// <summary>
     /// Sends the DISCONNECT that answers a Malformed Packet or a Protocol Error before the connection closes (section
-    /// 4.13.1, ADR-1198). It is best effort: a failed send leaves the transfer ending with the original failure.
+    /// 4.13.1, ADR-1201). It is best effort: a failed send leaves the transfer ending with the original failure.
     /// </summary>
     private async ValueTask SendClosingDisconnectAsync(Mqtt5ReasonCode reasonCode)
     {

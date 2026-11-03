@@ -199,7 +199,7 @@ public sealed class ConnackCases
         Assert.AreEqual($"curl: ({exitCode}) {message}{Environment.NewLine}", Encoding.UTF8.GetString(result.StandardError));
     }
 
-    /// <summary>Asserts curl sent CONNECT and then, answering the malformed or protocol-breaking CONNACK, DISCONNECT with <paramref name="reasonCode"/> (section 4.13.1, ADR-1198).</summary>
+    /// <summary>Asserts curl sent CONNECT and then, answering the malformed or protocol-breaking CONNACK, DISCONNECT with <paramref name="reasonCode"/> (section 4.13.1, ADR-1201).</summary>
     private static void AssertSentConnectThenDisconnect(CurlRunResult result, Mqtt5ReferenceBroker broker, byte reasonCode)
     {
         CollectionAssert.AreEqual(new[] { Mqtt5WirePacket.Connect, Mqtt5WirePacket.Disconnect }, broker.ReceivedPackets.Select(packet => packet.PacketType).ToArray());
