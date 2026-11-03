@@ -47,7 +47,12 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Notes
 
+- Fix, part 1 (an interactive session, 2026-11-02 17:40 Arizona): 7ecfdd99f - the previous-shift lookup skips the starting shift's own empty `lanes-<stamp>` folder, so a restarted shift adopts each stopped lane's task from that lane's state instead of treating every Doing task as an orphan (the root of AF-0544: both BL-2969 and BL-4507 looked orphaned at 09:51:19).
+- Fix, part 2: 3a15c59d1, pushed to work/dark-factory 2026-11-03 10:36:45 Arizona (17:36:45Z). `Get-OrphanAction` (DarkFactory/Park.ps1) now takes `-LaneLastTask`, each dirty lane's task by its newest run log (`Get-LaneLastRunTask`): a dirty lane whose last run was the orphan adopts it, and a dirty lane whose last run was another task is no candidate, so lane 1 can no longer adopt lane 2's BL-2969 over its own BL-4507 work. ShiftCoordinator.ps1 passes the map and traces why a lane adopts. `-TestPark` adds three cases (21/21 PASS under Windows PowerShell 5.1 and pwsh 7).
+- Evidence still owed: the measurement window starts at 2026-11-03T17:36:45Z; it needs shift logs written after that, so the task waits in Backlog for an interactive session to run the measurement.
+
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-03: Doing -> Backlog. Fix landed (7ecfdd99f, 3a15c59d1 at 2026-11-03 10:36 Arizona); the post-fix measurement needs shift logs written after it, so it waits in Backlog per its criterion.
