@@ -31,3 +31,4 @@ Found by BL-4486: `Mqtt5WebSocketConnection.Collect` sets `isClosed` on a Close 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 1ac6766c 6c3b4c2b 91dca242.
