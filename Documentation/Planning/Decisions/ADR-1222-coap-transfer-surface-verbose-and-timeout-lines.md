@@ -30,4 +30,4 @@ Windows, `* SSL connection using TLSv1.` on the OpenSSL build). Curl's DTLS 1.2 
 ## Consequences
 
 `CurlSurface:Verbose-Coap-1` and `CurlSurface:Verbose-Coaps-1` fail today (`-v` writes only `* CoAP response 2.05`)
-and are listed in `KnownFailures.txt` with BL-4666, which adds the connection and DTLS lines.
+and are listed in `KnownFailures.txt` with BL-4667, which adds the connection and DTLS lines.
