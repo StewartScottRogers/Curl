@@ -5,7 +5,7 @@ namespace Curl.Extension.Composition;
 /// <summary>
 /// The one place a host learns which protocol handlers Curl's extensions add beyond upstream
 /// curl's (ADR-0999). The engine never references an extension: a host passes
-/// <see cref="For" />'s factory to the engine's composition, which builds the extensions'
+/// <see cref="For(Func{string, string?})" />'s factory to the engine's composition, which builds the extensions'
 /// handlers over the same transports as curl's own and puts them after curl's, so a scheme
 /// both claim fails composition loudly rather than replacing curl's handler.
 /// </summary>
@@ -24,10 +24,17 @@ public static class ExtensionProtocolHandlers
     /// <returns>The factory, or <see langword="null" /> for no extensions.</returns>
     public static Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? For(Func<string, string?> readEnvironmentVariable)
     {
+        return For(readEnvironmentVariable, ExtensionCatalogue.Entries);
+    }
+
+    internal static Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? For(
+        Func<string, string?> readEnvironmentVariable,
+        IReadOnlyList<Func<ProtocolHandlerServices, IProtocolHandler>> factories)
+    {
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
         return readEnvironmentVariable(SwitchVariable) == "0"
             ? null
-            : services => Create(services with { ReadEnvironmentVariable = readEnvironmentVariable });
+            : services => CreateFrom(factories, services with { ReadEnvironmentVariable = readEnvironmentVariable });
     }
 
     /// <summary>Builds every registered extension's handler over <paramref name="services" />, in registration order.</summary>

@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.Composition.UnitTests]
+touches: [Curl.Extension.Composition.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionProtocolHandlers.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-02
 ---
 # BL-4635 — Fix AF-0529: For_GivesTheExtensionsTheRunsEnvironmentReader never checks that the reader reaches the extensions
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added internal `ExtensionProtocolHandlers.For(reader, factories)` (public `For` delegates to it with the catalogue) so a test can see the services each factory receives; widened `touches` to that file (no other Doing task holds it). New test `For_HandsEachExtensionFactoryServicesCarryingTheGivenReader` asserts `Assert.AreSame(reader, ...)`. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-02: Doing -> Done. Test now asserts the reader reaches each extension factory
