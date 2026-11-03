@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Coap.UnitLibrary/Dtls/Handshake/DtlsClientHandshake.cs, Curl.Extended.Protocol.Coap.UnitTests/Dtls, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4583 — Fix Coap conformance: Coap:RFC6347-4.2.1-1 (ClientKeyExchange carries the ECDHE point with two length prefixes)
 
@@ -28,14 +28,18 @@ Coap:RFC7252-9.1-3, Coap:RFC7252-9.1-4.
 
 ## Acceptance criteria
 
-- [ ] The cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` pass against `DtlsReferenceServer`.
-- [ ] A focused unit test in `Curl.Extended.Protocol.Coap.UnitTests` pins the ClientKeyExchange body as one length
+- [x] The cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` pass against `DtlsReferenceServer`.
+- [x] A focused unit test in `Curl.Extended.Protocol.Coap.UnitTests` pins the ClientKeyExchange body as one length
       byte and the 65-byte point (ADR-0482).
-- [ ] The five BL-4577 lines are removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
+- [x] The five BL-4577 lines are removed from `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`.
 
 ## Notes
+
+- `DtlsClientHandshake.ExchangeKeysAsync` now passes the bare point to `Tls12ClientKeyExchange`, whose `Encode` writes the one ecdh_Yc length byte; the unit test server and `DtlsTestServerTests` read and build it the same way. `RunAsync_Rfc8422Section5_7_ClientKeyExchange_CarriesTheUncompressedPointBehindOneLengthByte` pins the 66-byte body (65, 04, X, Y).
+- `KnownFailures.txt` also loses `Amqp0:AMQP091-1.5.2.3-1 BL-4564`: that case passes since eaf5b59f4 (channel.flow answered with flow-ok), and the ratchet fails `Flow_FromTheBroker_IsAnsweredWithFlowOk` while the line stays. Measured here by restoring the line and running the conformance tests.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: f298e558 bff304f3 34f35708.
+- 2026-11-02: Doing -> Done. ClientKeyExchange carries the ECDHE point behind one length byte; the five coaps:// cases pass against DtlsReferenceServer
