@@ -232,6 +232,69 @@ public sealed class OciRegistryProtocolHandlerTests
         Assert.AreEqual("sha256 does not apply", output);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_DigestWithNoBlob_PullsTheManifestUnderThatDigest()
+    {
+        var connector = new SequenceConnector(
+            SequenceConnector.Respond("404 Not Found", """{"errors":[{"code":"BLOB_UNKNOWN","message":"blob unknown"}]}"""),
+            SequenceConnector.Respond("200 OK", Manifest));
+
+        var (result, output) = await PullAsync(connector, "oci://reg.example/alpine@" + Sha256Of(Manifest));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(Manifest, output);
+        StringAssert.StartsWith(connector[0].Written, "GET /v2/alpine/blobs/" + Sha256Of(Manifest) + " HTTP/1.1\r\n");
+        StringAssert.StartsWith(connector[1].Written, "GET /v2/alpine/manifests/" + Sha256Of(Manifest) + " HTTP/1.1\r\n");
+        Assert.Contains("Accept: " + OciRegistryProtocolHandler.ManifestMediaTypes + "\r\n", connector[1].Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DigestWithNoBlobAndATamperedManifest_FailsAsWeirdServerReply()
+    {
+        var connector = new SequenceConnector(SequenceConnector.Respond("404 Not Found"), SequenceConnector.Respond("200 OK", "tampered"));
+
+        var (result, output) = await PullAsync(connector, "oci://reg.example/alpine@" + Sha256Of(Manifest));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual(string.Empty, output);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DigestWithNeitherBlobNorManifest_FailsWithTheBlobError()
+    {
+        var connector = new SequenceConnector(
+            SequenceConnector.Respond("404 Not Found", """{"errors":[{"code":"BLOB_UNKNOWN","message":"blob unknown"}]}"""),
+            SequenceConnector.Respond("404 Not Found", """{"errors":[{"code":"MANIFEST_UNKNOWN","message":"manifest unknown"}]}"""));
+
+        var (result, _) = await PullAsync(connector, "oci://reg.example/alpine@" + Sha256Of(Manifest));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("The requested URL returned error: 404 (BLOB_UNKNOWN: blob unknown)", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DigestWithNoBlobAndAManifestError_FailsWithTheManifestError()
+    {
+        var connector = new SequenceConnector(
+            SequenceConnector.Respond("404 Not Found"),
+            SequenceConnector.Respond("403 Forbidden", """{"errors":[{"code":"DENIED","message":"no"}]}"""));
+
+        var (result, _) = await PullAsync(connector, "oci://reg.example/alpine@" + Sha256Of(Manifest));
+
+        Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
+        Assert.AreEqual("The requested URL returned error: 403 (DENIED: no)", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DigestWhoseBlobPullFailsOtherThanNotFound_DoesNotAskForAManifest()
+    {
+        var connector = new SequenceConnector(SequenceConnector.Respond("500 Internal Server Error"));
+
+        var (result, _) = await PullAsync(connector, "oci://reg.example/alpine@" + Sha256Of(Manifest));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("The requested URL returned error: 500", result.ErrorMessage);
+    }
     private static string Sha256Of(string content) => "sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
 
     private static async Task<(TransferResult Result, string Output)> PullAsync(SequenceConnector connector, string url, NetworkCredential? credentials = null)

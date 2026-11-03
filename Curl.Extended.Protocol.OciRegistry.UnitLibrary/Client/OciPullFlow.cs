@@ -22,7 +22,37 @@ internal sealed class OciPullFlow(OciRegistrySession session)
     /// <param name="cancellationToken">Cancels the pull.</param>
     /// <returns>The body of the final 2xx response.</returns>
     /// <exception cref="OciTransferException">No 2xx response was reached.</exception>
-    public async Task<byte[]> PullAsync(Uri url, string accept, CancellationToken cancellationToken)
+    public async Task<byte[]> PullAsync(Uri url, string accept, CancellationToken cancellationToken) =>
+        BodyOf(await ReceiveFinalAsync(url, accept, cancellationToken));
+
+    /// <summary>
+    /// Pulls <paramref name="url"/>, and <paramref name="fallbackUrl"/> when the registry answers the first with 404
+    /// (ADR-1207): an <c>@digest</c> URL names a blob or a manifest, and only the registry knows which. When both are
+    /// unknown the failure is the first one's.
+    /// </summary>
+    /// <param name="url">The registry API URL pulled first.</param>
+    /// <param name="accept">The <c>Accept</c> value of the first pull.</param>
+    /// <param name="fallbackUrl">The registry API URL pulled when the first is not found.</param>
+    /// <param name="fallbackAccept">The <c>Accept</c> value of the fallback pull.</param>
+    /// <param name="cancellationToken">Cancels the pull.</param>
+    /// <returns>The body of the final 2xx response.</returns>
+    /// <exception cref="OciTransferException">No 2xx response was reached.</exception>
+    public async Task<byte[]> PullWithFallbackAsync(Uri url, string accept, Uri fallbackUrl, string fallbackAccept, CancellationToken cancellationToken)
+    {
+        var response = await ReceiveFinalAsync(url, accept, cancellationToken);
+        if (response.StatusCode != 404)
+        {
+            return BodyOf(response);
+        }
+
+        var fallback = await ReceiveFinalAsync(fallbackUrl, fallbackAccept, cancellationToken);
+        return BodyOf(fallback.StatusCode == 404 ? response : fallback);
+    }
+
+    private static byte[] BodyOf(OciHttpResponse response) =>
+        response.StatusCode is >= 200 and < 300 ? response.Body : throw OciRegistryError.From(response);
+
+    private async Task<OciHttpResponse> ReceiveFinalAsync(Uri url, string accept, CancellationToken cancellationToken)
     {
         var response = await SendAsync(url, accept, null, cancellationToken);
         if (response.StatusCode == 401)
@@ -30,8 +60,7 @@ internal sealed class OciPullFlow(OciRegistrySession session)
             response = await SendAsync(url, accept, await session.RequestAuthorizationAsync(response, null, cancellationToken), cancellationToken);
         }
 
-        response = await FollowRedirectsAsync(response, url, accept, cancellationToken);
-        return response.StatusCode is >= 200 and < 300 ? response.Body : throw OciRegistryError.From(response);
+        return await FollowRedirectsAsync(response, url, accept, cancellationToken);
     }
 
     /// <summary>

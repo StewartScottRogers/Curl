@@ -4,7 +4,6 @@
 Mqtt5:MQTT5-3.1.2.10-1 BL-4575
 Amqp1:Core-2.6.5-1 BL-4585
 SignalR:RFC6455-1.4-1 BL-4584
-OciRegistry:DIST-PullManifests-2 BL-4584
 Mqtt5:RFC6455-5.5.1-1 BL-4584
 Grpc:Http2-Errors-1 BL-4591
 Grpc:Http2-GoAway-1 BL-4591
