@@ -190,7 +190,10 @@ public sealed class OpenApiDocumentTests
     {
         OpenApiDocument document = Document("""{"x":[{}],"loop":{"$ref":"#/loop"},"paths":{"/":{"get":{"operationId":"a","parameters":[{"$ref":"REF"}]}}}}""".Replace("REF", reference, StringComparison.Ordinal));
 
-        Assert.AreEqual(message, Assert.ThrowsExactly<ArgumentExpansionException>(() => document.FindOperation("a")).Message);
+        ArgumentExpansionException failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => document.FindOperation("a"));
+
+        Assert.AreEqual(message, failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
     }
 
     private static OpenApiDocument Document(string json) =>
