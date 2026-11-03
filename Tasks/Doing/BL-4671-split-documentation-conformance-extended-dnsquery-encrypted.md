@@ -24,11 +24,21 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 ## Acceptance criteria
 
-- [ ] The per-case or per-stand-in content of `Documentation/Conformance/Extended/DnsQuery-Encrypted.md` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
-- [ ] After the waiting tasks' `touches` (BL-4474, BL-4514, BL-4515, BL-4516, BL-4646) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Documentation/Conformance/Extended/DnsQuery-Encrypted.md`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The per-case or per-stand-in content of `Documentation/Conformance/Extended/DnsQuery-Encrypted.md` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
+- [x] After the waiting tasks' `touches` (BL-4474, BL-4514, BL-4515, BL-4516, BL-4646) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Documentation/Conformance/Extended/DnsQuery-Encrypted.md`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-11-03 (lane 1): There was nothing to split. `Documentation/Conformance/Extended/DnsQuery-Encrypted.md`
+  does not exist, either in this checkout or on `origin/work/dark-factory`. BL-4474 creates it, and BL-4474 is the
+  only unfinished task whose `touches` names it (checked on the shared branch's Backlog, Doing and Blocked).
+  BL-4514, BL-4515 and BL-4516 touch `DnsQuery.md`, a different page. BL-4646 touches only an ADR. So their
+  `touches` already name their own files and needed no edit. `task-board.ps1 hotspots` reports "No hotspots", so the
+  count for the file is 1, fewer than 5. The coordinator's count of 5 most likely came from an older board, from
+  before BL-4473 was split into BL-4514 to BL-4516. The page gets its first content from BL-4474, the only task that
+  writes it, so serialising on it costs nothing. Criterion 1 is therefore met trivially: there is no shared content to
+  move. `dotnet build` is clean and the fast tests pass (no project failed). No code changed.
 
 ## Log
 
