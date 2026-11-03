@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Stomp, Curl.Conformance.Extended.UnitTests/Stomp, Documentation/Conformance/Extended/Stomp.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4493 — Conformance: STOMP 1.2 for stomp:// and stomps://
 
@@ -44,21 +44,21 @@ fixed here, but a defect in the extension library is listed in `KnownFailures.tx
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Stomp.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of STOMP 1.2
+- [x] `Documentation/Conformance/Extended/Stomp.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of STOMP 1.2
       that binds a client a `Stomp:` ID mapped to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Stomp/` run curl in process for `stomp://` and `stomps://` and
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Stomp/` run curl in process for `stomp://` and `stomps://` and
       assert frame bytes, stdout, stderr and exit code for at least: CONNECT headers (`accept-version`, `host`,
       credentials, `heart-beat`), a server choosing another version, an ERROR at connect, SEND with
       `content-length` and a body holding NUL, header escapes both ways (and none in CONNECT/CONNECTED), repeated
       headers, CR LF frames, heart-beat EOLs between frames, MESSAGE frames with and without `content-length`, a
       DISCONNECT receipt and a missing one, and a frame split across reads.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Stomp conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Stomp/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Stomp/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
@@ -66,3 +66,4 @@ fixed here, but a defect in the extension library is listed in `KnownFailures.tx
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 8272e82f 081e4f29 010a29e2 d8e3fb0e 32c763d1 ef6c9026.
+- 2026-11-02: Doing -> Done. STOMP 1.2 matrix of 43 client requirements with 21 in-process cases for stomp:// and stomps://; content-type on SEND listed for BL-4603
