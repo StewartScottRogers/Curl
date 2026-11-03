@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4708 — Fix AF-0560: Surviving mutant: -H Content-Type with -F can throw IndexOutOfRangeException without a test failing
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added three `RequestContentTypeOf` tests to `Curl.Engine.UnitTests/MultipartFormPartMappingTests.cs` (the test project of the touched library; no production change, so no quality run was needed): a bare `Content-Type` value is skipped and the next one read, a bare name or `Content-Types:` gives null, and `Content-Type:` gives empty. A lane cannot run `Audit/Tools/Invoke-MutationTest.ps1`, so I applied the mutant (`>` to `>=` at line 66) by hand: two of the new tests failed against it, then I reverted it. The re-audit confirms. Engine fast tests: 2957 passed, 0 failed.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Tests for a bare Content-Type -H value kill the >= mutant at MultipartFormPartMapping.cs:66; engine fast tests green

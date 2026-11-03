@@ -37,6 +37,45 @@ public sealed class MultipartFormPartMappingTests
     }
 
     [TestMethod]
+    public void RequestContentTypeOf_HeaderIsTheBareName_IgnoresItAndReadsTheNextOne()
+    {
+        string[] headers = ["Content-Type", "content-type; multipart/mixed"];
+        Diagnostics.Arrange("-H values", string.Join(" | ", headers));
+
+        string? contentType = MultipartFormPartMapping.RequestContentTypeOf(headers);
+        Diagnostics.Act("request content type", contentType);
+
+        Diagnostics.Assert("request content type", "multipart/mixed", contentType);
+        Assert.AreEqual("multipart/mixed", contentType);
+    }
+
+    [TestMethod]
+    public void RequestContentTypeOf_OnlyTheBareNameOrALongerName_GivesNull()
+    {
+        string[] headers = ["Content-Type", "Content-Types: x/y"];
+        Diagnostics.Arrange("-H values", string.Join(" | ", headers));
+
+        string? contentType = MultipartFormPartMapping.RequestContentTypeOf(headers);
+        Diagnostics.Act("request content type", contentType);
+
+        Diagnostics.Assert("request content type", null, contentType);
+        Assert.IsNull(contentType);
+    }
+
+    [TestMethod]
+    public void RequestContentTypeOf_ColonWithEmptyValue_GivesEmpty()
+    {
+        string[] headers = ["Content-Type:"];
+        Diagnostics.Arrange("-H values", headers[0]);
+
+        string? contentType = MultipartFormPartMapping.RequestContentTypeOf(headers);
+        Diagnostics.Act("request content type", contentType);
+
+        Diagnostics.Assert("request content type", string.Empty, contentType);
+        Assert.AreEqual(string.Empty, contentType);
+    }
+
+    [TestMethod]
     public void FromMimeBody_NestedMultipart_MapsItsPartsInOrder()
     {
         Diagnostics.Arrange("form arguments", "m=(;type=multipart/alternative | x=1 | y=@t.txt | =)");
