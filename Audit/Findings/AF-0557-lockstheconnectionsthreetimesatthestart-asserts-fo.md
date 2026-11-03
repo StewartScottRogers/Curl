@@ -3,8 +3,8 @@ id: AF-0557
 title: LocksTheConnectionsThreeTimesAtTheStart asserts four locks over the whole perform
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitTests/ManagedShareHandleTests.cs:PerformAsync_ConnectionsSharedAndNoUrl_LocksTheConnectionsThreeTimesAtTheStart:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitTests/ManagedShareHandleTests.cs -Pattern 'L
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
