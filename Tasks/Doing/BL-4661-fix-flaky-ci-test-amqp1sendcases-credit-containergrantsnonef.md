@@ -30,3 +30,4 @@ On lane 7 (BL-4638's run, 2026-11-02) the full `dotnet test --filter "TestCatego
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: f31bf7b3 9742157d.
