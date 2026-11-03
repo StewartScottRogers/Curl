@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4748 — Fix AF-0584: ConnectToMap_DestinationInAnInvalidPartition_FailsWithCurlsExit49Text never checks exit 49
 
@@ -52,3 +52,4 @@ Added `Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, destination.ParseErrorCo
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Test now asserts ParseErrorCode is SetoptOptionSyntax (49)
