@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Plugin.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4701 — Fix AF-0553: ThrowsTheHostsIOException checks only the type, not that it is the host's own exception
 
@@ -52,3 +52,4 @@ The test now also asserts the thrown IOException's message and that it has no in
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Test asserts the host's exception message; fast tests green.
