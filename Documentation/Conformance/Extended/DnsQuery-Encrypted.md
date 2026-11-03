@@ -2,7 +2,7 @@
 
 Curl's `dns://` client (`Curl.Extended.Protocol.DnsQuery.UnitLibrary`) measured under `--dns-transport tls` against
 RFC 7858 (DNS over TLS) and RFC 8310 where its profiles bind a client, and under `--dns-transport https` against
-RFC 8484 (DNS over HTTPS), through the reference servers in `Curl.Conformance.Extended.UnitLibrary/DnsQuery/`
+RFC 8484 (DNS over HTTPS), and under `--dns-transport quic` against RFC 9250 (DNS over QUIC), through the reference servers in `Curl.Conformance.Extended.UnitLibrary/DnsQuery/`
 (BL-4681): `DnsReferenceServer` behind a TLS route for DoT, `Encrypted/DohReferenceServer` (HTTP/1.1) behind a TLS
 route for DoH, and `Encrypted/DnsTlsRefusalServer` for a certificate curl must refuse. The cleartext transports have
 their own matrix, [DnsQuery.md](DnsQuery.md). A case listed in `KnownFailures.txt` names the task that fixes it.
@@ -40,4 +40,24 @@ their own matrix, [DnsQuery.md](DnsQuery.md). A case listed in `KnownFailures.tx
 
 ## RFC 9250 (DNS over QUIC)
 
-Measured by BL-4682 and BL-4683.
+Measured under `--dns-transport quic` (BL-4683) through `Encrypted/DoqReferenceServer`, written from RFC 9250 on the
+conformance HTTP/3 server's QUIC connection with the ALPN protocol `doq` (BL-4682) behind a UDP route.
+
+| ID | Level | Requirement | Covered by |
+|----|-------|-------------|------------|
+| DnsQuery:RFC9250-4.1-1 | MUST | A DoQ connection negotiates the ALPN token `doq` in its QUIC handshake. | DnsOverQuicCases.Quic_DefaultPort853_SendsTheLengthPrefixedQueryWithMessageId0AndFinOnTheFirstStream |
+| DnsQuery:RFC9250-4.1.1-1 | MUST | DoQ uses the dedicated UDP port 853 unless client and server agree on another. | DnsOverQuicCases.Quic_DefaultPort853_SendsTheLengthPrefixedQueryWithMessageId0AndFinOnTheFirstStream |
+| DnsQuery:RFC9250-4.1.1-2 | MUST NOT | A DoQ connection never uses UDP port 53. | DnsOverQuicCases.Quic_ExplicitPort53_IsRefusedWithoutAConnection |
+| DnsQuery:RFC9250-4.2-1 | MUST | Every DNS message over DoQ is the two-octet length field followed by the message. | DnsOverQuicCases.Quic_DefaultPort853_SendsTheLengthPrefixedQueryWithMessageId0AndFinOnTheFirstStream |
+| DnsQuery:RFC9250-4.2-2 | MUST | A client sends each query on a new client-initiated bidirectional stream, the next one available. | DnsOverQuicCases.Quic_DefaultPort853_SendsTheLengthPrefixedQueryWithMessageId0AndFinOnTheFirstStream |
+| DnsQuery:RFC9250-4.2-3 | MUST | After its query the client ends the stream with STREAM FIN. | DnsOverQuicCases.Quic_DefaultPort853_SendsTheLengthPrefixedQueryWithMessageId0AndFinOnTheFirstStream |
+| DnsQuery:RFC9250-4.2.1-1 | MUST | A query sent over DoQ carries DNS Message ID 0. | DnsOverQuicCases.Quic_DefaultPort853_SendsTheLengthPrefixedQueryWithMessageId0AndFinOnTheFirstStream |
+| DnsQuery:RFC9250-4.2.1-2 | MUST | A client that receives a message with a non-zero Message ID treats it as an error and uses no answer from it. | DnsOverQuicCases.Quic_AnswerWithANonZeroMessageId_IsAProtocolErrorWithExit8 |
+| DnsQuery:RFC9250-4.3.3-1 | SHOULD | On a protocol error a peer aborts the connection with CONNECTION_CLOSE and the error code DOQ_PROTOCOL_ERROR (0x2). | DnsOverQuicCases.Quic_AnswerWithANonZeroMessageId_IsAProtocolErrorWithExit8 |
+| DnsQuery:RFC9250-4.3-1 | MUST | A connection the server closes with a DoQ error code ends every query on it; the client reads no answer from it. | DnsOverQuicCases.Quic_ServerClosesWithAQuicErrorCode_IsNoAnswerAndExit56 |
+| DnsQuery:RFC9250-4.3.1-1 | SHOULD | A client that cancels a query resets its stream and sends STOP_SENDING with DOQ_REQUEST_CANCELLED. | n/a: curl never cancels its one query while keeping the connection; a timeout ends the connection and the run |
+| DnsQuery:RFC9250-4.4-1 | SHOULD | A client reuses one connection for its queries to a server rather than opening a new one each time. | n/a: curl sends one query per transfer and closes the connection after its answer |
+| DnsQuery:RFC9250-4.5-1 | SHOULD | A client uses session resumption to lower the cost of new connections. | n/a: curl keeps no TLS session between runs, and a run makes one DoQ connection |
+| DnsQuery:RFC9250-4.5-2 | MUST NOT | A client never sends a query that is not replay-safe in 0-RTT data. | n/a: curl's DoQ client resumes no session, so it never sends 0-RTT data |
+| DnsQuery:RFC9250-5.1-1 | MUST | A stub client authenticates its resolver as DoT does under RFC 8310's profiles: under Strict (no `-k`) it sends no query to a server it cannot authenticate. | DnsOverQuicCases.Quic_UntrustedCertificate_IsRefusedWithExit60BeforeAnyQuery |
+| DnsQuery:RFC9250-5.4-1 | MUST | A client protects its queries against traffic analysis with padding: the EDNS(0) Padding option or QUIC padding. | DnsOverQuicCases.Quic_Query_IsPaddedWithTheEdnsPaddingOption |
