@@ -1,5 +1,5 @@
 ---
-id: BL-4674
+id: BL-4680
 title: Keep a grpcs target from taking a pooled https connection to the same origin
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4674 — Keep a grpcs target from taking a pooled https connection to the same origin
+# BL-4680 — Keep a grpcs target from taking a pooled https connection to the same origin
 
 ## Goal
 
