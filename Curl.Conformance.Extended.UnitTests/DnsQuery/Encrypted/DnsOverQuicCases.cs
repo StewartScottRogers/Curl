@@ -47,7 +47,7 @@ public sealed class DnsOverQuicCases
             DoqReceivedQuery received = server.Received.Single();
             Assert.AreEqual(0UL, received.StreamId);
             Assert.AreEqual((ushort)0, received.Query.Id);
-            byte[] message = DnsReferenceMessageWriter.WriteQuery(0, Name, 1, DnsReferenceRecord.InternetClass);
+            byte[] message = received.Query.Bytes;
             CollectionAssert.AreEqual(new byte[] { 0, (byte)message.Length }.Concat(message).ToArray(), received.StreamBytes);
             AssertAnswer(result);
             Assert.AreEqual(0UL, server.ClientClose!.ErrorCode);

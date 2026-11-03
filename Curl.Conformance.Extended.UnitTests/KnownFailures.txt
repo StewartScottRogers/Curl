@@ -3,5 +3,4 @@
 # A listed ID that no test carries fails RequirementChecks. Lines merge by union, so add or remove only whole lines.
 Coap:RFC6347-4.1-3 BL-4685
 
-DnsQuery:RFC9250-5.4-1 BL-4719
-DnsQuery:RFC9250-4.1.1-2 BL-4720
+DnsQuery:RFC9250-4.1.1-2 BL-4723
