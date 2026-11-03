@@ -32,3 +32,4 @@ Found by BL-4491: `SignalRHubProtocolCases.HubCallWithAnInvocationId_IsAnsweredW
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 8748c747 95af5e93 0753b55a 724857c1.
