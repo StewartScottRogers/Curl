@@ -73,8 +73,9 @@ public sealed class Mqtt5WebSocketProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            Mqtt5WebSocketConnection upgraded = await UpgradeAsync(context, connection).ConfigureAwait(false);
+            // Past connect: curl sends the upgrade as the transfer's request, so -m during it is "Operation timed out".
             context.Progress.ReportTransferStarted();
+            Mqtt5WebSocketConnection upgraded = await UpgradeAsync(context, connection).ConfigureAwait(false);
             var flow = new Mqtt5ClientFlow(upgraded, context.Output, context.Progress, context.TimeProvider, context.CancellationToken);
             try
             {

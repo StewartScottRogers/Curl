@@ -64,6 +64,21 @@ public sealed class Mqtt5WebSocketProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_UpgradeRefused_ReportsTheTransferStartedBeforeTheUpgrade()
+    {
+        ScriptedMqtt5Connection connection = new("HTTP/1.1 404 Not Found\r\n\r\n"u8.ToArray());
+        RecordingProgress progress = new();
+        TransferContext context = new() { Url = CurlUrl.Parse("mqtt5+ws://broker/t"), Output = new MemoryStream(), Progress = progress };
+
+        await new Mqtt5WebSocketProtocolHandler(
+            new ScriptedMqtt5Connector(ConnectResult.Connected(connection)),
+            new ScriptedWebSocketRandomSource(ScriptedWebSocketRandomSource.SampleNonce),
+            () => "ABCDEFGH").ExecuteAsync(context);
+
+        Assert.AreEqual(1, progress.TransferStartedCount);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NoTopic_EndsWithUrlMalformatBeforeConnecting()
     {
         ScriptedMqtt5Connector connector = new(ConnectResult.Refused("x"));
@@ -138,4 +153,20 @@ public sealed class Mqtt5WebSocketProtocolHandlerTests
 
     private static TransferContext Context(string url, Stream output, string? body = null) =>
         new() { Url = CurlUrl.Parse(url), Output = output, PostData = body is null ? null : (ReadOnlyMemory<byte>?)System.Text.Encoding.UTF8.GetBytes(body) };
+
+    /// <summary>Counts the handler's transfer-started reports; every other report is dropped.</summary>
+    private sealed class RecordingProgress : ITransferProgress
+    {
+        public int TransferStartedCount { get; private set; }
+
+        public void ReportTransferStarted() => TransferStartedCount++;
+
+        public void ReportDownloaded(long bytesSoFar, long? expectedTotal)
+        {
+        }
+
+        public void ReportUploaded(long bytesSoFar, long? expectedTotal)
+        {
+        }
+    }
 }
