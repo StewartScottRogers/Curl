@@ -48,7 +48,7 @@ public sealed class DnsOverQuicCases
             Assert.AreEqual(0UL, received.StreamId);
             Assert.AreEqual((ushort)0, received.Query.Id);
             byte[] message = received.Query.Bytes;
-            CollectionAssert.AreEqual(new byte[] { 0, (byte)message.Length }.Concat(message).ToArray(), received.StreamBytes);
+            CollectionAssert.AreEqual(new byte[] { (byte)(message.Length >> 8), (byte)message.Length }.Concat(message).ToArray(), received.StreamBytes);
             AssertAnswer(result);
             Assert.AreEqual(0UL, server.ClientClose!.ErrorCode);
         });
