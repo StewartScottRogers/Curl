@@ -93,7 +93,7 @@ public static class ExtendedConformanceHarness
     }
 
     // Every host name is the reference servers' host, except one under RFC 6761's reserved .invalid
-    // name, which never resolves, so a case reaches curl's exit 6 (ADR-1213).
+    // name, which never resolves, so a case reaches curl's exit 6 (ADR-1214).
     private sealed class ReferenceDnsResolver : IDnsResolver
     {
         public ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>

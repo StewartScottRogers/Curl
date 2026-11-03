@@ -1,4 +1,4 @@
-# ADR-1213: The extended conformance harness leaves every host under .invalid unresolved
+# ADR-1214: The extended conformance harness leaves every host under .invalid unresolved
 
 - Status: Accepted
 - Date: 2026-11-02

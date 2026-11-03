@@ -32,7 +32,7 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 
 ## Notes
 
-- Decision (ADR-1213): no new `RunAsync` parameter; the harness resolver answers no address for any host under RFC 6761's reserved `.invalid` name (last label only, any case, trailing dot ignored), 127.0.0.1 for every other. Simplest choice, needs no change to callers, and matches what a real resolver does. Renamed the private `LoopbackDnsResolver` to `ReferenceDnsResolver` since it no longer always answers loopback.
+- Decision (ADR-1214): no new `RunAsync` parameter; the harness resolver answers no address for any host under RFC 6761's reserved `.invalid` name (last label only, any case, trailing dot ignored), 127.0.0.1 for every other. Simplest choice, needs no change to callers, and matches what a real resolver does. Renamed the private `LoopbackDnsResolver` to `ReferenceDnsResolver` since it no longer always answers loopback.
 - Tests: `RunAsync_HostUnderInvalid_FailsToResolve` (exit 6, stderr `curl: (6) Could not resolve host: cache.invalid` + Environment.NewLine, so platform-neutral) and `RunAsync_HostWithInvalidOnlyAsAnInnerLabel_ResolvesToTheReferenceServers`.
 - Build -warnaserror clean, fast tests green (Curl.Conformance.Extended.UnitTests 886 passed). Measure-CodeQuality: Curl.Conformance.Extended.UnitLibrary 100/100, 0 failing members. CI on Linux and macOS: change is platform-neutral.
 
