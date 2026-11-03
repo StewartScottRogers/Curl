@@ -3,8 +3,8 @@ id: AF-0537
 title: Surviving mutant: Lib677.Exchange.RunAsync can carry on after a failed multi perform without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib677.cs:RunAsync-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib677.cs:102:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
