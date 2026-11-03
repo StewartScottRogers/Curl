@@ -187,7 +187,7 @@ public sealed class Lib3101To5004Tests
             Assert.AreEqual(port.SiteUrl, seen.Network.Url);
             CollectionAssert.AreEqual(new[] { port.CookieLine }, seen.Http.CookieList.ToArray());
             Assert.IsTrue(seen.Behaviour.IncludeHeader);
-            Assert.IsNotNull(engine.LastShare);
+            CollectionAssert.AreEqual(new[] { CurlLockData.Cookie }, engine.LastShare!.Shared);
         }
     }
 

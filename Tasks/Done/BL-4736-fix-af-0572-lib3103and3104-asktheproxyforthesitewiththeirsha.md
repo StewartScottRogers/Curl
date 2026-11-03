@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4736 — Fix AF-0572: Lib3103And3104_AskTheProxyForTheSiteWithTheirSharedCookie checks the share only for null
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now asserts `engine.LastShare!.Shared` equals exactly `[CurlLockData.Cookie]` (the single `SetOption(Share, Cookie)` call LibSharedCookieThroughProxy makes), the pattern of Lib1905's test. Reproduction gives no match. Test-only change, platform-neutral; Curl.Conformance.LibTest.UnitTests builds clean and its 1190 fast tests pass.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Test asserts the share holds exactly CurlLockData.Cookie
