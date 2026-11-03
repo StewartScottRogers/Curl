@@ -51,6 +51,34 @@ public sealed class HeaderLineTeeStreamTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_TextStartingWithABareLineFeed_TakesTheLineFeedAsTheFirstLine()
+    {
+        using MemoryStream shared = new();
+        using HeaderLineTeeStream stream = new(shared, shared);
+        Diagnostics.Arrange("text", "\nA\r\n");
+
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("\nA\r\n").AsMemory());
+        Diagnostics.Act("shared", Encoding.ASCII.GetString(shared.ToArray()));
+
+        Diagnostics.Assert("shared", "\n\nA\r\nA\r\n", Encoding.ASCII.GetString(shared.ToArray()));
+        Assert.AreEqual("\n\nA\r\nA\r\n", Encoding.ASCII.GetString(shared.ToArray()));
+    }
+
+    [TestMethod]
+    public void Write_TextStartingWithABareLineFeed_TakesTheLineFeedAsTheFirstLine()
+    {
+        using MemoryStream shared = new();
+        using HeaderLineTeeStream stream = new(shared, shared);
+        Diagnostics.Arrange("text", "\nA\r\n");
+
+        stream.Write(Encoding.ASCII.GetBytes("\nA\r\n"));
+        Diagnostics.Act("shared", Encoding.ASCII.GetString(shared.ToArray()));
+
+        Diagnostics.Assert("shared", "\n\nA\r\nA\r\n", Encoding.ASCII.GetString(shared.ToArray()));
+        Assert.AreEqual("\n\nA\r\nA\r\n", Encoding.ASCII.GetString(shared.ToArray()));
+    }
+
+    [TestMethod]
     public async Task WriteAsync_TextWithoutALineFeed_WritesItWholeToEach()
     {
         using MemoryStream dumpHeader = new();
