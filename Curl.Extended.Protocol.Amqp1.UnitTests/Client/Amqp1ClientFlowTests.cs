@@ -132,6 +132,30 @@ public sealed class Amqp1ClientFlowTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ClosingDetachWithErrorAfterAttach_AnswersWithAClosingDetachAndReportsTheError_Part2Section2_6_5()
+    {
+        ScriptedAmqp1Connection connection = new([.. Authenticated, .. Opened(true), .. Detach(Error(new Amqp1Symbol("amqp:unauthorized-access"), "no"))]);
+
+        var failure = await RunAsync(connection, new MemoryStream(), "hi");
+
+        Assert.AreEqual("AMQP 1.0 detach error: amqp:unauthorized-access: no", failure!.Message);
+        Assert.AreEqual("header,sasl-init,header,open,begin,attach,detach", Names(connection));
+        Assert.IsTrue(true.Equals(Written(connection)[^1].Performative!["closed"]));
+        Assert.IsNull(Written(connection)[^1].Performative!["error"]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ClosingDetachWithoutErrorAfterAttach_AnswersWithAClosingDetachAndEndsWithWeirdServerReply_Part2Section2_6_5()
+    {
+        ScriptedAmqp1Connection connection = new([.. Authenticated, .. Opened(true), .. Detach()]);
+
+        var failure = await RunAsync(connection, new MemoryStream(), "hi");
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure!.ExitCode);
+        Assert.AreEqual("header,sasl-init,header,open,begin,attach,detach", Names(connection));
+    }
+
+    [TestMethod]
     public async Task RunAsync_CloseWithErrorAfterAttach_AnswersWithCloseAndReportsTheError_Part2Section2_4_3()
     {
         ScriptedAmqp1Connection connection = new([.. Authenticated, .. Opened(true), .. Close(Error(new Amqp1Symbol("amqp:internal-error"), "bye"))]);

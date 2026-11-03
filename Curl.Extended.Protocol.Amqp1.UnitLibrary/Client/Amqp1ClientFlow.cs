@@ -250,23 +250,40 @@ internal sealed class Amqp1ClientFlow(IConnection transport, Stream output, ITra
     /// <summary>
     /// The next performative of type <paramref name="expected"/>, passing over flow frames the flow does not wait for
     /// but keeping the link credit each grants.
-    /// A detach, end or close carrying an error, or any other performative, ends the transfer; a close the flow did
-    /// not ask for is first answered with a close (Part 2 section 2.4.3).
+    /// A detach, end or close carrying an error, or any other performative, ends the transfer; a close or detach the
+    /// flow did not ask for is first answered in kind.
     /// </summary>
     private async ValueTask<(Amqp1Composite Performative, ReadOnlyMemory<byte> Payload)> ReceiveAsync(Amqp1CompositeType expected)
     {
         while (true)
         {
             var (performative, payload) = await channel.ReceiveAsync().ConfigureAwait(false);
-            if (performative.Type == Amqp1CompositeType.Close && expected != Amqp1CompositeType.Close)
-            {
-                await channel.SendAsync(Frame(Amqp1CompositeType.Close)).ConfigureAwait(false);
-            }
-
+            await AnswerUnaskedEndingAsync(performative, expected).ConfigureAwait(false);
             if (IsAwaited(performative, expected))
             {
                 return (performative, payload);
             }
+        }
+    }
+
+    /// <summary>
+    /// Answers a close the flow did not ask for with a close (Part 2 section 2.4.3), and a detach it did not ask for
+    /// with a detach of the same closed flag (Part 2 sections 2.6.5 and 2.6.6), before the failure is reported.
+    /// </summary>
+    private async ValueTask AnswerUnaskedEndingAsync(Amqp1Composite performative, Amqp1CompositeType expected)
+    {
+        if (performative.Type == expected)
+        {
+            return;
+        }
+
+        if (performative.Type == Amqp1CompositeType.Close)
+        {
+            await channel.SendAsync(Frame(Amqp1CompositeType.Close)).ConfigureAwait(false);
+        }
+        else if (performative.Type == Amqp1CompositeType.Detach)
+        {
+            await channel.SendAsync(Frame(Amqp1CompositeType.Detach, ("handle", Handle), ("closed", performative["closed"]))).ConfigureAwait(false);
         }
     }
 
