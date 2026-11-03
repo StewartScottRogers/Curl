@@ -74,6 +74,20 @@ public sealed class Pop3ProtocolHandlerAdversarialTests
     }
 
     [TestMethod]
+    [DataRow("a b", "p", DisplayName = "user name with a space")]
+    [DataRow("u", "a b", DisplayName = "password with a space")]
+    public async Task ExecuteAsync_CredentialsWithSpace_LogsInWithTheSpaceSentVerbatim(string user, string password)
+    {
+        // A space (0x20) is the first byte curl 8.22.0 does not refuse as a control code (AF-0558).
+        string login = "USER " + user + "\r\nPASS " + password + "\r\n";
+        Pop3Run run = await RunAsync(Url, new NetworkCredential(user, password), null, "+OK POP3 ready\r\n", UserOnlyCapaReply, "+OK\r\n+OK\r\n", EmptyListing, Bye);
+
+        Diagnostics.Diff("sent", Capa + login + List + Quit, run.Sent);
+        Assert.AreEqual(Capa + login + List + Quit, run.Sent);
+        Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+    }
+
+    [TestMethod]
     [DataRow("0", DisplayName = "message 0")]
     [DataRow("-1", DisplayName = "message -1")]
     [DataRow("2147483647", DisplayName = "message int.MaxValue")]
