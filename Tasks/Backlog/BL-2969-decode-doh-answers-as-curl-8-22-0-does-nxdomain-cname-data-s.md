@@ -48,3 +48,4 @@ If this is too big for one run, split it: the TTL cap and NXDOMAIN code are smal
 - 2026-10-22: Backlog -> Deferred. Split for the cost cap into BL-3097 (decoder tests), BL-3098 (resolver trace and ADR) and BL-3099 (quality gates); code landed in 8677cc087 and BL-3011
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: bd93dc30 0841b2d7 2a446683.
+- 2026-11-02: Doing -> Backlog. Returned from Doing by an interactive session: lane 2 claimed it at 09:49 on 2026-11-02, its shift was restarted at 09:51 before work began, and no work for it exists (lane 2's worktree is clean, no factory/BL-2969-lane-* branch).
