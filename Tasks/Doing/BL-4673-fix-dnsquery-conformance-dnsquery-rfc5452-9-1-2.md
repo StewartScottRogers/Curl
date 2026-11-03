@@ -32,3 +32,4 @@ Found by BL-4515's case `DnsQueryMessageTests.ReplyWithAnotherQuestion_IsIgnored
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 084392de 605f83e1 914c30cc 7a88b852.
