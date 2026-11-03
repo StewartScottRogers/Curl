@@ -83,3 +83,4 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 5b728cab ae154384 295a60eb fb1c989b d8e3fb0e f055b099 17248609.
 - 2026-11-02: Doing -> Backlog. Waits on BL-4583: curl cannot complete a DTLS handshake with DtlsReferenceServer until its ClientKeyExchange fix lands
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 5b728cab ae154384 cd212654 fb1c989b d8e3fb0e f055b099 17248609.
