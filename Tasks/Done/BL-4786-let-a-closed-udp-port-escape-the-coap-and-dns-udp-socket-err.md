@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Coap.UnitLibrary/Client/CoapExchange.cs, Curl.Extended.Protocol.Coap.UnitTests/Client, Curl.Extended.Protocol.DnsQuery.UnitLibrary/Transport/Udp/DnsUdpTransport.cs, Curl.Extended.Protocol.DnsQuery.UnitTests/Transport/DnsUdpTransportTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4786 — Let a closed UDP port escape the CoAP and DNS UDP socket-error catches as exit 7
 
@@ -42,3 +42,4 @@ Decision: the catches filter `when (exception.GetType() == typeof(SocketExceptio
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 9099dbe7 0f270ae7 bb51a515 4cca8abe 3d836d5e.
+- 2026-11-03: Doing -> Done. CoAP and DNS UDP catches now only catch a plain SocketException; DatagramPortUnreachableException escapes for exit 7
