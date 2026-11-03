@@ -71,6 +71,16 @@ public sealed class GeneratedRequestTests
     }
 
     [TestMethod]
+    public void From_HLineStartingWithAColon_GivesNoField()
+    {
+        var http = new HttpRequestOptions { Headers = [":x"] };
+
+        var request = GeneratedRequest.From(Context(http: http));
+
+        Assert.IsEmpty(request.Headers);
+    }
+
+    [TestMethod]
     public void From_HGivesAField_ItReplacesTheOneCurlWouldAdd()
     {
         var http = new HttpRequestOptions { UserAgent = "agent", Body = new BytesBody("x"u8.ToArray(), "text/x"), Headers = ["user-agent: mine", "Content-Type:"] };
