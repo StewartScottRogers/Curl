@@ -102,6 +102,7 @@ public sealed class MultipartFormPartMappingTests
 
     [TestMethod]
     [DataRow(-1L, null)]
+    [DataRow(0L, 0L)]
     [DataRow(5L, 5L)]
     public void FromMimeBody_CallbackData_IsAReaderPartOverTheCallbackKeptInCallbackReads(long size, long? expectedLength)
     {

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-02
 ---
 # BL-4637 — Fix AF-0531: Surviving mutant: a zero-size callback MIME part can lose its known length without a test failing
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The fix is test-only: `MultipartFormPartMappingTests.FromMimeBody_CallbackData_IsAReaderPartOverTheCallbackKeptInCallbackReads` gains `[DataRow(0L, 0L)]`, so a zero-size `curl_mime_data_cb` part must keep its known length 0. No production code changed, so no Measure-CodeQuality run was needed.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the reproduction was checked by hand: with `ContentLengthOf`'s pattern changed to `{ Size: > 0 }` in the working tree, the test failed (expected 0, got null), so the mutant is killed; then the pattern went back to `>= 0`. The re-audit runs the tool itself.
+- `dotnet build` was clean, and the fast tests passed in all 115 test projects on Windows. The change is a platform-neutral DataRow.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-02: Doing -> Done. A zero-size callback MIME part's known length 0 is pinned by a test, killing AF-0531's mutant
