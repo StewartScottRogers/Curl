@@ -41,10 +41,14 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killed the mutant with two tests in `Curl.Engine.UnitTests/TransferProgressRecorderTests.cs`, `Constructor_WithOnlyALiveWriter_RedrawsTheStatusLineEachSecondWithNoData` and `Constructor_WithOnlyAProgressBar_RedrawsTheStatusLineEachSecondWithNoData`. Each runs on `ManualTimerTimeProvider`, whose timers fire, and checks that one second with no data draws one more status line (and, with a live writer, writes one more time).
+- The lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so I checked by hand: with line 174's `||` changed to `&&`, both new tests failed; with `||` put back, they passed. Production code is unchanged, so no quality run was needed.
+- `dotnet build` and the solution's fast tests pass on Windows. The tests read no file, path or OS text, so they do not depend on the platform.
 
 ## Log
 
