@@ -102,7 +102,8 @@ resends them on a timer that starts at 1 second and doubles up to 60 seconds on 
   repeats dropped); hands the chain to `ITlsProvider.VerifyServerCertificateChain` (a rejection fails with its exit
   code, 60 for an untrusted chain; `-k` accepts); checks the ECDHE signature with `DtlsServerKeyExchangeSignature`;
   sends ClientKeyExchange, ChangeCipherSpec and the protected Finished and checks the server's Finished over the
-  transcript of section 4.2.6. Each flight goes through `DtlsFlightRetransmitter`; every other failure is exit 35.
+  transcript of section 4.2.6. Each flight goes through `DtlsFlightRetransmitter`; a fatal alert from the server ends
+  the handshake at once, sending nothing more (section 4.2.7; a warning alert is ignored); every other failure is exit 35.
 - `DtlsClientSession` then sends and receives application data under epoch 1, dropping unprotected records,
   replays and records that fail their tag. `DtlsDatagramRecords` splits a datagram into records and a record into
   handshake fragments, dropping what does not parse.

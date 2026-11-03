@@ -247,9 +247,35 @@ public sealed class DtlsClientHandshakeTests
         using DtlsTestServer server = new(DtlsTestServerKeyKind.Ecdsa);
         DtlsTestServerChannel channel = new(server);
         channel.Deliver(Record(TlsContentType.Handshake, 1, new byte[24]));
-        channel.Deliver(Record(TlsContentType.Alert, 0, [2, 40]));
+        channel.Deliver(Record(TlsContentType.Alert, 1, [2, 40]));
         channel.Deliver(Record(TlsContentType.Handshake, 0, [1, 2, 3]));
         channel.Deliver([0x16, 0xFE]);
+
+        using DtlsClientSession session = await RunAsync(channel, insecure: true);
+
+        Assert.IsTrue(server.HandshakeComplete);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Rfc6347Section4_2_7_FatalAlertInPlaceOfTheHelloFlight_FailsWithExit35AndSendsNothingMore()
+    {
+        using DtlsTestServer server = new(DtlsTestServerKeyKind.Ecdsa);
+        DtlsTestServerChannel channel = new(server) { RewriteServerDatagram = _ => Record(TlsContentType.Alert, 0, [2, 40]) };
+
+        CoapException failure = await Assert.ThrowsExactlyAsync<CoapException>(async () => await RunAsync(channel, insecure: true));
+
+        Assert.AreEqual(CurlExitCode.SslConnectError, failure.ExitCode);
+        Assert.AreEqual("DTLS handshake failed: the server sent the fatal alert HandshakeFailure", failure.Message);
+        Assert.HasCount(1, channel.Sent);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Rfc5246Section7_2_WarningOrTruncatedAlert_IsIgnoredAndTheHandshakeCompletes()
+    {
+        using DtlsTestServer server = new(DtlsTestServerKeyKind.Ecdsa);
+        DtlsTestServerChannel channel = new(server);
+        channel.Deliver(Record(TlsContentType.Alert, 0, [1, 90]));
+        channel.Deliver(Record(TlsContentType.Alert, 0, [2]));
 
         using DtlsClientSession session = await RunAsync(channel, insecure: true);
 
