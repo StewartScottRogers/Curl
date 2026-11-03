@@ -35,3 +35,4 @@ Found by BL-4683: `DnsOverQuicCases.Quic_Query_IsPaddedWithTheEdnsPaddingOption`
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: af9ddcbf af7fc95c.
 - 2026-11-03: Doing -> Backlog. Needs Curl.Conformance.Extended.UnitTests/DnsQuery/Encrypted/DnsOverQuicCases.cs, which BL-4719 (Doing) holds; fix is written and waits in the stash
+- 2026-11-03: Backlog -> Doing. Criteria at claim: af9ddcbf af7fc95c.
