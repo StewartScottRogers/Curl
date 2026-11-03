@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4695 — Fix AF-0547: Lib1576_UploadsWithTheCustomMethod never checks the custom method, and checks the read callback only for null
 
@@ -52,3 +52,4 @@ Test now asserts the custom method "CURL" and that the read callback uploads Lib
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Lib1576 test asserts custom method and uploaded body
