@@ -3,8 +3,8 @@ id: AF-0556
 title: Lib566 RunAsync_TransferFails_WritesNothing never checks that nothing was written
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs:RunAsync_TransferFails_WritesNothing:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs -Patt
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
