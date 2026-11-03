@@ -4,7 +4,7 @@ using Curl.Api.EngineContracts.Share;
 
 namespace Curl.Conformance.LibTest.UnitTests;
 
-/// <summary>An <see cref="IShareHandle"/> that keeps its lock callbacks, answers <see cref="LockResult"/> and <see cref="CleanupResult"/>, and shares nothing.</summary>
+/// <summary>An <see cref="IShareHandle"/> that keeps its lock callbacks, answers <see cref="LockResult"/> and <see cref="CleanupResult"/>, and records in <see cref="Shared"/> each data kind asked to be shared, sharing nothing itself.</summary>
 internal sealed class FakeShareHandle : IShareHandle
 {
     public CurlShareCode LockResult { get; init; } = CurlShareCode.Ok;
@@ -17,7 +17,13 @@ internal sealed class FakeShareHandle : IShareHandle
 
     public CurlShareCode ShareResult { get; init; } = CurlShareCode.Ok;
 
-    public CurlShareCode Share(CurlLockData data) => ShareResult;
+    public List<CurlLockData> Shared { get; } = [];
+
+    public CurlShareCode Share(CurlLockData data)
+    {
+        Shared.Add(data);
+        return ShareResult;
+    }
 
     public CurlShareCode Unshare(CurlLockData data) => CurlShareCode.Ok;
 

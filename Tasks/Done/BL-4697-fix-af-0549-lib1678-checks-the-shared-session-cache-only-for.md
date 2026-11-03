@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4697 — Fix AF-0549: Lib1678 checks the shared session cache only for null
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Pipeline `feature` run as a direct test-only change: `FakeShareHandle` now records each `Share` call in `Shared`; Lib1678 asserts exactly `[SslSession]` was shared, and Lib1905 (the only other `Assert.IsNotNull(engine.LastShare)` in the file, which the reproduction's `-First 1` would otherwise hit next) asserts `[Cookie, Cookie]`, as its program shares cookies twice.
+- Reproduction now prints nothing. `dotnet build` clean; fast tests green (Curl.Conformance.LibTest.UnitTests 1189 passed). No production code changed, so no quality run. Platform-neutral: no path, OS error or certificate.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Lib1678 asserts the share shares SSL sessions only; Lib1905 asserts it shares cookies
