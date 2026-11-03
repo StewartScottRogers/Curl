@@ -8,7 +8,7 @@ depends-on: [BL-4147, BL-4354, BL-4357]
 touches: [Curl.Extension.WireGuard.UnitLibrary/IpStack/Udp, Curl.Extension.WireGuard.UnitTests/IpStack/Udp, Curl.Extension.WireGuard.UnitLibrary/Tunnel/WireGuardDatagramConnector.cs, Curl.Extension.WireGuard.UnitLibrary/Tunnel/WireGuardTunnelLifetime.cs, Curl.Extension.WireGuard.UnitLibrary/Tunnel/WireGuardConnector.cs, Curl.Extension.WireGuard.UnitLibrary/WireGuardConnectionHook.cs, Curl.Extension.WireGuard.UnitLibrary/CLAUDE.md, Curl.Extension.WireGuard.UnitTests/Tunnel, Curl.Extension.WireGuard.UnitTests/WireGuardConnectionHookTests.cs, Curl.Extension.WireGuard.UnitTests/Curl.Extension.WireGuard.UnitTests.csproj, Curl.Console/Curl.Console.csproj]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-11-02
 ---
 # BL-4355 — WireGuard extension: carry UDP inside the tunnel so HTTP/3 runs through --wireguard
 
@@ -22,10 +22,10 @@ BL-4147 (ADR-1159) carries TCP alone and replaces curl's datagram connector with
 
 ## Acceptance criteria
 
-- [ ] The hook's datagram connector opens a UDP channel inside the tunnel whose datagrams are sealed as transport data and checked against RFC 768 by unit tests with recorded bytes.
-- [ ] An HTTP/3 transfer's QUIC datagrams travel through the tunnel in a unit test with a fake peer.
-- [ ] The four quality gates hold by Measure-CodeQuality.ps1.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The hook's datagram connector opens a UDP channel inside the tunnel whose datagrams are sealed as transport data and checked against RFC 768 by unit tests with recorded bytes.
+- [x] An HTTP/3 transfer's QUIC datagrams travel through the tunnel in a unit test with a fake peer.
+- [x] The four quality gates hold by Measure-CodeQuality.ps1.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -33,6 +33,8 @@ BL-4147 (ADR-1159) carries TCP alone and replaces curl's datagram connector with
 - HTTP/3 wiring found: the HTTP handler calls `ConnectMultiplexedAsync` on the hook's `WireGuardConnector`, which refused QUIC. Decided (ADR-1162): it now hands QUIC to curl's connector (the hook passes it), whose QUIC dialer opens UDP through the hook's datagram connector (BL-4318) and so through the tunnel; unit tests in `WireGuardConnectionHookTests`.
 - Criterion 2 is left: the end-to-end test. Plan: in `Curl.Extension.WireGuard.UnitTests` (its csproj now references `Curl.Console` and `Curl.Conformance.Http3Server.UnitLibrary`; `Curl.Console.csproj` has `InternalsVisibleTo` for it), run `CurlComposition.CreateRunner(stdout, stderr, in, ITcpDialer, IDnsResolver, IDatagramConnector, parsesAsQuicBuild: true, ...)` with `["--wireguard","wg0.conf","--http3-only","-k","https://10.0.0.1/"]`, the connection hook activator `values => WireGuardExtension.Activate(values, _ => TunnelTestPeer.ConfigurationText(), peer, TimeProvider.System, RandomNumberGenerator.Create())` (check the dialing overload accepts hook activators; else use the catalogue), curl's datagram connector one that fails the test, and a relay: `TunnelTestPeer` (new `NextSentAsync(CancellationToken)`) opens each transport message, reads the UDP datagram and sends its payload to `UpstreamHttp3ServerFactory.Create(backend, new Http3ServerTlsSettings { CertificateChain = [cert.RawData], SigningKey = new EcdsaTlsSigningKey(key), QuicTransportParameters = Http3ServerConnection.DefaultTransportParameters.Encode() })`'s channel, sealing each reply back as UDP from 10.0.0.1:443; backend an `IConnector` answering `HTTP/1.1 200 OK`. That runner builds its QUIC dialer over `EngineDialing.DatagramConnector` without the hook, so BL-4357 must land first.
 - Then: update `Curl.Extension.WireGuard.UnitLibrary/CLAUDE.md` (UDP and QUIC, no longer "TCP only"), run Measure-CodeQuality.ps1 -Library Curl.Extension.WireGuard.UnitLibrary, the fast tests, and commit. Touches widened for the files above (no task in Doing on the shared branch held them).
+
+- 2026-11-02 run (lane 5): nothing left to do. The split parts are Done: BL-4371 (UDP in the tunnel, RFC 768 tests with recorded bytes, CLAUDE.md, its quality gates) and BL-4372 (`WireGuardHttp3EndToEndTests`, HTTP/3 through a fake peer, its quality gates). The stash a302cc62 is that same work, already landed through them, so none of it was carried over. Curl.Extension.WireGuard.UnitTests ran 338 passed, 0 failed on this branch. No code changed, so no quality run was needed; each part's own run met criterion 3.
 
 ## Log
 
@@ -42,3 +44,4 @@ BL-4147 (ADR-1159) carries TCP alone and replaces curl's datagram connector with
 - 2026-10-30: Backlog -> Deferred. Over its cost cap; split into BL-4371 (UDP in the tunnel) and BL-4372 (HTTP/3 end-to-end test)
 - 2026-11-02: Deferred -> Backlog. Stewart 2026-11-02: complete all existing tasks before the third-party handoff.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 954a2d25 6291ef19 62dbae4c 3d836d5e.
+- 2026-11-02: Doing -> Done. Its split parts BL-4371 and BL-4372 are Done; WireGuard tests 338 green
