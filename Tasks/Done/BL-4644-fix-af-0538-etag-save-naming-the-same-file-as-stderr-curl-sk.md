@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console]
+touches: [Curl.Console, Curl.Console.UnitTests/CurlCommandRunnerEtagTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-02
 ---
 # BL-4644 — Fix AF-0538: --etag-save naming the same file as --stderr: curl skips the transfer and exits 26, Curl sends the request and exits 0
 
@@ -41,12 +41,19 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: `CurlCommandRunner` keeps the full path of the open `--stderr` file; on Windows an `--etag-save` whose full path matches it (case-insensitive) takes the existing "Failed creating file for saving etags" skip path (exit 26, no request). Off Windows the transfer goes ahead, as a POSIX `fopen` of an already open file succeeds. `PhysicalFileSystem`'s write sharing is left alone because `%output{file}`, `-D` and the trace files depend on it. Decision recorded in ADR-1217.
+- Widened `touches` to `Curl.Console.UnitTests/CurlCommandRunnerEtagTests.cs` for the focused unit tests; no task in Doing on origin/work/dark-factory names it.
+- Measured 2026-11-02 with the finding's reproduction (Debug build of Curl.Console): curl and Curl both exit 26, request.bin is 0 bytes for both, and f.txt holds the same warning and `curl: no transfer performed` lines in both.
+- Measure-CodeQuality.ps1 -Library Curl.Console: 100% line, 100% branch, 0 failing members. The first run found PrepareEtagSaveFileAsync at complexity 12, so the open moved into CreateEtagSaveFileAsync.
+- Full fast tests: all 115 test projects passed. Curl.Console.UnitTests: 3132 passed, 33 skipped. The tests are platform-neutral (in-memory file system, `runsOnWindows` injected).
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-02: Doing -> Done. --etag-save naming the open --stderr file skips the transfer with exit 26 on Windows, as curl does
