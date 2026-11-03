@@ -10,7 +10,8 @@ namespace Curl.Extended.Protocol.S3.Client;
 /// <summary>
 /// Sends one S3 REST request per connection (ADR-1090): it adds <c>Host</c>, the session token and, with credentials, the
 /// SigV4 headers over the whole payload's SHA-256, and turns a response of 300 or above into a failure naming S3's
-/// <c>Error</c> code (Amazon S3 API reference, "Error responses").
+/// <c>Error</c> code (Amazon S3 API reference, "Error responses"), first writing the error body to the output under
+/// <c>--fail-with-body</c>.
 /// </summary>
 /// <param name="connector">Opens the connection to the endpoint.</param>
 /// <param name="context">The transfer, for its clock, proxy, events and cancellation.</param>
@@ -47,11 +48,24 @@ internal sealed class S3Client(IConnector connector, ITransferContext context, S
             S3HttpResponse response = await new S3HttpClientConnection(connection).SendAsync(request, context.CancellationToken);
             if (response.StatusCode >= 300)
             {
-                throw ErrorOf(response.StatusCode, await ReadTextAsync(response));
+                throw await FailureOfAsync(response);
             }
 
             return await readResponse(response);
         }
+    }
+
+    // --fail-with-body writes the error body to the output before the transfer fails, as curl's manual says ("--fail-with-body").
+    private async Task<S3TransferException> FailureOfAsync(S3HttpResponse response)
+    {
+        using MemoryStream body = new();
+        await response.Body.CopyToAsync(body, context.CancellationToken);
+        if (context.Http?.Fail == HttpFailMode.FailWithBody)
+        {
+            await context.Output.WriteAsync(body.GetBuffer().AsMemory(0, (int)body.Length), context.CancellationToken);
+        }
+
+        return ErrorOf(response.StatusCode, Encoding.UTF8.GetString(body.GetBuffer(), 0, (int)body.Length));
     }
 
     /// <summary>Reads a response body as UTF-8 text.</summary>

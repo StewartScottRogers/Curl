@@ -69,6 +69,34 @@ public sealed class S3ProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(HttpFailMode.FailWithBody, "<Error><Code>NoSuchKey</Code></Error>")]
+    [DataRow(HttpFailMode.Fail, "")]
+    [DataRow(HttpFailMode.None, "")]
+    public async Task ExecuteAsync_ErrorResponse_WritesTheErrorBodyOnlyUnderFailWithBody(HttpFailMode fail, string expectedOutput)
+    {
+        QueuedS3Connector connector = new("HTTP/1.1 404 Not Found\r\nContent-Length: 37\r\n\r\n<Error><Code>NoSuchKey</Code></Error>");
+        MemoryStream output = new();
+        TransferContext context = new() { Url = CurlUrl.Parse("s3://bucket/k"), Output = output, Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Fail = fail }, TimeProvider = new FixedTimeProvider() };
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(expectedOutput, Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Connect_HandsTheConnectorTheTransfersEventsAndLog()
+    {
+        QueuedS3Connector connector = new(QueuedS3Connector.Ok(string.Empty));
+        TransferContext context = new() { Url = CurlUrl.Parse("s3://bucket/k"), Output = new MemoryStream(), Events = new InfoLineStoppingTransferEvents(NoTransferEvents.Instance), TimeProvider = new FixedTimeProvider() };
+
+        await Handler(connector, Minio).ExecuteAsync(context);
+
+        Assert.AreSame(context.Events, connector.Targets[0].Events);
+        Assert.AreSame(context.DiagnosticLog, connector.Targets[0].DiagnosticLog);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ErrorResponseWithoutAnErrorBody_NamesOnlyTheStatus()
     {
         QueuedS3Connector connector = new("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n");
