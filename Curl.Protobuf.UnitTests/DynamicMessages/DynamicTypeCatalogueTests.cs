@@ -55,6 +55,18 @@ public sealed class DynamicTypeCatalogueTests
     }
 
     [TestMethod]
+    public void TryGetMessageType_KnownAndUnknownNames_ResolveOrReturnFalse()
+    {
+        Assert.IsTrue(Catalogue.TryGetMessageType("test.Outer", out var outer));
+        Assert.AreSame(Type("Outer"), outer);
+        Assert.AreSame(Catalogue, outer!.Catalogue);
+        Assert.AreSame(Catalogue, outer.FindField("inner")!.MessageType!.Catalogue);
+        Assert.IsFalse(Catalogue.TryGetMessageType("test.Nothing", out var nothing));
+        Assert.IsNull(nothing);
+        Assert.IsFalse(Catalogue.TryGetMessageType("test.Broken", out _));
+    }
+
+    [TestMethod]
     public void GetMessageType_FileWithNoPackage_ResolvesFromTheTopScope()
     {
         Assert.IsTrue(ProtoParser.TryParse("syntax = \"proto3\"; message A { B b = 1; } message B { }", out var file, out _));

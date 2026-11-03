@@ -1279,3 +1279,4 @@ Each option and the specific reason it lost.
 | [1229](ADR-1229-dns-over-https-queries-carry-dns-id-0.md) | DNS over HTTPS queries carry DNS ID 0 (BL-4688) | Accepted | 2026-11-03 |
 | [1230](ADR-1230-dns-over-tls-queries-carry-edns-padding.md) | DNS over TLS queries carry EDNS(0) Padding to a 128-octet block (BL-4689) | Accepted | 2026-11-03 |
 | [1231](ADR-1231-dns-over-https-prefers-http2-through-alpn.md) | DNS over HTTPS prefers HTTP/2 through ALPN (BL-4690) | Accepted | 2026-11-03 |
+| [1232](ADR-1232-protojson-any-resolves-its-type-in-the-catalogue.md) | ProtoJSON Any resolves its type URL in the message type's catalogue (BL-4720) | Accepted | 2026-11-03 |

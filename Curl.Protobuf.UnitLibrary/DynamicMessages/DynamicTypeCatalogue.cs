@@ -51,6 +51,24 @@ public sealed class DynamicTypeCatalogue
         }
     }
 
+    /// <summary>
+    /// The message type of this full name (a leading '.' allowed), or false and null when the
+    /// name, or a type one of its fields names, is not in the catalogue.
+    /// </summary>
+    public bool TryGetMessageType(string fullName, out DynamicMessageType? type)
+    {
+        try
+        {
+            type = GetMessageType(fullName);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            type = null;
+            return false;
+        }
+    }
+
     private DynamicMessageType GetOrCreateMessageType(string fullName)
     {
         var name = fullName.TrimStart('.');
@@ -61,7 +79,7 @@ public sealed class DynamicTypeCatalogue
 
         var descriptor = messages.GetValueOrDefault(name)
             ?? throw new ArgumentException($"No message is named {fullName}.", nameof(fullName));
-        var type = new DynamicMessageType(name, descriptor);
+        var type = new DynamicMessageType(name, descriptor, this);
         types[name] = type;
         createdTypeNames.Add(name);
         type.SetFields([.. descriptor.Fields.Select(field => ResolveField(name, field))]);
@@ -121,7 +139,7 @@ public sealed class DynamicTypeCatalogue
             [],
             [],
             []);
-        var type = new DynamicMessageType(entryName, entry);
+        var type = new DynamicMessageType(entryName, entry, this);
         type.SetFields([.. entry.Fields.Select(entryField => ResolveField(scope, entryField))]);
         return type;
     }

@@ -19,7 +19,8 @@ public static class ProtobufJsonFormatter
 {
     /// <summary>
     /// The message as JSON text, on one line or indented. Throws <see cref="FormatException" />
-    /// when a Timestamp or Duration field holds a value outside its type's range.
+    /// when a Timestamp or Duration field holds a value outside its type's range, or an Any's
+    /// type URL or value is not a message type of the catalogue and a message of it.
     /// </summary>
     public static string Format(DynamicMessage message, bool indented)
     {
@@ -36,6 +37,13 @@ public static class ProtobufJsonFormatter
     private static void WriteMessage(Utf8JsonWriter writer, DynamicMessage message)
     {
         writer.WriteStartObject();
+        WriteFields(writer, message);
+        writer.WriteEndObject();
+    }
+
+    /// <summary>Writes the message's fields as members of the object being written.</summary>
+    internal static void WriteFields(Utf8JsonWriter writer, DynamicMessage message)
+    {
         foreach (var field in message.Type.Fields)
         {
             if (message.FindValue(field.Number) is { } value && IsWritten(field, value))
@@ -44,8 +52,6 @@ public static class ProtobufJsonFormatter
                 WriteField(writer, field, value);
             }
         }
-
-        writer.WriteEndObject();
     }
 
     private static bool IsWritten(DynamicField field, object value) => value switch
@@ -115,8 +121,8 @@ public static class ProtobufJsonFormatter
         }
     }
 
-    // A well-known type in its own JSON form, or any other message as an object.
-    private static void WriteMessageValue(Utf8JsonWriter writer, DynamicMessage message)
+    /// <summary>A well-known type in its own JSON form, or any other message as an object.</summary>
+    internal static void WriteMessageValue(Utf8JsonWriter writer, DynamicMessage message)
     {
         if (ProtobufJsonTimeTypes.HasStringForm(message.Type))
         {
@@ -133,6 +139,10 @@ public static class ProtobufJsonFormatter
         else if (ProtobufJsonStructTypes.IsStructType(message.Type))
         {
             ProtobufJsonStructTypes.Write(writer, message);
+        }
+        else if (ProtobufJsonAny.IsAny(message.Type))
+        {
+            ProtobufJsonAny.Write(writer, message);
         }
         else
         {

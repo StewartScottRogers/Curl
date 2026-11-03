@@ -17,7 +17,7 @@ public static class ProtobufJsonConverter
     /// <summary>
     /// Converts the binary form of a message of this type to JSON; the JSON is null unless the
     /// error is <see cref="ProtobufJsonError.None" />. A Timestamp or Duration outside its type's
-    /// range has no JSON form and is <see cref="ProtobufJsonError.InvalidValue" />.
+    /// range, or an Any whose type URL names no type of the catalogue or whose value is not a message of that type, has no JSON form and is <see cref="ProtobufJsonError.InvalidValue" />.
     /// </summary>
     public static ProtobufJsonError TryConvertBinaryToJson(DynamicMessageType type, ReadOnlyMemory<byte> binary, bool indented, out string? json)
     {
@@ -45,7 +45,7 @@ public static class ProtobufJsonConverter
         }
         catch (FormatException)
         {
-            // A Timestamp or Duration outside its range has no JSON form.
+            // A Timestamp or Duration outside its range, or an Any that does not resolve, has no JSON form.
             json = null;
             return false;
         }
