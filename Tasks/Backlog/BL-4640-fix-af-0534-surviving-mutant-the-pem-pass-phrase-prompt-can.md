@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary/TerminalPemPassPhrasePrompt.cs]
 requirement: none
 created: 2026-11-03
 completed:

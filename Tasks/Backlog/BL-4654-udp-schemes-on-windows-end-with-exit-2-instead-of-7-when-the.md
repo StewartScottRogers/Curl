@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
+touches: [Curl.Networking.UnitLibrary/UdpChannelOpener.cs, Curl.Networking.UnitLibrary/UdpDatagramConnector.cs, Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs, Curl.Networking.UnitTests/UdpChannelOpenerTests.cs]
 requirement: none
 created: 2026-11-02
 completed:

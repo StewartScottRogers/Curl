@@ -24,11 +24,13 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 ## Acceptance criteria
 
-- [ ] The per-case or per-stand-in content of `Curl.Networking.UnitLibrary` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
-- [ ] After the waiting tasks' `touches` (BL-4514, BL-4515, BL-4516, BL-4639, BL-4640, BL-4654) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Networking.UnitLibrary`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The per-case or per-stand-in content of `Curl.Networking.UnitLibrary` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
+- [x] After the waiting tasks' `touches` (BL-4514, BL-4515, BL-4516, BL-4639, BL-4640, BL-4654) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Networking.UnitLibrary`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The library already holds one type per file (214 files), so no code moved. The two waiting tasks that really change it, BL-4640 and BL-4654, now name only their own files in `touches`; BL-4639 is no longer on the board. BL-4514 to BL-4516 name no Networking path (the hotspot report lists them anyway, likely a board quirk); `hotspots` now shows 5 per file including this task, 4 once it is Done.
 
 ## Log
 
