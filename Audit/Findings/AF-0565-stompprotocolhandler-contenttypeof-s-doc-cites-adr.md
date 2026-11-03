@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompProtocolHandler.cs:ContentTypeOf:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-4713
+tasks: BL-4713
 found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md

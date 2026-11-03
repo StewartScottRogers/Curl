@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Core.UnitTests/CoreParserAdversarialTests.cs:ByteRangeParser_PositionsAtTheLongLimit_NameARange:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-4698
+tasks: BL-4698
 found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md

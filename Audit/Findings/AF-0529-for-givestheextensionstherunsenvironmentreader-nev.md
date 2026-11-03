@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Extension.Composition.UnitTests/ExtensionProtocolHandlersTests.cs:For_GivesTheExtensionsTheRunsEnvironmentReader:name-lies
 reproduction: none
-task: BL-4635
-tasks: BL-4635
+task: BL-4691
+tasks: BL-4635, BL-4691
 found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md

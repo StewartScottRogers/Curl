@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-1216-webtransport-conformance-pins-wt-enabled-and-exit-56-on-server-close.md:KnownFailures-listing:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-4714
+tasks: BL-4714
 found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md

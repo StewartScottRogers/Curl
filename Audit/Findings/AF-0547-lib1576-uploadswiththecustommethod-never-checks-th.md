@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs:Lib1576_UploadsWithTheCustomMethodAndAnswersItsCode:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-4695
+tasks: BL-4695
 found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md

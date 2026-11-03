@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpConnectionReader.cs:ReadLineAsync-gt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpConnectionReader.cs:29:>
-task: none
-tasks:
+task: BL-4707
+tasks: BL-4707
 found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md

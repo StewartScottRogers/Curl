@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitLibrary/MultipartFormPartMapping.cs:RequestContentTypeOf-gt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/MultipartFormPartMapping.cs:66:>
-task: none
-tasks:
+task: BL-4708
+tasks: BL-4708
 found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md

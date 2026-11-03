@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitTests/ManagedEasyTransferTests.Sockets.cs:CreateDispatcher_SocketCallbackSet_BuildsTheDispatcherOverASocketCallbackPool:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-4700
+tasks: BL-4700
 found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md

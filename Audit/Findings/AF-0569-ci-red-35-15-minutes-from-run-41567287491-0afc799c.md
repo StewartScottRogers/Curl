@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:ci-run-41567287491:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-4717
+tasks: BL-4717
 found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md
