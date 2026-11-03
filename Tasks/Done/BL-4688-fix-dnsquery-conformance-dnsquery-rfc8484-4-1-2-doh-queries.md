@@ -29,7 +29,7 @@ Found by BL-4681: `DnsOverHttpsCases.Https_Query_CarriesDnsId0` (`DnsQuery:RFC84
 ## Notes
 
 - Touches widened with `Client/IDnsQueryTransport.cs`: the transport tells the handler which ID to use through a new default interface member, `QueriesWithMessageIdZero` (false by default, true for `DnsHttpsTransport`). No task in Doing on `origin/work/dark-factory` names that file.
-- First tried rewriting the ID inside the DoH transport, as DoQ does. Dropped it: `Https_DefaultPort443_PostsTheQueryAsAnApplicationDnsMessageBody` expects the written header to show the wire ID (`id: 0`). The handler now encodes ID 0 itself and keeps the answer's ID check. Recorded in ADR-1228.
+- First tried rewriting the ID inside the DoH transport, as DoQ does. Dropped it: `Https_DefaultPort443_PostsTheQueryAsAnApplicationDnsMessageBody` expects the written header to show the wire ID (`id: 0`). The handler now encodes ID 0 itself and keeps the answer's ID check. Recorded in ADR-1229.
 - Moved the ID choice and the answer-ID check out of `TransferAsync` (`MessageIdFor`, `RequireQueryId`) to keep its complexity under 10. `Measure-CodeQuality.ps1 -Library Curl.Extended.Protocol.DnsQuery.UnitLibrary`: 100% line and branch coverage, 0 failing members, worst CRAP 10.
 - Tests: `DnsQueryProtocolHandlerTests.ExecuteAsync_DnsTransportHttps_Rfc8484Section4_1_QueriesWithDnsId0AndAcceptsTheAnswersId0` and `DnsHttpsTransportTests.QueriesWithMessageIdZero_Rfc8484Section4_1_IsTrue`. DnsQuery.UnitTests 222 passed. Conformance.Extended.UnitTests 1698 passed, 1 skipped. Full solution build with -warnaserror is clean and the fast tests are green. The change is platform-neutral: no paths, OS errors or certificates.
 ## Log

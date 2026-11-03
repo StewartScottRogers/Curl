@@ -1,4 +1,4 @@
-# ADR-1228: DNS over HTTPS queries carry DNS ID 0
+# ADR-1229: DNS over HTTPS queries carry DNS ID 0
 
 - Status: Accepted
 - Date: 2026-11-03
