@@ -42,6 +42,8 @@ Select-String -Path Curl.Http3.UnitTests/Http3ClientSessionTests.cs -Pattern 'Th
 
 ## Re-audits
 
+- 2026-11-02 | 2026-11-02_1724.md | reproduces: no | Ran the reproduction: Select-String on Curl.Http3.UnitTests/Http3ClientSessionTests.cs matched line 47 'IOException thrown = await Assert.ThrowsExactlyAsync<IOException>(...)' and its context shows line 49 'Assert.AreSame(connection.BidirectionalOpenFailure, thrown);'. The test now checks that the exception is the connection's own IOException, not just its type.
+
 ## Log
 
 - 2026-11-02: filed proposed.

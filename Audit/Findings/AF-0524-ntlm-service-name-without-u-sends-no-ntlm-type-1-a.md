@@ -3,8 +3,8 @@ id: AF-0524
 title: --ntlm --service-name without -u sends no NTLM Type-1 Authorization where curl starts NTLM with the default Windows credentials
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-02_1724.md: the reproduction no longer reproduces.
 key: conformance:--service-name:ntlm-default-credentials:request
 reproduction: none
 task: BL-4460
@@ -13,9 +13,9 @@ found: 2026-11-01
 found-at: 379ec9aa19ade61c2ce4cb9ee9b729c5aa926fc5
 scorecard: 2026-11-01_1801.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-02
+closed-how: reliable-reaudit
+closed-by: 2026-11-02_1724.md
 ---
 # AF-0524 - --ntlm --service-name without -u sends no NTLM Type-1 Authorization where curl starts NTLM with the default Windows credentials
 
@@ -43,8 +43,10 @@ dotnet build Curl.Console -c Release -v q; & ./Record-CurlExchange.ps1 -Port 506
 ## Re-audits
 
 - 2026-11-02 | 2026-11-02_0645.md | reproduces: yes | Ran the reproduction as given, with the output folders in the scratch folder instead of $env:TEMP, against curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel. Select-String matched only the reference: sn-curl/request.bin:3 `Authorization: NTLM TlRMTVNTUAABAAAAB7IIogkACQA3AAAADwAPACgAAAAKAPRlAAAAD1NURVdBUlQtUk9HRVJTLVdPUktHUk9VUA==`. sn-cand/request.bin has no Authorization: NTLM line. Both exited 0.
+- 2026-11-02 | 2026-11-02_1724.md | reproduces: no | Ran the reproduction's two Record-CurlExchange.ps1 commands on port 50613 against the Release curl.exe built from this tree (the build step was skipped because the binary was already built from this tree). Select-String matched '^Authorization: NTLM' in both request.bin files, with the identical header 'Authorization: NTLM TlRMTVNTUAABAAAAB7IIogkACQA3AAAADwAPACgAAAAKAPRlAAAAD1NURVdBUlQtUk9HRVJTLVdPUktHUk9VUA=='. Both exited 0. Reference: curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel.
 
 ## Log
 
 - 2026-11-01: filed proposed.
 - 2026-11-02: proposed -> accepted.
+- 2026-11-02: accepted -> closed. Re-audit 2026-11-02_1724.md: the reproduction no longer reproduces.
