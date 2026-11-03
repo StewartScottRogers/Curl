@@ -41,3 +41,4 @@ Follow `Documentation/Conformance/Extended/README.md` (harness: `ExtendedConform
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 9b3ce63c e91ad7dd f3c72898 738dab01 d8e3fb0e 929e00c1 ef6c9026.
