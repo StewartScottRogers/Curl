@@ -32,7 +32,7 @@ Split from BL-4613 (the broker schemes' part of BL-4496, the transfer surface fo
 ## Notes
 
 - Plan: shared checks `KafkaTransferChecks` (one instance per scheme) and one case file per scheme, `KafkaTransferSurfaceCases` (kafka, port 9092, IDs `-1`) and `KafkasTransferSurfaceCases` (kafkas, port 9093 over `ReferenceRoute.Tls` with `-k`, IDs `-2`), against `KafkaReferenceBroker` with one broker leading partition 0 of `orders` (records `a`, `b`); `-m` on `KafkaTransferClock`, copied from `Realtime/RealtimeTransferClock.cs`, with a private never-answering broker.
-- Decision (ADR-1217): the Kafka extension maps no broker error to exit 22 (ADR-1076: exit 8), so the `--fail`/`--fail-with-body` cases pin exit 8 and the OFFSET_OUT_OF_RANGE message under either option.
+- Decision (ADR-1218): the Kafka extension maps no broker error to exit 22 (ADR-1076: exit 8), so the `--fail`/`--fail-with-body` cases pin exit 8 and the OFFSET_OUT_OF_RANGE message under either option.
 - All 14 cases passed on the first run: no gap, nothing added to `KnownFailures.txt`, no fix task filed. `Curl.Conformance.Extended.UnitLibrary` is unchanged, so no quality run was needed.
 - Platform: the TLS line check takes the Schannel line on Windows and the OpenSSL line elsewhere, the file checks use a temporary directory and `Path.Combine`; nothing else depends on the platform, so CI on Linux and macOS stays green with the fast tests green here.
 

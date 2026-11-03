@@ -10,7 +10,7 @@ namespace Curl.Conformance.Extended.UnitTests.CurlSurface.Transfer.Brokers.Kafka
 /// <summary>
 /// curl's generic transfer options checked for <c>kafka://</c> or <c>kafkas://</c>, each against curl's manual page for
 /// curl 8.22.0 (curl.se/docs/manpage.html: "-v", "-o", "-O", "-w", "--fail", "--fail-with-body", "-m" and "EXIT
-/// CODES") and the extension's ADRs (ADR-1076, ADR-1080, ADR-1217), run in process through the harness against
+/// CODES") and the extension's ADRs (ADR-1076, ADR-1080, ADR-1218), run in process through the harness against
 /// <see cref="KafkaReferenceBroker" /> on a clock that moves only when a check advances it.
 /// </summary>
 /// <param name="scheme">The URL scheme, <c>kafka</c> or <c>kafkas</c>.</param>
@@ -103,7 +103,7 @@ internal sealed class KafkaTransferChecks(string scheme, int port, int idNumber)
 
     /// <summary>
     /// --fail and --fail-with-body: the extension maps no broker error to exit 22, so a broker's OFFSET_OUT_OF_RANGE ends
-    /// the transfer with exit 8 and its message under either option, as without it (ADR-1076, ADR-1217; manual,
+    /// the transfer with exit 8 and its message under either option, as without it (ADR-1076, ADR-1218; manual,
     /// "--fail": HTTP response codes only, "EXIT CODES" 8).
     /// </summary>
     public Task FailAsync(string option, string requirementOption) =>
@@ -115,7 +115,7 @@ internal sealed class KafkaTransferChecks(string scheme, int port, int idNumber)
                 new KafkaTransferClock());
 
             Assert.AreEqual(8, result.ExitCode, Text(result.StandardError));
-            Assert.AreEqual($"curl: (8) {FailureMessage}\n", Text(result.StandardError), "ADR-1217; manual, EXIT CODES 8");
+            Assert.AreEqual($"curl: (8) {FailureMessage}\n", Text(result.StandardError), "ADR-1218; manual, EXIT CODES 8");
             Assert.AreEqual($"8:{FailureMessage}", Text(result.StandardOutput), "manual, -w %{exitcode} and %{errormsg}");
         });
 

@@ -4,7 +4,7 @@ namespace Curl.Conformance.Extended.UnitTests.CurlSurface.Transfer.Brokers.Kafka
 
 /// <summary>
 /// curl's transfer options for <c>kafka://</c> (ADR-1076): consuming partition 0 to its high watermark, and a broker's
-/// OFFSET_OUT_OF_RANGE ending the transfer with exit 8 under <c>--fail</c> and <c>--fail-with-body</c> (ADR-1217).
+/// OFFSET_OUT_OF_RANGE ending the transfer with exit 8 under <c>--fail</c> and <c>--fail-with-body</c> (ADR-1218).
 /// </summary>
 [TestClass]
 public sealed class KafkaTransferSurfaceCases

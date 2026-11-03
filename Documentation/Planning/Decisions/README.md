@@ -1265,4 +1265,4 @@ Each option and the specific reason it lost.
 | [1215](ADR-1215-realtime-transfer-surface-pins-in-band-errors-as-exit-22-under-fail.md) | The realtime transfer surface pins in-band errors as exit 22 under `--fail`, and `webtransport` waits for its reference server (BL-4616) | Accepted | 2026-11-02 |
 | [1216](ADR-1216-webtransport-conformance-pins-wt-enabled-and-exit-56-on-server-close.md) | WebTransport conformance pins SETTINGS_WT_ENABLED and exit 56 on a server's WT_CLOSE_SESSION (BL-4608) | Accepted | 2026-11-02 |
 | [1217](ADR-1217-url-errors-pin-curls-http-text-for-every-extended-scheme.md) | URL errors pin curl's `http://` text for every extended scheme (BL-4612) | Accepted | 2026-11-02 |
-| [1217](ADR-1217-kafka-transfer-surface-pins-broker-errors-as-exit-8-under-fail.md) | The Kafka transfer surface pins broker errors as exit 8 under `--fail` (BL-4630) | Accepted | 2026-11-02 |
+| [1218](ADR-1218-kafka-transfer-surface-pins-broker-errors-as-exit-8-under-fail.md) | The Kafka transfer surface pins broker errors as exit 8 under `--fail` (BL-4630) | Accepted | 2026-11-02 |

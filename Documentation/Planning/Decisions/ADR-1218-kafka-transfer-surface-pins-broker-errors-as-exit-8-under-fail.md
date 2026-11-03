@@ -1,4 +1,4 @@
-# ADR-1217: The Kafka transfer surface pins broker errors as exit 8 under `--fail`
+# ADR-1218: The Kafka transfer surface pins broker errors as exit 8 under `--fail`
 
 - Status: Accepted
 - Date: 2026-11-02
