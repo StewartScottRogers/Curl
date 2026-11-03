@@ -42,8 +42,8 @@ Follow `Documentation/Conformance/Extended/README.md` and ADR-1186/ADR-1188: the
 - Link behaviours (`AcceptingLink`, `ClosingLink`) live in the case files as nested classes, so nothing was added to
   `Harness/` and the container stays generic.
 - Measured: 5 of 8 new cases pass; 3 fail on client defects in `Amqp1ClientFlow.cs`, listed in `KnownFailures.txt`
-  with filed High tasks: BL-4583 (Amqp1:Core-2.4.5-1, no empty frames within the peer's idle-time-out), BL-4584
-  (Amqp1:Core-2.4.3-2, no answering close), BL-4585 (Amqp1:Core-2.6.5-1, no answering detach).
+  with filed High tasks: BL-4586 (Amqp1:Core-2.4.5-1, no empty frames within the peer's idle-time-out), BL-4587
+  (Amqp1:Core-2.4.3-2, no answering close), BL-4588 (Amqp1:Core-2.6.5-1, no answering detach).
 - `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary`: 0 failing members.
 - `dotnet build Curl.slnx -warnaserror` clean, fast tests green (Curl.Conformance.Extended.UnitTests 534 passed).
 - Platform-neutral: the cases use no paths, certificates or OS text; error lines end with `Environment.NewLine`; the
@@ -53,4 +53,4 @@ Follow `Documentation/Conformance/Extended/README.md` and ADR-1186/ADR-1188: the
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: b448894b 45bfdece 208eae6e 9fbc674d d8e3fb0e ef6c9026.
-- 2026-11-02: Doing -> Done. Amqp1 conformance measures framing, max-frame-size, empty frames, idle timeout, open/begin/attach/detach/end/close order and close/detach errors; 3 client gaps filed as BL-4583..BL-4585
+- 2026-11-02: Doing -> Done. Amqp1 conformance measures framing, max-frame-size, empty frames, idle timeout, open/begin/attach/detach/end/close order and close/detach errors; 3 client gaps filed as BL-4586..BL-4588

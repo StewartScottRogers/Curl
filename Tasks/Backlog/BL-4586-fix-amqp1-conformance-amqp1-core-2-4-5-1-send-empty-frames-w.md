@@ -1,5 +1,5 @@
 ---
-id: BL-4583
+id: BL-4586
 title: Fix Amqp1 conformance: Amqp1:Core-2.4.5-1 send empty frames within the peer's idle-time-out
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4583 — Fix Amqp1 conformance: Amqp1:Core-2.4.5-1 send empty frames within the peer's idle-time-out
+# BL-4586 — Fix Amqp1 conformance: Amqp1:Core-2.4.5-1 send empty frames within the peer's idle-time-out
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-4585
+id: BL-4588
 title: Fix Amqp1 conformance: Amqp1:Core-2.6.5-1 answer a peer's closing detach with detach
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4585 — Fix Amqp1 conformance: Amqp1:Core-2.6.5-1 answer a peer's closing detach with detach
+# BL-4588 — Fix Amqp1 conformance: Amqp1:Core-2.6.5-1 answer a peer's closing detach with detach
 
 ## Goal
 

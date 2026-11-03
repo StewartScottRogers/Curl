@@ -1,5 +1,5 @@
 ---
-id: BL-4584
+id: BL-4587
 title: Fix Amqp1 conformance: Amqp1:Core-2.4.3-2 answer a peer's close with close
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4584 — Fix Amqp1 conformance: Amqp1:Core-2.4.3-2 answer a peer's close with close
+# BL-4587 — Fix Amqp1 conformance: Amqp1:Core-2.4.3-2 answer a peer's close with close
 
 ## Goal
 
