@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.CodeGeneration.UnitLibrary]
+touches: [Curl.Extension.CodeGeneration.UnitLibrary, Curl.Extension.CodeGeneration.UnitTests/PowerShellScriptTests.cs]
 requirement: none
 created: 2026-11-03
 completed:
@@ -41,10 +41,14 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added Curl.Extension.CodeGeneration.UnitTests/PowerShellScriptTests.cs to touches: the test that kills the mutant belongs there, and no task in Doing on origin/work/dark-factory names it.
+- Fix: For_FollowingRedirects_SetsMaximumRedirection now also pins `-L --max-redirs 0` (FollowRedirects true, MaxRedirects 0) to ` -MaximumRedirection 0 `, which the `<= 0` mutant would write as 2147483647. No production change. A lane may not run the audit office's mutation tool, so the reproduction was checked by applying the `<= 0` mutation by hand: the test failed under it and passes without it.
+- Resumed run: the earlier run was cut off with the hand-applied `<= 0` mutant still in PowerShellScript.cs; it was reverted, so production code is unchanged. dotnet build clean, fast tests green (0 failed). No production change, so no Measure-CodeQuality run was needed.
 
 ## Log
 
