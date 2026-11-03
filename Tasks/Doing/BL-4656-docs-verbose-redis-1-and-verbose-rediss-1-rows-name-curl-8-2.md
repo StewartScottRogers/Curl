@@ -30,3 +30,4 @@ BL-4651 measured real curl 8.22.0 (`Record-CurlExchange.ps1`, `-sv http://localh
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: a063ab12 e3a4fd8b.
