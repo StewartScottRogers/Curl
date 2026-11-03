@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4605 — Fix CI failure GoAway_LastStreamBeforeTheCall_FailsTheCallAsUnavailable on Linux and macOS
 
@@ -26,11 +26,16 @@ Lanes test only on Windows, so reproduce with `gh run view 41567287491 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `GoAway_LastStreamBeforeTheCall_FailsTheCallAsUnavailable` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `GoAway_LastStreamBeforeTheCall_FailsTheCallAsUnavailable` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+- The failure was not a platform problem. It also failed on windows-latest in run 41567287491. The test threw KnownFailurePassedException because `Grpc:Http2-GoAway-1` (and `Grpc:Http2-Errors-1`) now pass, but their KnownFailures.txt lines were still there at 0afc799c.
+- 8fa866b82 (BL-4594), which comes after 0afc799c, already removed both lines, so no code change is needed. Locally, Curl.Conformance.Extended.UnitTests passes 778/778, including all 67 Grpc cases.
+- CI criterion: the fix touches no platform-dependent behaviour (it only deletes lines from a data file), and the fast tests pass here; the shift's CI watch files a task for any further failure.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 20bd686e.
+- 2026-11-02: Doing -> Done. GoAway_LastStreamBeforeTheCall passes: 8fa866b82 (BL-4594) already dropped the stale Grpc known-failure lines
