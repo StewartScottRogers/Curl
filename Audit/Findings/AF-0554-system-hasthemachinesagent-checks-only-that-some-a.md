@@ -3,8 +3,8 @@ id: AF-0554
 title: System_HasTheMachinesAgent checks only that some agent connector exists
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Extension.SshJump.UnitTests/SshJumpServicesTests.cs:System_HasTheMachinesAgent:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Extension.SshJump.UnitTests/SshJumpServicesTests.cs -Pa
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
