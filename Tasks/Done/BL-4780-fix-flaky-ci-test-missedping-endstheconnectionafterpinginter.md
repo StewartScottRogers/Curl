@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests/SocketIo/SocketIoEngineIoCases.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4780 — Fix flaky CI test MissedPing_EndsTheConnectionAfterPingIntervalPlusPingTimeoutOnTheInjectedClock
 
@@ -22,12 +22,15 @@ Found by BL-4755's run on 2026-11-03: in `dotnet test --filter "TestCategory!=In
 
 ## Acceptance criteria
 
-- [ ] The test waits for the event it depends on (the ping wait armed, the connection ended) before it advances the clock or reads the result, with no wall-clock sleep.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The test waits for the event it depends on (the ping wait armed, the connection ended) before it advances the clock or reads the result, with no wall-clock sleep.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The client arms its heartbeat (`heartbeat.CancelAfter`) on the open packet, before it sends `40`, so the existing wait for the first client packet already means the ping wait is armed. The flake was the end: after 2.5 s on the injected clock the test gave the run only about 5 x 10 ms of wall time to finish once the heartbeat fired. The test now advances the clock 2000 ms (pingInterval + pingTimeout) in one step and awaits the run itself (`WaitAsync`, 30 s cap), with no wall-clock sleep. Build clean and the fast tests green (115 assemblies, 0 failed). Test-only change, so no quality run was needed.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 740dd9e0 9742157d.
+- 2026-11-03: Doing -> Done. Test advances the clock to the heartbeat timeout and awaits the run
