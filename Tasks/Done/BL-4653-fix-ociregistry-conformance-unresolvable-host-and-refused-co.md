@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.OciRegistry.UnitLibrary, Curl.Extended.Protocol.OciRegistry.UnitTests, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4653 — Fix OciRegistry conformance: unresolvable host and refused connection write curl's own error text
 
@@ -22,13 +22,17 @@ Found by BL-4612: the OCI extension wraps the engine's message, writing `curl: (
 
 ## Acceptance criteria
 
-- [ ] CurlSurface:unresolvable-host-oci-1 and CurlSurface:connection-refused-oci-1 pass and their KnownFailures.txt lines are removed.
-- [ ] A focused unit test in Curl.Extended.Protocol.OciRegistry.UnitTests pins the message (ADR-0482).
-- [ ] The library stays at 100% line and branch coverage, complexity at most 10; build clean and fast tests green.
+- [x] CurlSurface:unresolvable-host-oci-1 and CurlSurface:connection-refused-oci-1 pass and their KnownFailures.txt lines are removed.
+- [x] A focused unit test in Curl.Extended.Protocol.OciRegistry.UnitTests pins the message (ADR-0482).
+- [x] The library stays at 100% line and branch coverage, complexity at most 10; build clean and fast tests green.
 
 ## Notes
+
+- OciHttpClient now passes the connector's ErrorMessage through unchanged (the `ErrorMessage!` pattern AzureStorage, GCS and DnsQuery use: a failed ConnectResult always carries curl's text), so the host prints curl's own `Could not resolve host:` and `Failed to connect to ...` lines. No ADR: this is restoring curl's text, not a new decision.
+- Unit test SendAsync_ConnectorFails_ReturnsTheConnectorsExitCodeAndMessageUnwrapped pins it. Conformance.Extended: 1322 passed with both KnownFailures lines removed. Measure-CodeQuality (OciRegistry): 0 failing members. Full build clean; fast tests 115 projects passed, 0 failed. Change is platform-neutral (no paths or OS text).
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 7043b855 3434f389 e7091c96.
+- 2026-11-02: Doing -> Done. OCI unresolvable-host and refused-connection errors print curl's own text

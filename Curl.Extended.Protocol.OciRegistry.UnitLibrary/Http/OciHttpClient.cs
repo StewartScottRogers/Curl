@@ -46,7 +46,7 @@ public sealed class OciHttpClient(IConnector connector)
         var url = request.Url;
         var connect = await connector.ConnectAsync(new ConnectTarget(url.IdnHost, url.Port, url.Scheme == Uri.UriSchemeHttps), cancellationToken);
         await using var connection = connect.Connection
-            ?? throw new OciHttpException(OciHttpFailure.ConnectFailed, connect.ExitCode, $"Could not connect to {url.IdnHost}: {connect.ErrorMessage}");
+            ?? throw new OciHttpException(OciHttpFailure.ConnectFailed, connect.ExitCode, connect.ErrorMessage!);
         return await OciHttpExchange.ExchangeAsync(connection, request, cancellationToken);
     }
 }

@@ -202,15 +202,15 @@ public sealed class OciHttpClientTests
     }
 
     [TestMethod]
-    public async Task SendAsync_ConnectorFails_ReturnsTheConnectorsExitCode()
+    public async Task SendAsync_ConnectorFails_ReturnsTheConnectorsExitCodeAndMessageUnwrapped()
     {
-        var connector = new RecordedConnector(ConnectResult.Failed(CurlExitCode.CouldntConnect, "Connection refused"));
+        var connector = new RecordedConnector(ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect to registry.example.com port 443 after 0 ms: Could not connect to server"));
 
         var result = await new OciHttpClient(connector).SendAsync(GetManifest, CancellationToken.None);
 
         Assert.AreEqual(OciHttpFailure.ConnectFailed, result.Failure);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
-        Assert.AreEqual("Could not connect to registry.example.com: Connection refused", result.Message);
+        Assert.AreEqual("Failed to connect to registry.example.com port 443 after 0 ms: Could not connect to server", result.Message);
     }
 
     [TestMethod]
