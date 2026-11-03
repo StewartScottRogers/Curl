@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463]
 touches: [Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/Storage, Documentation/Conformance/Extended/CurlSurface-Transfer-Storage.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4615 — Conformance: curl's transfer options (-v, -o, -O, -w, --fail, -m) for the storage schemes az, abfs, gs, s3, oci
 
@@ -24,12 +24,12 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/CurlSurface-Transfer-Storage.md` lists, for each of `az`, `abfs`, `abfss`, `gs`, `s3`, `oci`, the checks `-v` (connection lines, and TLS lines for TLS schemes, on stderr, nothing extra on stdout), `-o file` in a temporary directory, `-O`, `-w` (`%{exitcode}`, `%{errormsg}`, `%{url}`, `%{url_effective}`, `%{scheme}`, `%{remote_ip}`, `%{remote_port}`, `%{size_download}`, `%{time_total}` on the injected clock), `--fail` and `--fail-with-body` (exit 22 where the library maps a server error to it) and `-m` (exit 28 at the deadline on the injected clock), each with a `CurlSurface:` ID mapped to a test or to `n/a: <reason>`, and the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/Storage/` run curl in process for every one of those schemes and assert stdout, stderr and exit code for each check, naming the expected value's manual-page or ADR source.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with the ID of its filed High `Fix <Name> conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no test needs `TestCategory=Integration`, opens a real socket or starts a real process.
-- [ ] `Curl.Conformance.Extended.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`), if this task changes it.
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] `Documentation/Conformance/Extended/CurlSurface-Transfer-Storage.md` lists, for each of `az`, `abfs`, `abfss`, `gs`, `s3`, `oci`, the checks `-v` (connection lines, and TLS lines for TLS schemes, on stderr, nothing extra on stdout), `-o file` in a temporary directory, `-O`, `-w` (`%{exitcode}`, `%{errormsg}`, `%{url}`, `%{url_effective}`, `%{scheme}`, `%{remote_ip}`, `%{remote_port}`, `%{size_download}`, `%{time_total}` on the injected clock), `--fail` and `--fail-with-body` (exit 22 where the library maps a server error to it) and `-m` (exit 28 at the deadline on the injected clock), each with a `CurlSurface:` ID mapped to a test or to `n/a: <reason>`, and the harness's matrix check passes.
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/Storage/` run curl in process for every one of those schemes and assert stdout, stderr and exit code for each check, naming the expected value's manual-page or ADR source.
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` with the ID of its filed High `Fix <Name> conformance: ...` task; the known-failures check passes.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no test needs `TestCategory=Integration`, opens a real socket or starts a real process.
+- [x] `Curl.Conformance.Extended.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`), if this task changes it.
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
@@ -37,3 +37,4 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: ec06ae24 3ee7022d fe617ef5 be674468 9438adeb ef6c9026.
+- 2026-11-02: Doing -> Done. Transfer options checked for every storage scheme; -v and --fail-with-body gaps filed as BL-4620 to BL-4623
