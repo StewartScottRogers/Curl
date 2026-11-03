@@ -42,6 +42,8 @@ Select-String -Path Curl.Extension.Composition.UnitTests/ExtensionProtocolHandle
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: yes | The test body is unchanged: 'Assert.HasCount(ExtensionCatalogue.Entries.Count, handlers); Assert.IsNull(Services.ReadEnvironmentVariable);'. It still never checks that the reader reaches the extensions. A separate test, For_HandsEachExtensionFactoryServicesCarryingTheGivenReader, now covers the behaviour, but this test's name still promises what its body does not check.
+
 ## Log
 
 - 2026-11-02: filed proposed.

@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: outcome survived at resolvedLine 44 ('Console.ReadKey(intercept: true)' -> 'Console.ReadKey(intercept: false)' for the first key); the baseline left out three failing ECH tests. Runner's targeted mutation rerun on the clean audited commit: survived.
+
 ## Log
 
 - 2026-11-02: filed proposed.

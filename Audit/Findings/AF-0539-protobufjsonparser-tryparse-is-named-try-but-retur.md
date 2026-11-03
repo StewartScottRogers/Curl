@@ -42,6 +42,8 @@ Select-String -Path Curl.Protobuf.UnitLibrary/Json/ProtobufJsonParser.cs -Patter
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: no | Ran the reproduction: Select-String found no 'public static \w+ TryParse(' line in Curl.Protobuf.UnitLibrary/Json/ProtobufJsonParser.cs.
+
 ## Log
 
 - 2026-11-02: filed proposed.

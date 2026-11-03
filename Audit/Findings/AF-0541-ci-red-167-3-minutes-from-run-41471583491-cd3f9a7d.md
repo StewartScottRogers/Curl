@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: yes | The given reproduction over the old logs still lists spell 41471583491 at 167.3 minutes (history). Run over this window, the same mechanism recurs: spell 41567287491 (2026-11-03T03:06:46Z to 03:41:55Z, 35.15 minutes) came entirely after fix 8fa866b82 (02:46:28Z, BL-4594). Ten runs in a row (41568356821 to 41571869140) were cancelled before 41572448811 went green, and the coordinator cancelled 41570033273 at 20:28:33 Arizona. Spell 41549222390 likewise stayed red 20 minutes after fix 844d53972 while 3 runs were cancelled.
+
 ## Log
 
 - 2026-11-02: filed proposed.
