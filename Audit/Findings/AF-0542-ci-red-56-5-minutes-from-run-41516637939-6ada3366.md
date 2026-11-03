@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: yes | Run over this window, the CI red rule is crossed again by an MQTT 5 conformance test failing on Linux and macOS. Spell 41560119555 (bcc7d1f5) lasted 34.63 minutes from 2026-11-03T01:43:57Z, caused by Mqtt5s_UntrustedCertificate_IsRefusedBeforeAnyMqttWithExit60; BL-4596 was filed at 18:46:45 Arizona and done at 19:02:41. The specific CONNECT and Frame_Malformed tests and the duplicate CI-fix tasks (BL-4547 requeue) did not recur, so a narrow reading would be false.
+
 ## Log
 
 - 2026-11-02: filed proposed.

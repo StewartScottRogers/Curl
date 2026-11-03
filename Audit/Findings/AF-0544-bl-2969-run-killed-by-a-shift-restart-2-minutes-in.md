@@ -3,8 +3,8 @@ id: AF-0544
 title: BL-2969 run killed by a shift restart 2 minutes in; the new shift gave it to the wrong lane and it stayed orphaned in Doing
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_0025.md: the reproduction no longer reproduces.
 key: process:logs:BL-2969:unfinished-run
 reproduction: none
 task: BL-4650
@@ -13,9 +13,9 @@ found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_0025.md
 ---
 # AF-0544 - BL-2969 run killed by a shift restart 2 minutes in; the new shift gave it to the wrong lane and it stayed orphaned in Doing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: no | This window holds one shift (174304) that finished 79 tasks, with no 'restarted' shift end. It adopted 11 stopped lanes 'work in place', each resuming its own task. unfinishedRuns is empty. BL-2969 was claimed by L8 at 18:13:58 and DONE at 20:05:05. The old orphan's after-effect still cost this window two refused shift starts (17:25:01 and 17:40:37 Arizona, about 18 minutes with alarms), but no run was killed or orphaned again.
+
 ## Log
 
 - 2026-11-02: filed proposed.
 - 2026-11-02: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_0025.md: the reproduction no longer reproduces.

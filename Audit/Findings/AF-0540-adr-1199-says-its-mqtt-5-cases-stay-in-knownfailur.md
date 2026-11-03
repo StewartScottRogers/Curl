@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.Extended.UnitTests/KnownFailures.txt -Patte
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: no | Ran the reproduction: no match. Curl.Conformance.Extended.UnitTests/KnownFailures.txt lists no MQTT case under any task (its 4 lines are BL-4621..BL-4623 CurlSurface cases), so the cases are no longer filed under BL-4573..BL-4575. The MQTT 5 fixes appear to have landed (Mqtt5PublishResponse.cs and Topic Alias handling exist in Curl.Extended.Protocol.Mqtt5.UnitLibrary). ADR-1199's 'stay ... until each fix lands' is conditional and no longer contradicted.
+
 ## Log
 
 - 2026-11-02: filed proposed.

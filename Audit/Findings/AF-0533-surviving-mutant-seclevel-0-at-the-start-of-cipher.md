@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs:LowersSecurityLevelToZero-ge:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs:201:>=
-task: BL-4639
-tasks: BL-4639
+task: BL-4692
+tasks: BL-4639, BL-4692
 found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md
@@ -41,6 +41,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 - Actual: survived
 
 ## Re-audits
+
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: outcome survived at resolvedLine 201 ('return at >= 0 && ...' -> 'return at > 0 && ...'); the baseline left out three failing ECH tests. Runner's targeted mutation rerun on the clean audited commit: survived.
 
 ## Log
 

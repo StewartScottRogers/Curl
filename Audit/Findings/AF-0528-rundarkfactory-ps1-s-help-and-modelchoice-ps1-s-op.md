@@ -3,8 +3,8 @@ id: AF-0528
 title: RunDarkFactory.ps1's help and ModelChoice.ps1's $OpusLibraries call their list the hand-built security and crypto libraries, but it omits Curl.Ssh.UnitLibrary, which holds SSH's key exchanges and ciphers
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_0025.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-02_1724.md, 2026-11-03_0025.md).
 key: truthfulness:RunDarkFactory.ps1:OpusLibraries:false-help
 reproduction: none
 task: BL-4512
@@ -13,9 +13,9 @@ found: 2026-11-02
 found-at: 4698726450f0ce3447bd6790d0bf9c59787bae95
 scorecard: 2026-11-02_0645.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: consecutive
+closed-by: 2026-11-02_1724.md, 2026-11-03_0025.md
 ---
 # AF-0528 - RunDarkFactory.ps1's help and ModelChoice.ps1's $OpusLibraries call their list the hand-built security and crypto libraries, but it omits Curl.Ssh.UnitLibrary, which holds SSH's key exchanges and ciphers
 
@@ -43,8 +43,10 @@ powershell -NoProfile -Command ". ./DarkFactory/ModelChoice.ps1; 'Curl.Ssh.UnitL
 ## Re-audits
 
 - 2026-11-02 | 2026-11-02_1724.md | reproduces: no | Ran the reproduction: it printed True. DarkFactory/ModelChoice.ps1:9 is now $OpusLibraries = 'Curl.Cryptography', 'Curl.Tls', 'Curl.Quic', 'Curl.Kerberos', 'Curl.Ntlm', 'Curl.Ssh', 'Curl.Original.Protocol.Ssh', so Curl.Ssh.UnitLibrary/KeyExchange/Curve25519SshKeyExchange.cs matches $OpusLibraryPattern. RunDarkFactory.ps1's help (lines 116-118) lists Curl.Ssh too.
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: no | Ran the reproduction: it printed True. DarkFactory/ModelChoice.ps1:9 now reads $OpusLibraries = 'Curl.Cryptography', 'Curl.Tls', 'Curl.Quic', 'Curl.Kerberos', 'Curl.Ntlm', 'Curl.Ssh', 'Curl.Original.Protocol.Ssh', so Curl.Ssh.UnitLibrary/KeyExchange/Curve25519SshKeyExchange.cs matches $OpusLibraryPattern.
 
 ## Log
 
 - 2026-11-02: filed proposed.
 - 2026-11-02: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_0025.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-02_1724.md, 2026-11-03_0025.md).

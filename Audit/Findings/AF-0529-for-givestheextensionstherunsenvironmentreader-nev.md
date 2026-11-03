@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Extension.Composition.UnitTests/ExtensionProtocolHandlersTests.cs:For_GivesTheExtensionsTheRunsEnvironmentReader:name-lies
 reproduction: none
-task: BL-4635
-tasks: BL-4635
+task: BL-4691
+tasks: BL-4635, BL-4691
 found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md
@@ -41,6 +41,8 @@ Select-String -Path Curl.Extension.Composition.UnitTests/ExtensionProtocolHandle
 - Actual: Only Assert.HasCount(ExtensionCatalogue.Entries.Count, handlers); and Assert.IsNull(Services.ReadEnvironmentVariable);
 
 ## Re-audits
+
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: yes | The test body is unchanged: 'Assert.HasCount(ExtensionCatalogue.Entries.Count, handlers); Assert.IsNull(Services.ReadEnvironmentVariable);'. It still never checks that the reader reaches the extensions. A separate test, For_HandsEachExtensionFactoryServicesCarryingTheGivenReader, now covers the behaviour, but this test's name still promises what its body does not check.
 
 ## Log
 

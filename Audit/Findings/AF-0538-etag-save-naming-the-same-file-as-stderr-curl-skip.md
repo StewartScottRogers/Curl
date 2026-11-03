@@ -3,8 +3,8 @@ id: AF-0538
 title: --etag-save naming the same file as --stderr: curl skips the transfer and exits 26, Curl sends the request and exits 0
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_0025.md: the reproduction no longer reproduces.
 key: conformance:Curl.Console/CurlCommandRunner.cs:--etag-save:exit-code
 reproduction: none
 task: BL-4644
@@ -13,9 +13,9 @@ found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_0025.md
 ---
 # AF-0538 - --etag-save naming the same file as --stderr: curl skips the transfer and exits 26, Curl sends the request and exits 0
 
@@ -42,7 +42,10 @@ New-Item -ItemType Directory -Force $env:TEMP/af-etag | Out-Null; $f = Join-Path
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_0025.md | reproduces: no | Ran the reproduction as given against curl 8.22.0 Schannel. Both curl and Curl exit 26 and send no request (request.bin is 0 bytes for both). Both write the same text to f.txt: 'Warning: Failed creating file for saving etags: "...\af-etag\f.txt". Skip this transfer' and then 'curl: no transfer performed'.
+
 ## Log
 
 - 2026-11-02: filed proposed.
 - 2026-11-02: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_0025.md: the reproduction no longer reproduces.
