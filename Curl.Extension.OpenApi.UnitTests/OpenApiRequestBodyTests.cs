@@ -64,10 +64,13 @@ public sealed class OpenApiRequestBodyTests
             new OpenApiRequestBody("multipart/form-data", Types).Arguments(Values(("a", "<x"))).ToArray());
 
     [TestMethod]
-    public void Arguments_UnsupportedMediaType_FailsWithExit2() =>
-        Assert.AreEqual(
-            "openapi: request body media type application/xml is not supported",
-            Assert.ThrowsExactly<ArgumentExpansionException>(() => new OpenApiRequestBody("application/xml", Types).Arguments(Values(("a", "1")))).Message);
+    public void Arguments_UnsupportedMediaType_FailsWithExit2()
+    {
+        ArgumentExpansionException failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => new OpenApiRequestBody("application/xml", Types).Arguments(Values(("a", "1"))));
+
+        Assert.AreEqual("openapi: request body media type application/xml is not supported", failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+    }
 
     private static OrderedDictionary<string, List<string>> Values(params (string Name, string Value)[] values)
     {
