@@ -33,6 +33,14 @@ command line and returns a `CurlRunResult`:
   among them; `TimeProvider.System` when not given. A test drives a timeout with a fake clock and no
   real wait: `ExtendedCurlRunTimeoutTests` runs `-m 100` against a server that never answers and gets
   exit 28 once it advances its clock.
+- A case whose command line runs an extension handler that starts a program (an `mcp+stdio://`
+  server, a `curl-proto-<scheme>` helper) passes a stand-in `IExtensionProcessStarter` through the
+  overload `RunAsync(curl, routes, arguments, processStarter, environment, timeProvider)`, whose
+  `curl` is an `InProcessCurlProcessRunner` - `Curl.Console`'s `InProcessCurl.RunAsync` overload that
+  takes the starter. Every program the handlers run is then started by the stand-in and looked for in
+  the environment its `ReadEnvironmentVariable` reads, so no real process starts (ADR-1200, BL-4577):
+  `ExtendedConformanceHarnessProcessTests` runs `mcp+stdio://localhost/server?a` and sees the stand-in
+  asked to start `server` with `a`.
 - The result holds the exit code, the standard output and standard error bytes and, per connection
   or datagram channel in the order curl opened them, a `WireExchange` with the bytes each side sent
   (on a TLS route, the plaintext behind the handshake).

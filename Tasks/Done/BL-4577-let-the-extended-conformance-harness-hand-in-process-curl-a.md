@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/InProcessCurl.cs, Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/InProcessCurlExtensionProcessTests.cs, Curl.Conformance.Extended.UnitLibrary/Harness/ExtendedConformanceHarness.cs, Curl.Conformance.Extended.UnitLibrary/Harness/InProcessCurlRunner.cs, Curl.Conformance.Extended.UnitLibrary/Harness/InProcessCurlProcessRunner.cs, Curl.Conformance.Extended.UnitTests/Harness/ExtendedConformanceHarnessProcessTests.cs, Documentation/Conformance/Extended/README.md]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4577 — Let the extended conformance harness hand in-process curl a stand-in extension process starter
 
@@ -36,20 +36,34 @@ stand-in's `ReadEnvironmentVariable`, as ADR-1184 says.
 
 ## Acceptance criteria
 
-- [ ] `InProcessCurl` has a public overload that takes an `IExtensionProcessStarter`, and a test in
+- [x] `InProcessCurl` has a public overload that takes an `IExtensionProcessStarter`, and a test in
       `Curl.Console.UnitTests` shows an `mcp+stdio://localhost/server?a` run through it starts `server` with `a`
       on the stand-in and starts no real process.
-- [ ] `ExtendedConformanceHarness.RunAsync` accepts an optional process starter and hands it to curl; a test in
+- [x] `ExtendedConformanceHarness.RunAsync` accepts an optional process starter and hands it to curl; a test in
       `Curl.Conformance.Extended.UnitTests/Harness/` shows it reaches the stand-in; every existing case file
       compiles unchanged.
-- [ ] `Documentation/Conformance/Extended/README.md` says how a case passes a stand-in process starter.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `Documentation/Conformance/Extended/README.md` says how a case passes a stand-in process starter.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; `Curl.Console` and the harness stay at 100% line and branch coverage, complexity at most 10 and CRAP
       at most 30 per method; no package added; tests platform-neutral.
 
 ## Notes
+- Decided (ADR-1200): a new public `InProcessCurl.RunAsync` overload takes an `IExtensionProcessStarter` after the
+  clock and reaches `CreateProtocolHandlers` through a new optional `extensionProcessStarter` on
+  `CurlComposition.CreateRunner` and `CreateDialingTransferDispatch`. I left the production `CreateTransferDispatch`
+  (line 950) alone, because the shipped curl keeps each extension's real starter. In the harness, a new delegate
+  `InProcessCurlProcessRunner` and an `ExtendedConformanceHarness.RunAsync` overload with the starter fourth make the
+  starter optional by overload choice, so every existing case file compiles unchanged. Both overloads share one
+  private body.
+- Tests: `InProcessCurlExtensionProcessTests` and `ExtendedConformanceHarnessProcessTests` run
+  `mcp+stdio://localhost/server?a`. The stand-in records `server` with `a` and refuses to start it, so no real
+  process starts. They are platform-neutral: no paths, and the error text comes from the stand-in.
+- Checked: `dotnet build Curl.slnx -warnaserror` is clean; 115 fast test assemblies passed and 0 failed;
+  `Measure-CodeQuality.ps1 -Library Curl.Console,Curl.Conformance.Extended.UnitLibrary` reports 0 failing members.
+  No package added. The CI criterion for Linux and macOS is met by keeping the change platform-neutral.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: cf4fd37d b5239a59 4b2811c8 e3597dcc.
+- 2026-11-02: Doing -> Done. In-process curl and the extended harness take a stand-in extension process starter
