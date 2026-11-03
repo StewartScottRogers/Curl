@@ -8,7 +8,7 @@ depends-on: [BL-3011, BL-3012]
 touches: [Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitLibrary/DnsAnswer.cs, Curl.Networking.UnitLibrary/DnsMessageFailure.cs, Curl.Networking.UnitLibrary/DnsMessageFailureText.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.AnswerDecoding.cs, Curl.Networking.UnitLibrary/DnsServerQuery.cs, Curl.Networking.UnitLibrary/DohDnsResolver.AnswerDecoding.cs, Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.AnswerDecoding.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-11-02
 ---
 # BL-2969 â€” Decode DoH answers as curl 8.22.0 does: NXDOMAIN, CNAME data skipped, TTL capped at 86400
 
@@ -28,9 +28,9 @@ If this is too big for one run, split it: the TTL cap and NXDOMAIN code are smal
 
 ## Acceptance criteria
 
-- [ ] `Curl.Networking.UnitTests` has focused tests that `DnsAnswerDecoder.Decode` gives `NxDomain` for RCODE 3, `None` for unit1650's self-pointing CNAME row, and a TTL of 86400 for an answer TTL above 86400.
-- [ ] The DoH resolver's exit code and `--trace-config doh` lines for an NXDOMAIN answer and a CNAME-only answer match curl 8.22.0 as measured, recorded in an ADR and pinned in `Curl.Networking.UnitTests`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Networking.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
+- [x] `Curl.Networking.UnitTests` has focused tests that `DnsAnswerDecoder.Decode` gives `NxDomain` for RCODE 3, `None` for unit1650's self-pointing CNAME row, and a TTL of 86400 for an answer TTL above 86400.
+- [x] The DoH resolver's exit code and `--trace-config doh` lines for an NXDOMAIN answer and a CNAME-only answer match curl 8.22.0 as measured, recorded in an ADR and pinned in `Curl.Networking.UnitTests`.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Networking.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
 
@@ -39,6 +39,8 @@ If this is too big for one run, split it: the TTL cap and NXDOMAIN code are smal
 - Split (as the Context allowed) after reading curl 8.22.0's `lib/vdns/doh.c`: besides the three decoder changes, 8.22.0 rewrote the A/AAAA `--trace-config doh` lines (`[DoH] [A] error decoding response: ...`, `DoH request complete, N to go`, no `hostname:`/`TTL:`/`CNAME:` entry). Skipping CNAME data and dropping `NoContent` changes that entry, so they go together with the new line form to BL-2970, which measures them with the local curl 8.22.0. This task did NXDOMAIN and the TTL cap.
 - Choice: `NxDomain` is appended at the end of `DnsMessageFailure`, so `DnsMessageFailureText`'s table stays indexed by value. Until BL-2970 the trace keeps 8.21.0's form with the new text: `[DNS] DoH: No such name type A for <host>` (ADR-0738).
 - `DnsServerQuery` (c-ares) reads RCODE itself before decoding, so it is unchanged.
+
+- 2026-11-02 lane 8: subtasks BL-3097, BL-3098 and BL-3099 are Done, so this claim only checked the criteria: the decoder tests (`Decode_AnNxdomainRcode_FailsWithNxDomain`, `Decode_UnitSixteenFiftysSelfPointingCname_DecodesAsNone`, `Decode_AnAnswerTtlAboveOneDay_IsCappedAtOneDay`) and resolver pins (`DohDnsResolverTraceTests.AnswerDecoding.cs`) exist, ADR-0738 records the measured lines and exit 6; `dotnet build Curl.slnx -warnaserror` clean, fast tests 115 projects 0 failed (Curl.Networking.UnitTests 3996 passed, 34 skipped), `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` 0 failing members. CI on Linux and macOS: no code changed in this run.
 
 ## Log
 
@@ -50,3 +52,4 @@ If this is too big for one run, split it: the TTL cap and NXDOMAIN code are smal
 - 2026-11-02: Backlog -> Doing. Criteria at claim: bd93dc30 0841b2d7 2a446683.
 - 2026-11-02: Doing -> Backlog. Returned from Doing by an interactive session: lane 2 claimed it at 09:49 on 2026-11-02, its shift was restarted at 09:51 before work began, and no work for it exists (lane 2's worktree is clean, no factory/BL-2969-lane-* branch).
 - 2026-11-02: Backlog -> Doing. Criteria at claim: bd93dc30 0841b2d7 2a446683.
+- 2026-11-02: Doing -> Done. DoH decoder gives NxDomain, skips CNAME data and caps TTLs at 86400 as curl 8.22.0 does, with resolver trace pins and ADR-0738
