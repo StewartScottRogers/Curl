@@ -3,8 +3,8 @@ id: AF-0529
 title: For_GivesTheExtensionsTheRunsEnvironmentReader never checks that the reader reaches the extensions
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Extension.Composition.UnitTests/ExtensionProtocolHandlersTests.cs:For_GivesTheExtensionsTheRunsEnvironmentReader:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Extension.Composition.UnitTests/ExtensionProtocolHandle
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
