@@ -31,3 +31,4 @@ Found by BL-4612: the OCI extension wraps the engine's message, writing `curl: (
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 7043b855 3434f389 e7091c96.
