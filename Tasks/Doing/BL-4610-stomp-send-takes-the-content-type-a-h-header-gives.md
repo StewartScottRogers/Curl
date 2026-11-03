@@ -31,3 +31,4 @@ ADR-1209 (BL-4609) gives every SEND `content-type:application/octet-stream` and 
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 9eb1466c 42b9926e e3a4fd8b.
