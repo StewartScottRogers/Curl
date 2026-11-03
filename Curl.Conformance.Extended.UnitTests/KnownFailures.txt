@@ -2,5 +2,3 @@
 # A listed case passes while it still fails and fails once it passes: then remove its line.
 # A listed ID that no test carries fails RequirementChecks. Lines merge by union, so add or remove only whole lines.
 CurlSurface:FailWithBody-Gs-1 BL-4621
-CurlSurface:Verbose-Oci-1 BL-4623
-CurlSurface:FailWithBody-Oci-1 BL-4623
