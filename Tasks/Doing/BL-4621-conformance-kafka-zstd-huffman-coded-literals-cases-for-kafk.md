@@ -34,3 +34,4 @@ Part of BL-4572's split. Add a Huffman encoder (RFC 8878 4.2) and a literals sec
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: afe1d32d 0fc765d5 914c30cc 8fea9d62.
