@@ -48,4 +48,4 @@ printed JSON with its whitespace removed.
 | Grpc:ProtoJson-Unknown-1 | SHOULD | The parser rejects unknown fields by default. | GrpcProtoJsonCases.Parse_UnknownField_IsRejectedBeforeTheCall |
 | Grpc:ProtoJson-Timestamp-1 | MUST | `google.protobuf.Timestamp` is an RFC 3339 string, emitted Z-normalized. | GrpcProtoJsonCases.RoundTrip_TimestampAndDuration_UseTheirStringForms |
 | Grpc:ProtoJson-Duration-1 | MUST | `google.protobuf.Duration` is a string of seconds ending in `s`, emitted with 0, 3, 6 or 9 fractional digits. | GrpcProtoJsonCases.RoundTrip_TimestampAndDuration_UseTheirStringForms |
-| Grpc:ProtoJson-WellKnown-1 | MUST | `Any`, `Struct`, `Value`, `ListValue`, `NullValue`, the wrapper types, `FieldMask` and `Empty` use their own JSON forms. | n/a: not measured here; BL-4676 adds their cases and replaces this row |
+| Grpc:ProtoJson-WellKnown-1 | MUST | `Any`, `Struct`, `Value`, `ListValue`, `NullValue`, the wrapper types, `FieldMask` and `Empty` use their own JSON forms. | n/a: not measured here; BL-4687 adds their cases and replaces this row |

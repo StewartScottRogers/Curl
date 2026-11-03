@@ -74,8 +74,8 @@ focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), the `Kn
 - Decision: the client speaks reflection v1 only (ADR-1149), so the v1alpha fallback row is n/a. The ProtoJSON guide
   states its rules descriptively; the matrix reads them as MUST and keeps SHOULD for "should reject unknown fields".
 - Measured: every case passes except Timestamp/Duration (curl exits 2: Curl.Protobuf has no well-known-type JSON
-  forms), listed in KnownFailures.txt with the filed High task BL-4675. The other well-known types (Any, Struct,
-  wrappers, FieldMask, Empty) are one n/a row pointing at BL-4676, filed to add their cases.
+  forms), listed in KnownFailures.txt with the filed High task BL-4686. The other well-known types (Any, Struct,
+  wrappers, FieldMask, Empty) are one n/a row pointing at BL-4687, filed to add their cases.
 - Checks: `dotnet build Curl.slnx -warnaserror` clean; fast tests green (Curl.Conformance.Extended.UnitTests 1562
   passed, 1 skipped; all 115 test assemblies passed); `Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary`:
   0 failing members. Tests are platform-neutral (no file paths; stdout compared with `\n`, stderr with
@@ -86,4 +86,4 @@ focused unit test in the library's `.UnitTests` pins the fix (ADR-0482), the `Kn
 
 - 2026-11-02: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: ffc6d5d0 0984e30a 2d0dc877 d8e3fb0e 5af3e2d0 ef6c9026.
-- 2026-11-03: Doing -> Done. grpc:// server reflection and the proto3 JSON mapping are measured by 10 cases against a reference reflection service; Grpc-Reflection.md maps every requirement; Timestamp/Duration listed for BL-4675
+- 2026-11-03: Doing -> Done. grpc:// server reflection and the proto3 JSON mapping are measured by 10 cases against a reference reflection service; Grpc-Reflection.md maps every requirement; Timestamp/Duration listed for BL-4686

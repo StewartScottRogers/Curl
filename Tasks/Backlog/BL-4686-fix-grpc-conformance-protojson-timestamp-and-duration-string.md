@@ -1,5 +1,5 @@
 ---
-id: BL-4675
+id: BL-4686
 title: Fix Grpc conformance: ProtoJSON Timestamp and Duration string forms (Grpc:ProtoJson-Timestamp-1, Grpc:ProtoJson-Duration-1)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4675 — Fix Grpc conformance: ProtoJSON Timestamp and Duration string forms (Grpc:ProtoJson-Timestamp-1, Grpc:ProtoJson-Duration-1)
+# BL-4686 — Fix Grpc conformance: ProtoJSON Timestamp and Duration string forms (Grpc:ProtoJson-Timestamp-1, Grpc:ProtoJson-Duration-1)
 
 ## Goal
 
