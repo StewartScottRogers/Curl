@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Composition.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4691 — Re-fix AF-0529: For_GivesTheExtensionsTheRunsEnvironmentReader never checks that the reader reaches the extensions
 
@@ -56,3 +56,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. For_GivesTheExtensionsTheRunsEnvironmentReader asserts the extensions' services carry the given reader
