@@ -1,5 +1,5 @@
 ---
-id: BL-4596
+id: BL-4599
 title: Fix SocketIo conformance: SocketIo:EIO-MaxPayload-1 send no packet over the handshake's maxPayload
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4596 — Fix SocketIo conformance: SocketIo:EIO-MaxPayload-1 send no packet over the handshake's maxPayload
+# BL-4599 — Fix SocketIo conformance: SocketIo:EIO-MaxPayload-1 send no packet over the handshake's maxPayload
 
 ## Goal
 

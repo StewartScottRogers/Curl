@@ -66,4 +66,4 @@ fixed here, but a defect in the extension library is listed in `KnownFailures.tx
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: c277b35d 2d3da0c3 c4413a47 d8e3fb0e fcb5b1c7 ef6c9026.
-- 2026-11-02: Doing -> Done. socketio:// and socketios:// measured against Engine.IO v4, Socket.IO v5 and RFC 6455 with a full matrix; three failures filed as BL-4595 to BL-4597
+- 2026-11-02: Doing -> Done. socketio:// and socketios:// measured against Engine.IO v4, Socket.IO v5 and RFC 6455 with a full matrix; three failures filed as BL-4598 to BL-4597

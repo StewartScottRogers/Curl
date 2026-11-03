@@ -1,5 +1,5 @@
 ---
-id: BL-4595
+id: BL-4598
 title: Fix SocketIo conformance: SocketIo:EIO-Heartbeat-2 end the session when no ping arrives within pingInterval + pingTimeout
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-02
 completed:
 ---
-# BL-4595 — Fix SocketIo conformance: SocketIo:EIO-Heartbeat-2 end the session when no ping arrives within pingInterval + pingTimeout
+# BL-4598 — Fix SocketIo conformance: SocketIo:EIO-Heartbeat-2 end the session when no ping arrives within pingInterval + pingTimeout
 
 ## Goal
 
