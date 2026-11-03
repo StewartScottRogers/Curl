@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams.md]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4664 — Split Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams.md so tasks touching it can run in parallel
 
@@ -36,3 +36,4 @@ Split by scheme family, as the Brokers pages are: `CurlSurface-Transfer-Messagin
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: efb1682a 3430a6d1 a0b49a29.
+- 2026-11-03: Doing -> Done. Split the page by scheme family into four pages and narrowed the waiting tasks; hotspots lists none.
