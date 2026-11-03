@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1224-closed-udp-port-is-exit-7.md:PortUnreachableReportingDatagramChannel:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-4777
+tasks: BL-4777
 found: 2026-11-03
 found-at: f4a738a932020f9832b23c0977dbaf0f27206871
 scorecard: 2026-11-03_1017.md

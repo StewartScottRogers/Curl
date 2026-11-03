@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs:AddGiven-gt:surviving-mutant
 reproduction: mutation Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs:134:>
-task: none
-tasks:
+task: BL-4760
+tasks: BL-4760
 found: 2026-11-03
 found-at: f4a738a932020f9832b23c0977dbaf0f27206871
 scorecard: 2026-11-03_1017.md

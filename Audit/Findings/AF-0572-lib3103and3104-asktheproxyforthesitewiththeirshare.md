@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib3101To5004Tests.cs:Lib3103And3104_AskTheProxyForTheSiteWithTheirSharedCookie:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-4736
+tasks: BL-4736
 found: 2026-11-03
 found-at: f4a738a932020f9832b23c0977dbaf0f27206871
 scorecard: 2026-11-03_1017.md

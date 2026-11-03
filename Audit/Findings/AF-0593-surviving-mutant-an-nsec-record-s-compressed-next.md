@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.Dane.UnitLibrary/Wire/DnsRecordDataDecoder.cs:DecodeNsec-false:surviving-mutant
 reproduction: mutation Curl.Extension.Dane.UnitLibrary/Wire/DnsRecordDataDecoder.cs:74:false
-task: none
-tasks:
+task: BL-4757
+tasks: BL-4757
 found: 2026-11-03
 found-at: f4a738a932020f9832b23c0977dbaf0f27206871
 scorecard: 2026-11-03_1017.md

@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OpenApi.UnitTests/OpenApiRequestBodyTests.cs:Arguments_UnsupportedMediaType_FailsWithExit2:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-4742
+tasks: BL-4742
 found: 2026-11-03
 found-at: f4a738a932020f9832b23c0977dbaf0f27206871
 scorecard: 2026-11-03_1017.md
