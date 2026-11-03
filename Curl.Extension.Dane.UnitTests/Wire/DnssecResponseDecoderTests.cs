@@ -282,6 +282,16 @@ public sealed class DnssecResponseDecoderTests
     }
 
     [TestMethod]
+    public void TryDecode_Rfc4034Section4_1_1_ACompressedNsecNextNameGivesFalse()
+    {
+        // The NSEC RDATA is read on its own, so a pointer counts from its first octet and must point backwards: a
+        // one-octet label holding 0x00, then a pointer to that octet, which reads as the root.
+        byte[] nsec = [0x01, 0x00, 0xC0, 0x01, .. NsecRdata[18..]];
+
+        Assert.IsFalse(DnssecResponseDecoder.TryDecode(Response(0x8180, [Record(PointerToExampleCom, DnssecRecordType.Nsec, nsec)], []), out _));
+    }
+
+    [TestMethod]
     [DataRow(new byte[] { 0x00, 0x00 }, DisplayName = "A bitmap length of 0")]
     [DataRow(new byte[] { 0x00, 0x21 }, DisplayName = "A bitmap length of 33")]
     public void TryDecode_Rfc4034Section4_1_2_ATypeBitMapLengthOutside1To32GivesFalse(byte[] window)
