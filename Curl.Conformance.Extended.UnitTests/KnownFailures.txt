@@ -2,4 +2,3 @@
 # A listed case passes while it still fails and fails once it passes: then remove its line.
 # A listed ID that no test carries fails RequirementChecks. Lines merge by union, so add or remove only whole lines.
 
-DnsQuery:RFC9250-4.1.1-2 BL-4723

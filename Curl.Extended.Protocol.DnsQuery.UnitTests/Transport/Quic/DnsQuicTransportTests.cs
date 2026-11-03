@@ -139,6 +139,19 @@ public sealed class DnsQuicTransportTests
     }
 
     [TestMethod]
+    public async Task ExchangeAsync_Rfc9250Section4_1_1_Port53_FailsWithExit7WithoutOpeningAChannel()
+    {
+        FakeDatagramConnector connector = new(null);
+
+        DnsQueryException failure = await Assert.ThrowsExactlyAsync<DnsQueryException>(async () =>
+            await new DnsQuicTransport(connector, new HandshakingTlsProvider()).ExchangeAsync("dns.example", 53, Query, ContextOf()));
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, failure.ExitCode);
+        Assert.AreEqual("DNS over QUIC must not use UDP port 53 (RFC 9250 section 4.1.1)", failure.Message);
+        Assert.IsEmpty(connector.Opens);
+    }
+
+    [TestMethod]
     public async Task ExchangeAsync_ChannelCannotBeOpened_FailsWithTheConnectorsExitCode()
     {
         FakeDatagramConnector connector = new(null);
