@@ -32,3 +32,4 @@ Found by BL-4491: `SignalRWebSocketCases.CallCompleted_ClosesTheWebSocketWithACl
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: 6b0d8889 95af5e93 d48c076d 724857c1.
