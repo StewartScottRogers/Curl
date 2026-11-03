@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.DnsQuery.UnitLibrary/Transport/Udp/DnsUdpTransport.cs, Curl.Extended.Protocol.DnsQuery.UnitTests/Transport/DnsUdpTransportTests.cs, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4673 — Fix DnsQuery conformance: DnsQuery:RFC5452-9.1-2
 
@@ -36,3 +36,4 @@ Found by BL-4515's case `DnsQueryMessageTests.ReplyWithAnotherQuestion_IsIgnored
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 084392de 605f83e1 914c30cc 7a88b852.
+- 2026-11-03: Doing -> Done. dns:// over UDP ignores a reply carrying another question and takes the matching one (RFC 5452 9.1)
