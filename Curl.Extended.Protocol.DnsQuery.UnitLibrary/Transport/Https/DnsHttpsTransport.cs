@@ -22,6 +22,9 @@ internal sealed class DnsHttpsTransport(IConnector connector, ITlsProvider tlsPr
     /// <summary>Gets true: a DoH query carries DNS ID 0 for cache friendliness (RFC 8484 section 4.1).</summary>
     public bool QueriesWithMessageIdZero => true;
 
+    /// <summary>The protocols the TLS handshake offers through ALPN: HTTP/2 first, RFC 8484 section 5.2's minimum recommended version, then HTTP/1.1 (BL-4690, ADR-1231).</summary>
+    public static IReadOnlyList<string> ApplicationProtocols { get; } = [DohHttp2Exchange.Protocol, "http/1.1"];
+
     /// <inheritdoc />
     public async ValueTask<byte[]> ExchangeAsync(string host, int port, byte[] query, ITransferContext context)
     {
@@ -31,7 +34,7 @@ internal sealed class DnsHttpsTransport(IConnector connector, ITlsProvider tlsPr
             throw new DnsQueryException(tcp.ExitCode, tcp.ErrorMessage!);
         }
 
-        ConnectResult tls = await tlsProvider.AuthenticateAsClientAsync(plaintext, host, context.CancellationToken).ConfigureAwait(false);
+        ConnectResult tls = await tlsProvider.AuthenticateAsClientAsync(plaintext, host, context.Events, ApplicationProtocols, context.CancellationToken).ConfigureAwait(false);
         if (tls.Connection is not { } secure)
         {
             await plaintext.DisposeAsync().ConfigureAwait(false);
@@ -40,6 +43,11 @@ internal sealed class DnsHttpsTransport(IConnector connector, ITlsProvider tlsPr
 
         await using (secure.ConfigureAwait(false))
         {
+            if (tls.ApplicationProtocol == DohHttp2Exchange.Protocol)
+            {
+                return await DohHttp2Exchange.ExchangeAsync(secure, host, port, query, context.CancellationToken).ConfigureAwait(false);
+            }
+
             await secure.WriteAsync(DohRequest.Encode(host, port, query), context.CancellationToken).ConfigureAwait(false);
             await secure.FlushAsync(context.CancellationToken).ConfigureAwait(false);
             return await DohResponseReader.ReadAnswerAsync(secure, context.CancellationToken).ConfigureAwait(false);

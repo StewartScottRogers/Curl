@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
+using Curl.Extended.Protocol.DnsQuery.Transport;
 using Curl.Extension.Abstractions;
 using Curl.Extension.Abstractions.Description;
 using Curl.Extension.Abstractions.Transfer;
-using Curl.Extended.Protocol.DnsQuery.Transport;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 

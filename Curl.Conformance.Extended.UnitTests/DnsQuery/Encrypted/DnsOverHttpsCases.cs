@@ -95,12 +95,22 @@ public sealed class DnsOverHttpsCases
     public Task Https_Request_IsSentOverHttp2() =>
         KnownFailures.RunCaseAsync(["DnsQuery:RFC8484-5.2-1"], async () =>
         {
-            DohReferenceServer server = new((_, _) => [new DnsReferenceReply { Answers = [DnsReferenceRecord.A(Name, 300, "192.0.2.1")] }]);
+            using X509Certificate2 certificate = ReferenceCertificate.CreateSelfSigned("localhost");
+            DohHttp2ReferenceServer server = new((_, _) => [new DnsReferenceReply { Answers = [DnsReferenceRecord.A(Name, 300, "192.0.2.1")] }], certificate);
 
-            CurlRunResult result = await RunAsync(server);
+            CurlRunResult result = await ExtendedConformanceHarness.RunAsync(
+                InProcessCurl.RunAsync,
+                [ReferenceRoute.Tcp(443, server)],
+                ["-sS", "-k", "--dns-transport", "https", Url]);
 
-            // RFC 9113 section 3.4: an HTTP/2 connection opens with the client's connection preface.
-            StringAssert.StartsWith(Encoding.ASCII.GetString(result.Exchanges.Single().ClientBytes), "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n");
+            // The server selects h2 through ALPN and reads only HTTP/2, so a request it received came after the client's
+            // connection preface (RFC 9113 section 3.4) as a POST on one stream.
+            Assert.AreEqual(0, result.ExitCode, Encoding.UTF8.GetString(result.StandardError));
+            Curl.Conformance.Extended.Grpc.GrpcReferenceCall request = server.Received.Single();
+            Assert.AreEqual("POST", request.Header(":method"));
+            Assert.AreEqual("/dns-query", request.Path);
+            Assert.AreEqual("application/dns-message", request.Header("content-type"));
+            StringAssert.Contains(Encoding.UTF8.GetString(result.StandardOutput), "192.0.2.1");
         });
 
     [TestMethod]

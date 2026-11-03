@@ -22,15 +22,23 @@ internal static class DohRequest
     /// <returns>The request's octets: its head, then the query.</returns>
     public static byte[] Encode(string host, int port, byte[] query)
     {
-        string authority = host.Contains(':') ? $"[{host}]" : host;
-        string hostHeader = port == DnsHttpsTransport.Port ? authority : $"{authority}:{port}";
         string head =
             $"POST {Path} HTTP/1.1\r\n" +
-            $"Host: {hostHeader}\r\n" +
+            $"Host: {AuthorityOf(host, port)}\r\n" +
             $"Accept: {MediaType}\r\n" +
             $"Content-Type: {MediaType}\r\n" +
             $"Content-Length: {query.Length}\r\n" +
             "Connection: close\r\n\r\n";
         return [.. Encoding.ASCII.GetBytes(head), .. query];
+    }
+
+    /// <summary>Gives the authority a request names the server by: its host, bracketed when IPv6, with the port unless it is 443.</summary>
+    /// <param name="host">The server's host, an IPv6 address without brackets.</param>
+    /// <param name="port">The server's port.</param>
+    /// <returns>The value of HTTP/1.1's <c>Host</c> header and HTTP/2's <c>:authority</c>.</returns>
+    public static string AuthorityOf(string host, int port)
+    {
+        string authority = host.Contains(':') ? $"[{host}]" : host;
+        return port == DnsHttpsTransport.Port ? authority : $"{authority}:{port}";
     }
 }
