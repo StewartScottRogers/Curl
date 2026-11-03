@@ -3,8 +3,8 @@ id: AF-0559
 title: Surviving mutant: an S3 response line of exactly MaxLineLength bytes can be refused as too long without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpConnectionReader.cs:ReadLineAsync-gt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpConnectionReader.cs:29:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
