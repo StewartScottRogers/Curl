@@ -32,3 +32,4 @@ behaviour is decided in ADR-1199. The change lands in `Curl.Extended.Protocol.Mq
 ## Log
 
 - 2026-11-02: Created by BL-4485.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: e66bc520 7b580d6c 73c2678e.
