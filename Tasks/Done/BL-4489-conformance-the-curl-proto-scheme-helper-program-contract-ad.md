@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463, BL-4
 touches: [Curl.Conformance.Extended.UnitLibrary/Plugin, Curl.Conformance.Extended.UnitTests/Plugin, Documentation/Conformance/Extended/Plugin.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4489 — Conformance: the curl-proto-<scheme> helper program contract (ADR-1142) for the Plugin extension
 
@@ -48,21 +48,21 @@ library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a 
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Plugin.md` gives every requirement of ADR-1142's Decision a `Plugin:` ID
+- [x] `Documentation/Conformance/Extended/Plugin.md` gives every requirement of ADR-1142's Decision a `Plugin:` ID
       mapped to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Plugin/` run curl in process against stand-in helpers and assert
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Plugin/` run curl in process against stand-in helpers and assert
       the program and argument started, the bytes written to the helper, stdout, stderr and exit code for at least:
       discovery and precedence, a `curl-proto-http` ignored, `CURL_EXTENSIONS=0` (exit 1), get and put with `-T` and
       `-d`, an unknown mandatory capability, a missing `get` or `put` capability, `error <message>` (exit 56), a bad
       reply and an early end (exit 8), CRLF lines, a 8193-byte line, a non-zero helper exit (exit 56) and a helper
       that cannot start (exit 7).
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Plugin conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration` and none starts a real process.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Plugin/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Plugin/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test passes on Windows, Linux and macOS, with platform-specific discovery rules pinned
+- [x] No package added; every test passes on Windows, Linux and macOS, with platform-specific discovery rules pinned
       per platform.
 
 ## Notes
@@ -71,3 +71,4 @@ library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a 
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: dc2a1e48 e899b333 b0e0d532 add6527d 228eeab3 73126a85.
+- 2026-11-02: Doing -> Done. The Plugin extension is measured against ADR-1142's helper contract: 26 matrix rows, 25 in-process cases with stand-in helpers, all passing
