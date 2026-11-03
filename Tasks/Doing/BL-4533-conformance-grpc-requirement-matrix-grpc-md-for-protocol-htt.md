@@ -69,3 +69,4 @@ Builds on BL-4530 (server, unary case), BL-4531 (response cases) and BL-4532 (fr
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 123b988a abb71175 36ff140a 3af8a194.
 - 2026-11-02: Doing -> Backlog. Waits on BL-4585: the reference server cannot yet send RST_STREAM, GOAWAY or PING, which the client requirements in the matrix need
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 123b988a abb71175 36ff140a 3af8a194.
