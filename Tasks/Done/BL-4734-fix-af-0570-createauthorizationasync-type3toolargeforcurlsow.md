@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4734 — Fix AF-0570: CreateAuthorizationAsync_Type3TooLargeForCurlsOwnNtlm_ReportsNothingBeforeExit100 never checks exit 100
 
@@ -52,3 +52,4 @@ Added the missing ExitCode == CurlExitCode.TooLarge assertion to the test; test 
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Test now asserts ExitCode is TooLarge (100)
