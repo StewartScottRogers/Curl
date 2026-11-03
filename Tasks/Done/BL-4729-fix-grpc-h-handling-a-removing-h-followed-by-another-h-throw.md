@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Grpc.UnitLibrary/Wire/GrpcRequestHeaders.cs, Curl.Extended.Protocol.Grpc.UnitTests/Wire/GrpcRequestHeadersTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4729 — Fix gRPC -H handling: a removing -H followed by another -H throws, and HTTP/2 connection-specific headers are forwarded
 
@@ -29,13 +29,16 @@ Simplest fix: apply the `-H` overrides to a separate call-definition list, then 
 
 ## Acceptance criteria
 
-- [ ] `GrpcRequestHeaders` builds headers for `-H "te:" -H "x-trace: abc"` without throwing; the result has no `te` and has `x-trace: abc` (unit test).
-- [ ] `-H "user-agent:" -H "x-a: 1" -H "x-a: 2"` produces two `x-a` entries, in order (unit test).
-- [ ] `-H "Connection: keep-alive"`, `Keep-Alive`, `Proxy-Connection`, `Transfer-Encoding` and `Upgrade` are not sent, and a `te` other than `trailers` is not sent (one unit test per name).
-- [ ] `dotnet build` is clean, the fast tests pass, and the library keeps 100% line and branch coverage.
+- [x] `GrpcRequestHeaders` builds headers for `-H "te:" -H "x-trace: abc"` without throwing; the result has no `te` and has `x-trace: abc` (unit test).
+- [x] `-H "user-agent:" -H "x-a: 1" -H "x-a: 2"` produces two `x-a` entries, in order (unit test).
+- [x] `-H "Connection: keep-alive"`, `Keep-Alive`, `Proxy-Connection`, `Transfer-Encoding` and `Upgrade` are not sent, and a `te` other than `trailers` is not sent (one unit test per name).
+- [x] `dotnet build` is clean, the fast tests pass, and the library keeps 100% line and branch coverage.
 ## Notes
+
+Separate call-definition and metadata lists; forbidden names skipped (connection, keep-alive, proxy-connection, transfer-encoding, upgrade; te unless trailers). Quality run clean. CI platform-neutral.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 4ed83a1b 8cd5f741 bc5004fd a963b8b4.
+- 2026-11-03: Doing -> Done. gRPC -H overrides and forbidden HTTP/2 fields fixed
