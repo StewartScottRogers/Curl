@@ -30,3 +30,4 @@ BL-4689 added `Wire/DnsEdnsPadding.Pad` and calls it from `Transport/Tls/DnsTlsT
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: d07fdc63 8368df41.
