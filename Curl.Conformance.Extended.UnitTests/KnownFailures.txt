@@ -20,3 +20,6 @@ SignalR:HUB-Invocation-3 BL-4583
 SignalR:RFC6455-1.4-1 BL-4584
 OciRegistry:IMAGE-Descriptor-Digests-1 BL-4583
 OciRegistry:DIST-PullManifests-2 BL-4584
+Mqtt5:RFC6455-4.1-9 BL-4583
+Mqtt5:RFC6455-4.1-10 BL-4583
+Mqtt5:RFC6455-5.5.1-1 BL-4584
