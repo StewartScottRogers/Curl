@@ -3,8 +3,8 @@ id: AF-0553
 title: ThrowsTheHostsIOException checks only the type, not that it is the host's own exception
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Extended.Protocol.Plugin.UnitTests/ExtensionHelperProcessStarterTests.cs:Start_WhenTheHostCannotStartIt_ThrowsTheHostsIOException:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Extended.Protocol.Plugin.UnitTests/ExtensionHelperProce
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted.
