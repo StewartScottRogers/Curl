@@ -36,7 +36,7 @@ internal sealed class OciPullFlow(OciRegistrySession session)
 
     /// <summary>
     /// Checks that a blob pulled by <paramref name="digest"/> hashes to it (OCI Image Specification, descriptor,
-    /// "Digests"), after any redirect, so tampered content never reaches the output (ADR-1202). The registered
+    /// "Digests"), after any redirect, so tampered content never reaches the output (ADR-1206). The registered
     /// algorithms <c>sha256</c> and <c>sha512</c> are checked; a digest of another algorithm passes unchecked, as the
     /// specification allows for an unrecognised algorithm that meets the grammar.
     /// </summary>

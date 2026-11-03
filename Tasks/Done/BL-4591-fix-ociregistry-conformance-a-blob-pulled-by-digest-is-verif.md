@@ -28,7 +28,7 @@ Found by BL-4488: `OciPullCases.BlobPull_WhoseContentDoesNotMatchItsDigest_IsRef
 
 ## Notes
 
-- Decided: a mismatch exits 8 (`CURLE_WEIRD_SERVER_REPLY`) with nothing written; `sha256` and `sha512` are checked, a digest of another algorithm passes unchecked as the Image Specification allows; recorded in ADR-1202. The check runs in `OciRegistryProtocolHandler` on the body `OciPullFlow` returns after redirects, so a redirected blob is checked too; tag pulls are unchanged. Existing unit tests that used the fake digest `sha256:abc` now use the real hash of their body.
+- Decided: a mismatch exits 8 (`CURLE_WEIRD_SERVER_REPLY`) with nothing written; `sha256` and `sha512` are checked, a digest of another algorithm passes unchecked as the Image Specification allows; recorded in ADR-1206. The check runs in `OciRegistryProtocolHandler` on the body `OciPullFlow` returns after redirects, so a redirected blob is checked too; tag pulls are unchanged. Existing unit tests that used the fake digest `sha256:abc` now use the real hash of their body.
 - Verified: OciRegistry.UnitTests 161 passed; Conformance.Extended OciRegistry cases 45 passed; `dotnet build Curl.slnx -warnaserror` clean; every fast test project passed (0 failed); Measure-CodeQuality for the library: 100% line, 100% branch, max complexity 10, 0 failing members. The change is platform-neutral (in-memory hashing, no paths or OS text), which covers the Linux and macOS CI criterion.
 
 

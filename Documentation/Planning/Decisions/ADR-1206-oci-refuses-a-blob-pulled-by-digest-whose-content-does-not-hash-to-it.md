@@ -1,4 +1,4 @@
-# ADR-1202: OCI refuses a blob pulled by digest whose content does not hash to it, with exit 8
+# ADR-1206: OCI refuses a blob pulled by digest whose content does not hash to it, with exit 8
 
 - Status: Accepted
 - Date: 2026-11-02
