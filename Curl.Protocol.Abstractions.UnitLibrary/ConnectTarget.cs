@@ -98,8 +98,11 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// pooled and never served from a pool (ADR-0050).
     /// </summary>
     /// <remarks>
-    /// Only a handler that hands connections back with <see cref="IConnection.MarkReusable" />
-    /// sets it; every other protocol leaves it <see langword="null" />.
+    /// A handler that hands connections back with <see cref="IConnection.MarkReusable" /> sets it;
+    /// so does a target that sets <c>https</c> only so its TLS handshake offers
+    /// <see cref="ApplicationProtocols" /> and never marks its connection reusable (the gRPC
+    /// extension's <c>grpcs://</c> target, ADR-1197). Every other protocol leaves it
+    /// <see langword="null" />.
     /// </remarks>
     public string? PoolScheme { get; init; }
 

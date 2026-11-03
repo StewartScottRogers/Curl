@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary/ConnectTarget.cs]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4576 — Docs: ConnectTarget.PoolScheme remark names grpcs:// targets, which set it without MarkReusable
 
@@ -25,8 +25,8 @@ its connection reusable. BL-4562's `touches` did not name the Abstractions file,
 
 ## Acceptance criteria
 
-- [ ] The remark also names a target that sets `PoolScheme` `https` only so its handshake offers `ApplicationProtocols` (the `grpcs://` target, ADR-1197).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean.
+- [x] The remark also names a target that sets `PoolScheme` `https` only so its handshake offers `ApplicationProtocols` (the `grpcs://` target, ADR-1197).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean.
 
 ## Notes
 
@@ -34,3 +34,4 @@ its connection reusable. BL-4562's `touches` did not name the Abstractions file,
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 2b95d9b1 d71d6599.
+- 2026-11-02: Doing -> Done. Remark names the grpcs:// target
