@@ -86,8 +86,13 @@ public sealed class OpenApiDocumentTests
     }
 
     [TestMethod]
-    public void FindOperation_WithoutPaths_FailsWithExit2() =>
-        Assert.ThrowsExactly<ArgumentExpansionException>(() => Document("""{"info":{}}""").FindOperation("a"));
+    public void FindOperation_WithoutPaths_FailsWithExit2()
+    {
+        var failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => Document("""{"info":{}}""").FindOperation("a"));
+
+        Assert.AreEqual("openapi: no operation a in the description", failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+    }
 
     [TestMethod]
     public void FindOperation_PathItemReference_IsFollowed_AndTheMethodIsItsMember()
