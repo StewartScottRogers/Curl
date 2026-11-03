@@ -23,11 +23,16 @@ behaviour is decided in ADR-1199. The change lands in `Curl.Extended.Protocol.Mq
 
 ## Acceptance criteria
 
-- [ ] `KeepAliveCases.Subscribe_NoPingrespWithinTheInterval_ClosesTheConnectionWithDisconnect0x8D` passes as a plain case (its `KnownFailures.txt` lines for BL-4575 are removed).
-- [ ] A focused unit test in `Curl.Extended.Protocol.Mqtt5.UnitTests` pins the fix (ADR-0482).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests are green and `Curl.Extended.Protocol.Mqtt5.UnitLibrary` stays at 100% line and branch coverage (`Measure-CodeQuality.ps1`).
+- [x] `KeepAliveCases.Subscribe_NoPingrespWithinTheInterval_ClosesTheConnectionWithDisconnect0x8D` passes as a plain case (its `KnownFailures.txt` lines for BL-4575 are removed).
+- [x] A focused unit test in `Curl.Extended.Protocol.Mqtt5.UnitTests` pins the fix (ADR-0482).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests are green and `Curl.Extended.Protocol.Mqtt5.UnitLibrary` stays at 100% line and branch coverage (`Measure-CodeQuality.ps1`).
 
 ## Notes
+
+- `Mqtt5ClientFlow` tracks an unanswered PINGREQ; a PINGRESP clears it. When the next ping falls due with it still set, the flow throws exit 8 with reason code 0x8D, so `RunAsync` sends DISCONNECT 0x8D Keep Alive timeout (ADR-1199: one ping interval is the reasonable time).
+- Decided: the error text is the plain "Weird server reply" that a Protocol Error already uses, so `Mqtt5ClientMessages.cs` (not in touches) stays as it is.
+- Focused unit test: `Mqtt5ClientFlowTests.RunAsync_NextPingDueWithNoPingResponse_ClosesWithDisconnect0x8DAndWeirdServerReply` (fake time provider now fires the first N timers).
+- Build clean with -warnaserror; fast tests green; Measure-CodeQuality.ps1 -Library Curl.Extended.Protocol.Mqtt5.UnitLibrary reports 0 failing members.
 
 ## Log
 

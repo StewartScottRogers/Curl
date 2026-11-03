@@ -213,7 +213,7 @@ public sealed class Mqtt5ClientFlowTests
         byte[] connAck = new Mqtt5ConnAck { Properties = [Mqtt5Property.FromInteger(Mqtt5PropertyIdentifier.ServerKeepAlive, 10)] }.ToBytes();
         byte[] afterPing = [.. new Mqtt5Ping(Mqtt5PacketType.PingResp).ToBytes(), .. Publish("abc"), .. new Mqtt5Disconnect { ReasonCode = Mqtt5ReasonCode.NormalDisconnection }.ToBytes()];
         PingAnsweringConnection connection = new([.. connAck, .. SubAck(Mqtt5ReasonCode.GrantedQos0)], afterPing);
-        FirstTimerFiresTimeProvider timeProvider = new();
+        FirstTimersFireTimeProvider timeProvider = new();
         var output = new MemoryStream();
 
         await new Mqtt5ClientFlow(connection, output, NoTransferProgress.Instance, timeProvider, CancellationToken.None).RunAsync(new Mqtt5Connect(), "t", null);
@@ -229,7 +229,7 @@ public sealed class Mqtt5ClientFlowTests
         byte[] disconnect = new Mqtt5Disconnect { ReasonCode = Mqtt5ReasonCode.NormalDisconnection }.ToBytes();
         ScriptedMqtt5Connection connection = new([.. ConnAck(), .. SubAck(Mqtt5ReasonCode.GrantedQos0), .. Publish("abc"), .. disconnect]);
 
-        await new Mqtt5ClientFlow(connection, new MemoryStream(), NoTransferProgress.Instance, new FirstTimerFiresTimeProvider(), CancellationToken.None).RunAsync(new Mqtt5Connect(), "t", null);
+        await new Mqtt5ClientFlow(connection, new MemoryStream(), NoTransferProgress.Instance, new FirstTimersFireTimeProvider(), CancellationToken.None).RunAsync(new Mqtt5Connect(), "t", null);
 
         Assert.IsFalse(connection.Writes.Exists(write => write.AsSpan().SequenceEqual(PingRequest)));
     }
@@ -281,6 +281,20 @@ public sealed class Mqtt5ClientFlowTests
     private static byte[] QosPublish(Mqtt5QualityOfService qualityOfService, ushort packetIdentifier, string payload) =>
         new Mqtt5Publish { QualityOfService = qualityOfService, PacketIdentifier = packetIdentifier, TopicName = "t", Payload = System.Text.Encoding.UTF8.GetBytes(payload) }.ToBytes();
 
+    [TestMethod]
+    public async Task RunAsync_NextPingDueWithNoPingResponse_ClosesWithDisconnect0x8DAndWeirdServerReply()
+    {
+        byte[] connAck = new Mqtt5ConnAck { Properties = [Mqtt5Property.FromInteger(Mqtt5PropertyIdentifier.ServerKeepAlive, 10)] }.ToBytes();
+        PingAnsweringConnection connection = new([.. connAck, .. SubAck(Mqtt5ReasonCode.GrantedQos0)], afterPing: null);
+        var flow = new Mqtt5ClientFlow(connection, new MemoryStream(), NoTransferProgress.Instance, new FirstTimersFireTimeProvider(2), CancellationToken.None);
+
+        Mqtt5ClientException failure = await Assert.ThrowsExactlyAsync<Mqtt5ClientException>(async () => await flow.RunAsync(new Mqtt5Connect(), "t", null));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure.ExitCode);
+        Assert.AreEqual(1, connection.Writes.Count(write => write.AsSpan().SequenceEqual(PingRequest)));
+        CollectionAssert.AreEqual(new Mqtt5Disconnect { ReasonCode = Mqtt5ReasonCode.KeepAliveTimeout }.ToBytes(), connection.Writes[^1]);
+    }
+
     private static readonly byte[] PingRequest = new Mqtt5Ping(Mqtt5PacketType.PingReq).ToBytes();
 
     private static async Task<Mqtt5ClientException> RunFailingAsync(ScriptedMqtt5Connection connection, string? body = null, string topic = "t")
@@ -295,8 +309,8 @@ public sealed class Mqtt5ClientFlowTests
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) => throw new IOException("full");
     }
 
-    /// <summary>Records each timer's due time; only the first one fires, at once, so exactly one ping falls due.</summary>
-    private sealed class FirstTimerFiresTimeProvider : TimeProvider
+    /// <summary>Records each timer's due time; only the first <c>firingTimers</c> fire, at once, so that many pings fall due.</summary>
+    private sealed class FirstTimersFireTimeProvider(int firingTimers = 1) : TimeProvider
     {
         public List<TimeSpan> DueTimes { get; } = [];
 
@@ -305,7 +319,7 @@ public sealed class Mqtt5ClientFlowTests
             lock (DueTimes)
             {
                 DueTimes.Add(dueTime);
-                if (DueTimes.Count == 1)
+                if (DueTimes.Count <= firingTimers)
                 {
                     ThreadPool.QueueUserWorkItem(_ => callback(state));
                 }
@@ -326,8 +340,11 @@ public sealed class Mqtt5ClientFlowTests
         }
     }
 
-    /// <summary>A fake <see cref="IConnection"/> that serves its first bytes, then waits for a PINGREQ before serving the rest.</summary>
-    private sealed class PingAnsweringConnection(byte[] beforePing, byte[] afterPing) : IConnection
+    /// <summary>
+    /// A fake <see cref="IConnection"/> that serves its first bytes, then waits for a PINGREQ before serving the rest; with
+    /// no rest it never answers the PINGREQ.
+    /// </summary>
+    private sealed class PingAnsweringConnection(byte[] beforePing, byte[]? afterPing) : IConnection
     {
         private readonly TaskCompletionSource pinged = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -341,10 +358,16 @@ public sealed class Mqtt5ClientFlowTests
 
         public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
         {
-            byte[] chunk = ++reads == 1 ? beforePing : afterPing;
+            byte[]? chunk = ++reads == 1 ? beforePing : afterPing;
             if (reads == 2)
             {
                 await pinged.Task.WaitAsync(cancellationToken);
+            }
+
+            if (chunk is null)
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return 0;
             }
 
             if (reads > 2)

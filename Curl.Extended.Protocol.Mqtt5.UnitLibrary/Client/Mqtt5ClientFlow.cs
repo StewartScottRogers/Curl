@@ -9,7 +9,8 @@ namespace Curl.Extended.Protocol.Mqtt5.Client;
 /// DISCONNECT, otherwise SUBSCRIBE, SUBACK and each PUBLISH payload written to the output, a QoS 1 PUBLISH answered with
 /// PUBACK and a QoS 2 one with PUBREC and its PUBREL with PUBCOMP (ADR-1199), until the server sends
 /// DISCONNECT. A failure reason code ends the transfer as ADR-1049 maps it. While it waits for messages it sends a
-/// PINGREQ every half of the Server Keep Alive a CONNACK returns, on <paramref name="timeProvider"/>.
+/// PINGREQ every half of the Server Keep Alive a CONNACK returns, on <paramref name="timeProvider"/>, and closes with
+/// DISCONNECT 0x8D Keep Alive timeout when the next one falls due with the last unanswered (ADR-1199).
 /// </summary>
 internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITransferProgress progress, TimeProvider timeProvider, CancellationToken cancellationToken)
 {
@@ -17,6 +18,9 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
     internal const ushort SubscribePacketIdentifier = 1;
 
     private readonly Mqtt5PacketChannel channel = new(transport, cancellationToken);
+
+    /// <summary>Whether the last PINGREQ sent has had no PINGRESP yet.</summary>
+    private bool pingUnanswered;
 
     /// <summary>The payload bytes written to the output so far.</summary>
     internal long BytesWritten { get; private set; }
@@ -158,6 +162,8 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
             if (await Task.WhenAny(receive, ping).ConfigureAwait(false) == ping)
             {
                 await ping.ConfigureAwait(false);
+                ThrowIfPingUnanswered();
+                pingUnanswered = true;
                 await channel.SendAsync(new Mqtt5Ping(Mqtt5PacketType.PingReq)).ConfigureAwait(false);
                 ping = DelayUntilNextPing(pingInterval, stopPings.Token);
             }
@@ -171,6 +177,25 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
                 receive = channel.ReceiveAsync().AsTask();
             }
         }
+    }
+
+    /// <summary>
+    /// Refuses to go on when the next PINGREQ falls due with the last one still unanswered: one ping interval is the
+    /// reasonable time a PINGRESP gets (MQTT5-3.1.2.10-1), so the connection closes with DISCONNECT 0x8D Keep Alive
+    /// timeout and exit 8 (ADR-1199).
+    /// </summary>
+    private void ThrowIfPingUnanswered()
+    {
+        if (pingUnanswered)
+        {
+            throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.WeirdServerReply, Mqtt5ReasonCode.KeepAliveTimeout);
+        }
+    }
+
+    private ValueTask AcceptPingResponseAsync()
+    {
+        pingUnanswered = false;
+        return ValueTask.CompletedTask;
     }
 
     private Task DelayUntilNextPing(TimeSpan? pingInterval, CancellationToken stopPings) =>
@@ -217,7 +242,7 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
     private ValueTask AnswerReleaseOrAcceptPingResponseAsync(Mqtt5Packet packet) => packet switch
     {
         Mqtt5PublishResponse { PacketType: Mqtt5PacketType.PubRel } release => SendPublishResponseAsync(Mqtt5PacketType.PubComp, release.PacketIdentifier),
-        Mqtt5Ping { PacketType: Mqtt5PacketType.PingResp } => ValueTask.CompletedTask,
+        Mqtt5Ping { PacketType: Mqtt5PacketType.PingResp } => AcceptPingResponseAsync(),
         _ => throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.WeirdServerReply, Mqtt5ReasonCode.ProtocolError),
     };
 
