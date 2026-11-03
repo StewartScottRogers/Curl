@@ -3,8 +3,8 @@ id: AF-0535
 title: Surviving mutant: UrlHandleParts.WrittenPortOf can drop an explicit port 0 without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/UrlHandleParts.cs:WrittenPortOf-lt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlHandleParts.cs:132:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
