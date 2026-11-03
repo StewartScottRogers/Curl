@@ -14,6 +14,14 @@ public sealed class GrpcWebTrailersTests
     }
 
     [TestMethod]
+    public void Parse_ALineStartingWithAColon_GivesAFieldWithAnEmptyName()
+    {
+        IReadOnlyList<KeyValuePair<string, string>> fields = GrpcWebTrailers.Parse(":x\r\n"u8);
+
+        CollectionAssert.AreEqual(new[] { new KeyValuePair<string, string>("", "x") }, fields.ToArray());
+    }
+
+    [TestMethod]
     public void Parse_ALineWithNoColon_ThrowsFormatException()
     {
         FormatException thrown = Assert.ThrowsExactly<FormatException>(() => GrpcWebTrailers.Parse("grpc-status 0"u8));
