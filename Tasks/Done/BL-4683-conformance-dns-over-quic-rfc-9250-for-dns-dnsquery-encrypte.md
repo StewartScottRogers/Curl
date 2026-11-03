@@ -53,12 +53,12 @@ scripted application error code (`Close(code)`), or answer with a scripted non-z
 
 - Filed by BL-4474's split (2026-11-03).
 - 2026-11-03 (lane 2): DoqReferenceServer (+ DoqReceivedQuery) in DnsQuery/Encrypted/ answers on the query's stream with FIN, or closes with a scripted code; a non-zero Message ID is scripted through DnsReferenceReply.Id. Six cases in DnsOverQuicCases plus DoqReferenceServerTests (a query split across datagrams, the branch curl's one-datagram query never reaches). 16 RFC 9250 rows in DnsQuery-Encrypted.md (10 tested, 6 n/a).
-- Measured: ALPN doq, port 853, length prefix, stream 0, FIN, Message ID 0, curl's DOQ_NO_ERROR close, exit 8 plus DOQ_PROTOCOL_ERROR on a non-zero ID, exit 56 on a server close, exit 60 on an untrusted certificate all pass. Two fail and are listed in KnownFailures.txt: no EDNS(0) padding on DoQ queries (BL-4719) and DoQ to UDP port 53 not refused (BL-4720, depends on BL-4719 because both change DnsQuicTransport.cs).
-- Decision (sensible default): the padding case checks EDNS(0) Padding, as the DoT case does, because RFC 9250 5.4 allows it and curl already pads DoT; the port-53 case asserts only a non-zero exit and no handshake, leaving the exit code to BL-4720. The server-close case pins only the message prefix, since the rest is Curl.Quic's IOException text.
+- Measured: ALPN doq, port 853, length prefix, stream 0, FIN, Message ID 0, curl's DOQ_NO_ERROR close, exit 8 plus DOQ_PROTOCOL_ERROR on a non-zero ID, exit 56 on a server close, exit 60 on an untrusted certificate all pass. Two fail and are listed in KnownFailures.txt: no EDNS(0) padding on DoQ queries (BL-4722) and DoQ to UDP port 53 not refused (BL-4723, depends on BL-4722 because both change DnsQuicTransport.cs).
+- Decision (sensible default): the padding case checks EDNS(0) Padding, as the DoT case does, because RFC 9250 5.4 allows it and curl already pads DoT; the port-53 case asserts only a non-zero exit and no handshake, leaving the exit code to BL-4723. The server-close case pins only the message prefix, since the rest is Curl.Quic's IOException text.
 - Quality: Measure-CodeQuality.ps1 -Library Curl.Conformance.Extended.UnitLibrary reported 0 failing members. All tests are platform-neutral (no paths, a generated in-memory certificate, Environment.NewLine in the stderr comparison); the CI-on-Linux/macOS criterion is met by that and fast tests green here.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 21a4291a 19f3f6e9 f3c72898 d8e3fb0e 627fbee3 17248609.
-- 2026-11-03: Doing -> Done. DoQ measured against RFC 9250: matrix rows, six cases, two known failures filed as BL-4719 and BL-4720
+- 2026-11-03: Doing -> Done. DoQ measured against RFC 9250: matrix rows, six cases, two known failures filed as BL-4722 and BL-4723

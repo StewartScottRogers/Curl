@@ -1,5 +1,5 @@
 ---
-id: BL-4719
+id: BL-4722
 title: Fix DnsQuery conformance: DoQ queries carry no EDNS(0) padding (RFC 9250 5.4)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4719 — Fix DnsQuery conformance: DoQ queries carry no EDNS(0) padding (RFC 9250 5.4)
+# BL-4722 — Fix DnsQuery conformance: DoQ queries carry no EDNS(0) padding (RFC 9250 5.4)
 
 ## Goal
 
