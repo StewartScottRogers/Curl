@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4705 — Fix AF-0557: LocksTheConnectionsThreeTimesAtTheStart asserts four locks over the whole perform
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The engine locks Connect three times as a perform takes the shared pool (TakeConnections, no host key with no URL) and once when it is done (LockConnectionsAtDone); the two are not observable apart from the lock callback, so the test now says what it counts: renamed to PerformAsync_ConnectionsSharedAndNoUrl_LocksTheConnectionsThreeTimesToTakeThePoolAndOnceWhenDone, asserting `3 + 1` with a message. The reproduction's Select-String now finds nothing. Build clean, fast tests green (Curl.Engine.UnitTests 2959 passed). Test-only change, so no quality run. touches left as the whole project: a one-file change, done before narrowing would have paid off.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. LocksTheConnections test name now says the four locks it asserts (three to take the pool, one when done)
