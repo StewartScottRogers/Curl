@@ -403,11 +403,21 @@ public sealed class Lib566Tests
     [TestMethod]
     public async Task RunAsync_TransferFails_WritesNothing()
     {
-        var run = new PortRun(new FakeCurlEngine { PerformResult = CurlCode.PartialFile }, 566, "http://x/566");
+        string path = Path.Combine(Path.GetTempPath(), $"lib566-{Guid.NewGuid():N}");
+        try
+        {
+            var run = new PortRun(new FakeCurlEngine { PerformResult = CurlCode.PartialFile }, 566, "http://x/566", path);
 
-        LibTestResult result = await new Lib566().RunAsync(run.Context, CancellationToken.None);
+            LibTestResult result = await new Lib566().RunAsync(run.Context, CancellationToken.None);
 
-        Assert.AreEqual((int)CurlCode.PartialFile, result.ExitCode);
+            Assert.AreEqual((int)CurlCode.PartialFile, result.ExitCode);
+            Assert.AreEqual(string.Empty, run.OutputText);
+            Assert.IsFalse(File.Exists(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [TestMethod]
