@@ -34,3 +34,4 @@ Part of BL-4572's split. BL-4481's `KafkaReferenceZstdFrameWriter` writes raw li
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: fab2f00f c5936357 914c30cc 3ead4734.
