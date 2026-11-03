@@ -89,7 +89,7 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
         {
             await channel.SendAsync(query, channel.ServerEndPoint, context.CancellationToken).ConfigureAwait(false);
         }
-        catch (SocketException exception)
+        catch (SocketException exception) when (exception.GetType() == typeof(SocketException))
         {
             throw new DnsQueryException(CurlExitCode.SendError, $"Failed sending the query over UDP: {exception.Message}");
         }
@@ -116,7 +116,7 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
         {
             return null;
         }
-        catch (SocketException exception)
+        catch (SocketException exception) when (exception.GetType() == typeof(SocketException))
         {
             throw new DnsQueryException(CurlExitCode.RecvError, $"Failed receiving the answer over UDP: {exception.Message}");
         }

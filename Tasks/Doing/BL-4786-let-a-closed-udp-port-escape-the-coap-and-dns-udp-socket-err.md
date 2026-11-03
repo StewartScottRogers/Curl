@@ -28,13 +28,15 @@ Found by the shift-end review of 2026-11-03 (silent-failure-hunter and code-revi
 
 ## Acceptance criteria
 
-- [ ] A `DatagramPortUnreachableException` thrown by the channel's send or receive escapes `CoapExchange` unchanged. A unit test in `Curl.Extended.Protocol.Coap.UnitTests` asserts it for both send and receive.
-- [ ] The same holds for `DnsUdpTransport`, with a unit test for both send and receive in `Curl.Extended.Protocol.DnsQuery.UnitTests`.
-- [ ] A plain `SocketException` still ends with exit 55 on send and exit 56 on receive; the existing tests stay green.
-- [ ] `VerifyExtensionIsolation` still passes, and both libraries keep 100% line and branch coverage.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A `DatagramPortUnreachableException` thrown by the channel's send or receive escapes `CoapExchange` unchanged. A unit test in `Curl.Extended.Protocol.Coap.UnitTests` asserts it for both send and receive.
+- [x] The same holds for `DnsUdpTransport`, with a unit test for both send and receive in `Curl.Extended.Protocol.DnsQuery.UnitTests`.
+- [x] A plain `SocketException` still ends with exit 55 on send and exit 56 on receive; the existing tests stay green.
+- [x] `VerifyExtensionIsolation` still passes, and both libraries keep 100% line and branch coverage.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decision: the catches filter `when (exception.GetType() == typeof(SocketException))`, so any subclass (DatagramPortUnreachableException) escapes to the engine's exit 7 mapping with no Curl.Networking reference in Coap. Tests use a local SocketException subclass. Quality run: 0 failing members.
 
 ## Log
 
