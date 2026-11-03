@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4728 — Fix CI failure Quic_Query_IsPaddedWithTheEdnsPaddingOption on Linux and macOS and Windows
 
@@ -26,11 +26,14 @@ Lanes test only on Windows, so reproduce with `gh run view 41634593982 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `Quic_Query_IsPaddedWithTheEdnsPaddingOption` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `Quic_Query_IsPaddedWithTheEdnsPaddingOption` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+- 2026-11-03: Nothing to change. CI run 41634593982 ran 62178b13, where RFC9250-5.4-1 was still in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` although BL-4718 had made it pass. 7e2b2728a (BL-4720), which landed after that run, removed the line. The test now passes locally, as do all 6 DnsOverQuicCases and the whole Curl.Conformance.Extended.UnitTests project (1719 passed, 1 skipped). That fix only removes a data line, so it does not depend on the platform. Per lane rule 11, the CI criterion is met by that and the shift's CI watch.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: bebe6e3e.
+- 2026-11-03: Doing -> Done. Quic_Query_IsPaddedWithTheEdnsPaddingOption passes; 7e2b2728a removed the stale RFC9250-5.4-1 known failure
