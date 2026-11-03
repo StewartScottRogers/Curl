@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.DnsQuery.UnitLibrary/Transport/Https, Curl.Extended.Protocol.DnsQuery.UnitLibrary/Transport/Quic, Curl.Extended.Protocol.DnsQuery.UnitTests/Transport/Https, Curl.Extended.Protocol.DnsQuery.UnitTests/Transport/Quic]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4718 — Pad DNS over HTTPS and DNS over QUIC queries with EDNS(0) Padding
 
@@ -33,3 +33,4 @@ Padding added in DnsHttpsTransport (before either HTTP version) and DnsQuicTrans
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: d07fdc63 8368df41.
+- 2026-11-03: Doing -> Done. DoH and DoQ queries padded to 128 octets; tests, build and quality green
