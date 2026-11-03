@@ -56,7 +56,7 @@ library, its `.UnitTests` and `KnownFailures.txt`; criteria: the case passes, a 
 
 - Touches widened by `Curl.Conformance.Extended.UnitLibrary/Grpc/GrpcReferencePing.cs` (new file, one public type per file): the PING that records its echo. No other task in Doing names it.
 - `GrpcReferenceReply` gained `ResetCode`, `GoAwayLastStreamId` and `PingBeforeReply` (init properties) and the `Reset` and `GoAway` factories; RST_STREAM and GOAWAY (NO_ERROR) are sent in place of the reply, the PING before it. STREAM_CLOSED has no row in the Errors table, so it has no case.
-- Decided (ADR-1202): an RST_STREAM or GOAWAY ending a call is reported like a non-OK status, exit 22 and `curl: (22) grpc-status <code> (<name>): `; the cases pin that prefix only. Curl today exits 16, so Grpc:Http2-Errors-1 and Grpc:Http2-GoAway-1 are in KnownFailures.txt under BL-4591 (High). Grpc:Http2-Ping-1, Grpc:Http2-Response-6 and Grpc:Http2-Request-6 pass.
+- Decided (ADR-1202): an RST_STREAM or GOAWAY ending a call is reported like a non-OK status, exit 22 and `curl: (22) grpc-status <code> (<name>): `; the cases pin that prefix only. Curl today exits 16, so Grpc:Http2-Errors-1 and Grpc:Http2-GoAway-1 are in KnownFailures.txt under BL-4595 (High). Grpc:Http2-Ping-1, Grpc:Http2-Response-6 and Grpc:Http2-Request-6 pass.
 - The ASCII-Value case uses a tab (valid HTTP field-value, outside %x20-%x7E). Cases are in-memory and platform-neutral.
 - Checked: `dotnet build Curl.slnx -warnaserror` clean, fast tests green (no failures), Measure-CodeQuality for Curl.Conformance.Extended.UnitLibrary: 0 failing members.
 

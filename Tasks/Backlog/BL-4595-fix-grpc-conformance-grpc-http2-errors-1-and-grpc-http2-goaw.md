@@ -1,5 +1,5 @@
 ---
-id: BL-4591
+id: BL-4595
 title: Fix Grpc conformance: Grpc:Http2-Errors-1 and Grpc:Http2-GoAway-1 - report an RST_STREAM or GOAWAY as its mapped gRPC status
 priority: High
 assignee: Claude
