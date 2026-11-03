@@ -3,8 +3,8 @@ id: AF-0541
 title: CI red 167.3 minutes from run 41471583491 (cd3f9a7d); 104 minutes of it came after the fix landed, because newer pushes cancelled every run
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces.
 key: process:logs:41471583491:ci-red
 reproduction: none
 task: BL-4647
@@ -13,9 +13,9 @@ found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_1017.md
 ---
 # AF-0541 - CI red 167.3 minutes from run 41471583491 (cd3f9a7d); 104 minutes of it came after the fix landed, because newer pushes cancelled every run
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_0025.md | reproduces: yes | The given reproduction over the old logs still lists spell 41471583491 at 167.3 minutes (history). Run over this window, the same mechanism recurs: spell 41567287491 (2026-11-03T03:06:46Z to 03:41:55Z, 35.15 minutes) came entirely after fix 8fa866b82 (02:46:28Z, BL-4594). Ten runs in a row (41568356821 to 41571869140) were cancelled before 41572448811 went green, and the coordinator cancelled 41570033273 at 20:28:33 Arizona. Spell 41549222390 likewise stayed red 20 minutes after fix 844d53972 while 3 runs were cancelled.
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | The given reproduction still shows the historical 167.3-minute spell from 41471583491 (the old window's logs are unchanged). By mechanism over this window (-Since 2026-11-03, 83 tasks done): CI red spells are 25.02, 14.37, 44.7 and 95 minutes. In the 44.7-minute spell the last fix (BL-4728) landed at 12:47Z and CI was green at 13:04:10Z, 17 minutes later, with only 2 runs cancelled in between. In the 95-minute spell the post-fix run 41660275371 failed rather than being cancelled. No spell stays red over 30 minutes after its fix because newer pushes cancelled every run.
 
 ## Log
 
 - 2026-11-02: filed proposed.
 - 2026-11-02: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces.

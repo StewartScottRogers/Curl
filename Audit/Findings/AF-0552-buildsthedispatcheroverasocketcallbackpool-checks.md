@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.UnitTests/ManagedEasyTransferTests.Sockets.cs -P
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | No match for Assert.IsNotNull(ManagedCurlEngine.CreateDispatcher; the test performs through the dispatcher and asserts CouldntConnect, the error text and the open-socket callback call.
+
 ## Log
 
 - 2026-11-03: filed proposed.

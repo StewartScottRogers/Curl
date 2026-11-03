@@ -3,8 +3,8 @@ id: AF-0563
 title: Surviving mutant: Lib677.Advance can keep its send position after a zero-length send without a test failing
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib677.cs:Advance-gt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib677.cs:188:>
 task: BL-4711
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: mechanical
+closed-by: 2026-11-03_1017.md
 ---
 # AF-0563 - Surviving mutant: Lib677.Advance can keep its send position after a zero-length send without a test failing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | Ran the -Site command: outcome killed (resolvedLine 188). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

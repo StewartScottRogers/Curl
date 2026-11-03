@@ -42,6 +42,8 @@ Select-String -Path Curl.Extended.Protocol.Plugin.UnitTests/ExtensionHelperProce
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | ThrowsTheHostsIOException now asserts Assert.AreEqual("The system cannot find the file specified.", thrown.Message) (the stand-in host's own text) and Assert.IsNull(thrown.InnerException).
+
 ## Log
 
 - 2026-11-03: filed proposed.

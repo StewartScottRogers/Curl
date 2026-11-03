@@ -3,8 +3,8 @@ id: AF-0542
 title: CI red 56.5 minutes from run 41516637939 (6ada3366): MQTT 5 CONNECT and Frame_Malformed conformance tests
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces.
 key: process:logs:41516637939:ci-red
 reproduction: none
 task: BL-4648
@@ -13,9 +13,9 @@ found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_1017.md
 ---
 # AF-0542 - CI red 56.5 minutes from run 41516637939 (6ada3366): MQTT 5 CONNECT and Frame_Malformed conformance tests
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_0025.md | reproduces: yes | Run over this window, the CI red rule is crossed again by an MQTT 5 conformance test failing on Linux and macOS. Spell 41560119555 (bcc7d1f5) lasted 34.63 minutes from 2026-11-03T01:43:57Z, caused by Mqtt5s_UntrustedCertificate_IsRefusedBeforeAnyMqttWithExit60; BL-4596 was filed at 18:46:45 Arizona and done at 19:02:41. The specific CONNECT and Frame_Malformed tests and the duplicate CI-fix tasks (BL-4547 requeue) did not recur, so a narrow reading would be false.
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | The given reproduction still shows the historical 56.5-minute spell from 41516637939 and the BL-4543/4544/4547/4548 MQTT and Frame_Malformed lines. By mechanism over this window (83 tasks done, ciRedMinutes 179.09): the spells over 30 minutes came from ProtoJSON RoundTrip, QUIC DoQ and the Console progress-meter test. No MQTT 5 or Frame_Malformed conformance test failed or was filed.
 
 ## Log
 
 - 2026-11-02: filed proposed.
 - 2026-11-02: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces.

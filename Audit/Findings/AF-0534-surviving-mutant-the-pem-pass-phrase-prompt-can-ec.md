@@ -3,8 +3,8 @@ id: AF-0534
 title: Surviving mutant: the PEM pass phrase prompt can echo the first typed key to the terminal without a test failing
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/TerminalPemPassPhrasePrompt.cs:ReadConsoleLine-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TerminalPemPassPhrasePrompt.cs:44:true
 task: BL-4640
@@ -13,9 +13,9 @@ found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: mechanical
+closed-by: 2026-11-03_1017.md
 ---
 # AF-0534 - Surviving mutant: the PEM pass phrase prompt can echo the first typed key to the terminal without a test failing
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_0025.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: outcome survived at resolvedLine 44 ('Console.ReadKey(intercept: true)' -> 'Console.ReadKey(intercept: false)' for the first key); the baseline left out three failing ECH tests. Runner's targeted mutation rerun on the clean audited commit: survived.
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | Ran the -Site command twice: outcome killed both times (resolvedLine 44). Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-11-02: filed proposed.
 - 2026-11-02: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1017.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

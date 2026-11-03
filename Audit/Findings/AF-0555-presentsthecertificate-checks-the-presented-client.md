@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/TcpConnectorQuicTests.TlsOptions.c
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1017.md | reproduces: no | No match for 'ClientCertificate\);'; both tests assert CollectionAssert.AreEqual(s_clientCertificate.RawData, presented.CertificateData).
+
 ## Log
 
 - 2026-11-03: filed proposed.
