@@ -61,7 +61,7 @@
     Scan Audit/Tools/Fixtures/weak-tests (a UnitTests and an IntegrationTests project) and check every kind is found, and nothing else:
     an all-weak test, a weakened assertion beside a stronger one, an IsNotNull of a value that cannot
     be null, a commented-out assertion, a number stated after ExitsWithCode and Returns, a check left
-    to a helper and a commented-out test among others included.
+    to a helper, a commented-out test and "*/*" in strings among others included.
 #>
 param(
     [string]$Root,
@@ -160,7 +160,9 @@ function Get-CommentedOutTests([string]$Path) {
     # /* */ block, named by the first commented-out method signature after it.
     $text = [IO.File]::ReadAllText($Path)
     $found = @()
-    $blocks = @([regex]::Matches($text, '/\*[\s\S]*?\*/') | ForEach-Object { $_.Value })
+    # Real /* */ comments only: string literals are matched first, so "*/*" in a string opens none.
+    $blocks = @([regex]::Matches($text, '"(?:\\.|[^"\\])*"|@"(?:""|[^"])*"|''(?:\\.|[^''\\])*''|//[^\r\n]*|/\*[\s\S]*?\*/') |
+        Where-Object { $_.Value.StartsWith('/*') } | ForEach-Object { $_.Value })
     $lineComments = '(?m)^[ \t]*//[ \t]*\[(?:Data)?TestMethod\b[^\r\n]*\r?\n(?:[ \t]*//[^\r\n]*\r?\n)*?[ \t]*//[^\r\n]*?\b(?:void|Task)\s+(\w+)\s*\('
     foreach ($m in [regex]::Matches($text, $lineComments)) {
         $found += [pscustomobject]@{ Name = $m.Groups[1].Value; Line = ($text.Substring(0, $m.Index) -split "`n").Count }
@@ -369,7 +371,7 @@ if ($SelfTest) {
     $failed = 0
     function Check([string]$Name, [bool]$Ok, [string]$Detail) { if (-not $Ok) { $script:failed++ }; Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Detail" }
     Check 'every planted kind is found, and nothing else' (($got -join '|') -eq ($want -join '|')) ($got -join ', ')
-    Check 'tests and projects are counted' ($r.testsScanned -eq 23 -and $r.projectsScanned -eq 2) "tests $($r.testsScanned), projects $($r.projectsScanned)"
+    Check 'tests and projects are counted' ($r.testsScanned -eq 25 -and $r.projectsScanned -eq 2) "tests $($r.testsScanned), projects $($r.projectsScanned)"
     $detail = { param($Test) "$(@($r.candidates | Where-Object { $_.test -eq $Test -and $_.kind -ne 'no-assertion' })[0].detail)" }
     Check 'a fake value no assertion checks is named' ((& $detail 'Rewrite_EmptyPath_ReadsTheConfiguredFile') -eq 'Assert.IsNotNull(url) is the only check of url, and no assertion checks the value the test''s fakes return: "http://127.0.0.1:9"') (& $detail 'Rewrite_EmptyPath_ReadsTheConfiguredFile')
     Check 'a weakened assertion beside a stronger one names the value only it checks' ((& $detail 'Encode_Header_WritesTheBytes') -eq 'Assert.IsNotNull(bytes) is the only check of bytes; the other assertions check other values') (& $detail 'Encode_Header_WritesTheBytes')

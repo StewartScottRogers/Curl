@@ -42,6 +42,19 @@ public sealed class NumberedOutcomeTests
         Assert.AreEqual(28, 28);
     }
 
+    // Sound: "*/*" in a string opens no comment, so the test after it is not commented out.
+    [TestMethod]
+    public void Send_Get_AcceptsAnything()
+    {
+        Assert.AreEqual("*/*", "*/*");
+    }
+
+    [TestMethod]
+    public void Send_Head_AcceptsAnything()
+    {
+        Assert.AreEqual("Accept: */*", "Accept: */*");
+    }
+
     // Weak: the whole test is commented out.
     // [TestMethod]
     // public void Close_Twice_IsHarmless()
