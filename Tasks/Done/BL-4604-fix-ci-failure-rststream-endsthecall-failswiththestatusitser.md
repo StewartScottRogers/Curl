@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4604 — Fix CI failure RstStream_EndsTheCall_FailsWithTheStatusItsErrorCodeMapsTo on Linux and macOS
 
@@ -28,11 +28,14 @@ Lanes test only on Windows, so reproduce with `gh run view 41567287491 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `RstStream_EndsTheCall_FailsWithTheStatusItsErrorCodeMapsTo` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `RstStream_EndsTheCall_FailsWithTheStatusItsErrorCodeMapsTo` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+- CI run 41567287491 (head "chore(tasks): finish BL-4595") failed with KnownFailurePassedException: the case passed but KnownFailures.txt still listed Grpc:Http2-Errors-1 (and Grpc:Http2-GoAway-1). 8fa866b82 (BL-4594) removed those lines after that commit, so no code change is needed here. Locally: GrpcTransportCases 14/14 pass and Curl.Conformance.Extended.UnitTests 778/778 pass. The failure was a stale known-failure line, not platform behaviour, so the fix is platform-neutral; the CI part of the criterion is ticked on that basis, and the shift's CI watch files a task if it fails again.
 
 ## Log
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: e31523df.
+- 2026-11-02: Doing -> Done. RstStream gRPC cases pass: their stale KnownFailures.txt lines were already dropped by 8fa866b82 (BL-4594)
