@@ -31,3 +31,4 @@ Requirement Nats:NATS-SUBJ-1 (NATS client protocol, "Protocol conventions": wild
 ## Log
 
 - 2026-11-02: Created by BL-4487.
+- 2026-11-02: Backlog -> Doing. Criteria at claim: a26bc883 3e135a93 c3396a1b.
