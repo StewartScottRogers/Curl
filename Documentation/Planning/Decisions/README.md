@@ -1263,3 +1263,4 @@ Each option and the specific reason it lost.
 | [1213](ADR-1213-azure-block-upload-stays-within-50000-blocks.md) | An Azure Storage block upload stays within 50,000 blocks: the block grows when the length is known, else exit 63 (BL-4611) | Accepted | 2026-11-02 |
 | [1214](ADR-1214-conformance-harness-leaves-dot-invalid-hosts-unresolved.md) | The extended conformance harness leaves every host under `.invalid` unresolved, so a case reaches exit 6 (BL-4619) | Accepted | 2026-11-02 |
 | [1215](ADR-1215-realtime-transfer-surface-pins-in-band-errors-as-exit-22-under-fail.md) | The realtime transfer surface pins in-band errors as exit 22 under `--fail`, and `webtransport` waits for its reference server (BL-4616) | Accepted | 2026-11-02 |
+| [1213](ADR-1213-webtransport-conformance-pins-wt-enabled-and-exit-56-on-server-close.md) | WebTransport conformance pins SETTINGS_WT_ENABLED and exit 56 on a server's WT_CLOSE_SESSION (BL-4608) | Accepted | 2026-11-02 |
