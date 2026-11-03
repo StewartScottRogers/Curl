@@ -32,3 +32,4 @@ Found by BL-4574. RFC 6347 section 4.1 (and 4.1.2.6): each record has its own se
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 4772c294 a91ff38c cab5d64d fdc35bd6.
