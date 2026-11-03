@@ -30,3 +30,4 @@ Likely cause: `TransferSurfaceCaseRun.RunPastMaxTimeAsync` advances `ManualClock
 ## Log
 
 - 2026-11-02: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: fa8f2d3b 914c30cc.
