@@ -9,7 +9,7 @@ namespace Curl.Extended.Protocol.Mqtt5.WebSocket;
 /// An <see cref="IConnection"/> that carries MQTT 5 bytes in WebSocket binary frames over an upgraded connection
 /// (OASIS MQTT Version 5.0 section 6, RFC 6455 section 5). Each write goes out as one masked binary frame; reads give
 /// the binary payload as one byte stream, so a packet may span frames and a frame may hold several packets. A ping is
-/// answered with a pong, the server's close frame reads as the end of the stream, and a text frame or a frame that
+/// answered with a pong, the server's close frame is answered with a close frame echoing its status code and reads as the end of the stream, and a text frame or a frame that
 /// breaks RFC 6455 fails the read, so the transfer ends and the connection is closed.
 /// </summary>
 /// <param name="upgraded">The connection the opening handshake succeeded on.</param>
@@ -30,6 +30,8 @@ internal sealed class Mqtt5WebSocketConnection(IConnection upgraded, IWebSocketR
     private int delivered;
 
     private bool isClosed;
+
+    private byte[]? closeReply;
 
     private bool isTextMessage;
 
@@ -102,6 +104,13 @@ internal sealed class Mqtt5WebSocketConnection(IConnection upgraded, IWebSocketR
             await upgraded.WriteAsync(WsFrameEncoder.Encode(WsOpcode.Pong, ping, randomSource), cancellationToken).ConfigureAwait(false);
             await upgraded.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
+
+        if (closeReply is { } status)
+        {
+            closeReply = null;
+            await upgraded.WriteAsync(WsFrameEncoder.Encode(WsOpcode.Close, status, randomSource), cancellationToken).ConfigureAwait(false);
+            await upgraded.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private void Collect(WsFrameRun run)
@@ -110,6 +119,7 @@ internal sealed class Mqtt5WebSocketConnection(IConnection upgraded, IWebSocketR
         {
             case WsOpcode.Close:
                 isClosed = true;
+                closeReply = run.Payload.Length >= 2 ? run.Payload[..2].ToArray() : [];
                 break;
             case WsOpcode.Ping or WsOpcode.Pong:
                 break;

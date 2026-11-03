@@ -63,6 +63,28 @@ public sealed class Mqtt5WebSocketConnectionTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_CloseFrameWithAStatusCode_AnswersWithAMaskedCloseFrameEchoingIt()
+    {
+        ScriptedMqtt5Connection upgraded = new([0x88, 0x04, 0x03, 0xE8, (byte)'b', (byte)'y']);
+
+        Assert.IsEmpty(await ReadAllAsync(Over(upgraded)));
+
+        Assert.HasCount(1, upgraded.Writes);
+        CollectionAssert.AreEqual(new byte[] { 0x88, 0x82, 0x00, 0x00, 0x00, 0x00, 0x03, 0xE8 }, upgraded.Writes[0]);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_CloseFrameWithoutAStatusCode_AnswersWithAnEmptyMaskedCloseFrame()
+    {
+        ScriptedMqtt5Connection upgraded = new([0x88, 0x00]);
+
+        Assert.IsEmpty(await ReadAllAsync(Over(upgraded)));
+
+        Assert.HasCount(1, upgraded.Writes);
+        CollectionAssert.AreEqual(new byte[] { 0x88, 0x80, 0x00, 0x00, 0x00, 0x00 }, upgraded.Writes[0]);
+    }
+
+    [TestMethod]
     [DataRow(new byte[] { 0x81, 0x01, (byte)'a' }, "MQTT 5 over WebSocket: the server sent a text frame")]
     [DataRow(new byte[] { 0x01, 0x00, 0x80, 0x00 }, "MQTT 5 over WebSocket: the server sent a text frame")]
     public async Task ReadAsync_TextFrame_FailsTheRead(byte[] frames, string message)
