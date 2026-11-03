@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompClientFlow.cs, Curl.Extended.Protocol.Stomp.UnitTests, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
+touches: [Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompClientFlow.cs, Curl.Extended.Protocol.Stomp.UnitTests, Curl.Conformance.Extended.UnitTests/KnownFailures.txt, Curl.Conformance.Extended.UnitTests/Stomp/StompConnectCases.cs, Curl.Conformance.Extended.UnitTests/Stomp/StompSendCases.cs]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-02
 ---
 # BL-4609 — Fix Stomp conformance: content-type on SEND
 
@@ -26,9 +26,9 @@ given by the user, else a default such as `application/octet-stream`) and record
 
 ## Acceptance criteria
 
-- [ ] `StompSendCases.Publish_Body_SendsAContentType` passes and its `KnownFailures.txt` line is removed.
-- [ ] A focused unit test in `Curl.Extended.Protocol.Stomp.UnitTests` pins the header (ADR-0482).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests are green.
+- [x] `StompSendCases.Publish_Body_SendsAContentType` passes and its `KnownFailures.txt` line is removed.
+- [x] A focused unit test in `Curl.Extended.Protocol.Stomp.UnitTests` pins the header (ADR-0482).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and the fast tests are green.
 
 ## Notes
 
@@ -36,3 +36,4 @@ given by the user, else a default such as `application/octet-stream`) and record
 
 - 2026-11-02: Created.
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 93082f85 b218f3b4 e3a4fd8b.
+- 2026-11-02: Doing -> Done. stomp:// SEND carries content-type application/octet-stream; Stomp:STOMP12-ContentType-1 passes
