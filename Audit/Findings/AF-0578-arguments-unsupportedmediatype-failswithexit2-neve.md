@@ -3,8 +3,8 @@ id: AF-0578
 title: Arguments_UnsupportedMediaType_FailsWithExit2 never checks exit 2
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OpenApi.UnitTests/OpenApiRequestBodyTests.cs:Arguments_UnsupportedMediaType_FailsWithExit2:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Extension.OpenApi.UnitTests/OpenApiRequestBodyTests.cs 
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

@@ -3,8 +3,8 @@ id: AF-0572
 title: Lib3103And3104_AskTheProxyForTheSiteWithTheirSharedCookie checks the share only for null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib3101To5004Tests.cs:Lib3103And3104_AskTheProxyForTheSiteWithTheirSharedCookie:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib3101To5004Tests.cs -Pa
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

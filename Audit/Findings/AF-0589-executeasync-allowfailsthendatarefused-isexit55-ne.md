@@ -3,8 +3,8 @@ id: AF-0589
 title: ExecuteAsync_AllowFailsThenDataRefused_IsExit55 never checks exit 55
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Smtp.UnitTests/SmtpProtocolHandlerMailExtensionTests.cs:ExecuteAsync_AllowFailsThenDataRefused_IsExit55:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Original.Protocol.Smtp.UnitTests/SmtpProtocolHandlerMai
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

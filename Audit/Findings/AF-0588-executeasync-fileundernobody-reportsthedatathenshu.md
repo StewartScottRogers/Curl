@@ -3,8 +3,8 @@ id: AF-0588
 title: ExecuteAsync_FileUnderNoBody_ReportsTheDataThenShuttingDownWithNoLineForExit8 never checks exit 8
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Smb.UnitTests/SmbProtocolHandlerVerboseTests.cs:ExecuteAsync_FileUnderNoBody_ReportsTheDataThenShuttingDownWithNoLineForExit8:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Original.Protocol.Smb.UnitTests/SmbProtocolHandlerVerbo
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

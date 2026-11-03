@@ -3,8 +3,8 @@ id: AF-0582
 title: WithNoSessionId_OffersNoSessionAndLeavesTheCacheAlone checks the kept session only for null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/HandBuiltTlsProviderTests.SessionIdAndBeast.cs:AuthenticateAsClientAsync_WithNoSessionId_OffersNoSessionAndLeavesTheCacheAlone:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitTests/HandBuiltTlsProviderTests.SessionI
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

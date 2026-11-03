@@ -3,8 +3,8 @@ id: AF-0612
 title: ADR-1228 says wrappers, Struct, Any and FieldMask keep their plain message form; the code gives each its own ProtoJSON form
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1228-protojson-timestamp-and-duration-are-strings.md:WellKnownTypesPlainForm:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Documentation/Planning/Decisions/ADR-1228-*.md -Pattern 'pla
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

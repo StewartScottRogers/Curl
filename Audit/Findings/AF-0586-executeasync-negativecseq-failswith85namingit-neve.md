@@ -3,8 +3,8 @@ id: AF-0586
 title: ExecuteAsync_NegativeCSeq_FailsWith85NamingIt never checks exit 85
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Rtsp.UnitTests/RtspProtocolHandlerTests.cs:ExecuteAsync_NegativeCSeq_FailsWith85NamingIt:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Original.Protocol.Rtsp.UnitTests/RtspProtocolHandlerTes
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

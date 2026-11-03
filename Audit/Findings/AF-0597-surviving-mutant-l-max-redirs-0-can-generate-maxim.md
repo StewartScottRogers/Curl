@@ -3,8 +3,8 @@ id: AF-0597
 title: Surviving mutant: -L --max-redirs 0 can generate -MaximumRedirection 2147483647 without a test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.CodeGeneration.UnitLibrary/PowerShellScript.cs:MaximumRedirection-lt:surviving-mutant
 reproduction: mutation Curl.Extension.CodeGeneration.UnitLibrary/PowerShellScript.cs:76:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

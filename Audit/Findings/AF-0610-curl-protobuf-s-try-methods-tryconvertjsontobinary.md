@@ -3,8 +3,8 @@ id: AF-0610
 title: Curl.Protobuf's Try... methods (TryConvertJsonToBinary, TryDecode, TryRead and others) return an error enum, not bool; AF-0539 renamed only TryParse
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Protobuf.UnitLibrary/Json/ProtobufJsonConverter.cs:TryConvertJsonToBinary:misleading-name
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

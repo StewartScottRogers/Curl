@@ -3,8 +3,8 @@ id: AF-0585
 title: Parse_AnEntryThatDoesNotParse_ReportsCurlsExit49Message never checks exit 49
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/ResolveOverridesTests.cs:Parse_AnEntryThatDoesNotParse_ReportsCurlsExit49Message:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitTests/ResolveOverridesTests.cs -Pattern 
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

@@ -3,8 +3,8 @@ id: AF-0609
 title: SmbReadResponse.TryGetData is named Try... but returns string? (null on success, error text on failure), not bool
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Original.Protocol.Smb.UnitLibrary/SmbReadResponse.cs:TryGetData:misleading-name
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Original.Protocol.Smb.UnitLibrary/SmbReadResponse.cs -P
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

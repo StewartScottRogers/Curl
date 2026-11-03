@@ -3,8 +3,8 @@ id: AF-0592
 title: Surviving mutant: a gRPC-Web reply ending in an empty frame can be refused as cut short without a test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.GrpcWeb.UnitLibrary/GrpcWebFraming.cs:PayloadAt-lt:surviving-mutant
 reproduction: mutation Curl.Extension.GrpcWeb.UnitLibrary/GrpcWebFraming.cs:67:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

@@ -3,8 +3,8 @@ id: AF-0600
 title: Surviving mutant: lib1396 can abort with 'returned NULL!' on an empty input without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1396.cs:Escape-lt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1396.cs:134:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

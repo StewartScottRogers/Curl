@@ -3,8 +3,8 @@ id: AF-0593
 title: Surviving mutant: an NSEC record's compressed next name can be accepted without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.Dane.UnitLibrary/Wire/DnsRecordDataDecoder.cs:DecodeNsec-false:surviving-mutant
 reproduction: mutation Curl.Extension.Dane.UnitLibrary/Wire/DnsRecordDataDecoder.cs:74:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

@@ -3,8 +3,8 @@ id: AF-0583
 title: ResolveParse_EntryInAnInvalidPartition_FailsWithCurlsExit49Text never checks exit 49
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/NetworkingAdversarialTests.cs:ResolveParse_EntryInAnInvalidPartition_FailsWithCurlsExit49Text:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitTests/NetworkingAdversarialTests.cs -Pat
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

@@ -3,8 +3,8 @@ id: AF-0605
 title: Surviving mutant: a header write starting with a bare LF can be taken as one line without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/HeaderLineTeeStream.cs:LengthOfFirstLine-lt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/HeaderLineTeeStream.cs:89:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

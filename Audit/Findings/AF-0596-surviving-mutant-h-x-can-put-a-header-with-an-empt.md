@@ -3,8 +3,8 @@ id: AF-0596
 title: Surviving mutant: -H ':x' can put a header with an empty name into generated code without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs:AddGiven-gt:surviving-mutant
 reproduction: mutation Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs:134:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

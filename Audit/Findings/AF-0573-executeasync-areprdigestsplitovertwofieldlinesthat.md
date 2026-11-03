@@ -3,8 +3,8 @@ id: AF-0573
 title: ExecuteAsync_AReprDigestSplitOverTwoFieldLinesThatDoesNotMatch_FailsWithExit56 never checks exit 56
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.ContentDigest.UnitTests/ContentDigestTransferHookTests.cs:ExecuteAsync_AReprDigestSplitOverTwoFieldLinesThatDoesNotMatch_FailsWithExit56_Rfc9530Section3:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Extension.ContentDigest.UnitTests/ContentDigestTransfer
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

@@ -3,8 +3,8 @@ id: AF-0587
 title: TransferAsync_OutputFailsWithAnotherIOException_Exits23Returned0 never checks exit 23
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Smb.UnitTests/SmbFileTransferTests.cs:TransferAsync_OutputFailsWithAnotherIOException_Exits23Returned0:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Original.Protocol.Smb.UnitTests/SmbFileTransferTests.cs
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

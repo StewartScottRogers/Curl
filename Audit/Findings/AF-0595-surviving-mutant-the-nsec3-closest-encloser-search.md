@@ -3,8 +3,8 @@ id: AF-0595
 title: Surviving mutant: the NSEC3 closest-encloser search can start above the name's own label count without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.Dane.UnitLibrary/Lookup/DenialOfExistence.cs:ClosestEncloser-minus1:surviving-mutant
 reproduction: mutation Curl.Extension.Dane.UnitLibrary/Lookup/DenialOfExistence.cs:116:-1
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

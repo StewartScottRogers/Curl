@@ -3,8 +3,8 @@ id: AF-0590
 title: Init_WithoutAnEngine_..._AndCreatesEasyTransfersFromIt checks the transfer only for null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Libcurl.UnitTests/Global/CurlGlobalTests.cs:Init_WithoutAnEngine_BuildsTheManagedEngine_AndCreatesEasyTransfersFromIt:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Libcurl.UnitTests/Global/CurlGlobalTests.cs -Pattern 'Assert
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

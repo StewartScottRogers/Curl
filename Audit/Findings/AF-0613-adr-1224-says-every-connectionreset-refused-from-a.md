@@ -3,8 +3,8 @@ id: AF-0613
 title: ADR-1224 says every ConnectionReset/Refused from a send or receive becomes exit 7; the channel converts it only until its first datagram arrives
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1224-closed-udp-port-is-exit-7.md:PortUnreachableReportingDatagramChannel:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Documentation/Planning/Decisions/ADR-1224-*.md -Pattern 'fro
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

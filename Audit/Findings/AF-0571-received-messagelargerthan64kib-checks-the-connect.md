@@ -3,8 +3,8 @@ id: AF-0571
 title: Received_MessageLargerThan64KiB checks the CONNECT only for null, not that it announces no Maximum Packet Size
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe/ReceivedPublishCases.cs:Received_MessageLargerThan64KiB_IsWrittenWholeSinceCurlAnnouncesNoMaximumPacketSize:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe/R
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

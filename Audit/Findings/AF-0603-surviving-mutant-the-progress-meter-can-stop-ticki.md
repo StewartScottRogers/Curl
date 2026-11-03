@@ -3,8 +3,8 @@ id: AF-0603
 title: Surviving mutant: the progress meter can stop ticking when only one of its outputs is set without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/TransferProgressRecorder.cs:TransferProgressRecorder-or:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferProgressRecorder.cs:174:||
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

@@ -3,8 +3,8 @@ id: AF-0608
 title: ADR-1232 names the gRPC descriptor option --proto; the option is --grpc-proto (--proto is curl's allowed-protocols option)
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1232-protojson-any-resolves-its-type-in-the-catalogue.md:--proto:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Documentation/Planning/Decisions/ADR-1232-*.md,Curl.Extended
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
