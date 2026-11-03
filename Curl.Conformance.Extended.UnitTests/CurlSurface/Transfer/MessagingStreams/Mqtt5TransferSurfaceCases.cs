@@ -211,11 +211,19 @@ public sealed class Mqtt5TransferSurfaceCases
     };
 
     // The connection line every transfer's -v writes (curl 8.22.0's "* Established connection to localhost (127.0.0.1
-    // port N) from ...", as the xmpp cases measured), and for mqtt5s a TLS line after it: the Schannel build's
-    // "* schannel: ..." on Windows, the OpenSSL build's "* SSL connection using TLSv1..." elsewhere.
-    private static string[] VerboseLines(string scheme) => scheme == "mqtt5s"
-        ? [$"* Established connection to localhost (127.0.0.1 port {Port(scheme)}) from ", OperatingSystem.IsWindows() ? "* schannel: " : "* SSL connection using TLSv1."]
-        : [$"* Established connection to localhost (127.0.0.1 port {Port(scheme)}) from "];
+    // port N) from ...", as the xmpp cases measured), and for mqtt5s a TLS line: the Schannel build's "* schannel: ..."
+    // after it on Windows, the OpenSSL build's "* SSL connection using TLSv1..." before it elsewhere, as the xmpp and
+    // redis cases pin (the OpenSSL build reports the handshake before the connection counts as established, BL-4666).
+    private static string[] VerboseLines(string scheme)
+    {
+        string connectionLine = $"* Established connection to localhost (127.0.0.1 port {Port(scheme)}) from ";
+        if (scheme != "mqtt5s")
+        {
+            return [connectionLine];
+        }
+
+        return OperatingSystem.IsWindows() ? [connectionLine, "* schannel: "] : ["* SSL connection using TLSv1.", connectionLine];
+    }
 
     private static TransferSurfaceRoute Route(string scheme, Func<Mqtt5WirePacket, byte[]> answerSubscribe) => scheme switch
     {
