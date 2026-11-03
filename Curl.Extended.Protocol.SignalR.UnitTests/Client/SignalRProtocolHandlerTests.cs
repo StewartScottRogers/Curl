@@ -44,6 +44,19 @@ public sealed class SignalRProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task WithoutData_HubCallWithInvocationId_IsAnsweredWithACompletionError_HubProtocolInvocationAndCompletion()
+    {
+        ScriptedConnection webSocket = Hub("{}", "{\"type\":1,\"invocationId\":\"s1\",\"target\":\"Ask\",\"arguments\":[]}", "{\"type\":7}");
+        var output = new MemoryStream();
+
+        TransferResult result = await Run(Connector(webSocket), "signalr://example.com/chat", output, null);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("[\"Ask\"]\n", Encoding.UTF8.GetString(output.ToArray()));
+        StringAssert.Contains(webSocket.WrittenText, "{\"type\":3,\"invocationId\":\"s1\",\"error\":\"Client didn\\u0027t provide a result.\"}\u001e");
+    }
+
+    [TestMethod]
     public async Task StreamInvocation_WritesEachStreamItemOfItsInvocation_HubProtocolStreamInvocationAndStreamItem()
     {
         ScriptedConnection webSocket = Hub(

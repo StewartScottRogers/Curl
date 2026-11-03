@@ -11,7 +11,6 @@ Mqtt5:MQTT5-3.1.2.10-1 BL-4575
 Amqp1:Core-2.4.5-1 BL-4583
 Amqp1:Core-2.4.3-2 BL-4584
 Amqp1:Core-2.6.5-1 BL-4585
-SignalR:HUB-Invocation-3 BL-4583
 SignalR:RFC6455-1.4-1 BL-4584
 OciRegistry:IMAGE-Descriptor-Digests-1 BL-4583
 OciRegistry:DIST-PullManifests-2 BL-4584
