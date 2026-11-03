@@ -3,8 +3,8 @@ id: AF-0536
 title: Surviving mutant: AltSvcTransferCache.SameDestinationVersion can invert which alt-svc entries race HTTP/3 without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/AltSvcTransferCache.cs:SameDestinationVersion-eq:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/AltSvcTransferCache.cs:268:==
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-02: filed proposed.
+- 2026-11-02: proposed -> accepted.
