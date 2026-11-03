@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4726 — Fix CI failure RoundTrip_FieldMask_IsOneStringOfLowerCamelCasePaths on Linux and Windows
 
@@ -26,11 +26,16 @@ Lanes test only on Windows, so reproduce with `gh run view 41632220793 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `RoundTrip_FieldMask_IsOneStringOfLowerCamelCasePaths` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `RoundTrip_FieldMask_IsOneStringOfLowerCamelCasePaths` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+- Cause: `KnownFailurePassedException`. BL-4721 made Grpc:ProtoJson-FieldMask-1 pass (along with Struct-1 and Wrappers-1, which are BL-4725 and BL-4724), but `KnownFailures.txt` still listed it. Commit 1df901115 (BL-4691) already dropped those lines and is on this branch, so this task needs no code change.
+- Checked locally: `GrpcProtoJsonWellKnownCases` passes 6 of 6. The `Curl.Conformance.Extended.UnitTests` fast tests: 1719 passed, 0 failed, 1 skipped.
+- CI on Linux and macOS: the fix only removes lines from a text file, and nothing in it depends on the platform, so this criterion is ticked under rule 11. The shift's CI watch files a task for any failure.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 7f4f300e.
+- 2026-11-03: Doing -> Done. RoundTrip_FieldMask passes: its stale KnownFailures.txt line was already dropped by 1df901115
