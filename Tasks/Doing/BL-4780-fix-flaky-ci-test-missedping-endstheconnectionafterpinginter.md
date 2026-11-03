@@ -30,3 +30,4 @@ Found by BL-4755's run on 2026-11-03: in `dotnet test --filter "TestCategory!=In
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 740dd9e0 9742157d.
