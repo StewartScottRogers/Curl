@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Stomp.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4713 — Fix AF-0565: StompProtocolHandler.ContentTypeOf's doc cites ADR-1210 (Socket.IO pings) for the -H content-type rule that ADR-1220 decides
 
@@ -52,3 +52,4 @@ Comment-only fix: StompProtocolHandler.cs:70 now cites ADR-1220; StompClientFlow
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Doc comments cite ADR-1220
