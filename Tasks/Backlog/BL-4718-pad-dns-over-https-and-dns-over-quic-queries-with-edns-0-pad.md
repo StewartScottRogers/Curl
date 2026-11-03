@@ -1,5 +1,5 @@
 ---
-id: BL-4691
+id: BL-4718
 title: Pad DNS over HTTPS and DNS over QUIC queries with EDNS(0) Padding
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-03
 completed:
 ---
-# BL-4691 — Pad DNS over HTTPS and DNS over QUIC queries with EDNS(0) Padding
+# BL-4718 — Pad DNS over HTTPS and DNS over QUIC queries with EDNS(0) Padding
 
 ## Goal
 

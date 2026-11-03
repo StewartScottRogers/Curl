@@ -30,7 +30,7 @@ Found by BL-4681: `DnsOverTlsCases.Tls_Query_IsPaddedWithTheEdnsPaddingOption` (
 
 - Plan: `Wire/DnsEdnsPadding.Pad` appends an OPT record (root, TYPE 41, CLASS 1232, TTL 0) with one Padding option (code 12) whose zero octets bring the query to a multiple of 128 octets, and adds one to ARCOUNT; `Transport/Tls/DnsTlsTransport` pads the query just before framing it. The handler and other transports are unchanged, so the change stays inside this task's `touches`. Policy recorded in ADR-1230.
 - Choices: CLASS (UDP payload size) 1232, DNS Flag Day 2020's value, since it means nothing over TLS but must be set to something; a query already on a 128-octet boundary still carries an empty Padding option, so every DoT query has the same shape.
-- DoH and DoQ padding (RFC 8467 section 4.1) are filed as BL-4691; they live in `Transport/Https` and `Transport/Quic`, outside this task's `touches`.
+- DoH and DoQ padding (RFC 8467 section 4.1) are filed as BL-4718; they live in `Transport/Https` and `Transport/Quic`, outside this task's `touches`.
 - Unit tests: `DnsEdnsPaddingTests` (three cases) and `DnsTlsTransportTests.ExchangeAsync_Rfc8310Section9_PadsTheQueryWithTheEdnsPaddingOption` pin the fix (ADR-0482). The conformance case passes with its KnownFailures line removed.
 - Verified: build `-warnaserror` clean; the fast tests are green (DnsQuery.UnitTests 226, Conformance.Extended.UnitTests 1698 passed); `Measure-CodeQuality.ps1 -Library Curl.Extended.Protocol.DnsQuery.UnitLibrary` reports 0 failing members. The change is pure byte arithmetic, so it does not depend on the platform.
 - `dotnet format --verify-no-changes` flags import ordering in `Client/DnsQueryExtension.cs`, which this change does not touch and which is outside `touches`; left as it is.
