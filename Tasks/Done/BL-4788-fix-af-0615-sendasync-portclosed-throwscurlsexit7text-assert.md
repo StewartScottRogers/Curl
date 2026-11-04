@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4788 — Fix AF-0615: SendAsync_PortClosed_ThrowsCurlsExit7Text asserts only the text its own fake supplies, never exit 7 or curl's exit-7 text
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- SendAsync_PortClosed_ThrowsCurlsExit7Text now opens the channel through UdpDatagramConnector (the production wiring, as its receive sibling does) with both ConnectionReset and ConnectionRefused, and asserts curl's exit 7 text "Failed to connect to localhost:1 after 7 ms: Could not connect to server" and the kept socket error, so a send to a closed port reporting anything else fails it. DatagramPortUnreachableException carries no exit code of its own, so the text is the exit 7 assertion. Test-only change: no production code, so no quality run. Platform-neutral (fakes only).
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. SendAsync_PortClosed_ThrowsCurlsExit7Text asserts curl's exit 7 text through the connector
