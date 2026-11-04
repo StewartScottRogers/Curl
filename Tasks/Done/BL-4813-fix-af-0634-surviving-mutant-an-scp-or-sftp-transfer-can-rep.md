@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests/TransferPerformerTests.Setup.cs]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4813 — Fix AF-0634: Surviving mutant: an scp or sftp transfer can report its known-hosts file missing while one exists, and no test fails
 
@@ -41,12 +41,19 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The production code was already right; the gap was a test. Added `ResolveSshOptionsAsync_KnownHostsFileFoundWithoutInsecure_RecordsItPresentWritesNothingAndGoesOn` to `Curl.Engine.UnitTests/TransferPerformerTests.Setup.cs`: no `-k`, a known-hosts file found, so the test checks there is no failure, nothing goes to stderr, the file is recorded as present (`missing` false) and the SSH options are set.
+- Widened `touches` to that test file, the only file changed (no production change). No task in Doing on `origin/work/dark-factory` names `Curl.Engine.UnitTests`.
+- Reproduction: a lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so I applied the mutant (`&&` -> `||` at `TransferPerformer.Setup.cs:287`) by hand with the Edit tool. With the mutant in place the new test failed (1 failed, 6 passed of the `ResolveSshOptionsAsync` tests), so the mutant is killed. Then I reverted it.
+- `dotnet build` (whole solution): 0 warnings, 0 errors. Fast tests on the whole solution: no failures. `Curl.Engine.UnitTests`: 2971 passed, 7 skipped.
+- No quality run: no production code changed, so coverage and complexity cannot change.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. A test now kills the AF-0634 mutant: an sftp transfer that finds its known-hosts file without -k is recorded as not missing and writes no warning
