@@ -3,8 +3,8 @@ id: AF-0657
 title: Surviving mutant: a pinned-public-key file of exactly 1 MiB can be refused
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/PinnedPublicKey.cs:ReadKeyFile-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/PinnedPublicKey.cs:165:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
