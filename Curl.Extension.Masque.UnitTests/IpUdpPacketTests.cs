@@ -77,6 +77,20 @@ public sealed class IpUdpPacketTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void TryRead_AnEmptyDatagram_GivesBackAnEmptyPayload(bool isIPv6)
+    {
+        var (source, destination) = isIPv6 ? (Client6, Server6) : (Client4, Server4);
+
+        Assert.IsTrue(IpUdpPacket.TryRead(IpUdpPacket.Build(new(source, destination, Array.Empty<byte>())), out var datagram));
+
+        Assert.AreEqual(source, datagram!.Source);
+        Assert.AreEqual(destination, datagram.Destination);
+        Assert.IsTrue(datagram.Payload.IsEmpty);
+    }
+
+    [TestMethod]
     public void TryRead_IPv4WithTrailingBytesAndOptions_ReadsOnlyThePacket()
     {
         var built = IpUdpPacket.Build(new(Client4, Server4, new byte[] { 7 }));
