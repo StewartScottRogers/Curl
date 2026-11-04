@@ -40,3 +40,4 @@ The diff does not cause a regression: the old board-capacity ceiling was looser.
 ## Log
 
 - 2026-11-04: Created by the shift-end review.
+- 2026-11-04: Backlog -> Doing. Criteria at claim: 38fe2ec7 00a3a3aa 15c97c46 c8bbfacb 931a4d17.
