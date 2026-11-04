@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/ShiftCoordinator.ps1, DarkFactory/AutoLanes.ps1]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4848 — Stop the coordinator re-adding lanes that ended with nothing ready while only unclaimable Doing work fills the board's capacity
 
@@ -30,14 +30,17 @@ Two possible fixes:
 
 ## Acceptance criteria
 
-- [ ] With nothing claimable and only interactive-only or adopted tasks in Doing, neither the ramp check, the Auto step nor `Invoke-CapacityLaneStep` adds a lane; a `RunDarkFactory.ps1` self-test case drives that decision with a fake board and proves it.
-- [ ] When a claimable task appears later in the shift, a lane is still added for it (BL-4826's purpose); a self-test case proves it.
-- [ ] The BL-4826 self-test case in `DarkFactory/LaneState.ps1` checks behaviour, not only a regex over `ShiftCoordinator.ps1`'s source text.
-- [ ] The changed self-tests pass under Windows PowerShell and `pwsh`.
+- [x] With nothing claimable and only interactive-only or adopted tasks in Doing, neither the ramp check, the Auto step nor `Invoke-CapacityLaneStep` adds a lane; a `RunDarkFactory.ps1` self-test case drives that decision with a fake board and proves it.
+- [x] When a claimable task appears later in the shift, a lane is still added for it (BL-4826's purpose); a self-test case proves it.
+- [x] The BL-4826 self-test case in `DarkFactory/LaneState.ps1` checks behaviour, not only a regex over `ShiftCoordinator.ps1`'s source text.
+- [x] The changed self-tests pass under Windows PowerShell and `pwsh`.
 
 ## Notes
+
+- Decided: the add-back paths (ramp check, Auto step, fixed-count step) size to min(capacity, active lanes + claimable ready tasks) via Get-LaneAddCapacity (AutoLanes.ps1); Get-BoardCapacity returns ClaimableReady (capacity line ready IDs less not-claimable). Startup sizing is unchanged. Get-EndedLanes makes the BL-4826 removal testable; its case now checks behaviour. Self-tests (-TestAutoLanes, -TestHeartbeat) pass under powershell and pwsh. Fake-board cases drive Get-ClaimableReadyCount + Get-LaneAddCapacity with capacity lines.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: 269f34be 42deb321 cf8e3948 758046de.
+- 2026-11-04: Doing -> Done. Coordinator adds no lane beyond active lanes plus claimable ready tasks

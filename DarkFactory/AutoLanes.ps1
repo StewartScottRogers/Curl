@@ -275,6 +275,30 @@ function Get-FixedStartCount {
     return [pscustomobject]@{ Count = $count; Why = $why }
 }
 
+function Get-ClaimableReadyCount {
+    # The ready tasks the capacity line names that a lane may claim now: those it names less
+    # -NotClaimableIds (BL-4848). $null when the line has no count.
+    param([string]$CapacityLine, [string[]]$NotClaimableIds = @())
+    if ($CapacityLine -notmatch '(?m)^Capacity (\d+):') { return $null }
+    return @(Get-CapacityReadyIds $CapacityLine | Where-Object { $NotClaimableIds -notcontains $_ }).Count
+}
+
+function Get-LaneAddCapacity {
+    # The capacity the add-back paths (ramp check, Auto step, fixed-count step) size to: the
+    # board's -Capacity counts every task in Doing, interactive-only and adopted ones too, which
+    # no new lane can take, so a lane is added only for a ready task a lane may claim: at most
+    # -Current lanes plus -ClaimableReady (BL-4848). Never above -Capacity.
+    param([int]$Capacity, [int]$Current, [int]$ClaimableReady)
+    return [math]::Min($Capacity, $Current + $ClaimableReady)
+}
+
+function Get-EndedLanes {
+    # The -Active lanes that have written their summary (-Finished), whether retired or ended
+    # with nothing ready: they leave the active set (BL-4826).
+    param([int[]]$Active, [int[]]$Finished)
+    return @($Active | Where-Object { $Finished -contains $_ })
+}
+
 function Test-LanesFinished {
     # True once every active lane is among the finished ones (has written its summary).
     param([int[]]$Active, [int[]]$Finished)
@@ -436,6 +460,12 @@ if ($TestAutoLanes) {
         ,@('fixed start 9 capacity 1', '1 (-Lanes 9, capped at 1: 1 ready task can run at once)', "$((Get-FixedStartCount -Requested 9 -Capacity 1) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('fixed start 9 capacity 0', '1 (-Lanes 9, capped at 1: no ready task can run)', "$((Get-FixedStartCount -Requested 9 -Capacity 0) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('fixed start 9 capacity 2 adopted 6', '6 (lane 6 adopted from the previous shift)', "$((Get-FixedStartCount -Requested 9 -Capacity 2 -Adopted 6) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
+        ,@('add capacity with nothing claimable stays at the current lanes', '3', "$(Get-LaneAddCapacity -Capacity 5 -Current 3 -ClaimableReady (Get-ClaimableReadyCount -CapacityLine 'Capacity 5: 5 in Doing, none more can start.'))")
+        ,@('add capacity with only an interactive-only ready task stays at the current lanes', '3', "$(Get-LaneAddCapacity -Capacity 5 -Current 3 -ClaimableReady (Get-ClaimableReadyCount -CapacityLine 'Capacity 5: 4 in Doing, 1 more can start (BL-7).' -NotClaimableIds 'BL-7'))")
+        ,@('add capacity when a claimable task appears adds a lane for it', '4', "$(Get-LaneAddCapacity -Capacity 6 -Current 3 -ClaimableReady (Get-ClaimableReadyCount -CapacityLine 'Capacity 6: 5 in Doing, 1 more can start (BL-8).'))")
+        ,@('add capacity never exceeds the board capacity', '4', "$(Get-LaneAddCapacity -Capacity 4 -Current 3 -ClaimableReady 5)")
+        ,@('ended lanes are those whose summary exists', '2,4', "$((Get-EndedLanes -Active 1, 2, 3, 4 -Finished 2, 4, 9) -join ',')")
+        ,@('claimable ready count with no count', 'null', "$(if ($null -eq (Get-ClaimableReadyCount -CapacityLine 'oops')) { 'null' } else { 'a count' })")
         ,@('lanes-finished 1,3 of 1,2', 'False', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 2)")
         ,@('lanes-finished 1,3 of 1,3', 'True', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 3)")
         ,@('ci-fix lane for the oldest CI fix past the grace with every lane busy', 'BL-4052: waiting 21 min in Backlog with all 8 lanes busy', "$((Get-CiFixLaneDecision -Waiting @{ 'BL-4299' = 40.5; 'BL-4052' = 21.2 } -FreeLanes 0 -Active 8) | ForEach-Object { "$($_.Id): $($_.Why)" })")

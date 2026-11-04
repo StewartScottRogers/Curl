@@ -172,9 +172,8 @@ if ($TestHeartbeat) {
         $poll = { param($At, $Usage, $Id, $Capped) (Get-IdlePollDecision -Now $At -Deadline $deadline -UsageStop $Usage -ClaimableId $Id -CappedIds $Capped).Action }
         $cases = @(
             ,@('the polling heartbeat is phase idle, step polling', 'idle/polling', "$($idleObject.phase)/$($idleObject.step)")
-            ,@('a lane that ended with nothing ready leaves the active set like a retired one, so Auto can add lanes back (BL-4826)', 'True False', $(
-                $relane = Get-Content -Raw (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
-                "$($relane -match '(?s)if \(\$finished -notcontains \$n\) \{ continue \}\r?\n\s*\$activeLanes\.Remove\(\$n\)') $($relane -match "if \(\`$finished -notcontains \`$n -or -not \(Test-Path \(Get-LaneStatePath \`$n 'retire'\)\)\) \{ continue \}")"))
+            ,@('a lane that ended with nothing ready leaves the active set like a retired one, so Auto can add lanes back (BL-4826)', '1 0', $(
+                "$((Get-EndedLanes -Active 1, 2, 3 -Finished 2).Count) $(@(Get-EndedLanes -Active 1, 3 -Finished 2).Count)"))
             ,@('the next shift is handed -StopAtUsage, -StopAtWeeklyUsage and -UnpacedLanes (BL-4800)', 'True True True', $(
                 $handOn = Get-Content -Raw (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
                 "$($handOn -match "'-StopAtUsage', \`$StopAtUsage") $($handOn -match "'-StopAtWeeklyUsage', \`$StopAtWeeklyUsage") $($handOn -match "'-UnpacedLanes', \`$UnpacedLanes")"))

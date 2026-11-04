@@ -75,7 +75,7 @@ function Get-BoardCapacity {
             # recent run costs every cap comes from are read once for the whole check (BL-3988).
             $tasksDir = Join-Path $AutoBoardDir 'Tasks'
             $notClaimable = @(Invoke-WithRecentRunCostsReadOnce { Get-CapacityReadyIds $line | Where-Object { Get-TaskNotClaimableWhy $_ -TasksDir $tasksDir } })
-            return [pscustomobject]@{ Capacity = (Get-ClaimableCapacity $line $notClaimable); Created = $created; Why = '' }
+            return [pscustomobject]@{ Capacity = (Get-ClaimableCapacity $line $notClaimable); ClaimableReady = (Get-ClaimableReadyCount $line $notClaimable); Created = $created; Why = '' }
         }
         return [pscustomobject]@{ Capacity = $null; Created = $created; Why = "the board printed no capacity: $(Get-Short $out 60)" }
     } catch {
