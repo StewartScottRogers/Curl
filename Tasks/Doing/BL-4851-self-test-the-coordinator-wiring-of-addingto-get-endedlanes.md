@@ -39,3 +39,4 @@ LaneState.ps1's BL-4800 case already matches `ShiftCoordinator.ps1`'s source; fo
 ## Log
 
 - 2026-11-04: Created by the shift-end review.
+- 2026-11-04: Backlog -> Doing. Criteria at claim: d77cfb76 b1807ad1 16e60c1f 39cb9f86.
