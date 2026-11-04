@@ -3,8 +3,8 @@ id: AF-0661
 title: Surviving mutant: lib547's ioctl callback can rewind on every command except RestartRead
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib547.cs:Ioctl-eq:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib547.cs:103:==
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
