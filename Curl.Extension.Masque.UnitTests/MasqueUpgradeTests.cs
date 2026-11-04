@@ -22,6 +22,7 @@ public sealed class MasqueUpgradeTests
     [TestMethod]
     [DataRow("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: connect-udp", false)]
     [DataRow("HTTP/1.1 101 Switching Protocols\r\nbad line\r\nupgrade:CONNECT-IP\r\nconnection: keep-alive, upgrade", true)]
+    [DataRow("HTTP/1.1 101\r\nConnection: Upgrade\r\nUpgrade: connect-udp", false)]
     public void CheckReply_101WithTheUpgradeHeaders_Opens(string head, bool isConnectIp) =>
         MasqueUpgrade.CheckReply(head, isConnectIp ? MasqueTunnelKind.ConnectIp : MasqueTunnelKind.ConnectUdp);
 
