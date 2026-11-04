@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4816 — Fix AF-0637: Surviving mutant: the Schannel wildcard check can refuse a host whose first label is one character, and no test fails
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `PatternMatchesHost_WildcardAgainstAOneCharacterLeftMostLabel_IsTrue` (`*.hello.com` against `a.hello.com`) to `Curl.Networking.UnitTests/SchannelCommonNameCheckTests.cs`; test only, no production change.
+- The lane guard refuses `Audit/Tools/Invoke-MutationTest.ps1`, so the reproduction was run by hand: applying the mutant (`hostLabelEnd < 1` -> `<= 1` at SchannelCommonNameCheck.cs:67) makes the new test fail (killed); reverted afterwards. The re-audit runs the tool itself.
+- `dotnet build` clean; fast tests green (114 test assemblies passed, none failed). Platform-neutral: pure string matching.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. A one-character first label now has a test, so the AF-0637 mutant is killed
