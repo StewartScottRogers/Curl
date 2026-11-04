@@ -53,3 +53,4 @@ Fix (2026-11-04, interactive): the CI watch now reruns the failed jobs of the ne
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-04: Doing -> Backlog. Fix landed; criterion 1 waits for a factory shift's logs after it.
