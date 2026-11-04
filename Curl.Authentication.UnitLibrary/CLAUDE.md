@@ -35,7 +35,7 @@ context is kept between legs), and nothing after Type 3. The router gives SSPI o
 `HandBuiltNtlmSecurityContext` (curl's own NTLM, over `Curl.Ntlm`'s `NtlmChallengeAnswerer`)
 elsewhere; a Type 2 the context cannot answer throws `HttpAuthenticationFailedException`
 (exit 94) where the SSPI build is matched (the constructor's `matchesSspiBuild`, set on
-Windows by `CurlComposition`) unless the context is `HandBuiltNtlmSecurityContext` (a run that
+Windows by `EngineComposition`) unless the context is `HandBuiltNtlmSecurityContext` (a run that
 answers NTLM with curl's own context is the non-SSPI build, BL-1999), and sends nothing elsewhere, except that a Type 3
 past curl's 1024-byte buffer (the hand-built context's `Refused`) fails with exit 100,
 "user + domain + hostname too big for NTLM" (BL-849), or "incoming NTLM message too big" when the context's `AnswerRefusedBecause` says the responses alone overflowed it (BL-1128).
