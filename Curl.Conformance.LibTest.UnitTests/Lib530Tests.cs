@@ -75,6 +75,27 @@ public sealed class Lib530Tests
     }
 
     [TestMethod]
+    public async Task TestOneAsync_TimerExpires_RunsTheTimeoutActionOnlyThenAndSucceeds()
+    {
+        var engine = new FakeCurlEngine();
+        var multi = engine.Multi;
+        var clock = new ManualTimeProvider(DateTimeOffset.UnixEpoch);
+        int waits = 0;
+        multi.Waiting = () => clock.Advance(TimeSpan.FromMilliseconds(++waits == 2 ? 50 : 0));
+        int timeouts = 0;
+        multi.SocketActing = (socket, _) => socket != CurlMultiSockets.Timeout
+            ? (CurlMultiCode.Ok, 1)
+            : ++timeouts == 1 ? Code(Timer(multi, 50) | Socket(multi, First, CurlPoll.In), 1) : Finish(multi, CurlCode.Ok);
+        var (lib530, _) = Create(engine, clock);
+
+        CurlCode result = await lib530.TestOneAsync(CurlGlobal.Init(engine), CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, result);
+        Assert.AreEqual(2, timeouts);
+        Assert.AreEqual(2, waits);
+    }
+
+    [TestMethod]
     public async Task TestOneAsync_TimeoutActionFails_BadTimeout()
     {
         var engine = new FakeCurlEngine();
