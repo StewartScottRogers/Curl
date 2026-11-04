@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Integrate.ps1]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4785 — Stop the integration quality-gate check passing when it cannot measure or commit
 
@@ -28,15 +28,18 @@ Found by the shift-end review of 2026-11-03 (silent-failure-hunter, Important), 
 
 ## Acceptance criteria
 
-- [ ] A failed `git diff` in `Test-QualityGates` returns a non-empty reason, not `''`.
-- [ ] An unreadable report returns a non-empty reason and writes a trace line.
-- [ ] When the measure writes no report, the trace carries the last lines of its output.
-- [ ] `Repair-QualityGates` returns a reason when `add` or `commit` fails.
-- [ ] `-TestIntegrateLock` (or another `-Test*` self-test) covers each case.
+- [x] A failed `git diff` in `Test-QualityGates` returns a non-empty reason, not `''`.
+- [x] An unreadable report returns a non-empty reason and writes a trace line.
+- [x] When the measure writes no report, the trace carries the last lines of its output.
+- [x] `Repair-QualityGates` returns a reason when `add` or `commit` fails.
+- [x] `-TestIntegrateLock` (or another `-Test*` self-test) covers each case.
 
 ## Notes
+
+Test-QualityGates returns "quality gates not measured: ..." for a failed git diff or an unreadable report (traced); the no-report trace carries the measure's last output (default measure no longer discards it); Repair-QualityGates returns a reason when add or commit fails. Covered by four -TestIntegrateLock cases (all pass). Trace lines truncate at 118 chars, so the output tail is cut to 60.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: d6bb2f4f 3d5d9b50 bb98ace9 19b6af10 c809f201.
+- 2026-11-03: Doing -> Done. quality-gate check no longer passes when it cannot measure or commit

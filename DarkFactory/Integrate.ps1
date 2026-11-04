@@ -136,21 +136,35 @@ function Test-QualityGates {
     # that writes no report (a build or test failure) is left to Test-Green. -Measure (libraries,
     # report path -> runs it) stands in for the script in -TestIntegrateLock.
     param([string]$Id, [string]$Base, [scriptblock]$Measure)
-    $changed = @(& git -C $Root diff --name-only "$Base...HEAD" 2>$null | Where-Object { $_ })
+    $diff = @(& git -C $Root diff --name-only "$Base...HEAD" 2>$null)
+    if ($LASTEXITCODE -ne 0) {
+        Write-Trace $Id 'quality' "git diff against $Base failed; the changed files are unknown" 'DarkYellow'
+        return "quality gates not measured: git diff against $Base failed"
+    }
+    $changed = @($diff | Where-Object { $_ })
     $libraries = @(Get-GatedLibraries $changed)
     if (-not $libraries.Count) { return '' }
     if (-not $Measure) {
         $Measure = {
             param([string[]]$Libraries, [string]$JsonPath)
-            & (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'Measure-CodeQuality.ps1') -Library ($Libraries -join ',') -JsonPath $JsonPath 2>&1 | Out-Null
+            & (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'Measure-CodeQuality.ps1') -Library ($Libraries -join ',') -JsonPath $JsonPath 2>&1
         }
     }
     $json = Join-Path ([IO.Path]::GetTempPath()) "df-quality-$Lane-$PID.json"
     Remove-Item $json -ErrorAction SilentlyContinue
     Write-Trace $Id 'quality' "measuring $($libraries -join ', ') before integrating"
-    & $Measure -Libraries $libraries -JsonPath $json
-    if (-not (Test-Path $json)) { Write-Trace $Id 'quality' 'the measure wrote no report; left to the build and tests' 'DarkYellow'; return '' }
-    try { $report = Get-Content $json -Raw | ConvertFrom-Json } catch { return '' } finally { Remove-Item $json -ErrorAction SilentlyContinue }
+    $output = @(& $Measure -Libraries $libraries -JsonPath $json)
+    if (-not (Test-Path $json)) {
+        $tail = Get-Short ((@($output | ForEach-Object { "$_" } | Where-Object { $_.Trim() } | Select-Object -Last 5)) -join ' | ') 60
+        Write-Trace $Id 'quality' "no report (left to build and tests); it said: $tail" 'DarkYellow'
+        return ''
+    }
+    try { $report = Get-Content $json -Raw | ConvertFrom-Json }
+    catch {
+        Write-Trace $Id 'quality' "the measure's report is unreadable: $(Get-Short "$($_.Exception.Message)" 200)" 'DarkYellow'
+        return "quality gates not measured: the report is unreadable"
+    }
+    finally { Remove-Item $json -ErrorAction SilentlyContinue }
     $misses = @(Get-QualityGateMisses -Report $report -ChangedPaths $changed -RepoRoot $Root)
     if (-not $misses.Count) { Write-Trace $Id 'quality' "gates met in the files it changed ($($libraries -join ', '))"; return '' }
     return "quality gates missed by $($misses.Count) member(s) of files it changed: $(Get-Short ($misses -join '; ') 300)"
@@ -164,8 +178,8 @@ function Repair-QualityGates {
     Set-HeartbeatStep @('repair', 'quality gates')
     Invoke-TaskRun -Id $Id -Text $QualityRepairPrompt.Replace('{RED}', $Red) -Deny $LaneForbidden -Suffix '-quality' -Minutes 30 | Out-Null
     if (Test-WorktreeDirty $Root) {
-        Invoke-Git @('add', '-A') | Out-Null
-        Invoke-Git @('commit', '-q', '-m', "fix: meet the quality gates for $Id") | Out-Null
+        if (-not (Invoke-Git @('add', '-A'))) { return "$Red; the repair run's changes could not be staged" }
+        if (-not (Invoke-Git @('commit', '-q', '-m', "fix: meet the quality gates for $Id"))) { return "$Red; the repair run's commit failed" }
     }
     $still = Test-QualityGates -Id $Id -Base 'FETCH_HEAD'
     if ($still) { return "$still, still after a repair run" }
@@ -489,6 +503,41 @@ if ($TestIntegrateLock) {
                 $r = Test-QualityGates -Id 'BL-001' -Base 'origin/work' -Measure { param($Libraries, $JsonPath) $script:measured = 'measured' } 6>$null
                 & $fresh
                 "'$r' $(if ($script:measured) { 'measured' } else { 'not measured' })" })
+            ,@('a failed git diff fails the quality check with a reason rather than passing it as no gated change (BL-4785)', "'quality gates not measured: git diff against no-such-ref failed'", {
+                & $fresh
+                $r = Test-QualityGates -Id 'BL-001' -Base 'no-such-ref' -Measure { param($Libraries, $JsonPath) } 6>$null
+                "'$r'" })
+            ,@('an unreadable report fails the quality check with a reason and a trace line (BL-4785)', "'quality gates not measured: the report is unreadable' True", {
+                & $fresh
+                New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Curl.Foo.UnitLibrary') | Out-Null
+                Set-Content -Path (Join-Path $repo 'Curl.Foo.UnitLibrary\Bad.cs') -Value 'class Bad { }'
+                git -C $repo add -A 2>&1 | Out-Null; git -C $repo commit -q -m bad 2>&1 | Out-Null
+                $trace = $null
+                $r = Test-QualityGates -Id 'BL-001' -Base 'origin/work' -Measure { param($Libraries, $JsonPath) Set-Content -Path $JsonPath -Value '{ "failing": [' } 6>&1 | Out-String -OutVariable trace
+                $line = "$trace" -match 'report is unreadable'
+                & $fresh
+                "'$("$r".Trim().Split("`n")[-1].Trim())' $line" })
+            ,@('a measure that writes no report leaves its last output lines in the trace (BL-4785)', "'' True", {
+                & $fresh
+                New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Curl.Foo.UnitLibrary') | Out-Null
+                Set-Content -Path (Join-Path $repo 'Curl.Foo.UnitLibrary\NoReport.cs') -Value 'class NoReport { }'
+                git -C $repo add -A 2>&1 | Out-Null; git -C $repo commit -q -m noreport 2>&1 | Out-Null
+                $all = Test-QualityGates -Id 'BL-001' -Base 'origin/work' -Measure { param($Libraries, $JsonPath) 'build failed: CS1002 somewhere' } 6>&1
+                $returned = @($all | Where-Object { $_ -is [string] })
+                $trace = ($all | Out-String)
+                & $fresh
+                "'$($returned -join '')' $($trace -match 'CS1002 somewhere')" })
+            ,@('a repair run whose add or commit fails returns a reason rather than measuring the unfixed commit (BL-4785)', "'RED; the repair run's changes could not be staged' 'RED; the repair run's commit failed'", {
+                $QualityRepairPrompt = 'fix {RED}'; $LaneForbidden = @()
+                function Set-HeartbeatStep { param($Step) }
+                function Invoke-TaskRun { param($Id, $Text, $Deny, $Suffix, $Minutes) }
+                function Test-WorktreeDirty { param($Path) $true }
+                function Test-QualityGates { param([string]$Id, [string]$Base) 'must not be measured' }
+                function Invoke-Git { param([string[]]$GitArgs) $GitArgs[0] -ne 'add' -and $false }
+                $a = Repair-QualityGates -Id 'BL-001' -Red 'RED' 6>$null
+                function Invoke-Git { param([string[]]$GitArgs) $GitArgs[0] -eq 'add' }
+                $b = Repair-QualityGates -Id 'BL-001' -Red 'RED' 6>$null
+                "'$a' '$b'" })
             ,@('a run''s code that misses a quality gate is not pushed (BL-4649)', "'quality gates missed by 1 member(s)' 0 verifies, lane work shared: False", {
                 function Test-QualityGates { param([string]$Id, [string]$Base) 'quality gates missed by 1 member(s)' }
                 & $laneRequeues 'Backlog' 'requeued-quality-{0}.txt' })
