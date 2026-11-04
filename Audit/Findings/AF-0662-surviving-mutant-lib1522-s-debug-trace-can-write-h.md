@@ -3,8 +3,8 @@ id: AF-0662
 title: Surviving mutant: lib1522's debug trace can write hex dumps (noHex false)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1522.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1522.cs:63:true
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
