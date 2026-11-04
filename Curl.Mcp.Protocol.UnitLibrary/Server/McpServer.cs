@@ -93,11 +93,12 @@ public sealed class McpServer
         {
             while (await _transport.ReadMessageAsync(cancellationToken).ConfigureAwait(false) is { } message)
             {
-                Task dispatched = DispatchAsync(message, cancellationToken);
+                // Dispatched under the lock the shutdown's snapshot takes, so a request whose handler has
+                // started is always among the requests the shutdown waits for (BL-4804).
                 lock (running)
                 {
                     running.RemoveAll(task => task.IsCompleted);
-                    running.Add(dispatched);
+                    running.Add(DispatchAsync(message, cancellationToken));
                 }
             }
         }
