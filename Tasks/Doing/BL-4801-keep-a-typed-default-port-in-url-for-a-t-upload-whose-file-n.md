@@ -35,3 +35,4 @@ curl's `add_file_name_to_url` (src/tool_operhlp.c) rebuilds the URL with `curl_u
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: c86925db c33c592f 86ffbf95 8535b192 3d836d5e.
