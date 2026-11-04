@@ -26,13 +26,16 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since <date>
 - `-OutFile`: in the temporary folder the prompt names.
 - `-CiRunsJson <log folder>\ci-runs.json` when the log folder holds that file: an audit run
   saves the CI runs there when it copies the logs, so every auditor and every re-audit reads
-  the same CI history. Without it the tool asks `gh` for the runs as they are now.
+  the same CI history. Without it the tool asks `gh` for the runs as they are now. Each failed
+  run's jobs and annotations come from a `ci-jobs.json` beside it when there is one, else from `gh`:
+  a failed run whose only non-success jobs are infrastructure (no runner acquired, superseded, or a
+  timeout in a job that tests nothing) is not red time (ADR-1235).
 
 Put every metric it prints in `metrics`, with the names [Report-Format.md](Report-Format.md)
 defines: `tasksDone`, `medianTaskMinutes`, `p90TaskMinutes`, `tasksClaimedMoreThanOnce`,
 `requeues`, `resumedRuns`, `ciRedMinutes`, `laneIdleMinutes`, `waitOverlapMinutes`,
 `waitNothingReadyMinutes`, `tokensInput`, `tokensOutput`, `costUsd` and `costUsdPerTaskDone`.
-Add `waitOtherMinutes` and `laneMinutes` as well. The tool also prints `ciRedSpells` (each red spell's start, end, minutes and the CI run that turned it red) and `unfinishedRuns` (the run logs that end with no result and no `FACTORY: DONE` or `FACTORY: BLOCKED`): these are lists, not metrics, so quote them as evidence (BL-1366). Note in your summary when the tool's
+Add `waitOtherMinutes` and `laneMinutes` as well. The tool also prints `ciRedSpells` (each red spell's start, end, minutes and the CI run that turned it red) and `unfinishedRuns` (the run logs that end with no result and no `FACTORY: DONE` or `FACTORY: BLOCKED`): these are lists, not metrics, so quote them as evidence (BL-1366); so is `ciInfrastructureRuns`, the failed runs left out of the red time under ADR-1235 with each non-success job's reason. Note in your summary when the tool's
 `ciRunsFrom` is later than `-Since`: the CI numbers then cover less than the period.
 
 ## 2. Findings

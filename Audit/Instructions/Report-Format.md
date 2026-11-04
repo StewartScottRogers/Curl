@@ -116,7 +116,7 @@ authoritative definition of each; units and a short meaning here:
 | `tasksClaimedMoreThanOnce` | count | Tasks claimed more than once (redone work). |
 | `requeues` | count | `Doing -> Backlog` moves in task logs. |
 | `resumedRuns` | count | Task runs that resumed an earlier, stopped run. |
-| `ciRedMinutes` | minutes | Time `CI` was red on `work/dark-factory`: from the first failed run after a success to the next success, cancelled runs ignored. |
+| `ciRedMinutes` | minutes | Time `CI` was red on `work/dark-factory`: from the first failed run after a success to the next success, cancelled runs ignored, and failed runs whose non-success jobs are all infrastructure (no runner acquired, superseded, a timeout in a job that tests nothing) ignored too (ADR-1235). |
 | `laneIdleMinutes` | minutes | Sum of the lanes' `wait` phases. |
 | `waitOverlapMinutes` | minutes | The part of `laneIdleMinutes` spent waiting because a ready task overlapped one in Doing. |
 | `waitNothingReadyMinutes` | minutes | The rest of `laneIdleMinutes`: waiting with nothing ready. |
