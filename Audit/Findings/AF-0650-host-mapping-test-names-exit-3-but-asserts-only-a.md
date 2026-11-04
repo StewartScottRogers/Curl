@@ -3,8 +3,8 @@ id: AF-0650
 title: Host-mapping test names exit 3 but asserts only a false return
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingTests.cs:TryNormalizeReadingHost_MeasuredArabicFormCurlRefusesWithExit3_IsRefused:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingT
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
