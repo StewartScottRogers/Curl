@@ -3,8 +3,8 @@ id: AF-0645
 title: Lanes idle 24.2% of lane time waiting on an interactive-only Backlog
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: process:logs:interactive-only-backlog:empty-queue
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

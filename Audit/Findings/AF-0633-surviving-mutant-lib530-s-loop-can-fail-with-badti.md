@@ -3,8 +3,8 @@ id: AF-0633
 title: Surviving mutant: lib530's loop can fail with BadTimeout instead of running the expired timer's socket action, and no test fails
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib530Run.cs:ActOnTimerAsync-or:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib530Run.cs:253:||
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

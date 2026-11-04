@@ -3,8 +3,8 @@ id: AF-0641
 title: ADR-0184 says a failed SASL GSSAPI/NTLM step cancels with exit 67; SecurityContextSaslExchange throws exit 94
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0184-sasl-gssapi-and-ntlm-run-on-one-security-context-per-exchange.md:SecurityContextSaslExchange-failed-step-exit:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0184-*.md -Pattern 'exi
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

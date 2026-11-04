@@ -3,8 +3,8 @@ id: AF-0640
 title: Surviving mutant: a SOCKS5 GSS-API service name starting with '/' can be used whole instead of naming the host, and no test fails
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/Socks5GssapiNegotiation.cs:RequestFor-lt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/Socks5GssapiNegotiation.cs:79:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

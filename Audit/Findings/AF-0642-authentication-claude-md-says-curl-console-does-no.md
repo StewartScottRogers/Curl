@@ -3,8 +3,8 @@ id: AF-0642
 title: Authentication CLAUDE.md says Curl.Console does not yet pass SaslAuthenticator a security-context factory; EngineComposition does
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Authentication.UnitLibrary/CLAUDE.md:SaslAuthenticator-security-context-factory:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Authentication.UnitLibrary/CLAUDE.md -Pattern 'does not
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

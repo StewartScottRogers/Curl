@@ -3,8 +3,8 @@ id: AF-0643
 title: HttpFileVariables.Define documents a throw when the value 'references no variable'; it throws only for a reference to an undefined variable
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Extension.HttpFile.UnitLibrary/HttpFileVariables.cs:Define:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Extension.HttpFile.UnitLibrary/HttpFileVariables.cs -Pa
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

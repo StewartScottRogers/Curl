@@ -3,8 +3,8 @@ id: AF-0634
 title: Surviving mutant: an scp or sftp transfer can report its known-hosts file missing while one exists, and no test fails
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:ResolveSshOptionsAsync-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:287:&&
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

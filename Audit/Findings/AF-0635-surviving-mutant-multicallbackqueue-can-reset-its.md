@@ -3,8 +3,8 @@ id: AF-0635
 title: Surviving mutant: MultiCallbackQueue can reset its arrival signal while callbacks are still queued, and no test fails
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/MultiCallbackQueue.cs:TryDequeue-eq:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/MultiCallbackQueue.cs:124:==
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

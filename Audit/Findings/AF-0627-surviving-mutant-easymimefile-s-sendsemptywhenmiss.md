@@ -3,8 +3,8 @@ id: AF-0627
 title: Surviving mutant: EasyMimeFile's SendsEmptyWhenMissing can default to true, so a missing -F file part is sent empty, and no test fails
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Api.UnitLibrary/Options/Http/EasyMimeFile.cs:EasyMimeFile-false:surviving-mutant
 reproduction: mutation Curl.Api.UnitLibrary/Options/Http/EasyMimeFile.cs:12:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Api.U
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

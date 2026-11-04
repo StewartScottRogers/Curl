@@ -3,8 +3,8 @@ id: AF-0629
 title: Surviving mutant: an offset retrieval reporting the whole upload received can fail with exit 8, and no test fails
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.ResumableUpload.UnitLibrary/Transfer/ResumableUploadFlow.cs:OffsetIn-le:surviving-mutant
 reproduction: mutation Curl.Extension.ResumableUpload.UnitLibrary/Transfer/ResumableUploadFlow.cs:47:<=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

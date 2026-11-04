@@ -3,8 +3,8 @@ id: AF-0639
 title: Surviving mutant: the hand-built TLS connection can forget it already sent close_notify and send it again, and no test fails
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs:SendCloseNotifyAsync-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs:152:true
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

@@ -3,8 +3,8 @@ id: AF-0637
 title: Surviving mutant: the Schannel wildcard check can refuse a host whose first label is one character, and no test fails
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/SchannelCommonNameCheck.cs:WildcardMatchesHost-lt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/SchannelCommonNameCheck.cs:67:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

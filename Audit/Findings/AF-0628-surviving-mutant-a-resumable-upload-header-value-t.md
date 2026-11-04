@@ -3,8 +3,8 @@ id: AF-0628
 title: Surviving mutant: a resumable-upload header value that starts with CR or LF can escape the injection refusal, and no test fails
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.ResumableUpload.UnitLibrary/Http/ResumableUploadHttpClientConnection.cs:FormatHead-ge:surviving-mutant
 reproduction: mutation Curl.Extension.ResumableUpload.UnitLibrary/Http/ResumableUploadHttpClientConnection.cs:51:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
