@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Lib1541CheckFirstHeader_WithEveryTimeAboveZero_WritesOkForAllButTheSpeed`, which pins every line `CheckFirstHeader` writes with every time above 0; a lane cannot run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant (line 91 `mustBeZero: true`) was applied by hand: the new test failed, and passed again once reverted. Test-only change, so no quality run.
 
 ## Log
 
