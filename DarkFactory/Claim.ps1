@@ -140,6 +140,28 @@ function Get-DoingTasks {
     return [pscustomobject]@{ Lane = $lane; Interactive = $interactive }
 }
 
+function Test-DoingMayMakeReady {
+    # Whether a lane's end of one of -DoingIds (the lane-eligible tasks in Doing) can make a task
+    # ready for a lane: a lane-eligible Backlog task whose depends-on names it, or a lane-eligible
+    # Blocked task whose last Log line names it, which Invoke-Requeue moves back once it is Done.
+    # With neither, a lane that waits on Doing waits for nothing (AF-0645, BL-4824): restarted
+    # shift 20261103-185800's lanes 1 and 5 waited from 18:58 beside six adopted tasks that no
+    # task depended on, and every lane that finished one waited too, until the 19:15 lane step.
+    param([string[]]$DoingIds)
+    if (-not @($DoingIds).Count) { return $false }
+    $pattern = '\b(' + ((@($DoingIds) | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')\b'
+    foreach ($state in 'Backlog', 'Blocked') {
+        foreach ($file in @(Get-ChildItem (Join-Path $Root "Tasks\$state") -Filter 'BL-*.md' -ErrorAction SilentlyContinue)) {
+            if (Test-InteractiveOnlyTask $file.FullName) { continue }
+            $text = [IO.File]::ReadAllText($file.FullName)
+            $names = if ($state -eq 'Backlog') { if ($text -match '(?m)^depends-on:[ \t]*\[(.*)\]') { $Matches[1] } else { '' } }
+                else { "$(@($text -split "`r?`n" | Where-Object { $_ -match '^\s*-\s' })[-1])" }
+            if ($names -match $pattern) { return $true }
+        }
+    }
+    return $false
+}
+
 function Get-NothingReadyEndNotice {
     # The trace line a lane writes when it ends because nothing is ready and nothing in Doing
     # is a lane's: the interactive-only work that is left (-InteractiveDoing, the Doing tasks
@@ -486,13 +508,16 @@ function Invoke-Claim {
                 }
             } while ($overCap -or $unreadyWhy) }
             if (-not $id) {
-                # Nothing is ready: wait only while a lane-eligible task is in Doing, since its
-                # end may make more ready. An interactive-only one in Doing is a session's, which
+                # Nothing is ready: wait only while a lane-eligible task in Doing is one whose end
+                # can make more ready (Test-DoingMayMakeReady: a task depends on it or a Blocked
+                # one waits on it). An interactive-only one in Doing is a session's, which
                 # may hold it for hours: lane 1 waited 64 minutes on BL-3465 (AF-0435). The lane
                 # ends instead, and a -Continuous shift's idle poll starts the next shift once
-                # anything is claimable (BL-3092), so no later task is left without a shift.
+                # anything is claimable (BL-3092), so no later task is left without a shift; while
+                # the shift runs, its lanes still running claim new work, and a CI fix gets a lane
+                # of its own (ADR-1158).
                 $doing = Get-DoingTasks
-                if ($next -match 'can start yet' -or $doing.Lane.Count -gt 0) { return @{ Wait = $true; Why = (Get-Short (Get-WaitReason $next) 80) } }
+                if ($next -match 'can start yet' -or (Test-DoingMayMakeReady -DoingIds $doing.Lane)) { return @{ Wait = $true; Why = (Get-Short (Get-WaitReason $next) 80) } }
                 # Ready tasks this lane already ran this shift (its -Skip) are not claimable by
                 # it, but they are not unready: end the lane so a fresh shift, whose lanes have
                 # run nothing yet, claims them. Waiting held lane 1 four hours on 2026-10-21
@@ -808,10 +833,27 @@ if ($TestTaskReadiness) {
         git -C $repo commit -q -m 'only interactive work left' 2>&1 | Out-Null
         git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
         $interactiveOnly = Invoke-Claim -Skip @()
-        # A lane-eligible task in Doing beside them may still make more ready: the lane waits.
+        $idleTraced = @(Get-Content $TraceFile -ErrorAction SilentlyContinue | Where-Object { $_ -match ' idle +nothing a lane can claim' })
+        # A lane-eligible task in Doing beside them that no task waits on makes nothing ready
+        # when it ends, so the lane ends too (AF-0645, BL-4824); the interactive-only BL-005
+        # depending on it changes nothing, since no lane could claim it.
         Set-Content -Path (Join-Path $repo 'Tasks\Doing\BL-008-lane.md') -Encoding UTF8 -Value ((& $taskText 'Change a lane file' '[Curl.Cli.UnitLibrary/Qux.cs]') -replace 'BL-001', 'BL-008')
+        $interactiveOnDoing = Join-Path $repo 'Tasks\Backlog\BL-005-interactive.md'
+        Set-Content -Path $interactiveOnDoing -Encoding UTF8 -Value ((Get-Content -Raw $interactiveOnDoing) -replace 'depends-on: \[\]', 'depends-on: [BL-008]')
         git -C $repo add -A 2>&1 | Out-Null
         git -C $repo commit -q -m 'a lane runs BL-008' 2>&1 | Out-Null
+        git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
+        $laneNothingWaits = Invoke-Claim -Skip @()
+        # A Blocked task whose last Log line names BL-008 is requeued once BL-008 is Done.
+        $blockedOnDoing = Join-Path $repo 'Tasks\Blocked\BL-009-blocked.md'
+        Set-Content -Path $blockedOnDoing -Encoding UTF8 -Value ((& $taskText 'Wait for the lane file' '[Curl.Cli.UnitLibrary/Quux.cs]' -Log @('- 2026-10-01: Created.', '- 2026-10-02: Backlog -> Doing. Criteria at claim: 1.', '- 2026-10-02: Doing -> Blocked. Waits on BL-008.')) -replace 'BL-001', 'BL-009')
+        $blockedOnDoingWaits = Test-DoingMayMakeReady -DoingIds @('BL-008')
+        $blockedOnOtherWaits = Test-DoingMayMakeReady -DoingIds @('BL-00')
+        Remove-Item -LiteralPath $blockedOnDoing
+        # A lane-eligible Backlog task depending on BL-008 may become ready: the lane waits.
+        Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-014-after-lane.md') -Encoding UTF8 -Value (((& $taskText 'Follow the lane file' '[Curl.Cli.UnitLibrary/After.cs]') -replace 'BL-001', 'BL-014') -replace 'depends-on: \[\]', 'depends-on: [BL-002, BL-008]')
+        git -C $repo add -A 2>&1 | Out-Null
+        git -C $repo commit -q -m 'BL-014 waits on BL-008' 2>&1 | Out-Null
         git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
         $laneRunning = Invoke-Claim -Skip @()
         # ADR-1158: a High feature task BL-010 that next offers first; a CI fix BL-012 whose
@@ -828,7 +870,6 @@ if ($TestTaskReadiness) {
         $ciFirst = Invoke-Claim -Skip @('BL-013')
         $ciSkip = (Get-ClaimSkip -Attempted @('BL-002') -ShiftRequeued @('BL-010', 'BL-013', 'BL-002')) -join ','
         $traced = @(Get-Content $TraceFile -ErrorAction SilentlyContinue | Where-Object { $_ -match 'BL-001 unready' })
-        $idleTraced = @(Get-Content $TraceFile -ErrorAction SilentlyContinue | Where-Object { $_ -match ' idle +nothing a lane can claim' })
         $cases = @(
             ,@('a claim passes over an unready task held back by Doing and takes the next', 'BL-002', "$($first.Id)")
             ,@('with only tasks this lane ran left besides the unready one, the lane ends', 'none', $(if ($ranAlready.Wait) { 'wait' } elseif ($ranAlready.None) { 'none' } else { "claimed $($ranAlready.Id)" }))
@@ -841,7 +882,9 @@ if ($TestTaskReadiness) {
             ,@('unready.txt lists it once with its reason', '1 touches', "$(@(Get-ShiftUnready).Count) $(if ((Get-ShiftUnready) -match 'touches are empty') { 'touches' })")
             ,@('with only interactive-only work left, in Backlog and in Doing, the lane ends rather than waits (AF-0435)', 'none', $(if ($interactiveOnly.Wait) { "wait: $($interactiveOnly.Why)" } elseif ($interactiveOnly.None) { 'none' } else { "claimed $($interactiveOnly.Id)" }))
             ,@('the end names the interactive tasks in Doing and in Backlog, and is traced once as idle, not wait', 'True True 1', "$($interactiveOnly.Why -match 'in Doing with an interactive session: BL-006, BL-007') $($interactiveOnly.Why -match 'Backlog is interactive only, waiting on Stewart or an interactive session: BL-005') $($idleTraced.Count)")
-            ,@('a lane-eligible task in Doing beside them keeps the lane waiting', 'wait No task is ready.', $(if ($laneRunning.Wait) { "wait $($laneRunning.Why)" } elseif ($laneRunning.None) { 'none' } else { "claimed $($laneRunning.Id)" }))
+            ,@('a lane-eligible task in Doing that no lane task waits on ends the lane rather than waits (AF-0645)', 'none', $(if ($laneNothingWaits.Wait) { "wait $($laneNothingWaits.Why)" } elseif ($laneNothingWaits.None) { 'none' } else { "claimed $($laneNothingWaits.Id)" }))
+            ,@('a Blocked task whose last Log line names a task in Doing may be made ready by it, and an ID that only starts another does not count', 'True False', "$blockedOnDoingWaits $blockedOnOtherWaits")
+            ,@('a lane-eligible task in Doing that a Backlog task depends on keeps the lane waiting', 'wait', $(if ($laneRunning.Wait) { 'wait' } elseif ($laneRunning.None) { 'none' } else { "claimed $($laneRunning.Id)" }))
             ,@('the end notice is empty when no interactive work is named', "''", "'$(Get-NothingReadyEndNotice)'")
             ,@('next would offer the High feature task first', 'BL-010', "$nextFirst")
             ,@('a claim takes the ready CI fix first, over its overlap with Doing, past one waiting on Doing and one this lane ran (ADR-1158)', 'BL-012 Doing', "$($ciFirst.Id) $(Get-TaskState 'BL-012')")
