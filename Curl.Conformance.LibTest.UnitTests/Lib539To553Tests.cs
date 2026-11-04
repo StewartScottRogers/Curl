@@ -360,6 +360,19 @@ public sealed class Lib547Tests
     }
 
     [TestMethod]
+    public void BlurbReader_ReadIntoABufferExactlyTheUploadsSize_HandsOverTheUpload()
+    {
+        var error = new StringWriter();
+        var reader = new Lib547.BlurbReader(error);
+        byte[] buffer = new byte[Lib547.UploadThis.Length];
+
+        Assert.AreEqual(Lib547.UploadThis.Length, reader.Read(buffer));
+
+        Assert.AreEqual(Lib547.UploadThis, System.Text.Encoding.ASCII.GetString(buffer));
+        Assert.AreEqual("READ!\n", error.ToString());
+    }
+
+    [TestMethod]
     public async Task TestAsync_OnACleanedUpLibrary_FailsMajorBad()
     {
         var run = new PortRun(null, 547, "http://x/");
