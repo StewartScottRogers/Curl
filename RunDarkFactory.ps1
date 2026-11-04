@@ -204,10 +204,11 @@
 
     A -Continuous shift that ends with nothing claimable (only cost-capped or interactive-only
     tasks, or none) does not exit: it shows what waits on Stewart once, then every
-    -IdlePollMinutes (default 5, 1 to 60) pulls the shift branch and looks for a claimable
+    -IdlePollMinutes (default 5, 1 to 60) runs the CI watch, so a run that fails while it
+    idles is filed as a CI fix (BL-4797), pulls the shift branch and looks for a claimable
     task, writing a heartbeat with phase idle and step polling that the board page shows.
     When one is claimable it starts the next shift by the same hand-over as above; at the
-    -Hours deadline, or once -StopAtUsage or -StopAtWeeklyUsage says no shift may start, it
+    -Hours deadline (unless a CI fix is ready, ADR-1158), or once -StopAtUsage or -StopAtWeeklyUsage says no shift may start, it
     stops polling and ends as a shift without -Continuous does: the alarm when something
     waits on Stewart, else it closes (ADR-0758).
 

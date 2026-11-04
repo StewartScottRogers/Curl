@@ -29,6 +29,14 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public void TransferSettingsOf_PostFieldSizeZeroWithFieldsOnAnMqttUrl_PublishesAnEmptyPayload()
+    {
+        EngineTransferSettings settings = MqttSettingsOf("mqtt://h/t", new EasyHttpOptions { PostFields = Encoding.ASCII.GetBytes("hello"), PostFieldSize = 0 });
+
+        Assert.AreEqual(0, settings.PostData?.Length);
+    }
+
+    [TestMethod]
     public void TransferSettingsOf_PostFieldSizeLongerThanTheFieldsOnAnMqttUrl_KeepsTheWholePayload()
     {
         EngineTransferSettings settings = MqttSettingsOf("mqtt://h/t", new EasyHttpOptions { PostFields = Encoding.ASCII.GetBytes("hi"), PostFieldSize = 9 });

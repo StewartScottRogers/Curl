@@ -1281,3 +1281,5 @@ Each option and the specific reason it lost.
 | [1231](ADR-1231-dns-over-https-prefers-http2-through-alpn.md) | DNS over HTTPS prefers HTTP/2 through ALPN (BL-4690) | Accepted | 2026-11-03 |
 | [1232](ADR-1232-protojson-any-resolves-its-type-in-the-catalogue.md) | ProtoJSON Any resolves its type URL in the message type's catalogue (BL-4720) | Accepted | 2026-11-03 |
 | [1233](ADR-1233-dns-over-quic-refuses-udp-port-53-with-exit-7.md) | DNS over QUIC refuses UDP port 53 with exit 7 (BL-4723) | Accepted | 2026-11-03 |
+| [1234](ADR-1234-the-dark-factory-shortens-red-ci-and-settles-orphans-without-refusing-a-shift.md) | The dark factory shortens red CI and settles orphans without refusing a shift (BL-4647) | Accepted | 2026-11-03 |
+| [1235](ADR-1235-ci-red-time-counts-only-while-a-test-or-build-fails.md) | CI red time counts only while a test or build fails (BL-4647) | Accepted | 2026-11-04 |

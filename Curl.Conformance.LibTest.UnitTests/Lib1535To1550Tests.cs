@@ -272,6 +272,26 @@ public sealed class Lib1535To1550Tests
     }
 
     [TestMethod]
+    public async Task Lib1541CheckFirstHeader_WithEveryTimeAboveZero_WritesOkForAllButTheSpeed()
+    {
+        CurlLibrary library = CurlGlobal.Init(new FakeCurlEngine { Informing = Timed });
+        await using CurlEasy easy = library.EasyInit()!;
+        var output = new MemoryStream();
+
+        Lib1541.CheckFirstHeader(easy, output);
+
+        Assert.AreEqual(
+            "CURLINFO_CONNECT_TIME_T on 1st header is OK\n"
+            + "CURLINFO_PRETRANSFER_TIME_T on 1st header is OK\n"
+            + "CURLINFO_STARTTRANSFER_TIME_T on 1st header is OK\n"
+            + "CURLINFO_TOTAL_TIME_T on 1st header is OK\n"
+            + "CURLINFO_APPCONNECT_TIME_T on 1st header is OK\n"
+            + "CURLINFO_SPEED_DOWNLOAD_T on 1st header is WRONG: 5\n",
+            Encoding.ASCII.GetString(output.ToArray()));
+        await library.DisposeAsync();
+    }
+
+    [TestMethod]
     public async Task Lib1541CheckDone_WithEveryTimeZero_WritesWrongForAllButTheAppconnectTime()
     {
         CurlLibrary library = CurlGlobal.Init(new FakeCurlEngine { Informing = () => new TransferInfo() });

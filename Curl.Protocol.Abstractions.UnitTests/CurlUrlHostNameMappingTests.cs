@@ -565,11 +565,12 @@ public sealed class CurlUrlHostNameMappingTests
     [DataRow("ﹺ", DisplayName = "U+FE7A kasra isolated form")]
     [DataRow("ﹼ", DisplayName = "U+FE7C shadda isolated form")]
     [DataRow("ﹾ", DisplayName = "U+FE7E sukun isolated form")]
-    public void TryNormalizeReadingHost_MeasuredArabicFormCurlRefusesWithExit3_IsRefused(string character)
+    public void TryNormalizeReadingHost_MeasuredArabicFormCurlRefuses_IsRefusedAsIdnConversionFailed(string character)
     {
-        bool accepted = CurlUrlHost.TryNormalizeReadingHost("a" + character + "b.test", refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out _, out _, out _);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost("a" + character + "b.test", refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out _, out _, out CurlUrlRejection rejection);
 
         Assert.IsFalse(accepted);
+        Assert.AreEqual(CurlUrlRejection.IdnConversionFailed, rejection);
     }
 
     [TestMethod]
@@ -577,7 +578,10 @@ public sealed class CurlUrlHostNameMappingTests
     [DataRow("a℁b.test", "aa/sb.test", DisplayName = "U+2101 addressed to the subject")]
     [DataRow("a℅b.test", "ac/ob.test", DisplayName = "U+2105 care of")]
     [DataRow("a℆b.test", "ac/ub.test", DisplayName = "U+2106 cada una")]
-    public void TryNormalizeReadingHost_MeasuredLetterlikeSymbolCurlRefusesWithExit27ThroughAProxy_ConvertsToSlashText(string host, string expected) =>
+    // Measured: real curl refuses these through a proxy (its exit code is decided past host
+    // normalisation, so it is not this method's to assert); here the host is accepted and its
+    // compatibility decomposition keeps the slash.
+    public void TryNormalizeReadingHost_LetterlikeSymbolWithSlashDecomposition_IsAcceptedAndConvertsToSlashText(string host, string expected) =>
         AssertConvertsTo(host, expected);
 
     private static void AssertConvertsTo(string host, string expected)

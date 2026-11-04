@@ -360,6 +360,36 @@ public sealed class Lib547Tests
     }
 
     [TestMethod]
+    public void BlurbReader_IoctlRestartReadAlone_RewindsTheUpload()
+    {
+        var error = new StringWriter();
+        var reader = new Lib547.BlurbReader(error);
+        byte[] buffer = new byte[100];
+        reader.Read(buffer);
+
+        IoctlResult result = reader.Ioctl(IoctlCommand.RestartRead);
+
+        Assert.AreEqual(IoctlResult.Ok, result);
+        Assert.AreEqual(Lib547.UploadThis.Length, reader.Read(buffer));
+        Assert.AreEqual("READ!\nREWIND!\nREAD!\n", error.ToString());
+    }
+
+    [TestMethod]
+    public void BlurbReader_IoctlNop_NeitherRewindsNorSaysSo()
+    {
+        var error = new StringWriter();
+        var reader = new Lib547.BlurbReader(error);
+        byte[] buffer = new byte[100];
+        reader.Read(buffer);
+
+        IoctlResult result = reader.Ioctl(IoctlCommand.Nop);
+
+        Assert.AreEqual(IoctlResult.Ok, result);
+        Assert.AreEqual(0, reader.Read(buffer));
+        Assert.AreEqual("READ!\nREAD ALREADY DONE!\n", error.ToString());
+    }
+
+    [TestMethod]
     public void BlurbReader_ReadIntoABufferExactlyTheUploadsSize_HandsOverTheUpload()
     {
         var error = new StringWriter();

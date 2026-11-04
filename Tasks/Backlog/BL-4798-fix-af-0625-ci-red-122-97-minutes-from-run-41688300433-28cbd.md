@@ -42,11 +42,18 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Acceptance criteria
 
-- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the window's start: the fix's landing, or for a task with no fix yet the later of its fix's landing and ADR-1235's commit), gives the finding's expected result with CI red time counted only while a run on the branch has a failing test or build error (ADR-1235): a failed run whose only non-success jobs were never given a runner, ran into their `timeout-minutes` in a job that tests nothing, or were superseded by a newer commit is left out, as `gh run view <id> --json jobs` and each job's annotations classify it. Notes name the fix, its landing time, the window, each run left out and why, and the numbers. If no factory shift has run since the window's start, the task waits in Backlog.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause found: run 41688300433 (28cbd2df) had no failing test. Its non-success jobs (read 2026-11-04 with `gh run view 41688300433 --json jobs` and each job's annotations) were `Audit paths untouched by the dark factory`, cancelled after "The job has exceeded the maximum execution time of 5m0s" in its checkout, and `Audit self-tests (macos-latest)`, cancelled after "The job was not acquired by Runner of type hosted even after multiple attempts". Its failed-job log was empty, which the CI watch read as unreadable. Under ADR-1235 (b6dd48c99) this spell is infrastructure and does not count. The audit guard's checkout got a blobless fetch and 15 minutes (BL-4782, 624133845, audit branch); the empty-log reading was fixed by BL-4783 (6f289fef1, 2026-11-03 16:32:49 MST). The finding's second half, no shift watching CI, was the idle -Continuous coordinator polling without the CI watch (shift 20261103-080214, 08:26 to 13:46), the same cause as AF-0624.
+- Fix: 3e4d0d43d (BL-4797), pushed to work/dark-factory 2026-11-04 05:24:14 MST (12:24:14Z): each idle-poll look runs the CI watch and hands the ready CI fix to the poll decision. `-TestHeartbeat` 38/38 under Windows PowerShell 5.1 and pwsh 7.
+- Window: from the fix, 2026-11-04T12:24:14Z. No factory shift has run since, so criterion 1 waits in Backlog. For reference, from BL-4783's landing (`-Since '2026-11-03 16:32:49'`, gh run list read 2026-11-04 05:05 MST): ciRedMinutes 14.27, one spell (41764281440, 03:22:57Z-03:37:13Z), whose Windows test failure was filed as BL-4804; the same raw and under ADR-1235. AF-0625 itself is closed on the `audit` branch (`closed-how: reliable-reaudit`).
+- Build and fast tests (criterion 2), 2026-11-04 at aef2fa6d2: `dotnet build` 0 warnings, 0 errors; `dotnet test --filter "TestCategory!=Integration"` exit 0, no project failed.
 
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-04: Backlog -> Doing. Criteria at claim: 2ab4542b 9742157d.
+- 2026-11-04: Doing -> Backlog. Fix landed 2026-11-04 05:24:14 MST (3e4d0d43d with BL-4783; 41688300433 had no failing test and does not count under ADR-1235); the window starts there and no factory shift has run since, so criterion 1 waits in Backlog for an interactive session to measure it.

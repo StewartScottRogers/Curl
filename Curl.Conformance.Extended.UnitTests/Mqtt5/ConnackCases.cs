@@ -163,7 +163,8 @@ public sealed class ConnackCases
         };
         Mqtt5ReferenceBroker broker = new(connAck, responders);
 
-        CurlRunResult result = await ExtendedConformanceHarness.RunAsync(Curl, [ReferenceRoute.Tcp(Port, broker)], ["-sS", "mqtt5://localhost/t"]);
+        CurlRunResult result = await ExtendedConformanceHarness.RunAsync(
+            Curl, [ReferenceRoute.Tcp(Port, broker)], ["-sS", "mqtt5://localhost/t"], timeProvider: new FirstPingOnlyClock(TimeSpan.FromSeconds(0.5)));
 
         Mqtt5ConnectTests.AssertSucceededSilently(result);
         Assert.AreEqual(0, broker.Connect!.KeepAlive);

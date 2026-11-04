@@ -129,6 +129,20 @@ public sealed class ConnectTunnelVerboseLinesTests
     }
 
     [TestMethod]
+    public void ReportReplyHead_RestOfTheHeadStartingWithABareLineFeed_WritesThatLineFeedAsALineOfItsOwn()
+    {
+        var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("head", "HTTP/1.1 200 X\\r\\n\\nX-A: 1\\r\\n\\r\\n");
+
+        ConnectTunnelVerboseLines.ReportReplyHead(events, "HTTP/1.1 200 X\r\n\nX-A: 1\r\n\r\n"u8, 200, null);
+
+        string[] expected = ["< HTTP/1.1 200 X", "< ", "< X-A: 1", "< "];
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
+        CollectionAssert.AreEqual(expected, events.Transcript.ToArray());
+    }
+
+    [TestMethod]
     public void ReportReplyFailure_FailedReplies_WriteEachFailureMessageAndNothingForAReplyThatDidNotFail()
     {
         var events = new RecordingTransferEvents();

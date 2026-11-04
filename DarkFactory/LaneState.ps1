@@ -172,6 +172,9 @@ if ($TestHeartbeat) {
         $poll = { param($At, $Usage, $Id, $Capped) (Get-IdlePollDecision -Now $At -Deadline $deadline -UsageStop $Usage -ClaimableId $Id -CappedIds $Capped).Action }
         $cases = @(
             ,@('the polling heartbeat is phase idle, step polling', 'idle/polling', "$($idleObject.phase)/$($idleObject.step)")
+            ,@('a lane that ended with nothing ready leaves the active set like a retired one, so Auto can add lanes back (BL-4826)', 'True False', $(
+                $relane = Get-Content -Raw (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
+                "$($relane -match '(?s)if \(\$finished -notcontains \$n\) \{ continue \}\r?\n\s*\$activeLanes\.Remove\(\$n\)') $($relane -match "if \(\`$finished -notcontains \`$n -or -not \(Test-Path \(Get-LaneStatePath \`$n 'retire'\)\)\) \{ continue \}")"))
             ,@('the next shift is handed -StopAtUsage, -StopAtWeeklyUsage and -UnpacedLanes (BL-4800)', 'True True True', $(
                 $handOn = Get-Content -Raw (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
                 "$($handOn -match "'-StopAtUsage', \`$StopAtUsage") $($handOn -match "'-StopAtWeeklyUsage', \`$StopAtWeeklyUsage") $($handOn -match "'-UnpacedLanes', \`$UnpacedLanes")"))
@@ -262,6 +265,27 @@ if ($TestHeartbeat) {
         $cases += ,@('each merge-wait poll runs the CI watch until the hand-over', '14:11,14:16,14:21,14:26,14:31,14:36', "$($script:watchedAt -join ',')")
         $cases += ,@('the CI fix the watch filed during the merge wait starts the next shift at once, once', '14:36 BL-4431 is claimable during the merge''s CI wait', "$($script:watchStartedAt -join ' | ')")
         $cases += ,@('the merge-wait poll marks the hand-over', 'True', "$($watchHandOver.Done)")
+        # The idle poll's look runs the CI watch too (BL-4797, AF-0624): shift 20261103-080214
+        # polled from 08:26 with no watch while run 41660275371 failed. Here the watch files
+        # BL-4732 at the second look, which pulls the board, names it the ready CI fix, and
+        # starts the next shift even past the -Hours deadline.
+        $script:idleWatched = 0; $script:idlePulls = 0; $script:idleFiled = ''
+        function Invoke-CiWatch { param($Branch, [switch]$Final) $script:idleWatched++; if ($script:idleWatched -ge 2) { $script:idleFiled = 'BL-4732' } }
+        function git { if ("$args" -match 'pull') { $script:idlePulls++ } }
+        function Get-ClaimableTaskId { @{ Id = $script:idleFiled; Capped = @() } }
+        function Get-ReadyCiFixTaskId { param($Skip) $script:idleFiled }
+        try {
+            $idleFirst = Invoke-IdlePollLook -Branch 'factory/test' -Pull $true
+            $idleSecond = Invoke-IdlePollLook -Branch 'factory/test' -Pull $true
+            $idleMoved = Invoke-IdlePollLook -Branch 'factory/test' -Pull $false
+        } finally { Remove-Item function:Invoke-CiWatch, function:git, function:Get-ClaimableTaskId, function:Get-ReadyCiFixTaskId }
+        $idleStart = Get-IdlePollDecision -Now ([datetime]'2026-11-03 14:00') -Deadline ([datetime]'2026-11-03 13:46') -UsageStop '' -ClaimableId $idleSecond.Id -CappedIds $idleSecond.Capped -CiFixId $idleSecond.CiFixId
+        $coordinatorText = Get-Content -Raw (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
+        $cases += ,@('each idle-poll look runs the CI watch, and pulls unless the branch moved (BL-4797)', '3 2', "$($script:idleWatched) $($script:idlePulls)")
+        $cases += ,@('a look before the watch files anything finds nothing', "'' ''", "'$($idleFirst.Id)' '$($idleFirst.CiFixId)'")
+        $cases += ,@('the look after the watch filed a CI fix names it claimable and the ready CI fix', 'BL-4732 BL-4732', "$($idleSecond.Id) $($idleSecond.CiFixId)")
+        $cases += ,@('that CI fix starts the next shift past the -Hours deadline', 'start', $idleStart.Action)
+        $cases += ,@('the idle poll loop looks with Invoke-IdlePollLook and hands its CI fix to the decision', 'True True', "$($coordinatorText -match '\$stillReady = Invoke-IdlePollLook -Branch \$branch') $($coordinatorText -match '-CiFixId \"\$\(\$stillReady\.CiFixId\)\"')")
         # A poll that throws, or writes output, leaves the wait and its result intact (BL-3150).
         $script:fakeNow = [datetime]'2026-10-22 14:20'
         $script:throwPolls = 0

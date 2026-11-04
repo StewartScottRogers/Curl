@@ -171,6 +171,29 @@ public sealed class Lib666To695Tests
     }
 
     [TestMethod]
+    public async Task Lib670_RefusedFormAddOnTheEasyInterface_PerformsNothing()
+    {
+        int performs = 0;
+        var engine = new FakeCurlEngine
+        {
+            CreatingMime = () => new FakeMimeBuilder(),
+            CreatingForm = () => new FakeFormBuilder { FailingCall = 1 },
+            Performing = _ =>
+            {
+                performs++;
+                return CurlCode.SendError;
+            },
+        };
+        var run = new PortRun(engine, 673, "http://x/673");
+
+        LibTestResult result = await new Lib670(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, performs);
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual("curl_formadd() = 1\n", run.Error.ToString());
+    }
+
+    [TestMethod]
     public void Lib670ReadThis_GivesAThenPausesThenBOnceUnpausedLateEnough()
     {
         var clock = new ManualTimeProvider(DateTimeOffset.UnixEpoch);
