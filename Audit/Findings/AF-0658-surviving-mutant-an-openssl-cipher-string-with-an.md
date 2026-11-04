@@ -3,8 +3,8 @@ id: AF-0658
 title: Surviving mutant: an OpenSSL cipher string with an empty alias word can be accepted instead of refused
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/OpenSslCipherString.cs:ApplyNextRule-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/OpenSslCipherString.cs:214:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
