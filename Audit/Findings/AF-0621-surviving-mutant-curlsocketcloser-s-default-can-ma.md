@@ -3,8 +3,8 @@ id: AF-0621
 title: Surviving mutant: CurlSocketCloser's default can mark every socket as the connection's own without a test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/CurlSocketCloser.cs:CurlSocketCloser-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/CurlSocketCloser.cs:19:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

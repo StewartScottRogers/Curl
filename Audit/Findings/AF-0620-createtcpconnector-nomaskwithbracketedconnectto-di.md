@@ -3,8 +3,8 @@ id: AF-0620
 title: CreateTcpConnector_NoMaskWithBracketedConnectTo_DialsTheMappedAddress never checks the mapped address, only port 80, which the unmapped URL also dials
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitTests/EngineCompositionConnectToFeatureMaskTests.cs:CreateTcpConnector_NoMaskWithBracketedConnectTo_DialsTheMappedAddress:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitTests/EngineCompositionConnectToFeatureMaskT
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

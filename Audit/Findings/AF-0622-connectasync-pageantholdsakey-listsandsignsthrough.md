@@ -3,8 +3,8 @@ id: AF-0622
 title: ConnectAsync_PageantHoldsAKey_ListsAndSignsThroughTheMapping checks the signature it names only for null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Ssh.UnitTests/Authentication/PageantSshAgentConnectorTests.cs:ConnectAsync_PageantHoldsAKey_ListsAndSignsThroughTheMapping:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Ssh.UnitTests/Authentication/PageantSshAgentConnectorTe
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

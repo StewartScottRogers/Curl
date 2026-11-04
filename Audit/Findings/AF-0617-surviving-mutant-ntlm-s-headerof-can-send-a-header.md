@@ -3,8 +3,8 @@ id: AF-0617
 title: Surviving mutant: NTLM's HeaderOf can send a header for an empty token or a refused step without a test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Authentication.UnitLibrary/NtlmHttpAuthenticator.cs:HeaderOf-and:surviving-mutant
 reproduction: mutation Curl.Authentication.UnitLibrary/NtlmHttpAuthenticator.cs:183:&&
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Authe
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

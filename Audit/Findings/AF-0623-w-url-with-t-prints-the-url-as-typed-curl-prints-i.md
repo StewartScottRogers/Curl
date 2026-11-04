@@ -3,8 +3,8 @@ id: AF-0623
 title: -w %{url} with -T prints the URL as typed; curl prints it with the uploaded file name appended
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:write-out:url-with-upload-file:stdout
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release; $a=@('-w','%{url}','-T','sub/f.txt','http:
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.

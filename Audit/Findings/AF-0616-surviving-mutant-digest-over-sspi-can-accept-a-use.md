@@ -3,8 +3,8 @@ id: AF-0616
 title: Surviving mutant: Digest over SSPI can accept a user name whose first character is a control character
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Authentication.UnitLibrary/DigestAuthenticator.cs:CreateSspiAnswer-ge:surviving-mutant
 reproduction: mutation Curl.Authentication.UnitLibrary/DigestAuthenticator.cs:101:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Authe
 ## Log
 
 - 2026-11-03: filed proposed.
+- 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
