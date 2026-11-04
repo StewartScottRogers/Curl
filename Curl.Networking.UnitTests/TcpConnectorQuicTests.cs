@@ -385,6 +385,30 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectMultiplexedAsync_WhenTheCaCertificateFileCannotBeReadAndTheNameHasTwoAddresses_StopsAtTheFirst()
+    {
+        // An unusable --cacert fails every address alike, so the dial does not go on (AF-0638).
+        var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
+        var events = new RecordingTransferEvents();
+        var connector = Connector(
+            opener,
+            new ManualTimeProvider(),
+            new TlsClientOptions(CaCertificateFile: Path.Combine(Path.GetTempPath(), "no-such-dir-af0638", "ca.pem")),
+            resolver: new FakeDnsResolver(IPAddress.Loopback, SecondAddress));
+        Diagnostics.Arrange("resolver addresses", "127.0.0.1, 127.0.0.2");
+
+        var result = await ConnectMultiplexedAsync(connector, Target(events), writesErrorMessage: false);
+
+        ActEvents(events);
+        Diagnostics.Assert("exit code", CurlExitCode.SslCacertBadfile, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.ExitCode);
+        CollectionAssert.AreEqual(
+            new[] { new IPEndPoint(IPAddress.Loopback, 443) },
+            opener.Opened.Select(channel => channel.ServerEndPoint).ToArray());
+        Assert.IsFalse(events.Info.Contains("  Trying 127.0.0.2:443..."));
+    }
+
+    [TestMethod]
     public async Task ConnectMultiplexedAsync_WhenAReceiveFailsInTheSchannelBuild_FailsWithExit56AndCurlsWinsockWords()
     {
         // curl.se's Windows build, --http3-only with nothing on UDP (ADR-0144): errno=10054 there;
