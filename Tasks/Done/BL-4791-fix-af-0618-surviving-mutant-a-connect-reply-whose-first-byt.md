@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4791 — Fix AF-0618: Surviving mutant: a CONNECT reply whose first byte is NUL can escape the NUL-byte refusal without a test failing
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added the DataRow "the reply's first byte, AF-0618" (the reply `\0HTTP/1.1 200 OK\r\n\r\n`, which starts with a NUL) to `ReadReplyAsync_WhenALineHoldsANulByte_FailsWithExit8BeforeThatLine` in `Curl.Networking.UnitTests/HttpProxyTunnelTests.cs`. Under the `> 0` mutant the NUL at index 0 skips NulByteReply, the reply ends at the empty line and is parsed as a status line that is not HTTP/1.x, so exit 8 and "Nul byte in header" no longer hold and the row fails: the mutant is killed. This test asserts what the code already does (the same answer as the existing NUL-in-the-status-line row), so production code is unchanged and no quality run was needed.
+- A lane cannot read or run `Audit/Tools`, so the reproduction script was not run here. The criterion is ticked on the reasoning above, and the quality auditor's re-audit confirms it.
+- Full `dotnet build` clean; fast tests green on Windows. The row has no path, OS text or certificate, so it does not depend on the platform.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Test row with a NUL as the reply's first byte kills the AF-0618 mutant

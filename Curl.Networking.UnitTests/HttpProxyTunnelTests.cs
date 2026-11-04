@@ -393,6 +393,7 @@ public sealed class HttpProxyTunnelTests
     [TestMethod]
     [DataRow("HTTP/1.1 200 OK\r\nX-Evil: he\0llo\r\n\r\n", "HTTP/1.1 200 OK\r\n", DisplayName = "a field, upstream test2107")]
     [DataRow("HTTP/1.1 2\00 OK\r\n\r\n", "", DisplayName = "the status line")]
+    [DataRow("\0HTTP/1.1 200 OK\r\n\r\n", "", DisplayName = "the reply's first byte, AF-0618")]
     [DataRow("HTTP/1.1 407 No\r\nA: b\r\n\0\r\n", "HTTP/1.1 407 No\r\nA: b\r\n", DisplayName = "a line of a NUL alone")]
     public async Task ReadReplyAsync_WhenALineHoldsANulByte_FailsWithExit8BeforeThatLine(string reply, string head)
     {
