@@ -3,8 +3,8 @@ id: AF-0663
 title: Authentication CLAUDE.md says CurlComposition sets NtlmHttpAuthenticator's matchesSspiBuild; EngineComposition does
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-04_1442.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Authentication.UnitLibrary/CLAUDE.md:NtlmHttpAuthenticator.matchesSspiBuild:false-statement
 reproduction: none
 task: BL-4845
@@ -13,9 +13,9 @@ found: 2026-11-04
 found-at: 650d20c75108547e7bc74da2e86fbee9c49f7931
 scorecard: 2026-11-04_0643.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-04
+closed-how: reliable-reaudit
+closed-by: 2026-11-04_1442.md
 ---
 # AF-0663 - Authentication CLAUDE.md says CurlComposition sets NtlmHttpAuthenticator's matchesSspiBuild; EngineComposition does
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Authentication.UnitLibrary/CLAUDE.md -Pattern 'by .Curl
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_1442.md | reproduces: no | Ran the reproduction. 'by CurlComposition' has no match in Curl.Authentication.UnitLibrary/CLAUDE.md, which now says matchesSspiBuild is 'set on Windows by EngineComposition'. The only 'new NtlmHttpAuthenticator' is EngineComposition.Authentication.cs:42 '(securityContexts, matchesSspiBuild: OperatingSystem.IsWindows(), diagnosticLog)'; Curl.Console/CurlComposition.cs has none.
+
 ## Log
 
 - 2026-11-04: filed proposed.
 - 2026-11-04: proposed -> accepted.
+- 2026-11-04: accepted -> closed. Re-audit 2026-11-04_1442.md: the reproduction no longer reproduces.

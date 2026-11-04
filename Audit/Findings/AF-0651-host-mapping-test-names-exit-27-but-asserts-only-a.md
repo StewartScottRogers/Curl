@@ -42,6 +42,8 @@ Select-String -Path Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingT
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_1442.md | reproduces: no | Ran the Select-String: AssertConvertsTo (lines 587-593) is unchanged, but no test that calls it names exit 27 any more (grep finds no Exit27/Exits27 in Curl.Protocol.Abstractions.UnitTests). The former test is now TryNormalizeReadingHost_LetterlikeSymbolWithSlashDecomposition_IsAcceptedAndConvertsToSlashText, whose name promises only acceptance and the text the helper asserts.
+
 ## Log
 
 - 2026-11-04: filed proposed.

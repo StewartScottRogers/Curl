@@ -3,8 +3,8 @@ id: AF-0642
 title: Authentication CLAUDE.md says Curl.Console does not yet pass SaslAuthenticator a security-context factory; EngineComposition does
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-04_1442.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Authentication.UnitLibrary/CLAUDE.md:SaslAuthenticator-security-context-factory:false-statement
 reproduction: none
 task: BL-4821
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 0ae5ce3f5e65976edeb9facb28b93fd3f4dcdbc8
 scorecard: 2026-11-03_2203.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-04
+closed-how: reliable-reaudit
+closed-by: 2026-11-04_1442.md
 ---
 # AF-0642 - Authentication CLAUDE.md says Curl.Console does not yet pass SaslAuthenticator a security-context factory; EngineComposition does
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Authentication.UnitLibrary/CLAUDE.md -Pattern 'does not
 ## Re-audits
 
 - 2026-11-04 | 2026-11-04_0643.md | reproduces: no | Ran the reproduction. Select-String finds no 'does not pass one yet' in Curl.Authentication.UnitLibrary/CLAUDE.md, which now says 'the production composition (EngineComposition) passes one for IMAP, POP3 and SMTP (BL-852)'. EngineComposition.cs:190-192 still passes CreateSaslAuthenticator(contexts.Value, ...) for imap, pop3 and smtp.
+- 2026-11-04 | 2026-11-04_1442.md | reproduces: no | Ran the reproduction. 'does not pass one yet' has no match in Curl.Authentication.UnitLibrary/CLAUDE.md, which now says 'the production composition (EngineComposition) passes one for IMAP, POP3 and SMTP (BL-852)'. EngineComposition.cs:190-192 call CreateSaslAuthenticator(contexts.Value, ...).
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-04: accepted -> closed. Re-audit 2026-11-04_1442.md: the reproduction no longer reproduces.

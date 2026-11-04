@@ -3,8 +3,8 @@ id: AF-0641
 title: ADR-0184 says a failed SASL GSSAPI/NTLM step cancels with exit 67; SecurityContextSaslExchange throws exit 94
 auditor: truthfulness
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-04_1442.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0184-sasl-gssapi-and-ntlm-run-on-one-security-context-per-exchange.md:SecurityContextSaslExchange-failed-step-exit:stale-adr
 reproduction: none
 task: BL-4820
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 0ae5ce3f5e65976edeb9facb28b93fd3f4dcdbc8
 scorecard: 2026-11-03_2203.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-04
+closed-how: reliable-reaudit
+closed-by: 2026-11-04_1442.md
 ---
 # AF-0641 - ADR-0184 says a failed SASL GSSAPI/NTLM step cancels with exit 67; SecurityContextSaslExchange throws exit 94
 
@@ -43,8 +43,10 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0184-*.md -Pattern 'exi
 ## Re-audits
 
 - 2026-11-04 | 2026-11-04_0643.md | reproduces: no | Ran the reproduction. SecurityContextSaslExchange.cs:79 still throws SaslAuthenticationFailedException(CurlExitCode.AuthError, ...) (94). ADR-0184 Decision item 5 now reads 'A context that cannot make its token fails the transfer with exit 94'. The only 'exit 67' match (line 61) is in the 2026-11-04 amendment, which says the code 'no longer answers null and cancels with exit 67'. The 'Without a factory' match (line 44) is a true ranking statement. ADR and code now agree on exit 94.
+- 2026-11-04 | 2026-11-04_1442.md | reproduces: no | Ran the reproduction. ADR-0184 Decision item 5 now reads 'A context that cannot make its token fails the transfer with exit 94'; the only 'exit 67' match (line 61) is the 2026-11-04 amendment saying the code 'no longer answers null and cancels with exit 67'. SecurityContextSaslExchange.cs:79 throws SaslAuthenticationFailedException(CurlExitCode.AuthError, ...) (94). ADR and code agree.
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-04: accepted -> closed. Re-audit 2026-11-04_1442.md: the reproduction no longer reproduces.

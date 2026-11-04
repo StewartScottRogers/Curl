@@ -3,8 +3,8 @@ id: AF-0643
 title: HttpFileVariables.Define documents a throw when the value 'references no variable'; it throws only for a reference to an undefined variable
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-04_1442.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Extension.HttpFile.UnitLibrary/HttpFileVariables.cs:Define:false-doc-comment
 reproduction: none
 task: BL-4822
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 0ae5ce3f5e65976edeb9facb28b93fd3f4dcdbc8
 scorecard: 2026-11-03_2203.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-04
+closed-how: reliable-reaudit
+closed-by: 2026-11-04_1442.md
 ---
 # AF-0643 - HttpFileVariables.Define documents a throw when the value 'references no variable'; it throws only for a reference to an undefined variable
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Extension.HttpFile.UnitLibrary/HttpFileVariables.cs -Pa
 ## Re-audits
 
 - 2026-11-04 | 2026-11-04_0643.md | reproduces: no | Ran the reproduction. 'references no variable' is gone. Define's exception doc (HttpFileVariables.cs:30) now reads 'A reference in the value names no defined variable (exit 2)', and Substitute's (line 36) reads 'A reference names no variable (exit 2)'. ValueOf (line 68) throws ArgumentExpansionException('... is not defined', CurlExitCode.FailedInit), and FailedInit = 2 (CurlExitCode.cs:30). The doc now matches the code.
+- 2026-11-04 | 2026-11-04_1442.md | reproduces: no | Ran the reproduction. 'references no variable' has no match. Define's doc (line 30) now reads 'A reference in the value names no defined variable (exit 2)', and line 68 throws only for an undefined reference ('is not defined', CurlExitCode.FailedInit = 2).
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-04: accepted -> closed. Re-audit 2026-11-04_1442.md: the reproduction no longer reproduces.
