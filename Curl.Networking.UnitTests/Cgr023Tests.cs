@@ -79,6 +79,9 @@ public sealed class Cgr023Tests
     [DataRow("DEFAULT@SECLEVELX0")]
     [DataRow("DEFAULT@SECLEVEL=-")]
     [DataRow("!AES128-SHA:AES128-SHA")]
+    [DataRow("AES128-SHA:HIGH+")]
+    [DataRow("AES128-SHA:+")]
+    [DataRow("AES128-SHA:ECDHE++AES")]
     public void Select_WithAnInvalidCommandOrNoSuiteLeft_FailsWithTheCipherListMessage(string ciphers)
     {
         Diagnostics.Arrange("--ciphers", ciphers);

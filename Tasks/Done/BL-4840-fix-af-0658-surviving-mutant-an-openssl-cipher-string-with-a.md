@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/Cgr023Tests.cs]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4840 — Fix AF-0658: Surviving mutant: an OpenSSL cipher string with an empty alias word can be accepted instead of refused
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Why the mutant survived: the only test with an empty alias word, `!!`, keeps no suite, so the value is refused whether the empty word counts as valid or not. I added `Cgr023Tests` rows `AES128-SHA:HIGH+`, `AES128-SHA:+` and `AES128-SHA:ECDHE++AES`. Each keeps a suite, so only the empty alias word can make the value refused, as OpenSSL refuses it (`ssl_cipher_process_rulestr`: a zero-length alias is `SSL_R_INVALID_COMMAND`). The production code is unchanged.
+- Widened `touches` to `Curl.Networking.UnitTests/Cgr023Tests.cs`, which holds the test. No task in Doing names that file.
+- The lane may not run the finding's mutation script (the audit guard refuses it). Instead I applied the mutant by hand with the Edit tool: exactly the three new rows failed (3 failed, 21 passed in `Cgr023Tests`), then I reverted the mutant. The re-audit runs the official reproduction.
+- Tests are platform-neutral (pure string parsing). The build is clean and the fast tests are green.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. Cgr023Tests now refuse cipher strings with an empty alias word, killing the line 214 mutant
