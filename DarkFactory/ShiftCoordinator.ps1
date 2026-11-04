@@ -643,15 +643,19 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         $tick = Get-Date
         $finished = @(Get-ChildItem $summaries -Filter 'lane-*.txt' -ErrorAction SilentlyContinue |
             ForEach-Object { [int]($_.BaseName -replace '^lane-', '') })
-        # A lane asked to retire that has written its summary is done: it leaves the active
-        # set, and its tab closes now if there is nothing in it to read.
+        # A lane that has written its summary is done, whether it was asked to retire or ended
+        # with nothing ready: it leaves the active set, so the Auto step counts only lanes
+        # still running and adds lanes back when work appears later in the shift (BL-4826),
+        # and its tab closes now if there is nothing in it to read. With no lane left active
+        # the shift ends below, as before.
         foreach ($n in @($activeLanes)) {
-            if ($finished -notcontains $n -or -not (Test-Path (Get-LaneStatePath $n 'retire'))) { continue }
+            if ($finished -notcontains $n) { continue }
             $activeLanes.Remove($n) | Out-Null
             $report = Read-LaneSummary $n
-            Write-Trace '-' 'lane' "lane $n retired ($($report.Summary -replace '^SUMMARY ', ''))" 'Cyan'
+            $how = if (Test-Path (Get-LaneStatePath $n 'retire')) { 'retired' } else { 'ended' }
+            Write-Trace '-' 'lane' "lane $n $how ($($report.Summary -replace '^SUMMARY ', ''))" 'Cyan'
             if (Test-LaneSummaryClean $report) {
-                Close-HerdrTab $laneTabs[$n] "lane $n retired cleanly" (Get-LaneTabLabel $n)
+                Close-HerdrTab $laneTabs[$n] "lane $n $how cleanly" (Get-LaneTabLabel $n)
                 $closedTabs[$n] = $true
             }
         }
