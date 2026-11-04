@@ -331,10 +331,18 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     function Get-ShiftCapacity {
         # The board's capacity on origin/<branch>, read in the auto-board worktree; the
         # coordinator's own checkout is not pulled. -Fallback when it cannot be read, traced once.
-        param([int]$Fallback)
+        # -AddingTo is the active lanes' count when the caller may add lanes: the capacity is then
+        # limited to those lanes plus the ready tasks a lane may claim, so interactive-only and
+        # adopted tasks in Doing fill no lane that would find nothing and end (BL-4848).
+        param([int]$Fallback, $AddingTo = $null)
         git -C $Root fetch -q origin $branch 2>&1 | Out-Null
         $board = Get-BoardCapacity -Ref "origin/$branch"
-        if ($null -ne $board.Capacity) { return $board.Capacity }
+        if ($null -ne $board.Capacity) {
+            if ($null -ne $AddingTo -and $null -ne $board.ClaimableReady) {
+                return Get-LaneAddCapacity -Capacity $board.Capacity -Current ([int]$AddingTo) -ClaimableReady $board.ClaimableReady
+            }
+            return $board.Capacity
+        }
         if (-not $script:Auto.CapacityTraced) {
             $script:Auto.CapacityTraced = $true
             Write-Trace '-' 'lanes' "cannot read the board's capacity ($($board.Why)); using $Fallback" 'Yellow'
@@ -401,6 +409,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $closedTabs = @{}
     # The non-SUMMARY lines of summaries a retired lane wrote before it was added again.
     $retiredLines = @()
+    # The SUMMARY lines of those summaries, for the shift-end trace (BL-4849).
+    $reusedSummaries = @()
 
     function Start-Lane {
         # Starts lane $N in its worktree $LanesDir\lane-<n> and records its process or tab.
@@ -438,7 +448,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if ($null -eq $n) { return $null }
         $summary = Join-Path $summaries "lane-$n.txt"
         if (Test-Path $summary) {
-            $script:retiredLines += @(Get-Content $summary | Where-Object { $_.Trim() -and $_ -notmatch '^SUMMARY ' })
+            $kept = Get-ReusedLaneKeep @(Get-Content $summary)
+            $script:retiredLines += @($kept.Stalls)
+            if ($kept.Summary) { $script:reusedSummaries += @($kept.Summary) }
+            # The old tab is not closed, so it gets its label now: Start-Lane replaces the tab.
+            if ($kept.TabLabel -and $laneTabs[$n] -and -not $closedTabs.ContainsKey($n)) { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n $kept.TabLabel) }
             Rename-Item -Path $summary -NewName "lane-$n.retired-$(Get-Date -Format 'HHmmss').log"
         }
         Remove-Item (Get-LaneStatePath $n 'retire') -ErrorAction SilentlyContinue
@@ -504,7 +518,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             $script:Auto.Samples = @(@($script:Auto.Samples) + @(New-UsageSample -At $now -Reading $reading -ActiveLanes $busy) |
                 Where-Object { $_.At -ge $now.AddHours(-3) })
         }
-        $capacity = if ($null -ne $Capacity) { [int]$Capacity } else { Get-ShiftCapacity -Fallback $current }
+        $capacity = if ($null -ne $Capacity) { [int]$Capacity } else { Get-ShiftCapacity -Fallback $current -AddingTo $current }
         $step = Get-AutoLaneStep -Samples $script:Auto.Samples -Current $current -Capacity $capacity -MachineCap $script:Auto.MachineCap `
             -Saved $script:Auto.Saved -PreviousLow $script:Auto.LastLow
         $script:Auto.FiveHourRate = $step.FiveHourRate
@@ -554,7 +568,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
         $current = @($activeLanes | Where-Object { $retiring -notcontains $_ }).Count
         if ((Get-UsageStop) -or (Get-Date) -gt $shiftEnd) { return }
-        $capacity = Get-ShiftCapacity -Fallback $current
+        $capacity = Get-ShiftCapacity -Fallback $current -AddingTo $current
         $idle = @(Get-IdleLanes | Where-Object { $retiring -notcontains $_ })
         $step = Get-CapacityLaneCount -Current $current -Capacity $capacity -Requested $requestedLanes -Idle $idle.Count
         if (-not $step.Changed) { return }
@@ -648,8 +662,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         # still running and adds lanes back when work appears later in the shift (BL-4826),
         # and its tab closes now if there is nothing in it to read. With no lane left active
         # the shift ends below, as before.
-        foreach ($n in @($activeLanes)) {
-            if ($finished -notcontains $n) { continue }
+        foreach ($n in @(Get-EndedLanes -Active @($activeLanes) -Finished $finished)) {
             $activeLanes.Remove($n) | Out-Null
             $report = Read-LaneSummary $n
             $how = if (Test-Path (Get-LaneStatePath $n 'retire')) { 'retired' } else { 'ended' }
@@ -688,7 +701,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             $rampCurrent = @($activeLanes | Where-Object { $rampRetiring -notcontains $_ }).Count
             $belowFloor = Test-UnpacedRampDue -Current $rampCurrent -Capacity $MaxLanes -MachineCap $script:Auto.MachineCap -MaxLanes $MaxLanes
             if ($belowFloor -and -not (Get-UsageStop) -and (Get-Date) -le $shiftEnd) {
-                $rampCapacity = Get-ShiftCapacity -Fallback $rampCurrent
+                $rampCapacity = Get-ShiftCapacity -Fallback $rampCurrent -AddingTo $rampCurrent
                 if (Test-UnpacedRampDue -Current $rampCurrent -Capacity $rampCapacity -MachineCap $script:Auto.MachineCap -MaxLanes $MaxLanes) {
                     Invoke-AutoLaneStep -Capacity $rampCapacity
                     $nextAutoStep = (Get-Date).AddMinutes(15)
@@ -723,6 +736,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     if ($moved) { Write-Trace '-' 'branch' "$moved; not pulling" 'Red' }
     else { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
     $stalls = @()
+    foreach ($s in $reusedSummaries) { Write-Trace '-' 'lane' ($s -replace '^SUMMARY ', '') 'Cyan' }
     # Every lane started this shift reports, retired ones included. A lane that blocked a
     # task or stalled keeps its tab for Stewart; so does a lane that never wrote a summary.
     foreach ($file in Get-ChildItem $summaries -Filter 'lane-*.txt' -ErrorAction SilentlyContinue) {
