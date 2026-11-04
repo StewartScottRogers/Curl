@@ -145,7 +145,7 @@ public sealed class ProtobufWriter
     }
 
     /// <summary>
-    /// Writes back a field read by <see cref="ProtobufReader.TryReadField" />, a group with
+    /// Writes back a field read by <see cref="ProtobufReader.ReadField" />, a group with
     /// every field inside it: how unknown fields survive a round trip.
     /// </summary>
     public void WriteField(ProtobufField field)

@@ -267,6 +267,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             $dirty = @(1..16 | Where-Object { -not $adopt.ContainsKey($_) -and (Test-WorktreeDirty (Join-Path $LanesDir "lane-$_")) })
             $returned = @()
             $laneBranchesAhead = @(Get-LaneBranchesAhead $branch $Root)
+            $unknownBranches = Get-UnknownLaneBranchesRefusal $laneBranchesAhead
+            if ($unknownBranches) { Stop-ShiftStart $unknownBranches; exit 1 }
             $laneLastTask = @{}
             foreach ($n in $dirty) { $laneLastTask[[int]$n] = Get-LaneLastRunTask $n }
             foreach ($id in $orphans) {
@@ -741,7 +743,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         # An Auto shift hands on Auto, not the count it ended at; the next one starts from
         # the count auto-lanes.json saved.
         $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-MaxRunTurns', $MaxRunTurns, '-HeartbeatMinutes', $HeartbeatMinutes, '-IdlePollMinutes', $IdlePollMinutes, '-Continuous', '-ShiftBranch', $branch)
-        if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
+        $forward += @('-StopAtUsage', $StopAtUsage.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-StopAtWeeklyUsage', $StopAtWeeklyUsage.ToString([System.Globalization.CultureInfo]::InvariantCulture))
+        if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes, '-UnpacedLanes', $UnpacedLanes) }
         if ($WeeklyPace) { $forward += '-WeeklyPace' }
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
         $startedAt = Get-Date; $keepTab = $false

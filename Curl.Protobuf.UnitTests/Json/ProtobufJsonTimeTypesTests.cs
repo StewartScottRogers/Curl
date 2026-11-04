@@ -113,7 +113,7 @@ public sealed class ProtobufJsonTimeTypesTests
         Assert.ThrowsExactly<FormatException>(() => ProtobufJsonFormatter.Format(WithTime(field, seconds, nanos), indented: false));
 
     [TestMethod]
-    public void TryConvertBinaryToJson_TimestampOutOfRange_IsInvalidValue()
+    public void ConvertBinaryToJson_TimestampOutOfRange_IsInvalidValue()
     {
         var binary = DynamicMessageEncoder.Encode(WithTime("at", 0, -1));
 
@@ -124,7 +124,7 @@ public sealed class ProtobufJsonTimeTypesTests
     }
 
     [TestMethod]
-    public void TryConvertJsonToBinary_TimestampAndDuration_AreTheirMessages()
+    public void ConvertJsonToBinary_TimestampAndDuration_AreTheirMessages()
     {
         var error = ProtobufJsonConverter.ConvertJsonToBinary(Times, Encoding.UTF8.GetBytes("""{"at":"1970-01-01T00:00:01Z","took":"1.5s"}"""), out var binary);
 

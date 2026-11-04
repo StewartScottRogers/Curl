@@ -9,7 +9,7 @@ Namespace `Curl.Protobuf.Wire` (folder `Wire/`): the wire format codec (BL-4164)
 - `ProtobufWriter`: varints, ZigZag `sint32`/`sint64`, fixed32/64, length-delimited and
   packed repeated fields, and `WriteField`, which writes back a field read unchanged.
 - `ProtobufReader`: every read is a `Read...` returning a `ProtobufDecodeError`;
-  malformed input never throws. `TryReadField` reads any field, a group whole, into a
+  malformed input never throws. `ReadField` reads any field, a group whole, into a
   `ProtobufField`, which is how unknown fields round-trip. Groups and embedded messages
   nest at most `MaximumDepth` (100) deep.
 - `ProtobufZigZag`: the ZigZag mapping.

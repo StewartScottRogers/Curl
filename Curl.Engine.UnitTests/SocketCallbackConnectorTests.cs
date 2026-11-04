@@ -414,6 +414,22 @@ public sealed class SocketCallbackConnectorTests
     }
 
     [TestMethod]
+    public async Task DisposeAsync_CloserNotMarkedAsTheConnectionsOwnSocket_CallsTheCloseSocketCallbackAfterTheConnectionCloses()
+    {
+        FakeConnection inner = new();
+        bool? innerDisposedAtCallback = null;
+        SocketCallbackConnection connection = new(inner, new CurlSocketCloser(new CurlSocket(4), _ =>
+        {
+            innerDisposedAtCallback = inner.Disposed;
+            return 0;
+        }));
+
+        await connection.DisposeAsync();
+
+        Assert.IsTrue(innerDisposedAtCallback);
+    }
+
+    [TestMethod]
     public async Task ClearTlsAsync_InnerGivesNone_GivesNone()
     {
         SocketCallbackConnection connection = new(new FakeConnection(), new CurlSocketCloser(new CurlSocket(4), null));

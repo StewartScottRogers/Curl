@@ -48,6 +48,8 @@ public sealed class Cgr077Tests
     [TestMethod]
     [DataRow("hello\n\r", CurlExitCode.AuthError, "An authentication function returned an error", DisplayName = "CR and LF")]
     [DataRow("us\tr", CurlExitCode.AuthError, "An authentication function returned an error", DisplayName = "tab")]
+    [DataRow("\u0001u", CurlExitCode.AuthError, "An authentication function returned an error", DisplayName = "control character first")]
+    [DataRow("dom\\\u001fu", CurlExitCode.AuthError, "An authentication function returned an error", DisplayName = "control character first after the domain")]
     [DataRow("", CurlExitCode.LoginDenied, "Login denied", DisplayName = "empty")]
     public void CreateAuthorization_UserNameSspiRefuses_FailsAsCurl(string user, CurlExitCode exitCode, string message)
     {

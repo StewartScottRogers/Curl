@@ -35,6 +35,9 @@ public sealed class PageantSshAgentConnectorTests
     {
         InMemorySshAgent agent = new InMemorySshAgent().Add(TestUserKeys.RsaPkcs1, "pageant-key");
         ScriptedPageantWindow window = ScriptedPageantWindow.AnsweringAs(agent);
+        Curl.Ssh.Keys.SshPrivateKey key = Curl.Ssh.Keys.SshPrivateKeyReader.Read(TestUserKeys.RsaPkcs1, [])!;
+        byte[] expectedSignRequest = SshTestEncoding.Join([SshAgentMessageNumber.SignRequest], SshTestEncoding.String(key.PublicKeyBlob), SshTestEncoding.String([1, 2, 3]), SshTestEncoding.UInt32(0));
+        byte[] expectedSignatureBlob = key.Sign("ssh-rsa", [1, 2, 3]);
         Diagnostics.Arrange("Pageant agent", "one RSA key, comment pageant-key");
         await using SshAgentClient client = new((await new PageantSshAgentConnector(window).ConnectAsync(CancellationToken.None))!);
 
@@ -42,16 +45,20 @@ public sealed class PageantSshAgentConnectorTests
         SshAgentSignature? signature = await client.SignAsync(identities![0].Blob, [1, 2, 3], 0, CancellationToken.None);
 
         Diagnostics.Act("identity comment", identities[0].DisplayComment);
-        Diagnostics.Act("signed", signature is not null);
+        byte[] signatureBlob = signature is null ? [] : SshTestEncoding.Join(SshTestEncoding.String(signature.Method), SshTestEncoding.String(signature.Signature ?? []));
+        Diagnostics.Bytes("signature blob", signatureBlob);
         Diagnostics.Act("window exchanges", window.Exchanges);
         Diagnostics.Bytes("first agent request", agent.Requests[0]);
         Diagnostics.Assert("identity comment", "pageant-key", identities[0].DisplayComment);
         Diagnostics.Assert("window exchanges", 2, window.Exchanges);
         Diagnostics.Diff("first agent request", new byte[] { 11 }, agent.Requests[0]);
+        Diagnostics.Diff("sign request", expectedSignRequest, agent.Requests[1]);
+        Diagnostics.Diff("signature blob", expectedSignatureBlob, signatureBlob);
         Assert.AreEqual("pageant-key", identities[0].DisplayComment);
-        Assert.IsNotNull(signature);
         Assert.AreEqual(2, window.Exchanges);
         CollectionAssert.AreEqual(new byte[] { 11 }, agent.Requests[0]);
+        CollectionAssert.AreEqual(expectedSignRequest, agent.Requests[1]);
+        CollectionAssert.AreEqual(expectedSignatureBlob, signatureBlob);
     }
 
     [TestMethod]

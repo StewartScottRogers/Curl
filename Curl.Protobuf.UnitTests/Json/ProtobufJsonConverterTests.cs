@@ -9,7 +9,7 @@ namespace Curl.Protobuf.Json;
 public sealed class ProtobufJsonConverterTests
 {
     [TestMethod]
-    public void TryConvertJsonToBinary_Int32150_IsTheSpecificationsVector()
+    public void ConvertJsonToBinary_Int32150_IsTheSpecificationsVector()
     {
         var error = ProtobufJsonConverter.ConvertJsonToBinary(Type("Scalars"), Encoding.UTF8.GetBytes("""{"fInt32":150}"""), out var binary);
 
@@ -18,7 +18,7 @@ public sealed class ProtobufJsonConverterTests
     }
 
     [TestMethod]
-    public void TryConvertJsonToBinary_UnknownMember_HasNoBinary()
+    public void ConvertJsonToBinary_UnknownMember_HasNoBinary()
     {
         var error = ProtobufJsonConverter.ConvertJsonToBinary(Type("Scalars"), Encoding.UTF8.GetBytes("""{"nope":1}"""), out var binary);
 
@@ -27,7 +27,7 @@ public sealed class ProtobufJsonConverterTests
     }
 
     [TestMethod]
-    public void TryConvertBinaryToJson_Int32150_IsItsJson()
+    public void ConvertBinaryToJson_Int32150_IsItsJson()
     {
         var error = ProtobufJsonConverter.ConvertBinaryToJson(Type("Scalars"), Convert.FromHexString("189601"), indented: false, out var json);
 
@@ -36,7 +36,7 @@ public sealed class ProtobufJsonConverterTests
     }
 
     [TestMethod]
-    public void TryConvertBinaryToJson_TruncatedVarint_IsMalformedBinary()
+    public void ConvertBinaryToJson_TruncatedVarint_IsMalformedBinary()
     {
         var error = ProtobufJsonConverter.ConvertBinaryToJson(Type("Scalars"), Convert.FromHexString("1896"), indented: false, out var json);
 
@@ -45,7 +45,7 @@ public sealed class ProtobufJsonConverterTests
     }
 
     [TestMethod]
-    public void TryConvertBinaryToJson_MessagesNestedPastOneHundred_IsNestingTooDeep()
+    public void ConvertBinaryToJson_MessagesNestedPastOneHundred_IsNestingTooDeep()
     {
         var outer = new DynamicMessage(Type("Node"));
         outer.SetValue("next", Parse("Node", ProtobufJsonParserTests.NestedNodes(100)));
@@ -57,7 +57,7 @@ public sealed class ProtobufJsonConverterTests
     }
 
     [TestMethod]
-    public void TryConvert_JsonToBinaryAndBack_KeepsEveryValue()
+    public void Convert_JsonToBinaryAndBack_KeepsEveryValue()
     {
         const string Json = """{"numbers":["1","-2"],"items":[{"fString":"x","fBytes":"AQID"}],"colors":["GREEN"]}""";
         ProtobufJsonConverter.ConvertJsonToBinary(Type("Lists"), Encoding.UTF8.GetBytes(Json), out var binary);

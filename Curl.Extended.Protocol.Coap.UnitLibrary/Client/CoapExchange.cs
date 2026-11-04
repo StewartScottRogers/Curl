@@ -184,7 +184,7 @@ internal sealed class CoapExchange(IDatagramChannel channel, TimeProvider timePr
         {
             return await receive.ConfigureAwait(false);
         }
-        catch (SocketException exception)
+        catch (SocketException exception) when (exception.GetType() == typeof(SocketException))
         {
             throw new CoapException(CurlExitCode.RecvError, $"CoAP receive failed: {exception.Message}");
         }
@@ -197,7 +197,7 @@ internal sealed class CoapExchange(IDatagramChannel channel, TimeProvider timePr
         {
             await channel.SendAsync(datagram, channel.ServerEndPoint, stop).ConfigureAwait(false);
         }
-        catch (SocketException exception)
+        catch (SocketException exception) when (exception.GetType() == typeof(SocketException))
         {
             throw new CoapException(CurlExitCode.SendError, $"CoAP send failed: {exception.Message}");
         }

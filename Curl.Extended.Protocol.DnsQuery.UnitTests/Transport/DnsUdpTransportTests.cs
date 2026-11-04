@@ -191,7 +191,7 @@ public sealed class DnsUdpTransportTests
     [TestMethod]
     public async Task ExchangeAsync_RefusalAfterAStrayDatagram_ThrowsExitRecvError()
     {
-        var connector = new RefusingConnector(failSend: false);
+        var connector = new RefusingConnector(failSend: false, new SocketException((int)SocketError.ConnectionReset));
 
         DnsQueryException exception = await Assert.ThrowsExactlyAsync<DnsQueryException>(async () =>
             await new DnsUdpTransport(connector, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider())));
@@ -202,7 +202,7 @@ public sealed class DnsUdpTransportTests
     [TestMethod]
     public async Task ExchangeAsync_SendFailsWithASocketError_ThrowsExitSendError()
     {
-        var connector = new RefusingConnector(failSend: true);
+        var connector = new RefusingConnector(failSend: true, new SocketException((int)SocketError.ConnectionReset));
 
         DnsQueryException exception = await Assert.ThrowsExactlyAsync<DnsQueryException>(async () =>
             await new DnsUdpTransport(connector, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider())));
@@ -210,13 +210,46 @@ public sealed class DnsUdpTransportTests
         Assert.AreEqual(CurlExitCode.SendError, exception.ExitCode);
     }
 
+    [TestMethod]
+    public async Task ExchangeAsync_SendFailsWithAPortUnreachableError_EscapesUnchanged()
+    {
+        var error = new PortUnreachable();
+        var connector = new RefusingConnector(failSend: true, error);
+
+        SocketException thrown = await Assert.ThrowsExactlyAsync<PortUnreachable>(async () =>
+            await new DnsUdpTransport(connector, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider())));
+
+        Assert.AreSame(error, thrown);
+    }
+
+    [TestMethod]
+    public async Task ExchangeAsync_ReceiveFailsWithAPortUnreachableError_EscapesUnchanged()
+    {
+        var error = new PortUnreachable();
+        var connector = new RefusingConnector(failSend: false, error);
+
+        SocketException thrown = await Assert.ThrowsExactlyAsync<PortUnreachable>(async () =>
+            await new DnsUdpTransport(connector, new RecordingTransport()).ExchangeAsync("h", 53, Query, ContextOf(new ImmediateTimeProvider())));
+
+        Assert.AreSame(error, thrown);
+    }
+
+    /// <summary>Stands in for Curl.Networking.DatagramPortUnreachableException, a SocketException subclass the transport must not catch.</summary>
+    private sealed class PortUnreachable : SocketException
+    {
+        public PortUnreachable()
+            : base((int)SocketError.ConnectionReset)
+        {
+        }
+    }
+
     /// <summary>Opens a channel that gives one stray datagram and then fails with a connection reset, or fails every send.</summary>
-    private sealed class RefusingConnector(bool failSend) : IDatagramConnector
+    private sealed class RefusingConnector(bool failSend, SocketException error) : IDatagramConnector
     {
         public ValueTask<DatagramOpenResult> OpenAsync(string host, int port, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(DatagramOpenResult.Opened(new RefusingChannel(failSend)));
+            ValueTask.FromResult(DatagramOpenResult.Opened(new RefusingChannel(failSend, error)));
 
-        private sealed class RefusingChannel(bool failSend) : IDatagramChannel
+        private sealed class RefusingChannel(bool failSend, SocketException error) : IDatagramChannel
         {
             private bool strayGiven;
 
@@ -225,13 +258,13 @@ public sealed class DnsUdpTransportTests
             public EndPoint? LocalEndPoint => null;
 
             public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken) =>
-                failSend ? throw new SocketException((int)SocketError.ConnectionReset) : ValueTask.CompletedTask;
+                failSend ? throw error : ValueTask.CompletedTask;
 
             public ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
             {
                 if (strayGiven)
                 {
-                    throw new SocketException((int)SocketError.ConnectionReset);
+                    throw error;
                 }
 
                 strayGiven = true;

@@ -3303,7 +3303,8 @@ internal sealed class CurlCommandRunner(
     /// <c>%{xfer_id}</c> prints.
     /// </param>
     /// <param name="givenUrl">
-    /// The URL <c>%{url}</c> prints: as the glob expanded it, or the gateway URL of a rewritten IPFS URL.
+    /// The URL as the glob expanded it, or the gateway URL of a rewritten IPFS URL, which <c>%{url}</c> prints
+    /// unless a <c>-T</c> file name was appended to it (<see cref="WriteOutGivenUrl" />).
     /// </param>
     /// <param name="transferUrl">
     /// The URL transferred: with its guessed scheme, or for a <c>-T</c> upload as
@@ -3371,7 +3372,8 @@ internal sealed class CurlCommandRunner(
         Api.Info.TransferInfo info = Running.EasyWriteOutInfo is { } easyInfo && easyInfo.Describes(result)
             ? easyInfo.Info
             : ReportWriteOutInfo(options, transfer, transferUrl, result, connectionId);
-        return new(debugWriteOut.Apply(info), result, WriteOutGivenUrl(options, givenUrl, transferUrl), transfer.UrlNumber)
+        string urlAsCurlHoldsIt = UrlWithUploadFileName(givenUrl, transfer.UploadFile, transferUrl);
+        return new(debugWriteOut.Apply(info), result, WriteOutGivenUrl(options, urlAsCurlHoldsIt, transferUrl), transfer.UrlNumber)
         {
             OutputFileName = Running.OutputFileName,
             RetryCount = Running.RetryCount,
@@ -3387,7 +3389,9 @@ internal sealed class CurlCommandRunner(
     /// <c>127.0.0.1:1/p?a=b</c>), and stays as typed, without the query, when curl rejects it (CGR-089, BL-3618).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
-    /// <param name="givenUrl">The URL as it was given.</param>
+    /// <param name="givenUrl">
+    /// The URL as it was given, or as <see cref="UrlWithUploadFileName" /> rewrote it with a <c>-T</c> file name.
+    /// </param>
     /// <param name="transferUrl">The URL transferred, with its guessed scheme.</param>
     /// <returns>The URL <c>%{url}</c> prints.</returns>
     private static string WriteOutGivenUrl(CommandLineOptions options, string givenUrl, string transferUrl)
@@ -3402,6 +3406,27 @@ internal sealed class CurlCommandRunner(
         return UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol) == givenUrl
             ? url
             : url[(url.IndexOf("://", StringComparison.Ordinal) + "://".Length)..];
+    }
+
+    /// <summary>
+    /// The URL curl's tool holds for a transfer once <c>add_file_name_to_url</c> has run: when a <c>-T</c> file
+    /// name was appended to a URL whose path names no file, curl replaces its URL with the rewritten one, scheme
+    /// guessed and normalised, which <c>%{url}</c> then prints (curl 8.22.0 Schannel:
+    /// <c>-w %{url} -T sub/f.txt http://127.0.0.1:1/</c> prints <c>http://127.0.0.1:1/f.txt</c>, missing file or
+    /// not; AF-0623, BL-4796). Otherwise, and for an upload from standard input or a URL curl could not parse,
+    /// the URL stays as given.
+    /// </summary>
+    /// <param name="givenUrl">The URL as it was given.</param>
+    /// <param name="uploadFile">The transfer's <c>-T</c> value, or <see langword="null" /> for none.</param>
+    /// <param name="transferUrl">The URL <see cref="UploadTransferUrl" /> resolved, empty when it could not.</param>
+    /// <returns>The URL curl's tool holds for the transfer.</returns>
+    private static string UrlWithUploadFileName(string givenUrl, string? uploadFile, string transferUrl)
+    {
+        bool appendsFileName = uploadFile is not null
+            && transferUrl.Length > 0
+            && !UploadUrl.IsStandardInput(uploadFile)
+            && UploadUrl.AppendLocalFileNameWhenUrlNamesNoFile(givenUrl, uploadFile) != givenUrl;
+        return appendsFileName ? transferUrl : givenUrl;
     }
 
     /// <summary>

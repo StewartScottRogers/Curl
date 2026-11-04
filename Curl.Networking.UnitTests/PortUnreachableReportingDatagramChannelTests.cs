@@ -40,19 +40,26 @@ public sealed class PortUnreachableReportingDatagramChannelTests
     }
 
     [TestMethod]
-    public async Task SendAsync_PortClosed_ThrowsCurlsExit7Text()
+    [DataRow(SocketError.ConnectionReset)]
+    [DataRow(SocketError.ConnectionRefused)]
+    public async Task SendAsync_PortClosed_ThrowsCurlsExit7Text(SocketError socketError)
     {
-        Diagnostics.Arrange("socket error on send", SocketError.ConnectionRefused);
-        await using var channel = new PortUnreachableReportingDatagramChannel(
-            new FailingChannel(new SocketException((int)SocketError.ConnectionRefused)),
-            () => "refused text");
+        Diagnostics.Arrange("socket error on send", socketError);
+        var timeProvider = new ManualTimeProvider();
+        var inner = new FailingChannel(new SocketException((int)socketError));
+        var connector = new UdpDatagramConnector(new FakeDnsResolver(IPAddress.Loopback), timeProvider, _ => inner);
+        var opened = await connector.OpenAsync("localhost", 1, CancellationToken.None);
+        await using var channel = opened.Channel!;
+        timeProvider.Advance(7);
 
         var refused = await Assert.ThrowsExactlyAsync<DatagramPortUnreachableException>(
             async () => await channel.SendAsync(new byte[1], Server, CancellationToken.None));
         Diagnostics.Act("message", refused.Message);
 
-        Diagnostics.Assert("message", "refused text", refused.Message);
-        Assert.AreEqual("refused text", refused.Message);
+        Diagnostics.Assert("message", "Failed to connect to localhost:1 after 7 ms: Could not connect to server", refused.Message);
+        Diagnostics.Assert("socket error kept", socketError, refused.SocketErrorCode);
+        Assert.AreEqual("Failed to connect to localhost:1 after 7 ms: Could not connect to server", refused.Message);
+        Assert.AreEqual(socketError, refused.SocketErrorCode);
     }
 
     [TestMethod]

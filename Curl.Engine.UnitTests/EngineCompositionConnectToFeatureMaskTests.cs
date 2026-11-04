@@ -1,3 +1,5 @@
+using System.Net;
+
 using Curl.Api.Options.Network;
 using Curl.Console;
 
@@ -41,8 +43,9 @@ public sealed class EngineCompositionConnectToFeatureMaskTests
     public async Task CreateTcpConnector_NoMaskWithBracketedConnectTo_DialsTheMappedAddress()
     {
         ScriptedConnector server = new([]);
+        RecordingDnsResolver resolver = new();
 
-        ConnectResult result = await ConnectAsync(server, EngineFeatureMask.None);
+        ConnectResult result = await ConnectAsync(server, EngineFeatureMask.None, resolver);
 
         Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
@@ -50,6 +53,20 @@ public sealed class EngineCompositionConnectToFeatureMaskTests
         Assert.HasCount(1, server.Targets);
         Diagnostics.Assert("server.Targets[0].Port", 80, server.Targets[0].Port);
         Assert.AreEqual(80, server.Targets[0].Port);
+        Diagnostics.Assert("resolver.Hosts", "::1", string.Join(", ", resolver.Hosts));
+        Assert.AreEqual("::1", string.Join(", ", resolver.Hosts));
+    }
+
+    /// <summary>A resolver that records every host name it is asked for and answers with the IPv4 loopback address.</summary>
+    private sealed class RecordingDnsResolver : IDnsResolver
+    {
+        public List<string> Hosts { get; } = [];
+
+        public ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
+        {
+            Hosts.Add(host);
+            return ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Loopback]);
+        }
     }
 
     [TestMethod]
@@ -91,7 +108,7 @@ public sealed class EngineCompositionConnectToFeatureMaskTests
     /// <paramref name="featureMask" />, over a <see cref="LoopbackDnsResolver" /> and
     /// <paramref name="server" />, and connects to <c>localhost</c> on port 80.
     /// </summary>
-    private async Task<ConnectResult> ConnectAsync(ScriptedConnector server, EngineFeatureMask featureMask)
+    private async Task<ConnectResult> ConnectAsync(ScriptedConnector server, EngineFeatureMask featureMask, IDnsResolver? resolver = null)
     {
         Diagnostics.Arrange("featureMask", featureMask);
         Diagnostics.Arrange("--connect-to", BracketedConnectTo);
@@ -100,7 +117,7 @@ public sealed class EngineCompositionConnectToFeatureMaskTests
 
         TcpConnector connector = EngineComposition.CreateTcpConnector(
             EasyOptionsFromCommandLine.ToolOptionsOf(parsed.Options), EasyOptionsFromCommandLine.TraceComponentsOf(parsed.Options), EasyOptionsFromCommandLine.NetworkOf(parsed.Options), EasyOptionsFromCommandLine.HttpOf(parsed.Options), EasyOptionsFromCommandLine.ProxyOf(parsed.Options), EasyOptionsFromCommandLine.AuthenticationOf(parsed.Options),
-            new LoopbackDnsResolver(),
+            resolver ?? new LoopbackDnsResolver(),
             new ScriptedTcpDialer(server),
             new PassThroughTlsProvider(),
             TimeProvider.System,

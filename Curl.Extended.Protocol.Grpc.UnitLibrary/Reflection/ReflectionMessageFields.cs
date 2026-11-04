@@ -21,7 +21,7 @@ internal sealed class ReflectionMessageFields
     /// <exception cref="GrpcWireException">The bytes are not a Protocol Buffers message.</exception>
     public static ReflectionMessageFields Read(ReadOnlyMemory<byte> message)
     {
-        ProtobufDecodeError error = new ProtobufReader(message).TryReadAllFields(out IReadOnlyList<ProtobufField> read);
+        ProtobufDecodeError error = new ProtobufReader(message).ReadAllFields(out IReadOnlyList<ProtobufField> read);
         return error == ProtobufDecodeError.None
             ? new ReflectionMessageFields(read)
             : throw new GrpcWireException($"A server reflection message does not decode ({error}).");

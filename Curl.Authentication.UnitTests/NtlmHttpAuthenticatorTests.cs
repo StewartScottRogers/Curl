@@ -54,6 +54,31 @@ public sealed partial class NtlmHttpAuthenticatorTests
         Assert.IsTrue(context.IsDisposed);
     }
 
+    /// <summary>
+    /// Pins that only a ContinueNeeded or Completed step that made a token becomes a header
+    /// (AF-0617): a step with an empty token sends no bare <c>NTLM </c>, and a refused or
+    /// malformed step sends nothing even when it carries bytes.
+    /// </summary>
+    [TestMethod]
+    [DataRow(SecurityContextStatus.ContinueNeeded, false, DisplayName = "ContinueNeeded with an empty token")]
+    [DataRow(SecurityContextStatus.Completed, false, DisplayName = "Completed with an empty token")]
+    [DataRow(SecurityContextStatus.Refused, true, DisplayName = "Refused carrying a token")]
+    [DataRow(SecurityContextStatus.MalformedToken, true, DisplayName = "MalformedToken carrying a token")]
+    public async Task CreateAuthorizationAsync_Type1StepWithoutAHeaderableToken_SendsNothing(SecurityContextStatus status, bool carriesToken)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("scripted status", status);
+        diagnostics.Arrange("scripted token carried", carriesToken);
+        ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(status, carriesToken ? Type1 : [])));
+
+        string? value = await Authenticator(contexts).CreateAuthorizationAsync(Request("u:p"), null, sentBeforeAnyChallenge: false, [], CancellationToken.None);
+
+        diagnostics.Act("Authorization", value);
+        diagnostics.Assert("Authorization", null, value);
+        Assert.IsNull(value);
+    }
+
     [TestMethod]
     [DataRow(null, false, DisplayName = "Nothing sent: --anyauth's first request")]
     [DataRow("NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, true, DisplayName = "Type 1 sent before any challenge")]
