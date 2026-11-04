@@ -3,8 +3,8 @@ id: AF-0628
 title: Surviving mutant: a resumable-upload header value that starts with CR or LF can escape the injection refusal, and no test fails
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-04_0643.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Extension.ResumableUpload.UnitLibrary/Http/ResumableUploadHttpClientConnection.cs:FormatHead-ge:surviving-mutant
 reproduction: mutation Curl.Extension.ResumableUpload.UnitLibrary/Http/ResumableUploadHttpClientConnection.cs:51:>=
 task: BL-4807
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 0ae5ce3f5e65976edeb9facb28b93fd3f4dcdbc8
 scorecard: 2026-11-03_2203.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-04
+closed-how: mechanical
+closed-by: 2026-11-04_0643.md
 ---
 # AF-0628 - Surviving mutant: a resumable-upload header value that starts with CR or LF can escape the injection refusal, and no test fails
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_0643.md | reproduces: no | Ran the -Site command: outcome killed, resolvedLine 51. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-04: accepted -> closed. Re-audit 2026-11-04_0643.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

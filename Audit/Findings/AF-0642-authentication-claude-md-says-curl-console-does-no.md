@@ -42,6 +42,8 @@ Select-String -Path Curl.Authentication.UnitLibrary/CLAUDE.md -Pattern 'does not
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_0643.md | reproduces: no | Ran the reproduction. Select-String finds no 'does not pass one yet' in Curl.Authentication.UnitLibrary/CLAUDE.md, which now says 'the production composition (EngineComposition) passes one for IMAP, POP3 and SMTP (BL-852)'. EngineComposition.cs:190-192 still passes CreateSaslAuthenticator(contexts.Value, ...) for imap, pop3 and smtp.
+
 ## Log
 
 - 2026-11-03: filed proposed.
