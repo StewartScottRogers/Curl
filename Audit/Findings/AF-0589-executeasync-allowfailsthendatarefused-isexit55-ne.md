@@ -42,6 +42,8 @@ Select-String -Path Curl.Original.Protocol.Smtp.UnitTests/SmtpProtocolHandlerMai
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Asserts Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode) (55).
+
 ## Log
 
 - 2026-11-03: filed proposed.

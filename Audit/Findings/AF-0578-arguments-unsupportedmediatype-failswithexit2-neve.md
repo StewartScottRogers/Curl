@@ -42,6 +42,8 @@ Select-String -Path Curl.Extension.OpenApi.UnitTests/OpenApiRequestBodyTests.cs 
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Asserts the message and Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode).
+
 ## Log
 
 - 2026-11-03: filed proposed.

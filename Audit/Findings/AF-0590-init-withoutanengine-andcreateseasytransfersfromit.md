@@ -42,6 +42,8 @@ Select-String -Path Libcurl.UnitTests/Global/CurlGlobalTests.cs -Pattern 'Assert
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | No 'Assert.IsNotNull(transfer)' match; CurlGlobalTests.cs:86 asserts Assert.IsInstanceOfType<ManagedEasyTransfer>(transfer).
+
 ## Log
 
 - 2026-11-03: filed proposed.

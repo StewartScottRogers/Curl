@@ -42,6 +42,8 @@ Select-String -Path Curl.Original.Protocol.Smb.UnitTests/SmbProtocolHandlerVerbo
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Asserts Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode) (8).
+
 ## Log
 
 - 2026-11-03: filed proposed.

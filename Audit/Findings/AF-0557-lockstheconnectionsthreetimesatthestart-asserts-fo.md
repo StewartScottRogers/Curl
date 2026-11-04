@@ -3,8 +3,8 @@ id: AF-0557
 title: LocksTheConnectionsThreeTimesAtTheStart asserts four locks over the whole perform
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1615.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1017.md, 2026-11-03_1615.md).
 key: quality:Curl.Engine.UnitTests/ManagedShareHandleTests.cs:PerformAsync_ConnectionsSharedAndNoUrl_LocksTheConnectionsThreeTimesAtTheStart:name-lies
 reproduction: none
 task: BL-4705
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: consecutive
+closed-by: 2026-11-03_1017.md, 2026-11-03_1615.md
 ---
 # AF-0557 - LocksTheConnectionsThreeTimesAtTheStart asserts four locks over the whole perform
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Engine.UnitTests/ManagedShareHandleTests.cs -Pattern 'L
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_1017.md | reproduces: no | Neither pattern matches: the test is now ..._LocksTheConnectionsThreeTimesToTakeThePoolAndOnceWhenDone and asserts Assert.AreEqual(3 + 1, locks, ...), matching its name.
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | No match for either pattern; the test is renamed ..._LocksTheConnectionsThreeTimesToTakeThePoolAndOnceWhenDone and asserts Assert.AreEqual(3 + 1, locks, ...).
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1615.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1017.md, 2026-11-03_1615.md).

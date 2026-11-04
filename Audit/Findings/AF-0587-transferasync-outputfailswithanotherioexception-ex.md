@@ -42,6 +42,8 @@ Select-String -Path Curl.Original.Protocol.Smb.UnitTests/SmbFileTransferTests.cs
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Asserts Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode) (23) and the message.
+
 ## Log
 
 - 2026-11-03: filed proposed.

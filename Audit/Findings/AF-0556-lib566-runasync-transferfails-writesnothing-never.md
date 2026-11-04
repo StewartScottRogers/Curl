@@ -3,8 +3,8 @@ id: AF-0556
 title: Lib566 RunAsync_TransferFails_WritesNothing never checks that nothing was written
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1615.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1017.md, 2026-11-03_1615.md).
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs:RunAsync_TransferFails_WritesNothing:name-lies
 reproduction: none
 task: BL-4704
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: consecutive
+closed-by: 2026-11-03_1017.md, 2026-11-03_1615.md
 ---
 # AF-0556 - Lib566 RunAsync_TransferFails_WritesNothing never checks that nothing was written
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs -Patt
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_1017.md | reproduces: no | RunAsync_TransferFails_WritesNothing asserts Assert.AreEqual(string.Empty, run.OutputText) and Assert.IsFalse(File.Exists(path)).
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Test now asserts Assert.AreEqual(string.Empty, run.OutputText) and Assert.IsFalse(File.Exists(path)).
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1615.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1017.md, 2026-11-03_1615.md).

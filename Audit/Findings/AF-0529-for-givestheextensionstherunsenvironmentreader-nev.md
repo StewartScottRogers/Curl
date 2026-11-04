@@ -3,8 +3,8 @@ id: AF-0529
 title: For_GivesTheExtensionsTheRunsEnvironmentReader never checks that the reader reaches the extensions
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1615.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1017.md, 2026-11-03_1615.md).
 key: quality:Curl.Extension.Composition.UnitTests/ExtensionProtocolHandlersTests.cs:For_GivesTheExtensionsTheRunsEnvironmentReader:name-lies
 reproduction: none
 task: BL-4691
@@ -13,9 +13,9 @@ found: 2026-11-02
 found-at: fcdba3d03e8b5378439deb78f2055b6f5eccf2bb
 scorecard: 2026-11-02_1724.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: consecutive
+closed-by: 2026-11-03_1017.md, 2026-11-03_1615.md
 ---
 # AF-0529 - For_GivesTheExtensionsTheRunsEnvironmentReader never checks that the reader reaches the extensions
 
@@ -44,8 +44,10 @@ Select-String -Path Curl.Extension.Composition.UnitTests/ExtensionProtocolHandle
 
 - 2026-11-03 | 2026-11-03_0025.md | reproduces: yes | The test body is unchanged: 'Assert.HasCount(ExtensionCatalogue.Entries.Count, handlers); Assert.IsNull(Services.ReadEnvironmentVariable);'. It still never checks that the reader reaches the extensions. A separate test, For_HandsEachExtensionFactoryServicesCarryingTheGivenReader, now covers the behaviour, but this test's name still promises what its body does not check.
 - 2026-11-03 | 2026-11-03_1017.md | reproduces: no | Select-String context now shows Assert.AreSame(reader, seen!.ReadEnvironmentVariable); after the For call: the reader is checked to reach the extensions.
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Line 40 now asserts Assert.AreSame(reader, seen!.ReadEnvironmentVariable): the reader reaching the extensions is checked.
 
 ## Log
 
 - 2026-11-02: filed proposed.
 - 2026-11-02: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1615.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1017.md, 2026-11-03_1615.md).
