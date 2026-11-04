@@ -37,3 +37,4 @@ CLAUDE.md's "say what it does" rule makes a stale name a defect: an agent readin
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 7b8acaed 97d85d25 128ab524 3d836d5e.
