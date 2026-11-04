@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Authentication.UnitLibrary/NtlmHttpAuthenticator.cs:HeaderOf-and:surviving-mutant
 reproduction: mutation Curl.Authentication.UnitLibrary/NtlmHttpAuthenticator.cs:183:&&
-task: none
-tasks:
+task: BL-4790
+tasks: BL-4790
 found: 2026-11-03
 found-at: 7410f102c809d5232e4f9b210b3ac32486848c27
 scorecard: 2026-11-03_1615.md

@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: process:logs:41715208450:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-4799
+tasks: BL-4799
 found: 2026-11-03
 found-at: 7410f102c809d5232e4f9b210b3ac32486848c27
 scorecard: 2026-11-03_1615.md

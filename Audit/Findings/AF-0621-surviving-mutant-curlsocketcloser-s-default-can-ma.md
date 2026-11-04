@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/CurlSocketCloser.cs:CurlSocketCloser-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/CurlSocketCloser.cs:19:false
-task: none
-tasks:
+task: BL-4794
+tasks: BL-4794
 found: 2026-11-03
 found-at: 7410f102c809d5232e4f9b210b3ac32486848c27
 scorecard: 2026-11-03_1615.md
