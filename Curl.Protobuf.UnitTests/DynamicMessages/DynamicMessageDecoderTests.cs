@@ -28,7 +28,7 @@ public sealed class DynamicMessageDecoderTests
     [DataRow("Scalars", "1501", ProtobufDecodeError.TruncatedFixed, DisplayName = "truncated fixed32")]
     [DataRow("Maps", "0A05", ProtobufDecodeError.LengthPastEnd, DisplayName = "map entry past the end")]
     [DataRow("Maps", "0A021096", ProtobufDecodeError.TruncatedVarint, DisplayName = "malformed map entry")]
-    public void TryDecode_MalformedInput_IsTheTypedErrorAndNoMessage(string typeName, string hex, ProtobufDecodeError expected)
+    public void Decode_MalformedInput_IsTheTypedErrorAndNoMessage(string typeName, string hex, ProtobufDecodeError expected)
     {
         var error = DynamicMessageDecoder.Decode(Type(typeName), Convert.FromHexString(hex), out var message);
 
@@ -37,7 +37,7 @@ public sealed class DynamicMessageDecoderTests
     }
 
     [TestMethod]
-    public void TryDecode_MessagesNestedPastTheMaximumDepth_IsNestingTooDeep()
+    public void Decode_MessagesNestedPastTheMaximumDepth_IsNestingTooDeep()
     {
         var payload = Array.Empty<byte>();
         for (var depth = 0; depth <= ProtobufReader.MaximumDepth; depth++)
@@ -54,7 +54,7 @@ public sealed class DynamicMessageDecoderTests
     }
 
     [TestMethod]
-    public void TryDecode_EmptyInput_IsAnEmptyMessage()
+    public void Decode_EmptyInput_IsAnEmptyMessage()
     {
         var error = DynamicMessageDecoder.Decode(Type("Test1"), ReadOnlyMemory<byte>.Empty, out var message);
 

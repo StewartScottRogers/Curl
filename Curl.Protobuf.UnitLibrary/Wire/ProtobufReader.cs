@@ -39,7 +39,7 @@ public sealed class ProtobufReader
     public bool IsAtEnd => position == input.Length;
 
     /// <summary>Reads a base-128 varint of at most 10 bytes; bits past the 64th are discarded.</summary>
-    public ProtobufDecodeError TryReadVarint(out ulong value)
+    public ProtobufDecodeError ReadVarint(out ulong value)
     {
         value = 0;
         var span = input.Span;
@@ -62,7 +62,7 @@ public sealed class ProtobufReader
     }
 
     /// <summary>Reads four little-endian bytes.</summary>
-    public ProtobufDecodeError TryReadFixed32(out uint value)
+    public ProtobufDecodeError ReadFixed32(out uint value)
     {
         value = 0;
         if (input.Length - position < sizeof(uint))
@@ -76,7 +76,7 @@ public sealed class ProtobufReader
     }
 
     /// <summary>Reads eight little-endian bytes.</summary>
-    public ProtobufDecodeError TryReadFixed64(out ulong value)
+    public ProtobufDecodeError ReadFixed64(out ulong value)
     {
         value = 0;
         if (input.Length - position < sizeof(ulong))
@@ -90,10 +90,10 @@ public sealed class ProtobufReader
     }
 
     /// <summary>Reads a varint length and that many bytes after it.</summary>
-    public ProtobufDecodeError TryReadLengthDelimited(out ReadOnlyMemory<byte> payload)
+    public ProtobufDecodeError ReadLengthDelimited(out ReadOnlyMemory<byte> payload)
     {
         payload = ReadOnlyMemory<byte>.Empty;
-        var error = TryReadVarint(out var length);
+        var error = ReadVarint(out var length);
         if (error != ProtobufDecodeError.None)
         {
             return error;
@@ -110,11 +110,11 @@ public sealed class ProtobufReader
     }
 
     /// <summary>Reads a field tag and checks its wire type and field number.</summary>
-    public ProtobufDecodeError TryReadTag(out int fieldNumber, out ProtobufWireType wireType)
+    public ProtobufDecodeError ReadTag(out int fieldNumber, out ProtobufWireType wireType)
     {
         fieldNumber = 0;
         wireType = ProtobufWireType.Varint;
-        var error = TryReadVarint(out var tag);
+        var error = ReadVarint(out var tag);
         if (error != ProtobufDecodeError.None)
         {
             return error;
@@ -140,10 +140,10 @@ public sealed class ProtobufReader
     /// Reads a length-delimited field's bytes as an embedded message, giving a reader one level
     /// deeper; fails with <see cref="ProtobufDecodeError.NestingTooDeep" /> past <see cref="MaximumDepth" />.
     /// </summary>
-    public ProtobufDecodeError TryReadEmbeddedMessage(out ProtobufReader? embedded)
+    public ProtobufDecodeError ReadEmbeddedMessage(out ProtobufReader? embedded)
     {
         embedded = null;
-        var error = TryReadLengthDelimited(out var payload);
+        var error = ReadLengthDelimited(out var payload);
         if (error != ProtobufDecodeError.None)
         {
             return error;
@@ -159,38 +159,38 @@ public sealed class ProtobufReader
     }
 
     /// <summary>Reads the next whole field, a group with every field inside it, whatever its wire type.</summary>
-    public ProtobufDecodeError TryReadField(out ProtobufField? field)
+    public ProtobufDecodeError ReadField(out ProtobufField? field)
     {
         field = null;
-        var error = TryReadTag(out var fieldNumber, out var wireType);
+        var error = ReadTag(out var fieldNumber, out var wireType);
         if (error != ProtobufDecodeError.None)
         {
             return error;
         }
 
-        return TryReadFieldValue(fieldNumber, wireType, out field);
+        return ReadFieldValue(fieldNumber, wireType, out field);
     }
 
     /// <summary>
-    /// Reads the value of a field whose tag <see cref="TryReadTag" /> has just read, a group
+    /// Reads the value of a field whose tag <see cref="ReadTag" /> has just read, a group
     /// with every field inside it: how a message reader keeps a field it does not recognise.
     /// </summary>
-    public ProtobufDecodeError TryReadFieldValue(int fieldNumber, ProtobufWireType wireType, out ProtobufField? field)
+    public ProtobufDecodeError ReadFieldValue(int fieldNumber, ProtobufWireType wireType, out ProtobufField? field)
     {
         field = null;
         return wireType == ProtobufWireType.EndGroup
             ? ProtobufDecodeError.UnmatchedEndGroup
-            : TryReadFieldValue(fieldNumber, wireType, Depth, out field);
+            : ReadFieldValue(fieldNumber, wireType, Depth, out field);
     }
 
     /// <summary>Reads every field to the end of the input.</summary>
-    public ProtobufDecodeError TryReadAllFields(out IReadOnlyList<ProtobufField> fields)
+    public ProtobufDecodeError ReadAllFields(out IReadOnlyList<ProtobufField> fields)
     {
         var read = new List<ProtobufField>();
         fields = read;
         while (!IsAtEnd)
         {
-            var error = TryReadField(out var field);
+            var error = ReadField(out var field);
             if (error != ProtobufDecodeError.None)
             {
                 return error;
@@ -209,7 +209,7 @@ public sealed class ProtobufReader
         var reader = new ProtobufReader(payload);
         while (!reader.IsAtEnd)
         {
-            var error = reader.TryReadVarint(out var value);
+            var error = reader.ReadVarint(out var value);
             if (error != ProtobufDecodeError.None)
             {
                 return error;
@@ -228,7 +228,7 @@ public sealed class ProtobufReader
         var reader = new ProtobufReader(payload);
         while (!reader.IsAtEnd)
         {
-            var error = reader.TryReadFixed32(out var value);
+            var error = reader.ReadFixed32(out var value);
             if (error != ProtobufDecodeError.None)
             {
                 return error;
@@ -247,7 +247,7 @@ public sealed class ProtobufReader
         var reader = new ProtobufReader(payload);
         while (!reader.IsAtEnd)
         {
-            var error = reader.TryReadFixed64(out var value);
+            var error = reader.ReadFixed64(out var value);
             if (error != ProtobufDecodeError.None)
             {
                 return error;
@@ -259,17 +259,17 @@ public sealed class ProtobufReader
         return ProtobufDecodeError.None;
     }
 
-    private ProtobufDecodeError TryReadFieldValue(int fieldNumber, ProtobufWireType wireType, int depth, out ProtobufField? field)
+    private ProtobufDecodeError ReadFieldValue(int fieldNumber, ProtobufWireType wireType, int depth, out ProtobufField? field)
     {
         field = null;
         ulong scalar = 0;
         var payload = ReadOnlyMemory<byte>.Empty;
         IReadOnlyList<ProtobufField> groupFields = [];
         var error = wireType == ProtobufWireType.StartGroup
-            ? TryReadGroupFields(fieldNumber, depth + 1, out groupFields)
+            ? ReadGroupFields(fieldNumber, depth + 1, out groupFields)
             : wireType == ProtobufWireType.LengthDelimited
-                ? TryReadLengthDelimited(out payload)
-                : TryReadScalar(wireType, out scalar);
+                ? ReadLengthDelimited(out payload)
+                : ReadScalar(wireType, out scalar);
         if (error != ProtobufDecodeError.None)
         {
             return error;
@@ -279,37 +279,37 @@ public sealed class ProtobufReader
         return ProtobufDecodeError.None;
     }
 
-    private ProtobufDecodeError TryReadScalar(ProtobufWireType wireType, out ulong scalar)
+    private ProtobufDecodeError ReadScalar(ProtobufWireType wireType, out ulong scalar)
     {
         if (wireType == ProtobufWireType.Varint)
         {
-            return TryReadVarint(out scalar);
+            return ReadVarint(out scalar);
         }
 
         if (wireType == ProtobufWireType.Fixed64)
         {
-            return TryReadFixed64(out scalar);
+            return ReadFixed64(out scalar);
         }
 
-        var error = TryReadFixed32(out var value);
+        var error = ReadFixed32(out var value);
         scalar = value;
         return error;
     }
 
-    private ProtobufDecodeError TryReadGroupFields(int groupFieldNumber, int depth, out IReadOnlyList<ProtobufField> groupFields)
+    private ProtobufDecodeError ReadGroupFields(int groupFieldNumber, int depth, out IReadOnlyList<ProtobufField> groupFields)
     {
         groupFields = [];
         return depth > MaximumDepth
             ? ProtobufDecodeError.NestingTooDeep
-            : TryReadGroupBody(groupFieldNumber, depth, ref groupFields);
+            : ReadGroupBody(groupFieldNumber, depth, ref groupFields);
     }
 
-    private ProtobufDecodeError TryReadGroupBody(int groupFieldNumber, int depth, ref IReadOnlyList<ProtobufField> groupFields)
+    private ProtobufDecodeError ReadGroupBody(int groupFieldNumber, int depth, ref IReadOnlyList<ProtobufField> groupFields)
     {
         var read = new List<ProtobufField>();
         while (!IsAtEnd)
         {
-            var error = TryReadTag(out var fieldNumber, out var wireType);
+            var error = ReadTag(out var fieldNumber, out var wireType);
             if (error != ProtobufDecodeError.None)
             {
                 return error;
@@ -321,7 +321,7 @@ public sealed class ProtobufReader
                 return fieldNumber == groupFieldNumber ? ProtobufDecodeError.None : ProtobufDecodeError.UnmatchedEndGroup;
             }
 
-            error = TryReadFieldValue(fieldNumber, wireType, depth, out var field);
+            error = ReadFieldValue(fieldNumber, wireType, depth, out var field);
             if (error != ProtobufDecodeError.None)
             {
                 return error;

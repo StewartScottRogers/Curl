@@ -15,8 +15,8 @@ public sealed class ProtobufWriterTests
 
         CollectionAssert.AreEqual(new byte[] { 0x08, 0x96, 0x01 }, writer.ToArray());
         var reader = new ProtobufReader(writer.ToArray());
-        Assert.AreEqual(ProtobufDecodeError.None, reader.TryReadTag(out var fieldNumber, out var wireType));
-        Assert.AreEqual(ProtobufDecodeError.None, reader.TryReadVarint(out var value));
+        Assert.AreEqual(ProtobufDecodeError.None, reader.ReadTag(out var fieldNumber, out var wireType));
+        Assert.AreEqual(ProtobufDecodeError.None, reader.ReadVarint(out var value));
         Assert.AreEqual((1, ProtobufWireType.Varint, 150UL), (fieldNumber, wireType, value));
         Assert.IsTrue(reader.IsAtEnd);
     }
@@ -29,7 +29,7 @@ public sealed class ProtobufWriterTests
 
         CollectionAssert.AreEqual(new byte[] { 0x08, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01 }, writer.ToArray());
         var reader = new ProtobufReader(writer.ToArray().AsMemory(1));
-        Assert.AreEqual(ProtobufDecodeError.None, reader.TryReadVarint(out var value));
+        Assert.AreEqual(ProtobufDecodeError.None, reader.ReadVarint(out var value));
         Assert.AreEqual(-1, (int)value);
     }
 
@@ -68,8 +68,8 @@ public sealed class ProtobufWriterTests
 
         CollectionAssert.AreEqual(new byte[] { 0x12, 0x07, 0x74, 0x65, 0x73, 0x74, 0x69, 0x6E, 0x67 }, writer.ToArray());
         var reader = new ProtobufReader(writer.ToArray());
-        Assert.AreEqual(ProtobufDecodeError.None, reader.TryReadTag(out _, out _));
-        Assert.AreEqual(ProtobufDecodeError.None, reader.TryReadLengthDelimited(out var payload));
+        Assert.AreEqual(ProtobufDecodeError.None, reader.ReadTag(out _, out _));
+        Assert.AreEqual(ProtobufDecodeError.None, reader.ReadLengthDelimited(out var payload));
         Assert.AreEqual("testing", System.Text.Encoding.UTF8.GetString(payload.Span));
     }
 
@@ -83,10 +83,10 @@ public sealed class ProtobufWriterTests
 
         CollectionAssert.AreEqual(new byte[] { 0x1A, 0x03, 0x08, 0x96, 0x01 }, writer.ToArray());
         var reader = new ProtobufReader(writer.ToArray());
-        Assert.AreEqual(ProtobufDecodeError.None, reader.TryReadTag(out _, out _));
-        Assert.AreEqual(ProtobufDecodeError.None, reader.TryReadEmbeddedMessage(out var embedded));
+        Assert.AreEqual(ProtobufDecodeError.None, reader.ReadTag(out _, out _));
+        Assert.AreEqual(ProtobufDecodeError.None, reader.ReadEmbeddedMessage(out var embedded));
         Assert.AreEqual(1, embedded!.Depth);
-        Assert.AreEqual(ProtobufDecodeError.None, embedded.TryReadAllFields(out var fields));
+        Assert.AreEqual(ProtobufDecodeError.None, embedded.ReadAllFields(out var fields));
         Assert.AreEqual(150UL, fields.Single().Scalar);
     }
 
@@ -110,7 +110,7 @@ public sealed class ProtobufWriterTests
 
         CollectionAssert.AreEqual(new byte[] { 0x15, 0x01, 0x00, 0x00, 0x00 }, writer.ToArray());
         var reader = new ProtobufReader(writer.ToArray().AsMemory(1));
-        Assert.AreEqual(ProtobufDecodeError.None, reader.TryReadFixed32(out var value));
+        Assert.AreEqual(ProtobufDecodeError.None, reader.ReadFixed32(out var value));
         Assert.AreEqual(1U, value);
     }
 
@@ -122,7 +122,7 @@ public sealed class ProtobufWriterTests
 
         CollectionAssert.AreEqual(new byte[] { 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01 }, writer.ToArray());
         var reader = new ProtobufReader(writer.ToArray().AsMemory(1));
-        Assert.AreEqual(ProtobufDecodeError.None, reader.TryReadFixed64(out var value));
+        Assert.AreEqual(ProtobufDecodeError.None, reader.ReadFixed64(out var value));
         Assert.AreEqual(0x0102030405060708UL, value);
     }
 
@@ -190,7 +190,7 @@ public sealed class ProtobufWriterTests
         ];
         var reader = new ProtobufReader(message);
 
-        Assert.AreEqual(ProtobufDecodeError.None, reader.TryReadAllFields(out var fields));
+        Assert.AreEqual(ProtobufDecodeError.None, reader.ReadAllFields(out var fields));
         var writer = new ProtobufWriter();
         foreach (var field in fields)
         {

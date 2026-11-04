@@ -36,7 +36,7 @@ public static class DynamicMessageDecoder
 
     private static ProtobufDecodeError DecodeField(ProtobufReader reader, DynamicMessage message)
     {
-        var error = reader.TryReadTag(out var fieldNumber, out var wireType);
+        var error = reader.ReadTag(out var fieldNumber, out var wireType);
         if (error != ProtobufDecodeError.None)
         {
             return error;
@@ -54,7 +54,7 @@ public static class DynamicMessageDecoder
 
     private static ProtobufDecodeError DecodeUnknownValue(ProtobufReader reader, DynamicMessage message, int fieldNumber, ProtobufWireType wireType)
     {
-        var error = reader.TryReadFieldValue(fieldNumber, wireType, out var unknownField);
+        var error = reader.ReadFieldValue(fieldNumber, wireType, out var unknownField);
         if (error == ProtobufDecodeError.None)
         {
             message.UnknownFields.Add(unknownField!);
@@ -86,7 +86,7 @@ public static class DynamicMessageDecoder
 
     private static ProtobufDecodeError DecodePacked(ProtobufReader reader, List<object> values, DynamicScalarCodec codec)
     {
-        var error = reader.TryReadLengthDelimited(out var payload);
+        var error = reader.ReadLengthDelimited(out var payload);
         var packed = new ProtobufReader(payload);
         while (error == ProtobufDecodeError.None && !packed.IsAtEnd)
         {
@@ -101,15 +101,15 @@ public static class DynamicMessageDecoder
     {
         if (codec.WireType == ProtobufWireType.Varint)
         {
-            return reader.TryReadVarint(out raw);
+            return reader.ReadVarint(out raw);
         }
 
         if (codec.WireType == ProtobufWireType.Fixed64)
         {
-            return reader.TryReadFixed64(out raw);
+            return reader.ReadFixed64(out raw);
         }
 
-        var error = reader.TryReadFixed32(out var value);
+        var error = reader.ReadFixed32(out var value);
         raw = value;
         return error;
     }
@@ -121,7 +121,7 @@ public static class DynamicMessageDecoder
             return field.IsMap ? DecodeMapEntry(reader, message, field) : DecodeMessage(reader, message, field);
         }
 
-        var error = reader.TryReadLengthDelimited(out var payload);
+        var error = reader.ReadLengthDelimited(out var payload);
         if (error != ProtobufDecodeError.None)
         {
             return error;
@@ -144,7 +144,7 @@ public static class DynamicMessageDecoder
 
     private static ProtobufDecodeError DecodeMessage(ProtobufReader reader, DynamicMessage message, DynamicField field)
     {
-        var error = reader.TryReadEmbeddedMessage(out var embedded);
+        var error = reader.ReadEmbeddedMessage(out var embedded);
         if (error != ProtobufDecodeError.None)
         {
             return error;
@@ -160,7 +160,7 @@ public static class DynamicMessageDecoder
 
     private static ProtobufDecodeError DecodeMapEntry(ProtobufReader reader, DynamicMessage message, DynamicField field)
     {
-        var error = reader.TryReadEmbeddedMessage(out var embedded);
+        var error = reader.ReadEmbeddedMessage(out var embedded);
         if (error != ProtobufDecodeError.None)
         {
             return error;
