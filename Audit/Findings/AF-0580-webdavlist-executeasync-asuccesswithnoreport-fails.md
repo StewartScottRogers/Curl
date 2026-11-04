@@ -42,6 +42,8 @@ Select-String -Path Curl.Extension.WebDavTools.UnitTests/Transfer/WebDavListTran
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Asserts Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode) (22) and the message.
+
 ## Log
 
 - 2026-11-03: filed proposed.

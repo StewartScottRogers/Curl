@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.Extended.UnitTests/Mqtt5/PublishSubscribe/R
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | No 'Assert.IsNotNull(broker.Connect)' match; line 146 asserts CollectionAssert.DoesNotContain(broker.Connect!.PropertyIdentifiers.ToList(), maximumPacketSizeProperty).
+
 ## Log
 
 - 2026-11-03: filed proposed.

@@ -3,8 +3,8 @@ id: AF-0610
 title: Curl.Protobuf's Try... methods (TryConvertJsonToBinary, TryDecode, TryRead and others) return an error enum, not bool; AF-0539 renamed only TryParse
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_1615.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Protobuf.UnitLibrary/Json/ProtobufJsonConverter.cs:TryConvertJsonToBinary:misleading-name
 reproduction: none
 task: BL-4774
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: f4a738a932020f9832b23c0977dbaf0f27206871
 scorecard: 2026-11-03_1017.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_1615.md
 ---
 # AF-0610 - Curl.Protobuf's Try... methods (TryConvertJsonToBinary, TryDecode, TryRead and others) return an error enum, not bool; AF-0539 renamed only TryParse
 
@@ -42,7 +42,10 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Ran the reproduction: the count is 0; no static method in Curl.Protobuf.UnitLibrary named Try... returns a Protobuf...Error enum.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1615.md: the reproduction no longer reproduces.

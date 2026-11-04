@@ -3,8 +3,8 @@ id: AF-0545
 title: Four storage surface tests are known failures whose catch (Exception) lets them pass on any failure while their named behaviour is broken
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1615.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1017.md, 2026-11-03_1615.md).
 key: quality:Curl.Conformance.Extended.UnitLibrary/Harness/KnownFailures.cs:RunCaseAsync:ignored-test
 reproduction: none
 task: BL-4693
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: consecutive
+closed-by: 2026-11-03_1017.md, 2026-11-03_1615.md
 ---
 # AF-0545 - Four storage surface tests are known failures whose catch (Exception) lets them pass on any failure while their named behaviour is broken
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Conformance.Extended.UnitLibrary/Harness/KnownFailures.
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_1017.md | reproduces: no | KnownFailures.cs now has catch (Exception exception) when (IsAssertionFailure(exception)), so the pattern 'catch \(Exception\)' finds nothing and a crash still fails; KnownFailures.txt has no ^CurlSurface line (only comments).
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | No 'catch (Exception)' match: KnownFailures.cs:110 is now 'catch (Exception exception) when (IsAssertionFailure(exception))'. KnownFailures.txt has no CurlSurface line (header comments only).
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1615.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1017.md, 2026-11-03_1615.md).

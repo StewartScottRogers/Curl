@@ -3,8 +3,8 @@ id: AF-0548
 title: Lib1591/1598 checks the trailer callback only for null
 auditor: quality
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1615.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1017.md, 2026-11-03_1615.md).
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1589To1648Tests.cs:Lib1591And1598_SendTheTrailerHeaderAndCallbackAndAnswerTheirCode:weak-assertion
 reproduction: none
 task: BL-4696
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: consecutive
+closed-by: 2026-11-03_1017.md, 2026-11-03_1615.md
 ---
 # AF-0548 - Lib1591/1598 checks the trailer callback only for null
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1589To1648Tests.cs -Pa
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_1017.md | reproduces: no | No match for Assert.IsNotNull(trailer); the test calls trailer!(trailers) and asserts TrailerResult.Ok and the two trailer lines.
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | No 'Assert.IsNotNull(trailer)' match; Lib1591And1598 test now invokes trailer!(trailers) and asserts TrailerResult.Ok and both trailer lines.
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1615.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1017.md, 2026-11-03_1615.md).
