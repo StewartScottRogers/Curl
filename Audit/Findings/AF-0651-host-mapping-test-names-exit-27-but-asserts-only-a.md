@@ -3,8 +3,8 @@ id: AF-0651
 title: Host-mapping test names exit 27 but asserts only acceptance and the converted text
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingTests.cs:TryNormalizeReadingHost_MeasuredLetterlikeSymbolCurlRefusesWithExit27ThroughAProxy_ConvertsToSlashText:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingT
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
