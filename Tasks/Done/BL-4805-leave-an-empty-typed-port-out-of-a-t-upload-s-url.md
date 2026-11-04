@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/UploadTransferUrl.cs, Curl.Cli.UnitTests/UploadTransferUrlTests.cs]
+touches: [Curl.Cli.UnitLibrary/UploadTransferUrl.cs, Curl.Cli.UnitTests/UploadTransferUrlTests.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrl.cs, Curl.Protocol.Abstractions.UnitTests/CurlUrlTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4805 — Leave an empty typed port out of a -T upload's URL
 
@@ -26,14 +26,17 @@ The re-parse also duplicates what `CurlUrlAuthority.SplitPort` already decided a
 
 ## Acceptance criteria
 
-- [ ] `UploadTransferUrlTests` has a case for `http://h:/` whose expected URL is what real curl prints (measured, recorded in the test's comment), and it passes.
-- [ ] The BL-4801 cases (`http://127.0.0.1:80/`, `http://[::1]:80/`, `https://u:p@h:443/d/?`, `http://h:80`) still keep the typed port.
-- [ ] `UploadTransferUrl` no longer re-parses `OriginalString` to find the port, or a test shows each input where the re-parse and `CurlUrlAuthority.SplitPort` could disagree.
-- [ ] `dotnet build` is clean, the fast tests pass and `Curl.Cli.UnitLibrary` keeps 100% line and branch coverage.
+- [x] `UploadTransferUrlTests` has a case for `http://h:/` whose expected URL is what real curl prints (measured, recorded in the test's comment), and it passes.
+- [x] The BL-4801 cases (`http://127.0.0.1:80/`, `http://[::1]:80/`, `https://u:p@h:443/d/?`, `http://h:80`) still keep the typed port.
+- [x] `UploadTransferUrl` no longer re-parses `OriginalString` to find the port, or a test shows each input where the re-parse and `CurlUrlAuthority.SplitPort` could disagree.
+- [x] `dotnet build` is clean, the fast tests pass and `Curl.Cli.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+Measured curl 8.22.0: -T f.txt with http://127.0.0.1:/ prints http://127.0.0.1/f.txt; :80 keeps the port. Added CurlUrl.PortWasWritten (widened touches to CurlUrl.cs and tests; no other Doing task touched them) and removed the OriginalString re-parse. Measure-CodeQuality on both libraries: 0 failing members.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 2e60ad31 780d1012 4457cece bd306633.
+- 2026-11-03: Doing -> Done. Empty typed port dropped from -T upload URL
