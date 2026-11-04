@@ -36,3 +36,4 @@ Where to start: `Get-CiRedSpells` in `Audit/Tools/Measure-FactoryProcess.ps1`; `
 ## Log
 
 - 2026-11-04: Created.
+- 2026-11-04: Backlog -> Doing. Criteria at claim: 927bd5a6 90e0df30 2e17a833.
