@@ -3,8 +3,8 @@ id: AF-0652
 title: Surviving mutant: an MQTT publish with CURLOPT_POSTFIELDSIZE 0 can send every post field instead of none
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs:MqttPostDataOf-lt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs:241:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
