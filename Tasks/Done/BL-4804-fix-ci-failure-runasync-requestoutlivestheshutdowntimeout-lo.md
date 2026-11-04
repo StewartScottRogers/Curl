@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Mcp.UnitTests, Curl.Mcp.UnitLibrary, Curl.Mcp, Curl.Mcp.Protocol.UnitLibrary/Server/McpServer.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4804 — Fix CI failure RunAsync_RequestOutlivesTheShutdownTimeout_LogsItAndReturnsOne on Windows
 
@@ -47,3 +47,4 @@ Lanes test only on Windows, so reproduce with `gh run view 41764281440 --log-fai
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 4d5996de.
+- 2026-11-03: Doing -> Done. McpServer dispatches each request under the lock the shutdown snapshot takes, so the shutdown-timeout test no longer races
