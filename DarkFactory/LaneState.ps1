@@ -184,6 +184,15 @@ if ($TestHeartbeat) {
             ,@('the next shift is handed -StopAtUsage, -StopAtWeeklyUsage and -UnpacedLanes (BL-4800)', 'True True True', $(
                 $handOn = Get-Content -Raw (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
                 "$($handOn -match "'-StopAtUsage', \`$StopAtUsage") $($handOn -match "'-StopAtWeeklyUsage', \`$StopAtWeeklyUsage") $($handOn -match "'-UnpacedLanes', \`$UnpacedLanes")"))
+            ,@('the Auto step, the capacity step and the unpaced ramp each pass -AddingTo to Get-ShiftCapacity (BL-4848)', '3', $(
+                $wired = Get-Content (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
+                @($wired | Where-Object { $_ -match 'Get-ShiftCapacity -Fallback \S+ -AddingTo \S+' }).Count))
+            ,@('the ended-lane loop iterates Get-EndedLanes (BL-4826)', 'True', $(
+                $wired = Get-Content -Raw (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
+                [bool]($wired -match 'foreach \(\$n in @\(Get-EndedLanes -Active @\(\$activeLanes\) -Finished \$finished\)\)')))
+            ,@('Add-Lane keeps a reused lane summary, collects it and the shift end traces it (BL-4849)', 'True True True True', $(
+                $wired = Get-Content -Raw (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
+                "$($wired -match '\$kept = Get-ReusedLaneKeep @\(Get-Content \$summary\)') $($wired -match '\$script:reusedSummaries \+= @\(\$kept\.Summary\)') $($wired -match 'Set-HerdrTabLabel \$laneTabs\[\$n\] \(Get-LaneTabLabel \$n \$kept\.TabLabel\)') $($wired -match 'foreach \(\$s in \$reusedSummaries\) \{ Write-Trace')"))
             ,@('nothing claimable and time left waits', 'wait', (& $poll $now '' '' @()))
             ,@('something claimable starts the next shift', 'start', (& $poll $now '' 'BL-3011' @()))
             ,@('past the -Hours deadline stops', 'stop', (& $poll $deadline.AddMinutes(1) '' 'BL-3011' @()))
