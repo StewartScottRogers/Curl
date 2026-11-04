@@ -416,6 +416,7 @@ public sealed class Lib552Tests
         Assert.AreEqual(12, data.Read(buffer.AsSpan(0, 12)));
         Assert.AreEqual(5, data.Write("ab\0cd"u8));
         Assert.AreEqual(2, data.Write("ef"u8));
+        Assert.AreEqual(3, data.Write("\0gh"u8));
 
         CollectionAssert.AreEqual("test data\0te"u8.ToArray(), buffer[..12]);
         Assert.AreEqual(
