@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4796 — Fix AF-0623: -w %{url} with -T prints the URL as typed; curl prints it with the uploaded file name appended
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- `%{url}` now prints the URL curl's tool holds after `add_file_name_to_url`: when `-T` appends the file name (path names no file, not standard input, URL parses), the resolved upload URL; otherwise the URL as given (`CurlCommandRunner.UrlWithUploadFileName`). An unparseable URL keeps the as-given text, as before (default: no measurement says otherwise).
+- Pinned by `Curl.Console.UnitTests/Af0623UploadWriteOutUrlTests.cs` (appended, missing file exit 26, URL naming a file, `-T -`, unparseable URL).
+- Reproduction re-run against curl 8.22.0 Schannel: both print `http://127.0.0.1:50700/f.txt`. Measure-CodeQuality for Curl.Console: 0 failing members. Full fast tests green on Windows; the change is platform-neutral (no paths beyond forward-slash relative names).
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. %{url} on a -T upload prints the URL with the file name appended, as curl does
