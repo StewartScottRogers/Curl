@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4828 — Fix AF-0646: Cgr170 test named Exit26 asserts exit 25
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-11-04: No code change needed. `Cgr170Tests.cs:46` already asserts `Assert.AreEqual(26, exitCode)` and stdout "0 26 000 / 1 26 000" since 27116a06b (BL-3968), so the name and the asserted exit code agree; the finding was most likely recorded against a seeded or older audit tree. Ran the reproduction (Select-String shows exit 26 in the body), `dotnet build` (0 errors) and the fast tests (114 projects passed, 0 failed).
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. Cgr170 Exit26 test name and asserted exit code agree (26); reproduction gives expected result
