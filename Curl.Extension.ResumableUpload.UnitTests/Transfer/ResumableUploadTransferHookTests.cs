@@ -102,6 +102,24 @@ public sealed class ResumableUploadTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_OffsetRetrievalReportsTheWholeUploadReceived_PatchesTheEmptyRest()
+    {
+        // tus 1.0 "Core Protocol": an Upload-Offset equal to the upload's length is a valid offset, so the client
+        // appends the empty rest from it rather than treating the response as a weird reply.
+        var broken = new RecordedConnection(TusOptions + TusCreated, writesBeforeBreak: 3);
+        var resumed = new RecordedConnection("HTTP/1.1 200 OK\r\nUpload-Offset: 5\r\nUpload-Length: 5\r\nTus-Resumable: 1.0.0\r\n\r\n" + TusPatched);
+        var connector = new ScriptedConnector(ConnectResult.Connected(broken), ConnectResult.Connected(resumed));
+
+        var result = await new ResumableUploadTransferHook().ExecuteAsync(Context("http://up.example.com/files"), Services(connector), NeverSent);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(
+            "HEAD /files/24e5 HTTP/1.1\r\n" + Host + "Tus-Resumable: 1.0.0\r\n\r\n"
+            + "PATCH /files/24e5 HTTP/1.1\r\n" + Host + "Tus-Resumable: 1.0.0\r\nUpload-Offset: 5\r\nContent-Type: application/offset+octet-stream\r\nContent-Length: 0\r\n\r\n",
+            resumed.Written);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_IetfServer_CreatesWithUploadCompleteFalseAndAppendsTheWhole()
     {
         // draft-ietf-httpbis-resumable-upload "Upload Creation" (Upload-Complete: ?0, Upload-Length) and "Upload Append"
