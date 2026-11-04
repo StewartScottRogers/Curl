@@ -3,8 +3,8 @@ id: AF-0653
 title: Surviving mutant: a MASQUE 101 status line without a reason phrase can be refused as malformed
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Extension.Masque.UnitLibrary/Wire/MasqueUpgrade.cs:ParseStatus-lt:surviving-mutant
 reproduction: mutation Curl.Extension.Masque.UnitLibrary/Wire/MasqueUpgrade.cs:61:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
