@@ -18,6 +18,12 @@
       CI:         gh run list --workflow CI --branch work/dark-factory --json
                   databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500,
                   or -CiRunsJson, a saved copy of that output.
+      CI jobs:    each failed run's jobs (gh run view <id> --json jobs) with each non-success
+                  job's annotations (gh api repos/StewartScottRogers/Curl/check-runs/<job id>/
+                  annotations), or -CiJobsJson (default: a ci-jobs.json beside -CiRunsJson, when
+                  there is one), a saved copy: a JSON array of {runId, jobs}, each job
+                  {databaseId, name, conclusion, steps [{name, status, conclusion}],
+                  annotations [{message}]}. A failed run whose jobs were not read counts as red.
 
     Metrics (the names are the process auditor's report metrics, Audit/Instructions/
     Report-Format.md):
@@ -36,7 +42,17 @@
                                 cancelled and unfinished runs are ignored, and a streak still
                                 red at the last finished run ends there; ciRunsFrom says when
                                 the oldest CI run read was created, since 500 runs (most of
-                                them cancelled) may not reach back to -Since
+                                them cancelled) may not reach back to -Since. A failed run counts
+                                as red only when one of its jobs has a failing test or a build
+                                error (ADR-1235): a failed run whose non-success jobs are all
+                                infrastructure - cancelled because no runner was acquired ("The
+                                job was not acquired by Runner"), cancelled as superseded by a
+                                newer commit ("higher priority waiting request"), or run into
+                                timeout-minutes ("exceeded the maximum execution time") with no
+                                test or build step (a step whose name holds test, build or
+                                coverage) left unsuccessful - neither starts nor ends a spell; a
+                                test or build step that hangs into the timeout still counts, and
+                                so does any other failed job, such as a failed test or build step
       laneIdleMinutes           minutes lanes spent in wait: each wait line lasts until the
                                 lane's next line, at most 60 minutes
       waitOverlapMinutes        the part whose reason says every ready task overlaps work in
@@ -55,6 +71,9 @@
     and these lists (evidence, not metrics; BL-1366):
       ciRedSpells               each red spell behind ciRedMinutes: start, end (UTC), minutes,
                                 runId (the CI run that turned it red) and stillRed
+      ciInfrastructureRuns      each failed run left out under ADR-1235: runId, ended (UTC) and
+                                jobs, one "<job name>: <reason>" per non-success job (runner not
+                                acquired, superseded, timeout testing nothing)
       unfinishedRuns            run-log file names (<ID>-<stamp>-L<n>.jsonl) with no result
                                 event and no FACTORY: DONE or FACTORY: BLOCKED line, of a shift
                                 that had ended (or whose shift log is not there)
@@ -73,7 +92,11 @@
     The factory's log folder. Default: <repo>.logs beside the repository.
 
 .PARAMETER CiRunsJson
-    A file holding gh run list's JSON. When given, gh is not called.
+    A file holding gh run list's JSON. When given, gh is not called for the run list.
+
+.PARAMETER CiJobsJson
+    A file holding each failed run's jobs and annotations (the CI jobs format above). Default:
+    ci-jobs.json beside -CiRunsJson when there is one; otherwise gh is called for them.
 
 .PARAMETER OutFile
     Write the JSON here as well as to standard output.
@@ -88,6 +111,7 @@ param(
     [datetime]$Since = [datetime]'2000-01-01',
     [string]$LogRoot,
     [string]$CiRunsJson,
+    [string]$CiJobsJson,
     [string]$OutFile,
     [switch]$SelfTest
 )
@@ -95,6 +119,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $MaxWaitMinutes = 60
+# A step that builds or tests: one that hangs into its job's timeout-minutes is a failing test and
+# still counts as red under ADR-1235.
+$TestOrBuildStep = '(?i)test|build|coverage'
 
 function Get-StampDate([string]$Name) {
     if ($Name -match '(\d{8})-(\d{6})') { return [datetime]::ParseExact("$($Matches[1])$($Matches[2])", 'yyyyMMddHHmmss', [Globalization.CultureInfo]::InvariantCulture) }
@@ -164,11 +191,43 @@ function Get-RunResults([string]$Root, [datetime]$From) {
     return $runs
 }
 
-function Get-CiRedSpells([object[]]$Runs, [datetime]$From) {
+function Get-CiJobInfrastructureReason([object]$Job) {
+    # Why a CI job that did not succeed is infrastructure under ADR-1235, or $null when it is a
+    # failing test or build error (or a failure the rule does not name, which stays red).
+    if ("$($Job.conclusion)" -in 'success', 'skipped', 'neutral') { return 'succeeded' }
+    $messages = @($Job.annotations | Where-Object { $_ } | ForEach-Object { "$($_.message)" })
+    if ($messages -match 'was not acquired by Runner') { return 'runner not acquired' }
+    if ($messages -match 'higher priority waiting request|superseded') { return 'superseded' }
+    if ($messages -match 'exceeded the maximum execution time') {
+        # A test or build step that hangs into the timeout is a failing test: it still counts.
+        $hung = @($Job.steps | Where-Object { $_ -and ("$($_.conclusion)" -notin 'success', 'skipped') -and "$($_.name)" -match $TestOrBuildStep })
+        if ($hung.Count) { return $null }
+        return 'timeout testing nothing'
+    }
+    return $null
+}
+
+function Get-CiRunInfrastructure([object[]]$Jobs) {
+    # For a failed run's jobs: "name: reason" for each non-success job when every one of them is
+    # infrastructure under ADR-1235, else $null (the run is red). No jobs read: $null.
+    if (-not $Jobs -or -not $Jobs.Count) { return $null }
+    $reasons = @()
+    foreach ($job in $Jobs) {
+        $reason = Get-CiJobInfrastructureReason $job
+        if (-not $reason) { return $null }
+        if ($reason -ne 'succeeded') { $reasons += "$($job.name): $reason" }
+    }
+    if (-not $reasons.Count) { return $null }
+    return $reasons
+}
+
+function Get-CiRedSpells([object[]]$Runs, [datetime]$From, [hashtable]$Jobs = @{}) {
     # Each red spell: from the end of the first failed run after a success to the end of the next
     # successful run (or of the last finished run, when still red), with the run that turned it
-    # red, so the process auditor can name the spell, not only the total (BL-1366).
+    # red, so the process auditor can name the spell, not only the total (BL-1366). A failed run
+    # whose non-success jobs are all infrastructure (ADR-1235) neither starts nor ends a spell.
     $finished = @($Runs | Where-Object { $_.status -eq 'completed' -and $_.conclusion -in 'success', 'failure' } |
+        Where-Object { -not ($_.conclusion -eq 'failure' -and (Get-CiRunInfrastructure $Jobs["$($_.databaseId)"])) } |
         ForEach-Object { [pscustomobject]@{ Id = $_.databaseId; Conclusion = $_.conclusion; Created = ([datetimeoffset]$_.createdAt).UtcDateTime; Ended = ([datetimeoffset]$_.updatedAt).UtcDateTime } } |
         Where-Object { $_.Created -ge $From.ToUniversalTime() } | Sort-Object Created)
     $spells = @()
@@ -187,9 +246,54 @@ function Get-CiRedSpells([object[]]$Runs, [datetime]$From) {
     return $spells
 }
 
-function Get-CiRedMinutes([object[]]$Runs, [datetime]$From) {
-    $minutes = @(Get-CiRedSpells $Runs $From | ForEach-Object { [double]$_.minutes })
+function Get-CiRedMinutes([object[]]$Runs, [datetime]$From, [hashtable]$Jobs = @{}) {
+    $minutes = @(Get-CiRedSpells $Runs $From $Jobs | ForEach-Object { [double]$_.minutes })
     return [math]::Round([double]($minutes | Measure-Object -Sum).Sum, 2)
+}
+
+function Get-CiInfrastructureRuns([object[]]$Runs, [datetime]$From, [hashtable]$Jobs = @{}) {
+    # The failed runs left out under ADR-1235, each with its non-success jobs' classification.
+    return @($Runs | Where-Object { $_.status -eq 'completed' -and $_.conclusion -eq 'failure' -and ([datetimeoffset]$_.createdAt).UtcDateTime -ge $From.ToUniversalTime() } |
+        Sort-Object { ([datetimeoffset]$_.createdAt).UtcDateTime } |
+        ForEach-Object {
+            $reasons = Get-CiRunInfrastructure $Jobs["$($_.databaseId)"]
+            if ($reasons) { [ordered]@{ runId = $_.databaseId; ended = ([datetimeoffset]$_.updatedAt).UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ssZ'); jobs = @($reasons) } }
+        })
+}
+
+function ConvertTo-CiJobTable([object[]]$Entries) {
+    # ci-jobs.json's entries ({runId, jobs}) as a table keyed by the run id's text.
+    $table = @{}
+    foreach ($entry in $Entries) { if ($entry) { $table["$($entry.runId)"] = @($entry.jobs) } }
+    return $table
+}
+
+function Read-CiJobsFromGh([object[]]$Runs, [datetime]$From) {
+    # Each failed run's jobs (gh run view --json jobs), with each non-success job's annotations
+    # (the check run's annotations API), as ci-jobs.json entries. A run gh cannot read is left
+    # out, so it counts as red.
+    $entries = @()
+    $failed = @($Runs | Where-Object { $_.status -eq 'completed' -and $_.conclusion -eq 'failure' -and ([datetimeoffset]$_.createdAt).UtcDateTime -ge $From.ToUniversalTime() })
+    foreach ($run in $failed) {
+        $ErrorActionPreference = 'Continue'
+        $raw = & gh run view $run.databaseId --json jobs 2>$null
+        $ErrorActionPreference = 'Stop'
+        if ($LASTEXITCODE -ne 0 -or -not $raw) { Write-Warning "gh run view $($run.databaseId) failed; the run counts as red."; continue }
+        $parsed = $raw | Out-String | ConvertFrom-Json
+        $jobs = @()
+        foreach ($job in @($parsed.jobs)) {
+            $annotations = @()
+            if ("$($job.conclusion)" -notin 'success', 'skipped', 'neutral') {
+                $ErrorActionPreference = 'Continue'
+                $rawNotes = & gh api "repos/StewartScottRogers/Curl/check-runs/$($job.databaseId)/annotations" 2>$null
+                $ErrorActionPreference = 'Stop'
+                if ($LASTEXITCODE -eq 0 -and $rawNotes) { $notes = $rawNotes | Out-String | ConvertFrom-Json; $annotations = @($notes | ForEach-Object { [ordered]@{ message = "$($_.message)" } }) }
+            }
+            $jobs += [ordered]@{ databaseId = $job.databaseId; name = $job.name; conclusion = $job.conclusion; steps = @($job.steps | ForEach-Object { [ordered]@{ name = $_.name; status = $_.status; conclusion = $_.conclusion } }); annotations = $annotations }
+        }
+        $entries += [pscustomobject]@{ runId = $run.databaseId; jobs = $jobs }
+    }
+    return $entries
 }
 
 function Get-Median([double[]]$Values) {
@@ -205,7 +309,7 @@ function Get-Percentile([double[]]$Values, [double]$Fraction) {
     return $s[[math]::Max(0, [math]::Ceiling($Fraction * $s.Length) - 1)]
 }
 
-function Measure-Process([string]$Root, [datetime]$From, [object[]]$CiRuns) {
+function Measure-Process([string]$Root, [datetime]$From, [object[]]$CiRuns, [hashtable]$CiJobs = @{}) {
     $events = @(Get-LaneEvents $Root $From)
     $runs = @(Get-RunResults $Root $From)
 
@@ -266,8 +370,9 @@ function Measure-Process([string]$Root, [datetime]$From, [object[]]$CiRuns) {
         tasksClaimedMoreThanOnce = @($rows | Where-Object { $_.claims -gt 1 }).Count
         requeues = @($events | Where-Object { $_.Verb -eq 'REQUEUE' }).Count
         resumedRuns = @($runs | Where-Object { $_.Resumed }).Count
-        ciRedMinutes = Get-CiRedMinutes $CiRuns $From
-        ciRedSpells = @(Get-CiRedSpells $CiRuns $From)
+        ciRedMinutes = Get-CiRedMinutes $CiRuns $From $CiJobs
+        ciRedSpells = @(Get-CiRedSpells $CiRuns $From $CiJobs)
+        ciInfrastructureRuns = @(Get-CiInfrastructureRuns $CiRuns $From $CiJobs)
         laneMinutes = [math]::Round($laneMinutes, 2)
         laneIdleMinutes = [math]::Round($overlap + $nothing + $other, 2)
         waitOverlapMinutes = [math]::Round($overlap, 2)
@@ -286,10 +391,11 @@ function Measure-Process([string]$Root, [datetime]$From, [object[]]$CiRuns) {
 if ($SelfTest) {
     $fixture = Join-Path $PSScriptRoot 'Fixtures\process'
     $ci = Get-Content -LiteralPath (Join-Path $fixture 'ci-runs.json') -Raw | ConvertFrom-Json
-    $m = Measure-Process (Join-Path $fixture 'lane-output') ([datetime]'2026-01-01') @($ci)
+    $jobs = Get-Content -LiteralPath (Join-Path $fixture 'ci-jobs.json') -Raw | ConvertFrom-Json
+    $m = Measure-Process (Join-Path $fixture 'lane-output') ([datetime]'2026-01-01') @($ci) (ConvertTo-CiJobTable @($jobs))
     $expected = [ordered]@{
         tasksDone = 4; medianTaskMinutes = 30; p90TaskMinutes = 45; tasksClaimedMoreThanOnce = 1; requeues = 1; resumedRuns = 1
-        ciRedMinutes = 120; laneIdleMinutes = 30; waitOverlapMinutes = 20; waitNothingReadyMinutes = 10; waitOtherMinutes = 0
+        ciRedMinutes = 150; laneIdleMinutes = 30; waitOverlapMinutes = 20; waitNothingReadyMinutes = 10; waitOtherMinutes = 0
         tokensInput = 5295; tokensOutput = 240; costUsd = 4.5; costUsdPerTaskDone = 1.125
     }
     $failed = 0
@@ -312,9 +418,22 @@ if ($SelfTest) {
     if (-not $ok) { $failed++ }
     Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) runningRuns: $(@($m.runningRuns) -join ',')"
     $spells = @($m.ciRedSpells)
-    $ok = $spells.Count -eq 2 -and $spells[0].runId -eq 2 -and "$($spells[0].minutes)" -eq '60' -and $spells[0].start -eq '2026-01-01T10:10:00Z' -and $spells[1].runId -eq 6 -and $spells[1].end -eq '2026-01-01T13:05:00Z' -and -not $spells[1].stillRed
+    $ok = $spells.Count -eq 3 -and $spells[0].runId -eq 2 -and "$($spells[0].minutes)" -eq '60' -and $spells[0].start -eq '2026-01-01T10:10:00Z' -and $spells[1].runId -eq 6 -and $spells[1].end -eq '2026-01-01T13:05:00Z' -and -not $spells[1].stillRed -and $spells[2].runId -eq 11 -and $spells[2].start -eq '2026-01-01T15:00:00Z' -and "$($spells[2].minutes)" -eq '30' -and -not $spells[2].stillRed
     if (-not $ok) { $failed++ }
     Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) ciRedSpells: $(($spells | ForEach-Object { "$($_.runId):$($_.minutes)" }) -join ', ')"
+    # ADR-1235 (BL-4825): run 9's only failure is a macOS job no runner acquired and run 10's is the
+    # audit guard's checkout running past its timeout, so neither starts a spell; run 11's failing
+    # test step does.
+    $left = @($m.ciInfrastructureRuns)
+    $ok = (@($left | ForEach-Object { $_.runId }) -join ',') -eq '9,10' -and (@($left[0].jobs) -join ';') -eq 'Build and test (macos-latest): runner not acquired' -and (@($left[1].jobs) -join ';') -eq 'Audit paths untouched by the dark factory: timeout testing nothing'
+    if (-not $ok) { $failed++ }
+    Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) ciInfrastructureRuns: $(($left | ForEach-Object { "$($_.runId) ($(@($_.jobs) -join '; '))" }) -join ', ')"
+    $hungTest = [pscustomobject]@{ name = 'Build and test (ubuntu-latest)'; conclusion = 'cancelled'; steps = @([pscustomobject]@{ name = 'Fast tests'; status = 'completed'; conclusion = 'cancelled' }); annotations = @([pscustomobject]@{ message = 'The job has exceeded the maximum execution time of 30m0s' }) }
+    $superseded = [pscustomobject]@{ name = 'Build and test (windows-latest)'; conclusion = 'cancelled'; steps = @(); annotations = @([pscustomobject]@{ message = "Canceling since a higher priority waiting request for 'CI-work/dark-factory' exists" }) }
+    $failedBuild = [pscustomobject]@{ name = 'Build and test (windows-latest)'; conclusion = 'failure'; steps = @([pscustomobject]@{ name = 'Build'; status = 'completed'; conclusion = 'failure' }); annotations = @() }
+    $ok = $null -eq (Get-CiJobInfrastructureReason $hungTest) -and (Get-CiJobInfrastructureReason $superseded) -eq 'superseded' -and $null -eq (Get-CiJobInfrastructureReason $failedBuild) -and $null -eq (Get-CiRunInfrastructure @())
+    if (-not $ok) { $failed++ }
+    Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) job classification: a test step hung into its timeout and a build error count, a superseded job does not, and a run with no jobs read stays red"
     $ok = "$($m.laneMinutes)" -eq '941.42'
     if (-not $ok) { $failed++ }
     Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) laneMinutes: $($m.laneMinutes) (expected 941.42)"
@@ -343,7 +462,15 @@ else {
     $parsed = $raw | Out-String | ConvertFrom-Json
 }
 $ciRuns = @($parsed)
-$measured = Measure-Process (Resolve-Path $LogRoot).Path $Since $ciRuns
+# Each failed run's jobs, to leave out infrastructure failures (ADR-1235): from -CiJobsJson, else a
+# ci-jobs.json beside -CiRunsJson, else from gh.
+if (-not $CiJobsJson -and $CiRunsJson) {
+    $beside = Join-Path (Split-Path -Parent (Resolve-Path -LiteralPath $CiRunsJson).Path) 'ci-jobs.json'
+    if (Test-Path -LiteralPath $beside) { $CiJobsJson = $beside }
+}
+if ($CiJobsJson) { $jobEntries = Get-Content -LiteralPath $CiJobsJson -Raw | ConvertFrom-Json }
+else { $jobEntries = Read-CiJobsFromGh $ciRuns $Since }
+$measured = Measure-Process (Resolve-Path $LogRoot).Path $Since $ciRuns (ConvertTo-CiJobTable @($jobEntries))
 # The CI runs read may not reach back to -Since: say where they start.
 $oldest = @($ciRuns | ForEach-Object { ([datetimeoffset]$_.createdAt).UtcDateTime } | Sort-Object)[0]
 $measured.ciRunsFrom = if ($oldest) { $oldest.ToString('yyyy-MM-ddTHH:mm:ssZ') } else { $null }
