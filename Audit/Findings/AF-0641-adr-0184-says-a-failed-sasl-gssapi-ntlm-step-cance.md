@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0184-sasl-gssapi-and-ntlm-run-on-one-security-context-per-exchange.md:SecurityContextSaslExchange-failed-step-exit:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-4820
+tasks: BL-4820
 found: 2026-11-03
 found-at: 0ae5ce3f5e65976edeb9facb28b93fd3f4dcdbc8
 scorecard: 2026-11-03_2203.md

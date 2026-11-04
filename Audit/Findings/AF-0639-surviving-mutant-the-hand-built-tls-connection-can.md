@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs:SendCloseNotifyAsync-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs:152:true
-task: none
-tasks:
+task: BL-4818
+tasks: BL-4818
 found: 2026-11-03
 found-at: 0ae5ce3f5e65976edeb9facb28b93fd3f4dcdbc8
 scorecard: 2026-11-03_2203.md

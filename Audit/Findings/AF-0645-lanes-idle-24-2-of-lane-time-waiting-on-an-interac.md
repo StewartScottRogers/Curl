@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: process:logs:interactive-only-backlog:empty-queue
 reproduction: none
-task: none
-tasks:
+task: BL-4824
+tasks: BL-4824
 found: 2026-11-03
 found-at: 0ae5ce3f5e65976edeb9facb28b93fd3f4dcdbc8
 scorecard: 2026-11-03_2203.md
