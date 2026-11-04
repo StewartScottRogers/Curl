@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4789 — Fix AF-0616: Surviving mutant: Digest over SSPI can accept a user name whose first character is a control character
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix is test-only: `Cgr077Tests.CreateAuthorization_UserNameSspiRefuses_FailsAsCurl` gains two DataRows with the control character at index 0 of the user name, one bare (`\u0001u`) and one after a domain (`dom\\\u001fu`, so index 0 of the split user). Both expect exit 94 "An authentication function returned an error". No production change, so no quality run was needed.
+- A lane cannot run `Audit/Tools/Invoke-MutationTest.ps1` (audit paths are off limits), so the mutant was applied by hand instead: with `>= 0` changed to `> 0` in `DigestAuthenticator.CreateSspiAnswer`, both new rows failed (2 of 41 Cgr077 tests); with the change reverted, all pass. The quality auditor's re-audit confirms the finding closes.
+- Touches: the test sits in `Curl.Authentication.UnitTests`, the matching test project of the library named in `touches`.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Two Cgr077 DataRows put the control character first in the SSPI user name; the >= to > mutant now fails them
