@@ -54,6 +54,21 @@ function Invoke-MergeWaitPoll {
     if ($poll.Action -eq 'start' -and @(& $StartShift "$($poll.Why) during the merge's CI wait")[-1]) { $HandOver.Done = $true }
 }
 
+function Invoke-IdlePollLook {
+    # One look of the idle -Continuous coordinator's poll, between its waits: runs the CI watch
+    # (Invoke-CiWatch, which looks at most once a heartbeat, every minute while CI is red),
+    # pulls -Branch when -Pull, and returns the claimable task (Get-ClaimableTaskId's Id and
+    # Capped) with CiFixId, the ready CI fix (Get-ReadyCiFixTaskId) that the -Hours deadline
+    # does not hold. The idle poll ran no CI watch before (AF-0624, AF-0625, BL-4797): shift
+    # 20261103-080214 polled from 08:26 to 13:46 while runs 41660275371, 41669804192 and
+    # 41671248257 failed, nothing filed a fix, and CI stayed red for 172 minutes.
+    param([string]$Branch, [bool]$Pull)
+    Invoke-CiWatch -Branch $Branch
+    if ($Pull) { git -C $Root pull -q --ff-only origin $Branch 2>&1 | Out-Null }
+    $ready = Get-ClaimableTaskId
+    return [pscustomobject]@{ Id = $ready.Id; Capped = @($ready.Capped); CiFixId = "$(Get-ReadyCiFixTaskId)" }
+}
+
 function Start-NextShiftDetached {
     # Starts the next shift with Start-Detached and says whether it really started: Started is
     # true only when a herdr tab or a process came back. A start that throws, or returns neither,
@@ -830,13 +845,14 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         Write-Trace '-' 'shift' "nothing claimable; polling the board every $IdlePollMinutes minutes until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
         while ($true) {
             Write-IdlePollHeartbeat
-            $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $stillReady.Id -CappedIds $stillReady.Capped
+            $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $stillReady.Id -CappedIds $stillReady.Capped -CiFixId "$($stillReady.CiFixId)"
             if ($poll.Action -eq 'start' -and @(& $startNextShift $poll.Why)[-1]) { exit 0 }
             if ($poll.Action -eq 'stop') { Write-Trace '-' 'shift' "polling stopped: $($poll.Why)" 'Yellow'; break }
             # The heartbeat is refreshed every minute of the wait, as a lane's is.
             foreach ($minute in 1..$IdlePollMinutes) { Start-Sleep -Seconds 60; Write-Heartbeat }
-            if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
-            $stillReady = Get-ClaimableTaskId
+            # Each look also runs the CI watch, so a run that fails while the factory idles is
+            # filed and its fix starts the next shift (BL-4797).
+            $stillReady = Invoke-IdlePollLook -Branch $branch -Pull (-not $moved)
         }
         Write-Heartbeat 'finished'
         Publish-BoardStatus -Branch $branch -State 'ended'
