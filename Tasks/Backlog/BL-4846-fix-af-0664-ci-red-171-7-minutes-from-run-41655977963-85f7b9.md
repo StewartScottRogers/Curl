@@ -43,10 +43,14 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Acceptance criteria
 
 - [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fix (2026-11-04, interactive): the CI watch now reruns the failed jobs of the newest CI run on the branch whose only bad jobs never got a runner (`gh run rerun --failed`, at most twice per run, `Invoke-CiCapacityRerun` in `DarkFactory/CiWatch.ps1`), and reads the rerun afresh. AF-0664's spell was 165 minutes of such runs waiting for a push that got every runner. -TestCiWatch passes under Windows PowerShell and pwsh (three new BL-4846 cases); `dotnet build` clean and the fast tests pass (115 projects, 0 failed). Criterion 1 waits for a factory shift after the fix lands, so the task goes back to Backlog until then.
 
 ## Log
 
 - 2026-11-04: Created.
+- 2026-11-04: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-04: Doing -> Backlog. Fix landed; criterion 1 waits for a factory shift's logs after it.

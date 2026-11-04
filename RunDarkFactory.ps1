@@ -263,7 +263,10 @@
     run to confirm it - once per run, and again when that changes. The watch also runs while
     a coordinator waits for a fresh session before its shift starts, and once more at the
     end of a shift, after the merge has waited for CI on the last commit; that last look
-    files a one-platform failure at once instead of waiting 5 minutes (BL-1031).
+    files a one-platform failure at once instead of waiting 5 minutes (BL-1031). A failed run
+    whose only bad jobs never got a runner files nothing (BL-3944); when it is the newest run
+    on the branch, the watch reruns its failed jobs (gh run rerun --failed), at most twice, so
+    the branch turns green without waiting for the next push (BL-4846, AF-0664).
 
     The audit guard (BL-998) fails the `audit-guard` job with "Audit guard: <path> changed
     on work/dark-factory ..." when the factory changed an audit path or a guard. The watch
