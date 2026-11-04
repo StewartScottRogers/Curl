@@ -50,3 +50,4 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Log
 
 - 2026-11-04: Created.
+- 2026-11-04: Backlog -> Doing. Criteria at claim: 2ab4542b 9742157d.
