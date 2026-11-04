@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4820 — Fix AF-0641: ADR-0184 says a failed SASL GSSAPI/NTLM step cancels with exit 67; SecurityContextSaslExchange throws exit 94
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Docs-only: amended ADR-0184 (item 5 and Consequences rewritten, Amendment section added) to record exit 94 (BL-856) and the router contexts passed by EngineComposition (BL-852). Remaining "exit 67" and "without a factory" matches are the amendment history and the still-true no-factory constructor. Build and tests not affected (Markdown only).
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. ADR-0184 amended to match code
