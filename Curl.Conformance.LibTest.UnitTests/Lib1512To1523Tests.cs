@@ -409,6 +409,27 @@ public sealed class Lib1512To1523Tests
     }
 
     [TestMethod]
+    public async Task Lib1522_TracesSentDataAsTextWithTheTimeAndNoHex()
+    {
+        var time = new ManualTimeProvider(new DateTimeOffset(2026, 10, 16, 14, 5, 6, TimeSpan.Zero));
+        time.Advance(TimeSpan.FromMicroseconds(123456));
+        var engine = new FakeCurlEngine
+        {
+            Info = new TransferInfo { SizeUpload = Lib1522.PostSize },
+            Performing = o =>
+            {
+                _ = o.Callbacks.Debug!(CurlInfoType.DataOut, "ok"u8);
+                return CurlCode.Ok;
+            },
+        };
+        var run = new PortRun(engine, 1522, "http://x/1522");
+
+        _ = await new Lib1522(time).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual("14:05:06.123456 => Send data, 2 bytes (0x2)\n0000: ok\n", run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task Lib1522_OnAFailingTransfer_WritesItAndEndsWithItsCode()
     {
         var run = new PortRun(new FakeCurlEngine { PerformResult = CurlCode.CouldntConnect }, 1522, "http://x/1522");
