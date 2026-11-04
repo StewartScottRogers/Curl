@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Extension.Masque.UnitLibrary/Wire/MasqueUpgrade.cs:ParseStatus-lt:surviving-mutant
 reproduction: mutation Curl.Extension.Masque.UnitLibrary/Wire/MasqueUpgrade.cs:61:<
-task: none
-tasks:
+task: BL-4835
+tasks: BL-4835
 found: 2026-11-04
 found-at: 650d20c75108547e7bc74da2e86fbee9c49f7931
 scorecard: 2026-11-04_0643.md

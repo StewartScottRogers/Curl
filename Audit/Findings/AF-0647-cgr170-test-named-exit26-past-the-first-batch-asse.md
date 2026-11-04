@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Console.UnitTests/Cgr170Tests.cs:RunAsync_UnreadableUploadFilePastTheFirstBatch_ReportsExit26WhateverFailedBeforeAndStartsNothingMore:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-4829
+tasks: BL-4829
 found: 2026-11-04
 found-at: 650d20c75108547e7bc74da2e86fbee9c49f7931
 scorecard: 2026-11-04_0643.md

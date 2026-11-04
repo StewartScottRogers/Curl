@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.Extended.UnitLibrary/Kafka/Compression/KafkaReferenceXxHash.cs:Hash32-le:surviving-mutant
 reproduction: mutation Curl.Conformance.Extended.UnitLibrary/Kafka/Compression/KafkaReferenceXxHash.cs:45:<=
-task: none
-tasks:
+task: BL-4837
+tasks: BL-4837
 found: 2026-11-04
 found-at: 650d20c75108547e7bc74da2e86fbee9c49f7931
 scorecard: 2026-11-04_0643.md

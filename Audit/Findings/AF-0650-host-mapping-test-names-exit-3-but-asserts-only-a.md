@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingTests.cs:TryNormalizeReadingHost_MeasuredArabicFormCurlRefusesWithExit3_IsRefused:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-4832
+tasks: BL-4832
 found: 2026-11-04
 found-at: 650d20c75108547e7bc74da2e86fbee9c49f7931
 scorecard: 2026-11-04_0643.md

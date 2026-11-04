@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/PinnedPublicKey.cs:ReadKeyFile-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/PinnedPublicKey.cs:165:>
-task: none
-tasks:
+task: BL-4839
+tasks: BL-4839
 found: 2026-11-04
 found-at: 650d20c75108547e7bc74da2e86fbee9c49f7931
 scorecard: 2026-11-04_0643.md

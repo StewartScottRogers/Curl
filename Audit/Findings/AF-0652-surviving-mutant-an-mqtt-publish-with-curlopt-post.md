@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs:MqttPostDataOf-lt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs:241:<
-task: none
-tasks:
+task: BL-4834
+tasks: BL-4834
 found: 2026-11-04
 found-at: 650d20c75108547e7bc74da2e86fbee9c49f7931
 scorecard: 2026-11-04_0643.md
