@@ -461,6 +461,28 @@ public sealed class PinnedPublicKeyTests
     }
 
     [TestMethod]
+    public void Matches_WithAFileOfExactly1MiB_Matches()
+    {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("pin", "a PEM file of the test certificate's key padded with x to exactly 1048576 bytes");
+        var key = PemEncoding.WriteString("PUBLIC KEY", s_subjectPublicKeyInfo) + "\n";
+        var path = Write("limit.pem", key + new string('x', 1_048_576 - key.Length));
+
+        bool matches;
+        using (diagnostics.Phase("matches"))
+        {
+            matches = PinnedPublicKey.Matches(path, s_subjectPublicKeyInfo);
+        }
+
+        diagnostics.Act("file length", new FileInfo(path).Length);
+        diagnostics.Assert("file length", 1_048_576L, new FileInfo(path).Length);
+        Assert.AreEqual(1_048_576L, new FileInfo(path).Length);
+        diagnostics.Act("matches", matches);
+        diagnostics.Assert("matches", true, matches);
+        Assert.IsTrue(matches);
+    }
+
+    [TestMethod]
     public void PemToDer_DecodesTheFirstPublicKeyBlock()
     {
         var diagnostics = Diagnostics;
