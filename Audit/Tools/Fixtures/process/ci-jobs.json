@@ -1,0 +1,14 @@
+[
+  {"runId":9,"jobs":[
+    {"databaseId":901,"name":"Build and test (windows-latest)","conclusion":"success","steps":[{"name":"Build","status":"completed","conclusion":"success"},{"name":"Fast tests","status":"completed","conclusion":"success"}],"annotations":[]},
+    {"databaseId":902,"name":"Build and test (macos-latest)","conclusion":"cancelled","steps":[],"annotations":[{"message":"The job was not acquired by Runner of type hosted even after multiple attempts"}]}
+  ]},
+  {"runId":10,"jobs":[
+    {"databaseId":1001,"name":"Build and test (ubuntu-latest)","conclusion":"success","steps":[{"name":"Build","status":"completed","conclusion":"success"},{"name":"Fast tests","status":"completed","conclusion":"success"}],"annotations":[]},
+    {"databaseId":1002,"name":"Audit paths untouched by the dark factory","conclusion":"cancelled","steps":[{"name":"Set up job","status":"completed","conclusion":"success"},{"name":"Run actions/checkout@v4","status":"completed","conclusion":"cancelled"}],"annotations":[{"message":"The job has exceeded the maximum execution time of 5m0s"}]}
+  ]},
+  {"runId":11,"jobs":[
+    {"databaseId":1101,"name":"Build and test (ubuntu-latest)","conclusion":"failure","steps":[{"name":"Build","status":"completed","conclusion":"success"},{"name":"Fast tests","status":"completed","conclusion":"failure"}],"annotations":[{"message":"Process completed with exit code 1."}]},
+    {"databaseId":1102,"name":"Build and test (macos-latest)","conclusion":"cancelled","steps":[],"annotations":[{"message":"The job was not acquired by Runner of type hosted even after multiple attempts"}]}
+  ]}
+]
