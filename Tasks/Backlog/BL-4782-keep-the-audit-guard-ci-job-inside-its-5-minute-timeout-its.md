@@ -24,10 +24,12 @@ ci.yml is a guard file (ADR-0267, BL-1209), so it changes only through the `audi
 
 ## Acceptance criteria
 
-- [ ] `audit-guard` in .github/workflows/ci.yml is changed on the `audit` branch so its checkout and check fit inside its `timeout-minutes`, and `Audit/Guard/Test-AuditPathsUntouched.ps1 -SelfTest` still passes.
+- [x] `audit-guard` in .github/workflows/ci.yml is changed on the `audit` branch so its checkout and check fit inside its `timeout-minutes`, and `Audit/Guard/Test-AuditPathsUntouched.ps1 -SelfTest` still passes.
 - [ ] The `CI` runs on work/dark-factory over the first full shift after the change merges show no `audit-guard` job cancelled by its `timeout-minutes` (`gh run view <id> --json jobs`).
 
 ## Notes
+
+Criterion 1 met on 2026-11-03: PR #294 (audit -> master, merge 63cd76682) gives audit-guard a blobless checkout (`filter: blob:none`) and `timeout-minutes: 15`; `Audit/Guard/Test-AuditPathsUntouched.ps1 -SelfTest` passes (exit 0). Criterion 2 waits for the first full shift after the merge.
 
 ## Log
 
