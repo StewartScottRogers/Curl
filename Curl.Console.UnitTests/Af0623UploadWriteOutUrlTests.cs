@@ -30,6 +30,15 @@ public sealed class Af0623UploadWriteOutUrlTests
     }
 
     [TestMethod]
+    public async Task RunAsync_UploadToUrlWithTypedDefaultPort_KeepsThePortInUrl()
+    {
+        int exitCode = await RunAsync(["-s", "-o", "out", "-w", "%{url}", "-T", "sub/f.txt", "http://127.0.0.1:80/"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("http://127.0.0.1:80/f.txt", StandardOutput);
+    }
+
+    [TestMethod]
     public async Task RunAsync_UnreadableUploadToUrlNamingNoFile_PrintsUrlWithFileNameAppended()
     {
         fileSystem.UnreadablePaths.Add("sub/f.txt");

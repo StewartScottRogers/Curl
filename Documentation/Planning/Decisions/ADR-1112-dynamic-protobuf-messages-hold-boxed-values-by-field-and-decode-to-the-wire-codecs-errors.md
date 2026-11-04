@@ -35,7 +35,7 @@ https://protobuf.dev/programming-guides/encoding/. There is no generated code an
   with another wire type than its field's, is kept as an unknown field (as protoc's C++ runtime does).
 - Malformed input is the wire codec's `ProtobufDecodeError`. Proto3 rejects a `string` that is not
   UTF-8, so `ProtobufDecodeError` gains `InvalidUtf8`; and `ProtobufReader` gains a public
-  `TryReadFieldValue`, which reads the value of a field whose tag was already read, so a field found
+  `ReadFieldValue`, which reads the value of a field whose tag was already read, so a field found
   unknown after its tag is kept and nested messages keep the reader's depth limit.
 
 ## Consequences

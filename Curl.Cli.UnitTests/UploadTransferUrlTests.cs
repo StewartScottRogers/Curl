@@ -28,6 +28,11 @@ public sealed class UploadTransferUrlTests
     [DataRow("http://h/x", "http://h/x")]
     [DataRow("imap://u;AUTH=PLAIN@h/", "imap://u;AUTH=PLAIN@h/local.txt")]
     [DataRow("http://u@h/", "http://u@h/local.txt")]
+    [DataRow("http://127.0.0.1:80/", "http://127.0.0.1:80/local.txt")]
+    [DataRow("https://u:p@h:443/d/?", "https://u:p@h:443/d/local.txt")]
+    [DataRow("http://[::1]:80/", "http://[::1]:80/local.txt")]
+    [DataRow("http://u:p@[::1]/", "http://u:p@[::1]/local.txt")]
+    [DataRow("http://h:80", "http://h:80/local.txt")]
     public void TryResolve_FileUpload_AppendsTheNameAndNormalises(string url, string expected)
     {
         ArrangeUpload(url, "local.txt");
