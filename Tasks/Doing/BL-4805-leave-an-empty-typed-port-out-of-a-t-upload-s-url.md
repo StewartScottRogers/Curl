@@ -36,3 +36,4 @@ The re-parse also duplicates what `CurlUrlAuthority.SplitPort` already decided a
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 2e60ad31 780d1012 4457cece bd306633.
