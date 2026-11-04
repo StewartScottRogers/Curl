@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/UploadTransferUrl.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/Af0623UploadWriteOutUrlTests.cs, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4801 — Keep a typed default port in %{url} for a -T upload whose file name is appended
 
@@ -24,15 +24,18 @@ curl's `add_file_name_to_url` (src/tool_operhlp.c) rebuilds the URL with `curl_u
 
 ## Acceptance criteria
 
-- [ ] Real curl's `%{url}` (and `%{url_effective}`) for `-T sub/f.txt http://127.0.0.1:80/` and `https://127.0.0.1:443/` is measured and recorded in this task's Notes.
-- [ ] Curl prints the same bytes: a typed default port is kept in the URL built for a `-T` upload, and a URL with no port typed still prints none.
-- [ ] `Curl.Console.UnitTests/Af0623UploadWriteOutUrlTests.cs` has a case with a typed `:80`, and `Curl.Cli.UnitTests` has a focused test of the URL `UploadTransferUrl` resolves with a typed default port (ADR-0482).
-- [ ] The doc comment on `UploadTransferUrl.Format` no longer says the port is left out, if it is now kept.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Real curl's `%{url}` (and `%{url_effective}`) for `-T sub/f.txt http://127.0.0.1:80/` and `https://127.0.0.1:443/` is measured and recorded in this task's Notes.
+- [x] Curl prints the same bytes: a typed default port is kept in the URL built for a `-T` upload, and a URL with no port typed still prints none.
+- [x] `Curl.Console.UnitTests/Af0623UploadWriteOutUrlTests.cs` has a case with a typed `:80`, and `Curl.Cli.UnitTests` has a focused test of the URL `UploadTransferUrl` resolves with a typed default port (ADR-0482).
+- [x] The doc comment on `UploadTransferUrl.Format` no longer says the port is left out, if it is now kept.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Measured curl 8.22.0 (Schannel): `-w "[%{url}][%{url_effective}]" -T ./f.txt` prints `http://127.0.0.1:80/f.txt` for `:80`, `https://127.0.0.1:443/f.txt` for `:443`, and `http://127.0.0.1/f.txt` with no port typed (both variables alike). Fix: `UploadTransferUrl.Format` keeps the port when the authority of the original string wrote one (CurlUrl does not record this and is outside touches). No ADR needed. Platform-neutral tests.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: c86925db c33c592f 86ffbf95 8535b192 3d836d5e.
+- 2026-11-03: Doing -> Done. Typed default port kept in the -T upload URL

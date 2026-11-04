@@ -62,7 +62,7 @@ public static class UploadTransferUrl
 
     /// <summary>
     /// Writes <paramref name="url"/> back out from its parts, as curl's <c>curl_url_get</c> writes a
-    /// whole URL. A port equal to the scheme's default is left out even when it was typed, which curl
+    /// whole URL. A port equal to the scheme's default is left out unless it was typed, which curl
     /// keeps; the host is written as <see cref="CurlUrl.Host"/> holds it.
     /// </summary>
     private static string Format(CurlUrl url)
@@ -71,7 +71,7 @@ public static class UploadTransferUrl
         text.Append("://");
         AppendUserInformation(text, url);
         AppendHost(text, url);
-        if (!url.IsDefaultPort)
+        if (!url.IsDefaultPort || PortWasTyped(url.OriginalString))
         {
             text.Append(':').Append(url.Port);
         }
@@ -93,6 +93,35 @@ public static class UploadTransferUrl
         }
 
         return text.ToString();
+    }
+
+    /// <summary>
+    /// Tells whether the authority of <paramref name="originalString"/> (already accepted by
+    /// <see cref="CurlUrl"/>) wrote a <c>:port</c> after its host.
+    /// </summary>
+    private static bool PortWasTyped(string originalString)
+    {
+        int schemeEnd = originalString.IndexOf(":/", StringComparison.Ordinal);
+        string authority = schemeEnd < 0 ? originalString : TrimAuthoritySlashes(originalString[(schemeEnd + 1)..]);
+        int end = authority.AsSpan().IndexOfAny('/', '?', '#');
+        if (end >= 0)
+        {
+            authority = authority[..end];
+        }
+
+        string hostAndPort = authority[(authority.LastIndexOf('@') + 1)..];
+        return hostAndPort.LastIndexOf(':') > hostAndPort.LastIndexOf(']');
+    }
+
+    private static string TrimAuthoritySlashes(string afterScheme)
+    {
+        int slashes = 0;
+        while (slashes < 2 && slashes < afterScheme.Length && afterScheme[slashes] == '/')
+        {
+            slashes++;
+        }
+
+        return afterScheme[slashes..];
     }
 
     private static void AppendUserInformation(StringBuilder text, CurlUrl url)
