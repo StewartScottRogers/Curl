@@ -3,8 +3,8 @@ id: AF-0656
 title: Surviving mutant: a CONNECT reply head whose remaining line starts with a bare LF can be written as one -v line
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/ConnectTunnelVerboseLines.cs:ReportReplyHead-lt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ConnectTunnelVerboseLines.cs:165:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
