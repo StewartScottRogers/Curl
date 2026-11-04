@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/NetworkingAdversarialTests.cs -Pat
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Asserts Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, destination.ParseErrorCode) (49).
+
 ## Log
 
 - 2026-11-03: filed proposed.

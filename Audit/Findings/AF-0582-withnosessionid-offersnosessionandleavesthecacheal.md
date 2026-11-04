@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/HandBuiltTlsProviderTests.SessionI
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | No 'Assert.IsNotNull(keptSession' match; the test compares keptSession?.Ticket with CachedTicket and its TicketAgeAdd.
+
 ## Log
 
 - 2026-11-03: filed proposed.

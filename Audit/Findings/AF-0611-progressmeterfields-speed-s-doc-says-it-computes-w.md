@@ -3,8 +3,8 @@ id: AF-0611
 title: ProgressMeterFields.Speed's doc says it computes 'without overflowing' and caps at long.MaxValue; the under-one-microsecond branch multiplies unchecked
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_1615.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Output.UnitLibrary/ProgressMeterFields.cs:Speed:false-doc-comment
 reproduction: none
 task: BL-4775
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: f4a738a932020f9832b23c0977dbaf0f27206871
 scorecard: 2026-11-03_1017.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_1615.md
 ---
 # AF-0611 - ProgressMeterFields.Speed's doc says it computes 'without overflowing' and caps at long.MaxValue; the under-one-microsecond branch multiplies unchecked
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Output.UnitLibrary/ProgressMeterFields.cs -Pattern 'wit
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Ran the reproduction: only 'ProgressMeterFields.cs:95: return size * 1000000;' matches; the 'without overflowing' and 'capped at' doc text is gone. The doc now reads 'Only that branch can overflow, as curl's does (a size of 9,223,372,036,855 bytes or more wraps there); the other branches cap at long.MaxValue', which is true of the code (the second branch is guarded by size < long.MaxValue / 1000000, the third divides or returns long.MaxValue).
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1615.md: the reproduction no longer reproduces.

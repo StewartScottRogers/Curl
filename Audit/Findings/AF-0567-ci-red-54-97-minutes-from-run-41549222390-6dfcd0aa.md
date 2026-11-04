@@ -3,8 +3,8 @@ id: AF-0567
 title: CI red 54.97 minutes from run 41549222390 (6dfcd0aa): a stale known-failure line for Flow_FromTheBroker_IsAnsweredWithFlowOk, filed 32 minutes late because shift starts were refused over orphaned BL-2969
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-03_1615.md: the reproduction no longer reproduces.
 key: process:logs:ci-run-41549222390:ci-red
 reproduction: none
 task: BL-4715
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: ef78cb0569375bf8475eb1a2da931cfd224d52f4
 scorecard: 2026-11-03_0025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_1615.md
 ---
 # AF-0567 - CI red 54.97 minutes from run 41549222390 (6dfcd0aa): a stale known-failure line for Flow_FromTheBroker_IsAnsweredWithFlowOk, filed 32 minutes late because shift starts were refused over orphaned BL-2969
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_1017.md | reproduces: yes | The given reproduction shows the 54.97-minute spell from 41549222390 and the 'refuse ... BL-2969 is in Doing and held by no lane' lines at 17:25:01 and 17:40:37. In this window the same main cause returned: run 41632220793 (27b710a0) went red at 12:19:28Z on stale known-failure lines for the ProtoJSON RoundTrip tests kept by a merge. BL-4724, 'Already fixed by 1df901115'; BL-4726, 'its stale Know~'. The spell lasted 44.7 minutes, over the 30-minute rule. The late-filing part did not recur: the tasks were filed 1 minute after the run, and this window's logs have no 'refuse' phase.
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | The reproduction still shows the historical spell (41549222390, 54.97 min) and the 'refuse BL-2969 is in Doing and held by no lane' lines at 17:25 and 17:40 on 2026-11-02. I re-audited by mechanism over this window (-Since 2026-11-03, logs 20261103-161553: three shifts, 44 tasks done). No coordinator log has a 'refuse' line, and no shift start was refused over an orphan. The CI red spells this window crossed (171.72, 122.97 and 71.8 min) have a different cause: failure logs gh could not read, and an idle coordinator that stopped watching CI. That cause is filed as new findings, not as this one.
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1615.md: the reproduction no longer reproduces.

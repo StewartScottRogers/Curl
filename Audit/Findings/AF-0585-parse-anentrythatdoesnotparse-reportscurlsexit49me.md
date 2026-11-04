@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/ResolveOverridesTests.cs -Pattern 
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Test now computes overrides.ParseFailureCodeWith(destination) and checks it against CurlExitCode.SetoptOptionSyntax (49) after the message.
+
 ## Log
 
 - 2026-11-03: filed proposed.

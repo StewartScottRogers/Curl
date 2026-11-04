@@ -3,8 +3,8 @@ id: AF-0613
 title: ADR-1224 says every ConnectionReset/Refused from a send or receive becomes exit 7; the channel converts it only until its first datagram arrives
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_1615.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1224-closed-udp-port-is-exit-7.md:PortUnreachableReportingDatagramChannel:stale-adr
 reproduction: none
 task: BL-4777
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: f4a738a932020f9832b23c0977dbaf0f27206871
 scorecard: 2026-11-03_1017.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_1615.md
 ---
 # AF-0613 - ADR-1224 says every ConnectionReset/Refused from a send or receive becomes exit 7; the channel converts it only until its first datagram arrives
 
@@ -42,7 +42,10 @@ Select-String -Path Documentation/Planning/Decisions/ADR-1224-*.md -Pattern 'fro
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Ran the reproduction: ADR-1224:15 now reads 'a `ConnectionReset` or `ConnectionRefused` from a send or receive, only until the channel has received its first datagram (BL-4675; ...)', agreeing with PortUnreachableReportingDatagramChannel.cs:12.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1615.md: the reproduction no longer reproduces.

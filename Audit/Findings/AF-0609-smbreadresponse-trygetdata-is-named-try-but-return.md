@@ -3,8 +3,8 @@ id: AF-0609
 title: SmbReadResponse.TryGetData is named Try... but returns string? (null on success, error text on failure), not bool
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_1615.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Original.Protocol.Smb.UnitLibrary/SmbReadResponse.cs:TryGetData:misleading-name
 reproduction: none
 task: BL-4773
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: f4a738a932020f9832b23c0977dbaf0f27206871
 scorecard: 2026-11-03_1017.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_1615.md
 ---
 # AF-0609 - SmbReadResponse.TryGetData is named Try... but returns string? (null on success, error text on failure), not bool
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Original.Protocol.Smb.UnitLibrary/SmbReadResponse.cs -P
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Ran the reproduction: no match for 'public static \S+ TryGetData\('. The method is now 'public static string? ReadDataOrRefusal(byte[] received, out ReadOnlyMemory<byte> data)' (SmbReadResponse.cs:27), a name that fits its string? return.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_1615.md: the reproduction no longer reproduces.

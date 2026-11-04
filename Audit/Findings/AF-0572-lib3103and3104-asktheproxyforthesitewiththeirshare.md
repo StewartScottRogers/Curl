@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib3101To5004Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | No match; Lib3101To5004Tests.cs:190 asserts CollectionAssert.AreEqual(new[] { CurlLockData.Cookie }, engine.LastShare!.Shared).
+
 ## Log
 
 - 2026-11-03: filed proposed.

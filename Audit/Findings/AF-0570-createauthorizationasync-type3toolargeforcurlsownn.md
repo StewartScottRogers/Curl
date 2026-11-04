@@ -42,6 +42,8 @@ Select-String -Path Curl.Authentication.UnitTests/NtlmHttpAuthenticatorTests.Ver
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Context contains Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode) (exit 100).
+
 ## Log
 
 - 2026-11-03: filed proposed.
