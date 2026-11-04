@@ -3,8 +3,8 @@ id: AF-0663
 title: Authentication CLAUDE.md says CurlComposition sets NtlmHttpAuthenticator's matchesSspiBuild; EngineComposition does
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Authentication.UnitLibrary/CLAUDE.md:NtlmHttpAuthenticator.matchesSspiBuild:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Authentication.UnitLibrary/CLAUDE.md -Pattern 'by .Curl
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
