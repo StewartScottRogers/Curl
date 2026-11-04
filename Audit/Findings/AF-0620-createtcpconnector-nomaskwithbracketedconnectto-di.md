@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.UnitTests/EngineCompositionConnectToFeatureMaskT
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: no | Ran the reproduction: its 12 context lines end at line 55 (port 80), but the test continues to line 57, Assert.AreEqual("::1", string.Join(", ", resolver.Hosts)). That checks the connector resolved the mapped address ::1 from --connect-to localhost:80:[::1]:80, which the unmapped URL (localhost) would not.
+
 ## Log
 
 - 2026-11-03: filed proposed.

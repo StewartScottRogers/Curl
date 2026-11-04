@@ -3,8 +3,8 @@ id: AF-0625
 title: CI red 122.97 minutes from run 41688300433 (28cbd2df): failure log unreadable and no shift watching CI
 auditor: process
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_2203.md: the reproduction no longer reproduces.
 key: process:logs:41688300433:ci-red
 reproduction: none
 task: BL-4798
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 7410f102c809d5232e4f9b210b3ac32486848c27
 scorecard: 2026-11-03_1615.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_2203.md
 ---
 # AF-0625 - CI red 122.97 minutes from run 41688300433 (28cbd2df): failure log unreadable and no shift watching CI
 
@@ -42,7 +42,11 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: yes | still reported
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: no | The reproduction still shows the historic spell 41688300433 (122.97 min) and its 'cannot read its log' lines at 134646.log:17 and 145254.log:31. Judged by mechanism over this window: after the BL-4781 fix (6f289fef1, 16:32, empty --log-failed read as an empty log) no 'cannot read its log' line appears in any coordinator log (162612 to 204644), and every shift had a coordinator watching CI. The window's spells are 16.15 and 14.27 min, both under 30. 19 tasks Done.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_2203.md: the reproduction no longer reproduces.
