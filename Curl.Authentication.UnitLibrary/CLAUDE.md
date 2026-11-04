@@ -54,7 +54,7 @@ wrapped RFC 4752 security-layer answer (no layer, size 0, `--sasl-authzid`). An 
 cannot answer gives `null` with `CancelReason` set to curl's `GSSAPI handshake failure (...)`
 line, worded as the SSPI or GSS-API build per `SaslAuthenticator.WordsGssapiFailuresAsSspi`
 (BL-1336). Without a factory
-both stay not offered; `Curl.Console` does not pass one yet (BL-852).
+both stay not offered; the production composition (`EngineComposition`) passes one for IMAP, POP3 and SMTP (BL-852).
 Tests fake the seam with `ScriptedSecurityContext` and run the hand-built route against
 `Curl.Kerberos.UnitTests`' `FakeKdc` and `FakeGssAcceptor`, linked into the test project.
 
