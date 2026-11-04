@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4833 — Fix AF-0651: Host-mapping test names exit 27 but asserts only acceptance and the converted text
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Renamed the test to `TryNormalizeReadingHost_LetterlikeSymbolWithSlashDecomposition_IsAcceptedAndConvertsToSlashText`: exit 27 through a proxy is decided past host normalisation, so `TryNormalizeReadingHost` cannot assert it; the name now states only what the test checks (the finding allows "a name without the number"). A comment keeps the measured curl behaviour. Curl.Protocol.Abstractions.UnitTests: 1636 passed, 2 skipped. Test-only change, platform-neutral, so no quality run.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. Test renamed to drop the exit 27 it never asserted

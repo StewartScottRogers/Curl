@@ -578,7 +578,10 @@ public sealed class CurlUrlHostNameMappingTests
     [DataRow("a℁b.test", "aa/sb.test", DisplayName = "U+2101 addressed to the subject")]
     [DataRow("a℅b.test", "ac/ob.test", DisplayName = "U+2105 care of")]
     [DataRow("a℆b.test", "ac/ub.test", DisplayName = "U+2106 cada una")]
-    public void TryNormalizeReadingHost_MeasuredLetterlikeSymbolCurlRefusesWithExit27ThroughAProxy_ConvertsToSlashText(string host, string expected) =>
+    // Measured: real curl refuses these through a proxy (its exit code is decided past host
+    // normalisation, so it is not this method's to assert); here the host is accepted and its
+    // compatibility decomposition keeps the slash.
+    public void TryNormalizeReadingHost_LetterlikeSymbolWithSlashDecomposition_IsAcceptedAndConvertsToSlashText(string host, string expected) =>
         AssertConvertsTo(host, expected);
 
     private static void AssertConvertsTo(string host, string expected)
