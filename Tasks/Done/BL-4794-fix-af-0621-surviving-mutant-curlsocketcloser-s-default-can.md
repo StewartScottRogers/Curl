@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4794 — Fix AF-0621: Surviving mutant: CurlSocketCloser's default can mark every socket as the connection's own without a test failing
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `CurlSocketCloserTests` (the default `isTheConnectionsOwnSocket` is false, the flag given is true, `Close` runs the callback once then disposes the owned socket) and `SocketCallbackConnectorTests.DisposeAsync_CloserNotMarkedAsTheConnectionsOwnSocket_CallsTheCloseSocketCallbackAfterTheConnectionCloses`, which pins the callback order the two default-relying callers give (CGR-129).
+- Reproduction: `Audit/Tools` is closed to lanes, so the mutant was applied by hand (`= false` -> `= true` at CurlSocketCloser.cs:19): both new tests failed against it (2 failed of 2977), and all 2970 passed once it was reverted. That is the killed result the finding expects.
+- Only test code changed (Curl.Engine.UnitTests), so no production member moved and no quality run was needed. The tests are platform-neutral (no paths, sockets or OS text), so CI on Linux and macOS should match.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Mutant killed by new CurlSocketCloser and SocketCallbackConnection dispose-order tests
