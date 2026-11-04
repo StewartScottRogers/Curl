@@ -42,6 +42,8 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0184-*.md -Pattern 'exi
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_0643.md | reproduces: no | Ran the reproduction. SecurityContextSaslExchange.cs:79 still throws SaslAuthenticationFailedException(CurlExitCode.AuthError, ...) (94). ADR-0184 Decision item 5 now reads 'A context that cannot make its token fails the transfer with exit 94'. The only 'exit 67' match (line 61) is in the 2026-11-04 amendment, which says the code 'no longer answers null and cancels with exit 67'. The 'Without a factory' match (line 44) is a true ranking statement. ADR and code now agree on exit 94.
+
 ## Log
 
 - 2026-11-03: filed proposed.

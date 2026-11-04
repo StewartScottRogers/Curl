@@ -3,8 +3,8 @@ id: AF-0620
 title: CreateTcpConnector_NoMaskWithBracketedConnectTo_DialsTheMappedAddress never checks the mapped address, only port 80, which the unmapped URL also dials
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-04_0643.md: the reproduction no longer reproduces.
 key: quality:Curl.Engine.UnitTests/EngineCompositionConnectToFeatureMaskTests.cs:CreateTcpConnector_NoMaskWithBracketedConnectTo_DialsTheMappedAddress:weak-assertion
 reproduction: none
 task: BL-4793
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 7410f102c809d5232e4f9b210b3ac32486848c27
 scorecard: 2026-11-03_1615.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-04
+closed-how: reliable-reaudit
+closed-by: 2026-11-04_0643.md
 ---
 # AF-0620 - CreateTcpConnector_NoMaskWithBracketedConnectTo_DialsTheMappedAddress never checks the mapped address, only port 80, which the unmapped URL also dials
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Engine.UnitTests/EngineCompositionConnectToFeatureMaskT
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_2203.md | reproduces: no | Ran the reproduction: its 12 context lines end at line 55 (port 80), but the test continues to line 57, Assert.AreEqual("::1", string.Join(", ", resolver.Hosts)). That checks the connector resolved the mapped address ::1 from --connect-to localhost:80:[::1]:80, which the unmapped URL (localhost) would not.
+- 2026-11-04 | 2026-11-04_0643.md | reproduces: no | Ran the reproduction. The test now also asserts Assert.AreEqual("::1", string.Join(", ", resolver.Hosts)), the mapped address, beside port 80.
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-04: accepted -> closed. Re-audit 2026-11-04_0643.md: the reproduction no longer reproduces.

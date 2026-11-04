@@ -42,6 +42,8 @@ Select-String -Path Curl.Extension.HttpFile.UnitLibrary/HttpFileVariables.cs -Pa
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_0643.md | reproduces: no | Ran the reproduction. 'references no variable' is gone. Define's exception doc (HttpFileVariables.cs:30) now reads 'A reference in the value names no defined variable (exit 2)', and Substitute's (line 36) reads 'A reference names no variable (exit 2)'. ValueOf (line 68) throws ArgumentExpansionException('... is not defined', CurlExitCode.FailedInit), and FailedInit = 2 (CurlExitCode.cs:30). The doc now matches the code.
+
 ## Log
 
 - 2026-11-03: filed proposed.
