@@ -40,3 +40,4 @@ The blocked task itself is still raised by `Get-WaitingOnStewart`.
 ## Log
 
 - 2026-11-04: Created.
+- 2026-11-04: Backlog -> Doing. Criteria at claim: a2e6f913 e17130dc 8d9492b6 758046de.
