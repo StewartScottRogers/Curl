@@ -532,7 +532,12 @@ function Get-CiRuns {
     # cannot list them, traced with gh's exit code and error (Write-GhListLine, -Now its clock).
     # -ListRuns and -ReadLog stand in for gh in -TestCiWatch: the first returns `gh run list`'s
     # JSON or Invoke-GhRunList's failure, the second a run's `--log-failed` lines, $null if unreadable.
-    param([string]$Branch, [scriptblock]$ListRuns, [scriptblock]$ReadLog, [scriptblock]$ReadJobs, [datetime]$Now = (Get-Date))
+    # A failed run whose only bad jobs never got a runner is, when it is the newest run on the
+    # branch, rerun with `gh run rerun --failed` (-RerunFailedJobs stands in), at most
+    # -MostCapacityReruns times: a branch whose last real failure is fixed otherwise stays red until
+    # the next push happens to get every runner (BL-4846, AF-0664: 165 of 171.7 red minutes).
+    param([string]$Branch, [scriptblock]$ListRuns, [scriptblock]$ReadLog, [scriptblock]$ReadJobs, [scriptblock]$RerunFailedJobs,
+        [int]$MostCapacityReruns = 2, [datetime]$Now = (Get-Date))
     # No --jq: Windows PowerShell strips the double quotes a jq filter needs from a native
     # command's arguments. Its ConvertFrom-Json turns "[]" into one empty element, hence the
     # databaseId filter.
@@ -551,6 +556,14 @@ function Get-CiRuns {
             return $json
         }
     }
+    if (-not $RerunFailedJobs) {
+        $RerunFailedJobs = {
+            param([string]$Id)
+            gh run rerun $Id --failed 2>$null | Out-Null
+            return ($LASTEXITCODE -eq 0)
+        }
+    }
+    if (-not $script:CiWatch.Reruns) { $script:CiWatch.Reruns = @{} }
     $json = & $ListRuns $Branch
     if (-not $script:CiWatch.List) { $script:CiWatch.List = @{} }
     $failure = Get-GhListFailure $json
@@ -597,6 +610,7 @@ function Get-CiRuns {
         if ($conclusion -eq 'cancelled' -and -not $failures.Count) { continue }
         if ($conclusion -eq 'failure' -and -not $failures.Count -and $script:CiWatch.Capacity[$id]) {
             Write-CiRunLine -RunId $id -Line "failure on ${on}: runner capacity - every job that did not succeed was never given a runner; nothing to file"
+            Invoke-CiCapacityRerun -Id $id -On $on -Newest ("$($listed[0].databaseId)" -eq $id) -Rerun $RerunFailedJobs -Most $MostCapacityReruns
             continue
         }
         if ($conclusion -eq 'failure' -and -not $failures.Count) {
@@ -606,6 +620,24 @@ function Get-CiRuns {
         $runs += [pscustomobject]@{ Id = $id; Sha = $sha; FinishedAt = $finished; Failures = $failures }
     }
     return , $runs
+}
+
+function Invoke-CiCapacityRerun {
+    # Reruns run -Id's failed jobs (-Rerun, returning $true when gh accepted it) when the run is the
+    # newest on its branch (-Newest) and has been rerun fewer than -Most times, and forgets what
+    # was read of it, so the rerun's own result is read afresh when it finishes (BL-4846).
+    param([string]$Id, [string]$On, [bool]$Newest, [scriptblock]$Rerun, [int]$Most)
+    if (-not $Newest) { return }
+    $done = [int]$script:CiWatch.Reruns[$Id]
+    if ($done -ge $Most) { return }
+    $script:CiWatch.Reruns[$Id] = $done + 1
+    if (-not (& $Rerun $Id)) {
+        Write-CiRunLine -RunId $Id -Line "failure on ${On}: gh run rerun --failed refused rerun $($done + 1) of $Most"
+        return
+    }
+    $script:CiWatch.Failures.Remove($Id)
+    $script:CiWatch.Capacity.Remove($Id)
+    Write-CiRunLine -RunId $Id -Line "failure on ${On}: reran its failed jobs for runner capacity ($($done + 1) of $Most)"
 }
 
 function ConvertTo-CiDateTime {
@@ -1264,10 +1296,31 @@ if ($TestCiWatch) {
     $ran = '{"jobs":[{"name":"Pack","conclusion":"cancelled","steps":[]},{"name":"T","conclusion":"failure","steps":[{"conclusion":"failure"}]}]}'
     $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
     $traced.Clear()
-    $capRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":902,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() } -ReadJobs { $noRunner })
+    $capRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":902,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() } -ReadJobs { $noRunner } -MostCapacityReruns 0)
     & $check 'a failed run whose only bad job never got a runner files nothing and says runner capacity (BL-3944)' '0|run 902 failure on abcdef01: runner capacity - every job that did not succeed was never given a runner; nothing to file' "$(@($capRuns[0]).Count)|$($traced -join ';')"
     $ranRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":903,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() } -ReadJobs { $ran })
     & $check 'an empty log with a job that ran and failed is still filed (BL-3944)' '1|job unknown job step unknown step' "$($ranRuns.Count)|$($ranRuns[0].Failures[0].Key)"
+    # BL-4846 (AF-0664): the newest run that failed only for runner capacity is rerun, at most
+    # twice, and its rerun is read afresh; an older one is not rerun, since a newer run decides.
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $traced.Clear()
+    $rerunIds = [System.Collections.Generic.List[string]]::new()
+    $capList = { '[{"databaseId":904,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' }
+    foreach ($beat in 1..3) {
+        $null = Get-CiRuns -Branch 'b' -ListRuns $capList -ReadLog { , @() } -ReadJobs { $noRunner } -RerunFailedJobs { param($Id) $rerunIds.Add($Id); $true }
+    }
+    & $check 'the newest runner-capacity run is rerun at most twice, read afresh each time (BL-4846)' '904,904|True' `
+        "$($rerunIds -join ',')|$(@($traced | Where-Object { $_ -match 'reran its failed jobs for runner capacity \(2 of 2\)' }).Count -eq 1)"
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $rerunIds.Clear()
+    $null = Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":906,"status":"in_progress","conclusion":"","headSha":"bbbbbbbb01","updatedAt":"2026-10-11T23:20:00Z"},{"databaseId":905,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } `
+        -ReadLog { , @() } -ReadJobs { $noRunner } -RerunFailedJobs { param($Id) $rerunIds.Add($Id); $true }
+    & $check 'a runner-capacity run with a newer run on the branch is not rerun (BL-4846)' '0' "$($rerunIds.Count)"
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $traced.Clear()
+    $null = Get-CiRuns -Branch 'b' -ListRuns $capList -ReadLog { , @() } -ReadJobs { $noRunner } -RerunFailedJobs { $false }
+    & $check 'a refused rerun is traced and the run stays read (BL-4846)' 'True|True' `
+        "$(@($traced | Where-Object { $_ -match 'refused rerun 1 of 2' }).Count -eq 1)|$($script:CiWatch.Capacity.ContainsKey('904'))"
     # BL-4420: run 41217938101 on fe634e2c, whose quality shard hung in Curl.Console.UnitTests
     # until its 45-minute timeout-minutes cancelled it, is filed as a hang; cancels are not.
     $shard = 'Quality gates shard 3 of 3 (windows-latest)'
