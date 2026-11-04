@@ -3,8 +3,8 @@ id: AF-0654
 title: Surviving mutant: an empty UDP datagram over CONNECT-IP can be dropped
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Extension.Masque.UnitLibrary/Wire/IpUdpPacket.cs:TryReadUdp-lt:surviving-mutant
 reproduction: mutation Curl.Extension.Masque.UnitLibrary/Wire/IpUdpPacket.cs:148:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
