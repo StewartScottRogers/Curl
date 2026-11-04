@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.ResumableUpload.UnitLibrary]
+touches: [Curl.Extension.ResumableUpload.UnitLibrary, Curl.Extension.ResumableUpload.UnitTests/Http/ResumableUploadHttpClientConnectionTests.cs]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4807 — Fix AF-0628: Surviving mutant: a resumable-upload header value that starts with CR or LF can escape the injection refusal, and no test fails
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only fix: SendAsync_FieldHoldsCrOrLf_ThrowsArgumentException gains DataRows with CR or LF at index 0 of the name (`"\r\nX-Injected"`) and of the value (`"\r\nX-Injected: 1"`, `"\nX-Injected: 1"`). Production code is unchanged.
+- Touches widened to the test file Curl.Extension.ResumableUpload.UnitTests/Http/ResumableUploadHttpClientConnectionTests.cs, where the missing case belongs. The only other task in Doing, BL-4806, holds Curl.Api.UnitLibrary.
+- A lane may not run the audit office mutation tool, so the mutant was applied by hand (">= 0" to "> 0" on the value check at line 51): the two new value rows failed, so the mutant is killed. It was then reverted. The finding closes on the quality auditor re-audit.
+- Build clean and fast tests green on Windows. The change is platform-neutral (no paths, OS text or certificates).
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. Header injection test now covers CR or LF at index 0; the '> 0' mutant is killed

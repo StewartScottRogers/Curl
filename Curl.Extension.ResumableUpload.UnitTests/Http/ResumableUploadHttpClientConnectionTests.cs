@@ -81,6 +81,9 @@ public sealed class ResumableUploadHttpClientConnectionTests
     [TestMethod]
     [DataRow("X-Bad\r\nInjected", "v")]
     [DataRow("X-Bad", "v\nInjected: 1")]
+    [DataRow("\r\nX-Injected", "v")]
+    [DataRow("X-Bad", "\r\nX-Injected: 1")]
+    [DataRow("X-Bad", "\nX-Injected: 1")]
     public async Task SendAsync_FieldHoldsCrOrLf_ThrowsArgumentException(string name, string value)
     {
         var request = new ResumableUploadHttpRequest("GET", "/", [new(name, value)]);
