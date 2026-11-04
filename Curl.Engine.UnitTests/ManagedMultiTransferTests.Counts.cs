@@ -96,6 +96,34 @@ public sealed partial class ManagedMultiTransferTests
         Assert.AreEqual((CurlMultiCode.OutOfMemory, 3), (emptyCode, emptyCount));
     }
 
+    [TestMethod]
+    public async Task GetWaitSockets_FinishedTransferThatHeldASocketBesideARunningOne_IsOnlyTheRunningOnesSocketThenTheResolverWakeup()
+    {
+        TimerManualTimeProvider time = new();
+        await using ManagedCurlEngine engine = new(time, null);
+        await using ManagedMultiTransfer multi = NewMulti(time);
+        TaskCompletionSource finishedTakesSocket = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using WrappingEasyTransfer finished = new((ManagedEasyTransfer)engine.CreateEasy(), (wait, _) =>
+        {
+            wait.TakeSocket(0x1236);
+            finishedTakesSocket.TrySetResult();
+            return Task.FromResult(CurlCode.Ok);
+        });
+        await using WrappingEasyTransfer running = TransferHoldingSocketUntilCancelled(engine, 0x1237, out Task runningHolds);
+        multi.Add(finished);
+        multi.Add(running);
+        await multi.PerformAsync(CancellationToken.None);
+        await Task.WhenAll(finishedTakesSocket.Task, runningHolds);
+        await multi.PerformAsync(CancellationToken.None);
+        CurlWaitSocket[] sockets = new CurlWaitSocket[3];
+
+        CurlMultiCode code = multi.GetWaitSockets(sockets, out int count);
+
+        Assert.AreEqual((CurlMultiCode.Ok, 2), (code, count));
+        Assert.AreEqual(new CurlSocket(0x1237), sockets[0].Socket);
+        Assert.AreEqual(new CurlSocket(ManagedMultiTransfer.ResolverWakeupSocket), sockets[1].Socket);
+    }
+
     /// <summary>A wrapped managed transfer that takes <paramref name="socket" /> and holds it until cancelled.</summary>
     private static WrappingEasyTransfer TransferHoldingSocketUntilCancelled(ManagedCurlEngine engine, nint socket, out Task holding)
     {

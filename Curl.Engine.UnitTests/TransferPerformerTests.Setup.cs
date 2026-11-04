@@ -147,6 +147,22 @@ public sealed partial class TransferPerformerTests
     }
 
     [TestMethod]
+    public async Task ResolveSshOptionsAsync_KnownHostsFileFoundWithoutInsecure_RecordsItPresentWritesNothingAndGoesOn()
+    {
+        List<string> lines = [];
+        List<(string? File, bool Missing)> recorded = [];
+        EngineTransferState state = NewState();
+
+        TransferResult? failure = await sshPerformer.ResolveSshOptionsAsync(
+            EasyOptionsFromCommandLine.TransferSettingsOf(Parse(SftpUrl)), new EasySshOptions(), CurlUrl.Parse(SftpUrl), state, () => "/home/user/.ssh/known_hosts", (file, missing) => recorded.Add((file, missing)), Recorder(lines));
+
+        Assert.IsNull(failure);
+        Assert.IsEmpty(lines);
+        CollectionAssert.AreEqual(new[] { ((string?)"/home/user/.ssh/known_hosts", false) }, recorded);
+        Assert.IsNotNull(state.Ssh);
+    }
+
+    [TestMethod]
     public async Task ResolveSshOptionsAsync_NoKnownHostsFileWithFingerprintUnderSilent_WritesNothing()
     {
         List<string> lines = [];

@@ -66,6 +66,25 @@ public sealed class CloseNotifyOnDisposeTests
         Assert.AreEqual(1, clock.TimersCreated, "Disposing a second time tried to send close_notify again.");
     }
 
+    // The hand-built streams refuse a second shutdown too, so here as well only the clock can
+    // tell a second close_notify attempt (AF-0639).
+    [TestMethod]
+    public async Task DisposeAsync_OfAHandBuiltTlsConnectionCalledTwice_TriesToSendCloseNotifyOnlyOnce()
+    {
+        var plaintext = new StallingConnection();
+        var clock = new TimerCountingTimeProvider();
+        var connection = new HandBuiltTlsConnection(new MemoryStream(), plaintext, null, string.Empty, clearsTls: false)
+        {
+            CloseNotifyTimeout = s_bound,
+            TimeProvider = clock,
+        };
+
+        await connection.DisposeAsync().AsTask().WaitAsync(s_generousWait);
+        await connection.DisposeAsync().AsTask().WaitAsync(s_generousWait);
+
+        Assert.AreEqual(1, clock.TimersCreated, "Disposing a second time tried to send close_notify again.");
+    }
+
     [TestMethod]
     public async Task DisposeAsync_OfAnSslStreamConnectionWhoseStreamDisposalThrows_StillDisposesTheTransport()
     {

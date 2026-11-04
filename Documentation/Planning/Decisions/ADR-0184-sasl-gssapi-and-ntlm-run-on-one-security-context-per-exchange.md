@@ -43,13 +43,21 @@ cannot be measured on the loopback recorder.
    last, or an empty one (`Curl_auth_user_contains_domain`); both need a user and no bearer
    token, like the other password mechanisms. Without a factory
    (`new SaslAuthenticator(Encoding)`) both stay not offered and `Begin` refuses them.
-5. **A failed step answers `null`**, so the handler cancels with `*` and exit 67 under
-   ADR-0183's contract. curl fails with exit 94 and sends nothing more (measured); matching it
-   needs the contract to carry the exit, filed as BL-856.
+5. **A context that cannot make its token fails the transfer with exit 94** and sends nothing
+   more, as curl does (measured). *(Amended; see the amendment below.)*
 
 ## Consequences
 
 - Both mechanisms are available on every platform through the router: no `OSCondition` refusal.
-- `CurlComposition` still builds `SaslAuthenticator` without a factory until BL-852 hands it
-  the router.
+- `EngineComposition` hands the router's contexts to the SASL authenticator for IMAP, POP3 and
+  SMTP (see the amendment below).
 - A context abandoned mid-exchange (the server drops the connection) is left to its finalizer.
+
+## Amendment (2026-11-04, BL-856, BL-852, AF-0641)
+
+- Decision item 5: `SecurityContextSaslExchange.GetInitialResponseAsync` throws
+  `SaslAuthenticationFailedException` with `CurlExitCode.AuthError` (94) when the context cannot
+  make its first token, matching curl 8.21.0, which sends nothing more. It no longer answers
+  `null` and cancels with exit 67 (BL-856).
+- Consequences: the engine now passes the router's security contexts to the SASL authenticator for
+  IMAP, POP3 and SMTP (BL-852), so GSSAPI and NTLM are offered there.

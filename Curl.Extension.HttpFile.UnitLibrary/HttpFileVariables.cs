@@ -27,7 +27,7 @@ internal sealed class HttpFileVariables(Func<string, string?> readEnvironmentVar
     /// <summary>Sets a variable to a value whose own references are substituted first, as a file variable's are.</summary>
     /// <param name="name">The variable's name.</param>
     /// <param name="value">Its value, which may reference variables defined before it.</param>
-    /// <exception cref="ArgumentExpansionException">The value references no variable (exit 2).</exception>
+    /// <exception cref="ArgumentExpansionException">A reference in the value names no defined variable (exit 2).</exception>
     public void Define(string name, string value) => values[name] = Substitute(value);
 
     /// <summary>Gives <paramref name="text" /> with each <c>{{reference}}</c> replaced by its value; a <c>{{</c> with no <c>}}</c> after it stays.</summary>

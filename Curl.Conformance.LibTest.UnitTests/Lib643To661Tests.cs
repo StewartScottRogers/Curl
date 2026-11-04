@@ -170,6 +170,15 @@ public sealed class Lib643To661Tests
         Assert.HasCount(calls, form.Calls);
         Assert.AreEqual(failingCall == 0 ? 1 : 0, performs);
         Assert.AreEqual(failingCall == 0 ? string.Empty : $"curl_formadd({failingCall}) = 1\n", run.OutputText);
+        if (calls >= 2)
+        {
+            // test650's second part goes under "fieldname" cut by one byte (CURLFORM_NAMELENGTH 8).
+            Assert.AreEqual(CurlFormOption.PointerName, form.Calls[1][0].Option);
+            Assert.AreEqual("fieldname", form.Calls[1][0].Value);
+            Assert.AreEqual(CurlFormOption.NameLength, form.Calls[1][1].Option);
+            Assert.AreEqual(8L, form.Calls[1][1].Value);
+        }
+
         if (calls >= 3)
         {
             var array = (CurlFormArgument[])form.Calls[1][2].Value!;

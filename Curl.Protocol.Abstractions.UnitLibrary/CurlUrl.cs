@@ -49,6 +49,7 @@ public sealed record CurlUrl
         int? defaultPort = CurlUrlScheme.DefaultPort(scheme);
         Port = authority.Port ?? defaultPort ?? -1;
         IsDefaultPort = authority.Port is null || authority.Port == defaultPort;
+        PortWasWritten = authority.Port is not null;
         AbsolutePath = absolutePath;
         Query = query;
         Fragment = fragment;
@@ -116,6 +117,12 @@ public sealed record CurlUrl
     /// port was written, or the one written equals the default.
     /// </summary>
     public bool IsDefaultPort { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the URL wrote a port number after its host; an empty
+    /// <c>host:</c> writes none.
+    /// </summary>
+    public bool PortWasWritten { get; }
 
     /// <summary>
     /// Gets the path as curl sends it: as written, with <c>\</c> turned into <c>/</c>,

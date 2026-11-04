@@ -33,6 +33,8 @@ public sealed class UploadTransferUrlTests
     [DataRow("http://[::1]:80/", "http://[::1]:80/local.txt")]
     [DataRow("http://u:p@[::1]/", "http://u:p@[::1]/local.txt")]
     [DataRow("http://h:80", "http://h:80/local.txt")]
+    // Measured with curl 8.22.0 (-w %{url} -T f.txt http://127.0.0.1:/): an empty port is dropped.
+    [DataRow("http://h:/", "http://h/local.txt")]
     public void TryResolve_FileUpload_AppendsTheNameAndNormalises(string url, string expected)
     {
         ArrangeUpload(url, "local.txt");

@@ -173,6 +173,38 @@ public sealed class MultiCallbackQueueTests
         Assert.AreEqual(1, runs);
     }
 
+    [TestMethod]
+    public async Task RunQueued_CallbackQueuedWhileAnotherRuns_ResetsArrivedOnlyOnceTheQueueIsEmpty()
+    {
+        MultiCallbackQueue queue = new();
+        Task<int>? second = null;
+        bool arrivedWhileSecondQueued = false;
+        Task<int> first = Task.Run(() => queue.Run(
+            () =>
+            {
+                second = Task.Run(() => queue.Run(() => 2, CancellationToken.None));
+                DateTime deadline = DateTime.UtcNow + Limit;
+                while (!queue.HasQueued && DateTime.UtcNow < deadline)
+                {
+                    Thread.Yield();
+                }
+
+                arrivedWhileSecondQueued = queue.Arrived.IsCompleted;
+                return 1;
+            },
+            CancellationToken.None));
+        await WaitUntilQueuedAsync(queue);
+
+        queue.RunQueued();
+
+        Assert.AreEqual(1, await first.WaitAsync(Limit));
+        Assert.IsNotNull(second);
+        Assert.AreEqual(2, await second.WaitAsync(Limit));
+        Assert.IsTrue(arrivedWhileSecondQueued);
+        Assert.IsFalse(queue.HasQueued);
+        Assert.IsFalse(queue.Arrived.IsCompleted);
+    }
+
     private static async Task WaitUntilQueuedAsync(MultiCallbackQueue queue)
     {
         DateTime deadline = DateTime.UtcNow + Limit;

@@ -819,6 +819,18 @@ public sealed class CurlUrlTests
         return url;
     }
 
+    [TestMethod]
+    [DataRow("http://h/", false)]
+    [DataRow("http://h:/", false)]
+    [DataRow("http://h:80/", true)]
+    [DataRow("http://[::1]:8080/", true)]
+    public void PortWasWritten_ReportsWhetherANumberFollowedTheHost(string text, bool expected)
+    {
+        Assert.IsTrue(CurlUrl.TryParse(text, pathAsIs: false, driveLetters: true, out CurlUrl? url));
+
+        Assert.AreEqual(expected, url.PortWasWritten);
+    }
+
     private static void AssertRejected(TestDiagnostics diagnostics, string text, string? description = null)
     {
         diagnostics.Arrange("url text", description ?? text);

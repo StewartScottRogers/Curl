@@ -72,6 +72,21 @@ public sealed class SchannelCommonNameCheckTests
         Assert.IsFalse(matches);
     }
 
+    // The wildcard stands for at least one character, so a one-character left-most label
+    // is the shortest host it matches (AF-0637).
+    [TestMethod]
+    public void PatternMatchesHost_WildcardAgainstAOneCharacterLeftMostLabel_IsTrue()
+    {
+        Diagnostics.Arrange("pattern, host", "*.hello.com, a.hello.com");
+
+        var matches = SchannelCommonNameCheck.PatternMatchesHost("*.hello.com", "a.hello.com");
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", true, matches);
+
+        Assert.IsTrue(matches);
+    }
+
     [TestMethod]
     public void CommonNameMatches_WithOnlyAnIpAlternativeNameAndTheHostAsCommonName_IsTrue()
     {

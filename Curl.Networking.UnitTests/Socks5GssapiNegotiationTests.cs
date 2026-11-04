@@ -14,6 +14,7 @@ public sealed class Socks5GssapiNegotiationTests
     [DataRow("", "", "proxy.example", DisplayName = "An empty service too")]
     [DataRow("socks/gw.example", "socks", "gw.example", DisplayName = "A service with a slash is the whole target")]
     [DataRow("a/b/c", "a", "b/c", DisplayName = "Split at the first slash")]
+    [DataRow("/host.example", "", "host.example", DisplayName = "A leading slash names an empty service and the host after it")]
     public void RequestFor_NamesTheAcceptorAsCurlDoes(string service, string serviceName, string hostName)
     {
         Diagnostics.Arrange("proxy host, service", $"proxy.example, {service}");
