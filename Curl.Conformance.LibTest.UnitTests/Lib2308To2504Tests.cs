@@ -297,6 +297,21 @@ public sealed class Lib2308To2504Tests
     }
 
     [TestMethod]
+    public async Task Lib2405_WhenTheAddedHandleGivesOneDescriptor_Passes()
+    {
+        var engine = new FakeCurlEngine();
+        engine.Multi.Adding = () => engine.Multi.WaitSockets = TwoSockets[..1];
+        engine.Multi.Performing = () => engine.Multi.WaitSockets = TwoSockets;
+        engine.Multi.PerformResults.Enqueue((CurlMultiCode.Ok, 2));
+        var run = new PortRun(engine, 2405, "http://x/2405");
+
+        LibTestResult result = await new Lib2405().RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, result.ExitCode, run.Error.ToString());
+        Assert.AreEqual(string.Empty, run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task Lib2405_WhenTheAddedHandlesWaitFdsFails_Fails()
     {
         var engine = new FakeCurlEngine();
