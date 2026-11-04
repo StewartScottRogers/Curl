@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4831 — Fix AF-0649: Upload glob (later match) test named Exits26 asserts exit 25
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test at Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs:449 already asserts `CurlExitCode.ReadError` (26) and stdout `http://h/g/nosuchfile 26`, so its name and its assertions agree. An earlier change fixed it after the audit snapshot, so no code change was needed. The reproduction now prints `Assert.AreEqual((int)CurlExitCode.ReadError, exitCode);`.
+- On 2026-11-04 `dotnet build` was clean and the fast tests passed (dotnet test exit 0).
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. Upload glob later-match Exits26 test already asserts exit 26 (ReadError); name and assertion agree
