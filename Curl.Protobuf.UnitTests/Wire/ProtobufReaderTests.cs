@@ -34,7 +34,7 @@ public sealed class ProtobufReaderTests
     }
 
     [TestMethod]
-    public void TryReadFixed_TooFewBytes_IsTruncatedFixed()
+    public void ReadFixed_TooFewBytes_IsTruncatedFixed()
     {
         Assert.AreEqual(ProtobufDecodeError.TruncatedFixed, new ProtobufReader(new byte[3]).ReadFixed32(out _));
         Assert.AreEqual(ProtobufDecodeError.TruncatedFixed, new ProtobufReader(new byte[7]).ReadFixed64(out _));
@@ -181,7 +181,7 @@ public sealed class ProtobufReaderTests
     }
 
     [TestMethod]
-    public void TryReadPacked_TruncatedElement_IsTheElementsError()
+    public void ReadPacked_TruncatedElement_IsTheElementsError()
     {
         Assert.AreEqual(ProtobufDecodeError.TruncatedVarint, ProtobufReader.ReadPackedVarints(new byte[] { 0x01, 0x80 }, new List<ulong>()));
         Assert.AreEqual(ProtobufDecodeError.TruncatedFixed, ProtobufReader.ReadPackedFixed32(new byte[5], new List<uint>()));

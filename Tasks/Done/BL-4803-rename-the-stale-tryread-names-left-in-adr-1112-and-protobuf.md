@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions/ADR-1112-dynamic-protobuf-messages-hold-boxed-values-by-field-and-decode-to-the-wire-codecs-errors.md, Curl.Protobuf.UnitTests/Wire/ProtobufReaderTests.cs]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4803 — Rename the stale TryRead names left in ADR-1112 and ProtobufReaderTests
 
@@ -27,14 +27,17 @@ CLAUDE.md's "say what it does" rule makes a stale name a defect: an agent readin
 
 ## Acceptance criteria
 
-- [ ] ADR-1112 names `ReadFieldValue` (a note saying the method was renamed from `TryReadFieldValue` is fine).
-- [ ] The two tests are renamed with a `Read` prefix (`ReadFixed_...`, `ReadPacked_...`).
-- [ ] `git grep -n "TryRead" -- Curl.Protobuf.* Documentation/Planning/Decisions/ADR-1112-*` finds nothing that names a `ProtobufReader` method.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] ADR-1112 names `ReadFieldValue` (a note saying the method was renamed from `TryReadFieldValue` is fine).
+- [x] The two tests are renamed with a `Read` prefix (`ReadFixed_...`, `ReadPacked_...`).
+- [x] `git grep -n "TryRead" -- Curl.Protobuf.* Documentation/Planning/Decisions/ADR-1112-*` finds nothing that names a `ProtobufReader` method.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+The remaining `TryRead` names in Curl.Protobuf.* belong to ProtoFileSetReader, IProtoFileReader and the JSON time helpers, not ProtobufReader. The fast tests of Curl.Protobuf.UnitTests pass (439); no production code changed.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 7b8acaed 97d85d25 128ab524 3d836d5e.
+- 2026-11-03: Doing -> Done. Renamed the stale TryRead names; build and fast tests green
