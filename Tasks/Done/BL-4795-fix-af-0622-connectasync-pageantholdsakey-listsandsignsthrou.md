@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Ssh.UnitTests]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4795 — Fix AF-0622: ConnectAsync_PageantHoldsAKey_ListsAndSignsThroughTheMapping checks the signature it names only for null
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now rebuilds the agent's key with SshPrivateKeyReader and compares, byte for byte, the sign request the agent received through the mapping (agent.Requests[1]) and the returned signature blob (method + signature) with key.Sign("ssh-rsa", [1, 2, 3]); Assert.IsNotNull(signature) is gone, so the reproduction finds no match.
+- Test-only change in Curl.Ssh.UnitTests: no production code, so no quality run; that project's fast tests (1011) pass. The test uses a scripted Pageant window and is platform-neutral.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-03: Doing -> Done. Test compares the sign request and signature bytes with the agent's
