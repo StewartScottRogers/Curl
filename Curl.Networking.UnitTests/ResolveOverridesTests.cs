@@ -1,5 +1,6 @@
 using System.Net;
 
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Networking;
@@ -256,6 +257,13 @@ public sealed class ResolveOverridesTests
         Diagnostics.Assert("parse error", $"Could not parse CURLOPT_RESOLVE entry '{entry}'", overrides.ParseError);
 
         Assert.AreEqual($"Could not parse CURLOPT_RESOLVE entry '{entry}'", overrides.ParseError);
+
+        var destination = new ConnectToMappings([]).Map("a", 80);
+        var code = overrides.ParseFailureCodeWith(destination);
+
+        Diagnostics.Act("exit code", code);
+        Diagnostics.Assert("exit code", CurlExitCode.SetoptOptionSyntax, code);
+        Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, code);
     }
 
     [TestMethod]

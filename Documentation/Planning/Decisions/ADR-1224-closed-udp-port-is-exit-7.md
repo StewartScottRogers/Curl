@@ -12,7 +12,7 @@ let the `SocketException` escape to the console's guard, which printed it as exi
 ## Decision
 
 `UdpDatagramConnector` wraps every channel it opens in `PortUnreachableReportingDatagramChannel`,
-which turns a `ConnectionReset` or `ConnectionRefused` from a send or receive into a
+which turns a `ConnectionReset` or `ConnectionRefused` from a send or receive, only until the channel has received its first datagram (BL-4675; a port that refuses after the server has answered passes through unchanged for the handler), into a
 `DatagramPortUnreachableException` carrying the connector's own exit 7 text,
 `Failed to connect to <host>:<port>[ via <host>:<port>] after <n> ms: Could not connect to server`,
 `n` measured from the open. The exception derives from `SocketException` and keeps the socket error,

@@ -83,7 +83,7 @@ public sealed class CurlGlobalTests
         Assert.AreEqual(CurlGlobalFlags.Default, library.Flags);
 
         var transfer = library.CreateEasyTransfer();
-        Assert.IsNotNull(transfer);
+        Assert.IsInstanceOfType<ManagedEasyTransfer>(transfer);
         await transfer.DisposeAsync();
 
         await library.DisposeAsync();

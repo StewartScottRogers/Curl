@@ -28,32 +28,32 @@ internal static class ProtobufJsonScalars
     };
 
     /// <summary>Reads a scalar of the kind from a JSON value; integers and floating point numbers are accepted as numbers or strings.</summary>
-    public static ProtobufJsonError TryRead(JsonElement element, DynamicValueKind kind, out object? value)
+    public static ProtobufJsonError Read(JsonElement element, DynamicValueKind kind, out object? value)
     {
         switch (kind)
         {
             case DynamicValueKind.Double or DynamicValueKind.Float:
-                return TryReadFloatingPoint(element, kind, out value);
+                return ReadFloatingPoint(element, kind, out value);
             case DynamicValueKind.Bool:
-                return TryReadBool(element, out value);
+                return ReadBool(element, out value);
             case DynamicValueKind.String:
                 return element.ValueKind == JsonValueKind.String
                     ? Succeed(element.GetString()!, out value)
                     : Fail(ProtobufJsonError.WrongType, out value);
             case DynamicValueKind.Bytes:
-                return TryReadBytes(element, out value);
+                return ReadBytes(element, out value);
             default:
-                return TryReadInteger(element, kind, out value);
+                return ReadInteger(element, kind, out value);
         }
     }
 
     /// <summary>Reads an enum value from its name as a JSON string, or from its number.</summary>
-    public static ProtobufJsonError TryReadEnum(JsonElement element, ProtoEnumDescriptor enumType, out object? value)
+    public static ProtobufJsonError ReadEnum(JsonElement element, ProtoEnumDescriptor enumType, out object? value)
     {
         if (element.ValueKind != JsonValueKind.String)
         {
             return element.ValueKind == JsonValueKind.Number
-                ? TryReadInteger(element, DynamicValueKind.Int32, out value)
+                ? ReadInteger(element, DynamicValueKind.Int32, out value)
                 : Fail(ProtobufJsonError.WrongType, out value);
         }
 
@@ -63,7 +63,7 @@ internal static class ProtobufJsonScalars
     }
 
     /// <summary>Reads a map key of the kind from a JSON member name, where every key is a string.</summary>
-    public static ProtobufJsonError TryReadMapKey(string text, DynamicValueKind kind, out object? key)
+    public static ProtobufJsonError ReadMapKey(string text, DynamicValueKind kind, out object? key)
     {
         switch (kind)
         {
@@ -74,7 +74,7 @@ internal static class ProtobufJsonScalars
                 key = text switch { "true" => true, "false" => false, _ => null };
                 return key is null ? ProtobufJsonError.InvalidValue : ProtobufJsonError.None;
             default:
-                return TryParseInteger(text, kind, out key);
+                return ParseInteger(text, kind, out key);
         }
     }
 
@@ -162,7 +162,7 @@ internal static class ProtobufJsonScalars
         }
     }
 
-    private static ProtobufJsonError TryReadBool(JsonElement element, out object? value) => element.ValueKind switch
+    private static ProtobufJsonError ReadBool(JsonElement element, out object? value) => element.ValueKind switch
     {
         JsonValueKind.True => Succeed(true, out value),
         JsonValueKind.False => Succeed(false, out value),
@@ -180,10 +180,10 @@ internal static class ProtobufJsonScalars
         _ => null,
     };
 
-    private static ProtobufJsonError TryReadInteger(JsonElement element, DynamicValueKind kind, out object? value) =>
-        NumberText(element) is { } text ? TryParseInteger(text, kind, out value) : Fail(ProtobufJsonError.WrongType, out value);
+    private static ProtobufJsonError ReadInteger(JsonElement element, DynamicValueKind kind, out object? value) =>
+        NumberText(element) is { } text ? ParseInteger(text, kind, out value) : Fail(ProtobufJsonError.WrongType, out value);
 
-    private static ProtobufJsonError TryParseInteger(string text, DynamicValueKind kind, out object? value)
+    private static ProtobufJsonError ParseInteger(string text, DynamicValueKind kind, out object? value)
     {
         var range = IntegerRanges[kind];
         var valid = decimal.TryParse(text, NumberSyntax, CultureInfo.InvariantCulture, out var number)
@@ -194,7 +194,7 @@ internal static class ProtobufJsonScalars
         return valid ? ProtobufJsonError.None : ProtobufJsonError.InvalidValue;
     }
 
-    private static ProtobufJsonError TryReadFloatingPoint(JsonElement element, DynamicValueKind kind, out object? value)
+    private static ProtobufJsonError ReadFloatingPoint(JsonElement element, DynamicValueKind kind, out object? value)
     {
         if (NumberText(element) is not { } text)
         {
@@ -228,7 +228,7 @@ internal static class ProtobufJsonScalars
         return ProtobufJsonError.None;
     }
 
-    private static ProtobufJsonError TryReadBytes(JsonElement element, out object? value)
+    private static ProtobufJsonError ReadBytes(JsonElement element, out object? value)
     {
         if (element.ValueKind != JsonValueKind.String)
         {

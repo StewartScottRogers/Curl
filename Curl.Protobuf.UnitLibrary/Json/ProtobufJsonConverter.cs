@@ -7,7 +7,7 @@ namespace Curl.Protobuf.Json;
 public static class ProtobufJsonConverter
 {
     /// <summary>Converts UTF-8 JSON to the binary form of a message of this type; the binary is null unless the error is <see cref="ProtobufJsonError.None" />.</summary>
-    public static ProtobufJsonError TryConvertJsonToBinary(DynamicMessageType type, ReadOnlyMemory<byte> json, out byte[]? binary)
+    public static ProtobufJsonError ConvertJsonToBinary(DynamicMessageType type, ReadOnlyMemory<byte> json, out byte[]? binary)
     {
         var error = ProtobufJsonParser.Parse(type, json, out var message);
         binary = message is null ? null : DynamicMessageEncoder.Encode(message);
@@ -19,9 +19,9 @@ public static class ProtobufJsonConverter
     /// error is <see cref="ProtobufJsonError.None" />. A Timestamp or Duration outside its type's
     /// range, or an Any whose type URL names no type of the catalogue or whose value is not a message of that type, has no JSON form and is <see cref="ProtobufJsonError.InvalidValue" />.
     /// </summary>
-    public static ProtobufJsonError TryConvertBinaryToJson(DynamicMessageType type, ReadOnlyMemory<byte> binary, bool indented, out string? json)
+    public static ProtobufJsonError ConvertBinaryToJson(DynamicMessageType type, ReadOnlyMemory<byte> binary, bool indented, out string? json)
     {
-        var error = DynamicMessageDecoder.TryDecode(type, binary, out var message);
+        var error = DynamicMessageDecoder.Decode(type, binary, out var message);
         json = null;
         if (message is not null && !TryFormat(message, indented, out json))
         {

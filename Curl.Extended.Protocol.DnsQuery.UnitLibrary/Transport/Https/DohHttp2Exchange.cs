@@ -26,9 +26,25 @@ internal static class DohHttp2Exchange
     /// <returns>The answer's octets.</returns>
     /// <exception cref="DnsQueryException">
     /// The status is not 200 (exit 22), the response is malformed or carries no DNS message (exit 8), or the stream
-    /// ended or the connection closed before the whole response arrived (exit 56).
+    /// ended or the connection closed before the whole response arrived, including a reset or GOAWAY (exit 56); an HTTP/2 or HPACK error, or an answer over 65535 octets, is exit 8.
     /// </exception>
     public static async ValueTask<byte[]> ExchangeAsync(IConnection connection, string host, int port, byte[] query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await ExchangeCoreAsync(connection, host, port, query, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception failure) when (failure is Http2StreamResetException or Http2GoAwayException or EndOfStreamException)
+        {
+            throw new DnsQueryException(CurlExitCode.RecvError, $"The DoH server's HTTP/2 connection failed before its whole answer arrived: {failure.Message}");
+        }
+        catch (Exception failure) when (failure is Http2ProtocolException or HpackDecodingException)
+        {
+            throw DohResponseHead.Malformed($"The DoH server's HTTP/2 response is malformed: {failure.Message}");
+        }
+    }
+
+    private static async ValueTask<byte[]> ExchangeCoreAsync(IConnection connection, string host, int port, byte[] query, CancellationToken cancellationToken)
     {
         Http2Connection http2 = new(new DohConnectionStream(connection));
         await http2.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
@@ -61,7 +77,7 @@ internal static class DohHttp2Exchange
             }
             else if (frame.Type == Http2FrameType.Data)
             {
-                body.AddRange(frame.Content.Span);
+                AppendWithinLimit(body, frame.Content.Span);
             }
 
             if (frame.IsEndStream)
@@ -71,6 +87,17 @@ internal static class DohHttp2Exchange
         }
 
         throw Closed();
+    }
+
+    /// <summary>Appends DATA to the answer, refusing (exit 8) before the answer would pass a DNS message's 65535 octets.</summary>
+    private static void AppendWithinLimit(List<byte> body, ReadOnlySpan<byte> data)
+    {
+        if (body.Count + data.Length > DohResponseHead.MaxMessageLength)
+        {
+            throw DohResponseHead.Malformed($"The DoH server's answer is longer than a DNS message's {DohResponseHead.MaxMessageLength} octets");
+        }
+
+        body.AddRange(data);
     }
 
     /// <summary>Reads a response head's fields; gives <see langword="null" /> for an informational response.</summary>

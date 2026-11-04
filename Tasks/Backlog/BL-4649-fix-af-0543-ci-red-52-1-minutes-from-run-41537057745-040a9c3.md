@@ -47,6 +47,12 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Notes
 
+- Cause found: lane 7's run of BL-4545 did run Measure-CodeQuality.ps1 for Curl.Conformance.Extended.UnitLibrary (BL-4545-20261102-095114-L7.jsonl: four runs exited 1). It judged the two members still outside a gate, `Amqp1ReferenceContainer.Accepts` and `AnswerAsync`, as BL-4546's and committed them anyway. The trace's "quality ok" only meant the shell command ran, since the run appended `echo exit $?`. Nothing in the factory measured the gates before the push.
+- Fix: ac11d86f4, pushed to work/dark-factory 2026-11-03 11:09:35 Arizona (18:09:35Z). Before taking the integrate lock, a lane runs Measure-CodeQuality.ps1 for the gated libraries whose C# files its commits change (`Test-QualityGates`, DarkFactory/Integrate.ps1). If a member of a changed file is outside a gate, a finished task gets one headless repair run (`Repair-QualityGates`, `$QualityRepairPrompt` in DarkFactory/Prompts.ps1); otherwise the work does not integrate and is parked. Members of files the lane left alone do not count. RunDarkFactory.ps1's help says so. Red time after a fix is also cut by BL-4647's 73fa18c5a and BL-4716's 5469c7711. `-TestIntegrateLock` 23/23 PASS under Windows PowerShell 5.1 and pwsh 7.
+- Evidence still owed: the window starts at 2026-11-03T18:09:35Z and needs shift logs and CI runs after it, so the task waits in Backlog for an interactive session to run the measurement.
+
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-03: Doing -> Backlog. Fix landed (ac11d86f4 at 2026-11-03 11:09 Arizona); the post-fix measurement needs shift logs and CI runs after it, so it waits in Backlog per its criterion.

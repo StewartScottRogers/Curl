@@ -204,7 +204,9 @@ public sealed partial class NtlmHttpAuthenticatorTests
 
         diagnostics.Act("exception", failure.Message);
         diagnostics.Act("verbose lines", string.Join(" | ", events.Info));
+        diagnostics.Assert("exit code", CurlExitCode.TooLarge, failure.ExitCode);
         diagnostics.Assert("verbose line count", 0, events.Info.Count);
+        Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
         Assert.IsEmpty(events.Info);
     }
 

@@ -152,9 +152,11 @@
     each) and the lane resumes its task from the work in its worktree, first integrating
     any finished commits it had not pushed. A new shift adopts a stopped shift's lanes the
     same way instead of refusing to start over their tasks in Doing. A task in Doing that
-    no lane holds (BL-1071) is adopted by the one lane worktree with uncommitted work, or,
-    when none has any and a parked factory/<ID>-lane-* branch holds its work, returned to
-    Backlog; anything else refuses to start, and every refusal raises the alarm, so the
+    no lane holds (BL-1071) is adopted by the lane worktree with uncommitted work whose newest
+    run log names it, or the one dirty lane with no run log (BL-4650); when none has any and
+    a parked factory/<ID>-lane-* branch holds its work, or no work for it exists, it returns to
+    Backlog; one whose work cannot be told apart is Blocked, every candidate kept, rather than
+    refusing the shift (BL-4715). Any other trouble refuses to start, and every refusal raises the alarm, so the
     factory never stops without saying why. A coordinator whose clean checkout is only
     behind origin/<branch> fast-forwards it and starts (BL-1141); one that is ahead of it
     or has diverged from it refuses. A run that dies on
@@ -313,7 +315,11 @@
                  resolves in all, and only a rebase made under the lock is pushed
                  (BL-2967). -TestIntegrateLock proves it. A finished task whose build or tests go red on the rebased
                  tree gets one headless repair run there, still holding the lock,
-                 traced as "repair" (AF-0051). Work that still will not integrate is pushed to its own branch,
+                 traced as "repair" (AF-0051). Before taking the lock, commits that change a
+                 C# file of a project held to the quality gates are measured with
+                 Measure-CodeQuality.ps1 for those libraries, traced as "quality"; a member of
+                 a file they changed outside a gate gets one headless repair run for a
+                 finished task, and otherwise does not integrate (BL-4649, AF-0543). Work that still will not integrate is pushed to its own branch,
                  factory/<ID>-lane-<n>-<stamp>, and the task goes back to Backlog on the
                  shared branch, retried for several minutes; a park whose move is never
                  pushed is in the lane's summary and the end-of-shift report (BL-1071).
@@ -575,8 +581,8 @@ param(
     [switch]$TestLaneMarker,
     # Prove, on a throwaway repository, that a park pushes its move to Backlog or reports
     # that it could not, how shift start settles a task in Doing held by no lane (adopted,
-    # or back to Backlog when no work for it exists, refused only when a lane branch holds
-    # commits beyond the shift branch), that a claim past the shift's end is released to
+    # or back to Backlog when no work for it exists, Blocked with its candidates kept when a
+    # lane branch holds commits beyond the shift branch), that a claim past the shift's end is released to
     # Backlog, and that a refused start raises the alarm (BL-1071, BL-4347), and exit.
     [switch]$TestPark,
     # Prove, on a throwaway repository, that a claim applies its task's own shift stash and

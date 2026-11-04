@@ -211,16 +211,20 @@ public sealed partial class CurlCompositionTests
                 .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: false)
                 .RunAsync([new Uri(path).AbsoluteUri]);
 
-            string expectedMeter = string.Concat(ProgressMeterLines.HeaderLines(null).Append(ProgressMeterLines.ZeroStatusLine).Select(line => line + Environment.NewLine));
+            // The composition runs on the real clock, so a slow runner that takes a second
+            // or more adds a refreshed status line ("\r  0 ... 00:01 ...") before the final
+            // newline (BL-4732). The meter is pinned up to its first status line, and the
+            // rest must be status lines only, ended by one newline.
+            string expectedMeterStart = string.Concat(ProgressMeterLines.HeaderLines(null).Select(line => line + Environment.NewLine)) + ProgressMeterLines.ZeroStatusLine;
             string actualMeter = Encoding.UTF8.GetString(standardError.ToArray());
             Diagnostics.Act("exit code", exitCode);
             Diagnostics.Act("standard error", actualMeter.ReplaceLineEndings("\\n"));
             Diagnostics.Assert("exit code", 0, exitCode);
-            Diagnostics.Assert("standard error", expectedMeter.ReplaceLineEndings("\\n"), actualMeter.ReplaceLineEndings("\\n"));
+            Diagnostics.Assert("standard error starts with", expectedMeterStart.ReplaceLineEndings("\\n"), actualMeter.ReplaceLineEndings("\\n"));
             Assert.AreEqual(0, exitCode);
-            Assert.AreEqual(
-                string.Concat(ProgressMeterLines.HeaderLines(null).Append(ProgressMeterLines.ZeroStatusLine).Select(line => line + Environment.NewLine)),
-                Encoding.UTF8.GetString(standardError.ToArray()));
+            Assert.StartsWith(expectedMeterStart, actualMeter);
+            Assert.EndsWith(Environment.NewLine, actualMeter);
+            Assert.DoesNotContain(Environment.NewLine, actualMeter[expectedMeterStart.Length..^Environment.NewLine.Length]);
         }
         finally
         {

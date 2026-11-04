@@ -117,7 +117,7 @@ public sealed class ProtobufJsonTimeTypesTests
     {
         var binary = DynamicMessageEncoder.Encode(WithTime("at", 0, -1));
 
-        var error = ProtobufJsonConverter.TryConvertBinaryToJson(Times, binary, indented: false, out var json);
+        var error = ProtobufJsonConverter.ConvertBinaryToJson(Times, binary, indented: false, out var json);
 
         Assert.AreEqual(ProtobufJsonError.InvalidValue, error);
         Assert.IsNull(json);
@@ -126,7 +126,7 @@ public sealed class ProtobufJsonTimeTypesTests
     [TestMethod]
     public void TryConvertJsonToBinary_TimestampAndDuration_AreTheirMessages()
     {
-        var error = ProtobufJsonConverter.TryConvertJsonToBinary(Times, Encoding.UTF8.GetBytes("""{"at":"1970-01-01T00:00:01Z","took":"1.5s"}"""), out var binary);
+        var error = ProtobufJsonConverter.ConvertJsonToBinary(Times, Encoding.UTF8.GetBytes("""{"at":"1970-01-01T00:00:01Z","took":"1.5s"}"""), out var binary);
 
         Assert.AreEqual(ProtobufJsonError.None, error);
         Assert.AreEqual("0A020801120808011080CAB5EE01", Convert.ToHexString(binary!));

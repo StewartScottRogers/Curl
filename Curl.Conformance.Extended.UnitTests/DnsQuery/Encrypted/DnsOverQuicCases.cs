@@ -128,9 +128,9 @@ public sealed class DnsOverQuicCases
 
             CurlRunResult result = await RunAsync(server, 53, "-k", "dns://localhost:53/example.com");
 
-            Assert.AreNotEqual(0, result.ExitCode);
-            Assert.IsEmpty(result.StandardOutput);
+            AssertFailed(result, 7, "DNS over QUIC must not use UDP port 53 (RFC 9250 section 4.1.1)");
             Assert.IsFalse(server.IsHandshakeComplete);
+            Assert.IsEmpty(server.Received);
         });
 
     internal static DoqReferenceServer Server(X509Certificate2 certificate, DnsReferenceResponder respond, ulong? closeCode = null) =>

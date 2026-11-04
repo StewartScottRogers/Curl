@@ -14,6 +14,25 @@ driven from a unit test without touching a network. The only dependency of the c
 the .NET base class library, the MCP server `Curl.Mcp` included (hand-written, ADR-0799);
 the only package in the solution is `MSTest`, for the tests.
 
+## Protocols
+
+Curl serves two groups of URL schemes, each protocol in its own class library.
+
+- **Original**, curl's own, behaving like upstream curl: `http`, `https`, `ftp`, `ftps`,
+  `file`, `dict`, `gopher`, `gophers`, `imap`, `imaps`, `ldap`, `ldaps`, `mqtt`, `mqtts`,
+  `pop3`, `pop3s`, `rtsp`, `scp`, `sftp`, `smb`, `smbs`, `smtp`, `smtps`, `telnet`,
+  `tftp`, `ws` and `wss`.
+- **Extended**, schemes Curl adds that curl refuses: `amqp`, `amqps`, `amqp1`, `amqp1s`,
+  `az`, `abfs`, `abfss`, `coap`, `coaps`, `dns`, `gs`, `grpc`, `grpcs`, `kafka`, `kafkas`,
+  `mcp`, `mcps`, `mcp+stdio`, `mqtt5`, `mqtt5s`, `mqtt5+ws`, `nats`, `natss`, `oci`,
+  `redis`, `rediss`, `s3`, `signalr`, `signalrs`, `socketio`, `socketios`, `stomp`,
+  `stomps`, `webtransport`, `xmpp` and `xmpps`, plus any scheme served by a
+  `curl-proto-<scheme>` helper program on `PATH`. `CURL_EXTENSIONS=0` switches every
+  Extended protocol off.
+
+[Summary of every protocol](Documentation/Protocols.md): its schemes, specification,
+library and tests.
+
 
 <a href="https://stewartscottrogers.github.io/Curl/" target="_blank"><img src="https://github.com/StewartScottRogers/Curl/raw/gource/gource.gif" alt="Gource animation of Curl's commit history across every branch - click to watch in 4K, full screen" width="800"></a>
 
@@ -166,6 +185,7 @@ RunDarkFactory.cmd -Hours 4 -MaxTasks 3
 ## Read more
 
 - [Download and install](DOWNLOAD.md) - every supported platform, installers and checksums
+- [Protocols](Documentation/Protocols.md) - every Original and Extended protocol: schemes, specification, library and tests
 - [Product overview](Documentation/Product/Product-Overview.md) - scope, architecture and roadmap
 - [Libcurl and Curl.Api plan](Documentation/Planning/Curl-Api-And-libcurl.md) - the two .NET APIs, their phases and their libcurl inventory
 - [Task board](Tasks/README.md) - what is being worked on, one Markdown file per task

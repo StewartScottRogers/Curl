@@ -28,10 +28,10 @@ internal static class ProtobufJsonWrapperTypes
     }
 
     /// <summary>Reads the wrapped value into the wrapper message.</summary>
-    public static ProtobufJsonError TryRead(JsonElement element, DynamicMessage message)
+    public static ProtobufJsonError Read(JsonElement element, DynamicMessage message)
     {
         var field = message.Type.FindField(1)!;
-        var error = ProtobufJsonScalars.TryRead(element, field.Kind, out var value);
+        var error = ProtobufJsonScalars.Read(element, field.Kind, out var value);
         if (error == ProtobufJsonError.None)
         {
             message.SetSingular(field, value!);

@@ -97,6 +97,7 @@ public sealed class WebDavSyncTransferHookTests
 
         var result = await Hook().ExecuteAsync(Context(new MemoryStream()), Answer);
 
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
         Assert.AreEqual("The server answered GET /dav/a.txt with 0", result.ErrorMessage);
     }
 

@@ -60,9 +60,15 @@ function Get-OrphanAction {
     # refuse, saying why, when a lane branch holds commits beyond the shift branch, since
     # which lane's work they are cannot be told. -DirtyLanes are the lanes not already
     # adopted whose worktrees have uncommitted work; -LaneBranchesAhead the factory/lane-<n>
-    # branches with commits the shift branch lacks.
-    param([string]$Id, [string[]]$ParkedBranches, [int[]]$DirtyLanes, [string[]]$LaneBranchesAhead = @())
+    # branches with commits the shift branch lacks. -LaneLastTask maps a lane to the task its
+    # newest run log names (Get-LaneLastRunTask): a dirty lane whose last run was $Id is
+    # adopted, and one whose last run was another task holds that task's work, never $Id's,
+    # so it is no candidate (BL-4650, AF-0544: lane 1 adopted lane 2's task over its own work).
+    param([string]$Id, [string[]]$ParkedBranches, [int[]]$DirtyLanes, [string[]]$LaneBranchesAhead = @(), [hashtable]$LaneLastTask = @{})
     $dirty = @($DirtyLanes | Where-Object { $_ })
+    $own = @($dirty | Where-Object { $LaneLastTask[[int]$_] -eq $Id })
+    if ($own.Count) { return [pscustomobject]@{ Action = 'adopt'; Lane = $own[0]; Branch = ''; Why = '' } }
+    $dirty = @($dirty | Where-Object { -not $LaneLastTask[[int]$_] })
     if ($dirty.Count -eq 1) { return [pscustomobject]@{ Action = 'adopt'; Lane = $dirty[0]; Branch = ''; Why = '' } }
     if ($dirty.Count -gt 1) {
         return [pscustomobject]@{ Action = 'refuse'; Lane = 0; Branch = ''; Why = "$Id is in Doing and held by no lane, and lanes $($dirty -join ', ') have uncommitted work; which one is its work cannot be told" }
@@ -74,6 +80,38 @@ function Get-OrphanAction {
         return [pscustomobject]@{ Action = 'refuse'; Lane = 0; Branch = ''; Why = "$Id is in Doing and held by no lane, no parked branch factory/$Id-lane-* exists, and lane branches $($ahead -join ', ') have commits beyond the shift branch, or git could not say; which one is its work cannot be told" }
     }
     return [pscustomobject]@{ Action = 'backlog'; Lane = 0; Branch = ''; Why = '' }
+}
+
+function Get-OrphanBlockReason {
+    # An orphan Get-OrphanAction cannot place goes to Blocked rather than refusing the shift
+    # (BL-4715, AF-0567: two refused starts over BL-2969 kept the CI watch off for 32 minutes).
+    # Its candidate work is kept first, since starting lanes resets their branches and stashes
+    # their worktrees: each lane branch in -LaneBranchesAhead is copied to
+    # factory/<Id>-lane-<n>-<Stamp>, a parked branch Get-ParkedBranches finds. Returns the
+    # Blocked reason, naming -Why, the copies and where each dirty lane's work goes.
+    param([string]$Id, [string]$Why, [int[]]$DirtyLanes = @(), [string[]]$LaneBranchesAhead = @(), [string]$Repo = $Root, [string]$ForStamp = $Stamp)
+    $kept = @()
+    foreach ($ref in @($LaneBranchesAhead | Where-Object { $_ -match '^factory/lane-(\d+)$' })) {
+        $copy = "factory/$Id-lane-$($Matches[1])-$ForStamp"
+        git -C $Repo branch -f $copy $ref 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) { $kept += "$ref is kept as $copy" } else { $kept += "$ref could not be copied (git branch failed); its reflog still holds it" }
+    }
+    $dirty = @($DirtyLanes | Where-Object { $_ })
+    if ($dirty.Count) { $kept += "uncommitted work of lane $($dirty -join ', ') is stashed when each lane starts (git stash list: darkfactory lane-<n> before $ForStamp)" }
+    $where = if ($kept.Count) { " Kept: $($kept -join '; ')." } else { '' }
+    return "Blocked at shift start instead of refusing the shift: $Why.$where Claude (an interactive session) finds the task's work among these, moves it to Backlog naming it, or Backlog with no work."
+}
+
+function Get-LaneLastRunTask {
+    # The task lane $N ran last, by its newest run log in $Dir (BL-<id>-<stamp>-L<n>.jsonl, or
+    # its -resumed run), or '' when the lane has none. Get-OrphanAction reads it to tell whose
+    # work a dirty lane worktree holds (BL-4650).
+    param([int]$N, [string]$Dir = $LogDir)
+    $pattern = '^(BL-\d+)-\d{8}-\d{6}-L' + $N + '(-resumed)?\.jsonl$'
+    $newest = Get-ChildItem $Dir -Filter "BL-*-L$N*.jsonl" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match $pattern } |
+        Sort-Object LastWriteTimeUtc | Select-Object -Last 1
+    if ($newest -and $newest.Name -match $pattern) { return $Matches[1] }
+    return ''
 }
 
 $UnknownLaneBranches = '(git could not say which lane branches are ahead)'
@@ -236,6 +274,18 @@ if ($TestPark) {
             Set-Content -Path (Join-Path $repo 'half-done.txt') -Value 'half'
             $a = Get-OrphanAction -Id 'BL-002' -ParkedBranches (Get-ParkedBranches 'BL-002' $repo) -DirtyLanes @(@(9) | Where-Object { Test-WorktreeDirty $repo })
             "$($a.Action) $($a.Lane)" })
+        ,@('an orphan is not adopted by the one dirty lane whose last run was another task (AF-0544)', "backlog ''", {
+            $a = Get-OrphanAction -Id 'BL-2969' -ParkedBranches @() -DirtyLanes @(1) -LaneLastTask @{ 1 = 'BL-4507' }
+            "$($a.Action) '$($a.Branch)'" })
+        ,@('an orphan is adopted by the dirty lane whose last run was it, over a dirty lane with no run log', 'adopt 2', {
+            $a = Get-OrphanAction -Id 'BL-2969' -ParkedBranches @() -DirtyLanes @(1, 2) -LaneLastTask @{ 2 = 'BL-2969' }
+            "$($a.Action) $($a.Lane)" })
+        ,@('a lane''s last run task is named by its newest run log, resumed runs included, and is empty with none', 'BL-7 BL-9 ''''', {
+            $logs = Join-Path $temp 'runlogs'; New-Item -ItemType Directory -Force -Path $logs | Out-Null
+            $old = Join-Path $logs 'BL-5-20261102-083146-L1.jsonl'; Set-Content $old 'x'; (Get-Item $old).LastWriteTimeUtc = [datetime]'2026-11-02T10:00:00Z'
+            $new = Join-Path $logs 'BL-7-20261102-083146-L1-resumed.jsonl'; Set-Content $new 'x'; (Get-Item $new).LastWriteTimeUtc = [datetime]'2026-11-02T11:00:00Z'
+            Set-Content (Join-Path $logs 'BL-9-20261102-083146-L12.jsonl') 'x'
+            "$(Get-LaneLastRunTask 1 $logs) $(Get-LaneLastRunTask 12 $logs) '$(Get-LaneLastRunTask 3 $logs)'" })
         ,@('an orphan with no work anywhere goes to Backlog with no branch', "backlog ''", {
             $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches (Get-ParkedBranches 'BL-003' $repo) -DirtyLanes @() -LaneBranchesAhead (Get-LaneBranchesAhead 'work' $repo)
             "$($a.Action) '$($a.Branch)'" })
@@ -247,6 +297,11 @@ if ($TestPark) {
             git -C $repo checkout -q work 2>&1 | Out-Null
             $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches @() -DirtyLanes @() -LaneBranchesAhead (Get-LaneBranchesAhead 'work' $repo)
             "$($a.Action) $(if ($a.Why -match 'lane branches (factory/lane-9) have commits') { "lane branches $($Matches[1])" } else { $a.Why })" })
+        ,@('an orphan that cannot be placed is Blocked, not a refused shift: the lane branch is kept as a parked branch and the dirty lanes named (AF-0567)', 'kept factory/BL-003-lane-9-test parked lanes 2, 3 named Blocked instead of refusing', {
+            $a = Get-OrphanAction -Id 'BL-003' -ParkedBranches @() -DirtyLanes @() -LaneBranchesAhead (Get-LaneBranchesAhead 'work' $repo)
+            $why = Get-OrphanBlockReason -Id 'BL-003' -Why $a.Why -DirtyLanes @(2, 3) -LaneBranchesAhead (Get-LaneBranchesAhead 'work' $repo) -Repo $repo -ForStamp 'test'
+            $same = (git -C $repo rev-parse 'factory/BL-003-lane-9-test' 2>$null) -eq (git -C $repo rev-parse 'factory/lane-9' 2>$null)
+            "$(if ($same -and $why -match 'kept as (factory/BL-003-lane-9-test)') { "kept $($Matches[1])" } else { "'$why'" }) $(if ((Get-ParkedBranches 'BL-003' $repo) -contains 'factory/BL-003-lane-9-test') { 'parked' } else { 'not parked' }) $(if ($why -match 'lane (2, 3) is stashed') { "lanes $($Matches[1]) named" } else { 'lanes not named' }) $(if ($why -match '^Blocked at shift start instead of refusing the shift') { 'Blocked instead of refusing' } else { 'no' })" })
         ,@('a refused start raises the alarm with its reason', 'SHIFT REFUSED  BL-003 is in Doing', {
             $script:Alarmed = @()
             Stop-ShiftStart -Why 'BL-003 is in Doing' -Notify $quiet

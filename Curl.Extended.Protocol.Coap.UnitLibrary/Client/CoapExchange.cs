@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using Curl.Extended.Protocol.Coap.Wire;
 using Curl.Protocol.Abstractions;
 
@@ -46,7 +47,7 @@ internal sealed class CoapExchange(IDatagramChannel channel, TimeProvider timePr
     /// <param name="initialTimeout">The first retransmission timeout, ACK_TIMEOUT times a random factor between 1 and ACK_RANDOM_FACTOR.</param>
     /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <returns>The response.</returns>
-    /// <exception cref="CoapException">The server reset the request (exit 56) or did not answer in time (exit 28).</exception>
+    /// <exception cref="CoapException">The server reset the request (exit 56), the socket failed (exit 55 sending, 56 receiving) or the server did not answer in time (exit 28).</exception>
     public async ValueTask<CoapMessage> RunAsync(CoapMessage request, TimeSpan initialTimeout, CancellationToken cancellationToken)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -82,7 +83,7 @@ internal sealed class CoapExchange(IDatagramChannel channel, TimeProvider timePr
                 continue;
             }
 
-            CoapMessage? message = Decoded(buffer.AsSpan(0, (await receive.ConfigureAwait(false)).Length));
+            CoapMessage? message = Decoded(buffer.AsSpan(0, (await ReceivedAsync(receive).ConfigureAwait(false)).Length));
             Reply reply = Classify(request, message);
             await AnswerAsync(message, reply, stop).ConfigureAwait(false);
             switch (reply)
@@ -176,6 +177,29 @@ internal sealed class CoapExchange(IDatagramChannel channel, TimeProvider timePr
         return message.Token.AsSpan().SequenceEqual(request.Token) ? Reply.Response : Reply.Ignored;
     }
 
-    private ValueTask SendAsync(byte[] datagram, CancellationToken stop) =>
-        channel.SendAsync(datagram, channel.ServerEndPoint, stop);
+    /// <summary>Gives the datagram a receive got; a socket error (a refusal after a datagram was received, say) ends with exit 56.</summary>
+    private static async ValueTask<DatagramReceived> ReceivedAsync(Task<DatagramReceived> receive)
+    {
+        try
+        {
+            return await receive.ConfigureAwait(false);
+        }
+        catch (SocketException exception)
+        {
+            throw new CoapException(CurlExitCode.RecvError, $"CoAP receive failed: {exception.Message}");
+        }
+    }
+
+    /// <summary>Sends a datagram to the server; a socket error ends with exit 55.</summary>
+    private async ValueTask SendAsync(byte[] datagram, CancellationToken stop)
+    {
+        try
+        {
+            await channel.SendAsync(datagram, channel.ServerEndPoint, stop).ConfigureAwait(false);
+        }
+        catch (SocketException exception)
+        {
+            throw new CoapException(CurlExitCode.SendError, $"CoAP send failed: {exception.Message}");
+        }
+    }
 }

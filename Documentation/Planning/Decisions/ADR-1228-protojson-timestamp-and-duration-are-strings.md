@@ -21,7 +21,7 @@ gRPC, so there is no curl output to measure; the rules follow the specification 
   at most 315,576,000,000 seconds, an optional "." and 1 to 9 digits, then "s". Any other string is
   `InvalidValue`, any other JSON kind `WrongType`.
 - A value outside its type's range (from the wire) has no JSON form: `ProtobufJsonFormatter.Format` throws
-  `FormatException`, which `ProtobufJsonConverter.TryConvertBinaryToJson` reports as `InvalidValue`, as protobuf's
+  `FormatException`, which `ProtobufJsonConverter.ConvertBinaryToJson` reports as `InvalidValue`, as protobuf's
   printer fails rather than printing a wrong time.
 - Parsing is by hand with `DateTime.TryParseExact` and `TimeSpan.TryParseExact`, not a source-generated regex,
   whose generated code would fall under the library's coverage and complexity gates.
@@ -29,4 +29,6 @@ gRPC, so there is no curl output to measure; the rules follow the specification 
 ## Consequences
 
 A `grpc://` call (the only user of `ProtobufJsonConverter`) reads and prints Timestamp and Duration fields as their ProtoJSON strings. The
-other well-known types (wrappers, `Struct`, `Any`, `FieldMask`, `Empty`) keep their plain message form.
+other well-known types were left alone by this decision. Later decisions and code gave most of them their own ProtoJSON
+forms: the nine wrapper types (`ProtobufJsonWrapperTypes.cs`), `Struct`, `Value` and `ListValue` (`ProtobufJsonStructTypes.cs`),
+`FieldMask` (`ProtobufJsonFieldMask.cs`) and `Any` (`ProtobufJsonAny.cs`, ADR-1232). Only `Empty` keeps its plain message form.

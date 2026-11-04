@@ -37,12 +37,12 @@ public sealed class ProtobufJsonAnyTests
     {
         const string Json = """{"a":{"@type":"type.googleapis.com/google.protobuf.Point","x":1,"y":2}}""";
 
-        Assert.AreEqual(ProtobufJsonError.None, ProtobufJsonConverter.TryConvertJsonToBinary(Holder, Encoding.UTF8.GetBytes(Json), out var binary));
+        Assert.AreEqual(ProtobufJsonError.None, ProtobufJsonConverter.ConvertJsonToBinary(Holder, Encoding.UTF8.GetBytes(Json), out var binary));
 
         // a (1) { type_url (1) = PointUrl, value (2) = { x (1) = 1, y (2) = 2 } }
         var url = Convert.ToHexString(Encoding.UTF8.GetBytes(PointUrl));
         Assert.AreEqual("0A" + "31" + "0A" + "29" + url + "1204" + "08011002", Convert.ToHexString(binary!));
-        Assert.AreEqual(ProtobufJsonError.None, ProtobufJsonConverter.TryConvertBinaryToJson(Holder, binary, indented: false, out var json));
+        Assert.AreEqual(ProtobufJsonError.None, ProtobufJsonConverter.ConvertBinaryToJson(Holder, binary, indented: false, out var json));
         Assert.AreEqual(Json, json);
     }
 
@@ -99,7 +99,7 @@ public sealed class ProtobufJsonAnyTests
         Assert.ThrowsExactly<FormatException>(() => ProtobufJsonFormatter.Format(message, indented: false));
         Assert.AreEqual(
             ProtobufJsonError.InvalidValue,
-            ProtobufJsonConverter.TryConvertBinaryToJson(Holder, DynamicMessageEncoder.Encode(message), indented: false, out _));
+            ProtobufJsonConverter.ConvertBinaryToJson(Holder, DynamicMessageEncoder.Encode(message), indented: false, out _));
     }
 
     [TestMethod]

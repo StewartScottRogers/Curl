@@ -463,6 +463,33 @@ or
 FACTORY: UNREPAIRED {ID} <why>
 '@
 
+# The run Repair-QualityGates gives a finished task whose commits leave members of the files
+# they changed outside a quality gate (BL-4649, AF-0543).
+$QualityRepairPrompt = @'
+DARK FACTORY SHIFT, LANE {LANE}. Stewart is away; never ask a question.
+
+Task {ID} is finished in this checkout and its commits have been rebased onto
+origin/{BRANCH}, but Measure-CodeQuality.ps1, the gate CI's quality job applies, finds
+members of files these commits changed outside a gate: {RED}. CI's quality job would go
+red on them. Fix it here, even where a member was left to another task:
+
+1. Split each member over the complexity gate into smaller methods, and add tests in the
+   library's own .UnitTests project for any line or branch left uncovered.
+2. Run Measure-CodeQuality.ps1 -Library <library> once for each library named above, then
+   dotnet build and dotnet test --filter "TestCategory!=Integration" once, and commit the
+   fix (Conventional Commits, naming {ID}). Do not move the task: it stays in Done.
+3. Never run git push, git pull, git fetch, git rebase, git reset, or git checkout of
+   another branch: the shift integrates your commit.
+4. This run ends the moment your reply ends, and anything still in the background dies
+   with it. Run every command in the foreground with the Bash tool and a timeout of up to
+   3600000 ms, and never end your reply to wait for a notification. It is killed at {DEADLINE}.
+
+End your reply with exactly one line, either
+FACTORY: REPAIRED {ID}
+or
+FACTORY: UNREPAIRED {ID} <why>
+'@
+
 $script:ToolLabels = @{}
 
 # Commands only Stewart may authorize (CLAUDE.md). --dangerously-skip-permissions does

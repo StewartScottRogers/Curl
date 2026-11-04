@@ -92,7 +92,7 @@ public sealed class SmbAdversarialTests
         byte[] received = SmbRecordedExchange.ReadAccepted[..length];
         Diagnostics.Arrange("length", length);
 
-        string? refusal = SmbReadResponse.TryGetData(received, out _);
+        string? refusal = SmbReadResponse.ReadDataOrRefusal(received, out _);
 
         Diagnostics.Assert("refusal", expected, refusal);
         Assert.AreEqual(expected, refusal);
@@ -124,7 +124,7 @@ public sealed class SmbAdversarialTests
         BinaryPrimitives.WriteUInt16LittleEndian(received.AsSpan(ReadDataLengthOffset), (ushort)(11 + pastTheEnd));
         Diagnostics.Arrange("data past the message", pastTheEnd);
 
-        string? refusal = SmbReadResponse.TryGetData(received, out ReadOnlyMemory<byte> data);
+        string? refusal = SmbReadResponse.ReadDataOrRefusal(received, out ReadOnlyMemory<byte> data);
 
         Diagnostics.Assert("refusal", expected, refusal);
         Assert.AreEqual(expected, refusal);
@@ -139,7 +139,7 @@ public sealed class SmbAdversarialTests
         BinaryPrimitives.WriteUInt16LittleEndian(received.AsSpan(ReadDataOffsetOffset), ushort.MaxValue);
         Diagnostics.Arrange("data offset and length", "0xffff, 0xffff");
 
-        string? refusal = SmbReadResponse.TryGetData(received, out ReadOnlyMemory<byte> data);
+        string? refusal = SmbReadResponse.ReadDataOrRefusal(received, out ReadOnlyMemory<byte> data);
 
         Diagnostics.Assert("refusal", "Invalid input packet", refusal);
         Assert.AreEqual("Invalid input packet", refusal);
@@ -210,7 +210,7 @@ public sealed class SmbAdversarialTests
         BinaryPrimitives.WriteUInt32LittleEndian(received.AsSpan(9), 0xc0000022);
         Diagnostics.Arrange("status", "0xc0000022");
 
-        string? refusal = SmbReadResponse.TryGetData(received, out ReadOnlyMemory<byte> data);
+        string? refusal = SmbReadResponse.ReadDataOrRefusal(received, out ReadOnlyMemory<byte> data);
 
         Diagnostics.Assert("refusal", "Failure when receiving data from the peer", refusal);
         Assert.AreEqual("Failure when receiving data from the peer", refusal);
@@ -224,7 +224,7 @@ public sealed class SmbAdversarialTests
         BinaryPrimitives.WriteUInt16LittleEndian(received.AsSpan(ReadDataOffsetOffset), 0);
         Diagnostics.Arrange("data offset", 0);
 
-        string? refusal = SmbReadResponse.TryGetData(received, out ReadOnlyMemory<byte> data);
+        string? refusal = SmbReadResponse.ReadDataOrRefusal(received, out ReadOnlyMemory<byte> data);
 
         Diagnostics.Assert("refusal", null, refusal);
         Assert.IsNull(refusal);

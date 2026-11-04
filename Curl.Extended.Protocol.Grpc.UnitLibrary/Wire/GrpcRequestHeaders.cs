@@ -22,6 +22,9 @@ internal static class GrpcRequestHeaders
 
     private const string BinarySuffix = "-bin";
 
+    /// <summary>The fields RFC 9113 section 8.2.2 forbids in an HTTP/2 message.</summary>
+    private static readonly HashSet<string> ConnectionSpecificNames = ["connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade"];
+
     /// <summary>
     /// Builds the header list for one call.
     /// </summary>
@@ -54,45 +57,63 @@ internal static class GrpcRequestHeaders
             headers.Add(new("user-agent", userAgent));
         }
 
-        int callDefinitionCount = headers.Count;
+        List<KeyValuePair<string, string>> metadata = [];
         foreach (string entry in values.CustomHeaders)
         {
-            AddCustomHeader(headers, callDefinitionCount, entry);
+            AddCustomHeader(headers, metadata, entry);
         }
 
+        headers.AddRange(metadata);
         return headers;
     }
 
-    private static void AddCustomHeader(List<KeyValuePair<string, string>> headers, int callDefinitionCount, string entry)
+    /// <summary>
+    /// Applies one <c>-H</c> value: to the Call-Definition headers when it names one, otherwise to the Custom-Metadata.
+    /// A connection-specific field (RFC 9113 section 8.2.2) is never sent.
+    /// </summary>
+    private static void AddCustomHeader(List<KeyValuePair<string, string>> callDefinition, List<KeyValuePair<string, string>> metadata, string entry)
     {
         if (ParseCustomHeader(entry) is not (var name, var value))
         {
             return;
         }
 
-        int built = headers.FindIndex(0, callDefinitionCount, header => header.Key == name);
+        if (IsConnectionSpecific(name, value))
+        {
+            return;
+        }
+
+        int built = callDefinition.FindIndex(header => header.Key == name);
+        Store(built >= 0 ? callDefinition : metadata, built, name, value);
+    }
+
+    private static bool IsConnectionSpecific(string name, string? value) =>
+        ConnectionSpecificNames.Contains(name)
+        || (name == "te" && IsOtherThanTrailers(value));
+
+    private static bool IsOtherThanTrailers(string? value) =>
+        value is not null && !value.Equals("trailers", StringComparison.OrdinalIgnoreCase);
+
+    private static void Store(List<KeyValuePair<string, string>> list, int index, string name, string? value)
+    {
         if (value is null)
         {
-            RemoveAt(headers, built);
+            if (index >= 0)
+            {
+                list.RemoveAt(index);
+            }
+
             return;
         }
 
         KeyValuePair<string, string> field = new(name, name.EndsWith(BinarySuffix, StringComparison.Ordinal) ? UnpaddedBase64(name, value) : value);
-        if (built >= 0)
+        if (index >= 0)
         {
-            headers[built] = field;
+            list[index] = field;
         }
         else
         {
-            headers.Add(field);
-        }
-    }
-
-    private static void RemoveAt(List<KeyValuePair<string, string>> headers, int index)
-    {
-        if (index >= 0)
-        {
-            headers.RemoveAt(index);
+            list.Add(field);
         }
     }
 

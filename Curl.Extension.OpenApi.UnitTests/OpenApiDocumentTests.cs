@@ -77,14 +77,22 @@ public sealed class OpenApiDocumentTests
     }
 
     [TestMethod]
-    public void FindOperation_UnknownId_FailsWithExit2() =>
-        Assert.AreEqual(
-            "openapi: no operation nope in the description",
-            Assert.ThrowsExactly<ArgumentExpansionException>(() => Document("""{"paths":{"/":{"get":5,"summary":"x"}}}""").FindOperation("nope")).Message);
+    public void FindOperation_UnknownId_FailsWithExit2()
+    {
+        var failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => Document("""{"paths":{"/":{"get":5,"summary":"x"}}}""").FindOperation("nope"));
+
+        Assert.AreEqual("openapi: no operation nope in the description", failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+    }
 
     [TestMethod]
-    public void FindOperation_WithoutPaths_FailsWithExit2() =>
-        Assert.ThrowsExactly<ArgumentExpansionException>(() => Document("""{"info":{}}""").FindOperation("a"));
+    public void FindOperation_WithoutPaths_FailsWithExit2()
+    {
+        var failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => Document("""{"info":{}}""").FindOperation("a"));
+
+        Assert.AreEqual("openapi: no operation a in the description", failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+    }
 
     [TestMethod]
     public void FindOperation_PathItemReference_IsFollowed_AndTheMethodIsItsMember()
@@ -182,7 +190,10 @@ public sealed class OpenApiDocumentTests
     {
         OpenApiDocument document = Document("""{"x":[{}],"loop":{"$ref":"#/loop"},"paths":{"/":{"get":{"operationId":"a","parameters":[{"$ref":"REF"}]}}}}""".Replace("REF", reference, StringComparison.Ordinal));
 
-        Assert.AreEqual(message, Assert.ThrowsExactly<ArgumentExpansionException>(() => document.FindOperation("a")).Message);
+        ArgumentExpansionException failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => document.FindOperation("a"));
+
+        Assert.AreEqual(message, failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
     }
 
     private static OpenApiDocument Document(string json) =>

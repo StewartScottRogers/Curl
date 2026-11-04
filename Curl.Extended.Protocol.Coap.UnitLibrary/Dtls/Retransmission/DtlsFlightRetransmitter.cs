@@ -19,24 +19,24 @@ internal sealed class DtlsFlightRetransmitter(Func<ReadOnlyMemory<byte>, Cancell
     public static readonly TimeSpan MaximumTimeout = TimeSpan.FromSeconds(60);
 
     /// <summary>
-    /// Sends <paramref name="flight" /> and resends it on the doubling timer until
+    /// Sends the flight <paramref name="sealFlight" /> seals and resends it, sealed again, on the doubling timer until
     /// <paramref name="awaitNextFlightAsync" /> completes, the start of the peer's next flight.
     /// </summary>
     /// <typeparam name="TReply">What the start of the peer's next flight gives.</typeparam>
-    /// <param name="flight">The datagrams of the flight, sent in order each time.</param>
+    /// <param name="sealFlight">Seals the datagrams of the flight afresh, each record under the next sequence number of its epoch (RFC 6347 section 4.1), called once per send; the datagrams go out in order.</param>
     /// <param name="awaitNextFlightAsync">Completes when the peer's next flight starts; cancelled once this method returns.</param>
     /// <param name="cancellationToken">Cancels the wait and the resends.</param>
     /// <returns>What <paramref name="awaitNextFlightAsync" /> gave.</returns>
     /// <exception cref="TimeoutException">The peer did not answer after <see cref="MaximumRetransmissions" /> resends; the caller ends with exit 35.</exception>
     public async ValueTask<TReply> SendFlightAsync<TReply>(
-        IReadOnlyList<ReadOnlyMemory<byte>> flight,
+        Func<IReadOnlyList<ReadOnlyMemory<byte>>> sealFlight,
         Func<CancellationToken, Task<TReply>> awaitNextFlightAsync,
         CancellationToken cancellationToken)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
         {
-            return await ResendUntilReplyAsync(flight, awaitNextFlightAsync, stop.Token).ConfigureAwait(false);
+            return await ResendUntilReplyAsync(sealFlight, awaitNextFlightAsync, stop.Token).ConfigureAwait(false);
         }
         finally
         {
@@ -48,7 +48,7 @@ internal sealed class DtlsFlightRetransmitter(Func<ReadOnlyMemory<byte>, Cancell
     internal static TimeSpan NextTimeout(TimeSpan timeout) => timeout * 2 > MaximumTimeout ? MaximumTimeout : timeout * 2;
 
     private async ValueTask<TReply> ResendUntilReplyAsync<TReply>(
-        IReadOnlyList<ReadOnlyMemory<byte>> flight,
+        Func<IReadOnlyList<ReadOnlyMemory<byte>>> sealFlight,
         Func<CancellationToken, Task<TReply>> awaitNextFlightAsync,
         CancellationToken stop)
     {
@@ -56,7 +56,7 @@ internal sealed class DtlsFlightRetransmitter(Func<ReadOnlyMemory<byte>, Cancell
         TimeSpan timeout = InitialTimeout;
         for (int retransmissions = 0; ; retransmissions++)
         {
-            await SendAsync(flight, stop).ConfigureAwait(false);
+            await SendAsync(sealFlight(), stop).ConfigureAwait(false);
             Task delay = Task.Delay(timeout, timeProvider, stop);
             if (await Task.WhenAny(reply, delay).ConfigureAwait(false) == reply)
             {

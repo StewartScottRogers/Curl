@@ -398,6 +398,7 @@ public sealed class Lib578To599Tests
     [DataRow("123456", false, 0L)]
     [DataRow("70000", false, 0L)]
     [DataRow("5", true, 5L)]
+    [DataRow("0", true, 0L)]
     [DataRow("65535x", true, 65535L)]
     public void Lib591_TryParseAcceptTimeout_TakesDecimalDigitsUpTo65535(string? text, bool parsed, long seconds)
     {

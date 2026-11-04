@@ -70,6 +70,7 @@ public sealed class ContentDigestTransferHookTests
     {
         var result = await _hook.ExecuteAsync(Context(), Origin(200, "other", ("Repr-Digest", "md5=:AAAA:"), ("repr-digest", HelloWorldSha512)));
 
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("Repr-Digest sha-512 does not match the response body", result.ErrorMessage);
     }
 

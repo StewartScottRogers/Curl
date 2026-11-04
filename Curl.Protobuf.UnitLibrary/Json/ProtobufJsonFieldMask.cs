@@ -20,7 +20,7 @@ internal static class ProtobufJsonFieldMask
         string.Join(',', ((message.FindValue(1) as List<object>) ?? []).Select(path => ToLowerCamelCase((string)path)));
 
     /// <summary>Reads a comma-separated string of lowerCamelCase paths into the FieldMask's snake_case paths.</summary>
-    public static ProtobufJsonError TryRead(JsonElement element, DynamicMessage message)
+    public static ProtobufJsonError Read(JsonElement element, DynamicMessage message)
     {
         if (element.ValueKind != JsonValueKind.String)
         {

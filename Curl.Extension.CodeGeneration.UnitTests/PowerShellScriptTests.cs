@@ -48,6 +48,7 @@ public sealed class PowerShellScriptTests
     {
         Assert.Contains(" -MaximumRedirection 7 ", PowerShellScript.For([new GeneratedRequest("GET", "u", [], null, true, 7, false)]));
         Assert.Contains(" -MaximumRedirection 2147483647 ", PowerShellScript.For([new GeneratedRequest("GET", "u", [], null, true, -1, false)]));
+        Assert.Contains(" -MaximumRedirection 0 ", PowerShellScript.For([new GeneratedRequest("GET", "u", [], null, true, 0, false)]));
     }
 
     [TestMethod]

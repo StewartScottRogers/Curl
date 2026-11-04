@@ -47,6 +47,12 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Notes
 
+- Cause found: BL-4543 was the CI watch's task for the MQTT 5 CONNECT test (filed 13:28:46); BL-4544 and BL-4547 were "Fix flaky CI test Mqtt5ConnectTests.Connect_..." tasks two lanes filed from their own runs (13:31:00 and 13:44:42, renumbered from a shared BL-4543). Nothing at claim time compared a CI fix with the CI fixes already live, so all three were claimed.
+- Fix: 033395c38, pushed to work/dark-factory 2026-11-03 10:57:18 Arizona (17:57:18Z). A claim reads the test a CI-fix title names, by method name from either the watch's or a lane's form (`Get-CiFixTestName`), and when a live CI fix in Doing, or an older one in Backlog, names the same test (`Get-CiFixDuplicateOf`), it moves the task to Deferred as that one's duplicate and claims something else (DarkFactory/Claim.ps1). The 56.5 red minutes are addressed by BL-4647's 73fa18c5a and BL-4717's 28cbd2dfb (the running run is now seen while it reads `queued`, and cancelled for lacking a fix only once it has failed). `-TestClaimDuplicates` 16/16, `-TestTaskReadiness` and `-TestCiWatch` PASS under Windows PowerShell 5.1 and pwsh 7.
+- Evidence still owed: the window starts at 2026-11-03T17:57:18Z and needs shift logs and CI runs after it, so the task waits in Backlog for an interactive session to run the measurement.
+
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-03: Doing -> Backlog. Fix landed (033395c38 at 2026-11-03 10:57 Arizona); the post-fix measurement needs shift logs and CI runs after it, so it waits in Backlog per its criterion.
