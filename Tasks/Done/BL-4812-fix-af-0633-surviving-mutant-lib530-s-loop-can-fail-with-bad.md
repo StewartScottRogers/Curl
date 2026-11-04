@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary]
+touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests/Lib530Tests.cs]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4812 — Fix AF-0633: Surviving mutant: lib530's loop can fail with BadTimeout instead of running the expired timer's socket action, and no test fails
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Lib530Tests.TestOneAsync_TimerExpires_RunsTheTimeoutActionOnlyThenAndSucceeds`: a 50 ms timer that expires on the second wait must get exactly one more CURL_SOCKET_TIMEOUT action (not one while live) and the run returns Ok. Widened touches to `Curl.Conformance.LibTest.UnitTests/Lib530Tests.cs`, the test file, which no task in Doing names.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (`||` -> `&&` at Lib530Run.cs:253): the new test fails under it (killed) and passes on the reverted code. No production code changed, so no quality run was needed. Build clean, fast tests green (Curl.Conformance.LibTest.UnitTests 1196 passed); platform-neutral (ManualTimeProvider, no paths).
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. lib530's expired timer now has a test that kills the || -> && mutant at Lib530Run.cs:253
