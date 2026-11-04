@@ -34,3 +34,4 @@ Failing closed (not pushing unmeasured code) is right. Spending a repair run on 
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-03: Backlog -> Doing. Criteria at claim: 4d7bd0b2 f6fb8d53 d9e02a2a 85027b50.
