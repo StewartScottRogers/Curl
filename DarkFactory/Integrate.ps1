@@ -301,11 +301,13 @@ function Invoke-Integrate {
     }
     # The quality gates CI's quality job applies, for the files this lane's commits change,
     # measured before the lock so no other lane waits on it (BL-4649); FETCH_HEAD is the
-    # shared branch the rebase above put them on.
+    # shared branch the rebase above put them on. A real miss of a Done task gets a repair run;
+    # a "quality gates not measured" result (git diff or the report failed) is returned as it is,
+    # unpushed, because no code change can satisfy it (BL-4802).
     if ($State -eq 'Done' -or -not (Test-IncomingIsBoardOnly 'FETCH_HEAD' 'HEAD')) {
         Write-Heartbeat 'integrate' 'quality gates before the lock'
         $quality = Test-QualityGates -Id $Id -Base 'FETCH_HEAD'
-        if ($quality -and $State -eq 'Done') { $quality = Repair-QualityGates -Id $Id -Red $quality }
+        if ($quality -and $State -eq 'Done' -and $quality -notlike 'quality gates not measured*') { $quality = Repair-QualityGates -Id $Id -Red $quality }
         if ($quality) { return $quality }
     }
     $attempt = 0
@@ -541,6 +543,12 @@ if ($TestIntegrateLock) {
             ,@('a run''s code that misses a quality gate is not pushed (BL-4649)', "'quality gates missed by 1 member(s)' 0 verifies, lane work shared: False", {
                 function Test-QualityGates { param([string]$Id, [string]$Base) 'quality gates missed by 1 member(s)' }
                 & $laneRequeues 'Backlog' 'requeued-quality-{0}.txt' })
+            ,@('a not-measured result for a Done task is returned without a repair run (BL-4802)', "'quality gates not measured: git diff failed' 0 verifies, lane work shared: False no repair", {
+                function Test-QualityGates { param([string]$Id, [string]$Base) 'quality gates not measured: git diff failed' }
+                $script:Repaired = 'no repair'
+                function Repair-QualityGates { param([string]$Id, [string]$Red) $script:Repaired = 'repair' }
+                $r = & $laneRequeues 'Done' 'notmeasured-{0}.txt'
+                "$r $script:Repaired" })
             ,@('both task prompts commit a Backlog or Blocked run''s finished, tested code rather than leave it to the stash', 'True True False False', {
                 $commits = 'Commit with it, by logical unit as in rule {0}, every code change that is complete in'
                 $tested = 'covered by its own tests so CI''s'

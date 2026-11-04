@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Integrate.ps1]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-03
 ---
 # BL-4802 — Skip the quality repair run when the quality gates could not be measured
 
@@ -24,14 +24,17 @@ Failing closed (not pushing unmeasured code) is right. Spending a repair run on 
 
 ## Acceptance criteria
 
-- [ ] `Integrate.ps1` calls `Repair-QualityGates` only for a real gate miss (`quality gates missed ...`), never for a `quality gates not measured ...` result. That result is still returned, so the code is not pushed.
-- [ ] A `-TestIntegrateLock` case shows that a not-measured result for a Done task returns the reason without calling `Repair-QualityGates` (`Invoke-TaskRun` is not run).
-- [ ] The comment above the call at `Integrate.ps1:303-306` says what happens to a not-measured result.
-- [ ] `RunDarkFactory.ps1 -TestIntegrateLock` passes under Windows PowerShell and `pwsh`.
+- [x] `Integrate.ps1` calls `Repair-QualityGates` only for a real gate miss (`quality gates missed ...`), never for a `quality gates not measured ...` result. That result is still returned, so the code is not pushed.
+- [x] A `-TestIntegrateLock` case shows that a not-measured result for a Done task returns the reason without calling `Repair-QualityGates` (`Invoke-TaskRun` is not run).
+- [x] The comment above the call at `Integrate.ps1:303-306` says what happens to a not-measured result.
+- [x] `RunDarkFactory.ps1 -TestIntegrateLock` passes under Windows PowerShell and `pwsh`.
 
 ## Notes
+
+A not-measured result is matched by the `quality gates not measured*` prefix. Both PowerShells pass -TestIntegrateLock.
 
 ## Log
 
 - 2026-11-03: Created.
 - 2026-11-03: Backlog -> Doing. Criteria at claim: 4d7bd0b2 f6fb8d53 d9e02a2a 85027b50.
+- 2026-11-03: Doing -> Done. Repair run skipped for not-measured gates; test added
