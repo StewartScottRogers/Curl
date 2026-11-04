@@ -3,8 +3,8 @@ id: AF-0582
 title: WithNoSessionId_OffersNoSessionAndLeavesTheCacheAlone checks the kept session only for null
 auditor: quality
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_2203.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1615.md, 2026-11-03_2203.md).
 key: quality:Curl.Networking.UnitTests/HandBuiltTlsProviderTests.SessionIdAndBeast.cs:AuthenticateAsClientAsync_WithNoSessionId_OffersNoSessionAndLeavesTheCacheAlone:weak-assertion
 reproduction: none
 task: BL-4746
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: f4a738a932020f9832b23c0977dbaf0f27206871
 scorecard: 2026-11-03_1017.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: consecutive
+closed-by: 2026-11-03_1615.md, 2026-11-03_2203.md
 ---
 # AF-0582 - WithNoSessionId_OffersNoSessionAndLeavesTheCacheAlone checks the kept session only for null
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Networking.UnitTests/HandBuiltTlsProviderTests.SessionI
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_1615.md | reproduces: no | No 'Assert.IsNotNull(keptSession' match; the test compares keptSession?.Ticket with CachedTicket and its TicketAgeAdd.
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: no | Ran the reproduction: no match for Assert.IsNotNull(keptSession. Lines 65-66 check the kept session's Ticket and TicketAgeAdd exactly.
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_2203.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1615.md, 2026-11-03_2203.md).

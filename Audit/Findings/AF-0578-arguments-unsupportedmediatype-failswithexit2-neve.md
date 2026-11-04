@@ -3,8 +3,8 @@ id: AF-0578
 title: Arguments_UnsupportedMediaType_FailsWithExit2 never checks exit 2
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_2203.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1615.md, 2026-11-03_2203.md).
 key: quality:Curl.Extension.OpenApi.UnitTests/OpenApiRequestBodyTests.cs:Arguments_UnsupportedMediaType_FailsWithExit2:name-lies
 reproduction: none
 task: BL-4742
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: f4a738a932020f9832b23c0977dbaf0f27206871
 scorecard: 2026-11-03_1017.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: consecutive
+closed-by: 2026-11-03_1615.md, 2026-11-03_2203.md
 ---
 # AF-0578 - Arguments_UnsupportedMediaType_FailsWithExit2 never checks exit 2
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Extension.OpenApi.UnitTests/OpenApiRequestBodyTests.cs 
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_1615.md | reproduces: no | Asserts the message and Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode).
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: no | Ran the reproduction and read on: line 72 Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode) (2).
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_2203.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-03_1615.md, 2026-11-03_2203.md).

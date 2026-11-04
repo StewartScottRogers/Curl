@@ -3,8 +3,8 @@ id: AF-0618
 title: Surviving mutant: a CONNECT reply whose first byte is NUL can escape the NUL-byte refusal without a test failing
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_2203.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:ReplyAfterLineEnd-ge:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:231:>=
 task: BL-4791
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 7410f102c809d5232e4f9b210b3ac32486848c27
 scorecard: 2026-11-03_1615.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: mechanical
+closed-by: 2026-11-03_2203.md
 ---
 # AF-0618 - Surviving mutant: a CONNECT reply whose first byte is NUL can escape the NUL-byte refusal without a test failing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: no | Ran Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:231:>= -Member ReplyAfterLineEnd -ExcludeBaselineFailures -TimeoutSeconds 600: resolvedLine 231, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_2203.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

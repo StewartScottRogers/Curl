@@ -42,6 +42,8 @@ Select-String -Path Curl.Ssh.UnitTests/Authentication/PageantSshAgentConnectorTe
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: no | Ran the reproduction: no match for Assert.IsNotNull(signature). Line 61 asserts CollectionAssert.AreEqual(expectedSignatureBlob, signatureBlob).
+
 ## Log
 
 - 2026-11-03: filed proposed.

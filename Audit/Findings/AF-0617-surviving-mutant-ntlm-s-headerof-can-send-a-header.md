@@ -3,8 +3,8 @@ id: AF-0617
 title: Surviving mutant: NTLM's HeaderOf can send a header for an empty token or a refused step without a test failing
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_2203.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Authentication.UnitLibrary/NtlmHttpAuthenticator.cs:HeaderOf-and:surviving-mutant
 reproduction: mutation Curl.Authentication.UnitLibrary/NtlmHttpAuthenticator.cs:183:&&
 task: BL-4790
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 7410f102c809d5232e4f9b210b3ac32486848c27
 scorecard: 2026-11-03_1615.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: mechanical
+closed-by: 2026-11-03_2203.md
 ---
 # AF-0617 - Surviving mutant: NTLM's HeaderOf can send a header for an empty token or a refused step without a test failing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Authe
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: no | Ran Invoke-MutationTest.ps1 -Site Curl.Authentication.UnitLibrary/NtlmHttpAuthenticator.cs:183:&& -Member HeaderOf -ExcludeBaselineFailures -TimeoutSeconds 600: resolvedLine 183, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_2203.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

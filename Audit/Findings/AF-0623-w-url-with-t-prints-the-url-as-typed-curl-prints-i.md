@@ -3,8 +3,8 @@ id: AF-0623
 title: -w %{url} with -T prints the URL as typed; curl prints it with the uploaded file name appended
 auditor: conformance
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_2203.md: the reproduction no longer reproduces.
 key: conformance:write-out:url-with-upload-file:stdout
 reproduction: none
 task: BL-4796
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 7410f102c809d5232e4f9b210b3ac32486848c27
 scorecard: 2026-11-03_1615.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_2203.md
 ---
 # AF-0623 - -w %{url} with -T prints the URL as typed; curl prints it with the uploaded file name appended
 
@@ -42,7 +42,10 @@ dotnet build Curl.Console -c Release; $a=@('-w','%{url}','-T','sub/f.txt','http:
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: no | Reference curl 8.22.0 (x86_64-w64-mingw32) Schannel. Ran the reproduction pair (Record-CurlExchange.ps1, port 50700, -w %{url} -T sub/f.txt) with sub/f.txt present in the process's working folder: curl stdout 'http://127.0.0.1:50700/f.txt' exit 0; Curl stdout 'http://127.0.0.1:50700/f.txt' exit 0; request.bin identical (PUT /f.txt, Content-Length 6). Run as written, the recorder could not find sub/f.txt (exit 26 for both), and both still printed the URL with f.txt appended.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_2203.md: the reproduction no longer reproduces.
