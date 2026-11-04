@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4815 — Fix AF-0636: Surviving mutant: the multi handle's wait can count finished or never-started transfers as running, and no test fails
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `GetWaitSockets_FinishedTransferThatHeldASocketBesideARunningOne_IsOnlyTheRunningOnesSocketThenTheResolverWakeup` to `Curl.Engine.UnitTests/ManagedMultiTransferTests.Counts.cs`: a transfer that took socket 0x1236 and finished, reported by a second perform, beside one still holding 0x1237; the wait sockets are only 0x1237 and the resolver wakeup (count 2). A pending transfer has no socket record (set only in `Start`), so the finished one is what tells `&&` from `||`.
+- Checked by hand (lanes may not run `Audit/Tools`): with the site mutated to `||` the new test fails (count 3, not 2); restored, all 2973 engine fast tests pass and `dotnet build` is clean. Test-only change, so no quality run was needed.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. Test pins that a finished transfer's socket is not among the multi wait sockets; the && to || mutant now fails it
