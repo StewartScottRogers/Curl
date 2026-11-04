@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary]
+touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests/Lib643To661Tests.cs]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4810 — Fix AF-0631: Surviving mutant: lib650 can send its second field's name one byte longer (NameLength +1 instead of -1), and no test fails
 
@@ -41,12 +41,19 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Curl.Conformance.LibTest.UnitTests/Lib643To661Tests.cs` to touches: the fix is a test, and that file holds Lib650's test. No task in Doing on origin/work/dark-factory names it (BL-4806: Curl.Api.UnitLibrary, BL-4807: Curl.Extension.ResumableUpload.UnitLibrary).
+- Fix: `Lib650_AddsTheSixFieldsAndPostsOnlyWhenAllSucceed` now checks the second `curl_formadd` call's `PointerName` ("fieldname") and its `NameLength` (8, the name cut by one byte, as upstream test650 sends it). No production code changed.
+- Reproduction: a lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (`- 1` -> `+ 1` at Lib650.cs:96). The Lib650 tests failed on `Assert.AreEqual(8L, form.Calls[1][1].Value)`, so the mutant is killed. The mutation was then reverted. The quality auditor's re-audit closes AF-0631.
+- No quality run: only test code changed.
+- Build clean and fast tests green on Windows. The test runs no file system, path or OS operation, so it does not depend on the platform.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. Lib650's test now checks the second field's PointerName and NameLength 8, killing the NameLength +1 mutant
