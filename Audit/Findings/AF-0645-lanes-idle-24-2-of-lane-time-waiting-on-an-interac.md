@@ -3,8 +3,8 @@ id: AF-0645
 title: Lanes idle 24.2% of lane time waiting on an interactive-only Backlog
 auditor: process
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-04_0643.md: the reproduction no longer reproduces.
 key: process:logs:interactive-only-backlog:empty-queue
 reproduction: none
 task: BL-4824
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 0ae5ce3f5e65976edeb9facb28b93fd3f4dcdbc8
 scorecard: 2026-11-03_2203.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-04
+closed-how: reliable-reaudit
+closed-by: 2026-11-04_0643.md
 ---
 # AF-0645 - Lanes idle 24.2% of lane time waiting on an interactive-only Backlog
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_0643.md | reproduces: no | Ran the given reproduction on the old logs: waitNothingReadyMinutes / laneMinutes = 108 / 445.55 = 0.242, with 53 'interactive only' lines (historical). Over this audit's window (shift DarkFactory-20261104-032444, 17 tasks done): waitNothingReadyMinutes 5 of laneMinutes 479.78 = 0.0104, well under the 20% bar. The waits were overlap waits (59 min). 'interactive only' appears 5 times, all in lane 6 from 04:24:51, after its last task, and lane 2 ended rather than waiting (05:00:18, 'ending the lane rather than waiting on interactive work').
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-04: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-04: accepted -> closed. Re-audit 2026-11-04_0643.md: the reproduction no longer reproduces.

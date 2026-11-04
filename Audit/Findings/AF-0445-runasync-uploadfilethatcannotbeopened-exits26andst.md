@@ -42,6 +42,8 @@ Select-String -Path Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs -Patt
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_0643.md | reproduces: yes | still reported
+
 ## Log
 
 - 2026-10-25: filed proposed.

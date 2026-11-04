@@ -3,8 +3,8 @@ id: AF-0615
 title: SendAsync_PortClosed_ThrowsCurlsExit7Text asserts only the text its own fake supplies, never exit 7 or curl's exit-7 text
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-04_0643.md: the reproduction no longer reproduces.
 key: quality:Curl.Networking.UnitTests/PortUnreachableReportingDatagramChannelTests.cs:SendAsync_PortClosed_ThrowsCurlsExit7Text:name-lies
 reproduction: none
 task: BL-4788
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 7410f102c809d5232e4f9b210b3ac32486848c27
 scorecard: 2026-11-03_1615.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-04
+closed-how: reliable-reaudit
+closed-by: 2026-11-04_0643.md
 ---
 # AF-0615 - SendAsync_PortClosed_ThrowsCurlsExit7Text asserts only the text its own fake supplies, never exit 7 or curl's exit-7 text
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Networking.UnitTests/PortUnreachableReportingDatagramCh
 ## Re-audits
 
 - 2026-11-03 | 2026-11-03_2203.md | reproduces: no | Ran the reproduction and read on: line 61 asserts the exact message 'Failed to connect to localhost:1 after 7 ms: Could not connect to server'. That is curl's exit-7 text, built by the product from the ManualTimeProvider's 7 ms, not text the fake supplies (the fake throws a bare SocketException).
+- 2026-11-04 | 2026-11-04_0643.md | reproduces: no | Ran the Select-String reproduction. The test now asserts Assert.AreEqual("Failed to connect to localhost:1 after 7 ms: Could not connect to server", refused.Message). That is curl's exit-7 text, built by the code under test, not by the fake (FailingChannel throws only a SocketException).
 
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-04: accepted -> closed. Re-audit 2026-11-04_0643.md: the reproduction no longer reproduces.
