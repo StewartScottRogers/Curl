@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/CloseNotifyOnDisposeTests.cs]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4818 — Fix AF-0639: Surviving mutant: the hand-built TLS connection can forget it already sent close_notify and send it again, and no test fails
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `DisposeAsync_OfAHandBuiltTlsConnectionCalledTwice_TriesToSendCloseNotifyOnlyOnce` to `Curl.Networking.UnitTests/CloseNotifyOnDisposeTests.cs` (added to touches: the test project of the touched library), the twin of AF-0606's SslStream test. The hand-built TLS streams refuse a second `ShutdownAsync` themselves (`shutdownSent`, then `ObjectDisposedException`), so the wire cannot show the mutant; each attempt starts its close_notify bound on the connection's `TimeProvider`, which `TimerCountingTimeProvider` counts. No production change.
+- Reproduction: the lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (`_tlsEnded = false;` at HandBuiltTlsConnection.cs:152): the new test failed (1 of 5 in the class), and passes with the line restored, so the mutant is killed. Build clean, fast tests green (0 failures).
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. A second dispose of a HandBuiltTlsConnection is pinned to try close_notify once; AF-0639's mutant is killed
