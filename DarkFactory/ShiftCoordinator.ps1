@@ -333,13 +333,14 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         # coordinator's own checkout is not pulled. -Fallback when it cannot be read, traced once.
         # -AddingTo is the active lanes' count when the caller may add lanes: the capacity is then
         # limited to those lanes plus the ready tasks a lane may claim, so interactive-only and
-        # adopted tasks in Doing fill no lane that would find nothing and end (BL-4848).
-        param([int]$Fallback, $AddingTo = $null)
+        # adopted tasks in Doing fill no lane that would find nothing and end (BL-4848); -Idle is how many
+        # of those lanes hold no task, which will claim the ready tasks themselves (BL-4850).
+        param([int]$Fallback, $AddingTo = $null, [int]$Idle = 0)
         git -C $Root fetch -q origin $branch 2>&1 | Out-Null
         $board = Get-BoardCapacity -Ref "origin/$branch"
         if ($null -ne $board.Capacity) {
             if ($null -ne $AddingTo -and $null -ne $board.ClaimableReady) {
-                return Get-LaneAddCapacity -Capacity $board.Capacity -Current ([int]$AddingTo) -ClaimableReady $board.ClaimableReady
+                return Get-LaneAddCapacity -Capacity $board.Capacity -Current ([int]$AddingTo) -ClaimableReady $board.ClaimableReady -Idle $Idle
             }
             return $board.Capacity
         }
@@ -518,7 +519,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             $script:Auto.Samples = @(@($script:Auto.Samples) + @(New-UsageSample -At $now -Reading $reading -ActiveLanes $busy) |
                 Where-Object { $_.At -ge $now.AddHours(-3) })
         }
-        $capacity = if ($null -ne $Capacity) { [int]$Capacity } else { Get-ShiftCapacity -Fallback $current -AddingTo $current }
+        $addIdle = @(Get-IdleLanes | Where-Object { $retiring -notcontains $_ }).Count
+        $capacity = if ($null -ne $Capacity) { [int]$Capacity } else { Get-ShiftCapacity -Fallback $current -AddingTo $current -Idle $addIdle }
         $step = Get-AutoLaneStep -Samples $script:Auto.Samples -Current $current -Capacity $capacity -MachineCap $script:Auto.MachineCap `
             -Saved $script:Auto.Saved -PreviousLow $script:Auto.LastLow
         $script:Auto.FiveHourRate = $step.FiveHourRate
@@ -568,7 +570,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
         $current = @($activeLanes | Where-Object { $retiring -notcontains $_ }).Count
         if ((Get-UsageStop) -or (Get-Date) -gt $shiftEnd) { return }
-        $capacity = Get-ShiftCapacity -Fallback $current -AddingTo $current
+        $addIdle = @(Get-IdleLanes | Where-Object { $retiring -notcontains $_ }).Count
+        $capacity = Get-ShiftCapacity -Fallback $current -AddingTo $current -Idle $addIdle
         $idle = @(Get-IdleLanes | Where-Object { $retiring -notcontains $_ })
         $step = Get-CapacityLaneCount -Current $current -Capacity $capacity -Requested $requestedLanes -Idle $idle.Count
         if (-not $step.Changed) { return }
@@ -701,7 +704,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             $rampCurrent = @($activeLanes | Where-Object { $rampRetiring -notcontains $_ }).Count
             $belowFloor = Test-UnpacedRampDue -Current $rampCurrent -Capacity $MaxLanes -MachineCap $script:Auto.MachineCap -MaxLanes $MaxLanes
             if ($belowFloor -and -not (Get-UsageStop) -and (Get-Date) -le $shiftEnd) {
-                $rampCapacity = Get-ShiftCapacity -Fallback $rampCurrent -AddingTo $rampCurrent
+                $rampCapacity = Get-ShiftCapacity -Fallback $rampCurrent -AddingTo $rampCurrent -Idle @(Get-IdleLanes | Where-Object { $rampRetiring -notcontains $_ }).Count
                 if (Test-UnpacedRampDue -Current $rampCurrent -Capacity $rampCapacity -MachineCap $script:Auto.MachineCap -MaxLanes $MaxLanes) {
                     Invoke-AutoLaneStep -Capacity $rampCapacity
                     $nextAutoStep = (Get-Date).AddMinutes(15)

@@ -100,7 +100,7 @@ function Get-NextLaneCount {
         $limit = if ($Pace) { "$($Pace.Binding) allows $($paceValue.ToString('0.0', $culture))" } else { 'no burn rate yet' }
     } elseif ($Capacity -eq $ceiling) {
         $binding = 'capacity'
-        $limit = if ($Capacity -eq 1) { '1 ready task can run at once' } else { "$Capacity ready tasks can run at once" }
+        $limit = if ($Capacity -eq 1) { '1 lane can be busy at once' } else { "$Capacity lanes can be busy at once" }
     } elseif ($MachineCap -eq $ceiling) { $binding = 'machine'; $limit = "machine sustains $MachineCap" }
     else { $binding = 'maximum'; $limit = "lane maximum $MaxLanes" }
     if ($lowOnce) { $limit += ', low once' }
@@ -287,9 +287,11 @@ function Get-LaneAddCapacity {
     # The capacity the add-back paths (ramp check, Auto step, fixed-count step) size to: the
     # board's -Capacity counts every task in Doing, interactive-only and adopted ones too, which
     # no new lane can take, so a lane is added only for a ready task a lane may claim: at most
-    # -Current lanes plus -ClaimableReady (BL-4848). Never above -Capacity.
-    param([int]$Capacity, [int]$Current, [int]$ClaimableReady)
-    return [math]::Min($Capacity, $Current + $ClaimableReady)
+    # -Current lanes plus the claimable ready tasks no -Idle lane already in the shift will take
+    # (BL-4848, BL-4850). Never above -Capacity (a lower one still retires lanes), otherwise never below -Current.
+    param([int]$Capacity, [int]$Current, [int]$ClaimableReady, [int]$Idle = 0)
+    $added = [math]::Max(0, $ClaimableReady - $Idle)
+    return [math]::Min($Capacity, $Current + $added)
 }
 
 function Get-EndedLanes {
@@ -396,22 +398,22 @@ if ($TestAutoLanes) {
         ,@('weekly-binds low once', 'lanes 4 held (weekly pace allows 1.8, low once)', (Get-SampledLaneCount $weeklyBinds 4 $true 6 8 16 $false 1))
         ,@('weekly-binds low twice', 'lanes 4 -> 2 (weekly pace allows 1.8)', (Get-SampledLaneCount $weeklyBinds 4 $true 6 8 16 $true 1))
         ,@('five-hour span under 30 min', 'null', "$(if ($null -eq (Get-BurnRate $fiveHourTooShort FiveHour)) { 'null' } else { 'a rate' })")
-        ,@('weekly-pace-off', 'lanes 4 -> 5 (6 ready tasks can run at once)', (Get-SampledLaneCount $weeklyBinds 4 $false 6 8 16))
+        ,@('weekly-pace-off', 'lanes 4 -> 5 (6 lanes can be busy at once)', (Get-SampledLaneCount $weeklyBinds 4 $false 6 8 16))
         ,@('weekly-pace-off by default', 'Infinity', "$((Get-PaceTarget -Sample $weeklyBinds[-1] -FiveHourRate 1.0 -WeeklyRate 5.0 -StopAtUsage 0.85 -StopAtWeeklyUsage 0.97).Weekly)")
         ,@('five-hour-reset-in-window', 'lanes 3 -> 4 (5-hour pace allows 4.5)', (Get-SampledLaneCount $resetInWindow 3 $true 8 8 16))
         ,@('hold-inside-band 3.8', 'lanes 4 held (5-hour pace allows 3.8)', (Get-NextLaneCount 4 (New-TestPace 3.8) 16 16 16).Reason)
         ,@('below-band low once', 'lanes 4 held (5-hour pace allows 3.7, low once)', (Get-NextLaneCount 4 (New-TestPace 3.7) 16 16 16).Reason)
         ,@('below-band low twice', 'lanes 4 -> 3 (5-hour pace allows 3.7)', (Get-NextLaneCount 4 (New-TestPace 3.7) 16 16 16 $true).Reason)
         ,@('below-band Low flag', 'True', "$((Get-NextLaneCount 4 (New-TestPace 3.7) 16 16 16).Low)")
-        ,@('capacity-ceiling 3', 'lanes 5 -> 3 (3 ready tasks can run at once)', (Get-NextLaneCount 5 (New-TestPace 9.0) 3 16 16).Reason)
+        ,@('capacity-ceiling 3', 'lanes 5 -> 3 (3 lanes can be busy at once)', (Get-NextLaneCount 5 (New-TestPace 9.0) 3 16 16).Reason)
         ,@('pace drop 6 to 2.4 low once', 'lanes 6 held (5-hour pace allows 2.4, low once)', (Get-NextLaneCount 6 (New-TestPace 2.4) 16 16 16 $false 1).Reason)
         ,@('pace drop 6 to 2.4 low twice', 'lanes 6 -> 2 (5-hour pace allows 2.4)', (Get-NextLaneCount 6 (New-TestPace 2.4) 16 16 16 $true 1).Reason)
         ,@('pace drop 6 to 2.8 rounds up', 'lanes 6 -> 3 (5-hour pace allows 2.8)', (Get-NextLaneCount 6 (New-TestPace 2.8) 16 16 16 $true 1).Reason)
         ,@('pace drop 5 to spent budget', 'lanes 5 -> 1 (5-hour pace allows 0.0)', (Get-NextLaneCount 5 (New-TestPace 0.0) 16 16 16 $true 1).Reason)
-        ,@('ceiling drop 6 to capacity 2', 'lanes 6 -> 2 (2 ready tasks can run at once)', (Get-NextLaneCount 6 (New-TestPace 9.0) 2 16 16).Reason)
+        ,@('ceiling drop 6 to capacity 2', 'lanes 6 -> 2 (2 lanes can be busy at once)', (Get-NextLaneCount 6 (New-TestPace 9.0) 2 16 16).Reason)
         ,@('ceiling drop 6 to machine 3', 'lanes 6 -> 3 (machine sustains 3)', (Get-NextLaneCount 6 $infinite 20 3 16).Reason)
         ,@('up one from 3 at ceiling 6', 'lanes 3 -> 4 (lane maximum 6)', (Get-NextLaneCount 3 $infinite 20 16 6).Reason)
-        ,@('capacity-ceiling 1', 'lanes 2 -> 1 (1 ready task can run at once)', (Get-NextLaneCount 2 $null 1 16 16).Reason)
+        ,@('capacity-ceiling 1', 'lanes 2 -> 1 (1 lane can be busy at once)', (Get-NextLaneCount 2 $null 1 16 16).Reason)
         ,@('machine-ceiling', 'lanes 7 held (machine sustains 7)', (Get-NextLaneCount 7 $infinite 20 7 16).Reason)
         ,@('max-ceiling', 'lanes 2 held (lane maximum 2)', (Get-NextLaneCount 2 $infinite 20 16 2).Reason)
         ,@('no-rate', 'lanes 2 held (no burn rate yet)', (Get-NextLaneCount 2 $null 6 8 16 $false 1).Reason)
@@ -422,7 +424,7 @@ if ($TestAutoLanes) {
         ,@('binding no rate', 'no burn rate', (Get-NextLaneCount 2 $null 6 8 16 $false 1).Binding)
         ,@('unpaced up from 1 with no rate', 'lanes 1 -> 3 (up to 3 lanes run unpaced)', (Get-NextLaneCount 1 $null 6 8 16).Reason)
         ,@('unpaced jump from 1 past a high pace', 'lanes 1 -> 3 (up to 3 lanes run unpaced)', (Get-NextLaneCount 1 (New-TestPace 9.0) 6 8 16).Reason)
-        ,@('unpaced jump capped by capacity 2', 'lanes 1 -> 2 (2 ready tasks can run at once)', (Get-NextLaneCount 1 $null 2 16 16).Reason)
+        ,@('unpaced jump capped by capacity 2', 'lanes 1 -> 2 (2 lanes can be busy at once)', (Get-NextLaneCount 1 $null 2 16 16).Reason)
         ,@('unpaced jump to -Unpaced 5', 'lanes 2 -> 5 (up to 5 lanes run unpaced)', (Get-NextLaneCount 2 $null 8 16 16 $false 5).Reason)
         ,@('above the floor still up one', 'lanes 3 -> 4 (machine sustains 16)', (Get-NextLaneCount 3 $infinite 20 16 16).Reason)
         ,@('jump binding unpaced', 'unpaced', (Get-NextLaneCount 1 (New-TestPace 9.0) 6 8 16).Binding)
@@ -452,8 +454,8 @@ if ($TestAutoLanes) {
         ,@('pace holds at 3', 'lanes 3 held (5-hour pace allows 3.4)', (Get-NextLaneCount 3 (New-TestPace 3.4) 6 8 16).Reason)
         ,@('low pace holds at 3', 'lanes 3 held (up to 3 lanes run unpaced)', (Get-NextLaneCount 3 (New-TestPace 1.2) 6 8 16).Reason)
         ,@('pace drop 6 retires to 3 not below', 'lanes 6 -> 3 (up to 3 lanes run unpaced)', (Get-NextLaneCount 6 (New-TestPace 0.0) 16 16 16 $true).Reason)
-        ,@('unpaced capped by capacity 2', 'lanes 2 held (2 ready tasks can run at once)', (Get-NextLaneCount 2 (New-TestPace 0.5) 2 16 16).Reason)
-        ,@('unpaced capacity 1 retires', 'lanes 2 -> 1 (1 ready task can run at once)', (Get-NextLaneCount 2 $null 1 16 16).Reason)
+        ,@('unpaced capped by capacity 2', 'lanes 2 held (2 lanes can be busy at once)', (Get-NextLaneCount 2 (New-TestPace 0.5) 2 16 16).Reason)
+        ,@('unpaced capacity 1 retires', 'lanes 2 -> 1 (1 lane can be busy at once)', (Get-NextLaneCount 2 $null 1 16 16).Reason)
         ,@('binding unpaced', 'unpaced', (Get-NextLaneCount 1 $null 6 8 16).Binding)
         ,@('idle-lanes', 'null', "$(if ($null -eq (Get-BurnRate $idle FiveHour)) { 'null' } else { 'a rate' })")
         ,@('lane-to-add 1,2,4', '3', "$(Get-LaneToAdd -Active 1, 2, 4 -Max 16)")
@@ -483,6 +485,9 @@ if ($TestAutoLanes) {
         ,@('add capacity with only an interactive-only ready task stays at the current lanes', '3', "$(Get-LaneAddCapacity -Capacity 5 -Current 3 -ClaimableReady (Get-ClaimableReadyCount -CapacityLine 'Capacity 5: 4 in Doing, 1 more can start (BL-7).' -NotClaimableIds 'BL-7'))")
         ,@('add capacity when a claimable task appears adds a lane for it', '4', "$(Get-LaneAddCapacity -Capacity 6 -Current 3 -ClaimableReady (Get-ClaimableReadyCount -CapacityLine 'Capacity 6: 5 in Doing, 1 more can start (BL-8).'))")
         ,@('add capacity never exceeds the board capacity', '4', "$(Get-LaneAddCapacity -Capacity 4 -Current 3 -ClaimableReady 5)")
+        ,@('add capacity with idle lanes taking the claimable task adds none', '4', "$(Get-LaneAddCapacity -Capacity 8 -Current 4 -ClaimableReady 1 -Idle 2)")
+        ,@('add capacity with no idle lane adds one for the claimable task', '5', "$(Get-LaneAddCapacity -Capacity 8 -Current 4 -ClaimableReady 1 -Idle 0)")
+        ,@('add capacity with more claimable than idle adds the surplus', '6', "$(Get-LaneAddCapacity -Capacity 8 -Current 4 -ClaimableReady 4 -Idle 2)")
         ,@('ended lanes are those whose summary exists', '2,4', "$((Get-EndedLanes -Active 1, 2, 3, 4 -Finished 2, 4, 9) -join ',')")
         ,@('claimable ready count with no count', 'null', "$(if ($null -eq (Get-ClaimableReadyCount -CapacityLine 'oops')) { 'null' } else { 'a count' })")
         ,@('lanes-finished 1,3 of 1,2', 'False', "$(Test-LanesFinished -Active 1, 3 -Finished 1, 2)")

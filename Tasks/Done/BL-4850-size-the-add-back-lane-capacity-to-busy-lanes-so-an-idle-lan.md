@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/AutoLanes.ps1, DarkFactory/ShiftCoordinator.ps1]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4850 — Size the add-back lane capacity to busy lanes so an idle lane and a new lane do not chase one ready task
 
@@ -29,15 +29,18 @@ The diff does not cause a regression: the old board-capacity ceiling was looser.
 
 ## Acceptance criteria
 
-- [ ] The add-back capacity no longer counts a claimable ready task once for an idle lane and again for a new lane. For example, it is sized to `Current + max(0, ClaimableReady - Idle)` or an equivalent, still capped at the board's capacity and never below `Current`.
-- [ ] Every caller that passes `-AddingTo` (Auto step, fixed-count step, unpaced ramp) supplies the idle count, or the busy count, that the new sizing needs.
-- [ ] A `-TestAutoLanes` case pins it: 4 lanes, 2 idle, 1 claimable task and a board capacity of 8 give an add capacity of 4, and 4 lanes with none idle and 1 claimable give 5.
-- [ ] The Auto step's capacity-bound reason text describes the value it prints (lanes plus claimable ready tasks, or the claimable count), not "ready tasks can run at once" for a number that is not that.
-- [ ] `RunDarkFactory.ps1 -TestAutoLanes` and `-TestHeartbeat` pass.
+- [x] The add-back capacity no longer counts a claimable ready task once for an idle lane and again for a new lane. For example, it is sized to `Current + max(0, ClaimableReady - Idle)` or an equivalent, still capped at the board's capacity and never below `Current`.
+- [x] Every caller that passes `-AddingTo` (Auto step, fixed-count step, unpaced ramp) supplies the idle count, or the busy count, that the new sizing needs.
+- [x] A `-TestAutoLanes` case pins it: 4 lanes, 2 idle, 1 claimable task and a board capacity of 8 give an add capacity of 4, and 4 lanes with none idle and 1 claimable give 5.
+- [x] The Auto step's capacity-bound reason text describes the value it prints (lanes plus claimable ready tasks, or the claimable count), not "ready tasks can run at once" for a number that is not that.
+- [x] `RunDarkFactory.ps1 -TestAutoLanes` and `-TestHeartbeat` pass.
 
 ## Notes
+
+Get-LaneAddCapacity takes -Idle (Current + max(0, ClaimableReady - Idle), min Capacity); a board capacity below Current still wins so idle lanes retire. The three callers pass the non-retiring idle count. Auto reason text now reads "N lanes can be busy at once".
 
 ## Log
 
 - 2026-11-04: Created by the shift-end review.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: 38fe2ec7 00a3a3aa 15c97c46 c8bbfacb 931a4d17.
+- 2026-11-04: Doing -> Done. Add-back capacity now subtracts idle lanes; Auto reason text fixed; tests pass
