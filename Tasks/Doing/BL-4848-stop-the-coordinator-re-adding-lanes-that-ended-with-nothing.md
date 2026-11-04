@@ -40,3 +40,4 @@ Two possible fixes:
 ## Log
 
 - 2026-11-04: Created.
+- 2026-11-04: Backlog -> Doing. Criteria at claim: 269f34be 42deb321 cf8e3948 758046de.
