@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/ShiftCoordinator.ps1]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4849 — Keep an ended lane's blocked or stalled summary and tab label when Add-Lane reuses its number
 
@@ -30,14 +30,17 @@ The blocked task itself is still raised by `Get-WaitingOnStewart`.
 
 ## Acceptance criteria
 
-- [ ] When `Add-Lane` reuses the number of a lane whose summary is not clean, the old tab is labelled "BLOCKED, read" or "STALLED, read" (by `Get-LaneTabLabel`) before `Start-Lane` replaces `$laneTabs[$n]`.
-- [ ] The old lane's `SUMMARY` line appears in the shift-end trace or report, and its stalls are counted with the shift's stalls.
-- [ ] A `RunDarkFactory.ps1` self-test case covers reuse of a blocked lane's number and proves both points above.
-- [ ] The changed self-tests pass under Windows PowerShell and `pwsh`.
+- [x] When `Add-Lane` reuses the number of a lane whose summary is not clean, the old tab is labelled "BLOCKED, read" or "STALLED, read" (by `Get-LaneTabLabel`) before `Start-Lane` replaces `$laneTabs[$n]`.
+- [x] The old lane's `SUMMARY` line appears in the shift-end trace or report, and its stalls are counted with the shift's stalls.
+- [x] A `RunDarkFactory.ps1` self-test case covers reuse of a blocked lane's number and proves both points above.
+- [x] The changed self-tests pass under Windows PowerShell and `pwsh`.
 
 ## Notes
+
+- Add-Lane now calls Get-ReusedLaneKeep (AutoLanes.ps1): the old tab is labelled before Start-Lane replaces it, the SUMMARY line goes to a shift-end trace, stalls stay in retiredLines (counted with the shift stalls). Self-test cases in LaneState.ps1 (-TestHeartbeat) pass under powershell and pwsh; the coordinator wiring itself is not run by a self-test.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: a2e6f913 e17130dc 8d9492b6 758046de.
+- 2026-11-04: Doing -> Done. Add-Lane keeps a reused lane's summary and tab label

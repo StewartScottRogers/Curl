@@ -299,6 +299,25 @@ function Get-EndedLanes {
     return @($Active | Where-Object { $Finished -contains $_ })
 }
 
+function Get-ReusedLaneKeep {
+    # What Add-Lane keeps of a summary file (-Lines) before it reuses the lane's number
+    # (BL-4849): the SUMMARY line for the shift-end trace, the stall lines for the alarm, and
+    # the tab label text ('BLOCKED, read' or 'STALLED, read') when the summary is not clean,
+    # else ''. A clean summary keeps only its SUMMARY line.
+    param([string[]]$Lines)
+    $summary = ''
+    $stalls = @()
+    foreach ($line in $Lines) {
+        if ($line -match '^SUMMARY ') { $summary = $line }
+        elseif ($line.Trim()) { $stalls += $line }
+    }
+    $label = ''
+    if ($summary -and -not $stalls.Count -and $summary -notmatch 'blocked=[1-9]') { $label = '' }
+    elseif ($summary -match 'blocked=[1-9]') { $label = 'BLOCKED, read' }
+    else { $label = 'STALLED, read' }
+    return [pscustomobject]@{ Summary = $summary; Stalls = $stalls; TabLabel = $label }
+}
+
 function Test-LanesFinished {
     # True once every active lane is among the finished ones (has written its summary).
     param([int[]]$Active, [int[]]$Finished)

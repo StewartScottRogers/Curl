@@ -409,6 +409,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $closedTabs = @{}
     # The non-SUMMARY lines of summaries a retired lane wrote before it was added again.
     $retiredLines = @()
+    # The SUMMARY lines of those summaries, for the shift-end trace (BL-4849).
+    $reusedSummaries = @()
 
     function Start-Lane {
         # Starts lane $N in its worktree $LanesDir\lane-<n> and records its process or tab.
@@ -446,7 +448,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if ($null -eq $n) { return $null }
         $summary = Join-Path $summaries "lane-$n.txt"
         if (Test-Path $summary) {
-            $script:retiredLines += @(Get-Content $summary | Where-Object { $_.Trim() -and $_ -notmatch '^SUMMARY ' })
+            $kept = Get-ReusedLaneKeep @(Get-Content $summary)
+            $script:retiredLines += @($kept.Stalls)
+            if ($kept.Summary) { $script:reusedSummaries += @($kept.Summary) }
+            # The old tab is not closed, so it gets its label now: Start-Lane replaces the tab.
+            if ($kept.TabLabel -and $laneTabs[$n] -and -not $closedTabs.ContainsKey($n)) { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n $kept.TabLabel) }
             Rename-Item -Path $summary -NewName "lane-$n.retired-$(Get-Date -Format 'HHmmss').log"
         }
         Remove-Item (Get-LaneStatePath $n 'retire') -ErrorAction SilentlyContinue
@@ -730,6 +736,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     if ($moved) { Write-Trace '-' 'branch' "$moved; not pulling" 'Red' }
     else { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
     $stalls = @()
+    foreach ($s in $reusedSummaries) { Write-Trace '-' 'lane' ($s -replace '^SUMMARY ', '') 'Cyan' }
     # Every lane started this shift reports, retired ones included. A lane that blocked a
     # task or stalled keeps its tab for Stewart; so does a lane that never wrote a summary.
     foreach ($file in Get-ChildItem $summaries -Filter 'lane-*.txt' -ErrorAction SilentlyContinue) {
