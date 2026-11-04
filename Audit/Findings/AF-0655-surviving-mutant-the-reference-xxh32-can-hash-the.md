@@ -3,8 +3,8 @@ id: AF-0655
 title: Surviving mutant: the reference XXH32 can hash the last whole 4-byte group byte by byte
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.Extended.UnitLibrary/Kafka/Compression/KafkaReferenceXxHash.cs:Hash32-le:surviving-mutant
 reproduction: mutation Curl.Conformance.Extended.UnitLibrary/Kafka/Compression/KafkaReferenceXxHash.cs:45:<=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-04: proposed -> accepted.
