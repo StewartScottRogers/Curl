@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4832 — Fix AF-0650: Host-mapping test names exit 3 but asserts only a false return
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-11-04: CurlUrlHost.TryNormalizeReadingHost returns a CurlUrlRejection, not an exit code (the hosts map it to exit 3 later), so the test cannot assert exit 3 at this layer. Renamed it to TryNormalizeReadingHost_MeasuredArabicFormCurlRefuses_IsRefusedAsIdnConversionFailed and added an assertion that rejection is CurlUrlRejection.IdnConversionFailed (measured: all ten forms give it). The reproduction now finds no match. Test-only change in a test project nothing references: built and ran Curl.Protocol.Abstractions.UnitTests fast tests, 1636 passed, 2 skipped, 0 failed. No production code changed, so no quality run.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. Host-mapping refusal test is named for and asserts the IdnConversionFailed rejection rather than claiming exit 3

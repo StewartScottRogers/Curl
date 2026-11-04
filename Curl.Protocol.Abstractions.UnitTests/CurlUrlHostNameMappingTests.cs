@@ -565,11 +565,12 @@ public sealed class CurlUrlHostNameMappingTests
     [DataRow("ﹺ", DisplayName = "U+FE7A kasra isolated form")]
     [DataRow("ﹼ", DisplayName = "U+FE7C shadda isolated form")]
     [DataRow("ﹾ", DisplayName = "U+FE7E sukun isolated form")]
-    public void TryNormalizeReadingHost_MeasuredArabicFormCurlRefusesWithExit3_IsRefused(string character)
+    public void TryNormalizeReadingHost_MeasuredArabicFormCurlRefuses_IsRefusedAsIdnConversionFailed(string character)
     {
-        bool accepted = CurlUrlHost.TryNormalizeReadingHost("a" + character + "b.test", refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out _, out _, out _);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost("a" + character + "b.test", refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out _, out _, out CurlUrlRejection rejection);
 
         Assert.IsFalse(accepted);
+        Assert.AreEqual(CurlUrlRejection.IdnConversionFailed, rejection);
     }
 
     [TestMethod]
