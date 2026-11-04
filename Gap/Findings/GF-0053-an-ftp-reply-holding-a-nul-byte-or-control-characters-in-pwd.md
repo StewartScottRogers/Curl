@@ -52,6 +52,7 @@ In Curl.Protocol.Ftp.UnitLibrary's control-reply reader, fail with exit 8 (weird
 - 2026-10-30_2103: 0 of 3 items are gaps.
 - 2026-10-31_1828: 0 of 3 items are gaps.
 - 2026-11-02_0859: 0 of 3 items are gaps.
+- 2026-11-03_1616: 0 of 3 items are gaps.
 
 ## Log
 
