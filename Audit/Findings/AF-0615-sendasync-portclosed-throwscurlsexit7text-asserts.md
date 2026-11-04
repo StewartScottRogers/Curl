@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/PortUnreachableReportingDatagramCh
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: no | Ran the reproduction and read on: line 61 asserts the exact message 'Failed to connect to localhost:1 after 7 ms: Could not connect to server'. That is curl's exit-7 text, built by the product from the ManualTimeProvider's 7 ms, not text the fake supplies (the fake throws a bare SocketException).
+
 ## Log
 
 - 2026-11-03: filed proposed.

@@ -3,8 +3,8 @@ id: AF-0626
 title: CI red 71.8 minutes from run 41715208450 (2533dfc6): two failures whose logs the coordinator could not read, no CI task filed
 auditor: process
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-03_2203.md: the reproduction no longer reproduces.
 key: process:logs:41715208450:ci-red
 reproduction: none
 task: BL-4799
@@ -13,9 +13,9 @@ found: 2026-11-03
 found-at: 7410f102c809d5232e4f9b210b3ac32486848c27
 scorecard: 2026-11-03_1615.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-03
+closed-how: reliable-reaudit
+closed-by: 2026-11-03_2203.md
 ---
 # AF-0626 - CI red 71.8 minutes from run 41715208450 (2533dfc6): two failures whose logs the coordinator could not read, no CI task filed
 
@@ -42,7 +42,11 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: yes | still reported
+- 2026-11-03 | 2026-11-03_2203.md | reproduces: no | The reproduction still shows the historic spell 41715208450 (71.8 min) and 145254.log lines 30 and 38 'cannot read its log'. Judged by mechanism over this window: the later failures 41735630431 and 41764281440 were read and filed as CI tasks, BL-4781 at 16:26:01 and BL-4804 at 20:31:52. Neither spell exceeded 30 min (16.15, 14.27), and no unreadable failure log recurred. 19 tasks Done.
+
 ## Log
 
 - 2026-11-03: filed proposed.
 - 2026-11-03: proposed -> accepted. Accepted under Stewart's standing accept of 2026-11-02.
+- 2026-11-03: accepted -> closed. Re-audit 2026-11-03_2203.md: the reproduction no longer reproduces.
