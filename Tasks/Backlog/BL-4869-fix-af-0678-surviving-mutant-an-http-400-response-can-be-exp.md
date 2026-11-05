@@ -4,8 +4,8 @@ title: Fix AF-0678: Surviving mutant: an HTTP 400 response can be exported as a 
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Extension.OpenTelemetry.UnitLibrary]
+depends-on: [BL-4873]
+touches: [Curl.Extension.OpenTelemetry.UnitLibrary, Curl.Extension.OpenTelemetry.UnitTests]
 requirement: none
 created: 2026-11-05
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- 2026-11-05 (lane 6): The fix is a test pinning the 400 boundary (a 400 response is an error with error.type "400") in `Curl.Extension.OpenTelemetry.UnitTests/Otlp/OtlpHttpClientSpanTests.cs`; the production code is already right. That test project was not in touches and BL-4873 (in Doing) holds it whole, so touches was widened to it and BL-4873 added to depends-on; requeued before any code edit.
+
 ## Log
 
 - 2026-11-05: Created.
 - 2026-11-05: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-05: Doing -> Backlog. Needs Curl.Extension.OpenTelemetry.UnitTests, held by BL-4873 in Doing; waits on BL-4873
