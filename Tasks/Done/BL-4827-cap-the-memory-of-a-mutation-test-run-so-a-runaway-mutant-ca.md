@@ -9,7 +9,7 @@ touches: [Audit/Tools/Invoke-MutationTest.ps1]
 lane: no
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-05
 ---
 # BL-4827 — Cap the memory of a mutation test run so a runaway mutant cannot exhaust the machine
 
@@ -36,3 +36,4 @@ Done on the audit branch (db2c62484, PR #311): Invoke-Timed reads the test run's
 
 - 2026-11-04: Created.
 - 2026-11-05: Backlog -> Doing. Criteria at claim: 28d7b606 4b0f9e77.
+- 2026-11-05: Doing -> Done. Mutation test runs stop past -MaxMemoryGB (default 8) and count the mutant killed, reason memory limit; merged in PR #311 (db2c62484).
