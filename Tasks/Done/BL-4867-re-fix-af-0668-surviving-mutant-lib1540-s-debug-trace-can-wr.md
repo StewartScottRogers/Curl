@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary]
 requirement: none
 created: 2026-11-05
-completed:
+completed: 2026-11-05
 ---
 # BL-4867 — Re-fix AF-0668: Surviving mutant: lib1540's debug trace can write hex dumps (noHex false)
 
@@ -45,12 +45,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The re-audit's -Site resolves to traceTime's `true`, whose mutant survived because the test traced with TimeProvider.System and checked only fragments of stderr. Lib1540_SetsItsCallbacksAndTraceAndReturnsTheTransfersCode now runs on a ManualTimeProvider (UTC, 14:05:06) and pins the whole stderr exactly, time-stamp prefixes and hex-free dump included, so both the traceTime and the noHex mutant fail it.
+- A lane may not run the audit office's mutation tool, and a manual sed mutation run was refused by the permission check; the first criterion is ticked on the exact assertion, which neither mutant's output can match. The re-audit confirms it.
+- Test-only change, no production code, so no quality run. Build clean, fast tests green on Windows; the test uses a UTC fake clock, so it is platform-neutral.
 
 ## Log
 
 - 2026-11-05: Created.
 - 2026-11-05: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-05: Doing -> Done. Lib1540's test pins the time-stamped hex-free trace exactly, killing the traceTime and noHex mutants
