@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.OpenTelemetry.UnitTests]
 requirement: none
 created: 2026-11-05
-completed:
+completed: 2026-11-05
 ---
 # BL-4873 — Fix AF-0682: ReadsNoMoreThanItsLimit never checks how much was read
 
@@ -52,3 +52,4 @@ The test now asserts the connection served exactly 8192 bytes (the limit); the <
 
 - 2026-11-05: Created.
 - 2026-11-05: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-05: Doing -> Done. Test asserts 8192 bytes read
