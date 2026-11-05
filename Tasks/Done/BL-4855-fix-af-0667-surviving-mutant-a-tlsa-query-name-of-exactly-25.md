@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.Dane.UnitLibrary]
+touches: [Curl.Extension.Dane.UnitLibrary, Curl.Extension.Dane.UnitTests/Wire/DnssecQueryEncoderTests.cs]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4855 — Fix AF-0667: Surviving mutant: a TLSA query name of exactly 255 octets can be refused as too long
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added Encode_Rfc1035Section2_3_4_ANameOfExactly255OctetsIsEncoded to DnssecQueryEncoderTests: labels of 63, 63, 63 and 61 octets, 255 octets with the root. Widened touches to that one test file, which no other task in Doing names. No production code changed, so no quality run was needed.
+- Lanes cannot run the audit office's mutation tool, so the mutant was checked by hand: with `wire.Count >= MaximumNameLength` applied, the new test fails, so the mutant is killed; the change was then reverted. The test is platform-neutral.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. A 255-octet TLSA query name is pinned as encoded, killing the >= mutant

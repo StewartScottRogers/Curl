@@ -63,6 +63,18 @@ public sealed class DnssecQueryEncoderTests
     }
 
     [TestMethod]
+    public void Encode_Rfc1035Section2_3_4_ANameOfExactly255OctetsIsEncoded()
+    {
+        // Three 63-octet labels and one 61-octet label: 3 * 64 + 62 + the root's zero octet = 255 octets.
+        string name = string.Join('.', [.. Enumerable.Repeat(new string('a', 63), 3), new string('b', 61)]);
+
+        byte[] query = DnssecQueryEncoder.Encode(1, name, DnssecRecordType.Tlsa, false);
+
+        Assert.HasCount(12 + 255 + 4 + OptRecordWithDnssecOk.Length, query);
+        Assert.AreEqual(0x00, query[12 + 254]);
+    }
+
+    [TestMethod]
     public void Encode_AnEmptyNameIsRefused() =>
         Assert.ThrowsExactly<ArgumentException>(() => DnssecQueryEncoder.Encode(1, string.Empty, DnssecRecordType.Tlsa, false));
 }
