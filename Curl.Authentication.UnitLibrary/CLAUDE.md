@@ -61,7 +61,8 @@ Tests fake the seam with `ScriptedSecurityContext` and run the hand-built route 
 AWS Signature Version 4 (BL-628, ADR-0178): `AwsSigV4Signer` signs an `AwsSigV4Request`
 into an `AwsSigV4SigningResult` (header lines, or curl's exit code and message) exactly as
 curl 8.21.0's `http_aws_sigv4.c`, quirks included; `AwsSigV4Scope` parses `--aws-sigv4`,
-`AwsSigV4Headers` and `AwsSigV4UriEncoding` canonicalize. Not wired into a transfer yet (BL-629).
+`AwsSigV4Headers` and `AwsSigV4UriEncoding` canonicalize. `EngineComposition` wires it into every HTTP transfer: `AwsSigV4HttpAuthenticator`
+(in `Curl.Engine.UnitLibrary`) signs the request with an `AwsSigV4Signer` (BL-629).
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a
