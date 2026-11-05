@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/PeerVerificationTests.cs]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4859 — Fix AF-0671: Surviving mutant: a TLS handshake that fails before the certificate can be reported as certificate-verified
 
@@ -55,3 +55,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. A test now kills AF-0671's mutant: PeerVerification.Unobserved is pinned as not verified
