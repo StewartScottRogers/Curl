@@ -50,6 +50,18 @@ public sealed class Lib500Tests
     }
 
     [TestMethod]
+    public async Task RunAsync_SentHeader_TracesItWithoutAHexColumn()
+    {
+        var engine = new FakeCurlEngine { Performing = options => options.Callbacks.Debug!(CurlInfoType.HeaderOut, "GET\r\n"u8) == 0 ? CurlCode.Ok : CurlCode.Obsolete44 };
+        var run = new PortRun(engine, 500, "http://x/");
+
+        LibTestResult result = await new Lib500(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, result.ExitCode);
+        StringAssert.EndsWith(run.Error.ToString(), " => Send header, 5 bytes (0x5)\n0000: GET\n");
+    }
+
+    [TestMethod]
     public async Task RunAsync_FailedTransfer_AnswersItsCode()
     {
         var run = new PortRun(new FakeCurlEngine { PerformResult = CurlCode.CouldntConnect }, 500, "http://x/", "unused");

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4857 — Fix AF-0669: Surviving mutant: lib500's debug trace can write hex dumps (noHex false)
 
@@ -41,12 +41,22 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- `Lib500Tests.RunAsync_SentHeader_TracesItWithoutAHexColumn` sends a header through lib500's
+  debug trace and pins the dump's tail `=> Send header, 5 bytes (0x5)\n0000: GET\n` (no hex
+  column, as with lib1540's fix for AF-0668). The time prefix stays outside the pinned text.
+- A lane cannot run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand
+  (`noHex: false` on Lib500.cs:50): the new test failed against it, and passed once it was
+  reverted. That is the mutant killed.
+- Test-only change, no production code changed, so no quality run was needed. Full fast run:
+  115 test projects passed, none failed. The test has no platform-specific content.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. Lib500's test pins the hex-free debug dump; the hand-applied noHex mutant fails it
