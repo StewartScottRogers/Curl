@@ -60,6 +60,7 @@ public sealed class OtlpHttpExporterTests
         var failure = await new OtlpHttpExporter(new RecordedConnector(connection)).ExportAsync("http://collector/v1/traces", Body, CancellationToken.None);
 
         Assert.IsNull(failure);
+        Assert.AreEqual(8192, connection.BytesRead);
     }
 
     [TestMethod]
