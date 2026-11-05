@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console]
 requirement: none
 created: 2026-11-05
-completed:
+completed: 2026-11-05
 ---
 # BL-4875 — Fix AF-0684: -F upload under --limit-rate 1 puts one more body byte on the wire than curl before the server's reset
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause, from `--trace-ascii --trace-time` on both binaries: curl sends the head and the first body byte together, then the second byte 1.2 s later. Curl sent its second byte 0.28 s after the first, because `RateLimitedUploadStream` built its `RateLimitedStream` (and started the rate's clock) at transfer setup, so connecting and sending the head used up the first wait. After that, both pace on a cumulative schedule that catches up after a late byte.
+- Fix: `RateLimitedUploadStream` builds the limiter at its first asynchronous read, so the second body piece waits a whole second (ADR-1236). `RateLimitedStream` in Curl.Core is untouched, so the download pacing is unchanged and the task stays within `touches`. Test: `ReadAsync_TimePassesBeforeTheFirstRead_WaitsAWholeSecondBeforeTheSecond`.
+- Measured over 6 runs on fresh ports (63871 was taken by another process, so each run used its own port): body bytes past the 193-byte head were curl 3,1,1,1,1,2 and Curl 3,4,4,3,2,2 before the fix; curl 2,1,1,1,1,1 and Curl 2,5,1,1,1,2 after it. The pacing now matches curl's. The recorder stops after a 1 s read wait while both binaries send a byte about every second, so single runs still differ by jitter for curl as well (one curl run recorded 6). A re-audit should compare several runs rather than one.
+- Measure-CodeQuality.ps1 -Library Curl.Console: 0 failing members. All fast tests in the solution passed (VSTEST_CONNECTION_TIMEOUT=600 was needed because other lanes loaded the machine). The change has no platform-specific code or tests.
 
 ## Log
 
 - 2026-11-05: Created.
 - 2026-11-05: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-05: Doing -> Done. Upload limiter clock starts at the first body read; -F --limit-rate 1 pacing matches curl's (ADR-1236)
