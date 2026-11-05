@@ -42,6 +42,8 @@ Select-String -Path Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs -Patt
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_1442.md | reproduces: no | Ran the Select-String: CurlCommandRunnerUploadTests.cs:430 Assert.AreEqual((int)CurlExitCode.ReadError, exitCode); and CurlExitCode.ReadError = 26 (CurlExitCode.cs:118), matching Exits26.
+
 ## Log
 
 - 2026-11-04: filed proposed.

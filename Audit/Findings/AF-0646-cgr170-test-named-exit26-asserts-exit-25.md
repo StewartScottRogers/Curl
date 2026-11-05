@@ -42,6 +42,8 @@ Select-String -Path Curl.Console.UnitTests/Cgr170Tests.cs -Pattern 'ReportsEvery
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_1442.md | reproduces: no | Ran the Select-String: Cgr170Tests.cs:53 now reads Assert.AreEqual(26, exitCode); and line 54 expects '0 26 000\n1 26 000\n'. The name and assertion agree on 26.
+
 ## Log
 
 - 2026-11-04: filed proposed.

@@ -42,6 +42,8 @@ Select-String -Path Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingT
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_1442.md | reproduces: no | Ran the Select-String: no match. No test in CurlUrlHostNameMappingTests.cs names Exit3 any more; the refusal test is now TryNormalizeReadingHost_MeasuredArabicFormCurlRefuses_IsRefusedAsIdnConversionFailed (line 568), asserting Assert.IsFalse(accepted) and Assert.AreEqual(CurlUrlRejection.IdnConversionFailed, rejection).
+
 ## Log
 
 - 2026-11-04: filed proposed.

@@ -3,8 +3,8 @@ id: AF-0657
 title: Surviving mutant: a pinned-public-key file of exactly 1 MiB can be refused
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-04_1442.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/PinnedPublicKey.cs:ReadKeyFile-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/PinnedPublicKey.cs:165:>
 task: BL-4839
@@ -13,9 +13,9 @@ found: 2026-11-04
 found-at: 650d20c75108547e7bc74da2e86fbee9c49f7931
 scorecard: 2026-11-04_0643.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-04
+closed-how: mechanical
+closed-by: 2026-11-04_1442.md
 ---
 # AF-0657 - Surviving mutant: a pinned-public-key file of exactly 1 MiB can be refused
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-04 | 2026-11-04_1442.md | reproduces: no | Ran the -Site command: resolvedLine 165, outcome killed (same 3 ECH baseline exclusions). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-04: filed proposed.
 - 2026-11-04: proposed -> accepted.
+- 2026-11-04: accepted -> closed. Re-audit 2026-11-04_1442.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
