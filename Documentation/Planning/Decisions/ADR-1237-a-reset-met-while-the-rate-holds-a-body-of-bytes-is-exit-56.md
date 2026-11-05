@@ -1,4 +1,4 @@
-# ADR-1236 — A reset met while --limit-rate holds a body of bytes is exit 56
+# ADR-1237 — A reset met while --limit-rate holds a body of bytes is exit 56
 
 - Status: Accepted
 - Date: 2026-11-05

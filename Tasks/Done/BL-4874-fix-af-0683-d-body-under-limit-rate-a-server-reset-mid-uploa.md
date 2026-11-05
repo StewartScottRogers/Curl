@@ -46,7 +46,7 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
-- Fixed in HttpRequestBodyWriter.WriteBytesAtRateAsync: a rate-held piece of a -d bytes body that had to wait is written through WriteAfterWaitAsync, which applies ADR-0730's exit-56 receive probe. Decision recorded in ADR-1236 (amends ADR-0730's "any body of bytes").
+- Fixed in HttpRequestBodyWriter.WriteBytesAtRateAsync: a rate-held piece of a -d bytes body that had to wait is written through WriteAfterWaitAsync, which applies ADR-0730's exit-56 receive probe. Decision recorded in ADR-1237 (amends ADR-0730's "any body of bytes").
 - Measured with the Debug build: real curl 8.22.0 and Curl both exit 56 `curl: (56) Recv failure: Connection was reset` (port 63893 for curl; 63871 was in use).
 - Tests: HttpRequestBodyWriterRateHeldPieceResetTests (fake clock and connection, platform-neutral). Fast tests green; Measure-CodeQuality for the HTTP library: 0 failing members.
 
