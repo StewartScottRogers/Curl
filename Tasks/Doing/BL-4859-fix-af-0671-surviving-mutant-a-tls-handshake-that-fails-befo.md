@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/PeerVerificationTests.cs]
 requirement: none
 created: 2026-11-04
 completed:
@@ -41,10 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `PeerVerificationTests.Unobserved_HandshakeNeverReachedCertificate_ClaimsNoVerifiedCertificate`: `PeerVerification.Unobserved` (the observation `SslStreamTlsProvider` hands `ReportFailedHandshake` when the handshake fails before the certificate callback, and `HandBuiltCertificateVerifier.Observed`'s default) must not be verified, carry no verify result and no chain. No production code changed, so no Measure-CodeQuality run was needed.
+- `touches` widened to `Curl.Networking.UnitTests/PeerVerificationTests.cs`, where the test belongs; no task in Doing on work/dark-factory names it.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the reproduction was checked by hand: with line 15 changed to `new(true, null, [])`, the new test failed (1 of 4064), so the mutant is killed; the value was then put back. The re-audit runs the tool itself.
+- Build clean (0 warnings) and the fast tests green on Windows; the test is platform-neutral (no paths, sockets or certificates).
 
 ## Log
 
