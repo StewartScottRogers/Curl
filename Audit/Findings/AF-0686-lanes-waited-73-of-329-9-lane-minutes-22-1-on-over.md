@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: process:logs:whole-project-touches:overlap-wait
 reproduction: none
-task: none
-tasks:
+task: BL-4877
+tasks: BL-4877
 found: 2026-11-05
 found-at: aea9f0110c59ad5209aafb9f0f985886a2cb9439
 scorecard: 2026-11-05_0819.md

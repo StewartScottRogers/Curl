@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OpenTelemetry.UnitLibrary/Otlp/OtlpHttpExporter.cs:Outcome-ge:surviving-mutant
 reproduction: mutation Curl.Extension.OpenTelemetry.UnitLibrary/Otlp/OtlpHttpExporter.cs:76:>=
-task: none
-tasks:
+task: BL-4870
+tasks: BL-4870
 found: 2026-11-05
 found-at: aea9f0110c59ad5209aafb9f0f985886a2cb9439
 scorecard: 2026-11-05_0819.md

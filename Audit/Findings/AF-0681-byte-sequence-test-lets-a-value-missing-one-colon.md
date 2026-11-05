@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.ContentDigest.UnitTests/DigestFieldTests.cs:Parse_AValueThatIsNotADictionaryOfByteSequences_IsIgnoredWhole:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-4872
+tasks: BL-4872
 found: 2026-11-05
 found-at: aea9f0110c59ad5209aafb9f0f985886a2cb9439
 scorecard: 2026-11-05_0819.md

@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:Curl.Console/RateLimitedUploadStream.cs:--limit-rate:request
 reproduction: none
-task: none
-tasks:
+task: BL-4875
+tasks: BL-4875
 found: 2026-11-05
 found-at: aea9f0110c59ad5209aafb9f0f985886a2cb9439
 scorecard: 2026-11-05_0819.md
