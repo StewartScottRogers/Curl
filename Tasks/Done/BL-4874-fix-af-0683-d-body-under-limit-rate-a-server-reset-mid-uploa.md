@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-11-05
-completed:
+completed: 2026-11-05
 ---
 # BL-4874 — Fix AF-0683: -d body under --limit-rate: a server reset mid-upload is exit 55 Send failure in Curl, exit 56 Recv failure in curl
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fixed in HttpRequestBodyWriter.WriteBytesAtRateAsync: a rate-held piece of a -d bytes body that had to wait is written through WriteAfterWaitAsync, which applies ADR-0730's exit-56 receive probe. Decision recorded in ADR-1236 (amends ADR-0730's "any body of bytes").
+- Measured with the Debug build: real curl 8.22.0 and Curl both exit 56 `curl: (56) Recv failure: Connection was reset` (port 63893 for curl; 63871 was in use).
+- Tests: HttpRequestBodyWriterRateHeldPieceResetTests (fake clock and connection, platform-neutral). Fast tests green; Measure-CodeQuality for the HTTP library: 0 failing members.
 
 ## Log
 
 - 2026-11-05: Created.
 - 2026-11-05: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-05: Doing -> Done. Rate-held -d body reset now exits 56 Recv failure, as curl does
