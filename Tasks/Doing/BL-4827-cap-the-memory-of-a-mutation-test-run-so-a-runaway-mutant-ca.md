@@ -28,8 +28,11 @@ Audit 20261104-064338, 2026-11-04 07:23 MST: the quality auditor's mutation run 
 
 ## Notes
 
+Done on the audit branch (db2c62484, merged in PR #311): Invoke-Timed reads the test run's process tree about once a second and stops it past -MaxMemoryGB (default 8); the mutant is killed with reason 'memory limit'. -SelfTest: 39 PASS under Windows PowerShell 5.1 and pwsh 7, with a stand-in whose child allocates past a 1 GB limit. A real two-mutant run on Curl.Original.Protocol.Dict.UnitLibrary killed both.
+
 Done on the audit branch (db2c62484, PR #311): Invoke-Timed reads the test run's process tree about once a second and stops it past -MaxMemoryGB (default 8); the mutant is killed with reason 'memory limit'. -SelfTest: 39 PASS under Windows PowerShell 5.1 and pwsh 7, with a stand-in whose child allocates past a 1 GB limit. A real two-mutant run on Curl.Original.Protocol.Dict.UnitLibrary killed both.
 
 ## Log
 
 - 2026-11-04: Created.
+- 2026-11-05: Backlog -> Doing. Criteria at claim: 28d7b606 4b0f9e77.
