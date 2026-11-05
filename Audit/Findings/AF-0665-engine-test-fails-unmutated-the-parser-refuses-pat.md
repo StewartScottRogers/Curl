@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitTests/TransferContextFactoryTests.cs:Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine:failing-test
 reproduction: none
-task: BL-4853
-tasks: BL-4853
+task: BL-4866
+tasks: BL-4853, BL-4866
 found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md
@@ -41,6 +41,8 @@ dotnet test Curl.Engine.UnitTests --filter FullyQualifiedName~Create_CommandLine
 - Actual: Failed: 1 - curl: option --path-as-is: is unknown
 
 ## Re-audits
+
+- 2026-11-05 | 2026-11-05_0819.md | reproduces: yes | Ran the reproduction: Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine still fails, 'The parser refused the command line (exit FailedInit): curl: option --path-as-is: is unknown' (TransferContextFactoryTests.cs:943).
 
 ## Log
 

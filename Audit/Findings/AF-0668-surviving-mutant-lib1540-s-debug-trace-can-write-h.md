@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1540.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1540.cs:51:true
-task: BL-4856
-tasks: BL-4856
+task: BL-4867
+tasks: BL-4856, BL-4867
 found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md
@@ -41,6 +41,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 - Actual: outcome survived (sampled noHex mutant)
 
 ## Re-audits
+
+- 2026-11-05 | 2026-11-05_0819.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: outcome survived. The site resolved line 51's first 'true', now traceTime ('traceTime: true' -> 'traceTime: false'). That mutant survives, so the TestAsync-true site in Lib1540 is still unchecked; the noHex argument the title names was not mutated. Runner's targeted mutation rerun on the clean audited commit: survived.
 
 ## Log
 

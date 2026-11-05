@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Re-audits
 
 - 2026-11-04 | 2026-11-04_1442.md | not re-audited | Ran the -Site command: outcome killed, but the mutant it applied was 'traceTime: false, noHex: true'. The tool takes the line's first 'true' site, so it never mutated the noHex flag this finding names. The run does not tell whether the noHex mutant is killed. This audit's sample found the same noHex mutant surviving in Lib1540, Lib500 and Lib1515.
+- 2026-11-05 | 2026-11-05_0819.md | not re-audited | Ran the -Site command: outcome killed, but the site resolved line 63's first 'true', which is now traceTime ('traceTime: true' -> 'traceTime: false'), not the noHex argument the finding names. The noHex mutant was not run, so the result does not tell.
 
 ## Log
 
