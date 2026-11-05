@@ -31,7 +31,9 @@ state machine meets callers that read, write and open streams concurrently.
    `FLOW_CONTROL_ERROR` or `STREAM_LIMIT_ERROR`; a frame for a part the stream does not
    have, or for a client stream not opened, `STREAM_STATE_ERROR`; a changed or exceeded
    final size `FINAL_SIZE_ERROR`. The connection closes with that error; mapping it to
-   curl's exit is BL-727's (for now it is the handshake's exit 7).
+   curl's exit is `QuicHandshakeFailures.FromTransportError`'s: exit 7 with the error's
+   reason while the handshake is incomplete, exit 56 once it is complete. Stream frames
+   arrive after the handshake, so these errors end in exit 56.
 4. **STOP_SENDING is answered with RESET_STREAM** carrying the same code and the offset
    sent so far; the unsent bytes are dropped, and lost STREAM data of a reset stream is
    not sent again. `Abort` sends `RESET_STREAM` and `STOP_SENDING`, each only where it
