@@ -42,6 +42,8 @@ dotnet test Curl.Engine.UnitTests --filter FullyQualifiedName~Create_CommandLine
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_0819.md | reproduces: yes | Ran the reproduction: Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine still fails, 'The parser refused the command line (exit FailedInit): curl: option --path-as-is: is unknown' (TransferContextFactoryTests.cs:943).
+
 ## Log
 
 - 2026-11-04: filed proposed.

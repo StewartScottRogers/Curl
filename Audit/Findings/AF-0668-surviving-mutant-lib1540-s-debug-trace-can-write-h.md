@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_0819.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: outcome survived. The site resolved line 51's first 'true', now traceTime ('traceTime: true' -> 'traceTime: false'). That mutant survives, so the TestAsync-true site in Lib1540 is still unchecked; the noHex argument the title names was not mutated. Runner's targeted mutation rerun on the clean audited commit: survived.
+
 ## Log
 
 - 2026-11-04: filed proposed.

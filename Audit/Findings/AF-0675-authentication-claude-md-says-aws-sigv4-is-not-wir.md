@@ -3,8 +3,8 @@ id: AF-0675
 title: Authentication CLAUDE.md says AWS SigV4 is not wired into a transfer yet; EngineComposition wires it into every HTTP transfer
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-05_0819.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Authentication.UnitLibrary/CLAUDE.md:AwsSigV4Signer:false-statement
 reproduction: none
 task: BL-4863
@@ -13,9 +13,9 @@ found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: reliable-reaudit
+closed-by: 2026-11-05_0819.md
 ---
 # AF-0675 - Authentication CLAUDE.md says AWS SigV4 is not wired into a transfer yet; EngineComposition wires it into every HTTP transfer
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Authentication.UnitLibrary/CLAUDE.md -Pattern 'Not wire
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_0819.md | reproduces: no | Select-String for 'Not wired into a transfer yet' in Curl.Authentication.UnitLibrary/CLAUDE.md found no match. CLAUDE.md:64-66 now says EngineComposition puts AwsSigV4HttpAuthenticator in front and signs only when --aws-sigv4 is given. EngineComposition.cs:180 still builds 'new AwsSigV4HttpAuthenticator(httpAuthenticator.Value, new AwsSigV4Signer(...))' for the http/https handler, so the document and the code agree.
+
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_0819.md: the reproduction no longer reproduces.

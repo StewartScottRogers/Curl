@@ -3,8 +3,8 @@ id: AF-0667
 title: Surviving mutant: a TLSA query name of exactly 255 octets can be refused as too long
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-05_0819.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Extension.Dane.UnitLibrary/Wire/DnssecQueryEncoder.cs:EncodeName-gt:surviving-mutant
 reproduction: mutation Curl.Extension.Dane.UnitLibrary/Wire/DnssecQueryEncoder.cs:80:>
 task: BL-4855
@@ -13,9 +13,9 @@ found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: mechanical
+closed-by: 2026-11-05_0819.md
 ---
 # AF-0667 - Surviving mutant: a TLSA query name of exactly 255 octets can be refused as too long
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_0819.md | reproduces: no | Ran the -Site command: 'wire.Count > MaximumNameLength' -> '>=' at line 80, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_0819.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

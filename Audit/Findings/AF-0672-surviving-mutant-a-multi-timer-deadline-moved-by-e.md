@@ -3,8 +3,8 @@ id: AF-0672
 title: Surviving mutant: a multi timer deadline moved by exactly 1 ms can be told to the timer callback again
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-05_0819.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/ManagedMultiTransfer.Timer.cs:IsTimerUnchanged-le:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedMultiTransfer.Timer.cs:50:<=
 task: BL-4860
@@ -13,9 +13,9 @@ found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: mechanical
+closed-by: 2026-11-05_0819.md
 ---
 # AF-0672 - Surviving mutant: a multi timer deadline moved by exactly 1 ms can be told to the timer callback again
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_0819.md | reproduces: no | Ran the -Site command: '(due - reportedTimerDue).Duration() <= TimeSpan.FromMilliseconds(1)' -> '<' at line 50, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_0819.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
