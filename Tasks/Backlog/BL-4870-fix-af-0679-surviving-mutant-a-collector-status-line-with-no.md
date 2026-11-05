@@ -4,8 +4,8 @@ title: Fix AF-0679: Surviving mutant: a collector status line with no reason phr
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Extension.OpenTelemetry.UnitLibrary]
+depends-on: [BL-4873]
+touches: [Curl.Extension.OpenTelemetry.UnitLibrary, Curl.Extension.OpenTelemetry.UnitTests/Otlp/OtlpHttpExporterTests.cs]
 requirement: none
 created: 2026-11-05
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- 2026-11-05 (lane 6): The mutant is killed by a test in `Curl.Extension.OpenTelemetry.UnitTests/Otlp/OtlpHttpExporterTests.cs` exporting against a collector answering `HTTP/1.1 200` (no reason phrase) and expecting success; no production change is needed. That project is held by BL-4873 (in Doing), so the test file was added to touches, BL-4873 to depends-on, and the task requeued with no edits made.
+
 ## Log
 
 - 2026-11-05: Created.
 - 2026-11-05: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-05: Doing -> Backlog. Waits on BL-4873, which holds Curl.Extension.OpenTelemetry.UnitTests where the killing test goes
