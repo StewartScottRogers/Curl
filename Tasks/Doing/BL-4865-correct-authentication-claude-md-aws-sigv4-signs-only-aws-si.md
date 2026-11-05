@@ -37,3 +37,4 @@ As written, an agent reading the file would believe every HTTP transfer is SigV4
 ## Log
 
 - 2026-11-04: Created.
+- 2026-11-04: Backlog -> Doing. Criteria at claim: 7e952c3f 97c5d10c 4d0f720b.
