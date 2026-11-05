@@ -1284,3 +1284,4 @@ Each option and the specific reason it lost.
 | [1234](ADR-1234-the-dark-factory-shortens-red-ci-and-settles-orphans-without-refusing-a-shift.md) | The dark factory shortens red CI and settles orphans without refusing a shift (BL-4647) | Accepted | 2026-11-03 |
 | [1235](ADR-1235-ci-red-time-counts-only-while-a-test-or-build-fails.md) | CI red time counts only while a test or build fails (BL-4647) | Accepted | 2026-11-04 |
 | [1236](ADR-1236-limit-rate-upload-clock-starts-at-the-first-body-read.md) | The `--limit-rate` upload clock starts at the first body read, so the second body piece waits a whole second as curl's does (BL-4875) | Accepted | 2026-11-05 |
+| [1236](ADR-1236-a-reset-met-while-the-rate-holds-a-body-of-bytes-is-exit-56.md) | A reset met while --limit-rate holds a body of bytes is exit 56 (BL-4874) | Accepted | 2026-11-05 |

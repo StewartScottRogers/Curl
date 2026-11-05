@@ -411,7 +411,9 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// Writes a body of bytes no faster than <paramref name="rate" /> bytes a second: pieces of at
     /// most <paramref name="rate" /> bytes, each after the wait on <see cref="TimeProvider" /> that
     /// keeps the bytes sent before it within the rate, as curl's <c>CURLOPT_MAX_SEND_SPEED_LARGE</c>
-    /// pauses the send (BL-2957).
+    /// pauses the send (BL-2957). A piece that had to wait is written as one after a read the writer
+    /// waited for (<see cref="WriteAfterWaitAsync" />), since curl polls the socket for reading while
+    /// the rate holds the send (BL-4874).
     /// </summary>
     private async ValueTask WriteBytesAtRateAsync(ReadOnlyMemory<byte> content, long rate, bool isChunked, CancellationToken cancellationToken)
     {
@@ -419,7 +421,8 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         while (BytesWritten < content.Length && !CutShort)
         {
             TimeSpan due = TimeSpan.FromSeconds((double)BytesWritten / rate) - TimeProvider.GetElapsedTime(start);
-            if (due > TimeSpan.Zero)
+            bool waited = due > TimeSpan.Zero;
+            if (waited)
             {
                 await Task.Delay(due, TimeProvider, cancellationToken).ConfigureAwait(false);
             }
@@ -427,7 +430,30 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             int room = (int)Math.Min(NextReadRoom(isChunked), rate);
             int length = (int)Math.Min(room, content.Length - BytesWritten);
             ReportBufferRead(room, length, BytesWritten + length == content.Length, isChunked);
-            await WritePieceAsync(content.Slice((int)BytesWritten, length), isChunked, cancellationToken).ConfigureAwait(false);
+            await WriteAfterWaitAsync(content.Slice((int)BytesWritten, length), waited, isChunked, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Writes one piece of a body of bytes held by <see cref="SendBytesPerSecond" />. When the piece
+    /// had to wait for the rate and its write fails, the connection is read first
+    /// (<see cref="ReceiveFailureOrAsync" />): curl 8.22.0 polls the socket for reading while
+    /// <c>--limit-rate</c> holds the send, so a peer that reset meanwhile is met by <c>recv</c>,
+    /// exit 56 (measured, AF-0683).
+    /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// The connection failed the write (exit 55), or, after a wait, reports a failure of its own when
+    /// read (exit 56).
+    /// </exception>
+    private async ValueTask WriteAfterWaitAsync(ReadOnlyMemory<byte> piece, bool waited, bool isChunked, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await WritePieceAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpTransferException failed) when (waited && failed.ExitCode == CurlExitCode.SendError)
+        {
+            throw await ReceiveFailureOrAsync(failed, cancellationToken).ConfigureAwait(false);
         }
     }
 
