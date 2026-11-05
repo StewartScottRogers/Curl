@@ -157,8 +157,9 @@ if ($AutoLanesReport) {
     Write-Host "5-hour rate $(Format-Rate $step.FiveHourRate)$(if ($null -ne $step.FiveHourRate) { ' points/hour/lane' })$savedNote"
     Write-Host "weekly rate $(Format-Rate $step.WeeklyRate)$(if ($null -ne $step.WeeklyRate) { ' points/hour/lane' })$savedNote"
     if ($reading) {
-        Write-Host ("usage 5-hour {0}% (reset {1}), weekly {2}% (reset {3})" -f [math]::Round($reading.FiveHour * 100),
-            $reading.FiveHourResets.ToString('HH:mm'), [math]::Round($reading.Week * 100), $reading.WeekResets.ToString('ddd HH:mm'))
+        $fiveHourText = if ($reading.FiveHourReported) { "$([math]::Round($reading.FiveHour * 100))% (reset $($reading.FiveHourResets.ToString('HH:mm')))" } else { 'not reported (not near its limit)' }
+        $weekText = if ($reading.WeekReported) { "$([math]::Round($reading.Week * 100))% (reset $($reading.WeekResets.ToString('ddd HH:mm')))" } else { 'not reported (not near its limit)' }
+        Write-Host "usage 5-hour $fiveHourText, weekly $weekText"
     } else { Write-Host "usage unknown (no reading in $LogDir)" }
     if ($step.Pace) { Write-Host "5-hour target $(Format-Rate $step.Pace.FiveHour) lanes, weekly target $(Format-Rate $step.Pace.Weekly) lanes$(if (-not $WeeklyPace) { ' (not pacing weekly)' })" }
     else { Write-Host '5-hour target none yet, weekly target none yet' }
