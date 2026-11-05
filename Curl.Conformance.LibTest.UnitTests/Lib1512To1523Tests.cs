@@ -166,6 +166,21 @@ public sealed class Lib1512To1523Tests
     }
 
     [TestMethod]
+    public async Task Lib1515_SentHeader_TracesItWithoutAHexColumn()
+    {
+        var engine = new FakeCurlEngine();
+        engine.Multi.DoneResult = CurlCode.Ok;
+        var run = new PortRun(engine, 1515, "path/1515", "127.0.0.1", "8990");
+
+        LibTestResult result = await new Lib1515(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+        int traced = engine.Multi.Added!.Options.Callbacks.Debug!(CurlInfoType.HeaderOut, "GET\r\n"u8);
+
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual(0, traced);
+        StringAssert.EndsWith(run.Error.ToString(), " => Send header, 5 bytes (0x5)\n0000: GET\n");
+    }
+
+    [TestMethod]
     public async Task Lib1515_WaitsTheDnsTimeoutPlusOneSecondOnlyBetweenTheRequests()
     {
         var engine = new FakeCurlEngine();
