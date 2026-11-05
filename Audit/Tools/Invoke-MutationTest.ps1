@@ -29,7 +29,8 @@
     commit and seed always give the same sites.
 
     Outcomes, per mutant:
-        killed      the build succeeded and at least one test failed
+        killed      the build succeeded and at least one test failed, or a process of the
+                    test run passed -MaxMemoryGB and the run was stopped (reason: memory limit)
         survived    the build succeeded and every test passed: the tests did not notice
         timedOut    the tests ran past -TimeoutSeconds (counted as killed)
         stillborn   the mutant did not build (not counted)
@@ -73,6 +74,12 @@
 .PARAMETER TimeoutSeconds
     The limit for one test run. Default 600.
 
+.PARAMETER MaxMemoryGB
+    The memory limit for one test run: its process tree is read about once a second, and the run
+    is stopped once any process in it holds a working set past this many GB; a mutant stopped so
+    is killed, with reason "memory limit", and an unmutated baseline stopped so fails. 0 turns the
+    watch off. Default 8 (BL-4827: a mutant's testhost took 80 GB of the machine in 4 minutes).
+
 .PARAMETER OutFile
     Write the JSON result here as well as to standard output.
 
@@ -103,12 +110,13 @@
 
 .PARAMETER SelfTest
     Check the site finder, the operators, the member finder, site resolution, the test filter,
-    the baseline-failure path and the library draw on samples, print PASS or FAIL per case, and
-    exit.
+    the baseline-failure path, the library draw and the memory limit (a stand-in whose child
+    allocates past it) on samples, print PASS or FAIL per case, and exit.
 
 .OUTPUTS
     JSON: { library, commit, seed, baselineMs, excludedTests, mutants: [ { file, line, member,
-    operator, original, mutated, outcome, ms } ], killed, survived, timedOut, stillborn, score },
+    operator, original, mutated, outcome, ms, and reason "memory limit" on a mutant stopped at
+    -MaxMemoryGB } ], killed, survived, timedOut, stillborn, score },
     and on a failed baseline also baselineError; with -Site also site, resolvedLine, outcome.
 
 .EXAMPLE
@@ -124,6 +132,7 @@ param(
     [int]$MaxMutants = 50,
     [int]$Seed = 0,
     [int]$TimeoutSeconds = 600,
+    [double]$MaxMemoryGB = 8,
     [string]$OutFile,
     [string]$Site,
     [string]$Member,
@@ -295,30 +304,74 @@ function Invoke-Git([string[]]$Arguments) {
     return $LASTEXITCODE
 }
 
-function Invoke-Timed([string]$Exe, [string[]]$Arguments, [int]$Seconds, [string]$WorkDir) {
-    # Runs a command with its output in a temp file; returns ExitCode, TimedOut, Ms, Output.
+function Get-ProcessTreePeakBytes([int]$RootId) {
+    # The largest working set, in bytes, of -RootId and every process below it; 0 when none is left.
+    # Windows reads Win32_Process, elsewhere ps (rss in KiB), so it runs under 5.1 and pwsh alike.
+    $rows = @()
+    if ($env:OS -eq 'Windows_NT') {
+        $rows = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, WorkingSetSize -ErrorAction SilentlyContinue |
+            ForEach-Object { [pscustomobject]@{ Id = [int]$_.ProcessId; Parent = [int]$_.ParentProcessId; Bytes = [double]$_.WorkingSetSize } })
+    }
+    else {
+        $rows = @(& ps -A -o 'pid=,ppid=,rss=' 2>$null | ForEach-Object {
+                $f = "$_".Trim() -split '\s+'
+                if ($f.Count -ge 3) { [pscustomobject]@{ Id = [int]$f[0]; Parent = [int]$f[1]; Bytes = [double]$f[2] * 1024 } } })
+    }
+    $children = @{}
+    foreach ($r in $rows) { if ($r.Id -ne $r.Parent) { if (-not $children.ContainsKey($r.Parent)) { $children[$r.Parent] = @() }; $children[$r.Parent] += $r } }
+    $peak = [double]0
+    $queue = [System.Collections.Generic.Queue[int]]::new()
+    $queue.Enqueue($RootId)
+    $seen = @{}
+    foreach ($r in $rows) { if ($r.Id -eq $RootId) { $peak = $r.Bytes } }
+    while ($queue.Count) {
+        $id = $queue.Dequeue()
+        if ($seen.ContainsKey($id)) { continue }
+        $seen[$id] = $true
+        foreach ($c in @($children[$id])) { if ($c) { if ($c.Bytes -gt $peak) { $peak = $c.Bytes }; $queue.Enqueue($c.Id) } }
+    }
+    return $peak
+}
+
+function Stop-ProcessTree($Process) {
+    if ($env:OS -eq 'Windows_NT') { & taskkill /PID $Process.Id /T /F 2>&1 | Out-Null }
+    elseif ($PSVersionTable.PSVersion.Major -ge 7) { $Process.Kill($true) }
+    else { $Process.Kill() }
+    $Process.WaitForExit()
+}
+
+function Invoke-Timed([string]$Exe, [string[]]$Arguments, [int]$Seconds, [string]$WorkDir, [double]$MemoryLimitGB = 0) {
+    # Runs a command with its output in a temp file; returns ExitCode, TimedOut, MemoryLimited, Ms,
+    # Output. With -MemoryLimitGB above 0 its process tree is read about once a second and stopped
+    # once any process in it holds more than that (BL-4827: a mutant's testhost reached 80 GB in
+    # about 4 minutes, long before -TimeoutSeconds).
     $out = [IO.Path]::GetTempFileName()
     $err = [IO.Path]::GetTempFileName()
     $watch = [Diagnostics.Stopwatch]::StartNew()
     $p = Start-Process -FilePath $Exe -ArgumentList $Arguments -WorkingDirectory $WorkDir -NoNewWindow -PassThru `
         -RedirectStandardOutput $out -RedirectStandardError $err
     $null = $p.Handle
-    $done = $p.WaitForExit($Seconds * 1000)
-    if (-not $done) {
-        if ($env:OS -eq 'Windows_NT') { & taskkill /PID $p.Id /T /F 2>&1 | Out-Null } else { $p.Kill() }
-        $p.WaitForExit()
+    $limitBytes = $MemoryLimitGB * 1GB
+    $done = $false; $memoryLimited = $false
+    if ($limitBytes -le 0) { $done = $p.WaitForExit($Seconds * 1000) }
+    else {
+        while (-not $done -and $watch.ElapsedMilliseconds -lt $Seconds * 1000) {
+            $done = $p.WaitForExit(1000)
+            if (-not $done -and (Get-ProcessTreePeakBytes $p.Id) -gt $limitBytes) { $memoryLimited = $true; break }
+        }
     }
+    if (-not $done) { Stop-ProcessTree $p }
     $watch.Stop()
     $text = "$(Get-Content $out -Raw)`n$(Get-Content $err -Raw)"
     Remove-Item $out, $err -ErrorAction SilentlyContinue
-    return [pscustomobject]@{ ExitCode = $(if ($done) { $p.ExitCode } else { -1 }); TimedOut = (-not $done); Ms = [int]$watch.ElapsedMilliseconds; Output = $text }
+    return [pscustomobject]@{ ExitCode = $(if ($done) { $p.ExitCode } else { -1 }); TimedOut = (-not $done -and -not $memoryLimited); MemoryLimited = $memoryLimited; Ms = [int]$watch.ElapsedMilliseconds; Output = $text }
 }
 
 function Invoke-Tests([string]$TestProject, [string]$WorkDir, [int]$Seconds, [string[]]$Excluded, [string]$TrxPath) {
     # The twin's fast tests, without the excluded ones; a trx log when $TrxPath is given.
     $arguments = @('test', "`"$TestProject`"", '-c', 'Release', '--no-build', '--filter', "`"$(Get-TestFilter $Excluded)`"", '-nologo')
     if ($TrxPath) { $arguments += @('--logger', "`"trx;LogFileName=$TrxPath`"") }
-    return Invoke-Timed 'dotnet' $arguments $Seconds $WorkDir
+    return Invoke-Timed 'dotnet' $arguments $Seconds $WorkDir $MaxMemoryGB
 }
 
 function Invoke-Baseline([string]$TestProject, [string]$WorkDir, [int]$Seconds, [switch]$Exclude) {
@@ -334,6 +387,9 @@ function Invoke-Baseline([string]$TestProject, [string]$WorkDir, [int]$Seconds, 
     if (-not $test.TimedOut -and $test.ExitCode -eq 0) { return [pscustomobject]@{ Ok = $true; Ms = $ms; Excluded = @(); Error = '' } }
     $failing = if ($Exclude -and -not $test.TimedOut) { @(Get-FailedTests $trx) } else { @() }
     if ($trx) { Remove-Item -LiteralPath $trx -ErrorAction SilentlyContinue }
+    if ($test.MemoryLimited) {
+        return [pscustomobject]@{ Ok = $false; Ms = $ms; Excluded = @(); Error = "the unmutated tests passed the memory limit of $MaxMemoryGB GB" }
+    }
     if (-not $failing.Count) {
         return [pscustomobject]@{ Ok = $false; Ms = $ms; Excluded = @(); Error = "the unmutated tests failed or timed out (exit $($test.ExitCode))" }
     }
@@ -399,17 +455,28 @@ function Invoke-Mutant($SiteRecord, [string]$TestProject, [string]$WorkTree, [in
     $originalLine = $lines[$SiteRecord.Line - 1]
     $lines[$SiteRecord.Line - 1] = Get-MutatedLine $originalLine $SiteRecord
     [IO.File]::WriteAllLines($SiteRecord.Full, $lines)
+    $test = $null
     try {
         $build = Invoke-Timed 'dotnet' @('build', "`"$TestProject`"", '-c', 'Release', '-p:TreatWarningsAsErrors=false', '-nologo', '-v', 'q') $Seconds $WorkTree
         if ($build.TimedOut -or $build.ExitCode -ne 0) { $outcome = 'stillborn'; $ms = $build.Ms }
         else {
             $test = Invoke-Tests $TestProject $WorkTree $Seconds $Excluded ''
             $ms = $build.Ms + $test.Ms
-            $outcome = if ($test.TimedOut) { 'timedOut' } elseif ($test.ExitCode -ne 0) { 'killed' } else { 'survived' }
+            $outcome = Get-TestOutcome $test
         }
     }
     finally { Invoke-Git @('-C', $WorkTree, 'checkout', '--', $SiteRecord.File) | Out-Null }
-    return [ordered]@{ file = $SiteRecord.File; line = $SiteRecord.Line; member = $SiteRecord.Member; operator = $SiteRecord.Operator; original = $originalLine.Trim(); mutated = (Get-MutatedLine $originalLine $SiteRecord).Trim(); outcome = $outcome; ms = $ms }
+    $record = [ordered]@{ file = $SiteRecord.File; line = $SiteRecord.Line; member = $SiteRecord.Member; operator = $SiteRecord.Operator; original = $originalLine.Trim(); mutated = (Get-MutatedLine $originalLine $SiteRecord).Trim(); outcome = $outcome; ms = $ms }
+    if ($outcome -eq 'killed' -and $test -and $test.MemoryLimited) { $record.reason = 'memory limit' }
+    return $record
+}
+
+function Get-TestOutcome($Test) {
+    # A mutant's outcome from its test run: a run stopped at the memory limit is killed (BL-4827).
+    if ($Test.MemoryLimited) { return 'killed' }
+    if ($Test.TimedOut) { return 'timedOut' }
+    if ($Test.ExitCode -ne 0) { return 'killed' }
+    return 'survived'
 }
 
 function Get-DrawnLibraries([string]$Tree, [int]$Count, [int]$DrawSeed, [string[]]$Leave) {
@@ -518,6 +585,26 @@ if ($SelfTest) {
         Check 'asking for more than there are draws them all' '7' "$(@(Get-DrawnLibraries $tree 50 1 @('Curl.A.UnitLibrary')).Count)"
     }
     finally { Remove-Item -Recurse -Force -LiteralPath $tree -ErrorAction SilentlyContinue }
+    # BL-4827: a stand-in test run whose child process allocates past the memory limit is stopped,
+    # its whole tree with it, long before its timeout, and the mutant counts as killed.
+    # The running shell's own executable, found under $PSHOME: pwsh installed as a dotnet tool
+    # runs inside dotnet.exe, so the current process's file is not a shell.
+    $shellName = if ($PSVersionTable.PSVersion.Major -ge 7) { 'pwsh' } else { 'powershell' }
+    if ($env:OS -eq 'Windows_NT') { $shellName += '.exe' }
+    $shell = Join-Path $PSHOME $shellName
+    if (-not (Test-Path -LiteralPath $shell)) { $shell = (Get-Command $shellName -CommandType Application | Select-Object -First 1).Source }
+    $grow = '$k = New-Object System.Collections.ArrayList; while ($true) { $b = New-Object byte[] 33554432; for ($i = 0; $i -lt $b.Length; $i += 4096) { $b[$i] = 1 }; [void]$k.Add($b) }'
+    $growEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($grow))
+    $parent = "& '$($shell -replace "'", "''")' -NoProfile -NonInteractive -EncodedCommand $growEncoded"
+    $parentEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($parent))
+    $grower = Invoke-Timed $shell @('-NoProfile', '-NonInteractive', '-EncodedCommand', $parentEncoded) 120 ([IO.Path]::GetTempPath()) 1
+    Check 'a run whose child passes the memory limit is stopped before its timeout (BL-4827)' 'True False -1 True' "$($grower.MemoryLimited) $($grower.TimedOut) $($grower.ExitCode) $($grower.Ms -lt 60000)"
+    Check 'a run stopped at the memory limit is a killed mutant (BL-4827)' 'killed' (Get-TestOutcome $grower)
+    $quiet = Invoke-Timed $shell @('-NoProfile', '-NonInteractive', '-Command', 'exit 0') 120 ([IO.Path]::GetTempPath()) 1
+    Check 'a run under the memory limit ends on its own (BL-4827)' 'False False 0 survived' "$($quiet.MemoryLimited) $($quiet.TimedOut) $($quiet.ExitCode) $(Get-TestOutcome $quiet)"
+    if ($env:OS -eq 'Windows_NT') { $orphans = @(Get-CimInstance Win32_Process | Where-Object { "$($_.CommandLine)" -match [regex]::Escape($growEncoded) }) }
+    else { $orphans = @(& ps -A -o 'args=' 2>$null | Where-Object { "$_" -match [regex]::Escape($growEncoded.Substring(0, 40)) }) }
+    Check 'the stopped run leaves no process of its tree behind (BL-4827)' '0' "$($orphans.Count)"
     exit $(if ($failed) { 1 } else { 0 })
 }
 
