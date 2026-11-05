@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/PeerVerification.cs:Unobserved-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/PeerVerification.cs:15:false
-task: none
-tasks:
+task: BL-4859
+tasks: BL-4859
 found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md

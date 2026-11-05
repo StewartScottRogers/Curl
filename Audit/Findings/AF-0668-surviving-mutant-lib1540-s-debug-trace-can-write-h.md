@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1540.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1540.cs:51:true
-task: none
-tasks:
+task: BL-4856
+tasks: BL-4856
 found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md

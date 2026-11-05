@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/WriteGate.cs:RunExclusive-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/WriteGate.cs:85:false
-task: none
-tasks:
+task: BL-4861
+tasks: BL-4861
 found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md

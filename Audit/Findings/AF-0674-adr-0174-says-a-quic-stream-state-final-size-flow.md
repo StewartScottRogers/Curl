@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0174-quic-streams-keep-fixed-flow-control-windows-and-one-loop-carries-the-connection.md:QuicStreamErrorExit:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-4862
+tasks: BL-4862
 found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md

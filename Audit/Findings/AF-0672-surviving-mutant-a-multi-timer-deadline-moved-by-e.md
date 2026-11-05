@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedMultiTransfer.Timer.cs:IsTimerUnchanged-le:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedMultiTransfer.Timer.cs:50:<=
-task: none
-tasks:
+task: BL-4860
+tasks: BL-4860
 found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md

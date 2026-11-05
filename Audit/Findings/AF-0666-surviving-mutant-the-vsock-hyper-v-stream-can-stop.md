@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.VirtualMachineSocket.UnitLibrary/SystemVirtualMachineSocketOpener.cs:OpenAsync-true:surviving-mutant
 reproduction: mutation Curl.Extension.VirtualMachineSocket.UnitLibrary/SystemVirtualMachineSocketOpener.cs:27:true
-task: none
-tasks:
+task: BL-4854
+tasks: BL-4854
 found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md

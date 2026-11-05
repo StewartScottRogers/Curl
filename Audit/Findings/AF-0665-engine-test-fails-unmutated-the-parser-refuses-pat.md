@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitTests/TransferContextFactoryTests.cs:Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine:failing-test
 reproduction: none
-task: none
-tasks:
+task: BL-4853
+tasks: BL-4853
 found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md

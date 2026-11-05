@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Authentication.UnitLibrary/CLAUDE.md:AwsSigV4Signer:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-4863
+tasks: BL-4863
 found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md
