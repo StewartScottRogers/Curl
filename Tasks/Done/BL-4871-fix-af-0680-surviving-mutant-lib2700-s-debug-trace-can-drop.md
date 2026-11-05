@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary]
 requirement: none
 created: 2026-11-05
-completed:
+completed: 2026-11-05
 ---
 # BL-4871 — Fix AF-0680: Surviving mutant: lib2700's debug trace can drop its timestamps or write hex dumps unnoticed
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Lib2700_TracesWithTimesAndWithoutHex` (Curl.Conformance.LibTest.UnitTests/Lib2505To3100Tests.cs): a fixed UTC clock and the whole stderr pinned, as BL-4867 did for lib1540. A lane cannot run `Audit/Tools`, so both mutants were applied by hand to Lib2700.cs:63 (traceTime false; noHex false): the new test fails on each, and passes on the original line. No production change, so no quality run was needed.
 
 ## Log
 
 - 2026-11-05: Created.
 - 2026-11-05: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-05: Doing -> Done. Lib2700's test pins its time-stamped, no-hex trace; both line-63 mutants now fail it
