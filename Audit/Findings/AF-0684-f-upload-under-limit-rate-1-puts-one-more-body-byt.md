@@ -3,8 +3,8 @@ id: AF-0684
 title: -F upload under --limit-rate 1 puts one more body byte on the wire than curl before the server's reset
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:Curl.Console/RateLimitedUploadStream.cs:--limit-rate:request
 reproduction: none
 task: none

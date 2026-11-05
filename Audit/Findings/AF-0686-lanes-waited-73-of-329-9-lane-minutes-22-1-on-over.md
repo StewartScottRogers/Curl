@@ -3,8 +3,8 @@ id: AF-0686
 title: Lanes waited 73 of 329.9 lane-minutes (22.1%) on overlaps from whole-project touches in shift 174735
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: process:logs:whole-project-touches:overlap-wait
 reproduction: none
 task: none

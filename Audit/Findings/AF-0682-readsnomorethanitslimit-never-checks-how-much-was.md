@@ -3,8 +3,8 @@ id: AF-0682
 title: ReadsNoMoreThanItsLimit never checks how much was read
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OpenTelemetry.UnitTests/Otlp/OtlpHttpExporterTests.cs:ExportAsync_AStatusLineThatNeverEnds_ReadsNoMoreThanItsLimit:name-lies
 reproduction: none
 task: none

@@ -3,8 +3,8 @@ id: AF-0678
 title: Surviving mutant: an HTTP 400 response can be exported as a successful span
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OpenTelemetry.UnitLibrary/Otlp/OtlpHttpClientSpan.cs:ErrorTypeOf-ge:surviving-mutant
 reproduction: mutation Curl.Extension.OpenTelemetry.UnitLibrary/Otlp/OtlpHttpClientSpan.cs:69:>=
 task: none

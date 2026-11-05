@@ -3,8 +3,8 @@ id: AF-0679
 title: Surviving mutant: a collector status line with no reason phrase can be taken as no HTTP response
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OpenTelemetry.UnitLibrary/Otlp/OtlpHttpExporter.cs:Outcome-ge:surviving-mutant
 reproduction: mutation Curl.Extension.OpenTelemetry.UnitLibrary/Otlp/OtlpHttpExporter.cs:76:>=
 task: none

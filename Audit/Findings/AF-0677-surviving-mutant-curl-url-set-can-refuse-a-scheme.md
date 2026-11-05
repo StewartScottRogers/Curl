@@ -3,8 +3,8 @@ id: AF-0677
 title: Surviving mutant: curl_url_set can refuse a scheme of exactly 40 characters as a bad scheme
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/UrlPartSetter.cs:HasSchemeLength-le:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartSetter.cs:113:<=
 task: none

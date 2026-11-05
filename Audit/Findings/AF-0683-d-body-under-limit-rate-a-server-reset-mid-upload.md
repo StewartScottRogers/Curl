@@ -3,8 +3,8 @@ id: AF-0683
 title: -d body under --limit-rate: a server reset mid-upload is exit 55 Send failure in Curl, exit 56 Recv failure in curl
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:Curl.Original.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs:--limit-rate:exit-code
 reproduction: none
 task: none

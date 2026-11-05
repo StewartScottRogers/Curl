@@ -3,8 +3,8 @@ id: AF-0681
 title: Byte-sequence test lets a value missing one colon through: its rows fail only because the base64 inside is invalid
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.ContentDigest.UnitTests/DigestFieldTests.cs:Parse_AValueThatIsNotADictionaryOfByteSequences_IsIgnoredWhole:weak-assertion
 reproduction: none
 task: none

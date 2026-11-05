@@ -3,8 +3,8 @@ id: AF-0680
 title: Surviving mutant: lib2700's debug trace can drop its timestamps or write hex dumps unnoticed
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib2700.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib2700.cs:63:true
 task: none
