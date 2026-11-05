@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ContentDigest.UnitTests]
 requirement: none
 created: 2026-11-05
-completed:
+completed: 2026-11-05
 ---
 # BL-4872 — Fix AF-0681: Byte-sequence test lets a value missing one colon through: its rows fail only because the base64 inside is invalid
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The three missing-colon rows now carry valid base64 between the cut characters (sha-256=AAAAAA, sha-256=:AAAAA, sha-256=AAAAA:), so only the colon check refuses them and the surviving mutant (|| -> && on DigestField.cs:58) now fails the test. Test-only change; no production code, so no quality run. The finding's Select-String now matches nothing. Full build clean and fast tests green on Windows; the change is platform-neutral.
 
 ## Log
 
 - 2026-11-05: Created.
 - 2026-11-05: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-05: Doing -> Done. Missing-colon rows carry valid base64, so only the colon check refuses them
