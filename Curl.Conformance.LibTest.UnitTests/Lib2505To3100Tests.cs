@@ -1,3 +1,4 @@
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Multi;
@@ -159,6 +160,29 @@ public sealed class Lib2505To3100Tests
         Assert.AreEqual(3, socket.FragmentSizes[1]);
         Assert.AreEqual(CurlWebSocketFlags.Text, socket.Sent[3].Flags);
         Assert.AreEqual(CurlWebSocketFlags.Close | CurlWebSocketFlags.Offset, socket.Sent[5].Flags);
+    }
+
+    [TestMethod]
+    public async Task Lib2700_TracesWithTimesAndWithoutHex()
+    {
+        var socket = new FakeEasyWebSocket();
+        socket.FrameReceives.Enqueue((CurlCode.Ok, new CurlWebSocketFrame(0, CurlWebSocketFlags.Close, 0, 0, 0), string.Empty));
+        var engine = new FakeCurlEngine
+        {
+            WebSocket = socket,
+            Performing = o =>
+            {
+                _ = o.Callbacks.Debug!(CurlInfoType.Text, "hi\n"u8);
+                _ = o.Callbacks.Debug!(CurlInfoType.HeaderOut, "GET\r\n"u8);
+                return CurlCode.Ok;
+            },
+        };
+        var run = new PortRun(engine, 2700, "ws://x/2700");
+
+        LibTestResult result = await new Lib2700(new ManualTimeProvider(new DateTimeOffset(2026, 10, 16, 14, 5, 6, TimeSpan.Zero))).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual("14:05:06.000000 == Info: hi\n14:05:06.000000 => Send header, 5 bytes (0x5)\n0000: GET\n", run.Error.ToString());
     }
 
     [TestMethod]
