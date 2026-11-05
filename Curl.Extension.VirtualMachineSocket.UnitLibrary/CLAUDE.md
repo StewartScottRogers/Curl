@@ -14,6 +14,7 @@ integration services" (Hyper-V sockets), not against curl.
 - `VirtualMachineSocketConnectionHook` gives a `VirtualMachineSocketConnector`, which opens the socket through an
   `IVirtualMachineSocketOpener` for every connect, whatever host and port the URL names, and runs curl's TLS handshake
   over it for a TLS target, offering curl's ALPN list for `https`. `SystemVirtualMachineSocketOpener` is the thin
-  `Socket` adapter, excluded from coverage (ADR-0083).
+  `Socket` adapter: its tests give it a loopback TCP socket to check that the stream owns the socket; only its
+  default socket creation and connect, which need a vsock or Hyper-V host, are excluded from coverage (ADR-0083).
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.VirtualMachineSocket.UnitTests`.

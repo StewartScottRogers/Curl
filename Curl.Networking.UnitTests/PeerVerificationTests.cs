@@ -62,6 +62,21 @@ public sealed class PeerVerificationTests
     }
 
     [TestMethod]
+    public void Unobserved_HandshakeNeverReachedCertificate_ClaimsNoVerifiedCertificate()
+    {
+        Diagnostics.Arrange("peer verification", "unobserved");
+
+        var unobserved = PeerVerification.Unobserved;
+
+        Diagnostics.Act("verified", unobserved.Verified);
+        Diagnostics.Assert("verified", false, unobserved.Verified);
+
+        Assert.IsFalse(unobserved.Verified);
+        Assert.IsNull(unobserved.VerifyResult);
+        Assert.IsEmpty(unobserved.Chain);
+    }
+
+    [TestMethod]
     public void ReportVerifyResult_Unobserved_ReportsNothing()
     {
         var events = new RecordingTransferEvents();

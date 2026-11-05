@@ -190,6 +190,7 @@ public sealed class Lib1535To1550Tests
                 _ = o.Callbacks.Header!("H\n"u8);
                 _ = o.Callbacks.Write!("data"u8);
                 _ = o.Callbacks.Debug!(CurlInfoType.Text, "hi\n"u8);
+                _ = o.Callbacks.Debug!(CurlInfoType.HeaderOut, "GET\r\n"u8);
                 return CurlCode.PartialFile;
             },
         };
@@ -204,6 +205,7 @@ public sealed class Lib1535To1550Tests
         Assert.IsTrue(seen.Behaviour.Verbose);
         Assert.IsNotNull(seen.Callbacks.TransferInfo);
         StringAssert.Contains(run.Error.ToString(), "== Info: hi\n");
+        StringAssert.EndsWith(run.Error.ToString(), "=> Send header, 5 bytes (0x5)\n0000: GET\n");
     }
 
     [TestMethod]
