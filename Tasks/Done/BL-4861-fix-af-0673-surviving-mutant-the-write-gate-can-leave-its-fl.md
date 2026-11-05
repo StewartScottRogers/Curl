@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-04
 ---
 # BL-4861 — Fix AF-0673: Surviving mutant: the write gate can leave its flow marked as holding it, so later writes skip the lock
 
@@ -41,12 +41,26 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- WriteGate.cs is correct; the mutant survived for want of a test. Added
+  `WriteGateTests.RunExclusive_AfterItReturns_NextWriteOfThisFlowWaitsForAnotherHolder`: after one
+  `RunExclusive`, another flow (started with the context captured before it, so a leaked
+  `heldByThisFlow` cannot reach it) takes the gate, and this flow's `WriteExclusiveAsync` must not
+  complete or write until the holder lets go.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1` (audit paths), so the reproduction was run
+  by hand: with line 85 mutated to `heldByThisFlow.Value = true;` the new test fails (mutant killed);
+  restored, all 6 WriteGateTests pass. The quality auditor's re-audit confirms it with the script.
+- Only a test changed, so no Measure-CodeQuality run was needed (no production code changed).
+  Narrowing touches to the test file was not published (the commit and push command was refused), so
+  touches stays as claimed.
+- Build clean (0 warnings); fast tests green across all 115 test projects.
 
 ## Log
 
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-04: Doing -> Done. A test now checks that RunExclusive lets the gate go for its flow, killing AF-0673's mutant

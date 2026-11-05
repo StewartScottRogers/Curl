@@ -96,6 +96,42 @@ public sealed class WriteGateTests
     }
 
     [TestMethod]
+    public async Task RunExclusive_AfterItReturns_NextWriteOfThisFlowWaitsForAnotherHolder()
+    {
+        WriteGate gate = new();
+        TaskCompletionSource takeTheGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource holding = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource letGo = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task holder = Task.Run(async () =>
+        {
+            await takeTheGate.Task;
+            await gate.RunExclusiveAsync(async () =>
+            {
+                holding.SetResult();
+                await letGo.Task;
+            });
+        });
+        using MemoryStream output = new();
+        Diagnostics.Arrange("writes", "RunExclusive, then another flow holds the gate, then WriteExclusiveAsync");
+        gate.RunExclusive(() => { });
+        takeTheGate.SetResult();
+        await holding.Task;
+
+        ValueTask next = gate.WriteExclusiveAsync(output, new byte[] { 1 }, TestContext.CancellationToken);
+        bool completedWhileHeld = next.IsCompleted;
+        long writtenWhileHeld = output.Length;
+        Diagnostics.Act("next write completed / bytes written while another flow holds the gate", $"{completedWhileHeld} / {writtenWhileHeld}");
+        letGo.SetResult();
+        await holder;
+        await next;
+
+        Diagnostics.Assert("completed / written while held, then written", "False / 0, then 1", $"{completedWhileHeld} / {writtenWhileHeld}, then {output.Length}");
+        Assert.IsFalse(completedWhileHeld);
+        Assert.AreEqual(0L, writtenWhileHeld);
+        Assert.AreEqual(1L, output.Length);
+    }
+
+    [TestMethod]
     public async Task RunExclusiveAsync_WriteThrows_LetsTheGateGo()
     {
         WriteGate gate = new();
