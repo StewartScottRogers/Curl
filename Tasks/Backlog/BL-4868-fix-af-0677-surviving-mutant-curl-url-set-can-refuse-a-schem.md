@@ -4,8 +4,8 @@ title: Fix AF-0677: Surviving mutant: curl_url_set can refuse a scheme of exactl
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+depends-on: [BL-4866]
+touches: [Curl.Engine.UnitLibrary/UrlPartSetter.cs, Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.Set.cs]
 requirement: none
 created: 2026-11-05
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- 2026-11-05 lane 3: The production code is already right (upstream `curl_url_set` refuses a scheme only when `plen > MAX_SCHEME_LEN` or `plen < 1`), so the fix is a test only: in `Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.Set.cs`, pin a 40-character scheme set under `CurlUrlFlags.NonSupportScheme` as `CurlUrlCode.Ok` (the 41-character one is already pinned as `BadScheme` in `Set_BadScheme_ReturnsUpstreamsCodeAndKeepsTheScheme`). `touches` narrowed from the whole `Curl.Engine.UnitLibrary` to `UrlPartSetter.cs`, and widened to that test file because the fix lands there. BL-4866 (Doing) holds the whole `Curl.Engine.UnitTests`, so this task waits on it. No code edits made.
+
 ## Log
 
 - 2026-11-05: Created.
 - 2026-11-05: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-05: Doing -> Backlog. Waits on BL-4866, which holds the whole Curl.Engine.UnitTests where the 40-character scheme test lands
