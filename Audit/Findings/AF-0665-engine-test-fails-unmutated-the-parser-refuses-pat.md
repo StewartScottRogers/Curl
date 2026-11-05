@@ -3,8 +3,8 @@ id: AF-0665
 title: Engine test fails unmutated: the parser refuses --path-as-is as an unknown option
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitTests/TransferContextFactoryTests.cs:Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine:failing-test
 reproduction: none
 task: none

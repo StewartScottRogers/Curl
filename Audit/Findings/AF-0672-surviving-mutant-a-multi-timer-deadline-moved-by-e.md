@@ -3,8 +3,8 @@ id: AF-0672
 title: Surviving mutant: a multi timer deadline moved by exactly 1 ms can be told to the timer callback again
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedMultiTransfer.Timer.cs:IsTimerUnchanged-le:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedMultiTransfer.Timer.cs:50:<=
 task: none

@@ -3,8 +3,8 @@ id: AF-0675
 title: Authentication CLAUDE.md says AWS SigV4 is not wired into a transfer yet; EngineComposition wires it into every HTTP transfer
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Authentication.UnitLibrary/CLAUDE.md:AwsSigV4Signer:false-statement
 reproduction: none
 task: none

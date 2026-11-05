@@ -3,8 +3,8 @@ id: AF-0667
 title: Surviving mutant: a TLSA query name of exactly 255 octets can be refused as too long
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.Dane.UnitLibrary/Wire/DnssecQueryEncoder.cs:EncodeName-gt:surviving-mutant
 reproduction: mutation Curl.Extension.Dane.UnitLibrary/Wire/DnssecQueryEncoder.cs:80:>
 task: none

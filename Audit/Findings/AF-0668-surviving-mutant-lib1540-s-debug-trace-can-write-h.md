@@ -3,8 +3,8 @@ id: AF-0668
 title: Surviving mutant: lib1540's debug trace can write hex dumps (noHex false)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1540.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1540.cs:51:true
 task: none

@@ -3,8 +3,8 @@ id: AF-0674
 title: ADR-0174 says a QUIC stream-state/final-size/flow-control error exits 7; QuicHandshakeFailures maps it to exit 56 after the handshake
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0174-quic-streams-keep-fixed-flow-control-windows-and-one-loop-carries-the-connection.md:QuicStreamErrorExit:stale-adr
 reproduction: none
 task: none

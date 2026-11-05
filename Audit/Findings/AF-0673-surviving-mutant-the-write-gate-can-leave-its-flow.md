@@ -3,8 +3,8 @@ id: AF-0673
 title: Surviving mutant: the write gate can leave its flow marked as holding it, so later writes skip the lock
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/WriteGate.cs:RunExclusive-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/WriteGate.cs:85:false
 task: none

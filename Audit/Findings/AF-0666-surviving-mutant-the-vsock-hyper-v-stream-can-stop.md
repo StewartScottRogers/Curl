@@ -3,8 +3,8 @@ id: AF-0666
 title: Surviving mutant: the vsock/Hyper-V stream can stop owning its socket, so closing the connection never closes the socket
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.VirtualMachineSocket.UnitLibrary/SystemVirtualMachineSocketOpener.cs:OpenAsync-true:surviving-mutant
 reproduction: mutation Curl.Extension.VirtualMachineSocket.UnitLibrary/SystemVirtualMachineSocketOpener.cs:27:true
 task: none

@@ -3,8 +3,8 @@ id: AF-0671
 title: Surviving mutant: a TLS handshake that fails before the certificate can be reported as certificate-verified
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/PeerVerification.cs:Unobserved-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/PeerVerification.cs:15:false
 task: none
