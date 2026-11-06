@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.WebDavTools.UnitLibrary]
+touches: [Curl.Extension.WebDavTools.UnitLibrary, Curl.Extension.WebDavTools.UnitTests/Transfer/WebDavSyncTransferHookTests.cs]
 requirement: none
 created: 2026-11-06
-completed:
+completed: 2026-11-06
 ---
 # BL-4891 — Fix AF-0697: Surviving mutant: --webdav-sync can fail to replace an existing local file it re-downloads
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Pipeline `feature` run as a test-only fix: the production line is right; only a test was missing. New test `ExecuteAsync_ALocalCopyOfADifferentLength_IsReplacedByTheDownload` in `Curl.Extension.WebDavTools.UnitTests/Transfer/WebDavSyncTransferHookTests.cs` syncs over a stale local copy of a different length and checks it is replaced, has the server's last-modified time and leaves no partial file.
+- `touches` widened to that test file: the task named only the library, its tests belong in the matching `.UnitTests` project, and no task in Doing on work/dark-factory names it.
+- Reproduction: a lane cannot run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (`overwrite: false` at WebDavSyncTransferHook.cs:126). The new test failed (killed) and passed again once the mutation was reverted. The re-audit confirms it with the tool.
+- `dotnet build`: 0 warnings, 0 errors. Fast tests: no failures; WebDavTools.UnitTests 100 passed. No production code changed, so Measure-CodeQuality was not needed.
 
 ## Log
 
 - 2026-11-06: Created.
 - 2026-11-06: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-06: Doing -> Done. --webdav-sync replacing a stale local copy is tested; the overwrite:false mutant is killed

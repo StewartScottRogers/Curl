@@ -61,6 +61,25 @@ public sealed class WebDavSyncTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ALocalCopyOfADifferentLength_IsReplacedByTheDownload()
+    {
+        var localPath = Path.Combine(folder, "a b.txt");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(localPath, "stale copy");
+        var origin = Tree();
+        var output = new MemoryStream();
+
+        var result = await Hook().ExecuteAsync(Context(output), origin.Invoke);
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.Contains("GET /dav/a%20b.txt", origin.RequestLines.ToList());
+        Assert.AreEqual("A B", File.ReadAllText(localPath));
+        Assert.AreEqual(LastModifiedUtc, File.GetLastWriteTimeUtc(localPath));
+        StringAssert.StartsWith(Encoding.UTF8.GetString(output.ToArray()), $"downloaded\t{localPath}\n");
+        Assert.IsFalse(File.Exists(localPath + WebDavSyncTransferHook.PartialFileSuffix));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_AnHrefOutsideTheCollection_IsRefusedAndNothingIsWrittenForIt()
     {
         var origin = new DavOrigin();
