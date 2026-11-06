@@ -3,8 +3,8 @@ id: AF-0671
 title: Surviving mutant: a TLS handshake that fails before the certificate can be reported as certificate-verified
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-05_0819.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/PeerVerification.cs:Unobserved-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/PeerVerification.cs:15:false
 task: BL-4859
@@ -13,9 +13,9 @@ found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: mechanical
+closed-by: 2026-11-05_0819.md
 ---
 # AF-0671 - Surviving mutant: a TLS handshake that fails before the certificate can be reported as certificate-verified
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_0819.md | reproduces: no | Ran the -Site command: 'Unobserved { get; } = new(false, null, [])' -> 'new(true, null, [])' at line 15, outcome killed (3 ECH baseline failures excluded). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_0819.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

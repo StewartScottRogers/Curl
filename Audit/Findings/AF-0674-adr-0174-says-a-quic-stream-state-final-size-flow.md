@@ -3,8 +3,8 @@ id: AF-0674
 title: ADR-0174 says a QUIC stream-state/final-size/flow-control error exits 7; QuicHandshakeFailures maps it to exit 56 after the handshake
 auditor: truthfulness
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-05_0819.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0174-quic-streams-keep-fixed-flow-control-windows-and-one-loop-carries-the-connection.md:QuicStreamErrorExit:stale-adr
 reproduction: none
 task: BL-4862
@@ -13,9 +13,9 @@ found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: reliable-reaudit
+closed-by: 2026-11-05_0819.md
 ---
 # AF-0674 - ADR-0174 says a QUIC stream-state/final-size/flow-control error exits 7; QuicHandshakeFailures maps it to exit 56 after the handshake
 
@@ -42,6 +42,9 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0174-*.md -Pattern "han
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_0819.md | reproduces: no | Select-String for "handshake's exit 7" in ADR-0174 found no match. ADR-0174:34-36 now reads 'curl's exit is QuicHandshakeFailures.FromTransportError's: exit 7 with the error's reason while the handshake is incomplete, exit 56 once it is complete. Stream frames arrive after the handshake, so these errors end in exit 56.' This matches QuicHandshakeFailures.cs:46 (FromTransportError(error, handshakeComplete) => handshakeComplete ? ...) and :22 (ConnectionLost = new(CurlExitCode.RecvError, ...)).
+
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_0819.md: the reproduction no longer reproduces.
