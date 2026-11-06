@@ -3,8 +3,8 @@ id: AF-0698
 title: Surviving mutant: a multistatus status line with no reason phrase can be refused
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.WebDavTools.UnitLibrary/Multistatus/WebDavMultistatusReader.cs:ParseStatus-lt:surviving-mutant
 reproduction: mutation Curl.Extension.WebDavTools.UnitLibrary/Multistatus/WebDavMultistatusReader.cs:101:<
 task: none

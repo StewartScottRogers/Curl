@@ -3,8 +3,8 @@ id: AF-0697
 title: Surviving mutant: --webdav-sync can fail to replace an existing local file it re-downloads
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.WebDavTools.UnitLibrary/Transfer/WebDavSyncTransferHook.cs:Keep-true:surviving-mutant
 reproduction: mutation Curl.Extension.WebDavTools.UnitLibrary/Transfer/WebDavSyncTransferHook.cs:126:true
 task: none

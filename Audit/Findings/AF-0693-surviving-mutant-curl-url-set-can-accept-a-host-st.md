@@ -3,8 +3,8 @@ id: AF-0693
 title: Surviving mutant: curl_url_set can accept a host starting with a delimiter such as '@'
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/UrlPartSetter.cs:CheckedHost-ge:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartSetter.cs:152:>=
 task: none

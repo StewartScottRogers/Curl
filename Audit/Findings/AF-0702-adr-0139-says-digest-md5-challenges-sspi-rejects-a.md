@@ -3,8 +3,8 @@ id: AF-0702
 title: ADR-0139 says DIGEST-MD5 challenges SSPI rejects are answered null (exit 67) because exit 94 cannot be expressed; SaslAuthenticator now raises exit 94 for them
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0139-sasl-cram-md5-and-digest-md5-answer-as-each-platforms-curl-with-sspi-on-windows.md:ADR-0139:stale-adr
 reproduction: none
 task: none

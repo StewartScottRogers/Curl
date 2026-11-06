@@ -3,8 +3,8 @@ id: AF-0687
 title: ReceiveAsync_PortClosed_ThrowsCurlsExit7TextWithTheElapsedTime never asserts exit 7
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/PortUnreachableReportingDatagramChannelTests.cs:ReceiveAsync_PortClosed_ThrowsCurlsExit7TextWithTheElapsedTime:name-lies
 reproduction: none
 task: none

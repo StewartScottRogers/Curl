@@ -3,8 +3,8 @@ id: AF-0692
 title: Surviving mutant: any write error (or any header callback that delivered 0) can drop the head from getinfo
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs:HeaderCallbackTookNothing-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs:239:&&
 task: none

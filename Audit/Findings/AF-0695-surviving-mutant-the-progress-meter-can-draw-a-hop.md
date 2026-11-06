@@ -3,8 +3,8 @@ id: AF-0695
 title: Surviving mutant: the progress meter can draw a hop's start as done
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/TransferProgressRecorder.cs:StartHop-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferProgressRecorder.cs:398:false
 task: none

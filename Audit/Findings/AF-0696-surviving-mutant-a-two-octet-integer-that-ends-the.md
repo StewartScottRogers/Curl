@@ -3,8 +3,8 @@ id: AF-0696
 title: Surviving mutant: a two-octet integer that ends the input can read as 0
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.ObliviousDoh.UnitLibrary/Wire/LengthPrefixedReader.cs:TryReadUInt16-lt:surviving-mutant
 reproduction: mutation Curl.Extension.ObliviousDoh.UnitLibrary/Wire/LengthPrefixedReader.cs:34:<
 task: none

@@ -3,8 +3,8 @@ id: AF-0688
 title: SendAsync_PortClosed_ThrowsCurlsExit7Text never asserts exit 7
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/PortUnreachableReportingDatagramChannelTests.cs:SendAsync_PortClosed_ThrowsCurlsExit7Text:name-lies
 reproduction: none
 task: none

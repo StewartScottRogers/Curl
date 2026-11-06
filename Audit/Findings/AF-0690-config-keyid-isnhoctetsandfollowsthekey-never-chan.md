@@ -3,8 +3,8 @@ id: AF-0690
 title: Config_KeyId_IsNhOctetsAndFollowsTheKey never changes the key: it changes the AEAD
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.ObliviousDoh.UnitTests/Wire/ObliviousDohWireTests.cs:Config_KeyId_IsNhOctetsAndFollowsTheKey:name-lies
 reproduction: none
 task: none

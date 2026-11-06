@@ -3,8 +3,8 @@ id: AF-0701
 title: Surviving mutant: a final zero-length SvcParam (e.g. no-default-alpn) can drop from the DoH HTTPS-record trace
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/DohTraceLines.HttpsRecord.cs:FirstHttpsRecordLines-ge:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DohTraceLines.HttpsRecord.cs:140:>=
 task: none

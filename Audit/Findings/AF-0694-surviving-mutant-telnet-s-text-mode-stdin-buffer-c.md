@@ -3,8 +3,8 @@ id: AF-0694
 title: Surviving mutant: telnet's text-mode stdin buffer can be two bytes short and overflow on a full read
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/WindowsTextModeReadStream.cs:decoded-plus1:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/WindowsTextModeReadStream.cs:20:+1
 task: none

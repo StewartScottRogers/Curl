@@ -3,8 +3,8 @@ id: AF-0699
 title: Surviving mutant: every write through an HTTP/2 proxy tunnel can carry END_STREAM
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/Http2ProxyTunnelConnection.cs:WriteAsync-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/Http2ProxyTunnelConnection.cs:146:false
 task: none

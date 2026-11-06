@@ -3,8 +3,8 @@ id: AF-0689
 title: SchannelPeerFailedVerification_..._IsLibcurlsExit60Text never asserts exit 60
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/TlsFailureMessagesTests.cs:SchannelPeerFailedVerification_WithOnlyANameMismatchOnAnIpAddressAgainstAlternativeNames_IsLibcurlsExit60Text:name-lies
 reproduction: none
 task: none
