@@ -3,8 +3,8 @@ id: AF-0683
 title: -d body under --limit-rate: a server reset mid-upload is exit 55 Send failure in Curl, exit 56 Recv failure in curl
 auditor: conformance
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces.
 key: conformance:Curl.Original.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs:--limit-rate:exit-code
 reproduction: none
 task: BL-4874
@@ -13,9 +13,9 @@ found: 2026-11-05
 found-at: aea9f0110c59ad5209aafb9f0f985886a2cb9439
 scorecard: 2026-11-05_0819.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: reliable-reaudit
+closed-by: 2026-11-05_2025.md
 ---
 # AF-0683 - -d body under --limit-rate: a server reset mid-upload is exit 55 Send failure in Curl, exit 56 Recv failure in curl
 
@@ -42,6 +42,9 @@ dotnet build Curl.Console -c Release; & ./Record-CurlExchange.ps1 -Port 63871 -C
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_2025.md | reproduces: no | Ran the reproduction as given against curl 8.22.0 (x86_64-w64-mingw32) Schannel: exitcode.txt is 56 for curl and 56 for Curl (Release build). The exit codes now match.
+
 ## Log
 
 - 2026-11-05: filed proposed.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces.

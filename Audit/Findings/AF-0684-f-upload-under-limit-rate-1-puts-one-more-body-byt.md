@@ -42,6 +42,8 @@ dotnet build Curl.Console -c Release; & ./Record-CurlExchange.ps1 -Port 63871 -C
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_2025.md | not re-audited | Ran the reproduction 3 times against curl 8.22.0 (x86_64-w64-mingw32) Schannel. request.bin lengths (curl, Curl): (194, 198), (195, 194), (194, 195); both exit 56 every time. The count depends on timing in both binaries, and Curl sometimes sends fewer bytes than curl, so the reproduction does not reliably tell.
+
 ## Log
 
 - 2026-11-05: filed proposed.
