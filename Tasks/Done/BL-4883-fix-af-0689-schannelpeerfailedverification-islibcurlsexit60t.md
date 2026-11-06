@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-11-06
-completed:
+completed: 2026-11-06
 ---
 # BL-4883 — Fix AF-0689: SchannelPeerFailedVerification_..._IsLibcurlsExit60Text never asserts exit 60
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now asserts `CurlExitCode.PeerFailedVerification` is 60 and that the message equals a named constant holding curl_easy_strerror's text for exit 60 (lib/strerror.c), so the name's exit 60 is tied to the message. Test-only change: no production code, so no quality run. Whole-solution build clean and every fast test project green on Windows; the test is platform-neutral (chain built in memory).
 
 ## Log
 
 - 2026-11-06: Created.
 - 2026-11-06: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-06: Doing -> Done. SchannelPeerFailedVerification IP-name-mismatch test asserts exit 60 (CurlExitCode.PeerFailedVerification) beside libcurl's text
