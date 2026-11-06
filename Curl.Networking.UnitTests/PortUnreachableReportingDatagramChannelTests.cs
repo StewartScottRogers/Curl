@@ -12,6 +12,10 @@ public sealed class PortUnreachableReportingDatagramChannelTests
 {
     private static readonly IPEndPoint Server = new(IPAddress.Loopback, 1);
 
+    // curl_easy_strerror's words for CurlExitCode.CouldntConnect (exit 7). This layer only carries the text;
+    // the engine maps the exception to CurlExitCode.CouldntConnect, which EndPointReportingProtocolHandlerTests pins.
+    private const string CouldntConnectWords = "Could not connect to server";
+
     public TestContext TestContext { get; set; } = null!;
 
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
@@ -19,7 +23,7 @@ public sealed class PortUnreachableReportingDatagramChannelTests
     [TestMethod]
     [DataRow(SocketError.ConnectionReset)]
     [DataRow(SocketError.ConnectionRefused)]
-    public async Task ReceiveAsync_PortClosed_ThrowsCurlsExit7TextWithTheElapsedTime(SocketError socketError)
+    public async Task ReceiveAsync_PortClosed_ThrowsCouldntConnectTextWithTheElapsedTime(SocketError socketError)
     {
         Diagnostics.Arrange("socket error on receive", socketError);
         var timeProvider = new ManualTimeProvider();
@@ -36,13 +40,14 @@ public sealed class PortUnreachableReportingDatagramChannelTests
         Diagnostics.Assert("message", "Failed to connect to localhost:1 after 5 ms: Could not connect to server", refused.Message);
         Diagnostics.Assert("socket error kept", socketError, refused.SocketErrorCode);
         Assert.AreEqual("Failed to connect to localhost:1 after 5 ms: Could not connect to server", refused.Message);
+        Assert.EndsWith(CouldntConnectWords, refused.Message);
         Assert.AreEqual(socketError, refused.SocketErrorCode);
     }
 
     [TestMethod]
     [DataRow(SocketError.ConnectionReset)]
     [DataRow(SocketError.ConnectionRefused)]
-    public async Task SendAsync_PortClosed_ThrowsCurlsExit7Text(SocketError socketError)
+    public async Task SendAsync_PortClosed_ThrowsCouldntConnectText(SocketError socketError)
     {
         Diagnostics.Arrange("socket error on send", socketError);
         var timeProvider = new ManualTimeProvider();
@@ -59,6 +64,7 @@ public sealed class PortUnreachableReportingDatagramChannelTests
         Diagnostics.Assert("message", "Failed to connect to localhost:1 after 7 ms: Could not connect to server", refused.Message);
         Diagnostics.Assert("socket error kept", socketError, refused.SocketErrorCode);
         Assert.AreEqual("Failed to connect to localhost:1 after 7 ms: Could not connect to server", refused.Message);
+        Assert.EndsWith(CouldntConnectWords, refused.Message);
         Assert.AreEqual(socketError, refused.SocketErrorCode);
     }
 
