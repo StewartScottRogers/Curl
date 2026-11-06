@@ -39,6 +39,9 @@ internal sealed class RecordedConnection(string? response) : IConnection
 
     public bool IsDisposed { get; private set; }
 
+    /// <summary>Gets how many bytes of the response have been read from this connection.</summary>
+    public int BytesRead => _position;
+
     public string Written => Encoding.UTF8.GetString(_written.ToArray());
 
     public string WrittenBody => Written[(Written.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4)..];

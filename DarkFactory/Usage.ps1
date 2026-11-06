@@ -26,28 +26,68 @@ function Format-SpokenSpan {
 function ConvertTo-Unix { param([datetime]$When) return ([DateTimeOffset]$When).ToUnixTimeSeconds() }
 function ConvertFrom-Unix { param([long]$Seconds) return [DateTimeOffset]::FromUnixTimeSeconds($Seconds).LocalDateTime }
 
+function ConvertFrom-RateLimitEvent {
+    # The usage windows one stream-json rate_limit_event line reports, as a hashtable from
+    # window name ('five_hour', 'seven_day') to @{ Used; ResetsUnix }. Claude Code used to
+    # list every window under unifiedWindows; since October 2026 an event lists only the
+    # window it is about (rateLimitType), with utilization and resetsAt beside it, and
+    # leaves a window out until it nears its limit. Both shapes are read; a window named
+    # in unifiedWindows wins over the top-level fields. Pure, so -TestAutoLanes proves it.
+    param([string]$Line)
+    $windows = @{}
+    if ($Line -notmatch '"rate_limit_event"') { return $windows }
+    foreach ($m in [regex]::Matches($Line, '"(five_hour|seven_day)":\{"utilization":([0-9.]+),"resetsAt":(\d+)')) {
+        $windows[$m.Groups[1].Value] = @{ Used = [double]$m.Groups[2].Value; ResetsUnix = [long]$m.Groups[3].Value }
+    }
+    if ($Line -match '"rate_limit_info":\{[^{}]*"rateLimitType":"(five_hour|seven_day)"') {
+        $type = $Matches[1]
+        if (-not $windows.ContainsKey($type) -and $Line -match '"rate_limit_info":\{[^{}]*?"utilization":([0-9.]+)') {
+            $used = [double]$Matches[1]
+            if ($Line -match '"rate_limit_info":\{[^{}]*?"resetsAt":(\d+)') {
+                $windows[$type] = @{ Used = $used; ResetsUnix = [long]$Matches[1] }
+            }
+        }
+    }
+    return $windows
+}
+
 function Get-UsageReading {
-    # The newest usage reading a run logged: the share of the 5-hour and the weekly window
-    # used, and when each resets. A window whose reset has passed reads 0. -ThisShift looks
+    # The newest usage reading the runs logged: the share of the 5-hour and the weekly window
+    # used, and when each resets, each window taken from the newest event that reports it.
+    # A window whose reset has passed reads 0, and so does one no event reports: Claude
+    # Code leaves a window out until it nears its limit, so an unreported window is not
+    # near it (FiveHourReported and WeekReported say which were seen). -ThisShift looks
     # only at this shift's runs, so a lane never stops on a reading from before a reset
-    # that was lifted early. $null when no run has logged a reading.
+    # that was lifted early. $null when no run has logged a rate_limit_event.
     param([switch]$ThisShift)
     $filter = if ($ThisShift) { "*-$Stamp*.jsonl" } else { '*.jsonl' }
-    $files = Get-ChildItem $LogDir -Filter $filter -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 10
+    $files = Get-ChildItem $LogDir -Filter $filter -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 40
+    $found = @{}
+    $anyEvent = $false
     foreach ($f in $files) {
-        $line = Select-String -LiteralPath $f.FullName -Pattern '"five_hour":\{"utilization":' | Select-Object -Last 1
-        if (-not $line) { continue }
-        $text = $line.Line
-        if ($text -notmatch '"five_hour":\{"utilization":([0-9.]+),"resetsAt":(\d+)') { continue }
-        $reading = [pscustomobject]@{ FiveHour = [double]$Matches[1]; FiveHourResets = ConvertFrom-Unix ([long]$Matches[2]); Week = 0.0; WeekResets = [datetime]::MinValue }
-        if ($text -match '"seven_day":\{"utilization":([0-9.]+),"resetsAt":(\d+)') {
-            $reading.Week = [double]$Matches[1]; $reading.WeekResets = ConvertFrom-Unix ([long]$Matches[2])
+        $lines = @(Select-String -LiteralPath $f.FullName -Pattern '"rate_limit_event"' | ForEach-Object Line)
+        for ($i = $lines.Count - 1; $i -ge 0; $i--) {
+            $anyEvent = $true
+            $windows = ConvertFrom-RateLimitEvent $lines[$i]
+            foreach ($name in $windows.Keys) { if (-not $found.ContainsKey($name)) { $found[$name] = $windows[$name] } }
+            if ($found.ContainsKey('five_hour') -and $found.ContainsKey('seven_day')) { break }
         }
-        if ($reading.FiveHourResets -le (Get-Date)) { $reading.FiveHour = 0.0 }
-        if ($reading.WeekResets -le (Get-Date)) { $reading.Week = 0.0 }
-        return $reading
+        if ($found.ContainsKey('five_hour') -and $found.ContainsKey('seven_day')) { break }
     }
-    return $null
+    if (-not $anyEvent) { return $null }
+    $reading = [pscustomobject]@{
+        FiveHour = 0.0; FiveHourResets = [datetime]::MinValue; FiveHourReported = $false
+        Week = 0.0; WeekResets = [datetime]::MinValue; WeekReported = $false
+    }
+    if ($found.ContainsKey('five_hour')) {
+        $reading.FiveHour = $found['five_hour'].Used; $reading.FiveHourResets = ConvertFrom-Unix $found['five_hour'].ResetsUnix; $reading.FiveHourReported = $true
+    }
+    if ($found.ContainsKey('seven_day')) {
+        $reading.Week = $found['seven_day'].Used; $reading.WeekResets = ConvertFrom-Unix $found['seven_day'].ResetsUnix; $reading.WeekReported = $true
+    }
+    if ($reading.FiveHourResets -le (Get-Date)) { $reading.FiveHour = 0.0 }
+    if ($reading.WeekResets -le (Get-Date)) { $reading.Week = 0.0 }
+    return $reading
 }
 
 function Test-CiFixTitle {

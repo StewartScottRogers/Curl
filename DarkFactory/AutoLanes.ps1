@@ -391,8 +391,25 @@ if ($TestAutoLanes) {
         'Hotspot 7 Curl.Conformance.UnitTests/KnownDivergences.cs: BL-1, BL-2, BL-3, BL-4, BL-5, BL-6, BL-7'
         'Hotspot 5 Curl.Tests.Upstream/StandIns.cs: BL-8, BL-9, BL-10, BL-11, BL-12')
     $splitUnknown = @('Cannot validate argument on parameter ''Command''. The argument "hotspots" does not belong to the set')
+    # A shift whose events never report the 5-hour window (it is not near its limit): the
+    # reading carries 0 and no reset for it, so the 5-hour pace sets no limit.
+    $fiveHourUnreported = @(
+        New-TestSample '12:00' 0.0 ([datetime]::MinValue) 0.35 ($D.AddDays(3)) 5
+        New-TestSample '12:15' 0.0 ([datetime]::MinValue) 0.35 ($D.AddDays(3)) 5
+        New-TestSample '12:30' 0.0 ([datetime]::MinValue) 0.36 ($D.AddDays(3)) 5)
+    # rate_limit_event lines as Claude Code wrote them: both windows (September 2026), and
+    # one window beside rateLimitType (November 2026).
+    $eventBoth = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":1790827200,"rateLimitType":"five_hour","overageStatus":"rejected","isUsingOverage":false,"unifiedWindows":{"five_hour":{"utilization":0.11,"resetsAt":1790827200},"seven_day":{"utilization":0.24,"resetsAt":1791378000}}},"uuid":"u"}'
+    $eventWeekOnly = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1794402000,"rateLimitType":"seven_day","utilization":0.36,"overageStatus":"rejected","isUsingOverage":false,"unifiedWindows":{"seven_day":{"utilization":0.36,"resetsAt":1794402000,"status":"allowed"}},"overageEnabled":false},"uuid":"u"}'
+    $eventFiveHourTopLevel = '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1794400000,"rateLimitType":"five_hour","utilization":0.81,"overageStatus":"rejected","overageEnabled":false},"uuid":"u"}'
+    function Format-Windows { param($Windows) return (@($Windows.Keys | Sort-Object | ForEach-Object { "$($_)=$($Windows[$_].Used)@$($Windows[$_].ResetsUnix)" }) -join ' ') }
 
     $cases = @(
+        ,@('event both windows', 'five_hour=0.11@1790827200 seven_day=0.24@1791378000', (Format-Windows (ConvertFrom-RateLimitEvent $eventBoth)))
+        ,@('event weekly only', 'seven_day=0.36@1794402000', (Format-Windows (ConvertFrom-RateLimitEvent $eventWeekOnly)))
+        ,@('event five-hour top level', 'five_hour=0.81@1794400000', (Format-Windows (ConvertFrom-RateLimitEvent $eventFiveHourTopLevel)))
+        ,@('event not a rate limit', '', (Format-Windows (ConvertFrom-RateLimitEvent '{"type":"assistant","five_hour":{"utilization":0.5,"resetsAt":1}}')))
+        ,@('five-hour unreported grows', 'lanes 5 -> 6 (lane maximum 9)', (Get-SampledLaneCount $fiveHourUnreported 5 $false 33 16 9))
         ,@('five-hour-binds', 'lanes 3 -> 4 (5-hour pace allows 4.9)', (Get-SampledLaneCount $fiveHourBinds 3 $true 6 8 16))
         ,@('five-hour-binds weekly rate', 'null', "$(if ($null -eq (Get-BurnRate $fiveHourBinds Week)) { 'null' } else { 'a rate' })")
         ,@('weekly-binds low once', 'lanes 4 held (weekly pace allows 1.8, low once)', (Get-SampledLaneCount $weeklyBinds 4 $true 6 8 16 $false 1))

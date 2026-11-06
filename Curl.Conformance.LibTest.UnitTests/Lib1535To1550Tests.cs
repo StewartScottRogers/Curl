@@ -196,7 +196,7 @@ public sealed class Lib1535To1550Tests
         };
         var run = new PortRun(engine, 1540, "http://x/1540");
 
-        LibTestResult result = await new Lib1540(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+        LibTestResult result = await new Lib1540(new ManualTimeProvider(new DateTimeOffset(2026, 10, 16, 14, 5, 6, TimeSpan.Zero))).RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual((int)CurlCode.PartialFile, result.ExitCode);
         Assert.AreEqual("lib1540", new Lib1540(TimeProvider.System).ProgramName);
@@ -204,8 +204,7 @@ public sealed class Lib1535To1550Tests
         Assert.IsFalse(seen!.Behaviour.NoProgress);
         Assert.IsTrue(seen.Behaviour.Verbose);
         Assert.IsNotNull(seen.Callbacks.TransferInfo);
-        StringAssert.Contains(run.Error.ToString(), "== Info: hi\n");
-        StringAssert.EndsWith(run.Error.ToString(), "=> Send header, 5 bytes (0x5)\n0000: GET\n");
+        Assert.AreEqual("14:05:06.000000 == Info: hi\n14:05:06.000000 => Send header, 5 bytes (0x5)\n0000: GET\n", run.Error.ToString());
     }
 
     [TestMethod]

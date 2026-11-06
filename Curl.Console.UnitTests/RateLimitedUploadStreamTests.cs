@@ -39,6 +39,22 @@ public sealed class RateLimitedUploadStreamTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_TimePassesBeforeTheFirstRead_WaitsAWholeSecondBeforeTheSecond()
+    {
+        await using RateLimitedUploadStream upload = new(new MemoryStream(Body), 1, clock);
+        clock.CreateTimer(_ => { }, null, TimeSpan.FromMilliseconds(900), Timeout.InfiniteTimeSpan).Dispose();
+        byte[] buffer = new byte[64];
+
+        int first = await upload.ReadAsync(buffer);
+        int second = await upload.ReadAsync(buffer);
+
+        Diagnostics.Act("waits (ms)", WaitsText);
+        Assert.AreEqual(1, first);
+        Assert.AreEqual(1, second);
+        CollectionAssert.AreEqual(new[] { TimeSpan.FromMilliseconds(900), TimeSpan.FromSeconds(1) }, clock.Waits.ToArray());
+    }
+
+    [TestMethod]
     public async Task ReadAsync_ArrayOverload_ReadsNoMoreThanOneSecondsWorth()
     {
         await using RateLimitedUploadStream upload = new(new MemoryStream(Body), 10, clock);

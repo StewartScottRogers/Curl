@@ -11,7 +11,11 @@ namespace Curl.Console;
 /// (AF-0300, BL-2938, ADR-0745). Seeking, the length and the position pass through to the wrapped
 /// stream, so a resend can still rewind it; a synchronous read passes through unlimited, since
 /// waiting there would block a thread. It still tells the HTTP handler whether the wrapped stream
-/// could be rewound (<see cref="CanRewind" />). The wrapped stream is not owned.
+/// could be rewound (<see cref="CanRewind" />). The rate's clock starts at the first asynchronous
+/// read, not when the stream is built, so the time spent connecting and sending the request head
+/// does not shorten the wait before the second body piece: curl 8.22.0 sends a
+/// <c>-F a=b --limit-rate 1</c> body's second byte a second or more after its first (AF-0684,
+/// BL-4875). The wrapped stream is not owned.
 /// </summary>
 /// <param name="inner">The upload source.</param>
 /// <param name="bytesPerSecond">The <c>--limit-rate</c>, in bytes per second; at least 1.</param>
@@ -19,7 +23,7 @@ namespace Curl.Console;
 internal sealed class RateLimitedUploadStream(Stream inner, long bytesPerSecond, TimeProvider timeProvider)
     : Stream, IRewindableUpload
 {
-    private readonly RateLimitedStream limiter = new(inner, bytesPerSecond, timeProvider);
+    private RateLimitedStream? limiter;
 
     /// <summary>
     /// Gets a value indicating whether the wrapped stream could be rewound for a resend: unless it
@@ -57,11 +61,11 @@ internal sealed class RateLimitedUploadStream(Stream inner, long bytesPerSecond,
 
     /// <inheritdoc />
     public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
-        limiter.ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
 
     /// <inheritdoc />
     public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
-        limiter.ReadAsync(buffer, cancellationToken);
+        (limiter ??= new RateLimitedStream(inner, bytesPerSecond, timeProvider)).ReadAsync(buffer, cancellationToken);
 
     /// <inheritdoc />
     public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);

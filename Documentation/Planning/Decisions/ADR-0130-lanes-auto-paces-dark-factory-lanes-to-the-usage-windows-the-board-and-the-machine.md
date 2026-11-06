@@ -372,3 +372,25 @@ dark factory always runs as parallel as the board allows.
   is traced as "hotspots unavailable" and skipped. Why a task and not an automatic split:
   how a file is divided into self-registering units is design work a lane does with tests,
   and only the coordinator sees that a file is what holds lanes back.
+
+## Amendment 2026-11-05: reading a window that is not reported
+
+Since an October 2026 Claude Code update, a `rate_limit_event` no longer lists every window
+under `unifiedWindows`. It lists only the window it is about, named by `rateLimitType`, with
+`utilization` and `resetsAt` beside it, and leaves a window out until it nears its limit.
+`Get-UsageReading` demanded a `five_hour` figure, so it returned no reading. Each Auto step
+then held at "no burn rate yet", and no usage stop could fire. Surl's dark factory, which
+copies this design, found the same fault on 2026-11-05 (Surl ADR-0047 amendment 1). Stewart
+asked for it to be fixed here too.
+
+1. `ConvertFrom-RateLimitEvent` (`DarkFactory/Usage.ps1`) reads each window from either
+   shape. A window under `unifiedWindows` wins over the top-level fields.
+2. `Get-UsageReading` takes each window from the newest event that reports it, across the
+   newest 40 runs. It returns a reading once any `rate_limit_event` exists. A window no event
+   reports reads 0 with no reset, and `FiveHourReported` and `WeekReported` say which were
+   seen. An unreported window is not near its limit, so it sets no pace. The stops at
+   `-StopAtUsage` and `-StopAtWeeklyUsage` still apply as soon as Claude Code reports the
+   window.
+3. `-AutoLanesReport` prints "not reported (not near its limit)" for such a window.
+4. `-TestAutoLanes` proves both event shapes, a non-event line, and that a shift with no
+   5-hour report grows toward its ceiling.
