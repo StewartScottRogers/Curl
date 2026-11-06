@@ -69,7 +69,11 @@
                   is in a project that depends on a planted defect's project (its .csproj references
                   in -Tree, transitively): auditors run their reproductions in the planted tree.
                   (ADR-0422, amended 2026-10-07: a dependency alone set aside every re-audit of
-                  audit 20261007-133608.)
+                  audit 20261007-133608.) A "yes" on a finding with no mutation reproduction whose
+                  Reproduction command is exactly one dotnet test <project> --filter (quoted, or one
+                  unquoted word) has that test rerun on the clean -Commit as for a new finding; if
+                  the tests run and none fails, the verdict is set aside the same way, plant found or
+                  not (BL-4878: AF-0665 failed only because PD-303 removed --path-as-is).
       re-audit    Each other reaudits entry appends a Re-audits line to the finding it names (one
                   from another auditor marked "(re-audited by <auditor>)"). An open finding whose
                   own auditor says it no longer reproduces is closed (status, reason, closed,
@@ -173,7 +177,10 @@ function Read-Finding([string]$Path) {
         }
     }
     $location = if ($text -match '(?m)^Location: `([^`]*)`') { $Matches[1] } else { '' }
-    return [pscustomobject]@{ Path = $Path; Id = $fields['id']; Key = $fields['key']; Status = $fields['status']; Auditor = $fields['auditor']; Reproduction = "$($fields['reproduction'])"; Tasks = "$($fields['tasks'])"; Location = $location }
+    # The command in the Reproduction section's first code block, which a re-audit's clean test
+    # rerun reads (Get-TestCommand decides whether it may run; BL-4878).
+    $command = if ($text -match '(?s)\n## Reproduction\r?\n.*?```[A-Za-z]*\r?\n(.*?)\r?\n```') { $Matches[1].Trim() } else { '' }
+    return [pscustomobject]@{ Path = $Path; Id = $fields['id']; Key = $fields['key']; Status = $fields['status']; Auditor = $fields['auditor']; Reproduction = "$($fields['reproduction'])"; Tasks = "$($fields['tasks'])"; Location = $location; Command = $command }
 }
 
 # --- planted defects overlapping a finding (ADR-0422) -----------------------------------------
@@ -359,8 +366,9 @@ function Get-TestCommand([string]$Command) {
     # A reproduction command that is exactly one `dotnet test <project> --filter "<filter>"` ->
     # Project, Filter; $null for anything else, so no other command an auditor wrote is ever run.
     # The project is a folder name (optionally <name>/<name>.csproj): letters, digits, _ and dots,
-    # never a path out of the tree. The filter is one double-quoted string with no quote in it.
-    $pattern = '^dotnet\s+test\s+(?<project>[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)(?:[\\/](?:\k<project>\.csproj)?)?\s+--filter\s+"(?<filter>[^"\r\n`$]+)"$'
+    # never a path out of the tree. The filter is one double-quoted string with no quote in it, or
+    # one unquoted word of letters, digits and _ . ~ = ! (AF-0665's form, BL-4878).
+    $pattern = '^dotnet\s+test\s+(?<project>[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)(?:[\\/](?:\k<project>\.csproj)?)?\s+--filter\s+(?:"(?<filter>[^"\r\n`$]+)"|(?<filter>[A-Za-z0-9_.~=!]+))$'
     if ("$Command".Trim() -notmatch $pattern) { return $null }
     return [pscustomobject]@{ Project = $Matches['project']; Filter = $Matches['filter'] }
 }
@@ -750,6 +758,15 @@ function Invoke-WriteFindings {
             $evidence = "$($r.evidence)"
             if (-not $own) { $evidence = "(re-audited by $auditor) $evidence" }
             if ($mechanical -ne 'none') { $evidence += " Runner's targeted mutation rerun on the clean audited commit: $mechanical." }
+            # A "yes" on a failing-test finding is checked against the clean audited commit too: the
+            # auditor ran the test in the planted tree, so one that passes on the clean commit failed
+            # only because of a plant, whichever file the evidence cites (BL-4878: AF-0665, PD-303).
+            if ($reproduces -and -not $hasMechanical -and (Invoke-TestReproduction $target) -eq 'passed') {
+                $test = Get-TestCommand $target.Command
+                $overlap = if ($plant) { "overlaps planted defect $($plant.id) in $($plant.file) and " } else { '' }
+                Add-ReauditLine $target.Path "- $Date | $Scorecard | not re-audited | ${overlap}its failing test (dotnet test $($test.Project) --filter `"$($test.Filter)`") passes on the clean audited commit $Commit, so the auditor's verdict (reproduces yes) is set aside: $evidence"
+                continue
+            }
             # Set aside only what the clean rerun did not answer: no rerun, one that could not tell,
             # or an own "yes" the rerun contradicts (killed) - a "yes" closes nothing either way.
             $answered = ($mechanical -eq 'survived') -or ($mechanical -eq 'killed' -and -not $reproduces)
@@ -899,6 +916,30 @@ if ($SelfTest) {
         $badAccept = @($accepted | Where-Object { -not (Get-TestCommand $_) }); $badRefuse = @($refused | Where-Object { Get-TestCommand $_ })
         Check 'only exactly one dotnet test <project> --filter "..." is a rerunnable test command' ($badAccept.Count -eq 0 -and $badRefuse.Count -eq 0 -and (Get-TestCommand $accepted[1]).Project -eq 'Curl.X.UnitTests' -and (Get-TestCommand $accepted[0]).Filter -eq 'FullyQualifiedName~UpstreamCase_RunThroughCurl_HoldsTheRatchet&TestCategory!=Integration') "wrongly refused: $($badAccept -join ' / '); wrongly accepted: $($badRefuse -join ' / ')"
         Check 'closure summary line' ($line2 -eq 'findings: new 4, still open 1, closed 4, catches 0, set aside 2') $line2
+
+        # BL-4878: AF-0665's shape. A "yes" re-audit of a failing-test finding whose test passes on the
+        # clean commit is set aside though the evidence cites no planted file; one still failing there
+        # stays a "yes"; an unquoted --filter word is a rerunnable command.
+        $testReaudit = Join-Path $work 'testreaudit'
+        $FindingsDirectory = Join-Path $testReaudit 'findings'; $ReportDirectory = Join-Path $testReaudit 'reports'
+        New-Item -ItemType Directory -Force $FindingsDirectory, $ReportDirectory | Out-Null
+        Copy-Item -LiteralPath (Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md') -Destination $FindingsDirectory
+        $Manifest = Join-Path $testReaudit 'manifest.json'; $Tree = ''; $Unreliable = @(); $script:MechanicalOutcomes = @{}
+        [IO.File]::WriteAllText($Manifest, '{ "seed": 1, "commit": "abc1234", "planted": [ { "id": "PD-303", "auditor": "conformance", "file": "Curl.Cli.UnitLibrary/CommandLineOptionTable.cs", "line": 332, "description": "Removed the --path-as-is row", "catch": "path-as-is" } ] }', $Utf8)
+        $newTestFinding = { param($Id, $Test)
+            $t = [IO.File]::ReadAllText((Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md'))
+            $t = $t.Replace('{{ID}}', $Id).Replace('{{TITLE}}', "$Test fails unmutated").Replace('{{AUDITOR}}', 'quality').Replace('{{SEVERITY}}', 'High').Replace('{{KEY}}', "quality:Curl.Engine.UnitTests/TransferContextFactoryTests.cs:${Test}:failing-test").Replace('{{REPRODUCTION}}', 'none').Replace('{{FOUND}}', '2026-11-04').Replace('{{FOUND_AT}}', 'abc').Replace('{{SCORECARD}}', '2026-11-04_1442.md').Replace('{{SUMMARY}}', 's').Replace('{{LOCATION}}', 'Curl.Engine.UnitTests/TransferContextFactoryTests.cs:186').Replace('{{EVIDENCE}}', 'e').Replace('{{REPRODUCTION_COMMAND}}', "dotnet test Curl.Engine.UnitTests --filter FullyQualifiedName~$Test").Replace('{{REPRODUCTION_EXPECTED}}', 'Passed: 1, Failed: 0').Replace('{{REPRODUCTION_ACTUAL}}', 'Failed: 1')
+            [IO.File]::WriteAllText((Join-Path $FindingsDirectory "$Id-x.md"), $t.Replace('status: proposed', 'status: accepted'), $Utf8)
+        }
+        & $newTestFinding 'AF-0040' 'Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine'
+        & $newTestFinding 'AF-0041' 'Create_StillBroken'
+        [IO.File]::WriteAllText((Join-Path $ReportDirectory 'quality.md'), "Fixture reply.`n`n" + '```json' + "`n" + '{ "auditor": "quality", "commit": "abc1234", "fingerprint": "f", "findings": [], "reaudits": [ { "finding": "AF-0040", "reproduces": true, "evidence": "still fails at TransferContextFactoryTests.cs:943: option --path-as-is: is unknown" }, { "finding": "AF-0041", "reproduces": true, "evidence": "still fails at TransferContextFactoryTests.cs:950" } ], "metrics": {} }' + "`n" + '```' + "`n", $Utf8)
+        $script:TestOutcomes = @{ 'quality:Curl.Engine.UnitTests/TransferContextFactoryTests.cs:Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine:failing-test' = 'passed'; 'quality:Curl.Engine.UnitTests/TransferContextFactoryTests.cs:Create_StillBroken:failing-test' = 'failed' }
+        $null = Invoke-WriteFindings
+        $t40 = Lf 'AF-0040'; $t41 = Lf 'AF-0041'
+        Check 'a "yes" re-audit of a failing test that passes on the clean commit is set aside, no plant cited (BL-4878)' ($t40 -match '\| not re-audited \| its failing test \(dotnet test Curl\.Engine\.UnitTests --filter "FullyQualifiedName~Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine"\) passes on the clean audited commit abc1234, so the auditor''s verdict \(reproduces yes\) is set aside: still fails at TransferContextFactoryTests\.cs:943' -and $t40 -match '(?m)^status: accepted$' -and @(Get-ReauditLines $t40).Count -eq 0) 'AF-0040'
+        Check 'a "yes" re-audit of a failing test that still fails on the clean commit stays a yes (BL-4878)' ($t41 -match '\| reproduces: yes \| still fails at TransferContextFactoryTests\.cs:950' -and @(Get-ReauditLines $t41).Count -eq 1) 'AF-0041'
+        Check 'an unquoted --filter word is a rerunnable test command; one with a shell character is not (BL-4878)' ((Get-TestCommand 'dotnet test Curl.Engine.UnitTests --filter FullyQualifiedName~A_B').Filter -eq 'FullyQualifiedName~A_B' -and -not (Get-TestCommand 'dotnet test Curl.X.UnitTests --filter A;rm') -and -not (Get-TestCommand 'dotnet test Curl.X.UnitTests --filter A&B')) 'FullyQualifiedName~A_B'
 
         # ADR-0422, amended 2026-10-14: a finding about a past run's cost closes once its tasks are Done.
         $historical = Join-Path $work 'historical'
