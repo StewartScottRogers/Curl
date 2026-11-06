@@ -395,7 +395,22 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         uploadTotal = null;
         currentSpeed = 0;
         bytesReported = false;
-        Draw(done: false);
+        DrawFirstSample();
+    }
+
+    /// <summary>
+    /// Takes a hop's first speed sample and appends its zero status line, as curl's
+    /// <c>progress_calc</c> always draws when it has no sample yet, whether or not the transfer is done.
+    /// </summary>
+    private void DrawFirstSample()
+    {
+        long now = timeProvider.GetTimestamp();
+        CalculateAverageSpeeds(now);
+        sampleBytes[0] = downloaded + uploaded;
+        sampleTimes[0] = now;
+        sampleCount = 1;
+        currentSpeed = uploadSpeed + downloadSpeed;
+        statusLines.Append(StatusLine());
     }
 
     /// <summary>
@@ -419,19 +434,7 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// <returns><see langword="true" /> when the status line is to be drawn.</returns>
     private bool Calculate(long now, bool done)
     {
-        spentMicroseconds = Microseconds(start, now);
-        downloadSpeed = ProgressMeterFields.Speed(downloaded, spentMicroseconds);
-        uploadSpeed = ProgressMeterFields.Speed(uploaded, spentMicroseconds);
-        if (sampleCount == 0)
-        {
-            sampleBytes[0] = downloaded + uploaded;
-            sampleTimes[0] = now;
-            sampleCount = 1;
-            currentSpeed = uploadSpeed + downloadSpeed;
-
-            return true;
-        }
-
+        CalculateAverageSpeeds(now);
         if (!TrySample(now, done, out int latest))
         {
             return false;
@@ -442,6 +445,14 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         return true;
     }
 
+    /// <summary>Updates the time spent and the average speeds at <paramref name="now" />.</summary>
+    /// <param name="now">The clock's timestamp.</param>
+    private void CalculateAverageSpeeds(long now)
+    {
+        spentMicroseconds = Microseconds(start, now);
+        downloadSpeed = ProgressMeterFields.Speed(downloaded, spentMicroseconds);
+        uploadSpeed = ProgressMeterFields.Speed(uploaded, spentMicroseconds);
+    }
     /// <summary>
     /// Takes a new speed sample when a second has passed since the latest one; else, once the
     /// transfer is done and has no current speed yet, overwrites the latest one.
