@@ -241,6 +241,15 @@ public sealed class WebDavMultistatusReaderTests
     }
 
     [TestMethod]
+    public void Read_StatusLineWithoutReasonPhrase_GivesItsCode()
+    {
+        var result = WebDavMultistatusReader.Read(
+            "<multistatus xmlns=\"DAV:\"><response><href>/r</href><status>HTTP/1.1 404</status></response></multistatus>");
+
+        Assert.AreEqual(404, result.Entries!.Single().Status);
+    }
+
+    [TestMethod]
     public void Read_Null_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => WebDavMultistatusReader.Read(null!));
 
