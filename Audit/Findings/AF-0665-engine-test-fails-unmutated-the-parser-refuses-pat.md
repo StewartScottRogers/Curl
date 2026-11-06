@@ -3,8 +3,8 @@ id: AF-0665
 title: Engine test fails unmutated: the parser refuses --path-as-is as an unknown option
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces.
 key: quality:Curl.Engine.UnitTests/TransferContextFactoryTests.cs:Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine:failing-test
 reproduction: none
 task: BL-4866
@@ -13,9 +13,9 @@ found: 2026-11-04
 found-at: 4749d66adb6a165fcd90aec741b5f49017616c28
 scorecard: 2026-11-04_1442.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: reliable-reaudit
+closed-by: 2026-11-05_2025.md
 ---
 # AF-0665 - Engine test fails unmutated: the parser refuses --path-as-is as an unknown option
 
@@ -43,7 +43,9 @@ dotnet test Curl.Engine.UnitTests --filter FullyQualifiedName~Create_CommandLine
 ## Re-audits
 
 - 2026-11-05 | 2026-11-05_0819.md | reproduces: yes | Ran the reproduction: Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine still fails, 'The parser refused the command line (exit FailedInit): curl: option --path-as-is: is unknown' (TransferContextFactoryTests.cs:943).
+- 2026-11-05 | 2026-11-05_2025.md | reproduces: no | Ran 'dotnet test Curl.Engine.UnitTests --filter FullyQualifiedName~Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine': Passed! - Failed: 0, Passed: 1, Total: 1.
 
 ## Log
 
 - 2026-11-04: filed proposed.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces.

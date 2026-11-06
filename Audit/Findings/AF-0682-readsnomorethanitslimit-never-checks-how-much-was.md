@@ -3,8 +3,8 @@ id: AF-0682
 title: ReadsNoMoreThanItsLimit never checks how much was read
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces.
 key: quality:Curl.Extension.OpenTelemetry.UnitTests/Otlp/OtlpHttpExporterTests.cs:ExportAsync_AStatusLineThatNeverEnds_ReadsNoMoreThanItsLimit:name-lies
 reproduction: none
 task: BL-4873
@@ -13,9 +13,9 @@ found: 2026-11-05
 found-at: aea9f0110c59ad5209aafb9f0f985886a2cb9439
 scorecard: 2026-11-05_0819.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: reliable-reaudit
+closed-by: 2026-11-05_2025.md
 ---
 # AF-0682 - ReadsNoMoreThanItsLimit never checks how much was read
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Extension.OpenTelemetry.UnitTests/Otlp/OtlpHttpExporter
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_2025.md | reproduces: no | Ran the Select-String reproduction: the test now ends with Assert.IsNull(failure); Assert.AreEqual(8192, connection.BytesRead); (OtlpHttpExporterTests.cs:72-73), so it checks how much was read.
+
 ## Log
 
 - 2026-11-05: filed proposed.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces.
