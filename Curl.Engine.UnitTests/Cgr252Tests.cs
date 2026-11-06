@@ -28,4 +28,25 @@ public sealed partial class ManagedEasyTransferTests
         Assert.IsNull(easy.Info.ContentType);
         Assert.AreEqual(-1, easy.Info.ContentLengthDownload);
     }
+
+    // AF-0692: only a header callback that took nothing drops the head; a write error from the body callback alone,
+    // with no header callback set, leaves getinfo reporting the head libcurl parsed.
+    [TestMethod]
+    public async Task PerformAsync_WriteCallbackRefusesTheBodyWithNoHeaderCallback_KeepsTheParsedHeaders()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Callbacks = new() { Write = _ => 0 },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.WriteError, code);
+        Assert.AreEqual(Response.Length - "hello".Length, easy.Info.HeaderSize);
+        Assert.AreEqual("text/plain", easy.Info.ContentType);
+        Assert.AreEqual(5, easy.Info.ContentLengthDownload);
+    }
 }
