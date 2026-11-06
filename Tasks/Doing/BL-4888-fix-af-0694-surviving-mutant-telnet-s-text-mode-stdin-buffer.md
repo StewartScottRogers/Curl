@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitLibrary/WindowsTextModeReadStream.cs, Curl.Engine.UnitTests/Cgr112Tests.cs]
 requirement: none
 created: 2026-11-06
 completed:
@@ -45,6 +45,8 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Touches narrowed from the whole Curl.Engine.UnitLibrary to WindowsTextModeReadStream.cs and its tests in Curl.Engine.UnitTests/Cgr112Tests.cs, where the fix and its test land (ADR-0694).
 
 ## Log
 
