@@ -1,3 +1,4 @@
+using System.Globalization;
 using Curl.Extension.OpenTelemetry.Otlp;
 using Curl.Extension.OpenTelemetry.TraceContext;
 
@@ -30,14 +31,16 @@ public sealed class OtlpHttpClientSpanTests
     }
 
     [TestMethod]
-    public void For_AStatusOf400OrMore_IsAnErrorWithTheStatusAsItsType_SemanticConventionsHttpClientStatus()
+    [DataRow(400, DisplayName = "400, the boundary")]
+    [DataRow(404, DisplayName = "404")]
+    public void For_AStatusOf400OrMore_IsAnErrorWithTheStatusAsItsType_SemanticConventionsHttpClientStatus(int statusCode)
     {
-        var result = TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 404 } };
+        var result = TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = statusCode } };
 
         var span = OtlpHttpClientSpan.For(Sent, Context("http://example.com/"), result, Start, Start);
 
         Assert.IsTrue(span.IsError);
-        Assert.AreEqual(OtlpAttribute.String("error.type", "404"), span.Attributes[^1]);
+        Assert.AreEqual(OtlpAttribute.String("error.type", statusCode.ToString(CultureInfo.InvariantCulture)), span.Attributes[^1]);
         Assert.AreEqual("GET", span.Name);
     }
 

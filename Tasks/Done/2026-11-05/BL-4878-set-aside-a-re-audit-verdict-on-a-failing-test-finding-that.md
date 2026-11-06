@@ -9,7 +9,7 @@ touches: [Audit/Tools/Write-AuditFindings.ps1]
 lane: no
 requirement: none
 created: 2026-11-05
-completed:
+completed: 2026-11-05
 ---
 # BL-4878 — Set aside a re-audit verdict on a failing-test finding that passes on the clean commit
 
@@ -25,11 +25,15 @@ AF-0665 (`Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine`, Curl.Eng
 
 ## Acceptance criteria
 
-- [ ] For a re-audit "reproduces: yes" on a finding whose reproduction is exactly one `dotnet test <project> --filter "<filter>"`, the runner reruns it on the clean audited commit (as BL-3503 does for new findings); if the tests run and none fails, the verdict is recorded "not re-audited | ... set aside" (naming the overlapping plant when one is found) and no Re-fix task follows from it.
-- [ ] `Write-AuditFindings.ps1 -SelfTest` has a case for it, built on AF-0665's shape, and passes under Windows PowerShell 5.1 and pwsh 7.
+- [x] For a re-audit "reproduces: yes" on a finding whose reproduction is exactly one `dotnet test <project> --filter "<filter>"`, the runner reruns it on the clean audited commit (as BL-3503 does for new findings); if the tests run and none fails, the verdict is recorded "not re-audited | ... set aside" (naming the overlapping plant when one is found) and no Re-fix task follows from it.
+- [x] `Write-AuditFindings.ps1 -SelfTest` has a case for it, built on AF-0665's shape, and passes under Windows PowerShell 5.1 and pwsh 7.
 
 ## Notes
+
+Done on the audit branch (871ccbf81): a 'yes' re-audit of a dotnet-test finding is rerun on the clean commit and set aside when it passes; Read-Finding reads the Reproduction command; an unquoted --filter word is rerunnable. Write-AuditFindings -SelfTest 58 PASS under Windows PowerShell 5.1 and pwsh 7 (3 new BL-4878 cases on AF-0665's shape).
 
 ## Log
 
 - 2026-11-05: Created.
+- 2026-11-05: Backlog -> Doing. Criteria at claim: dc3baa2f f11b8c61.
+- 2026-11-05: Doing -> Done. Re-audited failing tests are rerun on the clean commit and set aside when they pass there; on the audit branch (871ccbf81).

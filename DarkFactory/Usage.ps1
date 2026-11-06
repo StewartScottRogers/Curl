@@ -51,29 +51,60 @@ function ConvertFrom-RateLimitEvent {
     return $windows
 }
 
+function Read-FileRateLimitWindows {
+    # The newest reading of each usage window one log file reports, as ConvertFrom-RateLimitEvent
+    # returns them, and the number of rate_limit_event lines it held. Counts each read in
+    # $script:UsageLogReads, so -TestAutoLanes can prove an unchanged file is not read twice.
+    param([string]$Path)
+    $script:UsageLogReads++
+    $newest = @{}
+    $count = 0
+    $lines = @(Select-String -LiteralPath $Path -Pattern '"rate_limit_event"' -ErrorAction SilentlyContinue | ForEach-Object Line)
+    for ($i = $lines.Count - 1; $i -ge 0; $i--) {
+        $count++
+        $windows = ConvertFrom-RateLimitEvent $lines[$i]
+        foreach ($name in $windows.Keys) { if (-not $newest.ContainsKey($name)) { $newest[$name] = $windows[$name] } }
+    }
+    return @{ Windows = $newest; Events = $count }
+}
+
 function Get-UsageReading {
     # The newest usage reading the runs logged: the share of the 5-hour and the weekly window
     # used, and when each resets, each window taken from the newest event that reports it.
-    # A window whose reset has passed reads 0, and so does one no event reports: Claude
-    # Code leaves a window out until it nears its limit, so an unreported window is not
-    # near it (FiveHourReported and WeekReported say which were seen). -ThisShift looks
+    # An event names one window, so a window is remembered (per process, in
+    # $script:UsageLastKnown) until its reset passes, however many events about the other
+    # window follow or however far its own event has fallen out of the 40 newest logs. A log
+    # file is read once: $script:UsageFileCache holds what it reported until its size or write
+    # time changes. A window whose reset has passed reads 0, and so does one no event
+    # reports (FiveHourReported and WeekReported say which were seen). -ThisShift looks
     # only at this shift's runs, so a lane never stops on a reading from before a reset
     # that was lifted early. $null when no run has logged a rate_limit_event.
     param([switch]$ThisShift)
+    if (-not $script:UsageFileCache) { $script:UsageFileCache = @{} }
+    if (-not $script:UsageLastKnown) { $script:UsageLastKnown = @{} }
     $filter = if ($ThisShift) { "*-$Stamp*.jsonl" } else { '*.jsonl' }
     $files = Get-ChildItem $LogDir -Filter $filter -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 40
     $found = @{}
     $anyEvent = $false
     foreach ($f in $files) {
-        $lines = @(Select-String -LiteralPath $f.FullName -Pattern '"rate_limit_event"' | ForEach-Object Line)
-        for ($i = $lines.Count - 1; $i -ge 0; $i--) {
-            $anyEvent = $true
-            $windows = ConvertFrom-RateLimitEvent $lines[$i]
-            foreach ($name in $windows.Keys) { if (-not $found.ContainsKey($name)) { $found[$name] = $windows[$name] } }
-            if ($found.ContainsKey('five_hour') -and $found.ContainsKey('seven_day')) { break }
+        $cached = $script:UsageFileCache[$f.FullName]
+        if (-not $cached -or $cached.Length -ne $f.Length -or $cached.Written -ne $f.LastWriteTimeUtc) {
+            $read = Read-FileRateLimitWindows $f.FullName
+            $cached = @{ Length = $f.Length; Written = $f.LastWriteTimeUtc; Windows = $read.Windows; Events = $read.Events }
+            $script:UsageFileCache[$f.FullName] = $cached
         }
-        if ($found.ContainsKey('five_hour') -and $found.ContainsKey('seven_day')) { break }
+        if ($cached.Events -gt 0) { $anyEvent = $true }
+        foreach ($name in $cached.Windows.Keys) { if (-not $found.ContainsKey($name)) { $found[$name] = $cached.Windows[$name] } }
     }
+    $key = [string][bool]$ThisShift
+    if (-not $script:UsageLastKnown[$key]) { $script:UsageLastKnown[$key] = @{} }
+    $known = $script:UsageLastKnown[$key]
+    $nowUnix = ConvertTo-Unix (Get-Date)
+    foreach ($name in @($known.Keys)) {
+        if ($known[$name].ResetsUnix -le $nowUnix) { $known.Remove($name); continue }
+        if (-not $found.ContainsKey($name)) { $found[$name] = $known[$name]; $anyEvent = $true }
+    }
+    foreach ($name in $found.Keys) { $known[$name] = $found[$name] }
     if (-not $anyEvent) { return $null }
     $reading = [pscustomobject]@{
         FiveHour = 0.0; FiveHourResets = [datetime]::MinValue; FiveHourReported = $false

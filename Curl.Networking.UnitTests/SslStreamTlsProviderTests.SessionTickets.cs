@@ -107,23 +107,23 @@ public sealed partial class SslStreamTlsProviderTests
     /// <summary>
     /// Writes the TLS settings, build and server protocols as ARRANGE, runs the handshake inside
     /// a <c>handshake</c> PHASE, echoes <c>hello</c>, and writes the echo and the TLS messages
-    /// reported as ACT.
+    /// reported as ACT. Windows' in-process Schannel now and then refuses a handshake between
+    /// its own client and server under CI load (BL-2792, BL-4880), so a refused handshake is
+    /// written as ACT with the server's exception and tried once more against a fresh server:
+    /// these tests pin ticket reporting, which other tests' handshakes do not depend on.
     /// </summary>
     private async Task<(List<TlsMessageEvent> Messages, string Echoed)> EchoOverAsync(bool matchesSchannelBuild, SslProtocols serverProtocols)
     {
-        var (client, server) = InMemoryDuplexStream.CreatePair();
-        var serverTask = RunEchoServerAsync(server, serverProtocols);
-        var events = new RecordingTransferEvents();
         var options = new TlsClientOptions(Insecure: true, MinimumVersion: serverProtocols == SslProtocols.Tls13 ? TlsVersion.Tls13 : TlsVersion.Tls12);
-        var provider = new SslStreamTlsProvider(options, matchesSchannelBuild);
         ArrangeOptions(options);
         Diagnostics.Arrange("build", BuildName(matchesSchannelBuild));
         Diagnostics.Arrange("server protocols", serverProtocols);
 
-        ConnectResult result;
-        using (Diagnostics.Phase("handshake"))
+        var (result, serverTask, events) = await HandshakeWithEchoServerAsync(options, matchesSchannelBuild, serverProtocols);
+        if (result.Connection is null)
         {
-            result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+            Diagnostics.Act("refused handshake, server side", await ServerFailureAsync(serverTask));
+            (result, serverTask, events) = await HandshakeWithEchoServerAsync(options, matchesSchannelBuild, serverProtocols);
         }
 
         ActResult(result);
@@ -139,5 +139,36 @@ public sealed partial class SslStreamTlsProviderTests
             "TLS messages",
             string.Join(", ", events.TlsMessages.Select(message => $"{(message.Sent ? "sent" : "received")} type {message.Bytes.Span[0]}")));
         return (events.TlsMessages, echoed);
+    }
+
+    /// <summary>Runs one handshake against a fresh echo server inside a <c>handshake</c> PHASE.</summary>
+    private async Task<(ConnectResult Result, Task ServerTask, RecordingTransferEvents Events)> HandshakeWithEchoServerAsync(
+        TlsClientOptions options,
+        bool matchesSchannelBuild,
+        SslProtocols serverProtocols)
+    {
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = RunEchoServerAsync(server, serverProtocols);
+        var events = new RecordingTransferEvents();
+        var provider = new SslStreamTlsProvider(options, matchesSchannelBuild);
+        using (Diagnostics.Phase("handshake"))
+        {
+            var result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+            return (result, serverTask, events);
+        }
+    }
+
+    /// <summary>Returns the type and message of the exception the echo server's handshake ended with, or <c>none</c>.</summary>
+    private static async Task<string> ServerFailureAsync(Task serverTask)
+    {
+        try
+        {
+            await serverTask;
+            return "none";
+        }
+        catch (Exception exception) when (exception is AuthenticationException or IOException or ObjectDisposedException)
+        {
+            return $"{exception.GetType().Name}: {exception.Message} {exception.InnerException?.Message}";
+        }
     }
 }

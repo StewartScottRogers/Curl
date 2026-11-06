@@ -8,7 +8,7 @@ depends-on: [BL-4873]
 touches: [Curl.Extension.OpenTelemetry.UnitLibrary, Curl.Extension.OpenTelemetry.UnitTests]
 requirement: none
 created: 2026-11-05
-completed:
+completed: 2026-11-05
 ---
 # BL-4869 — Fix AF-0678: Surviving mutant: an HTTP 400 response can be exported as a successful span
 
@@ -41,15 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-11-05 (lane 6): The fix is a test pinning the 400 boundary (a 400 response is an error with error.type "400") in `Curl.Extension.OpenTelemetry.UnitTests/Otlp/OtlpHttpClientSpanTests.cs`; the production code is already right. That test project was not in touches and BL-4873 (in Doing) holds it whole, so touches was widened to it and BL-4873 added to depends-on; requeued before any code edit.
+- 2026-11-05 (lane 2): The status test is now a DataRow test with a 400 row and a 404 row (commit f06f55b5c). The production code is unchanged, so no quality run was needed. The finding's mutation script first ran before that commit and reported "survived", since it tests the committed tree. The audit guard then refused to run it again, so the same mutant (`>= 400` to `> 400` at OtlpHttpClientSpan.cs:69) was applied by hand: the new 400 row fails (`span.IsError` is false), so the mutant is killed. The mutation was reverted. `dotnet build` is clean with 0 warnings, and the fast tests pass in all 115 test projects. A re-audit by the quality auditor closes AF-0678.
 
 ## Log
 
 - 2026-11-05: Created.
 - 2026-11-05: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-11-05: Doing -> Backlog. Needs Curl.Extension.OpenTelemetry.UnitTests, held by BL-4873 in Doing; waits on BL-4873
+- 2026-11-05: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-05: Doing -> Done. A 400 response is pinned as an error span; the >= 400 mutant at OtlpHttpClientSpan.cs:69 is killed
