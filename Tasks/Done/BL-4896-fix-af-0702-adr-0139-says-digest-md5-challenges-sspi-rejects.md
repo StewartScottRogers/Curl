@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-11-06
-completed:
+completed: 2026-11-06
 ---
 # BL-4896 — Fix AF-0702: ADR-0139 says DIGEST-MD5 challenges SSPI rejects are answered null (exit 67) because exit 94 cannot be expressed; SaslAuthenticator now raises exit 94 for them
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+ADR-0139 Decision now states exit 94 for a DIGEST-MD5 challenge SSPI rejects; the "cannot yet be expressed" and "answered `null`" sentences are gone. Docs-only change, so no code build or test was needed beyond leaving code untouched.
 
 ## Log
 
 - 2026-11-06: Created.
 - 2026-11-06: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-06: Doing -> Done. ADR-0139 amended to say exit 94
