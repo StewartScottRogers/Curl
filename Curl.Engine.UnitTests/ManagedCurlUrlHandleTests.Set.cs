@@ -292,6 +292,7 @@ public sealed partial class ManagedCurlUrlHandleTests
     [DataRow("a/b", CurlUrlFlags.None)]
     [DataRow("a:80", CurlUrlFlags.None)]
     [DataRow("u@h", CurlUrlFlags.None)]
+    [DataRow("@example.com", CurlUrlFlags.None)]
     [DataRow("[::1]/x", CurlUrlFlags.None)]
     [DataRow("bad host", CurlUrlFlags.None)]
     public void Set_BadHost_ReturnsBadHostnameAndKeepsTheHost(string host, CurlUrlFlags flags)
