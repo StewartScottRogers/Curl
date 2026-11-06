@@ -8,7 +8,7 @@ depends-on: []
 touches: [.github/workflows/ci.yml]
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-06
 ---
 # BL-4782 — Keep the audit-guard CI job inside its 5-minute timeout: its full-history checkout ran past it on runs 41688300433 and 41723085402 and turned CI red
 
@@ -25,12 +25,16 @@ ci.yml is a guard file (ADR-0267, BL-1209), so it changes only through the `audi
 ## Acceptance criteria
 
 - [x] `audit-guard` in .github/workflows/ci.yml is changed on the `audit` branch so its checkout and check fit inside its `timeout-minutes`, and `Audit/Guard/Test-AuditPathsUntouched.ps1 -SelfTest` still passes.
-- [ ] The `CI` runs on work/dark-factory over the first full shift after the change merges show no `audit-guard` job cancelled by its `timeout-minutes` (`gh run view <id> --json jobs`).
+- [x] The `CI` runs on work/dark-factory over the first full shift after the change merges show no `audit-guard` job cancelled by its `timeout-minutes` (`gh run view <id> --json jobs`).
 
 ## Notes
+
+Measured 2026-11-06 (interactive): the 8 CI runs on work/dark-factory during shift 20261106-051223 (05:12-13:12) all have 'Audit paths untouched by the dark factory' success; none was cancelled by its timeout-minutes.
 
 Criterion 1 met on 2026-11-03: PR #294 (audit -> master, merge 63cd76682) gives audit-guard a blobless checkout (`filter: blob:none`) and `timeout-minutes: 15`; `Audit/Guard/Test-AuditPathsUntouched.ps1 -SelfTest` passes (exit 0). Criterion 2 waits for the first full shift after the merge.
 
 ## Log
 
 - 2026-11-03: Created.
+- 2026-11-06: Backlog -> Doing. Criteria at claim: 0432a82d 58bf26f6.
+- 2026-11-06: Doing -> Done. Over a full shift, no audit-guard job hit its timeout (8 of 8 succeeded).
