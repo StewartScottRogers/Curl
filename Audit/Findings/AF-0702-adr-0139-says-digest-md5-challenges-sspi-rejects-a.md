@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0139-sasl-cram-md5-and-digest-md5-answer-as-each-platforms-curl-with-sspi-on-windows.md:ADR-0139:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-4896
+tasks: BL-4896
 found: 2026-11-05
 found-at: 4eba3c63638befcc6a63aaa31ddf5419922fa939
 scorecard: 2026-11-05_2025.md

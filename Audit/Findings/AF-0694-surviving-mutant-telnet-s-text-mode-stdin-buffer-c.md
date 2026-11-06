@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/WindowsTextModeReadStream.cs:decoded-plus1:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/WindowsTextModeReadStream.cs:20:+1
-task: none
-tasks:
+task: BL-4888
+tasks: BL-4888
 found: 2026-11-05
 found-at: 4eba3c63638befcc6a63aaa31ddf5419922fa939
 scorecard: 2026-11-05_2025.md

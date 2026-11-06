@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.WebDavTools.UnitLibrary/Transfer/WebDavSyncTransferHook.cs:Keep-true:surviving-mutant
 reproduction: mutation Curl.Extension.WebDavTools.UnitLibrary/Transfer/WebDavSyncTransferHook.cs:126:true
-task: none
-tasks:
+task: BL-4891
+tasks: BL-4891
 found: 2026-11-05
 found-at: 4eba3c63638befcc6a63aaa31ddf5419922fa939
 scorecard: 2026-11-05_2025.md

@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/UrlPartSetter.cs:CheckedHost-ge:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartSetter.cs:152:>=
-task: none
-tasks:
+task: BL-4887
+tasks: BL-4887
 found: 2026-11-05
 found-at: 4eba3c63638befcc6a63aaa31ddf5419922fa939
 scorecard: 2026-11-05_2025.md
