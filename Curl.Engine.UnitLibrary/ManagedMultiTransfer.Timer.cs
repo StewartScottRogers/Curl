@@ -14,7 +14,9 @@ internal sealed partial class ManagedMultiTransfer
     /// <summary>
     /// Tells the timer callback the next timeout when it changed, or, with <paramref name="tellsAgain" />, whenever
     /// it is not -1: after <see cref="CurlMultiSockets.Timeout" />, whose timer is spent, and on each add, as
-    /// curl 8.22.0's <c>curl_multi_add_handle</c> tells 0 for every handle it adds (CGR-034 C_21).
+    /// curl 8.22.0's <c>curl_multi_add_handle</c> tells 0 for every handle it adds (CGR-034 C_21). The clock is read
+    /// once, so the due time of a deadline that has not moved stays within the millisecond the value is rounded up by,
+    /// however long the thread is paused between working the value out and telling it (BL-4897).
     /// </summary>
     private CurlMultiCode UpdateTimer(bool tellsAgain)
     {
@@ -24,8 +26,9 @@ internal sealed partial class ManagedMultiTransfer
             return CurlMultiCode.Ok;
         }
 
-        long timer = TimerMilliseconds();
-        DateTimeOffset due = timeProvider.GetUtcNow().AddMilliseconds(timer);
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        long timer = TimerMilliseconds(now);
+        DateTimeOffset due = now.AddMilliseconds(timer);
         if (IsTimerUnchanged(timer, due) && !(tellsAgain && timer >= 0))
         {
             return CurlMultiCode.Ok;
@@ -56,21 +59,21 @@ internal sealed partial class ManagedMultiTransfer
     /// on a socket wait still computing, waiting on nothing after <see cref="SocketWaitSettleLimit" /> (ADR-0986), or
     /// one with no socket the application can poll (ADR-0998).
     /// </summary>
-    private long TimerMilliseconds()
+    private long TimerMilliseconds(DateTimeOffset now)
     {
         long handleTimeout = TimeoutMilliseconds();
         List<MultiEntry> running = entries.FindAll(entry => !entry.Done);
-        return running.Count == 0 || Options.Socket is null ? handleTimeout : RunningTimerMilliseconds(handleTimeout, running);
+        return running.Count == 0 || Options.Socket is null ? handleTimeout : RunningTimerMilliseconds(handleTimeout, running, now);
     }
 
     // A handle timeout other than 0 means no transfer waits to start or to be reported (TimeoutMilliseconds), so
     // every running one has a perform in progress.
-    private long RunningTimerMilliseconds(long handleTimeout, List<MultiEntry> running) =>
-        handleTimeout != 0 && running.TrueForAll(IsWaitingOnItsSocket) ? MillisecondsUntil(running.Min(EarliestDeadlineOf)) : 0;
+    private static long RunningTimerMilliseconds(long handleTimeout, List<MultiEntry> running, DateTimeOffset now) =>
+        handleTimeout != 0 && running.TrueForAll(IsWaitingOnItsSocket) ? MillisecondsUntil(running.Min(EarliestDeadlineOf), now) : 0;
 
     private static DateTimeOffset? EarliestDeadlineOf(MultiEntry entry) => entry.SocketWait!.EarliestDeadline;
 
-    private long MillisecondsUntil(DateTimeOffset? deadline) =>
-        deadline is { } due ? Math.Max(0, (long)Math.Ceiling((due - timeProvider.GetUtcNow()).TotalMilliseconds)) : -1;
+    private static long MillisecondsUntil(DateTimeOffset? deadline, DateTimeOffset now) =>
+        deadline is { } due ? Math.Max(0, (long)Math.Ceiling((due - now).TotalMilliseconds)) : -1;
 
 }
