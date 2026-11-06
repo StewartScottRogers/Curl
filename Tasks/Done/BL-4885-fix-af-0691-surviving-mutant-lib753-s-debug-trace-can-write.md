@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary]
 requirement: none
 created: 2026-11-06
-completed:
+completed: 2026-11-06
 ---
 # BL-4885 — Fix AF-0691: Surviving mutant: lib753's debug trace can write hex dumps (noHex false)
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Lib753_SentHeader_TracesItWithTheTimeAndNoHexColumn` to `Curl.Conformance.LibTest.UnitTests/Lib751To1398Tests.cs`: it calls lib753's debug callback with a sent header and pins the whole trace line, `14:05:06.123456 => Send header, 5 bytes (0x5)` then `0000: GET`, so a mutant of either `noHex` or `traceTime` fails it. The test sits in the test project of the `touches` library; production code is unchanged, so no quality run was needed.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the reproduction was done by hand: with `noHex: false` in `Lib753.cs:41`, the new test failed (killed). After restoring the line, all 1206 tests in the project passed.
 
 ## Log
 
 - 2026-11-06: Created.
 - 2026-11-06: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-06: Doing -> Done. lib753's trace test pins its time stamp and hex-free dump, killing the noHex mutant
