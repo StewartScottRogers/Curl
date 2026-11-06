@@ -523,6 +523,42 @@ if ($TestAutoLanes) {
         ,@('start default at capacity', '4 (first auto shift, capped at 4)', "$((Get-AutoStartCount $null 4 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start min 3 saved 2', '3 (last shift saved 2, raised to 3 by -MinStartLanes)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 2 }) 16 16 3) | ForEach-Object { "$($_.Count) ($($_.Why))" })")
         ,@('start min 1 saved 1', '1 (last shift saved 1)', "$((Get-AutoStartCount ([pscustomobject]@{ lanes = 1 }) 16 16 1 16) | ForEach-Object { "$($_.Count) ($($_.Why))" })"))
+    # Get-UsageReading over a temporary log folder: a window seen once is kept until its reset,
+    # an unchanged log is not read again, and a window never reported reads 0.
+    $savedLogDir = $LogDir; $savedCache = $script:UsageFileCache; $savedKnown = $script:UsageLastKnown
+    $usageDir = Join-Path ([IO.Path]::GetTempPath()) "usage-reading-$([guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $usageDir | Out-Null
+    try {
+        $script:LogDir = $usageDir; $script:UsageFileCache = $null; $script:UsageLastKnown = $null
+        $soon = ConvertTo-Unix (Get-Date).AddHours(2)
+        $fiveEvent = '{"type":"rate_limit_event","rate_limit_info":{"rateLimitType":"five_hour","utilization":0.84,"resetsAt":' + $soon + '},"uuid":"u"}'
+        $weekEvent = '{"type":"rate_limit_event","rate_limit_info":{"rateLimitType":"seven_day","utilization":0.96,"resetsAt":' + ($soon + 86400) + '},"uuid":"u"}'
+        Set-Content (Join-Path $usageDir 'a.jsonl') $fiveEvent
+        $script:UsageLogReads = 0
+        $first = Get-UsageReading
+        $firstReads = $script:UsageLogReads
+        for ($n = 0; $n -lt 45; $n++) {
+            $path = Join-Path $usageDir "w$n.jsonl"
+            Set-Content $path $weekEvent
+            (Get-Item $path).LastWriteTime = (Get-Date).AddMinutes($n + 1)
+        }
+        $second = Get-UsageReading
+        $readsAfterSecond = $script:UsageLogReads
+        $third = Get-UsageReading
+        $cases += ,@('usage five-hour kept after newer weekly-only logs', '0.84 True 0.96 True', "$($second.FiveHour) $($second.FiveHourReported) $($second.Week) $($second.WeekReported)")
+        $cases += ,@('usage first read', '1 0.84 False', "$firstReads $($first.FiveHour) $($first.WeekReported)")
+        $cases += ,@('usage unchanged logs not read again', "$readsAfterSecond", "$script:UsageLogReads")
+        $cases += ,@('usage repeat reading same', '0.84 0.96', "$($third.FiveHour) $($third.Week)")
+        $script:UsageFileCache = $null; $script:UsageLastKnown = $null
+        Get-ChildItem $usageDir | Remove-Item
+        Set-Content (Join-Path $usageDir 'b.jsonl') $weekEvent
+        $weekOnly = Get-UsageReading
+        $cases += ,@('usage unreported window reads 0', '0 False 0.96 True', "$($weekOnly.FiveHour) $($weekOnly.FiveHourReported) $($weekOnly.Week) $($weekOnly.WeekReported)")
+    }
+    finally {
+        $script:LogDir = $savedLogDir; $script:UsageFileCache = $savedCache; $script:UsageLastKnown = $savedKnown
+        Remove-Item $usageDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
     $failed = 0
     foreach ($case in $cases) {
         if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
