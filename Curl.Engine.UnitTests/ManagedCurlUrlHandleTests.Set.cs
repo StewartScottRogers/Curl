@@ -116,6 +116,18 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    public void Set_SchemeOfExactlyTheMaximumLength_IsAccepted()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://example.com/");
+        string scheme = "abcdefghijabcdefghijabcdefghijabcdefghij";
+
+        CurlUrlCode code = url.Set(CurlUrlPart.Scheme, scheme, CurlUrlFlags.NonSupportScheme);
+
+        Assert.AreEqual(CurlUrlCode.Ok, code);
+        Assert.AreEqual(scheme, GetOk(url, CurlUrlPart.Scheme));
+    }
+
+    [TestMethod]
     public void Set_SchemeOnAGuessedOne_IsNoLongerGuessed()
     {
         using ManagedCurlUrlHandle url = Parsed("example.com/", CurlUrlFlags.GuessScheme);
