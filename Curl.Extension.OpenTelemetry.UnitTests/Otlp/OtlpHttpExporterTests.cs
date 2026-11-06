@@ -38,6 +38,16 @@ public sealed class OtlpHttpExporterTests
     }
 
     [TestMethod]
+    public async Task ExportAsync_ACollectorWhoseStatusLineHasNoReasonPhrase_Succeeds()
+    {
+        var connection = new RecordedConnection("HTTP/1.1 200\r\n\r\n");
+
+        var failure = await new OtlpHttpExporter(new RecordedConnector(connection)).ExportAsync("http://collector/v1/traces", Body, CancellationToken.None);
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
     [DataRow("HTTP/1.1 503 Service Unavailable", "the collector answered HTTP/1.1 503 Service Unavailable", DisplayName = "a status that is not 2xx")]
     [DataRow("HTTP/1.1 199 Early", "the collector answered HTTP/1.1 199 Early", DisplayName = "a status below 200")]
     [DataRow("SSH-2.0 OpenSSH", "the collector sent no HTTP response", DisplayName = "not HTTP")]
