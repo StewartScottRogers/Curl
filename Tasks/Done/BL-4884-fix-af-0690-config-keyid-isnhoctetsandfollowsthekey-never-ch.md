@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ObliviousDoh.UnitTests]
 requirement: none
 created: 2026-11-06
-completed:
+completed: 2026-11-06
 ---
 # BL-4884 — Fix AF-0690: Config_KeyId_IsNhOctetsAndFollowsTheKey never changes the key: it changes the AEAD
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The key id is now pinned to an exact RFC 9230 section 6.1 value (`Config_KeyId_IsExpandOfExtractOverTheContentsAsRfc9230Section6_1`), computed outside Curl with .NET's HKDF in PowerShell over the hand-laid config contents (0010 0001 0001 0041 04 and 64 zero octets); RFC 9230 publishes no test vector, so that independent computation is the reference. A second test (`Config_KeyId_FollowsThePublicKey`) compares two configs that share a suite and differ only in the public key.
+- Test-only change: no production code changed, so no quality run was needed. `dotnet build` clean, fast tests green (Windows); the tests are platform-neutral.
 
 ## Log
 
 - 2026-11-06: Created.
 - 2026-11-06: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-06: Doing -> Done. Key id pinned to an exact RFC 9230 value and checked to follow the public key
