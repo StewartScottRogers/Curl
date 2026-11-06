@@ -162,15 +162,38 @@ public sealed class DohResponseReaderTests
     }
 
     [TestMethod]
-    public async Task ReadBodyAsync_WithALineOverTheLimit_ReturnsNull()
+    public async Task ReadBodyAsync_WithALineOneByteOverTheLimit_ReturnsNull()
     {
         Diagnostics.Arrange("line limit", DohResponseReader.MaximumLineLength);
-        var longLine = "HTTP/1.1 200 OK\r\nX-Long: " + new string('a', DohResponseReader.MaximumLineLength) + "\r\nContent-Length: 0\r\n\r\n";
+        var response = ResponseWithAHeaderLineOf(DohResponseReader.MaximumLineLength + 1);
 
-        var body = await ReadAsync(Encoding.Latin1.GetBytes(longLine));
+        var body = await ReadAsync(response);
 
         Diagnostics.Assert("body", "null", body is null ? "null" : $"{body.Length} bytes");
         Assert.IsNull(body);
+    }
+
+    [TestMethod]
+    public async Task ReadBodyAsync_WithALineOfExactlyTheLimit_ReturnsTheBody()
+    {
+        Diagnostics.Arrange("line limit", DohResponseReader.MaximumLineLength);
+        var response = ResponseWithAHeaderLineOf(DohResponseReader.MaximumLineLength);
+
+        var body = await ReadAsync(response);
+
+        Diagnostics.Assert("body", "0 bytes", body is null ? "null" : $"{body.Length} bytes");
+        Assert.IsNotNull(body);
+        Assert.IsEmpty(body);
+    }
+
+    // A response whose one header line is lineLength bytes before its LF, its CR included,
+    // since the reader counts the CR before it trims it.
+    private static byte[] ResponseWithAHeaderLineOf(int lineLength)
+    {
+        const string Name = "X-Long: ";
+        var line = Name + new string('a', lineLength - Name.Length - 1) + "\r";
+        Assert.HasCount(lineLength, line);
+        return Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n" + line + "\nContent-Length: 0\r\n\r\n");
     }
 
     private static byte[] Head(params string[] lines) =>
