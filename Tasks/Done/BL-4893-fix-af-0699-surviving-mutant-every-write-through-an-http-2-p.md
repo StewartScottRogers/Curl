@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-06
-completed:
+completed: 2026-11-06
 ---
 # BL-4893 — Fix AF-0699: Surviving mutant: every write through an HTTP/2 proxy tunnel can carry END_STREAM
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `WriteAsync_TwoWrites_SendsTheirBytesInDataFramesThatNeverEndTheStream` to `Curl.Networking.UnitTests/Http2ProxyTunnelConnectionTests.cs`: two writes through the tunnel, and every DATA frame on stream 1 must carry its bytes with END_STREAM clear. Production code is unchanged, so no quality run was needed.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand instead: line 146 set to `isEndStream: true` made the new test fail (killed), and it was then reverted. The re-audit runs the reproduction itself.
+- `dotnet build` of Curl.Networking.UnitTests is clean and its fast tests pass (4031 passed, 34 skipped by platform). The change is one test, platform-neutral (no paths, OS text or certificates).
 
 ## Log
 
 - 2026-11-06: Created.
 - 2026-11-06: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-06: Doing -> Done. A test now pins that DATA frames written through the HTTP/2 proxy tunnel never carry END_STREAM, killing AF-0699's mutant
