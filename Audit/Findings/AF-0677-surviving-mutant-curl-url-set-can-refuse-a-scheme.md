@@ -3,8 +3,8 @@ id: AF-0677
 title: Surviving mutant: curl_url_set can refuse a scheme of exactly 40 characters as a bad scheme
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/UrlPartSetter.cs:HasSchemeLength-le:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartSetter.cs:113:<=
 task: BL-4868
@@ -13,9 +13,9 @@ found: 2026-11-05
 found-at: aea9f0110c59ad5209aafb9f0f985886a2cb9439
 scorecard: 2026-11-05_0819.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: mechanical
+closed-by: 2026-11-05_2025.md
 ---
 # AF-0677 - Surviving mutant: curl_url_set can refuse a scheme of exactly 40 characters as a bad scheme
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_2025.md | reproduces: no | Ran the -Site reproduction: 'value.Length is > 0 and <= MaximumSchemeLength' -> '< MaximumSchemeLength', outcome killed (resolvedLine 113). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-05: filed proposed.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

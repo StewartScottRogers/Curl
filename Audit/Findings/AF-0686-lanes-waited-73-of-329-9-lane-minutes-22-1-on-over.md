@@ -3,8 +3,8 @@ id: AF-0686
 title: Lanes waited 73 of 329.9 lane-minutes (22.1%) on overlaps from whole-project touches in shift 174735
 auditor: process
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces.
 key: process:logs:whole-project-touches:overlap-wait
 reproduction: none
 task: BL-4877
@@ -13,9 +13,9 @@ found: 2026-11-05
 found-at: aea9f0110c59ad5209aafb9f0f985886a2cb9439
 scorecard: 2026-11-05_0819.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: reliable-reaudit
+closed-by: 2026-11-05_2025.md
 ---
 # AF-0686 - Lanes waited 73 of 329.9 lane-minutes (22.1%) on overlaps from whole-project touches in shift 174735
 
@@ -45,6 +45,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_2025.md | reproduces: no | The given reproduction over the old window still gives '73 of 329.92' and 24 'overlaps one in Doing' lines (historical). By mechanism over this window, which holds shifts 150256, 172904 and 193240 finishing 11 tasks: waitOverlapMinutes 35 of laneMinutes 597 (5.9%), under the 20% bar. The 20 overlap-wait lines are short waits at 15:34 to 15:38 and 17:42, not whole-project touches serialising lanes.
+
 ## Log
 
 - 2026-11-05: filed proposed.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces.

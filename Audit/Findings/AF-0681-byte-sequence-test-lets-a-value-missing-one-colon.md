@@ -3,8 +3,8 @@ id: AF-0681
 title: Byte-sequence test lets a value missing one colon through: its rows fail only because the base64 inside is invalid
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces.
 key: quality:Curl.Extension.ContentDigest.UnitTests/DigestFieldTests.cs:Parse_AValueThatIsNotADictionaryOfByteSequences_IsIgnoredWhole:weak-assertion
 reproduction: none
 task: BL-4872
@@ -13,9 +13,9 @@ found: 2026-11-05
 found-at: aea9f0110c59ad5209aafb9f0f985886a2cb9439
 scorecard: 2026-11-05_0819.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: reliable-reaudit
+closed-by: 2026-11-05_2025.md
 ---
 # AF-0681 - Byte-sequence test lets a value missing one colon through: its rows fail only because the base64 inside is invalid
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Extension.ContentDigest.UnitTests/DigestFieldTests.cs -
 
 ## Re-audits
 
+- 2026-11-05 | 2026-11-05_2025.md | reproduces: no | Ran the Select-String reproduction: no match. The rows are now DataRow("sha-256=:AAAAA") and DataRow("sha-256=AAAAA:") (lines 34-35). Dropping either colon check would leave a valid 4-character base64 'AAAA', so the rows now fail only on the missing colon.
+
 ## Log
 
 - 2026-11-05: filed proposed.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces.

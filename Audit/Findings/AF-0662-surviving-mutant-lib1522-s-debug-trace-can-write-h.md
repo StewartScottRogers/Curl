@@ -3,8 +3,8 @@ id: AF-0662
 title: Surviving mutant: lib1522's debug trace can write hex dumps (noHex false)
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1522.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1522.cs:63:true
 task: BL-4844
@@ -13,9 +13,9 @@ found: 2026-11-04
 found-at: 650d20c75108547e7bc74da2e86fbee9c49f7931
 scorecard: 2026-11-04_0643.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-05
+closed-how: mechanical
+closed-by: 2026-11-05_2025.md
 ---
 # AF-0662 - Surviving mutant: lib1522's debug trace can write hex dumps (noHex false)
 
@@ -44,8 +44,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 - 2026-11-04 | 2026-11-04_1442.md | not re-audited | Ran the -Site command: outcome killed, but the mutant it applied was 'traceTime: false, noHex: true'. The tool takes the line's first 'true' site, so it never mutated the noHex flag this finding names. The run does not tell whether the noHex mutant is killed. This audit's sample found the same noHex mutant surviving in Lib1540, Lib500 and Lib1515.
 - 2026-11-05 | 2026-11-05_0819.md | not re-audited | Ran the -Site command: outcome killed, but the site resolved line 63's first 'true', which is now traceTime ('traceTime: true' -> 'traceTime: false'), not the noHex argument the finding names. The noHex mutant was not run, so the result does not tell.
+- 2026-11-05 | 2026-11-05_2025.md | reproduces: no | Ran the -Site reproduction: outcome killed (resolvedLine 63). The tool mutated the line's first 'true' (traceTime: true -> false). The finding's noHex mutant is the second 'true', so I also changed noHex: true -> false in a scratch worktree (removed afterwards): Curl.Conformance.LibTest.UnitTests failed 1 of 1205 (Lib1522_TracesSentDataAsTextWithTheTimeAndNoHex). Both mutants at the site are killed. Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-11-04: filed proposed.
 - 2026-11-04: proposed -> accepted.
+- 2026-11-05: accepted -> closed. Re-audit 2026-11-05_2025.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
