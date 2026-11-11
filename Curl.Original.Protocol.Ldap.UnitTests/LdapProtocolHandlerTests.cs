@@ -1,7 +1,7 @@
 using System.Net;
-using Curl.Testing;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ldap.Fakes;
+using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Original.Protocol.Ldap;
 
@@ -20,7 +20,7 @@ public sealed partial class LdapProtocolHandlerTests
 
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
-    private const string WinLdapBindV3 ="30 84 00 00 00 1f 02 01 01 60 84 00 00 00 16 02 01 03 04 09 63 6e 3d 75 2c 64 63 3d 78 80 06 73 65 63 72 65 74";
+    private const string WinLdapBindV3 = "30 84 00 00 00 1f 02 01 01 60 84 00 00 00 16 02 01 03 04 09 63 6e 3d 75 2c 64 63 3d 78 80 06 73 65 63 72 65 74";
 
     private const string WinLdapBindV2 = "30 84 00 00 00 1f 02 01 02 60 84 00 00 00 16 02 01 02 04 09 63 6e 3d 75 2c 64 63 3d 78 80 06 73 65 63 72 65 74";
 
@@ -243,7 +243,7 @@ public sealed partial class LdapProtocolHandlerTests
 
         Diagnostics.Assert("result", TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
-        CollectionAssert.AreEqual(Hex.Bytes(OpenLdapBind +" " + OpenLdapSearch2 + " " + OpenLdapUnbind3), sent);
+        CollectionAssert.AreEqual(Hex.Bytes(OpenLdapBind + " " + OpenLdapSearch2 + " " + OpenLdapUnbind3), sent);
     }
 
     [TestMethod]
@@ -253,7 +253,7 @@ public sealed partial class LdapProtocolHandlerTests
 
         Diagnostics.Assert("result", TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
-        CollectionAssert.AreEqual(Hex.Bytes(OpenLdapAnonymousBind +" " + OpenLdapSearch2 + " " + OpenLdapUnbind3), sent);
+        CollectionAssert.AreEqual(Hex.Bytes(OpenLdapAnonymousBind + " " + OpenLdapSearch2 + " " + OpenLdapUnbind3), sent);
     }
 
     [TestMethod]

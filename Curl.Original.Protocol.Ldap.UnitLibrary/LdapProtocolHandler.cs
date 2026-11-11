@@ -275,14 +275,14 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         var exchange = new LdapExchange(connection, new LdapBerWriter(dialect), new LdapTransferLog(context.DiagnosticLog));
         await using (exchange.ConfigureAwait(false))
         {
-            bool bindsAsLogonUser = dialect == LdapDialect.WinLdap && context.Credentials is null;
-            TransferResult? bindFailure = await StartTlsAndBindAsync(exchange, connection, context, bindsAsLogonUser).ConfigureAwait(false);
+            LdapBindKind bindKind = ChooseBindKind(context);
+            TransferResult? bindFailure = await StartTlsAndBindAsync(exchange, connection, context, bindKind).ConfigureAwait(false);
             if (bindFailure is not null)
             {
                 return bindFailure;
             }
 
-            exchange.Log.Bound(bindsAsLogonUser ? "as the logged-on user" : DescribeSimpleBind(context.Credentials));
+            exchange.Log.Bound(DescribeBind(bindKind, context.Credentials));
 
             if (dialect == LdapDialect.OpenLdap)
             {
@@ -306,17 +306,38 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// Starts TLS when <see cref="StartsTls" /> says so, then binds as the logged-on user or with
     /// the transfer's credentials; the failure that ends the transfer, or <see langword="null" />.
     /// </summary>
-    private async ValueTask<TransferResult?> StartTlsAndBindAsync(LdapExchange exchange, IConnection connection, ITransferContext context, bool bindsAsLogonUser)
+    private async ValueTask<TransferResult?> StartTlsAndBindAsync(LdapExchange exchange, IConnection connection, ITransferContext context, LdapBindKind bindKind)
     {
         if (StartsTls(context) && await LdapStartTls.UpgradeAsync(exchange, connection, tlsProvider, context).ConfigureAwait(false) is { } startTlsFailure)
         {
             return startTlsFailure;
         }
 
-        return bindsAsLogonUser
-            ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.Url.Scheme == TlsScheme, context.CancellationToken).ConfigureAwait(false)
-            : await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false);
+        return bindKind switch
+        {
+            LdapBindKind.LogonUser => await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.Url.Scheme == TlsScheme, context.CancellationToken).ConfigureAwait(false),
+            LdapBindKind.Simple => await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false),
+            _ => await LdapAuthenticatedBind.BindAsync(bindKind, exchange, context.Credentials!, context.Url.IdnHost, context.CancellationToken).ConfigureAwait(false),
+        };
     }
+
+    /// <summary>
+    /// How the transfer binds: on OpenLDAP a simple bind; on WinLDAP what <see cref="LdapBindKindChoice" />
+    /// picks from <c>-u</c> and the auth mask, so <c>--ntlm</c>, <c>--digest</c> and <c>--negotiate</c> never send a simple bind.
+    /// </summary>
+    private LdapBindKind ChooseBindKind(ITransferContext context) =>
+        dialect == LdapDialect.WinLdap
+            ? LdapBindKindChoice.Choose(context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic, context.Credentials is not null)
+            : LdapBindKind.Simple;
+
+    /// <summary>Names a bind for the diagnostic log by its kind and DN, never its password.</summary>
+    private static string DescribeBind(LdapBindKind kind, NetworkCredential? credentials) =>
+        kind switch
+        {
+            LdapBindKind.LogonUser => "as the logged-on user",
+            LdapBindKind.Simple => DescribeSimpleBind(credentials),
+            _ => $"with a {kind} bind as \"{credentials!.UserName}\"",
+        };
 
     /// <summary>Names a simple bind by its DN, never its password, for the diagnostic log.</summary>
     private static string DescribeSimpleBind(NetworkCredential? credentials) =>

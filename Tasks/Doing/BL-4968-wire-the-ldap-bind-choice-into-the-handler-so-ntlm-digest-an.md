@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: protocol
 depends-on: [BL-4965, BL-4966, BL-4967]
-touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapAuthSchemeBindTests.cs]
+touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapExchange.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapAuthSchemeBindTests.cs]
 requirement: none
 created: 2026-11-11
 completed:
@@ -22,10 +22,10 @@ Fitness review STD-001 (2026-11-11): LDAP --ntlm, --digest and --negotiate send 
 
 ## Acceptance criteria
 
-- [ ] Against a mock, --ntlm and --negotiate send a bind with tag 0x8a and an NTLMSSP payload and never tag 0x80 with the password; --digest sends tag 0xa3; each exits 38 as REF does.
-- [ ] --basic and no auth option still send the simple bind (tag 0x80, password) and exit 0.
-- [ ] Unit tests in Curl.Original.Protocol.Ldap.UnitTests (LdapAuthSchemeBindTests) pin the bind choice for each auth mask.
-- [ ] dotnet build is clean and the fast tests (dotnet test --filter "TestCategory!=Integration") pass.
+- [x] Against a mock, --ntlm and --negotiate send a bind with tag 0x8a and an NTLMSSP payload and never tag 0x80 with the password; --digest sends tag 0xa3; each exits 38 as REF does.
+- [x] --basic and no auth option still send the simple bind (tag 0x80, password) and exit 0.
+- [x] Unit tests in Curl.Original.Protocol.Ldap.UnitTests (LdapAuthSchemeBindTests) pin the bind choice for each auth mask.
+- [x] dotnet build is clean and the fast tests (dotnet test --filter "TestCategory!=Integration") pass.
 
 ## Notes
 
@@ -35,3 +35,5 @@ Split from BL-4899 (over its cost cap). BL-4899 had no stash; its earlier work i
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: a52a37b8 d740cfff c7cd10b9 64c762d4.
+
+- 2026-11-11: Handler picks LdapBindKindChoice from context.Http.AuthSchemes (Basic by default) on WinLDAP; OpenLDAP stays simple. New LdapAuthenticatedBind sends Sicily negotiate (0x8a, NTLMSSP, no password) for --ntlm/--negotiate and DIGEST-MD5 (0xa3) for --digest; LdapExchange gained BindWithRequestAsync (touches widened). Verified by unit tests against a scripted connection, not a PowerShell mock or real curl (no budget to measure). Single attempt (no LDAPv2 retry) for the authenticated binds; failures exit 38 with WinLDAP's text. An NTLM challenge from the server cannot be answered yet: fails 38 "Local Error"; filed BL-4983 for the response. Digest security layer (qop auth-int) not negotiated, qop=auth only.
