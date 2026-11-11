@@ -8,7 +8,7 @@ depends-on: []
 touches: [Measure-CodeQuality.ps1, Curl.Engine.UnitLibrary/AltSvcTransferCache.cs, Curl.Engine.UnitTests/AltSvcTransferCacheTests.cs, Curl.Console.UnitTests/CurlCommandRunnerAltSvcTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4969 — Fix CI failure job Quality gates (windows-latest) step Measure coverage, complexity and CRAP on Windows
 
@@ -36,3 +36,4 @@ Cause: BL-4912 pinned the alt-svc tests off Windows, so the Windows quality job 
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 10cc6e68.
+- 2026-11-11: Doing -> Done. Alt-svc tests pin the platform through onWindows instead of skipping on Windows; quality gate shows 0 failing members for Engine and Console.
