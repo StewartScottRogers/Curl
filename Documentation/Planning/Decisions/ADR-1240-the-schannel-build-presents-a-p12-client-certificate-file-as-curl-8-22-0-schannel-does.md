@@ -1,4 +1,4 @@
-# ADR-1238: The Schannel build presents a P12 client certificate file, as curl 8.22.0 Schannel does
+# ADR-1240: The Schannel build presents a P12 client certificate file, as curl 8.22.0 Schannel does
 
 - **Status:** Accepted
 - **Date:** 2026-11-11

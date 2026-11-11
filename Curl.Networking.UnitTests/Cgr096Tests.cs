@@ -9,7 +9,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// CGR-096: a PKCS#12 <c>--cert</c> file that opens with its passphrase is loaded with its key
-/// in the Schannel build, as curl 8.22.0 Schannel presents it on Windows (ADR-1238). The
+/// in the Schannel build, as curl 8.22.0 Schannel presents it on Windows (ADR-1240). The
 /// OpenSSL build loads it too.
 /// </summary>
 [TestClass]

@@ -166,7 +166,7 @@ internal static class ClientCertificateLoader
 
         try
         {
-            // Schannel curl imports the file and presents its certificate and key (ADR-1238,
+            // Schannel curl imports the file and presents its certificate and key (ADR-1240,
             // measured with curl 8.22.0 Schannel on 2026-11-11).
             return (X509CertificateLoader.LoadPkcs12(contents, passphrase, Pkcs12KeyStorage), null);
         }
