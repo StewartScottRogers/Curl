@@ -45,3 +45,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Backlog -> Doing. Criteria at claim: a9c45dfd 6a5bb400 a0b49a29.
 - 2026-11-11: Doing -> Blocked. Stewart: this host has no .NET SDK matching global.json 10.0.401 (only 10.0.100-rc.1 and 11.0.x installed) - can you install SDK 10.0.4xx so the lane can build and test?
 - 2026-11-11: Blocked -> Backlog. SDK 10.0.404 installed 2026-11-11 ~09:20 Arizona; global.json resolves. Any work a lane kept is in that lane's stash - apply by hash, never pop.
+- 2026-11-11: Backlog -> Deferred. Split into BL-4963 and BL-4964 (over cost cap)
