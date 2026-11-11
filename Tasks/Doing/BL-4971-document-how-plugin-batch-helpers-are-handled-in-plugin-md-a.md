@@ -33,3 +33,4 @@ Split from BL-4898 (over its cost cap).
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 8fd3c890 6402073e 71dcc8d2.
