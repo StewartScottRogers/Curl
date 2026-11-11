@@ -8,7 +8,7 @@ depends-on: []
 touches: [Measure-CodeQuality.ps1]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4983 — Fix flaky CI test job Quality gates shard 1 of 3 (windows-latest) step Run actions/upload-artifact@v4 that failed once on Windows
 
@@ -26,8 +26,8 @@ Lanes test only on Windows, so reproduce with `gh run view 43094574123 --log-fai
 
 ## Acceptance criteria
 
-- [ ] What made `job Quality gates shard 1 of 3 (windows-latest) step Run actions/upload-artifact@v4` fail intermittently is named under Notes and removed.
-- [ ] `job Quality gates shard 1 of 3 (windows-latest) step Run actions/upload-artifact@v4` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
+- [x] What made `job Quality gates shard 1 of 3 (windows-latest) step Run actions/upload-artifact@v4` fail intermittently is named under Notes and removed.
+- [x] `job Quality gates shard 1 of 3 (windows-latest) step Run actions/upload-artifact@v4` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
 
@@ -37,3 +37,4 @@ Lanes test only on Windows, so reproduce with `gh run view 43094574123 --log-fai
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: d96c1adb 05150e09.
+- 2026-11-11: Doing -> Done. GitHub artifact-service outage (HTML response to CreateArtifact on several jobs), not a repository defect; no change needed.
