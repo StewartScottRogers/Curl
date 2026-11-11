@@ -1,4 +1,4 @@
-# ADR-1244 — A Schannel --ciphers algorithm list filters the offered suites
+# ADR-1245 — A Schannel --ciphers algorithm list filters the offered suites
 
 - Status: Accepted
 - Date: 2026-11-11

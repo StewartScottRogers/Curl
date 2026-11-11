@@ -100,7 +100,7 @@ internal static class SchannelAlgorithmList
     }
 
     /// <summary>
-    /// Gets the cipher suites the Schannel build offers for a <c>--ciphers</c> list (ADR-1244):
+    /// Gets the cipher suites the Schannel build offers for a <c>--ciphers</c> list (ADR-1245):
     /// within each algorithm class (key exchange, signature, bulk cipher, hash) the list names
     /// an accepted algorithm of, a suite is offered only when its algorithm of that class is
     /// named; a class the list names nothing of is not restricted (measured, curl 8.22.0

@@ -5,7 +5,7 @@ namespace Curl.Networking.UnitTests;
 
 /// <summary>
 /// Pins <see cref="SchannelAlgorithmList.OfferedSuites" />: a Schannel <c>--ciphers</c> ALG_ID
-/// list restricts the offered suites class by class, as curl 8.22.0 Schannel does (BL-4911, ADR-1244).
+/// list restricts the offered suites class by class, as curl 8.22.0 Schannel does (BL-4911, ADR-1245).
 /// </summary>
 [TestClass]
 public sealed class SchannelAlgorithmFilterTests
