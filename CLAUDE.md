@@ -180,10 +180,9 @@ MCP servers and a `-MaxRunTurns` turn cap, so a rule a lane needs goes in both f
 and files every part of it, the rest included, as new tasks, and a task that reaches the
 turn cap or is sent back to `Backlog` a second time gets the bounded split run instead of
 a third claim. The factory picks the Claude
-model per task - a task's front-matter `model:` wins, else opus for security, crypto,
-feature, protocol, retried and CI-fix work and sonnet for the rest, a routine feature
-task (an upstream unit program port, a harness stand-in and the like, naming no hard
-work) included - and `-Model` forces
+model per task - a task's front-matter `model:` wins, else sonnet for every first run and
+opus only for a retry after a run came back (Stewart, 2026-11-11: dial the models back and
+up only when there are problems; ADR-1238) - and `-Model` forces
 one model for every task (BL-1705). Inside herdr (`HERDR_ENV=1`) that opens the shift
 and each of its lanes as herdr tabs in the current workspace; outside herdr, as console
 windows. Never start one with `Start-Process` or a bare background command: Stewart

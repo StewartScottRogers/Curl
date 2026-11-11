@@ -113,17 +113,10 @@
          -Continuous hand-over and -Restart forward -Model unchanged, so auto stays auto.
       2. Otherwise the task's own front-matter model: haiku | sonnet | opus wins. Any other
          value is ignored with a "model" trace warning and the rule below applies.
-      3. Otherwise opus when the task's touches name a hand-built security or crypto
-         library (Curl.Cryptography, Curl.Tls, Curl.Quic, Curl.Kerberos, Curl.Ntlm,
-         Curl.Ssh, Curl.Original.Protocol.Ssh, or their .UnitTests or .IntegrationTests twin), its pipeline is
-         protocol, or feature unless its title is routine and names no hard work (BL-3001:
-         $RoutineFeatureTitles and $HardWorkMarkers in DarkFactory\ModelChoice.ps1, such as
-         an upstream unit program port or a harness stand-in with no TLS, crypto, QUIC,
-         HTTP/2 or /3, SSH, Kerberos, NTLM, DoH or concurrency in it, which runs on sonnet),
-         its Log shows an earlier claim that came back ("Doing ->
-         Backlog" or "Doing -> Blocked": a requeue, a park, a hand-back or a failed run),
-         or it is a High "Fix CI failure ..." or "Fix flaky CI test ..." task; sonnet for
-         everything else. The rule never picks haiku.
+      3. Otherwise opus when the task's Log shows an earlier claim that came back ("Doing ->
+         Backlog" or "Doing -> Blocked": a requeue, a park, a hand-back or a failed run), and
+         sonnet for every first run, whatever its pipeline, library or priority (BL-4951,
+         ADR-1238: opus only where sonnet had trouble). The rule never picks haiku.
     The resolver's, overtime and resumed runs use their task's model; the --max-turns 1
     probes use sonnet under auto. The claim and end trace lines say "[model <m>: <why>]",
     the heartbeat and status.json lane objects carry model and modelWhy, each run log's
