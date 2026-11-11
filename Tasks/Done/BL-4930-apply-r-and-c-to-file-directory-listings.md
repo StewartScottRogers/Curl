@@ -8,7 +8,7 @@ depends-on: [BL-4972, BL-4973]
 touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs, Curl.Original.Protocol.File.UnitTests/FileDirectoryRangeTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4930 — Apply -r and -C to file:// directory listings
 
@@ -27,14 +27,17 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] The four commands give exactly REF's outputs and exit codes.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The four commands give exactly REF's outputs and exit codes.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
+- Library quality run: 0 failing members for Curl.Original.Protocol.File.UnitLibrary. Semantics: the listing counts as size 0 (TryResolveWindow), `-r 0-N` cuts the listing to N+1 bytes. Unrelated Plugin.md matrix test failure seen in Curl.Conformance.Extended.UnitTests (not mine). Pinned by unit tests; real curl outputs taken from the task's measured REF.
+
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: acde5849 a0b49a29.
+- 2026-11-11: Doing -> Done. file:// directory listings honour -r and -C

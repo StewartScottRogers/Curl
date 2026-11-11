@@ -470,10 +470,33 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
             ?? WithPseudoHeaders(
                 context.NoBody
                     ? TransferResult.Success(0)
-                    : await WriteEntryNamesAsync(context, path, lister).ConfigureAwait(false),
+                    : await ListWithinWindowAsync(context, path, lister).ConfigureAwait(false),
                 headers);
 
         return EndDownload(context, result, connectionNumber, lastWrite);
+    }
+
+    /// <summary>
+    /// Applies <c>-C</c> and <c>-r</c> to a listing as curl 8.22.0 does: the listing's size
+    /// reads as zero, so a start past zero is exit 36, a suffix is exit 36 with its own
+    /// message, and a range with a positive byte count cuts the listing to that many bytes.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="path">The parsed URL path.</param>
+    /// <param name="lister">The lister to read the entry names from.</param>
+    /// <returns>The outcome of the listing.</returns>
+    private static ValueTask<TransferResult> ListWithinWindowAsync(
+        ITransferContext context,
+        FileUrlPath path,
+        IDirectoryLister lister)
+    {
+        if (!TryResolveWindow(context, 0, out _, out _, out string resumeErrorMessage))
+        {
+            return ValueTask.FromResult(
+                TransferResult.Failure(CurlExitCode.BadDownloadResume, resumeErrorMessage));
+        }
+
+        return WriteEntryNamesAsync(context, path, lister, CountOfUnknownSize(context));
     }
 
     /// <summary>
@@ -484,6 +507,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// <param name="context">The transfer being performed.</param>
     /// <param name="path">The parsed URL path.</param>
     /// <param name="lister">The lister to read the entry names from.</param>
+    /// <param name="limit">The most bytes to write; the listing is cut there as a success.</param>
     /// <returns>
     /// A success carrying the bytes written; exit 26 when the directory cannot be listed;
     /// exit 23 when the output refused a write; exit 63 at <c>--max-filesize</c>.
@@ -491,7 +515,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     private static async ValueTask<TransferResult> WriteEntryNamesAsync(
         ITransferContext context,
         FileUrlPath path,
-        IDirectoryLister lister)
+        IDirectoryLister lister,
+        long limit)
     {
         if (await lister.ListEntryNamesAsync(path.OsPath, context.CancellationToken).ConfigureAwait(false) is not { } names)
         {
@@ -505,7 +530,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             context.Events.ReportDataReceived(piece);
-            int allowed = (int)Math.Min(piece.Length, maxWritten - transferred);
+            int wanted = (int)Math.Min(piece.Length, limit - transferred);
+            int allowed = (int)Math.Min(wanted, maxWritten - transferred);
 
             if (await TryWriteInSlicesAsync(context.Output, piece.AsMemory(0, allowed), ChunkSize, context.CancellationToken)
                     .ConfigureAwait(false) is { } failure)
@@ -517,6 +543,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
             }
 
             transferred += allowed;
+
+            if (wanted < piece.Length && allowed == wanted)
+            {
+                return TransferResult.Success(transferred);
+            }
 
             if (allowed < piece.Length)
             {
