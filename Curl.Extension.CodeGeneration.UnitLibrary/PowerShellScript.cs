@@ -101,7 +101,7 @@ internal static class PowerShellScript
         }
 
         var bodyText = request.BodyText;
-        text.Append(bodyText is null
+        text.Append(bodyText is null || bodyText.AsSpan().ContainsAny('\r', '\n')
             ? " -Body ([System.Convert]::FromBase64String(" + Literal(Convert.ToBase64String(request.Body)) + "))"
             : " -Body ([System.Text.Encoding]::UTF8.GetBytes(" + Literal(bodyText) + "))");
     }

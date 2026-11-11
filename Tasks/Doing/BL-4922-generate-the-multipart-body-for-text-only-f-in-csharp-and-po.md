@@ -27,8 +27,8 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] Running `f.ps1` and `f.cs` makes `/echo` show `Content-Disposition: form-data; name="n"` and `v`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Running `f.ps1` and `f.cs` makes `/echo` show `Content-Disposition: form-data; name="n"` and `v`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -38,3 +38,5 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 89eff7f0 a0b49a29.
+
+Notes (Claude): `GeneratedRequest` now reads a seekable `StreamBody` of 1 MiB or less (what `-F` builds) ahead and rewinds it; PowerShell writes bodies holding CR/LF as base64 so line breaks survive. Measured through Curl.Console: `-F n=v` gives `-Body` and `ByteArrayContent` with the form part. Decision (ADR-1138 amended): file-part forms that are small and seekable are now included too, as the stream cannot tell parts apart. Quality run for the library: 0 failing members. Linux/macOS: tests are platform-neutral.
