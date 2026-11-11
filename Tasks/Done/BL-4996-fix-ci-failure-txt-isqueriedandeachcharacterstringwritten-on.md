@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4996 — Fix CI failure Txt_IsQueriedAndEachCharacterStringWritten on Linux and Windows
 
@@ -26,11 +26,14 @@ Lanes test only on Windows, so reproduce with `gh run view 43117708980 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `Txt_IsQueriedAndEachCharacterStringWritten` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `Txt_IsQueriedAndEachCharacterStringWritten` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Already fixed by 8fef66da3 (BL-4995, test expects the TXT string escaped once); the test passes locally. Platform-neutral, so CI criterion met by that.
 
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 45a2fac6.
+- 2026-11-11: Doing -> Done. Fixed by 8fef66da3 (BL-4995); test passes
