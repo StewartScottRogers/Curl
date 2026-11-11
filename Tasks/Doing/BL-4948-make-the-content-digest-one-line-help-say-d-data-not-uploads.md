@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [Curl.Extension.Composition.UnitLibrary]
+touches: [Curl.Extension.ContentDigest.UnitLibrary/ContentDigestExtension.cs, Curl.Extension.ContentDigest.UnitTests/ContentDigestExtensionTests.cs]
 requirement: none
 created: 2026-11-11
 completed:
@@ -27,10 +27,12 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] The `--extended-help` line for `--content-digest` names `-d` data, not uploads.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The `--extended-help` line for `--content-digest` names `-d` data, not uploads.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Widened touches to Curl.Extension.ContentDigest.UnitLibrary/ContentDigestExtension.cs and its test: the description lives there, not in Composition; no other Doing task names it. Summary now says "with -d data"; unit test added.
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
