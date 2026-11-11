@@ -28,6 +28,7 @@ public sealed class SegmentedDownloadTransferHookTests
         Assert.AreEqual("HTTP/1.1 206 X\r\nETag: \"v1\"\r\nContent-Range: bytes 0-8/26\r\n\r\n", Text(context.HeaderOutput!));
         Assert.AreEqual(Text(context.HeaderOutput!), Text(context.DumpHeaderOutput!));
         Assert.AreEqual(26, result.BytesTransferred);
+        Assert.AreEqual(26, result.Report!.DownloadSize);
         Assert.AreEqual(206, result.Report!.ResponseCode);
     }
 

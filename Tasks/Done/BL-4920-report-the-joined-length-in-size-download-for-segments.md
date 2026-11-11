@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.SegmentedDownload.UnitLibrary/SegmentedDownloadTransferHook.cs, Curl.Extension.SegmentedDownload.UnitTests/SegmentedSizeDownloadTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4920 — Report the joined length in %{size_download} for --segments
 
@@ -27,14 +27,17 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] `curl -s --segments 4 http://127.0.0.1:18800/big -o NUL -w "%{size_download}"` prints `100000`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `curl -s --segments 4 http://127.0.0.1:18800/big -o NUL -w "%{size_download}"` prints `100000`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
+`JoinAsync` now sets the report's `DownloadSize` to the complete length (DeliveredSize cleared so it follows). Unit test asserts it; quality run: 0 failing.
+
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 649fb9cc a0b49a29.
+- 2026-11-11: Doing -> Done. size_download reports the joined length
