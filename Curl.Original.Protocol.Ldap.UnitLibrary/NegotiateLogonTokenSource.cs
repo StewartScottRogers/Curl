@@ -5,8 +5,8 @@ using System.Net.Security;
 namespace Curl.Original.Protocol.Ldap;
 
 /// <summary>
-/// Produces the logged-on user's tokens with the BCL's <see cref="NegotiateAuthentication" />
-/// and <see cref="CredentialCache.DefaultNetworkCredentials" />, asking for the protection the
+/// Produces the tokens for the credentials it is given with the BCL's <see cref="NegotiateAuthentication" />
+/// (<see cref="CredentialCache.DefaultNetworkCredentials" /> for the logged-on user), asking for the protection the
 /// bind names as WinLDAP does (signing and sealing on <c>ldap</c>, neither on <c>ldaps</c>), and
 /// seals and unseals a plaintext session after the bind with its <see cref="NegotiateAuthentication.Wrap" /> and
 /// <see cref="NegotiateAuthentication.Unwrap" />.
@@ -14,11 +14,11 @@ namespace Curl.Original.Protocol.Ldap;
 public sealed class NegotiateLogonTokenSource : ILdapLogonTokenSource
 {
     /// <inheritdoc />
-    public ILdapLogonAuthentication Start(LdapLogonPackage package, string targetName, ProtectionLevel protection) =>
+    public ILdapLogonAuthentication Start(LdapLogonPackage package, string targetName, ProtectionLevel protection, NetworkCredential credential) =>
         new NegotiateLogonAuthentication(new NegotiateAuthentication(new NegotiateAuthenticationClientOptions
         {
             Package = package == LdapLogonPackage.Ntlm ? "NTLM" : "Negotiate",
-            Credential = CredentialCache.DefaultNetworkCredentials,
+            Credential = credential,
             TargetName = targetName,
             RequiredProtectionLevel = protection,
         }));

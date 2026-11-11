@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Security;
 
 namespace Curl.Original.Protocol.Ldap.Fakes;
@@ -19,6 +20,8 @@ public sealed class FakeLogonTokenSource(int tokensToAuthenticate, params string
 
     private readonly List<ProtectionLevel> protections = [];
 
+    private readonly List<NetworkCredential> credentials = [];
+
     private readonly List<byte[]> challenges = [];
 
     private readonly int tokensToAuthenticate = tokensToAuthenticate;
@@ -31,6 +34,9 @@ public sealed class FakeLogonTokenSource(int tokensToAuthenticate, params string
     /// <summary>Gets the protection each authentication started asked for, in order.</summary>
     public IReadOnlyList<ProtectionLevel> Protections => protections;
 
+    /// <summary>Gets the credentials each authentication started was given, in order.</summary>
+    public IReadOnlyList<NetworkCredential> Credentials => credentials;
+
     /// <summary>Gets every challenge the authentications were given, the empty first ones included.</summary>
     public IReadOnlyList<byte[]> Challenges => challenges;
 
@@ -38,10 +44,11 @@ public sealed class FakeLogonTokenSource(int tokensToAuthenticate, params string
     public int Disposed { get; private set; }
 
     /// <inheritdoc />
-    public ILdapLogonAuthentication Start(LdapLogonPackage package, string targetName, ProtectionLevel protection)
+    public ILdapLogonAuthentication Start(LdapLogonPackage package, string targetName, ProtectionLevel protection, NetworkCredential credential)
     {
         starts.Add((package, targetName));
         protections.Add(protection);
+        credentials.Add(credential);
         return new Authentication(this);
     }
 

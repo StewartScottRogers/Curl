@@ -34,10 +34,17 @@ namespace Curl.Original.Protocol.Ldap;
 /// </para>
 /// <para>
 /// Without <c>-u</c> the WinLDAP dialect binds as the logged-on user as
-/// <see cref="WinLdapLogonBind" /> describes - the rootDSE reads, then the <c>GSS-SPNEGO</c>
+/// <see cref="WinLdapAuthBind" /> describes - the rootDSE reads, then the <c>GSS-SPNEGO</c>
 /// or Sicily NTLM bind - with tokens from <paramref name="logonTokenSource" />. The rest of
 /// the session, search and UnbindRequest, is then signed and sealed with the bind's keys as
 /// <see cref="LdapSaslSecurityLayer" /> describes, as WinLDAP does.
+/// </para>
+/// <para>
+/// With <c>-u</c> the WinLDAP dialect sends a simple bind only when the auth mask holds Basic,
+/// curl's default; otherwise it binds with <c>-u</c>'s credentials by the first of
+/// <c>--negotiate</c>, <c>--ntlm</c> and <c>--digest</c> the mask holds, or as the logged-on user
+/// when it holds none, as curl's <c>ldap_win_bind</c> does, so the password is never sent
+/// (ADR-1238). The OpenLDAP dialect always sends the simple bind, as curl's OpenLDAP build does.
 /// </para>
 /// <para>
 /// The bind, the search, each message sent and search reply received, and the transfer's end
@@ -275,14 +282,14 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         var exchange = new LdapExchange(connection, new LdapBerWriter(dialect), new LdapTransferLog(context.DiagnosticLog));
         await using (exchange.ConfigureAwait(false))
         {
-            bool bindsAsLogonUser = dialect == LdapDialect.WinLdap && context.Credentials is null;
-            TransferResult? bindFailure = await StartTlsAndBindAsync(exchange, connection, context, bindsAsLogonUser).ConfigureAwait(false);
+            WinLdapAuthBinding? authBinding = dialect == LdapDialect.WinLdap ? WinLdapAuthBindingOf(context) : null;
+            TransferResult? bindFailure = await StartTlsAndBindAsync(exchange, connection, context, authBinding).ConfigureAwait(false);
             if (bindFailure is not null)
             {
                 return bindFailure;
             }
 
-            exchange.Log.Bound(bindsAsLogonUser ? "as the logged-on user" : DescribeSimpleBind(context.Credentials));
+            exchange.Log.Bound(authBinding?.Description ?? DescribeSimpleBind(context.Credentials));
 
             if (dialect == LdapDialect.OpenLdap)
             {
@@ -303,20 +310,56 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         && (dialect == LdapDialect.OpenLdap ? context.SslLevel != TransportSecurityLevel.None : context.SslLevel == TransportSecurityLevel.Required);
 
     /// <summary>
-    /// Starts TLS when <see cref="StartsTls" /> says so, then binds as the logged-on user or with
-    /// the transfer's credentials; the failure that ends the transfer, or <see langword="null" />.
+    /// Starts TLS when <see cref="StartsTls" /> says so, then binds as <paramref name="authBinding" />
+    /// says, or with a simple bind without one; the failure that ends the transfer, or <see langword="null" />.
     /// </summary>
-    private async ValueTask<TransferResult?> StartTlsAndBindAsync(LdapExchange exchange, IConnection connection, ITransferContext context, bool bindsAsLogonUser)
+    private async ValueTask<TransferResult?> StartTlsAndBindAsync(LdapExchange exchange, IConnection connection, ITransferContext context, WinLdapAuthBinding? authBinding)
     {
         if (StartsTls(context) && await LdapStartTls.UpgradeAsync(exchange, connection, tlsProvider, context).ConfigureAwait(false) is { } startTlsFailure)
         {
             return startTlsFailure;
         }
 
-        return bindsAsLogonUser
-            ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.Url.Scheme == TlsScheme, context.CancellationToken).ConfigureAwait(false)
+        return authBinding is { } binding
+            ? await WinLdapAuthBind.BindAsync(exchange, logonTokenSource, binding.Method, binding.Credential, context.Url.IdnHost, context.Url.Scheme == TlsScheme, context.CancellationToken).ConfigureAwait(false)
             : await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// How the WinLDAP dialect binds, as curl's <c>ldap_win_bind</c> chooses (ADR-1238): as the
+    /// logged-on user without <c>-u</c>; with a simple bind, <see langword="null" />, when the auth
+    /// mask holds Basic; otherwise as <see cref="WinLdapAuthBindingOf(HttpAuthSchemes, NetworkCredential)" /> says.
+    /// </summary>
+    private static WinLdapAuthBinding? WinLdapAuthBindingOf(ITransferContext context)
+    {
+        if (context.Credentials is not { } credentials)
+        {
+            return LogonUserBinding;
+        }
+
+        HttpAuthSchemes schemes = context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic;
+        return schemes.HasFlag(HttpAuthSchemes.Basic) ? null : WinLdapAuthBindingOf(schemes, credentials);
+    }
+
+    /// <summary>
+    /// <c>ldap_win_bind_auth</c>'s choice for a mask without Basic: the first of Negotiate, NTLM
+    /// and Digest it holds, with <paramref name="credentials" />, or the logged-on user when it holds none.
+    /// </summary>
+    private static WinLdapAuthBinding WinLdapAuthBindingOf(HttpAuthSchemes schemes, NetworkCredential credentials) =>
+        schemes.HasFlag(HttpAuthSchemes.Negotiate) ? WithCredentials(WinLdapAuthMethod.Negotiate, credentials)
+        : schemes.HasFlag(HttpAuthSchemes.Ntlm) ? WithCredentials(WinLdapAuthMethod.Ntlm, credentials)
+        : schemes.HasFlag(HttpAuthSchemes.Digest) ? WithCredentials(WinLdapAuthMethod.Digest, credentials)
+        : LogonUserBinding;
+
+    /// <summary>The bind with <c>-u</c>'s <paramref name="credentials" /> by <paramref name="method" />, named by method and user, never the password.</summary>
+    private static WinLdapAuthBinding WithCredentials(WinLdapAuthMethod method, NetworkCredential credentials) =>
+        new(method, credentials, $"with {method} as \"{credentials.UserName}\"");
+
+    /// <summary>The bind as the logged-on user: <c>LDAP_AUTH_NEGOTIATE</c> with no credentials.</summary>
+    private static WinLdapAuthBinding LogonUserBinding => new(WinLdapAuthMethod.Negotiate, CredentialCache.DefaultNetworkCredentials, "as the logged-on user");
+
+    /// <summary>One WinLDAP <c>ldap_bind_s</c> bind: its method, the credentials its tokens prove, and how the diagnostic log names it.</summary>
+    private sealed record WinLdapAuthBinding(WinLdapAuthMethod Method, NetworkCredential Credential, string Description);
 
     /// <summary>Names a simple bind by its DN, never its password, for the diagnostic log.</summary>
     private static string DescribeSimpleBind(NetworkCredential? credentials) =>

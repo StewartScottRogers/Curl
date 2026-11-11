@@ -1,3 +1,4 @@
+using System.Net;
 using System.Buffers;
 using System.Net.Security;
 using Curl.Testing;
@@ -23,7 +24,7 @@ public sealed class NegotiateLogonTokenSourceTests
         Diagnostics.Arrange("package", LdapLogonPackage.Negotiate);
         Diagnostics.Arrange("target name", "ldap/127.0.0.1");
         // Raw NTLM outside a domain, SPNEGO with Kerberos inside one: only its presence is machine-neutral.
-        using ILdapLogonAuthentication authentication = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Negotiate, "ldap/127.0.0.1", ProtectionLevel.EncryptAndSign);
+        using ILdapLogonAuthentication authentication = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Negotiate, "ldap/127.0.0.1", ProtectionLevel.EncryptAndSign, CredentialCache.DefaultNetworkCredentials);
 
         byte[]? token = authentication.NextToken([]);
 
@@ -40,7 +41,7 @@ public sealed class NegotiateLogonTokenSourceTests
     public void Start_NtlmFirstToken_IsTheNtlmNegotiateMessageAskingToSignAndSeal()
     {
         Diagnostics.Arrange("package", LdapLogonPackage.Ntlm);
-        using ILdapLogonAuthentication authentication = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1", ProtectionLevel.EncryptAndSign);
+        using ILdapLogonAuthentication authentication = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1", ProtectionLevel.EncryptAndSign, CredentialCache.DefaultNetworkCredentials);
 
         byte[]? token = authentication.NextToken([]);
 
@@ -59,7 +60,7 @@ public sealed class NegotiateLogonTokenSourceTests
     public void Start_NtlmWithNoProtection_FirstTokenAsksNeitherToSignNorSeal()
     {
         Diagnostics.Arrange("protection", ProtectionLevel.None);
-        using ILdapLogonAuthentication authentication = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1", ProtectionLevel.None);
+        using ILdapLogonAuthentication authentication = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1", ProtectionLevel.None, CredentialCache.DefaultNetworkCredentials);
 
         byte[]? token = authentication.NextToken([]);
 
@@ -75,7 +76,7 @@ public sealed class NegotiateLogonTokenSourceTests
     {
         Diagnostics.Arrange("package", LdapLogonPackage.Ntlm);
         Diagnostics.Arrange("client message", "search");
-        using ILdapLogonAuthentication client = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1", ProtectionLevel.EncryptAndSign);
+        using ILdapLogonAuthentication client = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1", ProtectionLevel.EncryptAndSign, CredentialCache.DefaultNetworkCredentials);
         using var server = new NegotiateAuthentication(new NegotiateAuthenticationServerOptions { Package = "NTLM", RequiredProtectionLevel = ProtectionLevel.EncryptAndSign });
         byte[]? challenge = server.GetOutgoingBlob(client.NextToken([]), out _);
         server.GetOutgoingBlob(client.NextToken(challenge), out _);
@@ -107,7 +108,7 @@ public sealed class NegotiateLogonTokenSourceTests
     public void Unwrap_MessageWhoseSignatureDoesNotCheck_ReturnsNull()
     {
         Diagnostics.Arrange("package", LdapLogonPackage.Ntlm);
-        using ILdapLogonAuthentication client = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1", ProtectionLevel.EncryptAndSign);
+        using ILdapLogonAuthentication client = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1", ProtectionLevel.EncryptAndSign, CredentialCache.DefaultNetworkCredentials);
         using var server = new NegotiateAuthentication(new NegotiateAuthenticationServerOptions { Package = "NTLM", RequiredProtectionLevel = ProtectionLevel.EncryptAndSign });
         byte[]? challenge = server.GetOutgoingBlob(client.NextToken([]), out _);
         server.GetOutgoingBlob(client.NextToken(challenge), out _);
@@ -127,7 +128,7 @@ public sealed class NegotiateLogonTokenSourceTests
     [TestMethod]
     public void NextToken_ChallengeThatIsNotNtlm_ReturnsNull()
     {
-        using ILdapLogonAuthentication authentication = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1", ProtectionLevel.EncryptAndSign);
+        using ILdapLogonAuthentication authentication = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1", ProtectionLevel.EncryptAndSign, CredentialCache.DefaultNetworkCredentials);
         authentication.NextToken([]);
         Diagnostics.Arrange("challenge", "01 02 03 04");
 

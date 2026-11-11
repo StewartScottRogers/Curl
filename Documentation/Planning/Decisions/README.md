@@ -1285,3 +1285,4 @@ Each option and the specific reason it lost.
 | [1235](ADR-1235-ci-red-time-counts-only-while-a-test-or-build-fails.md) | CI red time counts only while a test or build fails (BL-4647) | Accepted | 2026-11-04 |
 | [1236](ADR-1236-limit-rate-upload-clock-starts-at-the-first-body-read.md) | The `--limit-rate` upload clock starts at the first body read, so the second body piece waits a whole second as curl's does (BL-4875) | Accepted | 2026-11-05 |
 | [1237](ADR-1237-a-reset-met-while-the-rate-holds-a-body-of-bytes-is-exit-56.md) | A reset met while --limit-rate holds a body of bytes is exit 56 (BL-4874) | Accepted | 2026-11-05 |
+| [1238](ADR-1238-winldap-binds-by-the-auth-mask-never-sending-the-password-without-basic.md) | WinLDAP binds by the auth mask, never sending the password without Basic (BL-4899) | Accepted | 2026-11-11 |

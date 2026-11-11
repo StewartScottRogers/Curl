@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Security;
 using System.Text;
 using Curl.Protocol.Abstractions;
@@ -5,11 +6,21 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Original.Protocol.Ldap;
 
 /// <summary>
-/// Binds as the Windows build binds without <c>-u</c>: curl 8.21.0's <c>ldap_win_bind</c>
-/// calls WinLDAP's <c>ldap_bind_s</c> with <c>LDAP_AUTH_NEGOTIATE</c> and no credentials, so
-/// WinLDAP binds as the logged-on user (ADR-0166, measured by BL-830).
+/// Binds as the Windows build's <c>ldap_win_bind_auth</c> does: WinLDAP's <c>ldap_bind_s</c> with
+/// <c>LDAP_AUTH_NEGOTIATE</c> and no credentials binds as the logged-on user without <c>-u</c>
+/// (ADR-0166, measured by BL-830), and with <c>-u</c> and an auth mask without Basic it binds with
+/// <c>-u</c>'s credentials by the <see cref="WinLdapAuthMethod" /> the mask names, never sending the
+/// password (ADR-1238, measured by BL-4899).
 /// </summary>
 /// <remarks>
+/// <para>
+/// <see cref="WinLdapAuthMethod.Ntlm" /> reads only <c>supportedCapabilities</c> before its Sicily
+/// bind. <see cref="WinLdapAuthMethod.Digest" /> reads <c>supportedCapabilities</c> and
+/// <c>supportedSASLMechanisms</c>, then sends the SASL <c>DIGEST-MD5</c> bind with empty
+/// credentials; a <c>success</c> to it is <c>Protocol Error</c>, and a challenge is
+/// <c>Local Error</c>, since the DIGEST-MD5 response is not computed yet. What follows is
+/// <see cref="WinLdapAuthMethod.Negotiate" />'s flow.
+/// </para>
 /// <para>
 /// Each attempt reads the rootDSE's <c>supportedCapabilities</c>, then its
 /// <c>supportedSASLMechanisms</c>. When a server has offered <c>GSS-SPNEGO</c> (in this
@@ -30,7 +41,7 @@ namespace Curl.Original.Protocol.Ldap;
 /// <c>Local Error</c>.
 /// </para>
 /// </remarks>
-internal static class WinLdapLogonBind
+internal static class WinLdapAuthBind
 {
     private const string SupportedCapabilities = "supportedCapabilities";
 
@@ -54,9 +65,13 @@ internal static class WinLdapLogonBind
 
     private static readonly LdapBindReply ProtocolError = new(LdapBindReplyStatus.Answered, WinLdapResultText.ProtocolError);
 
-    /// <summary>Binds as the logged-on user as WinLDAP does.</summary>
+    private const string DigestMd5 = "DIGEST-MD5";
+
+    /// <summary>Binds as WinLDAP does with <paramref name="method" /> and <paramref name="credential" />.</summary>
     /// <param name="exchange">The session to bind on.</param>
-    /// <param name="tokenSource">Starts the logged-on user's authentication.</param>
+    /// <param name="tokenSource">Starts the authentication.</param>
+    /// <param name="method">How WinLDAP binds.</param>
+    /// <param name="credential">The credentials the tokens prove: <c>-u</c>'s, or the logged-on user's.</param>
     /// <param name="host">The URL's host, for the service principal name <c>ldap/</c><paramref name="host" />.</param>
     /// <param name="overTls">Whether the session is <c>ldaps</c>: the authentication then asks for no signing or sealing and
     /// the session gets no security layer, as WinLDAP does (NTLM flags <c>07 b2 08 a2</c>, measured by BL-4044).</param>
@@ -65,6 +80,8 @@ internal static class WinLdapLogonBind
     public static async ValueTask<TransferResult?> BindAsync(
         LdapExchange exchange,
         ILdapLogonTokenSource tokenSource,
+        WinLdapAuthMethod method,
+        NetworkCredential credential,
         string host,
         bool overTls,
         CancellationToken cancellationToken)
@@ -74,13 +91,15 @@ internal static class WinLdapLogonBind
         int resultCode = 0;
         for (int attempt = 1; attempt <= Attempts; attempt++)
         {
-            if (await ReadOffersSpnegoAsync(exchange, offersSpnego, cancellationToken).ConfigureAwait(false) is not { } offers)
+            if (await ReadRootDseForAsync(exchange, method, offersSpnego, cancellationToken).ConfigureAwait(false) is not { } offers)
             {
                 return LdapBind.WinLdapBindFailed(attempt == 1 ? WinLdapResultText.Timeout : WinLdapResultText.ServerDown);
             }
 
             offersSpnego = offers;
-            LdapBindReply reply = await BindOnceAsync(exchange, tokenSource, offers, "ldap/" + host, protection, cancellationToken).ConfigureAwait(false);
+            LdapBindReply reply = method == WinLdapAuthMethod.Digest
+                ? await DigestBindAsync(exchange, cancellationToken).ConfigureAwait(false)
+                : await BindOnceAsync(exchange, tokenSource.Start(offers ? LdapLogonPackage.Negotiate : LdapLogonPackage.Ntlm, "ldap/" + host, protection, credential), offers, protection, cancellationToken).ConfigureAwait(false);
             if (reply.Status != LdapBindReplyStatus.Answered)
             {
                 return LdapBind.WinLdapBindFailed(LostBindResultCode(reply.Status, overTls));
@@ -103,6 +122,36 @@ internal static class WinLdapLogonBind
     /// </summary>
     private static int LostBindResultCode(LdapBindReplyStatus status, bool overTls) =>
         overTls && status == LdapBindReplyStatus.Closed ? WinLdapResultText.Unavailable : WinLdapResultText.Timeout;
+
+    /// <summary>
+    /// Reads the rootDSE as one attempt with <paramref name="method" /> does and says whether to
+    /// bind with <c>GSS-SPNEGO</c>, which only <see cref="WinLdapAuthMethod.Negotiate" /> does;
+    /// <see langword="null" /> when the server closed or sent bytes that are not an LDAPMessage.
+    /// </summary>
+    private static async ValueTask<bool?> ReadRootDseForAsync(LdapExchange exchange, WinLdapAuthMethod method, bool offeredBefore, CancellationToken cancellationToken)
+    {
+        if (method == WinLdapAuthMethod.Negotiate)
+        {
+            return await ReadOffersSpnegoAsync(exchange, offeredBefore, cancellationToken).ConfigureAwait(false);
+        }
+
+        bool read = await ReadRootDseAsync(exchange, SupportedCapabilities, cancellationToken).ConfigureAwait(false) is not null
+            && (method == WinLdapAuthMethod.Ntlm || await ReadRootDseAsync(exchange, SupportedSaslMechanisms, cancellationToken).ConfigureAwait(false) is not null);
+        return read ? false : null;
+    }
+
+    /// <summary>
+    /// Sends the SASL <c>DIGEST-MD5</c> bind with empty credentials, as WinLDAP's
+    /// <c>LDAP_AUTH_DIGEST</c> opens; a <c>success</c> before any challenge is <c>Protocol Error</c>,
+    /// and a challenge is <c>Local Error</c> until the DIGEST-MD5 response is computed.
+    /// </summary>
+    private static async ValueTask<LdapBindReply> DigestBindAsync(LdapExchange exchange, CancellationToken cancellationToken)
+    {
+        LdapBindReply reply = await exchange.SaslBindAsync(DigestMd5, [], cancellationToken).ConfigureAwait(false);
+        return reply.IsSuccess ? ProtocolError
+            : reply.Status == LdapBindReplyStatus.Answered && reply.ResultCode == LdapBindReply.SaslBindInProgress ? LocalError
+            : reply;
+    }
 
     /// <summary>
     /// Reads the rootDSE as one attempt does and says whether to bind with <c>GSS-SPNEGO</c>;
@@ -161,19 +210,17 @@ internal static class WinLdapLogonBind
             .Select(value => Encoding.UTF8.GetString(value));
 
     /// <summary>
-    /// Makes one attempt's bind with a fresh authentication, SASL or Sicily. A bind that
+    /// Makes one attempt's bind with a fresh <paramref name="authentication" />, SASL or Sicily. A bind that
     /// succeeds with <paramref name="protection" /> asked for starts the session's security layer
     /// with the authentication's keys; any other disposes it.
     /// </summary>
     private static async ValueTask<LdapBindReply> BindOnceAsync(
         LdapExchange exchange,
-        ILdapLogonTokenSource tokenSource,
+        ILdapLogonAuthentication authentication,
         bool offersSpnego,
-        string targetName,
         ProtectionLevel protection,
         CancellationToken cancellationToken)
     {
-        ILdapLogonAuthentication authentication = tokenSource.Start(offersSpnego ? LdapLogonPackage.Negotiate : LdapLogonPackage.Ntlm, targetName, protection);
         LdapBindReply reply = LocalError;
         try
         {
