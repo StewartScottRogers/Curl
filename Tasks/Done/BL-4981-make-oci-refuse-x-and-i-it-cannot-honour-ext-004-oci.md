@@ -8,7 +8,7 @@ depends-on: [BL-4982]
 touches: [Curl.Extended.Protocol.OciRegistry.UnitLibrary/Client, Curl.Extended.Protocol.OciRegistry.UnitTests/Client/OciRegistryRequestMethodTests.cs, Documentation/Conformance/Extended/OciRegistry.md]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4981 — Make oci refuse -X and -I it cannot honour (EXT-004, oci)
 
@@ -38,3 +38,4 @@ Notes: carried over from the stash; quality gate run clean (0 failing members).
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: bc91e2a0 02a121ea 96270709.
+- 2026-11-11: Doing -> Done. oci refuses -I and non-GET/PUT -X with exit 4; tests, docs, quality gate green
