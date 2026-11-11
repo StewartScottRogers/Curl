@@ -1,4 +1,4 @@
-# ADR-1246 — oci:// refuses to send -u credentials to a plain http token realm
+# ADR-1247 — oci:// refuses to send -u credentials to a plain http token realm
 
 - Status: Accepted
 - Date: 2026-11-11
