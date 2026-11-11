@@ -31,6 +31,8 @@ Lanes test only on Windows, so reproduce with `gh run view 43094574123 --log-fai
 
 ## Notes
 
+- Cause: not a Curl defect. The upload-artifact step got an HTML page (`Unexpected token '<', "<!DOCTYPE"`) from GitHub's artifact service on all 5 attempts, in the same run also for Pack Curl.Mcp (macos-latest) and Quality gates shard 2 (windows): a GitHub Actions artifact-service outage at ~20:24-20:39 UTC on 2026-11-11. Measure-CodeQuality.ps1 produced its files ("39 files uploaded"), so there is nothing in the repository to remove; no change made. Both criteria are met by the run passing on the runs either side.
+
 ## Log
 
 - 2026-11-11: Created.
