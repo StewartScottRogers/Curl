@@ -23,6 +23,11 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (AzureStorageRequestMethod.RefusalOf(context) is { } refusal)
+        {
+            return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
+        }
+
         try
         {
             AzureStorageEndpoint endpoint = AzureStorageUrlMapping.Map(new Uri(context.Url.OriginalString));

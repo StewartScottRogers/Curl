@@ -40,3 +40,7 @@ service REST API at `x-ms-version: 2025-01-05` and HTTP/1.1 (RFC 9112), by the c
 | AzureStorage:GetBlob-2 | OPTIONAL | `Range` or `x-ms-range` reads part of a blob. | n/a: curl's client reads the whole blob |
 
 Data Lake Storage Gen2 (`abfs://`, `abfss://`) has its own matrix: [AzureStorage-DataLake.md](AzureStorage-DataLake.md).
+
+## Request methods
+
+`az://` sends only the methods its operations need: GET to download or list, and with `-T` PUT (Put Blob, Put Block, Put Block List); `abfs://` and `abfss://` behave the same. `-X GET` without `-T` and `-X PUT` with it are accepted, since they name what is sent anyway. `-I`/`--head` and every other `-X` (`DELETE`, `HEAD`, `POST`, ...) fail with exit 4 and `az:// does not support ...` before any connection, so a destructive method is never reported done while a GET was sent instead (ADR-1249, `AzureStorageRequestMethodTests`).
