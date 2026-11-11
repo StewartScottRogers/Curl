@@ -1,5 +1,5 @@
 ---
-id: BL-4983
+id: BL-4990
 title: Answer the Sicily NTLM challenge with -u credentials in the LDAP --ntlm and --negotiate bind
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4983 — Answer the Sicily NTLM challenge with -u credentials in the LDAP --ntlm and --negotiate bind
+# BL-4990 — Answer the Sicily NTLM challenge with -u credentials in the LDAP --ntlm and --negotiate bind
 
 ## Goal
 
