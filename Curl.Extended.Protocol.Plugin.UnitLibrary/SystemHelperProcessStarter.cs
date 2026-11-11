@@ -12,6 +12,7 @@ public sealed class SystemHelperProcessStarter : IHelperProcessStarter
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin Process adapter; every line needs a child process.")]
     public IHelperProcess Start(string program, string url)
     {
+        RefuseUnsafeBatchArgument(program, url);
         ProcessStartInfo info = new(program)
         {
             RedirectStandardInput = true,
@@ -27,6 +28,34 @@ public sealed class SystemHelperProcessStarter : IHelperProcessStarter
         {
             throw new IOException(failure.Message, failure);
         }
+    }
+
+    /// <summary>
+    /// Refuses, for a <c>.cmd</c> or <c>.bat</c> helper, a URL holding a cmd.exe metacharacter (<c>&amp; | &lt; &gt; ^ " %</c>)
+    /// or a control character, because cmd.exe would run the rest of the URL as another command. Other helpers are unchanged.
+    /// </summary>
+    /// <exception cref="IOException">The helper is a batch file and the URL holds such a character.</exception>
+    internal static void RefuseUnsafeBatchArgument(string program, string url)
+    {
+        bool isBatch = program.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
+            || program.EndsWith(".bat", StringComparison.OrdinalIgnoreCase);
+        if (isBatch && (url.AsSpan().IndexOfAny("&|<>^\"%") >= 0 || ContainsControlCharacter(url)))
+        {
+            throw new IOException("the URL holds a character cmd.exe would run as a command (& | < > ^ \" % or a control character), so it is not passed to a .cmd or .bat helper");
+        }
+    }
+
+    private static bool ContainsControlCharacter(string url)
+    {
+        foreach (char character in url)
+        {
+            if (char.IsControl(character))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin Process adapter; every line needs a child process.")]
