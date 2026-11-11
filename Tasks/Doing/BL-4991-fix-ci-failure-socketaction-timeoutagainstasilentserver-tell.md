@@ -26,9 +26,11 @@ Lanes test only on Windows, so reproduce with `gh run view 43102911007 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `SocketAction_TimeoutAgainstASilentServer_TellsTheTimeoutThenRemoveWithOperationTimedOut` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `SocketAction_TimeoutAgainstASilentServer_TellsTheTimeoutThenRemoveWithOperationTimedOut` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+- Cause: the transfer reaches its read wait on its own thread; on a slow macOS runner the Out action returned before CURL_POLL_IN was told, and the 4.1 s sleep then outran the 4 s deadline. Fix (test only, Cgr034Tests.cs): drive the engine with short Out actions until S=1 is told before the long sleep. Cgr034 tests pass locally (12/12); platform-neutral, so the CI criterion is met by that and the shift CI watch.
 
 ## Log
 
