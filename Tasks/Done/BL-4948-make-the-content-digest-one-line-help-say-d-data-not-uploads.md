@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ContentDigest.UnitLibrary/ContentDigestExtension.cs, Curl.Extension.ContentDigest.UnitTests/ContentDigestExtensionTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4948 — Make the --content-digest one-line help say -d data, not uploads
 
@@ -40,3 +40,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 3bc72e0f a0b49a29.
+- 2026-11-11: Doing -> Done. Extended-help summary for --content-digest now says -d data; unit test added
