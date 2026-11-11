@@ -265,6 +265,40 @@ public sealed class CurlCommandRunnerProgressMeterTests
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
+    [TestMethod]
+    public async Task RunAsync_FailWithBodyErrorResponse_DrawsTheFinalMeterRowBeforeTheError()
+    {
+        await RunAsync(["-o", "o9", "http://h/x"], handler: new FailedAfterBodyHandler(writesBodyFailureMessage: true));
+
+        StringAssert.Contains(StandardErrorText, "100     10 100     10");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FailureWithoutBodyKept_DrawsNoFinalMeterRow()
+    {
+        await RunAsync(["-o", "o10", "http://h/x"], handler: new FailedAfterBodyHandler(writesBodyFailureMessage: false));
+
+        Assert.DoesNotContain("100     10 100     10", StandardErrorText);
+    }
+
+    private sealed class FailedAfterBodyHandler(bool writesBodyFailureMessage) : IProtocolHandler
+    {
+        public IReadOnlyCollection<string> SupportedSchemes { get; } = ["http"];
+
+        public ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
+        {
+            context.Progress.ReportTransferStarted();
+            context.Progress.ReportDownloaded(10, 10);
+            context.Progress.ReportTransferDone();
+            TransferResult failed = TransferResult.Failure(CurlExitCode.HttpReturnedError, "The requested URL returned error: 404", 10)
+                with
+            {
+                WriteOutErrorMessage = writesBodyFailureMessage ? "The requested URL returned error" : null,
+            };
+            return ValueTask.FromResult(failed);
+        }
+    }
+
     private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private async Task<int> RunAsync(

@@ -4822,7 +4822,7 @@ internal sealed class CurlCommandRunner(
         }
         else
         {
-            state.Progress.Finish(result.IsSuccess || state.SucceededBeforeOutputFileCreationFailed);
+            state.Progress.Finish(result.IsSuccess || result.WriteOutErrorMessage is not null || state.SucceededBeforeOutputFileCreationFailed);
         }
     }
 
