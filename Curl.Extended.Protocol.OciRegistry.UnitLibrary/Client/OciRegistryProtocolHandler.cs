@@ -35,6 +35,11 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (OciRegistryRequestMethod.RefusalOf(context) is { } refusal)
+        {
+            return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
+        }
+
         return OciPullReference.Parse(context.Url.AbsolutePath) is { } reference
             ? await TransferAsync(context, reference)
             : TransferResult.Failure(CurlExitCode.UrlMalformat, NoReferenceMessage);
