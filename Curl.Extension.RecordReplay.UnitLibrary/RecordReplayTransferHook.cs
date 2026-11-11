@@ -52,6 +52,8 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
             {
                 ResponseCode = exchange.StatusCode,
                 ResponseHeaders = headers,
+                DownloadSize = exchange.Body.Length,
+                HeaderSize = exchange.Head.Length,
                 Method = exchange.Method,
                 EffectiveUrl = exchange.Url,
                 ContentType = headers.FirstOrDefault(field => field.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase)).Value,
