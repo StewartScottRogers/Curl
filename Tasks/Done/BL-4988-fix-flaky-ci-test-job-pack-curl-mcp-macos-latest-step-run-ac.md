@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.slnx]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4988 — Fix flaky CI test job Pack Curl.Mcp (macos-latest) step Run actions/upload-artifact@v4 that failed once on macOS
 
@@ -26,12 +26,15 @@ Lanes test only on Windows, so reproduce with `gh run view 43094574123 --log-fai
 
 ## Acceptance criteria
 
-- [ ] What made `job Pack Curl.Mcp (macos-latest) step Run actions/upload-artifact@v4` fail intermittently is named under Notes and removed.
-- [ ] `job Pack Curl.Mcp (macos-latest) step Run actions/upload-artifact@v4` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
+- [x] What made `job Pack Curl.Mcp (macos-latest) step Run actions/upload-artifact@v4` fail intermittently is named under Notes and removed.
+- [x] `job Pack Curl.Mcp (macos-latest) step Run actions/upload-artifact@v4` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: not a defect in the repository. Run 43094574123 got HTML (`Unexpected token <, <!DOCTYPE`) instead of JSON from GitHub artifact service on all five CreateArtifact attempts (about 10 minutes), the same outage that failed BL-4984. The pack step had produced its file (1 file found). ci.yml is off limits to a lane; no code changed. Platform-neutral criterion met by no change.
 
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: baabee88 5cbf2a83.
+- 2026-11-11: Doing -> Done. Upload failure was a GitHub artifact service outage (HTML instead of JSON); nothing in the repository to fix
