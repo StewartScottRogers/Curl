@@ -275,7 +275,7 @@ public static class CommandLineParser
         {
             CommandLineOptions group = options.CurrentGroup;
             CommandLineRefusal? refusal = reader.OptionsEnded
-                ? AddPositionalUrl(group, argument)
+                ? AddPositionalUrl(group, argument, reader)
                 : ParseArgument(group, argument, reader);
             if (refusal is not null)
             {
@@ -398,14 +398,25 @@ public static class CommandLineParser
             return ParseShortBundle(options, argument, reader);
         }
 
-        return AddPositionalUrl(options, argument);
+        return AddPositionalUrl(options, argument, reader);
     }
 
-    private static CommandLineRefusal? AddPositionalUrl(CommandLineOptions options, string argument)
+    /// <summary>
+    /// Adds a non-option argument as a URL. One that starts with <c>@</c> names a URL-list file and is
+    /// applied as <c>--url @file</c> is, as curl 8.13 and later hand every non-option argument to
+    /// <c>--url</c>'s parser (BL-4907); a missing file is refused naming the argument as typed.
+    /// </summary>
+    private static CommandLineRefusal? AddPositionalUrl(CommandLineOptions options, string argument, ArgumentReader reader)
     {
         if (argument.Length == 0)
         {
             return CommandLineRefusal.BlankArgument(string.Empty);
+        }
+
+        if (argument[0] == '@')
+        {
+            _ = CommandLineOptionTable.TryFindLong("url", out CommandLineOption? url);
+            return url!.Apply(options, argument, argument, reader.PathExists, reader.DataFileReader);
         }
 
         return options.AddUrl(argument, argument);
