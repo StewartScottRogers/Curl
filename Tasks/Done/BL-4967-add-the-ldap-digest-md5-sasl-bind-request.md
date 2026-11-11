@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5Bind.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5BindTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4967 — Add the LDAP DIGEST-MD5 SASL bind request
 
@@ -36,3 +36,4 @@ Done: LdapDigestMd5Bind (InitialRequest, AnswerRequest, ResponseHex) is hand-bui
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 1bb3a52f b935111b 8c49f348.
+- 2026-11-11: Doing -> Done. LdapDigestMd5Bind builds the DIGEST-MD5 initial and answer BindRequests, RFC 2831 vector pinned, 100% coverage
