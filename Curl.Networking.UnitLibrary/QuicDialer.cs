@@ -35,7 +35,19 @@ public sealed class QuicDialer
         [CurlExitCode.PeerFailedVerification] = "SSL peer certificate or SSH remote key was not OK",
         [CurlExitCode.InterfaceFailed] = "Failed binding local connection end",
         [CurlExitCode.BadFunctionArgument] = "A libcurl function was given a bad argument",
+        [CurlExitCode.SslCertProblem] = "Problem with the local SSL certificate",
+        [CurlExitCode.SslCipher] = "Couldn't use specified SSL cipher",
+        [CurlExitCode.SslCacertBadfile] = "Problem with the SSL CA cert (path? access rights?)",
+        [CurlExitCode.SslCrlBadfile] = "Failed to load CRL file (path? access rights?, format?)",
+        [CurlExitCode.SslIssuerError] = "Issuer check against peer certificate failed",
+        [CurlExitCode.SslPinnedPubKeyNotMatch] = "SSL public key does not match pinned public key",
+        [CurlExitCode.SslInvalidCertStatus] = "SSL server certificate status verification FAILED",
     };
+
+    // The words for an exit a QUIC connect failed with; an exit the table lacks reads as
+    // curl's own fallback rather than throwing (BL-4914).
+    internal static string WordsOf(CurlExitCode exitCode) =>
+        ExitCodeWords.TryGetValue(exitCode, out var words) ? words : "Unknown error";
 
     private readonly IUdpChannelOpener _channelOpener;
     private readonly TlsClientOptions _options;
@@ -371,7 +383,7 @@ public sealed class QuicDialer
             _ => CurlExitCode.CouldntConnect,
         };
         var elapsedMilliseconds = (long)_timeProvider.GetElapsedTime(request.NameResolved).TotalMilliseconds;
-        var message = $"Failed to connect to {request.Target.Host} port {request.Target.Port} after {elapsedMilliseconds} ms: {ExitCodeWords[exitCode]}";
+        var message = $"Failed to connect to {request.Target.Host} port {request.Target.Port} after {elapsedMilliseconds} ms: {WordsOf(exitCode)}";
         request.Target.Events.ReportInfo(message);
         return MultiplexedConnectResult.Failed(exitCode, message);
     }
@@ -487,7 +499,7 @@ public sealed class QuicDialer
         var (exitCode, message) = failure.TlsFailure?.CertificateRejection is ValueTuple<CurlExitCode, string> rejected
             ? rejected
             : (failure.ExitCode, failure.Message);
-        var words = ExitCodeWords[exitCode];
+        var words = WordsOf(exitCode);
         var events = request.Target.Events;
         events.ReportInfo(message);
         if (exitCode != CurlExitCode.SendError)

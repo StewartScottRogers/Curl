@@ -27,11 +27,13 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] A unit test drives the QUIC path with a pin mismatch and gets exit 90 with REF's message.
-- [ ] Every `CurlExitCode` the QUIC path can return has a word or a safe fallback, pinned by a test.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A unit test drives the QUIC path with a pin mismatch and gets exit 90 with REF's message.
+- [x] Every `CurlExitCode` the QUIC path can return has a word or a safe fallback, pinned by a test.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fix: QuicDialer.WordsOf (TryGetValue, fallback "Unknown error") plus words for exits 58, 59, 77, 82, 83, 90, 91; tests in QuicDialerExitCodeWordsTests.cs (partial of TcpConnectorQuicTests). Quality run clean. Texts follow curl_easy_strerror.
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
