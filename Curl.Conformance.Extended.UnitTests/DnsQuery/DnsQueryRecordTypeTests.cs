@@ -47,7 +47,7 @@ public sealed class DnsQueryRecordTypeTests
     [TestMethod]
     [SpecRequirement("DnsQuery:RFC1035-3.3.14-1")]
     public Task Txt_IsQueriedAndEachCharacterStringWritten() =>
-        AssertRecordAsync("DnsQuery:RFC1035-3.3.14-1", "TXT", 16, DnsReferenceRecord.Txt(Name, 300, "v=spf1 -all", "say \"hi\""), "\"v=spf1 -all\" \"say \\\"hi\\\"\"", "\"txt\":[\"v=spf1 -all\",\"say \\\\\\\"hi\\\\\\\"\"]");
+        AssertRecordAsync("DnsQuery:RFC1035-3.3.14-1", "TXT", 16, DnsReferenceRecord.Txt(Name, 300, "v=spf1 -all", "say \"hi\""), "\"v=spf1 -all\" \"say \\\"hi\\\"\"", "\"txt\":[\"v=spf1 -all\",\"say \\\"hi\\\"\"]");
 
     [TestMethod]
     [SpecRequirement("DnsQuery:RFC1035-3.3.13-1")]
