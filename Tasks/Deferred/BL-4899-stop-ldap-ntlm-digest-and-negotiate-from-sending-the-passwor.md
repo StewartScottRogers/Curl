@@ -41,3 +41,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: a3192bff f721d6be c47b4c7f a0b49a29.
 - 2026-11-11: Doing -> Backlog. Lane 2 could not integrate: build failed after rebasing onto the other lanes' work. The work is on branch factory/BL-4899-lane-2-20261111-082724; start with git cherry-pick --no-commit factory/BL-4899-lane-2-20261111-082724 and fix it.
+- 2026-11-11: Backlog -> Deferred. Split over its cost cap into BL-4951, BL-4952, BL-4953 and BL-4954
