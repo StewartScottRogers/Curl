@@ -27,11 +27,13 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] The localhost and www.example.test commands print `none`; the 127.0.0.1 command prints `hdrstyle=v11`.
-- [ ] The `Cookie` doc comment states the rule.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The localhost and www.example.test commands print `none`; the 127.0.0.1 command prints `hdrstyle=v11`.
+- [x] The `Cookie` doc comment states the rule.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Decision: a null Domain now matches only IP-literal hosts (IsIpAddressLiteral, the rule already used for IP hosts); existing 127.0.0.1 tests unchanged. Quality run for Curl.Cookies.UnitLibrary: 0 failing members. CI on Linux/macOS: change is platform-neutral.
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
