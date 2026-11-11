@@ -56,3 +56,4 @@ build. Scripts for `Record-CurlExchange.ps1 -Script` are: read / send head+`fast
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 572c4f19 12d3e7a4 a0b49a29.
 - 2026-11-11: Doing -> Blocked. Stewart: the .NET SDK 10.0.4xx that global.json pins (10.0.401, latestFeature) is no longer installed (only 10.0.100-rc.1 and 11.0.100); please reinstall it so lanes can build.
 - 2026-11-11: Blocked -> Backlog. SDK 10.0.404 installed 2026-11-11 ~09:20 Arizona; global.json resolves. Any work a lane kept is in that lane's stash - apply by hash, never pop.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 572c4f19 12d3e7a4 a0b49a29.
