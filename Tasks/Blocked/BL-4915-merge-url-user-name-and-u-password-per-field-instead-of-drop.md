@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitLibrary/TransferContextFactory.cs, Curl.Engine.UnitTests/UrlUserWithOptionPasswordTests.cs]
+touches: [Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Curl.Engine.UnitLibrary/TransferContextFactory.cs, Curl.Engine.UnitTests/UrlUserWithOptionPasswordTests.cs]
 requirement: none
 created: 2026-11-11
 completed:
@@ -35,7 +35,12 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
+
+- 2026-11-11 (lane 2): Fixed in `TransferCredentialLookup`: `OptionPasswordOf` (`-u`'s `Password`, else what follows `UserPassword`'s first colon) fills the password a URL with a user name leaves out, both with no netrc option (`CredentialsWrittenInUrl`) and when the netrc file has no entry (`TryLookUpInNetrcFile`); a URL password still wins, and a netrc entry's password still wins. `TransferContextFactory` needed no change: the lookup's credentials replace `-u`'s whole. Expected output taken from the review's REF 8.22.0 measurement (Context). Tests in `Curl.Engine.UnitTests/UrlUserWithOptionPasswordTests.cs`; `Curl.Engine.UnitLibrary/CLAUDE.md` updated (added to touches: its BL-791 line would otherwise be false).
+- 2026-11-11 (lane 2): NOT built or tested: this machine has no .NET SDK 10.0.401, which `global.json` pins (installed: 10.0.100-rc.1, 11.0.100-rc.2, 11.0.100; same blocker as BL-4911). The change is left uncommitted for the shift to stash. Left: build, run the fast tests, run Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary, measure the two criteria with Curl.Console, commit.
+
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 1a064b66 5225096c a0b49a29.
+- 2026-11-11: Doing -> Blocked. Stewart: install .NET SDK 10.0.401 (global.json pins it; this machine has only 10.0.100-rc.1 and 11.x), so the fix can be built and tested?
