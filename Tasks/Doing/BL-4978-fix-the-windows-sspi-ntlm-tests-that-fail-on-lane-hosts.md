@@ -30,3 +30,4 @@ Found by BL-4909 lane 4 on 2026-11-11 (Windows 11 Pro 10.0.26300, SDK 10.0.404):
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: e63b8ffe 3d836d5e.
