@@ -35,3 +35,4 @@ The stash holds all four schemes' uncommitted work; keep only this scheme's file
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: c3078526 489cf725 96270709.
