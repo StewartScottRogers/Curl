@@ -1,5 +1,5 @@
 ---
-id: BL-4978
+id: BL-4982
 title: Make s3 refuse -X and -I it cannot honour (EXT-004, s3)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4978 — Make s3 refuse -X and -I it cannot honour (EXT-004, s3)
+# BL-4982 — Make s3 refuse -X and -I it cannot honour (EXT-004, s3)
 
 ## Goal
 

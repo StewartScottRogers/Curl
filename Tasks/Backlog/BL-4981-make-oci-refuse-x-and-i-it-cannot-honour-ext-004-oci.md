@@ -4,7 +4,7 @@ title: Make oci refuse -X and -I it cannot honour (EXT-004, oci)
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4978]
+depends-on: [BL-4982]
 touches: [Curl.Extended.Protocol.OciRegistry.UnitLibrary/Client, Curl.Extended.Protocol.OciRegistry.UnitTests/Client/OciRegistryRequestMethodTests.cs, Documentation/Conformance/Extended/OciRegistry.md]
 requirement: none
 created: 2026-11-11
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4904 (EXT-004 of the 2026-11-11 outside fitness review): oci:// sent GET for `-X DELETE` and `-I`. BL-4904 decided (ADR-1238, refuse rather than implement): `-I` and any `-X` other than GET (no `-T`) / PUT (with `-T`) exit 4 (NotBuiltIn) with `oci:// does not support -X <M>; it sends only GET, or PUT with -T` before any connection. The library has its own `Client/*RequestMethod.RefusalOf` called first in the handler's `ExecuteAsync`. Library: `Curl.Extended.Protocol.OciRegistry.UnitLibrary`. ADR-1238 is landed by BL-4978; cite it.
+Split from BL-4904 (EXT-004 of the 2026-11-11 outside fitness review): oci:// sent GET for `-X DELETE` and `-I`. BL-4904 decided (ADR-1238, refuse rather than implement): `-I` and any `-X` other than GET (no `-T`) / PUT (with `-T`) exit 4 (NotBuiltIn) with `oci:// does not support -X <M>; it sends only GET, or PUT with -T` before any connection. The library has its own `Client/*RequestMethod.RefusalOf` called first in the handler's `ExecuteAsync`. Library: `Curl.Extended.Protocol.OciRegistry.UnitLibrary`. ADR-1238 is landed by BL-4982; cite it.
 
 ## Acceptance criteria
 
