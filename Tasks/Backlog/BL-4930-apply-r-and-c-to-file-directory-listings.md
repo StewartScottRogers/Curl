@@ -4,7 +4,7 @@ title: Apply -r and -C to file:// directory listings
 priority: Low
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-4970, BL-4971]
+depends-on: [BL-4972, BL-4973]
 touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs, Curl.Original.Protocol.File.UnitTests/FileDirectoryRangeTests.cs]
 requirement: none
 created: 2026-11-11

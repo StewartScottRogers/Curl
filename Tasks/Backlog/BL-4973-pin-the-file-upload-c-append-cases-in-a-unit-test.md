@@ -1,16 +1,16 @@
 ---
-id: BL-4971
+id: BL-4973
 title: Pin the file:// upload -C - append cases in a unit test
 priority: High
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-4970]
+depends-on: [BL-4972]
 touches: [Curl.Original.Protocol.File.UnitTests/FileUploadResumeUnknownOffsetTests.cs]
 requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4971 — Pin the file:// upload -C - append cases in a unit test
+# BL-4973 — Pin the file:// upload -C - append cases in a unit test
 
 ## Goal
 
@@ -18,7 +18,7 @@ A unit test in `Curl.Original.Protocol.File.UnitTests` pins `-T src -C - file://
 
 ## Context
 
-Split from BL-4902. BL-4970 makes the File handler honour `ResumeUploadFromUnknownOffset`; this task pins it, with the handler's lines and branches staying at 100% coverage.
+Split from BL-4902. BL-4972 makes the File handler honour `ResumeUploadFromUnknownOffset`; this task pins it, with the handler's lines and branches staying at 100% coverage.
 
 ## Acceptance criteria
 

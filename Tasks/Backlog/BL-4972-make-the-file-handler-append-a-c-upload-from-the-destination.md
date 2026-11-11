@@ -1,5 +1,5 @@
 ---
-id: BL-4970
+id: BL-4972
 title: Make the File handler append a -C - upload from the destination size
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4970 — Make the File handler append a -C - upload from the destination size
+# BL-4972 — Make the File handler append a -C - upload from the destination size
 
 ## Goal
 
@@ -28,7 +28,7 @@ Split from BL-4902 (finding STD-006 of the 2026-11-11 outside fitness review; RE
 
 ## Notes
 
-Split from BL-4902 (over its cost cap). The earlier run's work is on branch factory/BL-4902-lane-1-20261111-082724; it may be cherry-picked with `git cherry-pick --no-commit` as a starting point (its integration failed only on unrelated Curl.Console.UnitTests SSPI tests). The focused unit test is BL-4971; the handler code must stay at 100% line and branch coverage, so BL-4971 carries the pinning tests. Measure real curl before pinning any text; no Python.
+Split from BL-4902 (over its cost cap). The earlier run's work is on branch factory/BL-4902-lane-1-20261111-082724; it may be cherry-picked with `git cherry-pick --no-commit` as a starting point (its integration failed only on unrelated Curl.Console.UnitTests SSPI tests). The focused unit test is BL-4973; the handler code must stay at 100% line and branch coverage, so BL-4973 carries the pinning tests. Measure real curl before pinning any text; no Python.
 
 ## Log
 
