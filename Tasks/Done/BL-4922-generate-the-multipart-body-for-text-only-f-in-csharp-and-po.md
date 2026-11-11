@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs, Curl.Extension.CodeGeneration.UnitLibrary/CodeGenerationTransferHook.cs, Curl.Extension.CodeGeneration.UnitTests/CodeGenerationTextFormTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4922 — Generate the multipart body for text-only -F in --csharp and --powershell output
 
@@ -40,3 +40,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 89eff7f0 a0b49a29.
 
 Notes (Claude): `GeneratedRequest` now reads a seekable `StreamBody` of 1 MiB or less (what `-F` builds) ahead and rewinds it; PowerShell writes bodies holding CR/LF as base64 so line breaks survive. Measured through Curl.Console: `-F n=v` gives `-Body` and `ByteArrayContent` with the form part. Decision (ADR-1138 amended): file-part forms that are small and seekable are now included too, as the stream cannot tell parts apart. Quality run for the library: 0 failing members. Linux/macOS: tests are platform-neutral.
+- 2026-11-11: Doing -> Done. -F text forms are read ahead and written into --csharp and --powershell output
