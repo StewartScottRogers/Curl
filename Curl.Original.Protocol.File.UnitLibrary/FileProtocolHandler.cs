@@ -544,21 +544,38 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
 
             transferred += allowed;
 
-            if (wanted < piece.Length && allowed == wanted)
+            if (EndOfListingAfterWrite(piece.Length, wanted, allowed, transferred, maxWritten) is { } ended)
             {
-                return TransferResult.Success(transferred);
-            }
-
-            if (allowed < piece.Length)
-            {
-                return new TransferResult(
-                    CurlExitCode.FilesizeExceeded,
-                    transferred,
-                    FileTransferMessages.MaxFileSizeExceeded(maxWritten, transferred));
+                return ended;
             }
         }
 
         return TransferResult.Success(transferred);
+    }
+
+    /// <summary>
+    /// Decides whether a listing write that was cut short ends the listing: a cut at the
+    /// range's byte count is a success, a cut at <c>--max-filesize</c> is exit 63.
+    /// </summary>
+    /// <param name="pieceLength">The bytes the write offered.</param>
+    /// <param name="wanted">The bytes the range allows.</param>
+    /// <param name="allowed">The bytes both the range and <c>--max-filesize</c> allow.</param>
+    /// <param name="transferred">The bytes written so far, this write included.</param>
+    /// <param name="maxWritten">The <c>--max-filesize</c> limit, or the largest long when none.</param>
+    /// <returns>The outcome that ends the listing, or null when the whole write went out.</returns>
+    private static TransferResult? EndOfListingAfterWrite(int pieceLength, int wanted, int allowed, long transferred, long maxWritten)
+    {
+        if (wanted < pieceLength && allowed == wanted)
+        {
+            return TransferResult.Success(transferred);
+        }
+
+        return allowed < pieceLength
+            ? new TransferResult(
+                CurlExitCode.FilesizeExceeded,
+                transferred,
+                FileTransferMessages.MaxFileSizeExceeded(maxWritten, transferred))
+            : null;
     }
 
     /// <summary>
