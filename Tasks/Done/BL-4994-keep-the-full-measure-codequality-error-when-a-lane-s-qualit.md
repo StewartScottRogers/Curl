@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Integrate.ps1, Measure-CodeQuality.ps1]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4994 — Keep the full Measure-CodeQuality error when a lane's quality measure writes no report, and fix its cause
 
@@ -38,3 +38,4 @@ Run by hand on the main checkout (`Measure-CodeQuality.ps1 -Library Curl.Origina
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 446f37f3 cdbc8f7d 17ab7173 a0b49a29.
+- 2026-11-11: Doing -> Done. Lane keeps the whole quality-measure output in the log folder; cause was the 118-char trace cap hiding the throw message
