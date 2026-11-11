@@ -8,7 +8,7 @@ depends-on: [BL-4972]
 touches: [Curl.Original.Protocol.File.UnitTests/FileUploadResumeUnknownOffsetTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4973 — Pin the file:// upload -C - append cases in a unit test
 
@@ -36,3 +36,4 @@ The tests were already committed with BL-4972 (90a7a162c); verified they match t
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 42cc340a 947fbf8a c0432cfe.
+- 2026-11-11: Doing -> Done. Tests already landed with BL-4972; verified, File unit tests green
