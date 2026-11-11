@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4974 — Fix CI failure EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement on Linux and Windows
 
@@ -36,3 +36,4 @@ The Send-3 row named a test in Stomp.UnitTests that carries no [SpecRequirement]
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: e9d3d3fc.
+- 2026-11-11: Doing -> Done. Send-3 row now points at a SpecRequirement-carrying conformance case
