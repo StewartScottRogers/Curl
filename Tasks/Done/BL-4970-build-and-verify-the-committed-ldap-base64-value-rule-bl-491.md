@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapEntryFormatter.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4970 — Build and verify the committed LDAP base64 value rule (BL-4913 verification)
 
@@ -22,9 +22,9 @@ BL-4913's code and tests are committed on a lane branch (the `fix(ldap)` commit)
 
 ## Acceptance criteria
 
-- [ ] `dotnet build` at the repository root is clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes for Curl.Original.Protocol.Ldap.UnitTests (a failure in `Start_NtlmWithNoProtection_FirstTokenAsksNeitherToSignNorSeal` is BL-4962's, not this task's).
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Ldap.UnitLibrary` reports `LdapEntryFormatter` inside every gate.
+- [x] `dotnet build` at the repository root is clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes for Curl.Original.Protocol.Ldap.UnitTests (a failure in `Start_NtlmWithNoProtection_FirstTokenAsksNeitherToSignNorSeal` is BL-4962's, not this task's).
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Ldap.UnitLibrary` reports `LdapEntryFormatter` inside every gate.
 
 ## Notes
 
@@ -34,3 +34,5 @@ Split from BL-4913 (cost cap). All of BL-4913's code work is already committed, 
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: d2c57b84 d5ab0b9e aa24f8d9.
+- 2026-11-11: Verified: dotnet build clean, Ldap unit tests 682 passed, Measure-CodeQuality for Ldap library: 0 failing members. No code change needed.
+- 2026-11-11: Doing -> Done. Verified build, tests and quality gate
