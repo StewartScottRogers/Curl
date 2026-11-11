@@ -41,7 +41,7 @@ internal sealed class XmppProtocolHandler(IConnector connector, ITlsProvider tls
         XElement request;
         try
         {
-            request = XmppRequests.For(path.Length > 0 ? path : context.Url.Host, context.Url.Query, context.PostData);
+            request = XmppRequests.For(path.Length > 0 ? path : context.Url.Host, context.Url.Query, await RequestBodyAsync(context).ConfigureAwait(false));
         }
         catch (XmppClientException failure)
         {
@@ -49,6 +49,18 @@ internal sealed class XmppProtocolHandler(IConnector connector, ITlsProvider tls
         }
 
         return await TransferAsync(context, request).ConfigureAwait(false);
+    }
+
+    private static async ValueTask<ReadOnlyMemory<byte>?> RequestBodyAsync(ITransferContext context)
+    {
+        if (context.PostData is not null || context.Upload is not { } upload)
+        {
+            return context.PostData;
+        }
+
+        using var body = new MemoryStream();
+        await upload.CopyToAsync(body, context.CancellationToken).ConfigureAwait(false);
+        return body.ToArray();
     }
 
     /// <summary>Gives where to connect: the URL's host, its port or the scheme's default, and TLS for <c>xmpps</c>.</summary>

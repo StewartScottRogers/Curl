@@ -51,3 +51,6 @@ the client logs in in plaintext when STARTTLS is not offered; `xmpps://` is secu
 | Xmpp:RFC6121-5.2-1 | MUST | A chat message's text goes in `<body/>`, escaped as XML character data. | XmppStanzaCases.Message_FromData_IsAMessageStanzaToThePathJid |
 | Xmpp:XEP0030-3-1 | MUST | A disco#info query is an `iq` of type `get` holding an empty `query` in `http://jabber.org/protocol/disco#info`. | XmppStanzaCases.Disco_InfoQuery_IsAnIqGetAndItsResultIsPrinted |
 | Xmpp:XEP0368-1 | MUST | Direct TLS opens the XML stream only after the TLS handshake, with no STARTTLS. | XmppStreamCases.Xmpps_DirectTls_OpensTheStreamBehindTlsWithoutStartTls |
+
+`-T file` publishes like `-d`: the file's bytes become the message `<body/>` sent to the path JID (the upload stream is
+read into memory first when `-d` gave no data). It never receives or consumes; `XmppUploadTests` pins it.

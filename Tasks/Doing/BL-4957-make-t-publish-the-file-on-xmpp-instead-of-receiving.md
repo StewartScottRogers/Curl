@@ -22,9 +22,9 @@ Split from BL-4903 (outside fitness review 2026-11-11, finding EXT-008). Today t
 
 ## Acceptance criteria
 
-- [ ] `-T up.txt` (holding `filebody`) on xmpp:// sends `filebody` as the publish payload, or exits 2 before connecting where an upload has no meaning; a unit test in `Curl.Extended.Protocol.Xmpp.UnitTests` pins it.
-- [ ] `Documentation/Conformance/Extended/Xmpp.md` states what `-T` does.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `-T up.txt` (holding `filebody`) on xmpp:// sends `filebody` as the publish payload, or exits 2 before connecting where an upload has no meaning; a unit test in `Curl.Extended.Protocol.Xmpp.UnitTests` pins it.
+- [x] `Documentation/Conformance/Extended/Xmpp.md` states what `-T` does.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
