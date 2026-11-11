@@ -799,7 +799,12 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         // lib/file.c opens it in the transfer phase rather than at connect.
         context.Progress.ReportTransferStarted();
 
-        FileWriteMode mode = context.ResumeFrom is > 0
+        // -C - (ResumeUploadFromUnknownOffset) takes its offset from the destination's size,
+        // as curl 8.22.0's file_upload does from a stat of it, so the destination is opened
+        // for append: a missing or empty one is created or kept empty, the same as curl's
+        // offset 0 truncating it, and the size of an existing one is the offset (BL-4902).
+        bool resumeFromDestinationSize = IsResumedFromDestinationSize(context);
+        FileWriteMode mode = context.ResumeFrom is > 0 || resumeFromDestinationSize
             ? FileWriteMode.Append
             : FileWriteMode.Truncate;
 
@@ -822,28 +827,45 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
 
         await using (destination.ConfigureAwait(false))
         {
-            return await UploadIntoAsync(context, upload, destination).ConfigureAwait(false);
+            long skip = resumeFromDestinationSize
+                ? opened.Length
+                : context.ResumeFrom.GetValueOrDefault();
+
+            return await UploadIntoAsync(context, upload, destination, skip).ConfigureAwait(false);
         }
     }
 
     /// <summary>
-    /// Skips whatever <c>-C</c>/<c>--continue-at</c> asked for, then moves the body,
+    /// Tells whether the upload resumes from the destination's size: <c>-C -</c> asked for
+    /// it and no explicit offset overrides it.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <returns><see langword="true" /> when the offset is the destination's size.</returns>
+    private static bool IsResumedFromDestinationSize(ITransferContext context) =>
+        context.ResumeUploadFromUnknownOffset && context.ResumeFrom is null;
+
+    /// <summary>
+    /// Skips the resume offset's worth of the source, then moves the rest of the body,
     /// converting line endings on the way when <c>--crlf</c> asked for it.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="upload">The stream to upload from.</param>
     /// <param name="destination">The opened destination, which this method does not dispose.</param>
+    /// <param name="skip">
+    /// The source bytes to skip: the <c>-C</c>/<c>--continue-at</c> offset, or for <c>-C -</c>
+    /// the destination's size.
+    /// </param>
     /// <returns>The outcome of the upload.</returns>
     private static async ValueTask<TransferResult> UploadIntoAsync(
         ITransferContext context,
         Stream upload,
-        Stream destination)
+        Stream destination,
+        long skip)
     {
         // curl knows the length of a -T file and not of standard input, and only a known
         // length turns a failed read into exit 26; the curl tool reports a failed read as the
         // end of the file, so with no length to fall short of, the upload simply ends there.
         long? needed = RemainingLength(upload);
-        long skip = context.ResumeFrom.GetValueOrDefault();
 
         bool skipped = await TrySkipAsync(upload, skip, context.CancellationToken)
             .ConfigureAwait(false);
