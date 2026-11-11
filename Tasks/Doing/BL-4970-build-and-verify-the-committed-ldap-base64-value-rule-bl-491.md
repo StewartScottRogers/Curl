@@ -33,3 +33,4 @@ Split from BL-4913 (cost cap). All of BL-4913's code work is already committed, 
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: d2c57b84 d5ab0b9e aa24f8d9.
