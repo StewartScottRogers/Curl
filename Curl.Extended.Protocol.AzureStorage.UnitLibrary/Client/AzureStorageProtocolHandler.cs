@@ -28,28 +28,29 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
             return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
         }
 
+        AzureStorageHttpHeadReporter headReporter = new(context.Events, context.HeaderOutput);
         try
         {
             AzureStorageEndpoint endpoint = AzureStorageUrlMapping.Map(new Uri(context.Url.OriginalString));
             AzureStorageCredential credential = AzureStorageCredential.Choose(context.Http?.BearerToken, environment);
-            AzureStorageClient client = new(connector, context, new AzureStorageRequestAuthorizer(context.TimeProvider), credential);
+            AzureStorageClient client = new(connector, context, new AzureStorageRequestAuthorizer(context.TimeProvider), credential, headReporter);
             context.Progress.ReportTransferStarted();
             Task<long> transfer = context.Url.Scheme == "az"
                 ? new AzureBlobOperations(client, blockSize, maxBlockCount).TransferAsync(endpoint, context.Upload, context.Output)
                 : new AzureDataLakeOperations(client, blockSize).TransferAsync(endpoint, context.Upload, context.Output);
-            return TransferResult.Success(await transfer);
+            return TransferResult.Success(await transfer) with { Report = headReporter.Report };
         }
         catch (AzureStorageRequestException failure)
         {
-            return TransferResult.Failure(ExitCodeOf(failure.Failure), failure.Message);
+            return TransferResult.Failure(ExitCodeOf(failure.Failure), failure.Message) with { Report = headReporter.Report };
         }
         catch (AzureStorageTransferException failure)
         {
-            return TransferResult.Failure(failure.ExitCode, failure.Message);
+            return TransferResult.Failure(failure.ExitCode, failure.Message) with { Report = headReporter.Report };
         }
         catch (AzureStorageHttpException failure)
         {
-            return TransferResult.Failure(ExitCodeOf(failure.Failure), failure.Message);
+            return TransferResult.Failure(ExitCodeOf(failure.Failure), failure.Message) with { Report = headReporter.Report };
         }
     }
 

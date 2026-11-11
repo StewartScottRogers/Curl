@@ -32,18 +32,19 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
             return TransferResult.Failure(CurlExitCode.UrlMalformat, $"The S3 endpoint \"{configuration.EndpointUrl}\" is not an http or https URL");
         }
 
-        S3Operations operations = new(new S3Client(connector, context, configuration, endpoint), endpoint, bucket, partSize, context.CancellationToken);
+        S3HttpHeadReporter headReporter = new(context.Events, context.HeaderOutput);
+        S3Operations operations = new(new S3Client(connector, context, configuration, endpoint, headReporter), endpoint, bucket, partSize, context.CancellationToken);
         try
         {
-            return TransferResult.Success(await TransferAsync(operations, context, KeyOf(context.Url)));
+            return TransferResult.Success(await TransferAsync(operations, context, KeyOf(context.Url))) with { Report = headReporter.Report };
         }
         catch (S3TransferException failure)
         {
-            return TransferResult.Failure(failure.ExitCode, failure.Message);
+            return TransferResult.Failure(failure.ExitCode, failure.Message) with { Report = headReporter.Report };
         }
         catch (S3HttpException failure)
         {
-            return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message);
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message) with { Report = headReporter.Report };
         }
     }
 

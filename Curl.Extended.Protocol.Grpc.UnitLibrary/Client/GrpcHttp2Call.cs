@@ -1,5 +1,6 @@
 using Curl.Extended.Protocol.Grpc.Wire;
 using Curl.Http2;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Grpc.Client;
 
@@ -57,7 +58,7 @@ internal static class GrpcHttp2Call
         {
             if (response.Read(frame) is { } status)
             {
-                return new GrpcCallResult(response.Messages, status);
+                return new GrpcCallResult(response.Messages, status, response.Report);
             }
 
             frame = await connection.ReadStreamFrameAsync(cancellationToken).ConfigureAwait(false);
@@ -75,6 +76,9 @@ internal static class GrpcHttp2Call
 
         /// <summary>Gets the messages read so far.</summary>
         public List<GrpcMessage> Messages { get; } = [];
+
+        /// <summary>Gets what <c>-w</c> reports about the response head, or <see langword="null" /> before it is read.</summary>
+        public TransferReport? Report { get; private set; }
 
         /// <summary>Reads one frame; gives the call's status when the frame ended it, otherwise <see langword="null" />.</summary>
         public GrpcStatus? Read(Http2StreamFrame frame)
@@ -98,7 +102,22 @@ internal static class GrpcHttp2Call
             }
 
             isHeadRead = true;
-            return GrpcResponseHeaders.ReadHeaders(fields).FinalStatus;
+            GrpcResponseHead head = GrpcResponseHeaders.ReadHeaders(fields);
+            Report = ReportOf(head.HttpStatus, fields);
+            return head.FinalStatus;
+        }
+
+        // Sized as curl counts an HTTP/2 head: the status line "HTTP/2 200 ", each field as "name: value", then an empty line, all CRLF-ended (ADR-1260).
+        private static TransferReport ReportOf(int httpStatus, IReadOnlyList<KeyValuePair<string, string>> fields)
+        {
+            long size = $"HTTP/2 {httpStatus} \r\n".Length + 2;
+            foreach (KeyValuePair<string, string> field in fields.Where(static field => !field.Key.StartsWith(':')))
+            {
+                size += field.Key.Length + field.Value.Length + 4;
+            }
+
+            string? contentType = fields.FirstOrDefault(static field => field.Key == "content-type").Value;
+            return new TransferReport { ResponseCode = httpStatus, HttpVersion = new Version(2, 0), ContentType = contentType, HeaderSize = size };
         }
 
         private GrpcStatus? ReadMessages(Http2StreamFrame frame)

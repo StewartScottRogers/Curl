@@ -10,6 +10,38 @@ public sealed class S3HttpHeadReporterTests
     private const string Response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
 
     [TestMethod]
+    public async Task Report_AfterAResponseHead_GivesStatusVersionContentTypeAndSize()
+    {
+        var reporter = new S3HttpHeadReporter(NoTransferEvents.Instance, null);
+        Assert.IsNull(reporter.Report);
+
+        reporter.ReportRequestHead("GET / HTTP/1.1\r\n\r\n"u8);
+        foreach (string line in new[] { "HTTP/1.1 200 OK", "content-type:  application/octet-stream ", "X: y", "" })
+        {
+            await reporter.ReportResponseLineAsync(line, CancellationToken.None);
+        }
+
+        TransferReport report = reporter.Report!;
+        Assert.AreEqual(200, report.ResponseCode);
+        Assert.AreEqual(new Version(1, 1), report.HttpVersion);
+        Assert.AreEqual("application/octet-stream", report.ContentType);
+        Assert.AreEqual(17 + 42 + 6 + 2, report.HeaderSize);
+    }
+
+    [TestMethod]
+    public async Task Report_AnHttp10ResponseWithABadStatus_GivesVersion10AndCodeZero()
+    {
+        var reporter = new S3HttpHeadReporter(NoTransferEvents.Instance, null);
+
+        reporter.ReportRequestHead("GET / HTTP/1.1\r\n\r\n"u8);
+        await reporter.ReportResponseLineAsync("HTTP/1.0", CancellationToken.None);
+
+        Assert.AreEqual(new Version(1, 0), reporter.Report!.HttpVersion);
+        Assert.AreEqual(0, reporter.Report.ResponseCode);
+        Assert.IsNull(reporter.Report.ContentType);
+    }
+
+    [TestMethod]
     public async Task ReportResponseLineAsync_WithHeaderOutput_WritesTheLineWithCrlfToBothPlaces()
     {
         var events = new HeadEvents();
