@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Net;
+using Curl.Protocol.Abstractions;
 using Curl.Quic;
 
 namespace Curl.Extension.EncryptedDns.DnsOverQuic;
@@ -87,6 +88,35 @@ public sealed class DnsOverQuicResolverTests
         Assert.AreEqual((ulong)DnsOverQuicResolver.NoError, channel.Close.ErrorCode);
     }
 
+    [TestMethod]
+    [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task ResolveAsync_ServerPortUnreachable_FindsNoAddressesSoCurlExitsSixInsteadOfSeven()
+    {
+        RefusingChannel channel = new();
+
+        IReadOnlyList<IPAddress> addresses = await Resolver(new FakeDatagramConnector(channel)).ResolveAsync("example.com", CancellationToken.None);
+
+        Assert.IsEmpty(addresses);
+        Assert.IsTrue(channel.Refused);
+    }
+
+    private sealed class RefusingChannel : IDatagramChannel
+    {
+        public bool Refused { get; private set; }
+
+        public EndPoint ServerEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 853);
+
+        public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken)
+        {
+            Refused = true;
+            throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset);
+        }
+
+        public ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            ValueTask.FromCanceled<DatagramReceived>(cancellationToken);
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
     [TestMethod]
     [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task ResolveAsync_Rfc9250Section4_2_1_AnswerWithANonZeroMessageId_ClosesWithDoqProtocolError()

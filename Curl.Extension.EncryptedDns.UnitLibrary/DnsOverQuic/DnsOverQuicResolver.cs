@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Net;
+using System.Net.Sockets;
 using Curl.Extension.EncryptedDns.Wire;
 using Curl.Protocol.Abstractions;
 using Curl.Quic;
@@ -98,7 +99,7 @@ public sealed class DnsOverQuicResolver(IDatagramConnector connector, IServerCer
         }
 
         QuicClientConnectionState state = new(CreateQuicSettings(server), SystemTlsRandomSource.Instance, verifier, timeProvider);
-        if (await new QuicClientConnector(timeProvider).RunHandshakeAsync(state, channel, null, cancellationToken).ConfigureAwait(false) is not null)
+        if (!await HandshakeSucceedsAsync(state, channel, cancellationToken).ConfigureAwait(false))
         {
             state.Dispose();
             await channel.DisposeAsync().ConfigureAwait(false);
@@ -116,6 +117,19 @@ public sealed class DnsOverQuicResolver(IDatagramConnector connector, IServerCer
         }
     }
 
+    // False when the handshake fails or the channel reports the server's port unreachable (an ICMP refusal surfaces
+    // as a SocketException), so an unreachable resolver ends as a lookup that found nothing: curl's exit 6.
+    private async ValueTask<bool> HandshakeSucceedsAsync(QuicClientConnectionState state, IDatagramChannel channel, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await new QuicClientConnector(timeProvider).RunHandshakeAsync(state, channel, null, cancellationToken).ConfigureAwait(false) is null;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+    }
     // Sends every query on its own stream before reading any answer, then reads the answers in query order.
     private static async ValueTask<IReadOnlyList<IPAddress>> ExchangeAsync(QuicConnection connection, byte[][] queries, CancellationToken cancellationToken)
     {
