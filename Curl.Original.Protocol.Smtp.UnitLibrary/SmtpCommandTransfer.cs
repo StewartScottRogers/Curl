@@ -88,7 +88,7 @@ internal sealed class SmtpCommandTransfer(
         return result with
         {
             BytesTransferred = written,
-            Report = new TransferReport { ResponseCode = responseCode },
+            Report = new TransferReport { ResponseCode = responseCode, DownloadSize = written },
         };
     }
 

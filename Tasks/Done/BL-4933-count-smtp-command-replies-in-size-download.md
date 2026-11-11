@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Smtp.UnitLibrary/SmtpCommandTransfer.cs, Curl.Original.Protocol.Smtp.UnitTests/SmtpCommandSizeDownloadTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4933 — Count SMTP command replies in %{size_download}
 
@@ -27,11 +27,13 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] The repro prints `250 Fred <fred@example.com>\r\n29\n`.
-- [ ] The HELP case ends with `25`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The repro prints `250 Fred <fred@example.com>\r\n29\n`.
+- [x] The HELP case ends with `25`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fixed: SmtpCommandTransfer.SendAsync built its report without DownloadSize, so %{size_download} printed 0; it now carries the bytes written. Unit tests pin 29 (VRFY) and 25 (HELP); SmtpRun.HelpAnswered updated. Quality run: 0 failing members. Not run against live curl (values from the task).
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
@@ -39,3 +41,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 4c7ba47e 6c8f68bc a0b49a29.
+- 2026-11-11: Doing -> Done. SMTP command replies count in size_download

@@ -28,7 +28,7 @@ public sealed record SmtpRun(
 
     /// <summary>Gets the result of a session whose <c>HELP</c> was answered <see cref="HelpReply" />.</summary>
     public static TransferResult HelpAnswered { get; } =
-        TransferResult.Success(HelpReply.Length) with { Report = new TransferReport { ResponseCode = 214 } };
+        TransferResult.Success(HelpReply.Length) with { Report = new TransferReport { ResponseCode = 214, DownloadSize = HelpReply.Length } };
 
     /// <summary>Gets every byte written to the plaintext connection, as Latin-1 text.</summary>
     public string Sent => Encoding.Latin1.GetString(Connection.Sent);
