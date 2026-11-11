@@ -26,6 +26,7 @@ a negative `ResumeFrom` as exit 36 for both before either starts.
 | `ITransferContext` member | Download | Upload |
 | --- | --- | --- |
 | `ResumeFrom` | honoured: start of the window sent (`TryResolveWindow`) | honoured: a positive offset opens the destination for append and skips that many source bytes (`UploadAsync`, `UploadIntoAsync`) |
+| `ResumeUploadFromUnknownOffset` | ignored | honoured: `-C -` with no `ResumeFrom` opens the destination for append and skips as many source bytes as it already holds (`UploadIntoDestinationAsync`, BL-4902) |
 | `Range` | honoured: the window sent, when `ResumeFrom` is not set (`TryResolveWindow`) | ignored |
 | `RangeText` | honoured only to refuse text that names no range (`RangeText` set, `Range` null) with exit 33, after the open and the `-i` headers and never under `-I` (`DownloadBodyAsync`, BL-1334) | ignored |
 | `NoBody` | honoured: headers only, then success (`DownloadFromAsync`) | ignored |
