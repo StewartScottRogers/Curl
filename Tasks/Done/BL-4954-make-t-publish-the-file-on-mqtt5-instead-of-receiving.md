@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Mqtt5.UnitLibrary/Client/Mqtt5ProtocolHandler.cs, Curl.Extended.Protocol.Mqtt5.UnitLibrary/WebSocket/Mqtt5WebSocketProtocolHandler.cs, Curl.Extended.Protocol.Mqtt5.UnitTests/Mqtt5UploadTests.cs, Documentation/Conformance/Extended/Mqtt5.md]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4954 — Make -T publish the file on mqtt5:// instead of receiving
 
@@ -34,3 +34,4 @@ Stand-ins in PowerShell or C#, never Python.
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: d8c092e9 c751cbf9 a0b49a29.
+- 2026-11-11: Doing -> Done. Upload with T on mqtt5 and mqtt5+ws publishes the file bytes; Mqtt5UploadTests pin it; Mqtt5.md documents it; code in 3c5edcf0b
