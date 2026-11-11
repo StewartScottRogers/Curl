@@ -33,3 +33,4 @@ Split from BL-4902 (over its cost cap). Use a temporary directory the test creat
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 42cc340a 947fbf8a c0432cfe.
