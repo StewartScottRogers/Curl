@@ -1,0 +1,35 @@
+---
+id: BL-4970
+title: Make the File handler append a -C - upload from the destination size
+priority: High
+assignee: Claude
+pipeline: protocol
+depends-on: []
+touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs]
+requirement: none
+created: 2026-11-11
+completed:
+---
+# BL-4970 — Make the File handler append a -C - upload from the destination size
+
+## Goal
+
+`-T src -C - file:///dst` behaves like curl's `file_upload`: offset = destination size, the rest of the source appended, nothing truncated.
+
+## Context
+
+Split from BL-4902 (finding STD-006 of the 2026-11-11 outside fitness review; REF = curl 8.22.0 Schannel). `-C -` arrives as `ResumeFrom = null` with `ResumeUploadFromUnknownOffset = true` (set in `Curl.Engine.UnitLibrary/TransferContextFactory.cs`); `FileProtocolHandler.UploadIntoDestinationAsync` / `UploadIntoAsync` never read that flag (FTP, SFTP, HTTP do), so the destination is truncated.
+
+## Acceptance criteria
+
+- [ ] With `ResumeUploadFromUnknownOffset` set, the File handler uploads from the destination's current size onward: `dst` = `ZZ` and source `UPLOAD\n` ends as `ZZLOAD\n`, exit 0.
+- [ ] `dst` = `ZZZZZZZZZZZ` (11 bytes, longer than the source) is left unchanged, exit 0.
+- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+Split from BL-4902 (over its cost cap). The earlier run's work is on branch factory/BL-4902-lane-1-20261111-082724; it may be cherry-picked with `git cherry-pick --no-commit` as a starting point (its integration failed only on unrelated Curl.Console.UnitTests SSPI tests). The focused unit test is BL-4971; the handler code must stay at 100% line and branch coverage, so BL-4971 carries the pinning tests. Measure real curl before pinning any text; no Python.
+
+## Log
+
+- 2026-11-11: Created.
