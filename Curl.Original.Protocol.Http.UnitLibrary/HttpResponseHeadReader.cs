@@ -300,41 +300,68 @@ internal sealed class HttpResponseHeadReader
     /// </exception>
     internal async ValueTask<HttpResponseHead> ReadAsync(CancellationToken cancellationToken)
     {
-        if (await ReadHttp09HeadAsync(cancellationToken).ConfigureAwait(false) is { } http09)
+        if (!interimHeadRead && await ReadHttp09HeadAsync(cancellationToken).ConfigureAwait(false) is { } http09)
         {
             return http09;
         }
 
-        bool afterInterimHead = false;
+        bool afterInterimHead = interimHeadRead;
         while (true)
         {
-            HttpStatusLine statusLine = await ReadStatusLineAfterAsync(afterInterimHead, cancellationToken).ConfigureAwait(false);
-            afterInterimHead = true;
-            bool closed;
-            try
+            if (await ReadOneHeadAsync(afterInterimHead, cancellationToken).ConfigureAwait(false) is { } head)
             {
-                closed = await ReadHeaderLinesAsync(statusLine, cancellationToken).ConfigureAwait(false);
-            }
-            catch (HttpTransferException failure)
-            {
-                return HeadBeforeRefusalOrThrow(statusLine, failure);
-            }
-
-            ThrowDeferredCodeRefusal();
-            if (!IsInterim(statusLine))
-            {
-                EndedAtEmptyLine = !closed;
-                HttpResponseHead head = builder.Build(statusLine, closed ? [] : lines.TakeRemaining());
-                Refusal = FindRefusalOrTooMany(HeadWholeAt(head, closed));
-                ReleaseHeadBeforeRefusal();
                 return head;
             }
 
-            if (closed)
-            {
-                throw EmptyReply();
-            }
+            afterInterimHead = true;
         }
+    }
+
+    private bool interimHeadRead;
+
+    /// <summary>
+    /// Reads one 1xx head and reports its lines, so a <c>-v</c> line printed after it (the body
+    /// sent on its <c>100 Continue</c>) follows it, as curl 8.22.0 prints them (measured, BL-4932).
+    /// A later <see cref="ReadAsync" /> carries on after it, as if it had read it itself. Only for a
+    /// head whose status line is known to be a 1xx one, so never HTTP/0.9.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels every read.</param>
+    /// <returns>A task that completes when the head has been read.</returns>
+    /// <exception cref="HttpTransferException">As <see cref="ReadAsync" /> throws it.</exception>
+    internal async ValueTask ReadInterimHeadAsync(CancellationToken cancellationToken)
+    {
+        await ReadOneHeadAsync(false, cancellationToken).ConfigureAwait(false);
+        interimHeadRead = true;
+    }
+
+    /// <summary>
+    /// Reads one head: gives it when it is the final one (or ends at a refused header), and
+    /// <see langword="null" /> for a 1xx head, which the caller reads past.
+    /// </summary>
+    private async ValueTask<HttpResponseHead?> ReadOneHeadAsync(bool afterInterimHead, CancellationToken cancellationToken)
+    {
+        HttpStatusLine statusLine = await ReadStatusLineAfterAsync(afterInterimHead, cancellationToken).ConfigureAwait(false);
+        bool closed;
+        try
+        {
+            closed = await ReadHeaderLinesAsync(statusLine, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpTransferException failure)
+        {
+            return HeadBeforeRefusalOrThrow(statusLine, failure);
+        }
+
+        ThrowDeferredCodeRefusal();
+        if (!IsInterim(statusLine))
+        {
+            EndedAtEmptyLine = !closed;
+            HttpResponseHead head = builder.Build(statusLine, closed ? [] : lines.TakeRemaining());
+            Refusal = FindRefusalOrTooMany(HeadWholeAt(head, closed));
+            ReleaseHeadBeforeRefusal();
+            return head;
+        }
+
+        return closed ? throw EmptyReply() : null;
     }
 
     /// <summary>

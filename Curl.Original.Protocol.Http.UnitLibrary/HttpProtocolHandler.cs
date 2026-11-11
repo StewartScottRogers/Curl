@@ -1440,7 +1440,7 @@ public sealed class HttpProtocolHandler(
             ThrowIfChunkedResendToHttp10(plan);
             ThrowIfAuthorizationFailed(plan);
             exchange.RequestReady = context.TimeProvider.GetTimestamp();
-            (bool bodyLeftUnsent, HttpTransferException? sendFailedAfter2xx) = await SendBodyBefore2xxAsync(context, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
+            (bool bodyLeftUnsent, HttpTransferException? sendFailedAfter2xx) = await SendBodyBefore2xxAsync(context, framing, responseConnection, upload, headReader, cancellationToken).ConfigureAwait(false);
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
             exchangeLog.RequestSent(framing.Method, context.Url.AbsolutePath, request);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
@@ -3365,11 +3365,12 @@ public sealed class HttpProtocolHandler(
         HttpRequestFraming framing,
         IConnection responseConnection,
         HttpRequestBodyWriter upload,
+        HttpResponseHeadReader headReader,
         CancellationToken cancellationToken)
     {
         try
         {
-            return (await SendBodyAsync(context, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false), null);
+            return (await SendBodyAsync(context, framing, responseConnection, upload, headReader, cancellationToken).ConfigureAwait(false), null);
         }
         catch (HttpTransferException failure) when (failure.ExitCode == CurlExitCode.SendError && responseConnection is HttpContinueWaitConnection { AnsweredWithFinal2xx: true })
         {
@@ -3408,6 +3409,7 @@ public sealed class HttpProtocolHandler(
         HttpRequestFraming framing,
         IConnection responseConnection,
         HttpRequestBodyWriter upload,
+        HttpResponseHeadReader headReader,
         CancellationToken cancellationToken)
     {
         if (framing.Body is not { } requestBody)
@@ -3425,6 +3427,10 @@ public sealed class HttpProtocolHandler(
             }
 
             ReportContinueWaitRanOut(context.Events, waiting);
+            if (waiting.AnsweredWithInformational)
+            {
+                await headReader.ReadInterimHeadAsync(cancellationToken).ConfigureAwait(false);
+            }
         }
 
         await upload.WriteAsync(requestBody, framing.IsChunked, cancellationToken).ConfigureAwait(false);
