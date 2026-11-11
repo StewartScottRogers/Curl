@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests, Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4991 — Fix CI failure SocketAction_TimeoutAgainstASilentServer_TellsTheTimeoutThenRemoveWithOperationTimedOut on macOS
 
@@ -36,3 +36,4 @@ Lanes test only on Windows, so reproduce with `gh run view 43102911007 --log-fai
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 31c6c74e.
+- 2026-11-11: Doing -> Done. Test now waits for CURL_POLL_IN before sleeping past the deadline; Cgr034 tests pass.
