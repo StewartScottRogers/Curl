@@ -22,13 +22,15 @@ Split from BL-4902. BL-4972 makes the File handler honour `ResumeUploadFromUnkno
 
 ## Acceptance criteria
 
-- [ ] `FileUploadResumeUnknownOffsetTests` has a test where `dst` = `ZZ` and the source is `UPLOAD\n`, asserting `ZZLOAD\n`.
-- [ ] It has a test where `dst` = `ZZZZZZZZZZZ` asserting the destination is unchanged.
-- [ ] Both tests are platform-neutral (no drive-letter path) and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `FileUploadResumeUnknownOffsetTests` has a test where `dst` = `ZZ` and the source is `UPLOAD\n`, asserting `ZZLOAD\n`.
+- [x] It has a test where `dst` = `ZZZZZZZZZZZ` asserting the destination is unchanged.
+- [x] Both tests are platform-neutral (no drive-letter path) and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
-Split from BL-4902 (over its cost cap). Use a temporary directory the test creates and deletes; no Python.
+Split from BL-4902 (over its cost cap).
+
+The tests were already committed with BL-4972 (90a7a162c); verified they match the criteria and the File unit tests pass (487 passed). Use a temporary directory the test creates and deletes; no Python.
 
 ## Log
 
