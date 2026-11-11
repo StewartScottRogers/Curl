@@ -12,21 +12,33 @@ public sealed class SystemHelperProcessStarter : IHelperProcessStarter
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin Process adapter; every line needs a child process.")]
     public IHelperProcess Start(string program, string url)
     {
-        ProcessStartInfo info = new(program)
-        {
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-        };
-        info.ArgumentList.Add(url);
         try
         {
+            ProcessStartInfo info = StartInfoFor(program, url);
+            info.RedirectStandardInput = true;
+            info.RedirectStandardOutput = true;
+            info.UseShellExecute = false;
             return new SystemHelperProcess(Process.Start(info)!);
         }
         catch (Win32Exception failure)
         {
             throw new IOException(failure.Message, failure);
         }
+    }
+
+    // A batch file runs through cmd.exe, which .NET would hand the URL unescaped, so `&` would start a second
+    // command and `%NAME%` would expand (CVE-2024-24576); cmd.exe is started here with the URL quoted (ADR-1238).
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin Process adapter; every line needs a child process.")]
+    private static ProcessStartInfo StartInfoFor(string program, string url)
+    {
+        if (OperatingSystem.IsWindows() && BatchHelperCommandLine.IsBatchFile(program))
+        {
+            return new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"), BatchHelperCommandLine.ArgumentsFor(program, url));
+        }
+
+        ProcessStartInfo info = new(program);
+        info.ArgumentList.Add(url);
+        return info;
     }
 
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin Process adapter; every line needs a child process.")]
