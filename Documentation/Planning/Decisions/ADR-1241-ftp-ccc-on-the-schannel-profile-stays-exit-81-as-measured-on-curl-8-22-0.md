@@ -1,4 +1,4 @@
-# ADR-1238 — FTP's `CCC` on the Schannel profile stays exit 81, as measured on curl 8.22.0
+# ADR-1241 — FTP's `CCC` on the Schannel profile stays exit 81, as measured on curl 8.22.0
 
 - **Status:** Accepted
 - **Date:** 2026-11-11
