@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Text;
 
 namespace Curl.Cli;
 
@@ -37,7 +38,7 @@ public static class UploadUrl
     /// layer. When the URL has no non-empty query and
     /// its path is absent or ends in <c>/</c>, returns the URL with the base name of
     /// <paramref name="uploadFile"/> (the text after its last <c>/</c> or <c>\</c>),
-    /// percent-encoded as UTF-8, appended to the path; an absent path becomes <c>/</c>,
+    /// percent-encoded as UTF-8 (on Windows in the ANSI code page, the bytes curl's ANSI arguments hold, BL-4928), appended to the path; an absent path becomes <c>/</c>,
     /// an empty <c>?</c> is dropped, and a fragment is kept after the appended name.
     /// Returns <paramref name="url"/> unchanged when the upload is from standard input,
     /// when the query is non-empty, or when the path already names a file. The URL is
@@ -73,12 +74,43 @@ public static class UploadUrl
         return string.Concat(
             url[..parts.PathStart],
             directoryPath,
-            Uri.EscapeDataString(BaseName(uploadFile)),
+            EscapeBaseName(BaseName(uploadFile), OperatingSystem.IsWindows()),
             url[parts.FragmentStart..]);
     }
 
     private static string BaseName(string uploadFile) =>
         uploadFile[(uploadFile.LastIndexOfAny(['/', '\\']) + 1)..];
+
+    /// <summary>
+    /// Percent-encodes <paramref name="name"/> with the bytes the rest of the command line goes out as:
+    /// the ANSI code page on Windows, UTF-8 elsewhere. Only letters, digits and <c>-._~</c> stay as written.
+    /// </summary>
+    /// <param name="name">The base name of the local file.</param>
+    /// <param name="usesAnsiCodePage"><see langword="true"/> for the Windows ANSI code page; <see langword="false"/> for UTF-8.</param>
+    /// <returns>The percent-encoded name.</returns>
+    public static string EscapeBaseName(string name, bool usesAnsiCodePage)
+    {
+        if (!usesAnsiCodePage)
+        {
+            return Uri.EscapeDataString(name);
+        }
+
+        StringBuilder escaped = new();
+        foreach (byte value in ConfigFileWireText.WindowsAnsiCodePage(
+            () => CodePagesEncodingProvider.Instance.GetEncoding(0)).GetBytes(name))
+        {
+            if (char.IsAsciiLetterOrDigit((char)value) || "-._~".Contains((char)value, StringComparison.Ordinal))
+            {
+                escaped.Append((char)value);
+            }
+            else
+            {
+                escaped.Append('%').Append(value.ToString("X2", System.Globalization.CultureInfo.InvariantCulture));
+            }
+        }
+
+        return escaped.ToString();
+    }
 
     /// <summary>
     /// Offsets splitting a URL into scheme and authority, path, query and fragment.

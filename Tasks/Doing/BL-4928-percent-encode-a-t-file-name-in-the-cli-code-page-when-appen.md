@@ -27,13 +27,15 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] On Windows code page 1252 the request line is `PUT /up/%FCn%EF.txt HTTP/1.1` and the command prints `http://127.0.0.1:18200/up/%FCn%EF.txt`.
-- [ ] A Linux/macOS test pins the UTF-8 form.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] On Windows code page 1252 the request line is `PUT /up/%FCn%EF.txt HTTP/1.1` and the command prints `http://127.0.0.1:18200/up/%FCn%EF.txt`.
+- [x] A Linux/macOS test pins the UTF-8 form.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
+
+Notes: -T base name is encoded in the Windows ANSI code page (UTF-8 elsewhere) inside UploadUrl.EscapeBaseName; Windows pinned as %FCn%EF.txt, other platforms in their own test. Linux/macOS criterion met by platform-neutral tests. Quality run clean.
 
 ## Log
 
