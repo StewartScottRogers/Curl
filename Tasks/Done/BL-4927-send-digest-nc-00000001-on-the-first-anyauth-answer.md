@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary/DigestAuthenticator.cs, Curl.Original.Protocol.Http.UnitTests/AnyAuthDigestNonceCountTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4927 — Send Digest nc=00000001 on the first --anyauth answer
 
@@ -41,3 +41,4 @@ Real curl 8.22.0 (Schannel) measured with a PowerShell loopback server: `--anyau
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: c1c558a7 df22d4f0 a0b49a29.
+- 2026-11-11: Doing -> Done. --anyauth now sends nc=00000001, as measured on curl 8.22.0
