@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.WebSocket;
@@ -118,4 +119,29 @@ public sealed class SocketIoProtocolHandlerTests
 
     private static TransferContext Context(string url, Stream output, string? emit = null) =>
         new() { Url = CurlUrl.Parse(url), Output = output, PostData = emit is null ? null : (ReadOnlyMemory<byte>?)Encoding.UTF8.GetBytes(emit) };
+
+    [TestMethod]
+    public async Task ExecuteAsync_TheConnectionIsReset_FailsWithExit56()
+    {
+        TransferResult result = await new SocketIoProtocolHandler(new ScriptedConnector(ConnectResult.Connected(new ResettingConnection())), new ZeroRandomSource()).ExecuteAsync(Context("socketio://example.com", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Recv failure: Connection was reset", result.ErrorMessage);
+    }
+
+    private sealed class ResettingConnection : IConnection
+    {
+        public bool IsSecure => false;
+
+        public EndPoint? RemoteEndPoint => null;
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            throw new IOException("An existing connection was forcibly closed by the remote host.");
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 }

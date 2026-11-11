@@ -17,6 +17,8 @@ public sealed class SocketIoProtocolHandler(IConnector connector, IWebSocketRand
 
     private const int KeyLength = 16;
 
+    private const string ConnectionReset = "Recv failure: Connection was reset";
+
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes { get; } = ["socketio", SecureScheme];
 
@@ -27,6 +29,10 @@ public sealed class SocketIoProtocolHandler(IConnector connector, IWebSocketRand
         try
         {
             return await TransferAsync(context).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            return TransferResult.Failure(CurlExitCode.RecvError, ConnectionReset);
         }
         catch (SocketIoException failure)
         {

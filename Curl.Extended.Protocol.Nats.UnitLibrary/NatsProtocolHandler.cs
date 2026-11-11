@@ -17,6 +17,8 @@ public sealed class NatsProtocolHandler(IConnector connector, Func<string> newIn
 
     private const string SecureScheme = "natss";
 
+    private const string ConnectionReset = "Recv failure: Connection was reset";
+
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes { get; } = ["nats", SecureScheme];
 
@@ -31,6 +33,10 @@ public sealed class NatsProtocolHandler(IConnector connector, Func<string> newIn
         try
         {
             return await TransferAsync(context).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            return TransferResult.Failure(CurlExitCode.RecvError, ConnectionReset);
         }
         catch (NatsException failure)
         {

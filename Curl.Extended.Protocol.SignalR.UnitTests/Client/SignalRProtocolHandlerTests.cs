@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using Curl.Extended.Protocol.SignalR.Transport;
 using Curl.Protocol.Abstractions;
@@ -224,4 +225,31 @@ public sealed class SignalRProtocolHandlerTests
             Output = output,
             PostData = data is null ? (ReadOnlyMemory<byte>?)null : new ReadOnlyMemory<byte>(Encoding.UTF8.GetBytes(data)),
         });
+
+    [TestMethod]
+    public async Task ExecuteAsync_TheConnectionIsReset_FailsWithExit56()
+    {
+        var connector = new ScriptedConnector(ConnectResult.Connected(new ResettingConnection()));
+
+        TransferResult result = await Run(connector, "signalr://example.com/chat", new MemoryStream(), null);
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Recv failure: Connection was reset", result.ErrorMessage);
+    }
+
+    private sealed class ResettingConnection : IConnection
+    {
+        public bool IsSecure => false;
+
+        public EndPoint? RemoteEndPoint => null;
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            throw new IOException("An existing connection was forcibly closed by the remote host.");
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 }

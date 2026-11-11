@@ -15,6 +15,8 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
 {
     private const string SecureScheme = "signalrs";
 
+    private const string ConnectionReset = "Recv failure: Connection was reset";
+
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes { get; } = ["signalr", SecureScheme];
 
@@ -37,6 +39,10 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
         catch (Exception failure) when (failure is SignalRTransportException or SignalRWireFormatException)
         {
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, $"SignalR: {failure.Message}");
+        }
+        catch (IOException)
+        {
+            return TransferResult.Failure(CurlExitCode.RecvError, ConnectionReset);
         }
     }
 

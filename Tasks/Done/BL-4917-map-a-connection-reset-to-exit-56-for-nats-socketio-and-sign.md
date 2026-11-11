@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Nats.UnitLibrary/NatsProtocolHandler.cs, Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoProtocolHandler.cs, Curl.Extended.Protocol.SignalR.UnitLibrary/Client/SignalRProtocolHandler.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4917 — Map a connection reset to exit 56 for nats, socketio and signalr
 
@@ -27,9 +27,9 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] The nats repro prints `ok` then `curl: (56) Recv failure: Connection was reset` and exits 56.
-- [ ] The socketio and signalr reset repros exit 56; unit tests in each library pin it.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The nats repro prints `ok` then `curl: (56) Recv failure: Connection was reset` and exits 56.
+- [x] The socketio and signalr reset repros exit 56; unit tests in each library pin it.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -39,3 +39,6 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 077eac47 83f61203 a0b49a29.
+
+- 2026-11-11: Decision: an IOException on nats, socketio and signalr (the latter after its own SignalRTransportException, an IOException subclass, stays exit 8) maps to exit 56 `Recv failure: Connection was reset`, the text the other broker schemes use. Unit tests in each library pin it; quality run clean. The 18604 NATS "ok" before the failure comes from the existing subscribe flow writing each message before the next read throws. Linux/macOS: tests are platform-neutral.
+- 2026-11-11: Doing -> Done. Reset on nats, socketio and signalr maps to exit 56
