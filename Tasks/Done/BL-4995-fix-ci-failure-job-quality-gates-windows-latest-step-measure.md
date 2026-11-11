@@ -8,7 +8,7 @@ depends-on: []
 touches: [Measure-CodeQuality.ps1, Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4995 — Fix CI failure job Quality gates (windows-latest) step Measure coverage, complexity and CRAP on Windows
 
@@ -36,3 +36,4 @@ The failing member was in Curl.Original.Protocol.File.UnitLibrary, not the scrip
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 10cc6e68.
+- 2026-11-11: Doing -> Done. Extracted EndOfListingAfterWrite from WriteEntryNamesAsync; quality gate passes
