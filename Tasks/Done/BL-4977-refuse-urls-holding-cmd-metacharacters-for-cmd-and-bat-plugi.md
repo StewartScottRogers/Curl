@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Plugin.UnitLibrary/SystemHelperProcessStarter.cs, Curl.Extended.Protocol.Plugin.UnitTests/BatchHelperArgumentTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4977 — Refuse URLs holding cmd metacharacters for .cmd and .bat plugin helpers
 
@@ -35,3 +35,4 @@ Split from BL-4898 (over its cost cap). Implemented as internal SystemHelperProc
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: dfb4749c 27237708 07b99a6f 81b8ddc4.
+- 2026-11-11: Doing -> Done. Batch helpers refuse URLs with cmd metacharacters; tests and quality gates green.
