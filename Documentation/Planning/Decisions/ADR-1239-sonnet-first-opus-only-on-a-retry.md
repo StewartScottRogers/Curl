@@ -1,4 +1,4 @@
-# ADR-1238: Factory tasks run on sonnet first, and on opus only on a retry
+# ADR-1239: Factory tasks run on sonnet first, and on opus only on a retry
 
 - Status: Accepted
 - Date: 2026-11-11

@@ -182,7 +182,7 @@ turn cap or is sent back to `Backlog` a second time gets the bounded split run i
 a third claim. The factory picks the Claude
 model per task - a task's front-matter `model:` wins, else sonnet for every first run and
 opus only for a retry after a run came back (Stewart, 2026-11-11: dial the models back and
-up only when there are problems; ADR-1238) - and `-Model` forces
+up only when there are problems; ADR-1239) - and `-Model` forces
 one model for every task (BL-1705). Inside herdr (`HERDR_ENV=1`) that opens the shift
 and each of its lanes as herdr tabs in the current workspace; outside herdr, as console
 windows. Never start one with `Start-Process` or a bare background command: Stewart

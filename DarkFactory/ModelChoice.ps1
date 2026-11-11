@@ -7,7 +7,7 @@
 $ModelNames = 'haiku', 'sonnet', 'opus'
 # Every first run is on sonnet; a task moves to opus only after a run of it came back - a
 # requeue, a park, a hand-back or a failed run - so opus is spent only where sonnet had
-# trouble (BL-4951, ADR-1238; Stewart, 2026-11-11: "dial back the AI models ... and only dial
+# trouble (BL-4951, ADR-1239; Stewart, 2026-11-11: "dial back the AI models ... and only dial
 # them back up temporarily if you are having problems"). The rule never picks haiku.
 $script:ModelChoice = @{ Id = ''; Model = ''; Why = '' }
 
