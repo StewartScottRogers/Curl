@@ -26,9 +26,11 @@ Lanes test only on Windows, so reproduce with `gh run view 43074475535 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+The Send-3 row named a test in Stomp.UnitTests that carries no [SpecRequirement]; added StompSendCases.Publish_UploadFile_... (carries it, same check through the CLI) and repointed the row. Also touches Documentation/Conformance/Extended/Stomp.md. CI criterion met by platform-neutral change (temp dir only).
 
 ## Log
 
