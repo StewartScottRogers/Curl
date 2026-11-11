@@ -18,7 +18,11 @@ public sealed class SystemSecurityContextFactoryTests
 {
     // The first 16 bytes of the Type 1 curl 8.21.0 (Schannel, SSPI) sent for --ntlm -u u:p:
     // "NTLMSSP\0", type 1, flags 0xA2088207 (ADR-0142). The OS version block after them varies by build.
-    private const string MeasuredType1Start = "4E544C4D5353500001000000078208A2";
+    private const string MeasuredType1Header = "4E544C4D5353500001000000";
+
+    // SSPI chooses the flags: curl 8.21.0 measured 0xA2088207 (Type 1) and 0xA2888205 (Type 3); Windows build 26300 adds KEY_EXCH, SIGN and LM_KEY on top, so only the measured bits are pinned.
+    private const uint MeasuredType1Flags = 0xA2088207u;
+    private const uint MeasuredType3Flags = 0xA2888205u;
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -115,16 +119,18 @@ public sealed class SystemSecurityContextFactoryTests
         diagnostics.Act("status", step.Status);
         diagnostics.Bytes("token", step.Token);
         diagnostics.Assert("status", SecurityContextStatus.ContinueNeeded, step.Status);
-        diagnostics.Diff("token start hex", MeasuredType1Start, Convert.ToHexString(step.Token, 0, 16));
+        diagnostics.Diff("token header hex", MeasuredType1Header, Convert.ToHexString(step.Token, 0, 12));
+        diagnostics.Assert("measured flags", MeasuredType1Flags, BitConverter.ToUInt32(step.Token, 12) & MeasuredType1Flags);
         Assert.AreEqual(SecurityContextStatus.ContinueNeeded, step.Status);
-        Assert.AreEqual(MeasuredType1Start, Convert.ToHexString(step.Token, 0, 16));
+        Assert.AreEqual(MeasuredType1Header, Convert.ToHexString(step.Token, 0, 12));
+        Assert.AreEqual(MeasuredType1Flags, BitConverter.ToUInt32(step.Token, 12) & MeasuredType1Flags);
         Assert.IsFalse(context.IsCompleted);
     }
 
     /// <summary>
     /// curl 8.21.0 (Schannel, SSPI) answered MS-NLMP 4.2.4.3's CHALLENGE with a Type 3 whose
     /// header starts <c>NTLMSSP\0</c>, type 3, a 24-byte LM response, and carries flags
-    /// 0xA2888205 and user <c>u</c> (BL-526 Notes); its workstation is the machine's name
+    /// 0xA2888205 (later builds add bits) and user <c>u</c> (BL-526 Notes); its workstation is the machine's name
     /// and its NTLMv2 response holds a fresh nonce, time and MIC, so only these are pinned.
     /// </summary>
     [TestMethod]
@@ -144,10 +150,10 @@ public sealed class SystemSecurityContextFactoryTests
         diagnostics.Bytes("token", step.Token);
         diagnostics.Assert("status", SecurityContextStatus.Completed, step.Status);
         diagnostics.Diff("token start hex", "4E544C4D53535000030000001800", Convert.ToHexString(step.Token, 0, 14));
-        diagnostics.Assert("flags", 0xA2888205u, BitConverter.ToUInt32(step.Token, 60));
+        diagnostics.Assert("measured flags", MeasuredType3Flags, BitConverter.ToUInt32(step.Token, 60) & MeasuredType3Flags);
         Assert.AreEqual(SecurityContextStatus.Completed, step.Status);
         Assert.AreEqual("4E544C4D53535000030000001800", Convert.ToHexString(step.Token, 0, 14));
-        Assert.AreEqual(0xA2888205u, BitConverter.ToUInt32(step.Token, 60));
+        Assert.AreEqual(MeasuredType3Flags, BitConverter.ToUInt32(step.Token, 60) & MeasuredType3Flags);
         int userLength = BitConverter.ToUInt16(step.Token, 36);
         int userOffset = BitConverter.ToInt32(step.Token, 40);
         diagnostics.Diff("user name", "u", System.Text.Encoding.Unicode.GetString(step.Token, userOffset, userLength));

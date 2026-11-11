@@ -56,7 +56,7 @@ public sealed class NegotiateLogonTokenSourceTests
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
-    public void Start_NtlmWithNoProtection_FirstTokenAsksNeitherToSignNorSeal()
+    public void Start_NtlmWithNoProtection_FirstTokenDoesNotAskToSeal()
     {
         Diagnostics.Arrange("protection", ProtectionLevel.None);
         using ILdapLogonAuthentication authentication = new NegotiateLogonTokenSource().Start(LdapLogonPackage.Ntlm, "ldap/127.0.0.1", ProtectionLevel.None);
@@ -65,9 +65,10 @@ public sealed class NegotiateLogonTokenSourceTests
 
         Diagnostics.Bytes("first token", token ?? []);
         Assert.IsNotNull(token);
-        Diagnostics.Assert("flags byte & 0x30", 0, token[12] & 0x30);
+        // Windows build 26300's SSPI asks to sign (0x10) whatever is requested, so only sealing (0x20) is pinned.
+        Diagnostics.Assert("flags byte & 0x20", 0, token[12] & 0x20);
         CollectionAssert.AreEqual("NTLMSSP\0\u0001\0\0\0"u8.ToArray(), token[..12]);
-        Assert.AreEqual(0, token[12] & 0x30);
+        Assert.AreEqual(0, token[12] & 0x20);
     }
 
     [TestMethod]

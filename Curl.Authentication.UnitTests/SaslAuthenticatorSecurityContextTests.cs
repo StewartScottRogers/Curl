@@ -317,7 +317,7 @@ public sealed class SaslAuthenticatorSecurityContextTests
     [OSCondition(OperatingSystems.Windows)]
     public async Task Begin_NtlmOnSspi_SendsSspisType1AndAType3()
     {
-        // Measured: SSPI's Type 1 starts NTLMSSP, type 1, flags 0xA2088207; the OS version after varies by build.
+        // Measured: SSPI's Type 1 starts NTLMSSP, type 1, flags 0xA2088207; later Windows builds add flag bits and the OS version after varies by build, so the header and the measured flag bits are pinned.
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("mechanism", "NTLM");
         diagnostics.Arrange("credential", @"DOMAIN\user:pass");
@@ -330,8 +330,10 @@ public sealed class SaslAuthenticatorSecurityContextTests
         diagnostics.Bytes("Type 1 prefix", type1![..16]);
         diagnostics.Bytes("Type 3", type3);
         diagnostics.Act("Type 3 length", type3?.Length);
-        diagnostics.Diff("Type 1 prefix", Type1[..16], type1[..16]);
-        CollectionAssert.AreEqual(Type1[..16], type1![..16]);
+        diagnostics.Diff("Type 1 header", Type1[..12], type1[..12]);
+        CollectionAssert.AreEqual(Type1[..12], type1![..12]);
+        uint measuredFlags = BitConverter.ToUInt32(Type1, 12);
+        Assert.AreEqual(measuredFlags, BitConverter.ToUInt32(type1, 12) & measuredFlags);
         AssertIsType3(type3);
     }
 
