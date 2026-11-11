@@ -394,9 +394,13 @@ public sealed class RtspProtocolHandler(
         TransferResult result = head.SequenceNumber == sequenceNumber
             ? TransferResult.Success(bodyRead)
             : Fail(events, CurlExitCode.RtspCseqError, SequenceMismatch(sequenceNumber, head.SequenceNumber), bodyRead);
-        result = result with { Report = report with { DownloadSize = bodyRead } };
+        result = result with { Report = report with { DownloadSize = plan.WritesReplyBody ? bodyRead : 0, ContentType = ContentTypeOf(head) } };
         return new(result, result.IsSuccess && authorization is null ? AnswerChallenges(context, options, head) : null);
     }
+
+    /// <summary>The value of the reply's last <c>Content-Type</c> header, or <see langword="null" /> when it has none (BL-4934).</summary>
+    private static string? ContentTypeOf(RtspReplyHead head) =>
+        head.HeaderLines.LastOrDefault(line => line.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase)).Value;
 
     /// <summary>
     /// The <c>Authorization</c> value a <c>401</c> to a request sent without one is answered with,

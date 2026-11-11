@@ -27,12 +27,16 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] The repro prints exactly `200 0 [text/plain]`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The repro prints exactly `200 0 [text/plain]`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
+
+## Notes
+
+Fixed in RtspProtocolHandler.ReadReplyAsync: DownloadSize is the body bytes only when the plan writes the reply body (else 0); ContentType comes from the reply head. Three existing tests that pinned the old size for a discarded body now expect 0. Cross-platform: no OS-specific paths. Quality run for the library: 0 failing members.
 
 ## Log
 

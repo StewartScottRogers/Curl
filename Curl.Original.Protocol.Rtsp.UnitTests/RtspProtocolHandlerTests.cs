@@ -214,7 +214,7 @@ public sealed class RtspProtocolHandlerTests
         Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(5L, result.BytesTransferred);
-        Assert.AreEqual(5L, result.Report!.DownloadSize);
+        Assert.AreEqual(0L, result.Report!.DownloadSize);
         Assert.AreEqual(0L, output.Length);
     }
 
