@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ProtocolHandler.cs, Curl.Extended.Protocol.Amqp0.UnitTests/Amqp0UploadTests.cs, Documentation/Conformance/Extended/Amqp0.md]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4956 — Make -T publish the file on amqp:// instead of receiving
 
@@ -22,9 +22,9 @@ Split from BL-4903 (outside fitness review 2026-11-11, finding EXT-008). Today t
 
 ## Acceptance criteria
 
-- [ ] `-T up.txt` (holding `filebody`) on amqp:// sends `filebody` as the publish payload, or exits 2 before connecting where an upload has no meaning; a unit test in `Curl.Extended.Protocol.Amqp0.UnitTests` pins it.
-- [ ] `Documentation/Conformance/Extended/Amqp0.md` states what `-T` does.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `-T up.txt` (holding `filebody`) on amqp:// sends `filebody` as the publish payload, or exits 2 before connecting where an upload has no meaning; a unit test in `Curl.Extended.Protocol.Amqp0.UnitTests` pins it.
+- [x] `Documentation/Conformance/Extended/Amqp0.md` states what `-T` does.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -34,3 +34,4 @@ Stand-ins in PowerShell or C#, never Python.
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 426bc5e2 e447e5dc a0b49a29.
+- 2026-11-11: Doing -> Done. amqp0 -T publishes the file; test and conformance doc added; quality 0 failing

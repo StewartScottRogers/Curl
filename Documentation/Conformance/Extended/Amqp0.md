@@ -35,3 +35,10 @@ class's method section of the XML specification's documentation.
 | Amqp0:RFC4616-2-1 | MUST | The PLAIN response is NUL authcid NUL password (RFC 4616); without credentials the client uses guest/guest. | Amqp0ConnectionTests.StartOk_ChoosesPlainAndAnOfferedLocaleInAWellFormedTable |
 | Amqp0:RFC4616-2-2 | MUST | The PLAIN response carries the credentials of `-u` and of the URL's userinfo. | Amqp0ConnectionTests.StartOk_CarriesTheCredentialsOfTheUserOptionAndOfTheUrl |
 | Amqp0:RabbitMQ-URI-amqps-1 | MUST | `amqps://` runs the same connection over TLS (port 5671). | Amqp0ConnectionTests.Amqps_RunsTheSameConnectionOverTls |
+
+## What `-T` does
+
+`-T file` (BL-4956) publishes the file's bytes exactly as `-d` publishes its data: the client declares the queue and
+sends basic.publish to the default exchange with the file as the content body, and never sends basic.get, so it
+neither fetches nor consumes a message. When both `-d` and `-T` are given, `-d`'s data is published, as on
+`amqp1://`. Pinned by `Amqp0UploadTests` in `Curl.Extended.Protocol.Amqp0.UnitTests`.
