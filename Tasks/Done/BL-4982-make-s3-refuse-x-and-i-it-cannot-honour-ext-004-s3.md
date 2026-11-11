@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.S3.UnitLibrary/Client/S3ProtocolHandler.cs, Curl.Extended.Protocol.S3.UnitLibrary/Client/S3RequestMethod.cs, Curl.Extended.Protocol.S3.UnitTests/S3RequestMethodTests.cs, Documentation/Conformance/Extended/S3.md]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4982 — Make s3 refuse -X and -I it cannot honour (EXT-004, s3)
 
@@ -22,9 +22,9 @@ Split from BL-4904 (EXT-004 of the 2026-11-11 outside fitness review): s3:// sen
 
 ## Acceptance criteria
 
-- [ ] `-X DELETE`, `-X <other>` and `-I` on s3:// exit 4 before any connection, and never write the object body; a unit test in the library's `.UnitTests` project pins each.
-- [ ] `Documentation/Conformance/Extended/S3.md` has a section listing the supported methods (GET, and PUT with -T) and the refusal.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass; Measure-CodeQuality shows the library within its gates.
+- [x] `-X DELETE`, `-X <other>` and `-I` on s3:// exit 4 before any connection, and never write the object body; a unit test in the library's `.UnitTests` project pins each.
+- [x] `Documentation/Conformance/Extended/S3.md` has a section listing the supported methods (GET, and PUT with -T) and the refusal.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass; Measure-CodeQuality shows the library within its gates.
 
 ## Notes
 
@@ -36,3 +36,5 @@ The stash holds all four schemes' uncommitted work; keep only this scheme's file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: c3078526 489cf725 96270709.
+- 2026-11-11: Refusal, tests and S3.md section done; S3 unit tests pass (146), Measure-CodeQuality 0 failing members. ADR-1238 lands here (other schemes' files left for their tasks).
+- 2026-11-11: Doing -> Done. s3 refuses -I and other -X before any request

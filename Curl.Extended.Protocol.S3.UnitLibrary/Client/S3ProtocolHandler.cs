@@ -20,6 +20,11 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (S3RequestMethod.RefusalOf(context) is { } refusal)
+        {
+            return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
+        }
+
         string bucket = context.Url.Host;
         S3Configuration configuration = S3Configuration.From(environment, context.Credentials);
         if (S3Endpoint.For(bucket, configuration.Region, configuration.EndpointUrl) is not { } endpoint)
