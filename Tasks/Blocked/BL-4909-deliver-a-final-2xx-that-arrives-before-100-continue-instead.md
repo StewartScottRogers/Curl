@@ -35,6 +35,21 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
+2026-11-11 lane 9: blocked before any code change. `dotnet build Curl.Console` fails with
+"SDK not found": `global.json` pins 10.0.401 (rollForward latestFeature), and
+`C:\Program Files\dotnet\sdk` now holds only 10.0.100-rc.1.25451.107, 11.0.100-rc.2.26504.105
+and 11.0.100 (installed 2026-11-10 17:13, probably removing the 10.0.4xx SDK). No lane can
+build or run tests until a 10.0.4xx SDK is reinstalled.
+What the code reading found for the next claim: `HttpContinueWaitConnection.ReadStatusLineAsync`
+buffers only up to the first line feed. After an early 2xx, the wait runs out, the body is sent,
+and the server's close turns into a reset, which on Windows drops the unread rest of the head and
+body, so the next read fails with 56 and `000`. A likely fix, inside the touched file: after a
+final 2xx, keep reading the response into the replay buffer during the wait and the send, so it
+can still be delivered when the send fails. Exit 0 or 55 as REF reports then follows from whether
+the head says `Connection: close` (that may need `HttpRequestBodyWriter`/`HttpProtocolHandler`
+too). Measure REF first: the WinGet curl here is 8.18.0 mingw/LibreSSL and is not the reference
+build. Scripts for `Record-CurlExchange.ps1 -Script` are: read / send head+`fast\n` / pause 500 / close.
+
 ## Log
 
 - 2026-11-11: Created.
