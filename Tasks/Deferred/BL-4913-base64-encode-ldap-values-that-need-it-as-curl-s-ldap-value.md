@@ -47,3 +47,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Backlog -> Doing. Criteria at claim: bce392b4 f5708407 a0b49a29.
 - 2026-11-11: Doing -> Blocked. Stewart: the .NET SDK 10.0.4xx that global.json pins is not installed (only 10.0.100-rc.1 and 11.x); please reinstall it so the build, fast tests and quality gate can be run on the committed fix.
 - 2026-11-11: Blocked -> Backlog. SDK 10.0.404 installed 2026-11-11 ~09:20 Arizona; global.json resolves, so the fix can be built and tested. Any kept work is on the lane's branch or stash named in the log.
+- 2026-11-11: Backlog -> Deferred. Split into BL-4970 (build, fast tests and quality gate on the committed fix); the code work is done.
