@@ -18,7 +18,7 @@ namespace Curl.Engine;
 /// <remarks>
 /// <para>
 /// The lookup is libcurl 8.21.0's <c>url_set_conn_peer</c> (ADR-0226, BL-733 Notes), as curl.se's build with
-/// HTTP/2 and HTTP/3 runs it on every platform. The version option names the origin versions an entry is
+/// HTTP/2 and HTTP/3 runs it, except that with no version option on Windows only <c>h1</c> may be switched to, as the Schannel build allows (ADR-1238). The version option names the origin versions an entry is
 /// looked up under, in order, and the destination versions it may name:
 /// </para>
 /// <list type="table">
@@ -65,6 +65,10 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     private static readonly AltSvcAlpn[] NoAlpns = [];
 
     private static readonly IReadOnlySet<AltSvcAlpn> NoAllowedAlpns = new HashSet<AltSvcAlpn>();
+
+    private static readonly IReadOnlySet<AltSvcAlpn> SchannelBuildAlpns = new HashSet<AltSvcAlpn> { AltSvcAlpn.H1 };
+
+    private static readonly IReadOnlySet<AltSvcAlpn> EveryAlpn = new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 };
 
     private readonly AltSvcCache cache;
 
@@ -239,25 +243,38 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
             return null;
         }
 
-        (IReadOnlyList<AltSvcAlpn> lookedUpUnder, IReadOnlySet<AltSvcAlpn> allowed) = LookupOf(requestedVersion);
+        (IReadOnlyList<AltSvcAlpn> lookedUpUnder, IReadOnlySet<AltSvcAlpn> allowed) = LookupOf(requestedVersion, OperatingSystem.IsWindows());
         return cache.FindForOrigin(lookedUpUnder, url.IdnHost, url.Port, allowed);
     }
 
     /// <summary>
     /// The origin versions an entry is looked up under, in curl's order, and the destination versions the
     /// transfer may switch to, for a version option (curl 8.21.0's <c>Curl_http_neg_init</c> and
-    /// <c>url_set_conn_peer</c>): <c>-0</c> and <c>--http2-prior-knowledge</c> look nothing up.
+    /// <c>url_set_conn_peer</c>): <c>-0</c> and <c>--http2-prior-knowledge</c> look nothing up. With no version
+    /// option on Windows the transfer may switch to <c>h1</c> alone, as curl 8.22.0's Schannel build, built with
+    /// neither HTTP/2 nor HTTP/3, allows no other ALPN, so an <c>h2</c> or <c>h3</c> entry leaves the origin
+    /// (BL-4912, ADR-1238); a version option asks for what Curl offers on every platform (ADR-0141).
     /// </summary>
-    private static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(HttpVersion version) =>
+    /// <param name="version">The version option.</param>
+    /// <param name="isWindows">Whether the running system is Windows.</param>
+    /// <returns>The origin versions looked up under and the destination versions allowed.</returns>
+    internal static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(HttpVersion version, bool isWindows) =>
         version switch
         {
-            HttpVersion.None => ([AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 }),
+            HttpVersion.None => ([AltSvcAlpn.H2, AltSvcAlpn.H1], NoVersionOptionDestinations(isWindows)),
             HttpVersion.Http11 => ([AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1 }),
             HttpVersion.Http2 => ([AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2 }),
             HttpVersion.Http3 => ([AltSvcAlpn.H3, AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 }),
             HttpVersion.Http3Only => ([AltSvcAlpn.H3], new HashSet<AltSvcAlpn> { AltSvcAlpn.H3 }),
             _ => (NoAlpns, NoAllowedAlpns),
         };
+
+    /// <summary>
+    /// The destination versions a transfer with no version option may switch to: <c>h1</c> alone on Windows,
+    /// as the Schannel build, and <c>h1</c>, <c>h2</c> and <c>h3</c> elsewhere, as the OpenSSL builds.
+    /// </summary>
+    private static IReadOnlySet<AltSvcAlpn> NoVersionOptionDestinations(bool isWindows) =>
+        isWindows ? SchannelBuildAlpns : EveryAlpn;
 
     /// <summary>
     /// The version a connection to the origin itself uses when its entry names <paramref name="destination" />:

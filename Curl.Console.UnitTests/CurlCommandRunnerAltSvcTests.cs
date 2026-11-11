@@ -118,6 +118,7 @@ public sealed class CurlCommandRunnerAltSvcTests
     }
 
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task RunAsync_H2EntryThenH1Entry_UsesTheFirstWithoutAVersionOption()
     {
         string h2Entry = $"h1 localhost 18499 h2 localhost 18444 {Future} 0 0";
