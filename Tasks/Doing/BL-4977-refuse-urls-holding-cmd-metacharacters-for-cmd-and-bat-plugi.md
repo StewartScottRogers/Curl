@@ -34,3 +34,4 @@ Split from BL-4898 (over its cost cap). Mock helpers: PowerShell or a C# file-ba
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: dfb4749c 27237708 07b99a6f 81b8ddc4.
