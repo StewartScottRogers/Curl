@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.NamedPipe.UnitLibrary]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4950 — Say the named pipe was not found when --npipe names a missing pipe
 
@@ -40,3 +40,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 18e40d88 a0b49a29.
+- 2026-11-11: Doing -> Done. Missing --npipe pipe now reports the named pipe was not found, exit 7
