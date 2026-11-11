@@ -152,6 +152,11 @@ internal static class HttpConnectionPersistence
             .Where(header => string.Equals(header.Name, "Proxy-Connection", StringComparison.OrdinalIgnoreCase))
             .Any(header => NamesOption(header.Value, option));
 
+    /// <summary>
+    /// Tells whether <paramref name="head" /> names <c>close</c> in its <c>Connection</c> header.
+    /// </summary>
+    internal static bool NamesConnectionClose(HttpResponseHead head) => NamesConnectionOption(head, "close");
+
     private static bool NamesConnectionOption(HttpResponseHead head, string option) =>
         head.Headers
             .Where(header => string.Equals(header.Name, "Connection", StringComparison.OrdinalIgnoreCase))

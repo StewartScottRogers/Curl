@@ -141,6 +141,14 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     internal bool StopsSending => statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode >= 300;
 
     /// <summary>
+    /// Gets a value indicating whether the first status line received is a final 2xx, which lets
+    /// the body go on: a send that then fails still delivers that response first, as curl 8.22.0
+    /// does (BL-4909). Its bytes stay in this connection's replay buffer, so a reset the send
+    /// causes does not lose them.
+    /// </summary>
+    internal bool AnsweredWithFinal2xx => statusLineRead is { IsCompletedSuccessfully: true } && firstStatusCode is >= 200 and < 300;
+
+    /// <summary>
     /// Writes one piece of the body, unless a status of 300 or above arrives first: a write
     /// still under way when it arrives is cancelled, as curl 8.21.0 stops sending there
     /// (measured, BL-319 and BL-395 Notes).

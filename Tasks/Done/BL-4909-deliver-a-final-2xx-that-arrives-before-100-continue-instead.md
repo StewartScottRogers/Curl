@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs, Curl.Original.Protocol.Http.UnitTests/EarlyFinalResponseDuringContinueWaitTests.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpConnectionPersistence.cs, Curl.Original.Protocol.Http.UnitTests/EarlyFinalResponseDuringContinueWaitTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4909 — Deliver a final 2xx that arrives before 100 Continue instead of discarding it
 
@@ -27,9 +27,9 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] The repro prints `fast` then `200` and exits 0.
-- [ ] Without `Connection: close` it prints `fast`, `200` and exits 55 with REF's message.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The repro prints `fast` then `200` and exits 0.
+- [x] Without `Connection: close` it prints `fast`, `200` and exits 55 with REF's message.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,6 +50,26 @@ the head says `Connection: close` (that may need `HttpRequestBodyWriter`/`HttpPr
 too). Measure REF first: the WinGet curl here is 8.18.0 mingw/LibreSSL and is not the reference
 build. Scripts for `Record-CurlExchange.ps1 -Script` are: read / send head+`fast\n` / pause 500 / close.
 
+2026-11-11 lane 4: done. A send failure (exit 55) after a final 2xx answered the wait for
+`100 Continue` is now held (`HttpProtocolHandler.SendBodyBefore2xxAsync`) while the response is
+read and delivered, then thrown unless that response says `Connection: close`
+(`ThrowIfSendFailedUnlessClosing`, using the new `HttpConnectionPersistence.NamesConnectionClose`).
+`HttpContinueWaitConnection.AnsweredWithFinal2xx` tells the two apart from 3xx and above, which
+still stop sending. `HttpRequestBodyWriter` no longer reads the connection for a receive failure
+after a rate or source wait once a 2xx answered (that 1-byte read took a byte of the response).
+Touches widened to HttpProtocolHandler.cs, HttpRequestBodyWriter.cs and
+HttpConnectionPersistence.cs: no task in Doing on origin/work/dark-factory names them.
+Measured with Curl and `Record-CurlExchange.ps1 -Script` (read / send head+`fast\n` / pause 500 /
+close) and a 2,000,000-byte `-T` file: with `Connection: close` stdout `fast\n200\n`, stderr empty,
+exit 0; without it stdout `fast\n200\n`, `curl: (55) Send failure: Connection was aborted`, exit 55,
+the same as REF 8.22.0 in the review. No ADR: the behaviour is REF's as the review measured it, no
+choice was made. Quality for Curl.Original.Protocol.Http.UnitLibrary: 100% line, 100% branch,
+0 failing members (coverage of the Http.UnitTests run; the -Library run aborts on Console tests,
+below). The fast tests are green apart from six Windows SSPI NTLM tests in
+Curl.Authentication.UnitTests, Curl.Original.Protocol.Ldap.UnitTests and Curl.Console.UnitTests
+that fail on this host and touch no HTTP code: filed as BL-4951. The new tests are
+platform-neutral (the send failure's words come from `CurlSocketErrorText.Words` for the platform).
+
 ## Log
 
 - 2026-11-11: Created.
@@ -57,3 +77,4 @@ build. Scripts for `Record-CurlExchange.ps1 -Script` are: read / send head+`fast
 - 2026-11-11: Doing -> Blocked. Stewart: the .NET SDK 10.0.4xx that global.json pins (10.0.401, latestFeature) is no longer installed (only 10.0.100-rc.1 and 11.0.100); please reinstall it so lanes can build.
 - 2026-11-11: Blocked -> Backlog. SDK 10.0.404 installed 2026-11-11 ~09:20 Arizona; global.json resolves. Any work a lane kept is in that lane's stash - apply by hash, never pop.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 572c4f19 12d3e7a4 a0b49a29.
+- 2026-11-11: Doing -> Done. A final 2xx before 100 Continue is delivered: exit 0 with Connection: close, else 55 after the response, as curl 8.22.0
