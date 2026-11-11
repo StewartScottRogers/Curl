@@ -184,6 +184,7 @@ public sealed class NamedPipeConnectorTests
     [TestMethod]
     [DataRow(typeof(IOException), DisplayName = "not there or busy")]
     [DataRow(typeof(TimeoutException), DisplayName = "timed out")]
+    [DataRow(typeof(FileNotFoundException), DisplayName = "pipe not found")]
     [DataRow(typeof(UnauthorizedAccessException), DisplayName = "access denied")]
     public async Task ConnectAsync_PipeThatCannotBeOpened_FailsAsCouldNotConnect(Type failureType)
     {

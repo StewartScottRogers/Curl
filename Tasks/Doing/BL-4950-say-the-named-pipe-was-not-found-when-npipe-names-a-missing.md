@@ -27,14 +27,16 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] For a missing pipe the message names it as not found and does not say "timed out"; exit 7.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] For a missing pipe the message names it as not found and does not say "timed out"; exit 7.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
 ## Log
+
+- Notes: SystemNamedPipeOpener turns the no-wait timeout for a missing local pipe into FileNotFoundException "The named pipe was not found" (exit 7). Measured with Curl.Console; the opener is ADR-0083 excluded, so the connector test gains a FileNotFoundException row.
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 18e40d88 a0b49a29.

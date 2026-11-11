@@ -19,10 +19,19 @@ public sealed class SystemNamedPipeOpener : INamedPipeOpener
             await pipe.ConnectAsync(0, cancellationToken).ConfigureAwait(false);
             return pipe;
         }
+        catch (TimeoutException) when (ServerIsLocal(name) && !File.Exists(name.ToString()))
+        {
+            // With no wait, .NET reports a missing pipe as a timeout; say what is wrong instead.
+            await pipe.DisposeAsync().ConfigureAwait(false);
+            throw new FileNotFoundException("The named pipe was not found");
+        }
         catch
         {
             await pipe.DisposeAsync().ConfigureAwait(false);
             throw;
         }
     }
+
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin named pipe adapter; every line needs a live pipe.")]
+    private static bool ServerIsLocal(NamedPipeName name) => name.ServerName == ".";
 }
