@@ -615,8 +615,16 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
         };
     }
 
-    private static bool StoredLengthsDisagree(ReadOnlySpan<byte> block) =>
-        block.Length >= StoredBlockHeaderLength && (block[1] | (block[2] << 8)) != (~(block[3] | (block[4] << 8)) & 0xFFFF);
+    private static bool StoredLengthsDisagree(ReadOnlySpan<byte> block)
+    {
+        // A block shorter than its header cannot fail a stream, so the missing bytes are read as
+        // all ones: the lengths then agree (0xFFFF and 0x0000 are complements) and nothing is named.
+        Span<byte> header = stackalloc byte[StoredBlockHeaderLength];
+        header.Fill(0xFF);
+        header[1] = header[2] = 0;
+        block[..Math.Min(StoredBlockHeaderLength, block.Length)].CopyTo(header);
+        return (header[1] | (header[2] << 8)) != (~(header[3] | (header[4] << 8)) & 0xFFFF);
+    }
 
     private static HttpTransferException Corrupt(string message) => new(CurlExitCode.BadContentEncoding, message);
 

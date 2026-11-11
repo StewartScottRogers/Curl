@@ -63,6 +63,12 @@ public sealed class CorruptDeflateMessageTests
         Assert.AreEqual(HttpTransferMessages.BadContentEncoding, Fail(HttpContentCoding.Gzip, [0x78, 0x9C, 0x03, 0x02, 0, 0]));
     }
 
+    [TestMethod]
+    public void Decode_StoredBlockWithAgreeingLengthsThenReservedBlock_FailsWithGenericText()
+    {
+        Assert.AreEqual(HttpTransferMessages.BadContentEncoding, Fail(HttpContentCoding.Gzip, [0x78, 0x9C, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x07, 0, 0]));
+    }
+
     private static string Fail(HttpContentCoding coding, byte[] body)
     {
         using HttpContentCodingDecoder decoder = new(coding);
