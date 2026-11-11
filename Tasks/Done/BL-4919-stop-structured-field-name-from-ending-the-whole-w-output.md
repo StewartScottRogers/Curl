@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Output.UnitTests/StructuredFieldWriteOutTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4919 — Stop %{structured_field.<name>} from ending the whole -w output
 
@@ -27,8 +27,8 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] The repro prints `A[Dictionary of 2: u=Integer 1; i=Boolean true]B`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The repro prints `A[Dictionary of 2: u=Integer 1; i=Boolean true]B`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -38,3 +38,6 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 12e4ea9e a0b49a29.
+
+- Cause: curl's 24-byte variable-name buffer rule in `WriteOutTemplateRenderer` ended the output at `structured_field.priority` (25 bytes). A dotted name the source knows now renders; unknown or undotted long names still end silently. Covered by `StructuredFieldWriteOutTests`; checked by unit test rather than the live repro. Measure-CodeQuality could not complete: an unrelated Conformance.Extended test (`EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement`) fails in the shared run; the build's complexity gate passed.
+- 2026-11-11: Doing -> Done. Dotted extension variables longer than the name buffer render
