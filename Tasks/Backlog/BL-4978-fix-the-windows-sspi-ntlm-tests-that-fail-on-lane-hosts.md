@@ -1,5 +1,5 @@
 ---
-id: BL-4951
+id: BL-4978
 title: Fix the Windows SSPI NTLM tests that fail on lane hosts
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4951 — Fix the Windows SSPI NTLM tests that fail on lane hosts
+# BL-4978 — Fix the Windows SSPI NTLM tests that fail on lane hosts
 
 ## Goal
 

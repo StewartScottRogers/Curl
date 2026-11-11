@@ -67,7 +67,7 @@ choice was made. Quality for Curl.Original.Protocol.Http.UnitLibrary: 100% line,
 0 failing members (coverage of the Http.UnitTests run; the -Library run aborts on Console tests,
 below). The fast tests are green apart from six Windows SSPI NTLM tests in
 Curl.Authentication.UnitTests, Curl.Original.Protocol.Ldap.UnitTests and Curl.Console.UnitTests
-that fail on this host and touch no HTTP code: filed as BL-4951. The new tests are
+that fail on this host and touch no HTTP code: filed as BL-4978. The new tests are
 platform-neutral (the send failure's words come from `CurlSocketErrorText.Words` for the platform).
 
 ## Log
