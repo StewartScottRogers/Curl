@@ -33,3 +33,4 @@ Stand-ins in PowerShell or C#, never Python.
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 48be352d 4ff61769 a0b49a29.
