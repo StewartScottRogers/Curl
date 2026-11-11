@@ -33,3 +33,4 @@ Split from BL-4902 (over its cost cap). The earlier run's work is on branch fact
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: fe598c36 6090b5c1 a0b49a29.
