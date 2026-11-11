@@ -1,5 +1,5 @@
 ---
-id: BL-4970
+id: BL-4977
 title: Refuse URLs holding cmd metacharacters for .cmd and .bat plugin helpers
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4970 — Refuse URLs holding cmd metacharacters for .cmd and .bat plugin helpers
+# BL-4977 — Refuse URLs holding cmd metacharacters for .cmd and .bat plugin helpers
 
 ## Goal
 

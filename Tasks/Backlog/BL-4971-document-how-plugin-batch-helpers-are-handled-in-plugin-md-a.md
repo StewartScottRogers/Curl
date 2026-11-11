@@ -4,7 +4,7 @@ title: Document how plugin batch helpers are handled in Plugin.md and an ADR
 priority: High
 assignee: Claude
 pipeline: docs
-depends-on: [BL-4970]
+depends-on: [BL-4977]
 touches: [Documentation/Conformance/Extended/Plugin.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-11-11
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-BL-4970 refuses a URL holding `& | < > ^ " %` or a control character when the helper is a `.cmd` or `.bat` file (BatBadBut, CVE-2024-24576), instead of launching through an escaped `cmd.exe /d /s /c`, because cmd escaping cannot be made reliable. Read `Curl.Extended.Protocol.Plugin.UnitLibrary/SystemHelperProcessStarter.cs` after BL-4970 for the exact character set and error text.
+BL-4977 refuses a URL holding `& | < > ^ " %` or a control character when the helper is a `.cmd` or `.bat` file (BatBadBut, CVE-2024-24576), instead of launching through an escaped `cmd.exe /d /s /c`, because cmd escaping cannot be made reliable. Read `Curl.Extended.Protocol.Plugin.UnitLibrary/SystemHelperProcessStarter.cs` after BL-4977 for the exact character set and error text.
 
 ## Acceptance criteria
 
