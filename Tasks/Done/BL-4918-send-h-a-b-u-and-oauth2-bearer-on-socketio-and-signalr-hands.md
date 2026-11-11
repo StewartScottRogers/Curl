@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/HttpRequestWriter.cs, Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/SignalRNegotiator.cs, Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4918 — Send -H, -A, -b, -u and --oauth2-bearer on socketio and signalr handshakes
 
@@ -40,3 +40,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 318f9b01 1e58b3fc a0b49a29.
 - 2026-11-11: Added `HandshakeHeaderFields.cs` to each library (new file beside the touched ones): Authorization from `--oauth2-bearer` (wins) or `-u`, User-Agent (`-A` or curl/8.22.0), Cookie from `-b`, then each `-H`, as ADR-1243 does for MCP. SignalR sends them on the negotiate POST and the WebSocket GET; a negotiate redirect's access token replaces any Authorization. Header order of the redirect negotiate request is now Content-Length then Authorization (existing test updated). Cookie is sent by signalr too. Both libraries 100% line/branch, quality run 0 failing; fast tests green. Linux/macOS: tests are platform-neutral.
+- 2026-11-11: Doing -> Done. Handshakes of socketio and signalr send -H, -A, -b, -u and --oauth2-bearer
