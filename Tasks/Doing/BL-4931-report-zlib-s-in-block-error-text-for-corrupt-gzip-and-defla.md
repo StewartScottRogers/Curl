@@ -27,10 +27,12 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] `/a`, `/b` and `/c` print REF's three messages with exit 61.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `/a`, `/b` and `/c` print REF's three messages with exit 61.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Done: in-block fault (`InBlockFault`) names zlib text for gzip (plain 10-byte header only) and zlib bodies that fail before any output; a `deflate` body failing after its zlib header is re-read as raw from byte 0, as real curl does (measured: `/c` gives stored block lengths because 0x78 is a stored block header). Measured `1F8B..0A FFFFFFFF` gives `invalid block type`, so the old generic pins in Cgr071Tests and HttpContentCodingDecoderTests were corrected. Measure-CodeQuality.ps1 could not run: it requires all tests green and RequirementMatrixTests (Plugin.md, BL-4971) fails in another lane. Complexity is build-enforced and passed.
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
