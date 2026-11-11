@@ -86,6 +86,19 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
         return contentType;
     }
 
+    /// <summary>The SEND body: <c>-d</c>'s data when given, else the <c>-T</c> upload's bytes, else none (the receive path).</summary>
+    private static async ValueTask<ReadOnlyMemory<byte>?> RequestBodyAsync(ITransferContext context)
+    {
+        if (context.PostData is not null || context.Upload is not { } upload)
+        {
+            return context.PostData;
+        }
+
+        using var body = new MemoryStream();
+        await upload.CopyToAsync(body, context.CancellationToken).ConfigureAwait(false);
+        return body.ToArray();
+    }
+
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context, string destination)
     {
         ConnectResult connect = await connector.ConnectAsync(TargetOf(context), context.CancellationToken).ConfigureAwait(false);
@@ -100,7 +113,7 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
             var flow = new StompClientFlow(connection, context.Output, context.Progress, context.CancellationToken);
             try
             {
-                await flow.RunAsync(ConnectFor(context.Url.Host, context.Credentials), destination, context.PostData, ContentTypeOf(context.Http?.Headers)).ConfigureAwait(false);
+                await flow.RunAsync(ConnectFor(context.Url.Host, context.Credentials), destination, await RequestBodyAsync(context).ConfigureAwait(false), ContentTypeOf(context.Http?.Headers)).ConfigureAwait(false);
                 return TransferResult.Success(flow.BytesWritten);
             }
             catch (StompClientException failure)

@@ -54,3 +54,4 @@ client relies on) that binds a client is a row; statements that bind only a serv
 | Stomp:STOMP12-Error-1 | SHOULD | An ERROR carries a short `message`; the client reports it. | StompConnectCases.Publish_ErrorAtConnect_FailsWithItsMessageAndSendsNothingMore |
 | Stomp:STOMP12-Error-2 | MUST | A server closes the connection after an ERROR; the client treats ERROR as the end of the session. | StompConnectCases.Publish_ErrorAtConnect_FailsWithItsMessageAndSendsNothingMore |
 | Stomp:STOMP12-Transport-1 | MAY | STOMP runs over any reliable two-way stream; `stomps://` is TLS from the first byte on port 61614. | StompConnectCases.Publish_Stomps_SpeaksTlsFromTheFirstByteOnPort61614 |
+| Stomp:STOMP12-Send-3 | MAY | SEND's body is the client's payload; curl takes it from `-d`, or from the `-T` file when `-d` is absent (`-d` wins when both are given), and never subscribes for an upload. | StompUploadTests.ExecuteAsync_Upload_SendsTheFileAsTheSendBodyAndNeverSubscribes |
