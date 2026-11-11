@@ -1,16 +1,16 @@
 ---
-id: BL-4971
+id: BL-4976
 title: Measure the URL user with -u password merge against real curl and hold the quality gates
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4970]
+depends-on: [BL-4975]
 touches: [Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Curl.Engine.UnitLibrary/TransferContextFactory.cs, Curl.Engine.UnitTests/UrlUserWithOptionPasswordTests.cs]
 requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4971 — Measure the URL user with -u password merge against real curl and hold the quality gates
+# BL-4976 — Measure the URL user with -u password merge against real curl and hold the quality gates
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4915; needs BL-4970's fix landed. Measure with a PowerShell or C# file-based stand-in server, never Python.
+Split from BL-4915; needs BL-4975's fix landed. Measure with a PowerShell or C# file-based stand-in server, never Python.
 
 ## Acceptance criteria
 

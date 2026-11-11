@@ -1,5 +1,5 @@
 ---
-id: BL-4970
+id: BL-4975
 title: Build, test and land the per-field URL user and -u password merge
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4970 — Build, test and land the per-field URL user and -u password merge
+# BL-4975 — Build, test and land the per-field URL user and -u password merge
 
 ## Goal
 
