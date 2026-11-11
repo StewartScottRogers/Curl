@@ -9,7 +9,7 @@ touches: [DarkFactory/ModelChoice.ps1, RunDarkFactory.ps1, CLAUDE.md, DarkFactor
 lane: no
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4958 — Run every factory task on sonnet and move to opus only on a retry
 
@@ -23,9 +23,9 @@ Stewart, 2026-11-11: "lets try and dial back the AI models we are using and only
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestModelChoice` passes, with cases for a sonnet first run on the feature and protocol pipelines and on a crypto-library task, and opus for a retried task.
-- [ ] `RunDarkFactory.ps1`'s THE MODEL PER TASK help, the root `CLAUDE.md` and the task-board skill's `model` row describe the new rule, and ADR-1239 records it.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestModelChoice` passes, with cases for a sonnet first run on the feature and protocol pipelines and on a crypto-library task, and opus for a retried task.
+- [x] `RunDarkFactory.ps1`'s THE MODEL PER TASK help, the root `CLAUDE.md` and the task-board skill's `model` row describe the new rule, and ADR-1239 records it.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -35,3 +35,4 @@ Stewart, 2026-11-11: "lets try and dial back the AI models we are using and only
 - 2026-11-11: Backlog -> Doing. Criteria at claim: fbecace0.
 - 2026-11-11: Doing -> Backlog. Criteria were written after the claim (the claim snapshot held the template placeholder); reclaiming so the snapshot matches.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 3e25416a 7d4df1f7 a0b49a29.
+- 2026-11-11: Doing -> Done. Every factory first run now uses sonnet and only a retry uses opus; -TestModelChoice 31/31, build clean, 115 fast test projects pass.
