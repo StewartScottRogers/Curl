@@ -182,6 +182,10 @@
     {PAUSE} between reply lines sends the lines before it, waits a second and sends the
     rest, e.g. 'RETR=150 Opening\r\n{PAUSE}\r\n425 Cannot open data connection' (CGR-099).
 
+.PARAMETER FtpCccAwaitsCloseNotify
+    In -Ftp mode, answer CCC by waiting for curls close_notify before sending the servers
+    own, instead of sending the servers at once (BL-4910).
+
 .PARAMETER FtpData
     The file served by RETR, and the listing served by LIST, in -Ftp mode, with the
     same backslash escapes as Response.
@@ -708,6 +712,7 @@ param(
     [string] $StandardInput = '',
     [switch] $Ftp,
     [string[]] $FtpReply = @(),
+    [switch] $FtpCccAwaitsCloseNotify,
     [string] $FtpData = '',
     [ValidateRange(1, 600000)] [int] $FtpIdleMilliseconds = 5000,
     [ValidateRange(0, 600000)] [int] $FtpDataHoldMilliseconds = 0,
@@ -1010,7 +1015,7 @@ $sessionHelpers = {
 # one array, writes the two-way transcript into $Transcript, and the bytes uploaded on
 # STOR and APPE data connections into $UploadedData.
 $serveFtpSession = {
-    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript, [System.IO.MemoryStream] $UploadedData, $TlsCertificate, [bool] $ImplicitTls, [int] $ControlIdleMilliseconds, [System.Net.IPAddress] $ListenAddress, [string] $SessionHelpers, [int] $DataHoldMilliseconds)
+    param($Listener, [hashtable] $Overrides, [byte[]] $DataBytes, [System.Text.StringBuilder] $Transcript, [System.IO.MemoryStream] $UploadedData, $TlsCertificate, [bool] $ImplicitTls, [int] $ControlIdleMilliseconds, [System.Net.IPAddress] $ListenAddress, [string] $SessionHelpers, [int] $DataHoldMilliseconds, [bool] $FtpCccAwaitsCloseNotify)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -1034,7 +1039,7 @@ $serveFtpSession = {
     # nothing within the idle time or hung up.
     function Clear-ControlTls {
         param($Secure, $Plain)
-        $Secure.ShutdownAsync().Wait()
+        if (-not $FtpCccAwaitsCloseNotify) { $Secure.ShutdownAsync().Wait() }
         $Plain.ReadTimeout = $ControlIdleMilliseconds
         $first = -1
         try { $first = $Plain.ReadByte() } catch [System.IO.IOException] { }
@@ -1050,6 +1055,7 @@ $serveFtpSession = {
             $suffix = ''
             $first = -1
         }
+        if ($FtpCccAwaitsCloseNotify) { $Secure.ShutdownAsync().Wait() }
         [void] $Transcript.Append("= TLS cleared from the control connection$suffix`r`n")
         return @($Plain, $first)
     }
@@ -3411,7 +3417,7 @@ try {
         $serverRun = $null
         $http2Proxy.Start()
     } elseif ($Ftp) {
-        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress).AddArgument($sessionHelpers.ToString()).AddArgument($FtpDataHoldMilliseconds)
+        [void] $server.AddScript($serveFtpSession).AddArgument($listener).AddArgument($ftpOverrides).AddArgument([byte[]] (ConvertFrom-EscapedResponse -Text $FtpData)).AddArgument($transcript).AddArgument($uploadedData).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($FtpIdleMilliseconds).AddArgument($ListenAddress).AddArgument($sessionHelpers.ToString()).AddArgument($FtpDataHoldMilliseconds).AddArgument([bool] $FtpCccAwaitsCloseNotify)
     } elseif ($Smtp) {
         [void] $server.AddScript($serveSmtpSession).AddArgument($listener).AddArgument($smtpOverrides).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($SmtpIdleMilliseconds).AddArgument($sessionHelpers.ToString())
     } elseif ($Imap) {
