@@ -209,7 +209,7 @@ public sealed class CommandLineRemoteNameOptionTests
     }
 
     [TestMethod]
-    public void Parse_RemoteNameAllWithOutput_KeepsTheOutputFileName()
+    public void Parse_RemoteNameAllWithOutput_KeepsTheOutputFileNameInPlaceOfTheRemoteName()
     {
         CommandLineParseResult result = Parse(["--remote-name-all", Url, "-o", "x"]);
 
@@ -217,7 +217,7 @@ public sealed class CommandLineRemoteNameOptionTests
         Assert.IsTrue(result.IsAccepted);
         UrlOutput output = result.Options.UrlOutputs.Single();
         Assert.AreEqual("x", output.FileName);
-        Assert.IsTrue(output.UsesRemoteName);
+        Assert.IsFalse(output.UsesRemoteName);
     }
 
     [TestMethod]

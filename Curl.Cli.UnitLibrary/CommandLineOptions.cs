@@ -2364,12 +2364,15 @@ public sealed class CommandLineOptions
     /// opened or created. A value from a UTF-8 config file on Windows is re-spelled by
     /// <see cref="AsWireText"/>, so the name is the file's bytes read in the ANSI code page, as the
     /// curl 8.22.0 mingw build opens it (<c>output = "café.bin"</c> creates <c>cafÃ©.bin</c>, BL-3900).
+    /// The <c>-o</c> replaces the remote name <see cref="RemoteNameAll"/> would give that URL, so
+    /// <c>--remote-name-all -o - u</c> writes the body to standard output, as curl 8.22.0 does (BL-4908).
     /// </summary>
     /// <param name="outputFile">A <c>-o</c> / <c>--output</c> value.</param>
     internal void AddOutputFile(string outputFile)
     {
         UrlOutput output = urlOutputs.Find(output => !output.HasOutputOption) ?? AddUrlOutput();
         output.FileName = AsWireText(outputFile);
+        output.UsesRemoteName = false;
         output.HasOutputOption = true;
     }
 
