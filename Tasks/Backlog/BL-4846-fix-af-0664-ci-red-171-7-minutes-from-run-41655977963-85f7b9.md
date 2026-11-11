@@ -47,6 +47,8 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Notes
 
+Measured 2026-11-06 over shift 20261106-051223: no infrastructure-only red time any more (BL-4846's capacity rerun turned run 42249533661 green 22 minutes after it failed). The one spell over 30 minutes, 94.52 min from run 42239087175, was a real Linux test failure (BL-4897), not runner capacity, so the expected 'no spell over 30 minutes' does not hold yet; left in Backlog for the next shift's logs.
+
 Fix (2026-11-04, interactive): the CI watch now reruns the failed jobs of the newest CI run on the branch whose only bad jobs never got a runner (`gh run rerun --failed`, at most twice per run, `Invoke-CiCapacityRerun` in `DarkFactory/CiWatch.ps1`), and reads the rerun afresh. AF-0664's spell was 165 minutes of such runs waiting for a push that got every runner. -TestCiWatch passes under Windows PowerShell and pwsh (three new BL-4846 cases); `dotnet build` clean and the fast tests pass (115 projects, 0 failed). Criterion 1 waits for a factory shift after the fix lands, so the task goes back to Backlog until then.
 
 ## Log

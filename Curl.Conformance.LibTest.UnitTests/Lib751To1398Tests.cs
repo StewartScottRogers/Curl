@@ -100,6 +100,22 @@ public sealed class Lib751To1398Tests
     }
 
     [TestMethod]
+    public async Task Lib753_SentHeader_TracesItWithTheTimeAndNoHexColumn()
+    {
+        var time = new ManualTimeProvider(new DateTimeOffset(2026, 10, 16, 14, 5, 6, TimeSpan.Zero));
+        time.Advance(TimeSpan.FromMicroseconds(123456));
+        var engine = new FakeCurlEngine();
+        var run = new PortRun(engine, 753, "ftp://x/753");
+
+        LibTestResult result = await new Lib753(time).RunAsync(run.Context, CancellationToken.None);
+        int traced = engine.Multi.Added!.Options.Callbacks.Debug!(CurlInfoType.HeaderOut, "GET\r\n"u8);
+
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual(0, traced);
+        StringAssert.EndsWith(run.Error.ToString(), "\n14:05:06.123456 => Send header, 5 bytes (0x5)\n0000: GET\n");
+    }
+
+    [TestMethod]
     public void Lib753TransferStatus_PausesOrConsumesTheBody()
     {
         var error = new StringWriter();

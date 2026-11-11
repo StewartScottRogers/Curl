@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-11-05
-completed:
+completed: 2026-11-06
 ---
 # BL-4877 — Fix AF-0686: Lanes waited 73 of 329.9 lane-minutes (22.1%) on overlaps from whole-project touches in shift 174735
 
@@ -45,11 +45,15 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Acceptance criteria
 
-- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Measured 2026-11-06 (interactive) over shift 20261106-051223 (05:12-13:12, after BL-4846's capacity rerun landed): Measure-FactoryProcess.ps1 -Since 2026-11-06 with a fresh CI run list gives laneMinutes 810.65, waitNothingReadyMinutes 0, waitOverlapMinutes 70 (8.6%), 17 tasks done, one CI red spell of 94.52 min (run 42239087175, e9ba9daf: SocketAction_TimeoutAgainstASilentServer_TellsTheTimeout... failing on Linux, filed as BL-4897 at 08:20, ended by run 42249533661's success at 09:56 after the watch's capacity rerun at 09:34), no infrastructure-only runs. No code changed by this task; CI passed build and fast tests on all three platforms at 6065a1560.
 
 ## Log
 
 - 2026-11-05: Created.
+- 2026-11-06: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-06: Doing -> Done. Measured over shift 20261106-051223: overlap wait 8.6%, nothing-ready wait 0% of 810.65 lane minutes, both under 20%.

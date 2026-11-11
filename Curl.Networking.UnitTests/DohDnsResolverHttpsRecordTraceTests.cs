@@ -165,6 +165,25 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
             lines);
     }
 
+    // A last parameter with an empty value leaves exactly its four header bytes; curl still writes the record after it.
+    [TestMethod]
+    public async Task ResolveHttpsRecordAsync_ARecordEndingWithAnEmptyNoDefaultAlpn_WritesTheRecordAfterIt()
+    {
+        var record = "000100" + "00010003026832" + "00020000";
+        Diagnostics.Arrange("record", record);
+
+        var lines = await TraceHttpsRecordAsync(Ok(HttpsAnswer(record)));
+
+        AssertLines(
+            [
+                "[DNS] [HTTPS] got 1 records",
+                "[DNS] [HTTPS] record: 1 . alpn=h2",
+                "[DNS] [HTTPS] record: 1 . alpn=h2 no-default-alpn",
+                "[DoH] DoH request complete, 0 to go",
+            ],
+            lines);
+    }
+
     // Each refusal ends the record's lines with curl's CURLcode text for it, and no "complete" line.
     [TestMethod]
     [DataRow("0001", "", "A libcurl function was given a bad argument", DisplayName = "two bytes")]

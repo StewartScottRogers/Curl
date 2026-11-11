@@ -43,9 +43,10 @@ Windows, `SaslDigestMd5.AnswerAsCurl` elsewhere, chosen by the constructor's
 so `Curl.Console` needs no change). The client nonce is injected, as HTTP Digest's is, and
 defaults to `DigestClientNonce.CreateRandomHex`.
 
-SSPI's exit 94 cannot yet be expressed: `ISaslExchange.Respond` only answers bytes or
-`null`, which the handlers turn into `*` and exit 67. Until BL-781 widens that contract, the
-three challenges SSPI rejects are answered `null`.
+A DIGEST-MD5 challenge SSPI rejects fails the transfer with exit 94 (CURLE_AUTH_ERROR,
+"An authentication function returned an error"): `SaslAuthenticator` throws
+`SaslAuthenticationFailedException` with `CurlExitCode.AuthError` when
+`SaslDigestMd5.AnswerAsSspi` answers `null` (BL-781 widened the contract).
 
 ## Consequences
 

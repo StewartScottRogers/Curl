@@ -157,6 +157,30 @@ public sealed class Http2ProxyTunnelConnectionTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_TwoWrites_SendsTheirBytesInDataFramesThatNeverEndTheStream()
+    {
+        var proxy = new ScriptedConnection(TcpConnectorTests.ProxyFrames(TcpConnectorTests.StatusHeaders(1, "200")));
+        var tunnel = await OpenTunnelAsync(proxy);
+        Diagnostics.Arrange("writes", "\"first\", then \"second\"");
+
+        using (Diagnostics.Phase("write twice"))
+        {
+            await tunnel.WriteAsync("first"u8.ToArray(), CancellationToken.None);
+            await tunnel.WriteAsync("second"u8.ToArray(), CancellationToken.None);
+        }
+
+        var dataFrames = (await TcpConnectorTests.ReadClientFramesAsync(proxy.Written))
+            .Where(frame => frame.Type == Http2FrameType.Data)
+            .ToList();
+        var actual = string.Join(" | ", dataFrames.Select(frame =>
+            $"stream {frame.StreamId} \"{Encoding.Latin1.GetString(frame.Payload.Span)}\" END_STREAM={frame.HasFlag(Http2FrameFlags.EndStream)}"));
+        const string expected = "stream 1 \"first\" END_STREAM=False | stream 1 \"second\" END_STREAM=False";
+        Diagnostics.Act("DATA frames", actual);
+        Diagnostics.Assert("DATA frames", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
     public async Task WriteAsync_WhenTheProxyClosesWhileTheWindowsAreSpent_ThrowsIOException()
     {
         var tunnel = await OpenTunnelAsync(new ScriptedConnection(TcpConnectorTests.ProxyFrames(TcpConnectorTests.StatusHeaders(1, "200"))));

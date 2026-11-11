@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Networking;
@@ -416,10 +417,17 @@ public sealed partial class TlsFailureMessagesTests
             SslPolicyErrors.RemoteCertificateNameMismatch, chain, targetHost, hasCaCertificateFile: true);
 
         Diagnostics.Act("message", message);
-        Diagnostics.Assert("message", "SSL peer certificate or SSH remote key was not OK", message);
+        Diagnostics.Assert("exit code, message", $"60, {LibcurlExit60Text}", $"{(int)CurlExitCode.PeerFailedVerification}, {message}");
 
-        Assert.AreEqual("SSL peer certificate or SSH remote key was not OK", message);
+        Assert.AreEqual(60, (int)CurlExitCode.PeerFailedVerification);
+        Assert.AreEqual(LibcurlExit60Text, message);
     }
+
+    /// <summary>
+    /// curl_easy_strerror's text for <see cref="CurlExitCode.PeerFailedVerification" />
+    /// (60, CURLE_PEER_FAILED_VERIFICATION) in lib/strerror.c.
+    /// </summary>
+    private const string LibcurlExit60Text = "SSL peer certificate or SSH remote key was not OK";
 
     [TestMethod]
     [DataRow("localhost", "hostname 'localhost'")]

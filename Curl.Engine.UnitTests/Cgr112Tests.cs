@@ -112,6 +112,18 @@ public sealed class Cgr112Tests
     }
 
     [TestMethod]
+    public async Task ReadAsync_FullRawReadAfterAHeldCarriageReturn_DecodesEveryByte()
+    {
+        string first = new string('a', 4095) + "\r";
+        string second = new('b', 4096);
+        using WindowsTextModeReadStream stream = TextMode(first + second);
+
+        string text = await ReadAllAsync(stream);
+
+        Assert.AreEqual(first + second, text);
+    }
+
+    [TestMethod]
     public void Members_OfAReadOnlyStream_RefuseEverythingButReading()
     {
         using WindowsTextModeReadStream stream = TextMode(string.Empty);

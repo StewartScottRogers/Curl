@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-06
 ---
 # BL-4824 — Fix AF-0645: Lanes idle 24.2% of lane time waiting on an interactive-only Backlog
 
@@ -42,10 +42,12 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Acceptance criteria
 
-- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the window's start: the fix's landing, or for a task with no fix yet the later of its fix's landing and ADR-1235's commit), gives the finding's expected result with CI red time counted only while a run on the branch has a failing test or build error (ADR-1235): a failed run whose only non-success jobs were never given a runner, ran into their `timeout-minutes` in a job that tests nothing, or were superseded by a newer commit is left out, as `gh run view <id> --json jobs` and each job's annotations classify it. Notes name the fix, its landing time, the window, each run left out and why, and the numbers. If no factory shift has run since the window's start, the task waits in Backlog.
+- [x] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the window's start: the fix's landing, or for a task with no fix yet the later of its fix's landing and ADR-1235's commit), gives the finding's expected result with CI red time counted only while a run on the branch has a failing test or build error (ADR-1235): a failed run whose only non-success jobs were never given a runner, ran into their `timeout-minutes` in a job that tests nothing, or were superseded by a newer commit is left out, as `gh run view <id> --json jobs` and each job's annotations classify it. Notes name the fix, its landing time, the window, each run left out and why, and the numbers. If no factory shift has run since the window's start, the task waits in Backlog.
 - [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Measured 2026-11-06 (interactive) over shift 20261106-051223 (05:12-13:12, after BL-4846's capacity rerun landed): Measure-FactoryProcess.ps1 -Since 2026-11-06 with a fresh CI run list gives laneMinutes 810.65, waitNothingReadyMinutes 0, waitOverlapMinutes 70 (8.6%), 17 tasks done, one CI red spell of 94.52 min (run 42239087175, e9ba9daf: SocketAction_TimeoutAgainstASilentServer_TellsTheTimeout... failing on Linux, filed as BL-4897 at 08:20, ended by run 42249533661's success at 09:56 after the watch's capacity rerun at 09:34), no infrastructure-only runs. No code changed by this task; CI passed build and fast tests on all three platforms at 6065a1560.
 
 - Cause found: with nothing ready, a lane waited whenever any lane-eligible task was in Doing, since its end might make more ready (DarkFactory/Claim.ps1, `Invoke-Claim`). In restarted shift 20261103-185800 six lanes resumed adopted tasks (BL-4790 to BL-4796) that no task depended on, and the whole Backlog was interactive only, so lanes 1 and 5 waited from 18:58 and each lane that finished its task waited too, until the 19:15:54 lane step retired them ("lanes 8 -> 1"). The wait lines name the interactive-only Backlog, but what kept the lanes waiting was the lane-eligible work in Doing. A lane already ends rather than waits when only interactive-only work is left in Doing (AF-0435).
 - Fix: aef2fa6d2, pushed to work/dark-factory 2026-11-04 05:24:14 MST (12:24:14Z). A lane with nothing ready waits only when a lane-eligible Backlog task's `depends-on` names a task in Doing, or a lane-eligible Blocked task's last Log line names one (Invoke-Requeue moves that one back once it is Done) - `Test-DoingMayMakeReady`; otherwise it ends ("nothing ready"), and the lanes still running claim any new work, a CI fix gets a lane of its own (ADR-1158), and a -Continuous shift's idle poll starts the next shift once something is claimable. Settling the twelve interactive-only process tasks (BL-4647 to BL-4824) on 2026-11-04 also empties most of the interactive-only Backlog the finding names. `-TestTaskReadiness` 33/33 under Windows PowerShell 5.1 and pwsh 7, with the new cases "a lane-eligible task in Doing that no lane task waits on ends the lane rather than waits (AF-0645)", "a Blocked task whose last Log line names a task in Doing may be made ready by it" and "a lane-eligible task in Doing that a Backlog task depends on keeps the lane waiting"; `-TestClaimDuplicates` 16/16.
@@ -57,3 +59,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: 2ab4542b 9742157d.
 - 2026-11-04: Doing -> Backlog. Fix landed 2026-11-04 05:24:14 MST (aef2fa6d2, a lane ends when nothing in Doing can make a task ready); the window starts there and no factory shift has run since, so criterion 1 waits in Backlog for an interactive session to measure it.
+- 2026-11-06: Backlog -> Doing. Criteria at claim: 2ab4542b 9742157d.
+- 2026-11-06: Doing -> Done. Measured over shift 20261106-051223: overlap wait 8.6%, nothing-ready wait 0% of 810.65 lane minutes, both under 20%.

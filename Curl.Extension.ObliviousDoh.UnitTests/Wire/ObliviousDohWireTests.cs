@@ -65,12 +65,23 @@ public sealed class ObliviousDohWireTests
     }
 
     [TestMethod]
-    public void Config_KeyId_IsNhOctetsAndFollowsTheKey()
+    public void Config_KeyId_IsExpandOfExtractOverTheContentsAsRfc9230Section6_1()
     {
-        byte[] keyId = new ObliviousDohConfig(HpkeKem.DhkemP256HkdfSha256, HpkeKdf.HkdfSha256, HpkeAead.Aes128Gcm, P256Key).KeyId();
+        // Expand(Extract("", 0010 0001 0001 0041 04 || 64 zero octets), "odoh key id", 32) with HKDF-SHA256,
+        // computed outside Curl from the hand-laid config contents.
+        byte[] expected = Convert.FromHexString("E77E1B47B4CAD2C1CAC992681D6EC24E66BBC55834A55742168A1F2E7EA2EDD5");
 
-        Assert.HasCount(32, keyId);
-        CollectionAssert.AreNotEqual(keyId, new ObliviousDohConfig(HpkeKem.DhkemP256HkdfSha256, HpkeKdf.HkdfSha256, HpkeAead.Aes256Gcm, P256Key).KeyId());
+        CollectionAssert.AreEqual(expected, new ObliviousDohConfig(HpkeKem.DhkemP256HkdfSha256, HpkeKdf.HkdfSha256, HpkeAead.Aes128Gcm, P256Key).KeyId());
+    }
+
+    [TestMethod]
+    public void Config_KeyId_FollowsThePublicKey()
+    {
+        byte[] otherKey = [0x04, .. new byte[63], 0x01];
+
+        CollectionAssert.AreNotEqual(
+            new ObliviousDohConfig(HpkeKem.DhkemP256HkdfSha256, HpkeKdf.HkdfSha256, HpkeAead.Aes128Gcm, P256Key).KeyId(),
+            new ObliviousDohConfig(HpkeKem.DhkemP256HkdfSha256, HpkeKdf.HkdfSha256, HpkeAead.Aes128Gcm, otherKey).KeyId());
     }
 
     [TestMethod]
