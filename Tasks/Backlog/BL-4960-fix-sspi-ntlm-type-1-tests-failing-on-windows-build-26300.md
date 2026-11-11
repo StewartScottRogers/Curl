@@ -1,5 +1,5 @@
 ---
-id: BL-4951
+id: BL-4960
 title: Fix SSPI NTLM Type 1 tests failing on Windows build 26300
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4951 — Fix SSPI NTLM Type 1 tests failing on Windows build 26300
+# BL-4960 — Fix SSPI NTLM Type 1 tests failing on Windows build 26300
 
 ## Goal
 
