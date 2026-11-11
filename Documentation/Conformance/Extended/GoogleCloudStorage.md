@@ -27,3 +27,7 @@ locator naming the XML API reference page.
 | GoogleCloudStorage:XMLAPI-OAuth2-1 | REQUIRED | OAuth 2.0 authentication sends `Authorization: Bearer <access token>`. | GcsXmlApiObjectCases.Download_OAuth2Bearer_SendsTheAccessToken |
 | GoogleCloudStorage:XMLAPI-Anonymous-1 | REQUIRED | A request without credentials carries no `Authorization` header; a private bucket refuses it with `401`. | GcsXmlApiObjectCases.Download_NoCredentials_SendsNoAuthorizationAndIsRefusedByAPrivateBucket |
 | GoogleCloudStorage:XMLAPI-Emulator-1 | SHOULD | `STORAGE_EMULATOR_HOST` replaces the endpoint, as Google's client libraries read it. | GcsXmlApiObjectCases.Download_StorageEmulatorHost_SendsTheRequestToTheEmulator |
+
+## Request methods
+
+`gs://` sends only the methods its operations need: GET to download or list, and with `-T` PUT. `-X GET` without `-T` and `-X PUT` with it are accepted, since they name what is sent anyway. `-I`/`--head` and every other `-X` (`DELETE`, `HEAD`, `POST`, ...) fail with exit 4 and `gs:// does not support ...` before any connection, so a destructive method is never reported done while a GET was sent instead (ADR-1249, `GcsRequestMethodTests`).

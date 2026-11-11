@@ -22,6 +22,11 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (GcsRequestMethod.RefusalOf(context) is { } refusal)
+        {
+            return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
+        }
+
         string? emulatorHost = environment("STORAGE_EMULATOR_HOST");
         if (GcsEndpoint.For(emulatorHost) is not { } endpoint)
         {
