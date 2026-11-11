@@ -33,3 +33,4 @@ Split from BL-4899 (over its cost cap). BL-4899 had no stash; its earlier work i
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: baa581aa 08c4e9f8 8c49f348.
