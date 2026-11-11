@@ -24,12 +24,15 @@ Run by hand on the main checkout (`Measure-CodeQuality.ps1 -Library Curl.Origina
 
 ## Acceptance criteria
 
-- [ ] When the measure writes no report, the lane saves its whole output to a file in the shift's log folder (e.g. `<repo>.logs\quality-<id>-<stamp>.txt`) and the trace names that file.
-- [ ] The cause of the failures is found from that output or a reproduction, named in Notes, and fixed, or filed as its own task if it lies outside these files.
-- [ ] `RunDarkFactory.ps1 -TestIntegrateLock` passes, with a case for a measure that writes no report.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] When the measure writes no report, the lane saves its whole output to a file in the shift's log folder (e.g. `<repo>.logs\quality-<id>-<stamp>.txt`) and the trace names that file.
+- [x] The cause of the failures is found from that output or a reproduction, named in Notes, and fixed, or filed as its own task if it lies outside these files.
+- [x] `RunDarkFactory.ps1 -TestIntegrateLock` passes, with a case for a measure that writes no report.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: `Write-Trace` cuts every line at 118 characters and `Test-QualityGates` took the last 5 output lines. A `throw` in Measure-CodeQuality.ps1 (e.g. "dotnet build/test failed with exit code N") prints its message first and the `At ...:line char` and `+ ~~~~` pointer lines after, so the traced 60 characters were always the pointer, never the message. The failures are the script's own build or test failures (a lane building while others build, or the SDK missing before 09:20); the full message is now kept, and no change to Measure-CodeQuality.ps1 is needed.
+- Fix: on no report the whole output is saved to `<repo>.logsquality-<id>-<stamp>.txt`; the trace names the file (leaf name first, so the cap keeps it) and shows the last non-pointer line. `-TestIntegrateLock` has a case for it and passes. Only PowerShell changed, so no C# build or test was affected.
 
 ## Log
 
