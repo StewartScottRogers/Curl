@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapSicilyBind.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapSicilyBindTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4966 — Add the LDAP NTLM (sicily) bind request
 
@@ -36,3 +36,4 @@ Notes: LdapSicilyBind.NegotiateRequest validates the NTLMSSP type 1 header and d
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: ba49ea96 5baa8242 8c49f348.
+- 2026-11-11: Doing -> Done. LdapSicilyBind builds the NTLM sicily negotiate bind, byte-pinned, no password
