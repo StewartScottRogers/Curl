@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Redis.UnitLibrary/Client/RedisProtocolHandler.cs, Curl.Extended.Protocol.Redis.UnitTests/Client/RedisUploadTests.cs, Documentation/Conformance/Extended/Redis.md]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4953 — Make -T publish the file on redis:// instead of receiving
 
@@ -36,3 +36,4 @@ Stand-ins in PowerShell or C#, never Python.
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: d36b96e6 0308d30f a0b49a29.
+- 2026-11-11: Doing -> Done. -T on redis:// sends the file as the last argument; tests, docs and quality green
