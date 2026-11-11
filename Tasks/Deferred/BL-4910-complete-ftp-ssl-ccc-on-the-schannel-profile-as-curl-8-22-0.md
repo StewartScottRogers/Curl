@@ -43,3 +43,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: a2cbc8ec eebf7ab8 7f05f209 a0b49a29.
 - 2026-11-11: Doing -> Blocked. Stewart: real curl 8.22.0 Schannel (System32 and Git) exits 81 on --ftp-ssl-ccc in both modes (ADR-1241), contradicting the review's exit 0; close STD-007 as not reproducible, or name a server stack that reproduces it?
+- 2026-11-11: Blocked -> Deferred. Decided by Claude under Stewart's delegation: real curl 8.22.0 Schannel (System32 and Git) exits 81 on --ftp-ssl-ccc in both modes (ADR-1241), so Curl already matches the platform curl; the review's exit 0 did not reproduce. Look again only if a later review names a server stack where 8.22.0 completes CCC.
