@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/QuicDialer.cs, Curl.Networking.UnitTests/QuicDialerExitCodeWordsTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4914 — Map every TLS failure on the QUIC path to its exit code instead of a KeyNotFoundException
 
@@ -41,3 +41,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: ebf5b8e0 e6aa0a09 a0b49a29.
+- 2026-11-11: Doing -> Done. QUIC path maps exit 90 and every TLS exit to curl's words; unknown exits fall back safely.
