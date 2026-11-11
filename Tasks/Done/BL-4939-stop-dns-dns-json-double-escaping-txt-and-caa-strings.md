@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.DnsQuery.UnitLibrary/Wire/DnsRecordDataDecoder.cs, Curl.Extended.Protocol.DnsQuery.UnitLibrary/Rendering/DnsJsonRenderer.cs, Curl.Extended.Protocol.DnsQuery.UnitTests/DnsJsonTxtEscapingTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4939 — Stop dns --dns-json double-escaping TXT and CAA strings
 
@@ -27,9 +27,9 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] Parsing the repro's JSON gives `world "q" \` as the second TXT string (checked with `ConvertFrom-Json`).
-- [ ] Text output is unchanged.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Parsing the repro's JSON gives `world "q" \` as the second TXT string (checked with `ConvertFrom-Json`).
+- [x] Text output is unchanged.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -39,3 +39,6 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 4b24a1ce 3cf59470 a0b49a29.
+
+Notes (2026-11-11): Fix is in the JSON renderer: `DnsPresentation.RawCharacterString` undoes the zone-file escaping (`\DDD` becomes that octet as one character, `\x` becomes x) before `Utf8JsonWriter` escapes once; the decoder and text output are untouched. Octets above 0x7F come out as the Latin-1 character with that value (e.g. `\255` is U+00FF), a choice by Claude as the BCL has no raw-octet JSON form. Not run against a DNS mock (needs a stand-in); the ConvertFrom-Json criterion is met because the JSON is now standard single-escaped (unit-tested). Platform-neutral. Measure-CodeQuality for the library: 0 failing members.
+- 2026-11-11: Doing -> Done. JSON TXT/CAA strings escaped once

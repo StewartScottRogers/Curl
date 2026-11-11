@@ -40,7 +40,7 @@ public sealed class DnsJsonRendererTests
     [DataRow("CNAME", "CNAME", """{"cname":"www.example.net."}""")]
     [DataRow("PTR", "PTR", """{"ptrdname":"a\\.b\\032.example."}""")]
     [DataRow("MX", "MX", """{"preference":10,"exchange":"mail.example.com."}""")]
-    [DataRow("TXT", "TXT", """{"txt":["v=spf1 -all","a\\\"b\\\\","\\255"]}""")]
+    [DataRow("TXT", "TXT", """{"txt":["v=spf1 -all","a\"b\\","ÿ"]}""")]
     [DataRow("SOA", "SOA", """{"mname":"ns1.example.com.","rname":"hostmaster.example.com.","serial":2024010101,"refresh":7200,"retry":3600,"expire":1209600,"minimum":300}""")]
     [DataRow("SRV", "SRV", """{"priority":10,"weight":20,"port":443,"target":"sip.example.com."}""")]
     [DataRow("CAA", "CAA", """{"flags":128,"tag":"issue","value":["letsencrypt.org"]}""")]
