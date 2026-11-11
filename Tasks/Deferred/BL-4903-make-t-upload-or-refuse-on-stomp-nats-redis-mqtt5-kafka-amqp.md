@@ -35,7 +35,10 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
+2026-11-11 (lane 10): split per scheme at claim time, as Context asks, before any code: BL-4951 nats, BL-4952 stomp, BL-4953 redis, BL-4954 mqtt5 (TCP and WebSocket handlers), BL-4955 kafka, BL-4956 amqp (Amqp0), BL-4957 xmpp. Each carries its scheme's share of all three criteria. They touch disjoint libraries, so none depends on another. No task outside Done named BL-4903 in its depends-on.
+
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: b4cfa0fa 6e5cc0f2 a0b49a29.
+- 2026-11-11: Doing -> Deferred. Split into BL-4951, BL-4952, BL-4953, BL-4954, BL-4955, BL-4956, BL-4957
