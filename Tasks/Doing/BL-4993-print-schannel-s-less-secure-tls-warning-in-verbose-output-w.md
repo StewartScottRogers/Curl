@@ -29,3 +29,4 @@ Measured in BL-4992 (ADR-1250): curl 8.22.0 Schannel prints, right after `schann
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 60a8d34c.
