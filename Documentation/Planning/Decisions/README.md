@@ -1293,3 +1293,4 @@ Each option and the specific reason it lost.
 | [1244](ADR-1244-storage-schemes-show-request-and-response-heads.md) | The s3, gs, az and oci schemes show request and response heads under -v, -i and -D (BL-4916) | Accepted | 2026-11-11 |
 | [1245](ADR-1245-schannel-algorithm-list-filters-the-offered-suites.md) | A Schannel --ciphers algorithm list filters the offered suites (BL-4911) | Accepted | 2026-11-11 |
 | [1246](ADR-1246-winldap-bind-kind-follows-the-auth-mask.md) | The WinLDAP bind kind follows the auth mask: a simple bind only with `-u` and Basic, else Negotiate, NTLM or Digest in that order, else the logged-on user, as curl 8.22.0 Schannel's `ldap_win_bind` does (BL-4965) | Accepted | 2026-11-11 |
+| [1246](ADR-1246-oci-refuses-credentials-for-a-plain-http-token-realm.md) | oci:// refuses to send -u credentials to a plain http token realm (BL-4901) | Accepted | 2026-11-11 |
