@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Imap.UnitLibrary/ImapSession.cs, Curl.Original.Protocol.Imap.UnitTests/ImapHeadLogoutTests.cs, Curl.Original.Protocol.Imap.UnitTests/Fakes/ScriptedConnection.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4935 — Send IMAP LOGOUT after -I on a message download even when the reply is fully buffered
 
@@ -41,3 +41,4 @@ Decision (Claude): measured curl 8.22.0 against a loopback PowerShell mock: LOGO
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 4cabf188 a0b49a29.
 - 2026-11-11: Done; build clean, Imap tests and quality run green.
+- 2026-11-11: Doing -> Done. LOGOUT now sent after -I while the server is open
