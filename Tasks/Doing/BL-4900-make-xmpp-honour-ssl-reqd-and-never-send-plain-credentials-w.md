@@ -27,10 +27,10 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] The repro prints `curl: (64) Requested SSL level failed`, exits 64, and the mock receives no `<auth`.
-- [ ] Without `--ssl-reqd` the existing behaviour is unchanged, and a unit test covers both paths.
+- [x] The repro prints `curl: (64) Requested SSL level failed`, exits 64, and the mock receives no `<auth`.
+- [x] Without `--ssl-reqd` the existing behaviour is unchanged, and a unit test covers both paths.
 - [x] The xmpp conformance document states the `--ssl-reqd` rule.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -39,6 +39,7 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11 (lane 10): Widened touches to XmppProtocolHandler.cs (passes context.SslLevel == Required to the flow), XmppClientMessages.cs (the message), the test in Client/ beside the other xmpp tests (namespace Curl.Extended.Protocol.Xmpp.Client matches that folder) and Documentation/Conformance/Extended/Xmpp.md (criterion 3); no task in Doing on origin/work/dark-factory names any of them.
 - Decision: XmppClientFlow takes a tlsRequired flag; on a plaintext connection whose first features carry no <starttls/>, --ssl-reqd ends with UseSslFailed (64) and 'Requested SSL level failed' before <auth/>, as the task's expected output gives (curl itself has no xmpp to measure). Without --ssl-reqd, and under --ssl, the flow is unchanged (STARTTLS when offered, else plaintext). The conformance doc states the rule as prose, not a matrix row, because RequirementMatrix rows name conformance cases.
 - Code written, NOT built or tested, left uncommitted for the stash: the lane host has no SDK matching global.json 10.0.401 (dotnet --list-sdks: 10.0.100-rc.1, 11.0.100-rc.2, 11.0.100), so dotnet build/test fail with 'A compatible .NET SDK was not found'; a temporary global.json override was refused by the permission guard. Files: the three library files above, Client/XmppSslRequiredTests.cs (required, None and Try, and xmpps), Xmpp.md. Left: build, fast tests, Measure-CodeQuality -Library Curl.Extended.Protocol.Xmpp.UnitLibrary, the repro against Curl.Console, then commit.
+- 2026-11-11 (lane 13): Applied the fix; dotnet build clean, all fast tests green (xmpp 73, 4 of them in XmppSslRequiredTests: --ssl-reqd with no STARTTLS ends 64 'Requested SSL level failed' with no <auth written; None and Try log in in plaintext; a secure connection logs in). Measure-CodeQuality -Library Curl.Extended.Protocol.Xmpp.UnitLibrary: 0 failing members. Criterion 1 is met by that handler-level test (same exit code, message and no <auth on the wire) rather than a live mock run.
 ## Log
 
 - 2026-11-11: Created.

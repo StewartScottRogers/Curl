@@ -76,7 +76,7 @@ internal sealed class XmppProtocolHandler(IConnector connector, ITlsProvider tls
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            var flow = new XmppClientFlow(connection, tlsProvider, context.Url.Host, context.Output, context.Progress, createClientNonce, context.CancellationToken);
+            var flow = new XmppClientFlow(connection, tlsProvider, context.Url.Host, context.Output, context.Progress, createClientNonce, context.SslLevel == TransportSecurityLevel.Required, context.CancellationToken);
             TransferResult result = await RunFlowAsync(flow, context, request).ConfigureAwait(false);
             await flow.DisposeAsync().ConfigureAwait(false);
             return result;
