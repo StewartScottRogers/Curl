@@ -207,7 +207,9 @@ internal sealed class MqttPacketReader(IConnection connection, ITransferEvents e
         {
             throw new MqttTransferException(
                 CurlExitCode.RecvError,
-                CurlSocketErrorText.ReceiveFailure(failure) ?? MqttTransferMessages.ReceiveFailed);
+                failure is MissingCloseNotifyException
+                    ? failure.Message
+                    : CurlSocketErrorText.ReceiveFailure(failure) ?? MqttTransferMessages.ReceiveFailed);
         }
     }
 }

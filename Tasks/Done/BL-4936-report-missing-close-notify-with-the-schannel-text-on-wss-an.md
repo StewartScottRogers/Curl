@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ws.UnitLibrary/WsIoFailures.cs, Curl.Original.Protocol.Mqtt.UnitLibrary/MqttTransferMessages.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4936 — Report missing close_notify with the schannel text on wss and mqtts
 
@@ -27,8 +27,8 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] Both repros print `curl: (56) schannel: server closed abruptly (missing close_notify)` and exit 56; a unit test in each library pins it.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Both repros print `curl: (56) schannel: server closed abruptly (missing close_notify)` and exit 56; a unit test in each library pins it.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -38,3 +38,5 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 61abeed2 a0b49a29.
+- 2026-11-11: WsIoFailures.ReceiveFailed and MqttPacketReader now report a MissingCloseNotifyException's own text (as gophers does); a unit test in each library pins it. Fast tests green, Measure-CodeQuality 0 failing. Not measured against a live TLS server; text taken from TlsFailureMessages/gophers.
+- 2026-11-11: Doing -> Done. wss and mqtts report the schannel missing close_notify text

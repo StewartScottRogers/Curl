@@ -197,6 +197,19 @@ public sealed class WsUpgradeResponseReaderTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_MissingCloseNotify_FailsWithTheSchannelText()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("read failure", "MissingCloseNotifyException");
+
+        await AssertFailsOn(
+            diagnostics,
+            new FailingConnection(readFailure: new MissingCloseNotifyException("schannel: server closed abruptly (missing close_notify)")),
+            CurlExitCode.RecvError,
+            "schannel: server closed abruptly (missing close_notify)");
+    }
+
+    [TestMethod]
     public async Task ReadAsync_HeadLongerThanTheFirstBuffer_GrowsTheBuffer()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
