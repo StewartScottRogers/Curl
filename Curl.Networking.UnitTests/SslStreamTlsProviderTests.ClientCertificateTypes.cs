@@ -19,25 +19,25 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     [DataRow("P12")]
     [DataRow("p12")]
-    public async Task AuthenticateAsClientAsync_WithCertTypeP12InTheSchannelBuild_FailsAcquiringTheCredentials(string certificateType)
+    public async Task AuthenticateAsClientAsync_WithCertTypeP12InTheSchannelBuild_PresentsIt(string certificateType)
     {
         var file = WriteCertificateFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12, Passphrase));
         var options = ClientCertificate($"{file}:{Passphrase}") with { CertificateType = certificateType };
 
         var handshake = await HandshakeWithClientCertificateRequestAsync(options, SchannelBuild);
 
-        AssertCredentialsRefused(handshake);
+        AssertPresented(handshake);
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithPassOpeningAProtectedPkcs12InTheSchannelBuild_FailsAcquiringTheCredentials()
+    public async Task AuthenticateAsClientAsync_WithPassOpeningAProtectedPkcs12InTheSchannelBuild_PresentsIt()
     {
         var file = WriteCertificateFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12, Passphrase));
         var options = ClientCertificate(file) with { Passphrase = Passphrase };
 
         var handshake = await HandshakeWithClientCertificateRequestAsync(options, SchannelBuild);
 
-        AssertCredentialsRefused(handshake);
+        AssertPresented(handshake);
     }
 
     [TestMethod]
@@ -94,14 +94,14 @@ public sealed partial class SslStreamTlsProviderTests
     [DataRow("DER")]
     [DataRow("FOO")]
     [DataRow("ENG")]
-    public async Task AuthenticateAsClientAsync_WithAnyKeyTypeInTheSchannelBuild_IgnoresItAndFailsAcquiringTheCredentials(string privateKeyType)
+    public async Task AuthenticateAsClientAsync_WithAnyKeyTypeInTheSchannelBuild_IgnoresItAndPresentsTheCertificate(string privateKeyType)
     {
         var file = WriteCertificateFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12));
         var options = ClientCertificate(file) with { PrivateKeyType = privateKeyType };
 
         var handshake = await HandshakeWithClientCertificateRequestAsync(options, SchannelBuild);
 
-        AssertCredentialsRefused(handshake);
+        AssertPresented(handshake);
     }
 
     [TestMethod]
