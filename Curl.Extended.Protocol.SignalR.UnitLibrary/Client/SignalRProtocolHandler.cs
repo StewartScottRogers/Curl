@@ -67,7 +67,14 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
     {
         byte[]? callRecord = SignalRCall.RecordFor(context.PostData);
         IReadOnlyList<KeyValuePair<string, string>> requestFields = HandshakeHeaderFields.Of(context);
-        var negotiator = new SignalRNegotiator((url, cancellationToken) => OpenAsync(url, context, cancellationToken), requestFields);
+        var negotiator = new SignalRNegotiator(async (url, cancellationToken) =>
+        {
+            IConnection negotiation = await OpenAsync(url, context, cancellationToken).ConfigureAwait(false);
+
+            // Past connect: curl sends the negotiate POST as the transfer's request, so -m during it is "Operation timed out".
+            context.Progress.ReportTransferStarted();
+            return negotiation;
+        }, requestFields);
         NegotiatedWebSocketEndpoint endpoint = await negotiator.NegotiateAsync(EndpointUrlOf(context.Url), context.CancellationToken);
         await using IConnection connection = await OpenAsync(endpoint.WebSocketUrl, context, context.CancellationToken);
         SignalRWebSocketSession session = await SignalRWebSocketUpgrade.UpgradeAsync(
