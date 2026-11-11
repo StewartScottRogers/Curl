@@ -15,7 +15,7 @@ namespace Curl.Original.Protocol.Ldap;
 /// sent after the BindResponse, and stdout byte for byte (one <see cref="char" /> per byte);
 /// <c>size_download</c> was the length of stdout every time. The values holding tab, line feed,
 /// vertical tab, form feed or carriage return (print and ws rows), which those builds wrote as
-/// they were, are expected in base64 since curl 8.22.0 writes them so (BL-4913, ADR-1238).
+/// they were, are expected in base64 since curl 8.22.0 writes them so (BL-4913, ADR-1242).
 /// </content>
 public sealed partial class LdapProtocolHandlerTests
 {

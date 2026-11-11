@@ -1,4 +1,4 @@
-# ADR-1238 — LDAP values follow curl 8.22.0's base64 rule
+# ADR-1242 — LDAP values follow curl 8.22.0's base64 rule
 
 - Status: Accepted
 - Date: 2026-11-11

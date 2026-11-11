@@ -5,7 +5,7 @@ namespace Curl.Original.Protocol.Ldap;
 
 /// <summary>
 /// Pins curl 8.22.0's <c>ldap_value_needs_base64</c> rule as BL-4913 measured it with the
-/// WinLDAP build (ADR-1238): a value starting with a blank, a colon or a less-than sign,
+/// WinLDAP build (ADR-1242): a value starting with a blank, a colon or a less-than sign,
 /// ending with a blank, or holding any byte outside printable ASCII - tab, line feed and
 /// carriage return included - is written in base64 after <c>::</c>.
 /// </summary>

@@ -12,7 +12,7 @@ namespace Curl.Original.Protocol.Ldap;
 /// Both builds write a <c>DN:</c> line, then for each attribute one tab-indented line per
 /// value and a blank line after the attribute. A value is written in base64 after <c>::</c>
 /// when the attribute name is longer than <c>;binary</c> and ends with it in any case, or when
-/// the value needs it as curl 8.22.0's <c>ldap_value_needs_base64</c> decides (ADR-1238,
+/// the value needs it as curl 8.22.0's <c>ldap_value_needs_base64</c> decides (ADR-1242,
 /// measured by BL-4913): it starts with a space, a tab, a colon or a less-than sign, ends with
 /// a space or a tab, or holds a byte that is not printable ASCII (tab, line feed and carriage
 /// return included). An empty value, and any other, is written as it is.
