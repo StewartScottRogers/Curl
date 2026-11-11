@@ -34,3 +34,4 @@ Run by hand on the main checkout (`Measure-CodeQuality.ps1 -Library Curl.Origina
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 446f37f3 cdbc8f7d 17ab7173 a0b49a29.
