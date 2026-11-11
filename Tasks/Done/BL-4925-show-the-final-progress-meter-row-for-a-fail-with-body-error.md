@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/CurlCommandRunnerProgressMeterTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4925 — Show the final progress-meter row for a --fail-with-body error response
 
@@ -39,3 +39,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 47aa19f4 a0b49a29.
 - 2026-11-11: Cause was not in the HTTP handler: it already reports the body and transfer done. CurlCommandRunner.FinishTransferProgress finished the meter as a failed transfer (one draw, only after a second), so touches moved to Curl.Console (no other Doing task holds CurlCommandRunner.cs). A result with WriteOutErrorMessage (set only for --fail-with-body's exit 22) now finishes as a done transfer. Measured: the repro prints 3 final rows; unit tests added; Curl.Console quality gate 0 failing; fast tests green.
+- 2026-11-11: Doing -> Done. Final meter row now drawn for --fail-with-body exit 22 (fix in CurlCommandRunner)
