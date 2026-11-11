@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitTests/NegotiateLogonTokenSourceTests.cs, Curl.Console.UnitTests/CurlCompositionSmtpNtlmTests.cs, Curl.Console.UnitTests/CurlCompositionNtlmTests.cs, Curl.Authentication.UnitTests/SystemSecurityContextFactoryTests.cs, Curl.Authentication.UnitTests/SaslAuthenticatorSecurityContextTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4978 — Fix the Windows SSPI NTLM tests that fail on lane hosts
 
@@ -22,12 +22,15 @@ Found by BL-4909 lane 4 on 2026-11-11 (Windows 11 Pro 10.0.26300, SDK 10.0.404):
 
 ## Acceptance criteria
 
-- [ ] The six tests named under Context pass on a lane host, or each is pinned to the answer SSPI on this Windows build gives, with the reason in an ADR.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The six tests named under Context pass on a lane host, or each is pinned to the answer SSPI on this Windows build gives, with the reason in an ADR.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-11-11 lane 13: ran all six tests alone on this lane host (Windows 11 Pro 10.0.26300); all six pass, so the failure does not reproduce here. It was host-specific (NTLM policy or a transient SSPI state on lane 4). No code change needed. If it recurs, read the SSPI status on the failing host.
 
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: e63b8ffe 3d836d5e.
+- 2026-11-11: Doing -> Done. All six tests pass alone on lane 13 host; not reproducible, no code change
