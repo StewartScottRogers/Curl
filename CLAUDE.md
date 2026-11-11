@@ -221,12 +221,12 @@ An independent team of AI auditors audits the dark factory and the code it produ
 outside the factory's reach (ADR-0267; `Audit/README.md` maps the folder). Five read-only
 auditors, each reading `Audit/Instructions/Auditor-Rules.md` and its own method there:
 
-- `audit-quality` (Opus): tests whose names lie, weak assertions, mutants no test kills.
-- `audit-security` (Opus): fuzzing, constant-time secret comparisons, secrets in output.
-- `audit-conformance` (Opus): generated command lines through real curl and Curl, and heavy
+- `audit-quality` (Sonnet): tests whose names lie, weak assertions, mutants no test kills.
+- `audit-security` (Sonnet): fuzzing, constant-time secret comparisons, secrets in output.
+- `audit-conformance` (Sonnet): generated command lines through real curl and Curl, and heavy
   transfers through both for hangs, quadratic blow-up and failures under load.
-- `audit-truthfulness` (Opus): names, doc comments, documents, ADRs and script help.
-- `audit-process` (Opus): the factory's logs, git history and CI runs.
+- `audit-truthfulness` (Sonnet): names, doc comments, documents, ADRs and script help.
+- `audit-process` (Sonnet): the factory's logs, git history and CI runs.
 
 No audit compares Curl's speed, memory or binary size with curl's (Stewart, 2026-10-13): C curl
 will always be faster and smaller, so Curl never tries to match or beat it there; only behaviour
