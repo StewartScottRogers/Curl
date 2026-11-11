@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Kafka.UnitLibrary/Client/KafkaProtocolHandler.cs, Curl.Extended.Protocol.Kafka.UnitTests/KafkaUploadTests.cs, Documentation/Conformance/Extended/Kafka.md]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4955 — Make -T publish the file on kafka:// instead of receiving
 
@@ -34,3 +34,4 @@ Stand-ins in PowerShell or C#, never Python.
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: c6edaed3 16d86d3a a0b49a29.
+- 2026-11-11: Doing -> Done. Kafka upload publishes the file; test and docs added
