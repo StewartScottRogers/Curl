@@ -115,7 +115,7 @@
          value is ignored with a "model" trace warning and the rule below applies.
       3. Otherwise opus when the task's Log shows an earlier claim that came back ("Doing ->
          Backlog" or "Doing -> Blocked": a requeue, a park, a hand-back or a failed run), and
-         sonnet for every first run, whatever its pipeline, library or priority (BL-4951,
+         sonnet for every first run, whatever its pipeline, library or priority (BL-4958,
          ADR-1239: opus only where sonnet had trouble). The rule never picks haiku.
     The resolver's, overtime and resumed runs use their task's model; the --max-turns 1
     probes use sonnet under auto. The claim and end trace lines say "[model <m>: <why>]",
