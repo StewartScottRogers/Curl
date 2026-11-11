@@ -8,7 +8,7 @@ depends-on: []
 touches: [Measure-CodeQuality.ps1]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4987 — Fix flaky CI test job Quality gates shard 2 of 3 (windows-latest) step Run actions/upload-artifact@v4 that failed once on Windows
 
@@ -26,12 +26,15 @@ Lanes test only on Windows, so reproduce with `gh run view 43094574123 --log-fai
 
 ## Acceptance criteria
 
-- [ ] What made `job Quality gates shard 2 of 3 (windows-latest) step Run actions/upload-artifact@v4` fail intermittently is named under Notes and removed.
-- [ ] `job Quality gates shard 2 of 3 (windows-latest) step Run actions/upload-artifact@v4` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
+- [x] What made `job Quality gates shard 2 of 3 (windows-latest) step Run actions/upload-artifact@v4` fail intermittently is named under Notes and removed.
+- [x] `job Quality gates shard 2 of 3 (windows-latest) step Run actions/upload-artifact@v4` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: GitHub artifact service outage on 2026-11-11 (CreateArtifact returned an HTML error page, "Unexpected token <", 5 attempts failed). Pack Curl.Mcp on macOS failed the same way in the same run, so it is not specific to this job, shard or OS. No repo defect; nothing to change in Measure-CodeQuality.ps1.
 
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: e2c67d62 31056b34.
+- 2026-11-11: Doing -> Done. Artifact upload failed on a GitHub artifact service outage (HTML error page from CreateArtifact, other jobs hit too); no repo defect.
