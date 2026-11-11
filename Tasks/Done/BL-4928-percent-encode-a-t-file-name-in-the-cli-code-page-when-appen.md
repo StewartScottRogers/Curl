@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/UploadUrl.cs, Curl.Cli.UnitTests/UploadUrlCodePageTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4928 — Percent-encode a -T file name in the CLI code page when appending it to the URL
 
@@ -41,3 +41,4 @@ Notes: -T base name is encoded in the Windows ANSI code page (UTF-8 elsewhere) i
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 5905ddb4 17652dbc a0b49a29.
+- 2026-11-11: Doing -> Done. -T base name now percent-encoded in the ANSI code page on Windows, UTF-8 elsewhere
