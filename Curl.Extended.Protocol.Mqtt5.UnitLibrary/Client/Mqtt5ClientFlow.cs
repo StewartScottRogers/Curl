@@ -66,6 +66,7 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
         Mqtt5Packet publishOrSubscribe = BuildPublishOrSubscribe(topic, payload);
         await channel.SendAsync(connect).ConfigureAwait(false);
         var connAck = (Mqtt5ConnAck)await ReceiveAsync(Mqtt5PacketType.ConnAck).ConfigureAwait(false);
+        ThrowIfLoginRefused(connAck.ReasonCode);
         ThrowIfFailure("CONNACK", connAck.ReasonCode);
         ThrowIfSessionPresent(connAck);
         ThrowIfOverMaximumPacketSize(publishOrSubscribe, connAck);
@@ -128,6 +129,15 @@ internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITra
         if (connAck.SessionPresent)
         {
             throw new Mqtt5ClientException(CurlExitCode.WeirdServerReply, Mqtt5ClientMessages.SessionPresentOnCleanStart);
+        }
+    }
+
+    /// <summary>Ends the transfer with exit 67 when a CONNACK refuses the login with 0x86 or 0x87 (ADR-1251, superseding ADR-1049 for these two).</summary>
+    private static void ThrowIfLoginRefused(Mqtt5ReasonCode reasonCode)
+    {
+        if (reasonCode is Mqtt5ReasonCode.BadUserNameOrPassword or Mqtt5ReasonCode.NotAuthorized)
+        {
+            throw new Mqtt5ClientException(CurlExitCode.LoginDenied, Mqtt5ClientMessages.Refused("CONNACK", reasonCode));
         }
     }
 

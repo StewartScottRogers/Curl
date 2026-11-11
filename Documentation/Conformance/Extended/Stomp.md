@@ -31,7 +31,7 @@ client relies on) that binds a client is a row; statements that bind only a serv
 | Stomp:STOMP12-Connect-5 | MUST | The client sends no further frame until the server answers CONNECT with CONNECTED. | StompConnectCases.Publish_ErrorAtConnect_FailsWithItsMessageAndSendsNothingMore |
 | Stomp:STOMP12-Connect-6 | MAY | A client may send STOMP in place of CONNECT. | n/a: curl sends CONNECT, which every 1.2 server accepts |
 | Stomp:STOMP12-Negotiation-1 | MUST | CONNECTED's `version` is the version the session speaks, 1.0 when absent; curl speaks only 1.2 and fails otherwise. | StompConnectCases.Subscribe_ServerChoosesVersion11_FailsBeforeSubscribing |
-| Stomp:STOMP12-Negotiation-2 | MUST | A server sharing no version with the client answers ERROR and closes; the client fails. | StompConnectCases.Publish_ErrorAtConnect_FailsWithItsMessageAndSendsNothingMore |
+| Stomp:STOMP12-Negotiation-2 | MUST | A server sharing no version with the client answers ERROR and closes; the client fails with exit 67, a refused login (ADR-1251). | StompConnectCases.Publish_ErrorAtConnect_FailsWithItsMessageAndSendsNothingMore |
 | Stomp:STOMP12-HeartBeat-1 | MUST | A side that agreed to send heart-beats sends an EOL when it has no frame to send. | n/a: curl offers `0,0`, so no heart-beating is agreed |
 | Stomp:STOMP12-HeartBeat-2 | MAY | A side that agreed to receive heart-beats may treat a silent connection as dead. | n/a: curl offers `0,0`; `-m` bounds the transfer instead |
 | Stomp:STOMP12-Send-1 | REQUIRED | SEND carries `destination`. | StompConnectCases.Publish_NoCredentials_SendsConnectSendAndDisconnectAndEndsOnTheReceipt |

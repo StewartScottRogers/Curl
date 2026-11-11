@@ -11,7 +11,7 @@ wait. TLS schemes run with `-k` against a fresh self-signed certificate. IDs are
 `mqtt5` (port 1883), `mqtt5s` (TLS on port 8883) and `mqtt5+ws` (WebSocket upgrade to `/mqtt` on port 80, ADR-1054)
 subscribe to `t` (`mqtt5://localhost/t`) on the MQTT 5 reference broker, which answers SUBSCRIBE with a SUBACK granting
 QoS 0, a PUBLISH of `hello` (5 bytes, written as received) and a DISCONNECT, or with a SUBACK refusing the filter with
-reason code 0x80. Mqtt5 maps no server error to exit 22: ADR-1049 makes a refusing reason code exit 8 whatever `--fail`
+reason code 0x80. Mqtt5 maps no server error to exit 22: ADR-1049 makes a refusing reason code exit 8, except CONNACK 0x86 and 0x87, a refused login, which exit 67 (ADR-1251), whatever `--fail`
 says. curl 8.22.0 has no `mqtt5` scheme, so the `-v` connection line is the one every transfer writes, as for `xmpp`.
 
 | ID | Level | Requirement | Covered by |

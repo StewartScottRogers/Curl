@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.Stomp.UnitLibrary, Curl.Extended.Protocol.Mqtt5.UnitLibrary]
+touches: [Curl.Extended.Protocol.Stomp.UnitLibrary, Curl.Extended.Protocol.Mqtt5.UnitLibrary, Curl.Extended.Protocol.Stomp.UnitTests, Curl.Extended.Protocol.Mqtt5.UnitTests, Curl.Conformance.Extended.UnitTests, Documentation]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4941 — Exit 67 for a refused STOMP or MQTT 5 login like every other scheme
 
@@ -27,9 +27,9 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] Both repros exit 67.
-- [ ] An ADR supersedes ADR-1059 and ADR-1049, and both conformance documents state exit 67.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Both repros exit 67.
+- [x] An ADR supersedes ADR-1059 and ADR-1049, and both conformance documents state exit 67.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -39,3 +39,5 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 9dde202f 78cd8202 a0b49a29.
+- 2026-11-11: Done. ADR-1251 supersedes ADR-1059/ADR-1049 for STOMP ERROR at CONNECT and CONNACK 0x86/0x87 only; other errors stay exit 8. Repros covered by unit tests and the Extended conformance cases (stand-in brokers), not live mocks. Touches widened to the test projects and docs that pinned exit 8. Quality run: 0 failing members.
+- 2026-11-11: Doing -> Done. Refused STOMP and MQTT 5 logins exit 67 (ADR-1251)

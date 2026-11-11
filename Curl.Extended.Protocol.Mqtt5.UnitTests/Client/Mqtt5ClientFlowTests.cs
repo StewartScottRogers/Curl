@@ -8,11 +8,11 @@ namespace Curl.Extended.Protocol.Mqtt5.Client;
 public sealed class Mqtt5ClientFlowTests
 {
     [TestMethod]
-    public async Task RunAsync_ConnAckFailure_EndsWithWeirdServerReplyNamingTheReasonCode()
+    public async Task RunAsync_ConnAckLoginRefused_EndsWithLoginDeniedNamingTheReasonCode()
     {
         Mqtt5ClientException failure = await RunFailingAsync(new ScriptedMqtt5Connection(ConnAck(Mqtt5ReasonCode.NotAuthorized)), "hi");
 
-        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure.ExitCode);
+        Assert.AreEqual(CurlExitCode.LoginDenied, failure.ExitCode);
         Assert.AreEqual("MQTT 5 CONNACK reason code 0x87 NotAuthorized", failure.Message);
     }
 

@@ -108,7 +108,7 @@ public sealed class StompConnectCases
             "hi",
             "stomp://localhost/q");
 
-        StompRun.AssertExit(result, 8, "curl: (8) STOMP server sent ERROR: Supported protocol versions are 1.0\n");
+        StompRun.AssertExit(result, 67, "curl: (67) STOMP server sent ERROR: Supported protocol versions are 1.0\n");
         Assert.AreEqual(StompRun.PlainConnect, StompRun.ClientText(result));
     }
 
