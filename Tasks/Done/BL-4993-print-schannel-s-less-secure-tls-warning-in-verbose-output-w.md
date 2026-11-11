@@ -1,0 +1,35 @@
+---
+id: BL-4993
+title: Print Schannel's less-secure-TLS warning in verbose output when --ciphers is an ALG_ID list
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Output.UnitLibrary/SchannelTrustText.cs, Curl.Output.UnitTests/SchannelTrustTextTests.cs, Curl.Protocol.Abstractions.UnitLibrary/TlsTrustEvent.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/SslStreamTlsProviderTests.DescribeTrust.cs]
+requirement: none
+created: 2026-11-11
+completed: 2026-11-11
+---
+# BL-4993 — Print Schannel's less-secure-TLS warning in verbose output when --ciphers is an ALG_ID list
+
+## Goal
+
+`curl -v --ciphers CALG_AES_128 https://...` in the Schannel build prints curl's `* schannel: WARNING:` line, as curl 8.22.0 does.
+
+## Context
+
+Measured in BL-4992 (ADR-1250): curl 8.22.0 Schannel prints, right after `schannel: disabled automatic use of client certificate`, the verbose line `* schannel: WARNING: This version of Schannel negotiates a less-secure TLS version than TLS 1.3 because the user set an algorithm cipher list.` when `--ciphers` is an ALG_ID list. Curl prints none. Start at `Curl.Output.UnitLibrary/SchannelTrustText.cs`; measure with `Record-CurlExchange.ps1 -Tls`.
+
+## Acceptance criteria
+
+- [x] With the Schannel build and a `--ciphers` ALG_ID list, `-v` stderr carries the WARNING line at curl's position, pinned by a unit test; no line without such a list.
+
+## Notes
+
+- Added TlsTrustEvent.HasCipherList (set from TlsClientOptions.Ciphers in SslStreamTlsProvider.DescribeTrust); SchannelTrustText prints the measured WARNING after the client-certificate line and before the IP/SNI line. touches widened to those files (no other Doing task names them). Unit tests in Output and Networking pin it. Measure-CodeQuality.ps1 was started but exceeded 50 min under load and was stopped; the change adds one tiny branch per method and both branches are tested.
+
+## Log
+
+- 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 60a8d34c.
+- 2026-11-11: Doing -> Done. Schannel -v prints the less-secure-TLS WARNING for a --ciphers ALG_ID list

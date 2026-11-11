@@ -25,6 +25,20 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
+    [DataRow("CALG_AES_128", true)]
+    [DataRow(null, false)]
+    public void DescribeTrust_Ciphers_SaysWhetherAListIsSet(string? ciphers, bool expected)
+    {
+        Diagnostics.Arrange("ciphers", ciphers);
+
+        var trust = SslStreamTlsProvider.DescribeTrust(new TlsClientOptions(Ciphers: ciphers), "localhost");
+
+        Diagnostics.Act("has cipher list", trust.HasCipherList);
+        Diagnostics.Assert("has cipher list", expected, trust.HasCipherList);
+        Assert.AreEqual(expected, trust.HasCipherList);
+    }
+
+    [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
     public void DescribeTrust_CaCertificateBlob_SaysWhetherOneIsSet(bool hasBlob)

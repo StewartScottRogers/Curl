@@ -67,4 +67,11 @@ public sealed record TlsTrustEvent
     /// <c>schannel: reusing existing credential handle</c> (CGR-290).
     /// </summary>
     public bool ReusesCredentialHandle { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>--ciphers</c> gave a list, which in curl's Schannel
+    /// build is an ALG_ID list and makes it print its <c>schannel: WARNING:</c> line that the
+    /// version negotiated is less secure than TLS 1.3 (BL-4993).
+    /// </summary>
+    public bool HasCipherList { get; init; }
 }
