@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console/TransferEventOutput.cs, Curl.Console.UnitTests/TraceAndBodyOrderTests.cs]
+touches: [Curl.Console/TransferEventOutput.cs, Curl.Console.UnitTests/TraceAndBodyOrderTests.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, Curl.Original.Protocol.Http.UnitTests/HttpResponseBodyReaderTraceOrderTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4924 — Write the trace entry for received data before the body when both share stdout
 
@@ -27,9 +27,9 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] `curl -s --trace-ascii - http://127.0.0.1:18100/a | tail -3` prints `0000: hello /a.`, `hello /a`, `* Connection #0 to host 127.0.0.1:18100 left intact`.
-- [ ] With `-v --stderr -`, `{ [9 bytes data]` precedes `hello /a`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `curl -s --trace-ascii - http://127.0.0.1:18100/a | tail -3` prints `0000: hello /a.`, `hello /a`, `* Connection #0 to host 127.0.0.1:18100 left intact`.
+- [x] With `-v --stderr -`, `{ [9 bytes data]` precedes `hello /a`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -39,3 +39,8 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 37edc817 39ab3378 a0b49a29.
+
+## Notes
+
+- Cause was not the console: `HttpResponseBodyReader.WriteReadAsync` wrote a read, then reported its data pieces. It now reports the first piece (the whole body up to 16 KiB) before the write; later pieces of a larger read still follow the write (a single write is kept for file output, AF-0144). Added `touches` for the Http library; no other Doing task names it. Test: `HttpResponseBodyReaderTraceOrderTests`. Http and Console fast tests green; quality run clean for the Http library. Real curl order taken from the task's measurement.
+- 2026-11-11: Doing -> Done. Data event now reported before the body write
