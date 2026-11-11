@@ -136,6 +136,29 @@ public sealed class CurlCommandRunnerAltSvcTests
         Assert.AreEqual(new AltSvcRoute("h1", new AltSvcAlternative("h2", "localhost", 18444)), server.Targets.Single().AltSvcRoute);
     }
 
+    /// <summary>
+    /// A followed redirect asks the alt-svc cache again for its hop, on every platform: the hop to another
+    /// origin finds no entry and connects to the host the redirect names (BL-4969).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RedirectWithAnAltSvcCache_ConnectsToTheRedirectedHostWithNoRoute()
+    {
+        CacheFileHolds(H1AlternativeEntry);
+        ScriptedConnector server = new(
+        [
+            Encoding.Latin1.GetBytes("HTTP/1.1 302 Found\r\nLocation: https://other.example:18445/\r\nContent-Length: 0\r\n\r\n"),
+            Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi"),
+        ]);
+
+        int exitCode = await RunAsync(server, ["-sS", "-L", "--http1.1", "--alt-svc", CacheFile, Origin]);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.AreEqual("hi", Encoding.Latin1.GetString(standardOutput.ToArray()));
+        Assert.AreEqual("other.example", server.Targets.Last().Host);
+        Assert.IsNull(server.Targets.Last().AltSvcRoute);
+    }
+
     [TestMethod]
     public async Task RunAsync_ExpiredEntry_IsNotUsedAndIsDroppedFromTheFile()
     {

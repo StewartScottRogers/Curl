@@ -80,9 +80,12 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
 
     private readonly bool usesOverHttp;
 
-    private AltSvcTransferCache(AltSvcCache cache, string file, HttpVersion requestedVersion, IReadOnlyList<string> connectToEntries, bool usesOverHttp)
+    private readonly bool isWindows;
+
+    private AltSvcTransferCache(AltSvcCache cache, string file, HttpVersion requestedVersion, IReadOnlyList<string> connectToEntries, bool usesOverHttp, bool isWindows)
     {
         this.usesOverHttp = usesOverHttp;
+        this.isWindows = isWindows;
         this.cache = cache;
         this.file = file;
         this.requestedVersion = requestedVersion;
@@ -110,6 +113,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// up as an <c>https</c> one does: the harness's stand-in for curl's debug build under
     /// <c>CURL_ALTSVC_HTTP</c> (ADR-0497, BL-2263); off by default, as in curl's release build.
     /// </param>
+    /// <param name="onWindows">Whether to look alternatives up as the Windows build does; <see langword="null" /> asks the running system (tests pin either).</param>
     /// <returns>The cache.</returns>
     internal static async Task<AltSvcTransferCache> OpenAsync(
         EasyHttpOptions http,
@@ -117,7 +121,8 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
         IFileSystem fileSystem,
         TimeProvider clock,
         IDiagnosticLog? diagnosticLog = null,
-        bool usesOverHttp = false)
+        bool usesOverHttp = false,
+        bool? onWindows = null)
     {
         string file = http.AltSvc ?? string.Empty;
         HttpVersion requestedVersion = http.HttpVersion;
@@ -127,7 +132,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
             cache.ReadFile(await ReadTextAsync(file, fileSystem).ConfigureAwait(false));
         }
 
-        return new AltSvcTransferCache(cache, file, requestedVersion, connectToEntries, usesOverHttp);
+        return new AltSvcTransferCache(cache, file, requestedVersion, connectToEntries, usesOverHttp, onWindows ?? OperatingSystem.IsWindows());
     }
 
     /// <summary>
@@ -243,7 +248,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
             return null;
         }
 
-        (IReadOnlyList<AltSvcAlpn> lookedUpUnder, IReadOnlySet<AltSvcAlpn> allowed) = LookupOf(requestedVersion, OperatingSystem.IsWindows());
+        (IReadOnlyList<AltSvcAlpn> lookedUpUnder, IReadOnlySet<AltSvcAlpn> allowed) = LookupOf(requestedVersion, isWindows);
         return cache.FindForOrigin(lookedUpUnder, url.IdnHost, url.Port, allowed);
     }
 
