@@ -1296,3 +1296,4 @@ Each option and the specific reason it lost.
 | [1247](ADR-1247-oci-refuses-credentials-for-a-plain-http-token-realm.md) | oci:// refuses to send -u credentials to a plain http token realm (BL-4901) | Accepted | 2026-11-11 |
 | [1248](ADR-1248-plugin-refuses-a-url-with-cmd-metacharacters-for-a-batch-helper.md) | A plugin refuses a URL holding cmd.exe metacharacters for a .cmd or .bat helper instead of escaping it (BL-4971) | Accepted | 2026-11-11 |
 | [1249](ADR-1249-storage-schemes-refuse-a-method-they-cannot-send.md) | s3, gs, az and oci refuse -I and a -X they cannot send, with exit 4 before any request (BL-4904) | Accepted | 2026-11-11 |
+| [1250](ADR-1250-schannel-ciphers-measured-against-a-local-tls-12-server.md) | Schannel --ciphers CALG_AES_128 and CALG_RSA_KEYX negotiate the same suites as curl 8.22.0 against a local TLS 1.2 server (BL-4992) | Accepted | 2026-11-11 |

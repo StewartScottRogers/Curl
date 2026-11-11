@@ -14,17 +14,21 @@ completed:
 
 ## Goal
 
-<!-- One sentence: the observable outcome once this task is done. -->
+Measure curl 8.22.0 Schannel and Curl with `--ciphers CALG_AES_128` and `CALG_RSA_KEYX` against a local TLS 1.2 server and record the result.
 
 ## Context
 
-<!-- Why this matters, and where to start: requirement IDs, ADRs, projects, files, upstream curl links with the curl version. -->
+Follow-up of BL-4964 criterion 2 and ADR-1245.
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] Both lists measured against a local TLS 1.2 server for curl 8.22.0 and Curl; result recorded in ADR-1250.
 
 ## Notes
+
+- Measured with a C# file-based `SslStream` stand-in (TLS 1.2, prints the negotiated suite): REF and Curl agree for both lists (ECDHE-RSA-AES128-GCM-SHA256; TLS_RSA_WITH_AES_256_GCM_SHA384), exit 0.
+- The exit 35 case needs a server refusing RSA key exchange, impossible with `SslStream` on Windows; not re-measured (ADR-1250).
+- Found: REF's verbose WARNING line is missing in Curl; filed BL-4993.
 
 ## Log
 
