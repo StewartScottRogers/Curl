@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Xmpp.UnitLibrary/Client/XmppProtocolHandler.cs, Curl.Extended.Protocol.Xmpp.UnitTests/XmppUploadTests.cs, Documentation/Conformance/Extended/Xmpp.md]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4957 — Make -T publish the file on xmpp:// instead of receiving
 
@@ -34,3 +34,4 @@ Stand-ins in PowerShell or C#, never Python.
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 64beef6f fa38bf4d a0b49a29.
+- 2026-11-11: Doing -> Done. Upload flag now publishes the upload stream as the xmpp message body; test and Xmpp.md added; quality run clean
