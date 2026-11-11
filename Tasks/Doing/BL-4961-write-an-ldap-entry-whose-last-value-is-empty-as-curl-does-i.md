@@ -40,3 +40,4 @@ Found by BL-4913 with `Record-CurlExchange.ps1 -Script`: bind success, then entr
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 4207d817 f494e859 3d836d5e.
