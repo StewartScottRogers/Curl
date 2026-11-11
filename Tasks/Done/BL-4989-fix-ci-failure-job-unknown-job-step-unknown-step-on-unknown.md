@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.slnx]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4989 — Fix CI failure job unknown job step unknown step on unknown job
 
@@ -36,3 +36,4 @@ Cause: not a defect in the repository. Run 43094919125 completed as failure with
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 15da4c4d.
+- 2026-11-11: Doing -> Done. Failure was a GitHub Actions outage (no job concluded, no log); nothing in the repository to fix
