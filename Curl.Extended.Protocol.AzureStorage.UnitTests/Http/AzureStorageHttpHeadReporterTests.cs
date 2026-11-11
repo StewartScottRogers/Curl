@@ -1,0 +1,105 @@
+using System.Text;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Extended.Protocol.AzureStorage.Http;
+
+/// <summary>Pins that the request and response heads reach <c>-v</c> and the <c>-i</c> or <c>-D</c> stream.</summary>
+[TestClass]
+public sealed class AzureStorageHttpHeadReporterTests
+{
+    private const string Response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+
+    [TestMethod]
+    public async Task ReportResponseLineAsync_WithHeaderOutput_WritesTheLineWithCrlfToBothPlaces()
+    {
+        var events = new HeadEvents();
+        var headerOutput = new MemoryStream();
+
+        await new AzureStorageHttpHeadReporter(events, headerOutput).ReportResponseLineAsync("HTTP/1.1 200 OK", CancellationToken.None);
+
+        Assert.AreEqual("HTTP/1.1 200 OK\r\n", events.Response.ToString());
+        Assert.AreEqual("HTTP/1.1 200 OK\r\n", Encoding.Latin1.GetString(headerOutput.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ReportResponseLineAsync_WithoutHeaderOutput_ReportsOnlyToEvents()
+    {
+        var events = new HeadEvents();
+
+        await new AzureStorageHttpHeadReporter(events, null).ReportResponseLineAsync("X: y", CancellationToken.None);
+
+        Assert.AreEqual("X: y\r\n", events.Response.ToString());
+    }
+
+    [TestMethod]
+    public void ReportRequestHead_Always_ReportsTheBytes()
+    {
+        var events = new HeadEvents();
+
+        new AzureStorageHttpHeadReporter(events, null).ReportRequestHead("GET / HTTP/1.1\r\n\r\n"u8);
+
+        Assert.AreEqual("GET / HTTP/1.1\r\n\r\n", events.Request.ToString());
+    }
+
+    [TestMethod]
+    public async Task ReportResponseLineAsync_None_ShowsNothing()
+    {
+        AzureStorageHttpHeadReporter.None.ReportRequestHead("x"u8);
+        await AzureStorageHttpHeadReporter.None.ReportResponseLineAsync("x", CancellationToken.None);
+
+        Assert.IsNotNull(AzureStorageHttpHeadReporter.None);
+    }
+
+    [TestMethod]
+    public async Task Exchange_WithReporter_ShowsTheWholeRequestHeadAndEveryResponseLine()
+    {
+        var events = new HeadEvents();
+        var headerOutput = new MemoryStream();
+        var connection = new RecordedConnection(Response);
+        var reporter = new AzureStorageHttpHeadReporter(events, headerOutput);
+        await new AzureStorageHttpClientConnection(connection, reporter).SendAsync(new AzureStorageHttpRequest("GET", "/b/k", [new("Host", "h.example.com")]), CancellationToken.None);
+
+        StringAssert.StartsWith(events.Request.ToString(), "GET /");
+        Assert.AreEqual(Response, events.Response.ToString());
+        Assert.AreEqual(Response, Encoding.Latin1.GetString(headerOutput.ToArray()));
+    }
+
+    private sealed class HeadEvents : ITransferEvents
+    {
+        public StringBuilder Request { get; } = new();
+
+        public StringBuilder Response { get; } = new();
+
+        public void ReportInfo(string text)
+        {
+        }
+
+        public void ReportConnectionOpened(ConnectionOpenedEvent opened)
+        {
+        }
+
+        public void ReportConnectionReused(ConnectionReusedEvent reused)
+        {
+        }
+
+        public void ReportTlsHandshake(TlsHandshakeEvent handshake)
+        {
+        }
+
+        public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent)
+        {
+        }
+
+        public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => Request.Append(Encoding.Latin1.GetString(bytes));
+
+        public void ReportResponseHeader(ReadOnlySpan<byte> bytes) => Response.Append(Encoding.Latin1.GetString(bytes));
+
+        public void ReportDataSent(ReadOnlySpan<byte> bytes)
+        {
+        }
+
+        public void ReportDataReceived(ReadOnlySpan<byte> bytes)
+        {
+        }
+    }
+}

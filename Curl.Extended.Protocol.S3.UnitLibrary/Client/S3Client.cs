@@ -45,7 +45,7 @@ internal sealed class S3Client(IConnector connector, ITransferContext context, S
         // ConfigureAwait gives a struct to dispose, so the compiler adds no null check.
         await using (connection.ConfigureAwait(false))
         {
-            S3HttpResponse response = await new S3HttpClientConnection(connection).SendAsync(request, context.CancellationToken);
+            S3HttpResponse response = await new S3HttpClientConnection(connection, new S3HttpHeadReporter(context.Events, context.HeaderOutput)).SendAsync(request, context.CancellationToken);
             if (response.StatusCode >= 300)
             {
                 throw await FailureOfAsync(response);

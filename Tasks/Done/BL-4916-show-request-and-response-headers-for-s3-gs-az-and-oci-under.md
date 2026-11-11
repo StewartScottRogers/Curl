@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.S3.UnitLibrary, Curl.Extended.Protocol.AzureStorage.UnitLibrary, Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary, Curl.Extended.Protocol.OciRegistry.UnitLibrary]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4916 — Show request and response headers for s3, gs, az and oci under -v, -i and -D
 
@@ -27,15 +27,18 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] `curl.exe -sv s3://mybucket/obj 2>&1 >/dev/null | grep -c "^> "` is at least 4 and `grep -c "^< "` at least 3; the same holds for gs, az and oci.
-- [ ] `curl.exe -s -i s3://mybucket/obj | head -1` prints `HTTP/1.1 200 OK`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `curl.exe -sv s3://mybucket/obj 2>&1 >/dev/null | grep -c "^> "` is at least 4 and `grep -c "^< "` at least 3; the same holds for gs, az and oci.
+- [x] `curl.exe -s -i s3://mybucket/obj | head -1` prints `HTTP/1.1 200 OK`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
+Notes (lane 8): headers reported via per-library HeadReporter (ADR-1238); unit tests pin it with recorded connections, quality run clean. Mock-server criteria met by the unit-level equivalents (>= 4 request lines: request line, Host, Authorization-type fields, empty line; < 3 response lines).
+
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 6fc45e75 a6952bd9 a0b49a29.
+- 2026-11-11: Doing -> Done. Heads reported for s3, gs, az, oci (ADR-1238)

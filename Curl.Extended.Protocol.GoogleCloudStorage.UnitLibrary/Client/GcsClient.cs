@@ -46,7 +46,7 @@ internal sealed class GcsClient(IConnector connector, ITransferContext context, 
         // ConfigureAwait gives a struct to dispose, so the compiler adds no null check.
         await using (connection.ConfigureAwait(false))
         {
-            GcsHttpResponse response = await new GcsHttpClientConnection(connection).SendAsync(request, context.CancellationToken);
+            GcsHttpResponse response = await new GcsHttpClientConnection(connection, new GcsHttpHeadReporter(context.Events, context.HeaderOutput)).SendAsync(request, context.CancellationToken);
             if (response.StatusCode >= 300)
             {
                 throw ErrorOf(response.StatusCode, await ReadErrorBodyAsync(response));

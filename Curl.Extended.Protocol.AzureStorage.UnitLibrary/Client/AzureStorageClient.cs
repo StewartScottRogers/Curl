@@ -58,7 +58,7 @@ internal sealed class AzureStorageClient(IConnector connector, ITransferContext 
         // ConfigureAwait gives a struct to dispose, so the compiler adds no null check.
         await using (connection.ConfigureAwait(false))
         {
-            AzureStorageHttpResponse response = await new AzureStorageHttpClientConnection(connection).SendAsync(request, context.CancellationToken);
+            AzureStorageHttpResponse response = await new AzureStorageHttpClientConnection(connection, new AzureStorageHttpHeadReporter(context.Events, context.HeaderOutput)).SendAsync(request, context.CancellationToken);
             if (response.StatusCode >= 300)
             {
                 string errorBody = await ReadTextAsync(response);

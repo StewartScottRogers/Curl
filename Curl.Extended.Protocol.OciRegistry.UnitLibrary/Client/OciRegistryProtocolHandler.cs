@@ -42,7 +42,7 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
 
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context, OciPullReference reference)
     {
-        var session = new OciRegistrySession(new OciHttpClient(new TransferEventsConnector(connector, context)), context.Credentials);
+        var session = new OciRegistrySession(new OciHttpClient(new TransferEventsConnector(connector, context), new OciHttpHeadReporter(context.Events, context.HeaderOutput)), context.Credentials);
         context.Progress.ReportTransferStarted();
         try
         {
