@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Nats.UnitLibrary/NatsProtocolHandler.cs, Curl.Extended.Protocol.Nats.UnitTests/NatsUploadTests.cs, Documentation/Conformance/Extended/Nats.md]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4951 — Make -T publish the file on nats:// instead of receiving
 
@@ -22,9 +22,9 @@ Split from BL-4903 (outside fitness review 2026-11-11, finding EXT-008). Today t
 
 ## Acceptance criteria
 
-- [ ] `-T up.txt` (holding `filebody`) on nats:// sends `filebody` as the publish payload, or exits 2 before connecting where an upload has no meaning; a unit test in `Curl.Extended.Protocol.Nats.UnitTests` pins it.
-- [ ] `Documentation/Conformance/Extended/Nats.md` states what `-T` does.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `-T up.txt` (holding `filebody`) on nats:// sends `filebody` as the publish payload, or exits 2 before connecting where an upload has no meaning; a unit test in `Curl.Extended.Protocol.Nats.UnitTests` pins it.
+- [x] `Documentation/Conformance/Extended/Nats.md` states what `-T` does.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -34,3 +34,5 @@ Stand-ins in PowerShell or C#, never Python.
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: c59a2cc8 c3a84bef a0b49a29.
+- 2026-11-11: Done. -T publishes the file like -d; -d wins when both given. Build clean, fast tests green, quality 0 failing.
+- 2026-11-11: Doing -> Done. -T publishes the file on nats://; tests and quality gate green

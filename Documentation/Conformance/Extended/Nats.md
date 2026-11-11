@@ -43,3 +43,10 @@ Server-only statements and features curl does not use are `n/a`.
 | Nats:NATS-ERR-1 | MUST | `-ERR` at connect (such as 'Authorization Violation') ends the connection; the client reports it. | NatsConnectCases.Subscribe_AuthRequiredAndErrAtConnect_FailsWithLoginDenied |
 | Nats:NATS-ERR-2 | MUST | `-ERR` after PUB (such as 'Permissions Violation') is reported to the user. | NatsPublishCases.Publish_ErrAfterPub_FailsWithTheServersText |
 | Nats:NATS-REQ-1 | MUST | A request subscribes to a unique inbox, publishes with it as reply-to and reads the reply there. | NatsPublishCases.Request_ReplyOnItsInbox_IsWrittenWithoutANewline |
+
+## What `-T` does
+
+`-T file` publishes the file's bytes exactly as `-d` publishes its data: the server receives `PUB <subject> <length>`
+and the file's bytes, never a SUB, so an upload never subscribes, fetches or consumes. With `?request` the file is
+the request's payload. When both are given, `-d`'s data is published and the upload is ignored (BL-4951). Pinned by
+`NatsUploadTests` in `Curl.Extended.Protocol.Nats.UnitTests`.
