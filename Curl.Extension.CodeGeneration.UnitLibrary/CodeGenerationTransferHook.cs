@@ -19,10 +19,13 @@ internal sealed class CodeGenerationTransferHook(IReadOnlyList<CodeFile> files) 
 
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
-        requests.Add(GeneratedRequest.From(context));
-        foreach (var file in files)
+        if (context.Http?.RedirectsFollowed is not > 0)
         {
-            await WriteAsync(file, context).ConfigureAwait(false);
+            requests.Add(GeneratedRequest.From(context));
+            foreach (var file in files)
+            {
+                await WriteAsync(file, context).ConfigureAwait(false);
+            }
         }
 
         return await next(context).ConfigureAwait(false);

@@ -27,11 +27,13 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] `l.ps1` contains one request, and running it logs exactly `GET /redir`, `GET /plain`.
-- [ ] `l.cs` likewise.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `l.ps1` contains one request, and running it logs exactly `GET /redir`, `GET /plain`.
+- [x] `l.cs` likewise.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fix: the hook skips a transfer whose `Http.RedirectsFollowed` is above 0 (a follow-up hop), so a chain gives one request. Both files use the same hook, so `l.cs` and `l.ps1` are both fixed; HttpClient follows the redirect itself under -L (ADR-1138). Pinned by CodeGenerationRedirectTests. CI platform criteria: change is platform-neutral.
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
