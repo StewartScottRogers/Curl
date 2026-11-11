@@ -22,13 +22,15 @@ Fitness review STD-001 (2026-11-11): LDAP --ntlm, --digest and --negotiate send 
 
 ## Acceptance criteria
 
-- [ ] A new LdapDigestMd5Bind builds an initial SASL BindRequest with tag 0xa3 and mechanism DIGEST-MD5, pinned by byte-level tests in LdapDigestMd5BindTests.
-- [ ] It computes the digest-response from a given challenge per RFC 2831 (tested against a known vector) and never sends the password in cleartext.
-- [ ] dotnet build is clean and the fast tests (dotnet test --filter "TestCategory!=Integration") pass, with the new type at 100% line and branch coverage.
+- [x] A new LdapDigestMd5Bind builds an initial SASL BindRequest with tag 0xa3 and mechanism DIGEST-MD5, pinned by byte-level tests in LdapDigestMd5BindTests.
+- [x] It computes the digest-response from a given challenge per RFC 2831 (tested against a known vector) and never sends the password in cleartext.
+- [x] dotnet build is clean and the fast tests (dotnet test --filter "TestCategory!=Integration") pass, with the new type at 100% line and branch coverage.
 
 ## Notes
 
 Split from BL-4899 (over its cost cap). BL-4899 had no stash; its earlier work is on branch factory/BL-4899-lane-2-20261111-082724 (it failed to build after a rebase), which may be mined with git cherry-pick --no-commit.
+
+Done: LdapDigestMd5Bind (InitialRequest, AnswerRequest, ResponseHex) is hand-built on the BCL MD5 and pinned by the RFC 2831 example vector (d388dad9...). Charset utf-8 is honoured, otherwise Latin-1. Coverage measured 100% line and branch on the new type, complexity at most 10 (Measure-CodeQuality.ps1 aborted on an unrelated failing test, Conformance.Extended EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement for Stomp STOMP12-Send-3, so coverage was read from a Code Coverage cobertura run of the Ldap tests alone). Not wired into the handler, as the task says. No new ADR: no design question beyond the RFC.
 
 ## Log
 
