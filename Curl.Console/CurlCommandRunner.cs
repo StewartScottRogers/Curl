@@ -5892,9 +5892,21 @@ internal sealed class CurlCommandRunner(
         { VersionRequested: true } => CurlVersionText.Lines(runsOnWindows, OperatingSystem.IsMacOS()),
         { ManualRequested: true } => CurlManual.Lines(),
         { HelpRequested: true, HelpSubject: var subject } when !CurlHelpText.IsOptionSubject(subject) =>
-            CurlHelpText.Lines(subject, terminalColumns),
+            CurlHelpText.Lines(subject, terminalColumns, ExtensionsAreOn),
         _ => ExtensionsOrBuildInformationLines(options),
     };
+
+    /// <summary>The section <c>--ai-help extensions</c> ends with: Curl's own diagnostic-log options, which belong to no extension and are unknown under <c>CURL_EXTENSIONS=0</c> (BL-4937).</summary>
+    private const string CurlOnlyOptionsMarkdown = "## diagnostic-log\n\nCurl's own diagnostic log, not curl's -v.\n\n- Schemes: none\n- Options: `--log-level <level>` (none, error, warning, info or verbose), `--log-file <file>` (where the log is written)\n\n";
+
+    /// <summary>The <c>--extended-help</c> line for the options of <see cref="CurlOnlyOptionsMarkdown" />.</summary>
+    private static readonly string[] CurlOnlyOptionLines =
+    [
+        "diagnostic-log: Curl's own diagnostic log, not curl's -v: --log-level <level> sets how much is logged and --log-file <file> where. Schemes: none. Options: --log-level, --log-file.",
+    ];
+
+    /// <summary>Whether <c>CURL_EXTENSIONS</c> is anything but <c>0</c>: under <c>0</c> the help pages are curl's own.</summary>
+    private bool ExtensionsAreOn => EnvironmentVariables(ExtensionProtocolHandlers.SwitchVariable) != "0";
 
     /// <summary>
     /// The lines <see cref="InformationLines" /> gives for the rest: <see cref="ExtensionListing" />'s for
@@ -5904,7 +5916,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The lines, or <see langword="null" /> when no such option was given.</returns>
     private IReadOnlyList<string>? ExtensionsOrBuildInformationLines(CommandLineOptions options) =>
         options.ExtendedHelpRequested
-            ? ExtensionListing.Lines(EnvironmentVariables)
+            ? [.. ExtensionListing.Lines(EnvironmentVariables), .. CurlOnlyOptionLines]
             : TlsBuildInformation.Lines(EasyOptionsFromCommandLine.TlsOf(options), options.CaEmbedDumpRequested);
 
     /// <summary>
@@ -5925,7 +5937,7 @@ internal sealed class CurlCommandRunner(
                 continue;
             }
 
-            await WriteStandardOutputLinesAsync(CurlHelpText.Lines(subject, terminalColumns)).ConfigureAwait(false);
+            await WriteStandardOutputLinesAsync(CurlHelpText.Lines(subject, terminalColumns, ExtensionsAreOn)).ConfigureAwait(false);
         }
     }
 
@@ -5938,7 +5950,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>A task that completes when the output is flushed.</returns>
     private async Task WriteOptionManualSectionAsync(string subject)
     {
-        if (CurlOptionManualSection.TryGetLines(subject, out IReadOnlyList<string> lines))
+        if (CurlOptionManualSection.TryGetLines(subject, out IReadOnlyList<string> lines, ExtensionsAreOn))
         {
             await WriteStandardOutputLinesAsync(lines).ConfigureAwait(false);
         }
@@ -5959,7 +5971,7 @@ internal sealed class CurlCommandRunner(
     {
         if (CurlAiHelpText.IsExtensionsSubject(subject))
         {
-            await standardOutput.WriteAsync(Encoding.UTF8.GetBytes(ExtensionListing.Markdown(EnvironmentVariables))).ConfigureAwait(false);
+            await standardOutput.WriteAsync(Encoding.UTF8.GetBytes(ExtensionListing.Markdown(EnvironmentVariables) + CurlOnlyOptionsMarkdown)).ConfigureAwait(false);
             await standardOutput.FlushAsync().ConfigureAwait(false);
         }
         else if (CurlAiHelpText.TryGetMarkdown(subject, out string markdown))

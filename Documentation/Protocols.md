@@ -11,7 +11,7 @@ Every URL scheme Curl serves, one row per protocol library. There are two groups
   curl's handlers, so a scheme both claim fails composition rather than replacing curl's
   handler. Setting the environment variable `CURL_EXTENSIONS=0` turns every one off
   (`ExtensionProtocolHandlers.For` in `Curl.Extension.Composition.UnitLibrary` then
-  returns no handlers). Their libraries are `Curl.Extended.Protocol.<Name>.UnitLibrary`.
+  returns no handlers), and the parser refuses Curl's own `--ai-help`, `--extended-help`, `--log-level` and `--log-file` as unknown options (ADR-1251). Their libraries are `Curl.Extended.Protocol.<Name>.UnitLibrary`.
 
 The schemes in each table are the ones the library's handler reports in its
 `SupportedSchemes`, not a guess from the folder name. Both groups share the contracts in

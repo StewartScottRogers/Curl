@@ -30,13 +30,14 @@ public static class CurlOptionManualSection
     /// The section's lines, empty when the manual has no heading for the option; empty when the method
     /// returns <see langword="false"/>.
     /// </param>
+    /// <param name="knowsAiHelp"><see langword="false"/> under <c>CURL_EXTENSIONS=0</c>, when <c>--ai-help</c> is no option.</param>
     /// <returns>
     /// <see langword="false"/> when <paramref name="subject"/> names no option curl knows, and curl writes
     /// <see cref="IncorrectOptionNameMessage"/> to standard error instead.
     /// </returns>
-    public static bool TryGetLines(string subject, out IReadOnlyList<string> lines)
+    public static bool TryGetLines(string subject, out IReadOnlyList<string> lines, bool knowsAiHelp = true)
     {
-        if (subject == "--ai-help")
+        if (knowsAiHelp && subject == "--ai-help")
         {
             lines = CurlHelpText.AiHelpSectionLines;
             return true;

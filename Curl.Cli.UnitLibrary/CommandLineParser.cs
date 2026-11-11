@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 namespace Curl.Cli;
 
 /// <summary>
@@ -422,6 +423,25 @@ public static class CommandLineParser
         return options.AddUrl(argument, argument);
     }
 
+    /// <summary>
+    /// Finds a long option in the table, except that under <c>CURL_EXTENSIONS=0</c> the options only Curl has
+    /// (<see cref="CommandLineOptionTable.PortOnlyLongNames"/>) are not found, so the parser refuses each as curl
+    /// refuses an unknown option (BL-4937).
+    /// </summary>
+    private static bool TryFindLongOption(CommandLineOptions options, string longName, [NotNullWhen(true)] out CommandLineOption? option)
+    {
+        if (CommandLineOptionTable.PortOnlyLongNames.Contains(longName) && options.ReadEnvironmentVariable(ExtensionsSwitchVariable) == "0")
+        {
+            option = null;
+            return false;
+        }
+
+        return CommandLineOptionTable.TryFindLong(longName, out option);
+    }
+
+    /// <summary>The environment variable whose value <c>0</c> turns every Curl-only extension off.</summary>
+    private const string ExtensionsSwitchVariable = "CURL_EXTENSIONS";
+
     private static CommandLineRefusal? ParseLong(CommandLineOptions options, string argument, ArgumentReader reader)
     {
         string nameAndValue = argument[EndOfOptions.Length..];
@@ -429,7 +449,7 @@ public static class CommandLineParser
         string longName = equals >= 0 ? nameAndValue[..equals] : nameAndValue;
         string? attachedValue = equals >= 0 ? nameAndValue[(equals + 1)..] : null;
         options.FirstOptionOfArgument = true;
-        if (CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
+        if (TryFindLongOption(options, longName, out CommandLineOption? option))
         {
             return ApplyLong(options, option, argument, attachedValue, reader);
         }
@@ -509,7 +529,7 @@ public static class CommandLineParser
         }
 
         string negatedName = longName[NegationPrefix.Length..];
-        if (!CommandLineOptionTable.TryFindLong(negatedName, out CommandLineOption? option))
+        if (!TryFindLongOption(options, negatedName, out CommandLineOption? option))
         {
             return RefuseUnlistedName(argument);
         }
@@ -557,7 +577,7 @@ public static class CommandLineParser
     /// </summary>
     private static CommandLineRefusal? ParseExpandedLong(CommandLineOptions options, string argument, string longName, string? attachedValue, ArgumentReader reader)
     {
-        if (!CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
+        if (!TryFindLongOption(options, longName, out CommandLineOption? option))
         {
             return RefuseUnlistedName(argument);
         }

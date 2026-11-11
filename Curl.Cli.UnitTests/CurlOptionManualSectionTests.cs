@@ -42,6 +42,14 @@ public sealed class CurlOptionManualSectionTests
     }
 
     [TestMethod]
+    public void TryGetLines_AiHelpWhenItIsNoOption_IsNotFound()
+    {
+        Assert.IsTrue(CurlOptionManualSection.TryGetLines("--ai-help", out _));
+        Assert.IsFalse(CurlOptionManualSection.TryGetLines("--ai-help", out IReadOnlyList<string> lines, knowsAiHelp: false));
+        Assert.IsEmpty(lines);
+    }
+
+    [TestMethod]
     public void TryGetLines_Verbose_StartsWithItsHeadingAndStopsBeforeTheNextOption()
     {
         TryGetLines("-v", out IReadOnlyList<string> lines);
