@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.CodeGeneration.UnitLibrary/CodeGenerationTransferHook.cs, Curl.Extension.CodeGeneration.UnitTests/CodeGenerationRedirectTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4921 — Generate one request per redirect chain for --csharp and --powershell with -L
 
@@ -41,3 +41,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: f592c52c 6da66a29 a0b49a29.
+- 2026-11-11: Doing -> Done. Redirect follow-up hops no longer add requests; one request per chain
