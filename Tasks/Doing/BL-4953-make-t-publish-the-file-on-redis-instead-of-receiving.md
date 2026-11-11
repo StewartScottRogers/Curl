@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.Redis.UnitLibrary/Client/RedisProtocolHandler.cs, Curl.Extended.Protocol.Redis.UnitTests/RedisUploadTests.cs, Documentation/Conformance/Extended/Redis.md]
+touches: [Curl.Extended.Protocol.Redis.UnitLibrary/Client/RedisProtocolHandler.cs, Curl.Extended.Protocol.Redis.UnitTests/Client/RedisUploadTests.cs, Documentation/Conformance/Extended/Redis.md]
 requirement: none
 created: 2026-11-11
 completed:
@@ -22,13 +22,15 @@ Split from BL-4903 (outside fitness review 2026-11-11, finding EXT-008). Today t
 
 ## Acceptance criteria
 
-- [ ] `-T up.txt` (holding `filebody`) on redis:// sends `filebody` as the publish payload, or exits 2 before connecting where an upload has no meaning; a unit test in `Curl.Extended.Protocol.Redis.UnitTests` pins it.
-- [ ] `Documentation/Conformance/Extended/Redis.md` states what `-T` does.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `-T up.txt` (holding `filebody`) on redis:// sends `filebody` as the publish payload, or exits 2 before connecting where an upload has no meaning; a unit test in `Curl.Extended.Protocol.Redis.UnitTests` pins it.
+- [x] `Documentation/Conformance/Extended/Redis.md` states what `-T` does.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Stand-ins in PowerShell or C#, never Python.
+
+-T copies the whole upload into the last argument (as Amqp1 does); -d wins when both are given. Pinned by RedisUploadTests. Quality run: 0 failing members.
 
 ## Log
 

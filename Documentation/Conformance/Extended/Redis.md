@@ -48,3 +48,10 @@ the library's own output choice, so the printed text is pinned but not a protoco
 | Redis:URI-5 | MUST | The authority's port is the one connected to. | RedisUriCases.Port_InTheAuthority_IsTheOneConnectedTo |
 | Redis:URI-6 | MUST | `rediss` runs the same exchange over TLS. | RedisUriCases.Rediss_RunsTheSameExchangeOverTls |
 | Redis:URI-7 | MAY | A `db` query parameter names the database. | n/a: the provisional registration's path form is the one Curl reads (ADR-1079) |
+
+## Uploads
+
+`-d` appends its bytes to the command as one more argument. `-T <file>` does the same with the whole file: `curl -T
+up.txt redis://host/SET/kk` with `up.txt` holding `filebody` sends `SET kk filebody`, so an upload is a publish and
+never turns the command into a fetch. When both are given, `-d`'s bytes are the argument. Pinned by
+`RedisUploadTests` (`Curl.Extended.Protocol.Redis.UnitTests/Client/`), a library choice rather than a RESP requirement.
