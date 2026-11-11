@@ -11,7 +11,8 @@ namespace Curl.Extension.ServerSentEvents;
 /// </summary>
 /// <param name="parser">The event source's parser, kept across reconnections.</param>
 /// <param name="output">Where the events go next.</param>
-internal sealed class EventStreamWritingStream(EventStreamParser parser, Stream output) : Stream
+/// <param name="isEventStream">Whether the response is an event stream; when not, the bytes pass to <paramref name="output" /> as they are.</param>
+internal sealed class EventStreamWritingStream(EventStreamParser parser, Stream output, Func<bool> isEventStream) : Stream
 {
     /// <inheritdoc />
     public override bool CanRead => false;
@@ -61,11 +62,21 @@ internal sealed class EventStreamWritingStream(EventStreamParser parser, Stream 
     public override void Write(byte[] buffer, int offset, int count) => Write(buffer.AsSpan(offset, count));
 
     /// <inheritdoc />
-    public override void Write(ReadOnlySpan<byte> buffer) => output.Write(Format(parser.Parse(buffer)));
+    public override void Write(ReadOnlySpan<byte> buffer)
+    {
+        if (isEventStream())
+        {
+            output.Write(Format(parser.Parse(buffer)));
+        }
+        else
+        {
+            output.Write(buffer);
+        }
+    }
 
     /// <inheritdoc />
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
-        output.WriteAsync(Format(parser.Parse(buffer.Span)), cancellationToken);
+        isEventStream() ? output.WriteAsync(Format(parser.Parse(buffer.Span)), cancellationToken) : output.WriteAsync(buffer, cancellationToken);
 
     /// <inheritdoc />
     public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>

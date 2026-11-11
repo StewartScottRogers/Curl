@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ServerSentEvents.UnitLibrary, Curl.Extension.ServerSentEvents.UnitTests/SsePassthroughTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4923 — Pass non-event-stream responses through under --sse
 
@@ -27,11 +27,13 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] `curl -s --sse http://127.0.0.1:18800/status500` prints `err`.
-- [ ] The `/plain` command prints `hello`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `curl -s --sse http://127.0.0.1:18800/status500` prints `err`.
+- [x] The `/plain` command prints `hello`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Done: ResponseHeadWatchingStream is the hook's header output; it forwards headers and records status/Content-Type, so EventStreamWritingStream passes bytes through unless the head is 200 text/event-stream (no head seen = event stream). Verified by SsePassthroughTests; quality run for the library 100/100. Linux/macOS: tests are platform-neutral. Not run against a live server.
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
@@ -39,3 +41,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 5ef846dd 549d4d25 a0b49a29.
+- 2026-11-11: Doing -> Done. Non-event-stream responses pass through under --sse
