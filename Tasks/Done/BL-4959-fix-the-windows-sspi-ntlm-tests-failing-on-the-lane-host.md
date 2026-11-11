@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests/CurlCompositionNtlmTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4959 — Fix the Windows SSPI NTLM tests failing on the lane host
 
@@ -33,12 +33,15 @@ does not resolve there; BL-4908 ran its tests with a temporary local `global.jso
 
 ## Acceptance criteria
 
-- [ ] Both tests pass on the lane host, or are rewritten to pin only what every supported Windows build's SSPI sends.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Both tests pass on the lane host, or are rewritten to pin only what every supported Windows build's SSPI sends.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Already fixed by 9673d99c8 (BL-4912), which pins only the Type 1 header prefix and Type 3 prefix; both NTLM tests (and the whole CurlCompositionNtlmTests class) pass on this host: 8 passed, 2 skipped. dotnet build clean. No code change here.
 
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: b258f801 3d836d5e.
+- 2026-11-11: Doing -> Done. Already fixed by BL-4912 (9673d99c8); NTLM tests pass on the lane host
