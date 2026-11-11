@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.EncryptedDns.UnitLibrary]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4947 — Exit 6 when the --dns-over-quic resolver is unreachable
 
@@ -40,3 +40,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 7cef9a0d a0b49a29.
+- 2026-11-11: Doing -> Done. DoQ handshake SocketException now yields no addresses, so exit 6; unit test pins it
