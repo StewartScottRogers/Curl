@@ -40,3 +40,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: aab36c7c 80b0c93c a0b49a29.
 - 2026-11-11: Doing -> Backlog. Lane 8 could not integrate: build failed, and still build failed after a repair run after rebasing onto the other lanes' work. The work is on branch factory/BL-4901-lane-8-20261111-082724; start with git cherry-pick --no-commit factory/BL-4901-lane-8-20261111-082724 and fix it.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: aab36c7c 80b0c93c a0b49a29.
