@@ -27,13 +27,15 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] The repro's output contains `nc=00000001`.
-- [ ] `AnyAuthDigestNonceCountTests` pins `nc=00000001`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The repro's output contains `nc=00000001`.
+- [x] `AnyAuthDigestNonceCountTests` pins `nc=00000001`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
+
+Real curl 8.22.0 (Schannel) measured with a PowerShell loopback server: `--anyauth` sends nc=00000001, so BL-3897's 2 was wrong; the special case is removed. Quality run: 0 failing members.
 
 ## Log
 
