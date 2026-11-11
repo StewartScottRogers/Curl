@@ -5,7 +5,7 @@ namespace Curl.Extended.Protocol.S3;
 
 /// <summary>
 /// Checks that an <c>s3://</c> transfer refuses <c>-I</c> and a <c>-X</c> it cannot send with exit 4 before it connects,
-/// and lets through the <c>GET</c> it sends without <c>-T</c> and the <c>PUT</c> it sends with it (ADR-1238).
+/// and lets through the <c>GET</c> it sends without <c>-T</c> and the <c>PUT</c> it sends with it (ADR-1249).
 /// </summary>
 [TestClass]
 public sealed class S3RequestMethodTests

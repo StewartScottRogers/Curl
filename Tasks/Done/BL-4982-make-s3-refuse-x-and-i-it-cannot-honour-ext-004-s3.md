@@ -18,7 +18,7 @@ completed: 2026-11-11
 
 ## Context
 
-Split from BL-4904 (EXT-004 of the 2026-11-11 outside fitness review): s3:// sent GET for `-X DELETE` and `-I`. BL-4904 decided (ADR-1238, refuse rather than implement): `-I` and any `-X` other than GET (no `-T`) / PUT (with `-T`) exit 4 (NotBuiltIn) with `s3:// does not support -X <M>; it sends only GET, or PUT with -T` before any connection. The library has its own `Client/*RequestMethod.RefusalOf` called first in the handler's `ExecuteAsync`. Library: `Curl.Extended.Protocol.S3.UnitLibrary`. ADR-1238 and its README row (Documentation ADR folder) were written in the stash; this task lands them (add to touches if needed).
+Split from BL-4904 (EXT-004 of the 2026-11-11 outside fitness review): s3:// sent GET for `-X DELETE` and `-I`. BL-4904 decided (ADR-1249, refuse rather than implement): `-I` and any `-X` other than GET (no `-T`) / PUT (with `-T`) exit 4 (NotBuiltIn) with `s3:// does not support -X <M>; it sends only GET, or PUT with -T` before any connection. The library has its own `Client/*RequestMethod.RefusalOf` called first in the handler's `ExecuteAsync`. Library: `Curl.Extended.Protocol.S3.UnitLibrary`. ADR-1249 and its README row (Documentation ADR folder) were written in the stash; this task lands them (add to touches if needed).
 
 ## Acceptance criteria
 
@@ -36,5 +36,5 @@ The stash holds all four schemes' uncommitted work; keep only this scheme's file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: c3078526 489cf725 96270709.
-- 2026-11-11: Refusal, tests and S3.md section done; S3 unit tests pass (146), Measure-CodeQuality 0 failing members. ADR-1238 lands here (other schemes' files left for their tasks).
+- 2026-11-11: Refusal, tests and S3.md section done; S3 unit tests pass (146), Measure-CodeQuality 0 failing members. ADR-1249 lands here (other schemes' files left for their tasks).
 - 2026-11-11: Doing -> Done. s3 refuses -I and other -X before any request

@@ -1,4 +1,4 @@
-# ADR-1238 — s3, gs, az and oci refuse -I and a -X they cannot send, with exit 4 before any request
+# ADR-1249 — s3, gs, az and oci refuse -I and a -X they cannot send, with exit 4 before any request
 
 - Status: Accepted
 - Date: 2026-11-11

@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extended.Protocol.S3.Client;
 
 /// <summary>
-/// Refuses the request methods an <c>s3://</c> transfer cannot send (ADR-1238): <c>-I</c>/<c>--head</c>, and a
+/// Refuses the request methods an <c>s3://</c> transfer cannot send (ADR-1249): <c>-I</c>/<c>--head</c>, and a
 /// <c>-X</c> other than <c>GET</c> without <c>-T</c> or <c>PUT</c> with it, so a <c>-X DELETE</c> never downloads instead.
 /// </summary>
 internal static class S3RequestMethod

@@ -1295,4 +1295,4 @@ Each option and the specific reason it lost.
 | [1246](ADR-1246-winldap-bind-kind-follows-the-auth-mask.md) | The WinLDAP bind kind follows the auth mask: a simple bind only with `-u` and Basic, else Negotiate, NTLM or Digest in that order, else the logged-on user, as curl 8.22.0 Schannel's `ldap_win_bind` does (BL-4965) | Accepted | 2026-11-11 |
 | [1247](ADR-1247-oci-refuses-credentials-for-a-plain-http-token-realm.md) | oci:// refuses to send -u credentials to a plain http token realm (BL-4901) | Accepted | 2026-11-11 |
 | [1248](ADR-1248-plugin-refuses-a-url-with-cmd-metacharacters-for-a-batch-helper.md) | A plugin refuses a URL holding cmd.exe metacharacters for a .cmd or .bat helper instead of escaping it (BL-4971) | Accepted | 2026-11-11 |
-| [1238](ADR-1238-storage-schemes-refuse-a-method-they-cannot-send.md) | s3, gs, az and oci refuse -I and a -X they cannot send, with exit 4 before any request (BL-4904) | Accepted | 2026-11-11 |
+| [1249](ADR-1249-storage-schemes-refuse-a-method-they-cannot-send.md) | s3, gs, az and oci refuse -I and a -X they cannot send, with exit 4 before any request (BL-4904) | Accepted | 2026-11-11 |
