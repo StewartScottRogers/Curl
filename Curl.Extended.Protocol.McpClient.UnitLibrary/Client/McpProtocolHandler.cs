@@ -61,9 +61,14 @@ internal sealed class McpProtocolHandler(IConnector connector, IMcpServerProcess
     internal static CurlExitCode? ExitCodeOf(Exception exception) => exception switch
     {
         McpClientException failure => failure.ExitCode,
-        McpHttpException or McpWireFormatException or McpServerExitedException => CurlExitCode.WeirdServerReply,
+        McpHttpException http => ExitCodeOfHttp(http),
+        McpWireFormatException or McpServerExitedException => CurlExitCode.WeirdServerReply,
         _ => null,
     };
+
+    /// <summary>Gives exit 67 for a 401 the credentials did not clear (MCP 2025-06-18 "Authorization", ADR-1238), else exit 8.</summary>
+    private static CurlExitCode ExitCodeOfHttp(McpHttpException exception) =>
+        exception.StatusCode == 401 ? CurlExitCode.LoginDenied : CurlExitCode.WeirdServerReply;
 
     private static async Task<TransferResult> TransferAsync(McpClientFlow flow, IMcpSession session, McpToolCall? call, CancellationToken cancellationToken)
     {

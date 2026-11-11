@@ -21,6 +21,7 @@ public sealed class McpStreamableHttpTransport : IAsyncDisposable
     private readonly Func<CancellationToken, ValueTask<IConnection>> openConnection;
     private readonly string authority;
     private readonly string target;
+    private readonly IReadOnlyList<string> headerFields;
     private IConnection? connection;
     private McpHttpConnectionReader? reader;
     private string? protocolVersion;
@@ -29,12 +30,15 @@ public sealed class McpStreamableHttpTransport : IAsyncDisposable
     /// <param name="openConnection">Opens a connection to the endpoint's host, over TLS for an https endpoint.</param>
     /// <param name="authority">The <c>Host</c> header's value, such as <c>example.com:8080</c>.</param>
     /// <param name="target">The MCP endpoint's request target in origin form, such as <c>/mcp</c>, already percent-encoded.</param>
-    public McpStreamableHttpTransport(Func<CancellationToken, ValueTask<IConnection>> openConnection, string authority, string target)
+    /// <param name="headerFields">Fields every request carries after <c>Host</c>, each as <c>Name: value</c> without its line
+    /// end, such as <c>Authorization</c> and <c>User-Agent</c> (ADR-1238); none when <see langword="null"/>.</param>
+    public McpStreamableHttpTransport(Func<CancellationToken, ValueTask<IConnection>> openConnection, string authority, string target, IReadOnlyList<string>? headerFields = null)
     {
         ArgumentNullException.ThrowIfNull(openConnection);
         this.openConnection = openConnection;
         this.authority = RequireVisibleAscii(authority, nameof(authority));
         this.target = RequireVisibleAscii(target, nameof(target));
+        this.headerFields = headerFields ?? [];
     }
 
     /// <summary>Gets the session id the server assigned with <c>Mcp-Session-Id</c> ("Session Management"), or <see langword="null"/>.</summary>
@@ -169,7 +173,7 @@ public sealed class McpStreamableHttpTransport : IAsyncDisposable
     {
         connection ??= await openConnection(cancellationToken);
         reader ??= new McpHttpConnectionReader(connection);
-        await connection.WriteAsync(Encoding.ASCII.GetBytes(FormatHead(method, body?.Length)), cancellationToken);
+        await connection.WriteAsync(Encoding.Latin1.GetBytes(FormatHead(method, body?.Length)), cancellationToken);
         if (body is not null)
         {
             await connection.WriteAsync(body, cancellationToken);
@@ -182,6 +186,11 @@ public sealed class McpStreamableHttpTransport : IAsyncDisposable
     private string FormatHead(string method, int? bodyLength)
     {
         var head = new StringBuilder().Append(method).Append(' ').Append(target).Append(" HTTP/1.1\r\nHost: ").Append(authority).Append("\r\n");
+        foreach (string field in headerFields)
+        {
+            head.Append(field).Append("\r\n");
+        }
+
         if (bodyLength is { } length)
         {
             head.Append("Accept: application/json, text/event-stream\r\nContent-Type: application/json\r\nContent-Length: ").Append(length).Append("\r\n");

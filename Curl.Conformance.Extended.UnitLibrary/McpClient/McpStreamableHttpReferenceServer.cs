@@ -30,6 +30,12 @@ public sealed class McpStreamableHttpReferenceServer(McpReferenceToolServer tool
     /// <summary>Gets the JSON-RPC method whose first request ends the first session, answered with 404; <see langword="null" /> keeps it.</summary>
     public string? ExpiresSessionAtMethod { get; init; }
 
+    /// <summary>
+    /// Gets the <c>Authorization</c> value every request must carry ("Authorization": a request without it, or with another
+    /// value, is answered 401 Unauthorized); <see langword="null" /> requires none.
+    /// </summary>
+    public string? RequiredAuthorization { get; init; }
+
     /// <summary>Gets every request received so far, in order.</summary>
     public IReadOnlyList<McpHttpRequestRecord> Requests
     {
@@ -61,7 +67,8 @@ public sealed class McpStreamableHttpReferenceServer(McpReferenceToolServer tool
     }
 
     private string Reply(McpHttpRequestRecord request) =>
-        request.Method == "DELETE" ? EndSession()
+        RequiredAuthorization is not null && request.Header("Authorization") != RequiredAuthorization ? Response("401 Unauthorized", null, null, string.Empty)
+        : request.Method == "DELETE" ? EndSession()
         : request.JsonRpcMethod == "initialize" ? Answer(request, StartSession())
         : RejectSessionOf(request) ?? Answer(request, null);
 
