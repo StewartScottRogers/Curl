@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Rtsp.UnitLibrary/RtspProtocolHandler.cs, Curl.Original.Protocol.Rtsp.UnitTests/RtspWriteOutTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4934 — Fix RTSP %{size_download} and %{content_type} for a discarded reply body
 
@@ -42,3 +42,4 @@ Fixed in RtspProtocolHandler.ReadReplyAsync: DownloadSize is the body bytes only
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: b4585b61 a0b49a29.
+- 2026-11-11: Doing -> Done. RTSP size_download is 0 for a discarded body and content_type reports the reply's; tests and quality run green
