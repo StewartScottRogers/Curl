@@ -22,13 +22,15 @@ Split from BL-4915; needs BL-4975's fix landed. Measure with a PowerShell or C# 
 
 ## Acceptance criteria
 
-- [ ] `curl -sS http://user@127.0.0.1:18500/ -u :secret` sends `Authorization: Basic dXNlcjpzZWNyZXQ=`.
-- [ ] `curl -sS "imap://user@127.0.0.1:18500/INBOX/;UID=1" -u :secret` makes the IMAP stand-in log `A002 LOGIN user secret`.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports no member outside a gate.
+- [x] `curl -sS http://user@127.0.0.1:18500/ -u :secret` sends `Authorization: Basic dXNlcjpzZWNyZXQ=`.
+- [x] `curl -sS "imap://user@127.0.0.1:18500/INBOX/;UID=1" -u :secret` makes the IMAP stand-in log `A002 LOGIN user secret`.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports no member outside a gate.
 
 ## Notes
 
 Split from BL-4915 (over its cost cap).
+
+Measured with Record-CurlExchange.ps1 against the built Curl.Console: HTTP sent `Authorization: Basic dXNlcjpzZWNyZXQ=`. IMAP with the default stand-in (advertises AUTH=PLAIN) sent AUTHENTICATE PLAIN of `Split from BL-4915 (over its cost cap).userSplit from BL-4915 (over its cost cap).secret`; with CAPABILITY overridden to omit AUTH it logged `A002 LOGIN user secret`. Quality run: 0 failing members. No code change needed (BL-4975 held the fix).
 
 ## Log
 
