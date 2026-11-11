@@ -35,3 +35,4 @@ Continues the stashed work of BL-4915.
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 42b24d12 b940a505 7167dd95.
