@@ -21,13 +21,15 @@ internal static class SignalRWebSocketUpgrade
     /// <param name="accessToken">The bearer token a negotiate redirect gave, or <see langword="null"/>.</param>
     /// <param name="randomSource">The source of the key and of each frame's mask.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <param name="requestFields">The fields curl's options add to the request, or <see langword="null"/> for none.</param>
     /// <exception cref="SignalRTransportException">The server did not accept the upgrade.</exception>
     public static async Task<SignalRWebSocketSession> UpgradeAsync(
         IConnection connection,
         Uri webSocketUrl,
         string? accessToken,
         IWebSocketRandomSource randomSource,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyList<KeyValuePair<string, string>>? requestFields = null)
     {
         byte[] nonce = new byte[16];
         randomSource.Fill(nonce);
@@ -35,13 +37,15 @@ internal static class SignalRWebSocketUpgrade
         byte[] request = HttpRequestWriter.Write(
             "GET",
             webSocketUrl,
-            [
-                new("Upgrade", "websocket"),
-                new("Connection", "Upgrade"),
-                new("Sec-WebSocket-Key", key),
-                new("Sec-WebSocket-Version", "13"),
-                .. HttpRequestWriter.BearerAuthorization(accessToken),
-            ]);
+            HttpRequestWriter.Combine(
+                [
+                    new("Upgrade", "websocket"),
+                    new("Connection", "Upgrade"),
+                    new("Sec-WebSocket-Key", key),
+                    new("Sec-WebSocket-Version", "13"),
+                ],
+                requestFields,
+                accessToken));
         await connection.WriteAsync(request, cancellationToken);
         await connection.FlushAsync(cancellationToken);
 

@@ -83,7 +83,7 @@ public sealed class SocketIoProtocolHandler(IConnector connector, IWebSocketRand
         byte[] keyBytes = new byte[KeyLength];
         randomSource.Fill(keyBytes);
         string key = Convert.ToBase64String(keyBytes);
-        await connection.WriteAsync(SocketIoUpgrade.Request(context.Url, key), context.CancellationToken).ConfigureAwait(false);
+        await connection.WriteAsync(SocketIoUpgrade.Request(context.Url, key, HandshakeHeaderFields.Of(context)), context.CancellationToken).ConfigureAwait(false);
         await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
         ReadOnlyMemory<byte> afterHead = await SocketIoUpgrade.ReadReplyAsync(connection, key, context.CancellationToken).ConfigureAwait(false);
         var channel = new WebSocketMessageChannel(connection, randomSource, afterHead);

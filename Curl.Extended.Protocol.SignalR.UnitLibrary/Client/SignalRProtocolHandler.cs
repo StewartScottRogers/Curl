@@ -60,11 +60,12 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
     private async Task<long> TransferAsync(ITransferContext context)
     {
         byte[]? callRecord = SignalRCall.RecordFor(context.PostData);
-        var negotiator = new SignalRNegotiator((url, cancellationToken) => OpenAsync(url, context, cancellationToken));
+        IReadOnlyList<KeyValuePair<string, string>> requestFields = HandshakeHeaderFields.Of(context);
+        var negotiator = new SignalRNegotiator((url, cancellationToken) => OpenAsync(url, context, cancellationToken), requestFields);
         NegotiatedWebSocketEndpoint endpoint = await negotiator.NegotiateAsync(EndpointUrlOf(context.Url), context.CancellationToken);
         await using IConnection connection = await OpenAsync(endpoint.WebSocketUrl, context, context.CancellationToken);
         SignalRWebSocketSession session = await SignalRWebSocketUpgrade.UpgradeAsync(
-            connection, endpoint.WebSocketUrl, endpoint.AccessToken, randomSource, context.CancellationToken);
+            connection, endpoint.WebSocketUrl, endpoint.AccessToken, randomSource, context.CancellationToken, requestFields);
         context.Progress.ReportTransferStarted();
         return await new SignalRHubSession(session, callRecord, context.Output).RunAsync(context.CancellationToken);
     }

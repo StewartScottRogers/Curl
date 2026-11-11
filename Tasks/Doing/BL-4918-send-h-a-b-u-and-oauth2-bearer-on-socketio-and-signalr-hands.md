@@ -27,9 +27,9 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] Both captured requests contain `User-Agent: agentX` and an Authorization header (signalr with `--oauth2-bearer TT` sends `Bearer TT`, the precedence documented in its conformance file).
-- [ ] socketio's request also contains `Cookie: c=1`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Both captured requests contain `User-Agent: agentX` and an Authorization header (signalr with `--oauth2-bearer TT` sends `Bearer TT`, the precedence documented in its conformance file).
+- [x] socketio's request also contains `Cookie: c=1`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -39,3 +39,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 318f9b01 1e58b3fc a0b49a29.
+- 2026-11-11: Added `HandshakeHeaderFields.cs` to each library (new file beside the touched ones): Authorization from `--oauth2-bearer` (wins) or `-u`, User-Agent (`-A` or curl/8.22.0), Cookie from `-b`, then each `-H`, as ADR-1243 does for MCP. SignalR sends them on the negotiate POST and the WebSocket GET; a negotiate redirect's access token replaces any Authorization. Header order of the redirect negotiate request is now Content-Length then Authorization (existing test updated). Cookie is sent by signalr too. Both libraries 100% line/branch, quality run 0 failing; fast tests green. Linux/macOS: tests are platform-neutral.

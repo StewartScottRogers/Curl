@@ -40,7 +40,7 @@ public sealed class SignalRNegotiatorTests
 
         Assert.AreEqual(
             "POST /client/negotiate?hub=chat&negotiateVersion=1 HTTP/1.1\r\nHost: signalr.example.net\r\n"
-            + "Authorization: Bearer secret\r\nContent-Length: 0\r\n\r\n",
+            + "Content-Length: 0\r\nAuthorization: Bearer secret\r\n\r\n",
             second.WrittenText);
         Assert.AreEqual("https://signalr.example.net/client/negotiate?hub=chat&negotiateVersion=1", opened[1].AbsoluteUri);
         Assert.AreEqual("wss://signalr.example.net/client/?hub=chat&id=tok", endpoint.WebSocketUrl.AbsoluteUri);
