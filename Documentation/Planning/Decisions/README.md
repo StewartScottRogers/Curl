@@ -1291,3 +1291,4 @@ Each option and the specific reason it lost.
 | [1242](ADR-1242-ldap-values-follow-curl-8-22-base64-rule.md) | LDAP values follow curl 8.22.0's base64 rule: a leading `:` or `<` and any byte outside printable ASCII send a value to base64 (BL-4913) | Accepted | 2026-11-11 |
 | [1243](ADR-1243-mcp-requests-carry-curls-credentials-and-headers-and-a-401-is-exit-67.md) | MCP requests carry curl's credentials and headers, and a 401 is exit 67 (BL-4906) | Accepted | 2026-11-11 |
 | [1244](ADR-1244-storage-schemes-show-request-and-response-heads.md) | The s3, gs, az and oci schemes show request and response heads under -v, -i and -D (BL-4916) | Accepted | 2026-11-11 |
+| [1244](ADR-1244-schannel-algorithm-list-filters-the-offered-suites.md) | A Schannel --ciphers algorithm list filters the offered suites (BL-4911) | Accepted | 2026-11-11 |
