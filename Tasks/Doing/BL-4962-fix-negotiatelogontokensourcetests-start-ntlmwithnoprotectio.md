@@ -30,3 +30,4 @@ BL-4913 (2026-11-11) saw it fail in `Curl.Original.Protocol.Ldap.UnitTests` with
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 38e290f7 3d836d5e.
