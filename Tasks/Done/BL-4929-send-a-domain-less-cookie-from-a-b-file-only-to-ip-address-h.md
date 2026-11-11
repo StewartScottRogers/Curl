@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cookies.UnitLibrary/Cookie.cs, Curl.Cookies.UnitLibrary/CookieStore.cs, Curl.Cookies.UnitTests/DomainlessCookieMatchTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4929 — Send a domain-less cookie from a -b file only to IP-address hosts
 
@@ -41,3 +41,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 30a5e699 8c392f32 a0b49a29.
+- 2026-11-11: Doing -> Done. Domain-less cookies now match only IP hosts; tests and quality run green
