@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Networking.UnitLibrary/SslStreamConnection.cs, Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs, Curl.Original.Protocol.Ftp.UnitTests/FtpClearCommandChannelTests.cs]
+touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Networking.UnitLibrary/SslStreamConnection.cs, Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs, Curl.Original.Protocol.Ftp.UnitTests/FtpClearCommandChannelTests.cs, Record-CurlExchange.ps1]
 requirement: none
 created: 2026-11-11
 completed:
@@ -29,14 +29,17 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 - [ ] Both repro commands print `0123456789ABCDEF` and exit 0, and the server sees `PWD` in plain text after `200 CCC ok`.
 - [ ] `-v` shows the schannel shutdown and close_notify lines as REF does.
-- [ ] ADR-0280 is superseded by an ADR recording the 8.22.0 measurement.
+- [x] ADR-0280 is superseded by an ADR recording the 8.22.0 measurement.
 - [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
+- 2026-11-11 (lane 12): Measured real curl 8.22.0 Schannel before changing anything: `C:\Windows\System32\curl.exe` (8.22.0 Windows, Schannel) and Git for Windows' 8.22.0 Schannel both end the review's command with `curl: (81) Failed to clear the command channel (CCC)` in passive and active mode, with the server sending close_notify at once or waiting for curl's first (new `Record-CurlExchange.ps1 -FtpCccAwaitsCloseNotify`, added to `touches` for it; no Doing task names the script), and with `--tls-max 1.2`/`1.3`. curl prints `* schannel: shutting down SSL/TLS connection with 127.0.0.1 port 18403` and never `server close notification received`. Curl's Schannel profile already does exactly that (pinned by `FtpProtocolHandlerClearCommandChannelTests.ExecuteAsync_TlsNotCleared_EndsWithExit81WithoutQuit`), so no product code was changed. The review's exit 0 came from a Python (OpenSSL) server, which this repository cannot run; it was not reproduced. ADR-1238 records the measurement and supersedes ADR-0280's 8.21.0 one, keeping its behaviour. Criteria 1 and 2 contradict the platform's curl as measured, so the task is Blocked for Stewart: close STD-007 as not reproducible, or name a server stack that reproduces exit 0. Commit: `docs(adr)`/`chore(record)` commit with this task file.
+
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: a2cbc8ec eebf7ab8 7f05f209 a0b49a29.
+- 2026-11-11: Doing -> Blocked. Stewart: real curl 8.22.0 Schannel (System32 and Git) exits 81 on --ftp-ssl-ccc in both modes (ADR-1238), contradicting the review's exit 0; close STD-007 as not reproducible, or name a server stack that reproduces it?
