@@ -47,7 +47,7 @@ not moved yet: `ConnectionIdRecordingTransferEvents` and `TlsResultRecordingTran
 
 `TransferCredentialLookup` then chooses the transfer's credentials, once per URL. When `-u` gives
 no user name, the URL's percent-decoded user name and password are sent (`http://zz@host/` sends
-`zz:`, `http://:x@host/` sends `:x`, `http://@host/` nothing), replacing a `-u :pw` whole (BL-791).
+`zz:`, `http://:x@host/` sends `:x`, `http://@host/` nothing), replacing a `-u :pw` whole (BL-791), except that a URL user name with no URL password takes `-u`'s password (`http://user@host/ -u :secret` sends `user:secret`, BL-4915).
 Under `-n`, `--netrc-file` or `--netrc-optional` the netrc file has its say too, and the runner keeps them as the running transfer's
 `LookedUpCredentials`, which `TransferContextFactory` puts on every attempt's context in place of
 `-u`'s. A `-u` with a user name wins and no file is read. The file is the `--netrc-file` one, else the one a

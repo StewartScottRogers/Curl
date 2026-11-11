@@ -122,7 +122,7 @@ internal sealed class TransferCredentialLookup(
 
         if (authentication.Netrc == NetrcUsage.Ignored || UrlPasswordWinsOverOptionalNetrc(authentication, url))
         {
-            credentials = CredentialsWrittenInUrl(url);
+            credentials = CredentialsWrittenInUrl(url, OptionPasswordOf(authentication));
             return true;
         }
 
@@ -155,7 +155,7 @@ internal sealed class TransferCredentialLookup(
             reportInfo?.Invoke(HostNotFoundLine(url.Host, authentication.NetrcFile));
         }
 
-        credentials = CredentialsOf(result, urlUser, DecodedUserInformation(url.Password, sentCredentialEncoding));
+        credentials = CredentialsOf(result, urlUser, UrlPasswordOrOption(url, OptionPasswordOf(authentication)));
         return failure is null;
     }
 
@@ -215,6 +215,23 @@ internal sealed class TransferCredentialLookup(
     /// <returns><see langword="true" /> when <c>-u</c> gives a user name.</returns>
     private static bool UserOptionWins(EasyAuthenticationOptions authentication) =>
         !string.IsNullOrEmpty(authentication.UserName ?? authentication.UserPassword?.Split(':', 2)[0]);
+
+    /// <summary>
+    /// Gets the password <c>-u</c> gives (<see cref="EasyAuthenticationOptions.Password" />, else what
+    /// follows the first colon of <see cref="EasyAuthenticationOptions.UserPassword" />), which fills
+    /// the password a URL with a user name leaves out: curl 8.22.0 sends <c>user:secret</c> for
+    /// <c>http://user@host/ -u :secret</c> (BL-4915).
+    /// </summary>
+    /// <param name="authentication">The transfer's authentication options.</param>
+    /// <returns>The password, or <see langword="null" /> when <c>-u</c> gives none.</returns>
+    private static string? OptionPasswordOf(EasyAuthenticationOptions authentication) =>
+        authentication.Password ?? PasswordAfterFirstColon(authentication.UserPassword);
+
+    private string? UrlPasswordOrOption(CurlUrl url, string? optionPassword) =>
+        DecodedUserInformation(url.Password, sentCredentialEncoding) ?? optionPassword;
+
+    private static string? PasswordAfterFirstColon(string? userPassword) =>
+        userPassword?.Split(':', 2) is [_, string password] ? password : null;
 
     /// <summary>
     /// curl's exit-26 failure for a matching netrc entry whose login or password holds a byte below
@@ -281,17 +298,20 @@ internal sealed class TransferCredentialLookup(
     /// <summary>
     /// Gets the credentials written in the URL, sent when no netrc option is in effect: its
     /// percent-decoded user name and password, either one empty when absent, as curl 8.21.0 sends
-    /// <c>zz:</c> for <c>http://zz@host/</c> and <c>:x</c> for <c>http://:x@host/</c> (BL-791 Notes).
+    /// <c>zz:</c> for <c>http://zz@host/</c> and <c>:x</c> for <c>http://:x@host/</c> (BL-791 Notes),
+    /// except that a URL with a user name and no password takes <c>-u</c>'s password, as curl 8.22.0
+    /// sends <c>user:secret</c> for <c>http://user@host/ -u :secret</c> (BL-4915).
     /// </summary>
     /// <param name="url">The transfer's URL.</param>
+    /// <param name="optionPassword">The password <c>-u</c> gives, or <see langword="null" />.</param>
     /// <returns>
     /// The credentials, or <see langword="null" /> when the URL gives neither a user name nor a
     /// password, as <c>http://@host/</c> and <c>http://:@host/</c> send none.
     /// </returns>
-    private NetworkCredential? CredentialsWrittenInUrl(CurlUrl url)
+    private NetworkCredential? CredentialsWrittenInUrl(CurlUrl url, string? optionPassword)
     {
         string? user = DecodedUserInformation(url.User, sentCredentialEncoding);
-        string? password = DecodedUserInformation(url.Password, sentCredentialEncoding);
+        string? password = UrlPasswordOrOption(url, user is null ? null : optionPassword);
         return user is null && password is null ? null : new NetworkCredential(user ?? string.Empty, password ?? string.Empty);
     }
 
