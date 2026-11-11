@@ -760,8 +760,8 @@ internal sealed class ImapSession(
         Phase = ImapSessionPhase.Transferring;
         if (await CopyLiteralAsync(size, 0, reportsProgress: true).ConfigureAwait(false) is { } failure)
         {
-            // -I refusing the literal sends LOGOUT unless the whole response was already read (CGR-233).
-            return failure.ExitCode == CurlExitCode.WeirdServerReply && !channel.HasUnreadBytes
+            // -I refusing the literal sends LOGOUT unless the server has already hung up (CGR-233, BL-4935).
+            return failure.ExitCode == CurlExitCode.WeirdServerReply && !channel.Connection.HasPeerClosed
                 ? await LogoutIfBodyRefusedAsync(failure).ConfigureAwait(false)
                 : failure;
         }

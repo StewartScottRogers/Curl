@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Original.Protocol.Imap.UnitLibrary/ImapSession.cs, Curl.Original.Protocol.Imap.UnitTests/ImapHeadLogoutTests.cs]
+touches: [Curl.Original.Protocol.Imap.UnitLibrary/ImapSession.cs, Curl.Original.Protocol.Imap.UnitTests/ImapHeadLogoutTests.cs, Curl.Original.Protocol.Imap.UnitTests/Fakes/ScriptedConnection.cs]
 requirement: none
 created: 2026-11-11
 completed:
@@ -27,14 +27,17 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] Same exit 8 and stderr, and the mock log ends with `A005 LOGOUT`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Same exit 8 and stderr, and the mock log ends with `A005 LOGOUT`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
+Decision (Claude): measured curl 8.22.0 against a loopback PowerShell mock: LOGOUT is sent whenever the server is still open, even with the whole response in one write; a server that hung up got none (matches the earlier recorder run). The rule is now `!Connection.HasPeerClosed` instead of `!HasUnreadBytes`. ScriptedConnection (test fake) gained PeerStaysOpen/HasPeerClosed, added to touches; old tests stay valid as the exhausted script reads as hung up.
+
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 4cabf188 a0b49a29.
+- 2026-11-11: Done; build clean, Imap tests and quality run green.
