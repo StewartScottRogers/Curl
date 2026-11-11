@@ -40,3 +40,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: c912ec10 47b56d31 903bc26c a0b49a29.
+- 2026-11-11: Doing -> Backlog. Lane 1 could not integrate: build failed, and still fast tests failed twice (Curl.Console.UnitTests: RunAsync_WindowsProductionRoute_SendsSspisType1AndType3AsCurl8210Measured, RunAsync_WindowsProductionRoute_SendsSspisType1AndAType3AsCurl8210Measured; then Curl.Console.UnitTests: RunAsync_WindowsProductionRoute_SendsSspisType1AndType3AsCurl8210Measured, RunAsync_WindowsProductionRoute_SendsSspisType1AndAType3AsCurl8210Measured) after a repair run after rebasing onto the other lanes' work. The work is on branch factory/BL-4902-lane-1-20261111-082724; start with git cherry-pick --no-commit factory/BL-4902-lane-1-20261111-082724 and fix it.
