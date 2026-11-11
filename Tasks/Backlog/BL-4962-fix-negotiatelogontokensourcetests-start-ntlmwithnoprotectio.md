@@ -1,5 +1,5 @@
 ---
-id: BL-4952
+id: BL-4962
 title: Fix NegotiateLogonTokenSourceTests.Start_NtlmWithNoProtection_FirstTokenAsksNeitherToSignNorSeal failing on lane machines
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4952 — Fix NegotiateLogonTokenSourceTests.Start_NtlmWithNoProtection_FirstTokenAsksNeitherToSignNorSeal failing on lane machines
+# BL-4962 — Fix NegotiateLogonTokenSourceTests.Start_NtlmWithNoProtection_FirstTokenAsksNeitherToSignNorSeal failing on lane machines
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-4951
+id: BL-4961
 title: Write an LDAP entry whose last value is empty, as curl does, instead of its DN line alone
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4951 — Write an LDAP entry whose last value is empty, as curl does, instead of its DN line alone
+# BL-4961 — Write an LDAP entry whose last value is empty, as curl does, instead of its DN line alone
 
 ## Goal
 
