@@ -45,3 +45,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Backlog -> Doing. Criteria at claim: ed0257a9 51294672 a3c8beb1 a0b49a29.
 - 2026-11-11: Doing -> Blocked. Stewart: install .NET SDK 10.0.401 on the lane host (global.json pins it; only 10.0.100-rc.1 and 11.0.100 are installed), then requeue - the fix is written and stashed, unbuilt
 - 2026-11-11: Blocked -> Backlog. SDK 10.0.404 installed (winget, 2026-11-11 09:2x Arizona); global.json resolves. The unbuilt fix is in Z:\repos\Curl.lanes\lane-10's stash 'darkfactory BL-4900 20261111-082724' - apply it by hash, never pop.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: ed0257a9 51294672 a3c8beb1 a0b49a29.
