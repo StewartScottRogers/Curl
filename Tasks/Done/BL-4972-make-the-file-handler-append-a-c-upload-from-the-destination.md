@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4972 — Make the File handler append a -C - upload from the destination size
 
@@ -36,3 +36,4 @@ Done: cherry-picked the BL-4902 handler change (append mode plus skip = destinat
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: fe598c36 6090b5c1 a0b49a29.
+- 2026-11-11: Doing -> Done. File handler appends a -C - upload from the destination size; build clean, tests green
