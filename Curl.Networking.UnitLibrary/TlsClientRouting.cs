@@ -64,8 +64,16 @@ public static class TlsClientRouting
 
         return HandBuiltRows.FirstOrDefault(row => row.Holds(options)).Reason
             ?? (ChecksCaCertificateFileRevocationOnSchannel(options, matchesSchannelBuild) ? StapledRevocationReason : null)
-            ?? (TracesHandshakeMessagesInOpenSslBuild(options, matchesSchannelBuild) ? HandshakeMessageTraceReason : null);
+            ?? (TracesHandshakeMessagesInOpenSslBuild(options, matchesSchannelBuild) ? HandshakeMessageTraceReason : null)
+            ?? SchannelAlgorithmListRow(options, matchesSchannelBuild);
     }
+
+    private static string? SchannelAlgorithmListRow(TlsClientOptions options, bool matchesSchannelBuild) =>
+        matchesSchannelBuild && options.Ciphers is not null ? SchannelAlgorithmListReason : null;
+
+    // ADR-1245 (BL-4964): the Schannel build offers only the suites a --ciphers ALG_ID list allows,
+    // which SslStream cannot restrict on Windows.
+    private const string SchannelAlgorithmListReason = "the Schannel build offers only the cipher suites the --ciphers algorithm list allows";
 
     private const string StapledRevocationReason = "the Schannel build checks the --cacert chain's revocation, which a stapled OCSP response answers";
 

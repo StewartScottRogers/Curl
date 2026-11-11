@@ -801,7 +801,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // name that the client can run, and a list naming none of those is exit 59.
     private (IReadOnlyList<ushort>? Suites, ConnectResult? Failure) SelectCipherSuites() =>
         _matchesSchannelBuild
-            ? (null, SchannelAlgorithmList.Refusal(_options.Ciphers))
+            ? SchannelAlgorithmList.OfferedSuites(_options.Ciphers, Profile.CipherSuites)
             : SelectOpenSslCipherSuites();
 
     private (IReadOnlyList<ushort>? Suites, ConnectResult? Failure) SelectOpenSslCipherSuites()

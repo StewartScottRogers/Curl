@@ -20,7 +20,7 @@ public sealed class TlsClientRoutingTests
         [new TlsClientOptions(Insecure: true)],
         [new TlsClientOptions(CaCertificateFile: "ca.pem", CaCertificateDirectory: "certs", SkipRevocationCheck: true)],
         [new TlsClientOptions(ClientCertificate: "client.p12", Passphrase: "secret")],
-        [new TlsClientOptions(Ciphers: "ECDHE-RSA-AES128-GCM-SHA256", Tls13Ciphers: "TLS_AES_128_GCM_SHA256")],
+        [new TlsClientOptions(Tls13Ciphers: "TLS_AES_128_GCM_SHA256")],
         [new TlsClientOptions(SkipRevocationCheck: true, RevocationCheckBestEffort: true, UseAlpn: false)],
         [new TlsClientOptions(MinimumVersion: TlsVersion.Tls12)],
         [new TlsClientOptions(MinimumVersion: TlsVersion.Tls13)],
@@ -302,6 +302,20 @@ public sealed class TlsClientRoutingTests
         Diagnostics.Assert("reason", "null", actual ?? "null");
 
         Assert.IsNull(TlsClientRouting.Reason(options));
+    }
+
+    // ADR-1245 (BL-4964): a Schannel --ciphers list runs on the hand-built client, which filters the suites.
+    [TestMethod]
+    [DataRow(true, "CALG_AES_128", "the Schannel build offers only the cipher suites the --ciphers algorithm list allows")]
+    [DataRow(true, null, null)]
+    [DataRow(false, "CALG_AES_128", null)]
+    public void ReasonInBuild_WhenCiphersAreListed_NamesTheAlgorithmListInTheSchannelBuildOnly(bool matchesSchannelBuild, string? ciphers, string? expected)
+    {
+        var options = new TlsClientOptions(Ciphers: ciphers);
+
+        var actual = TlsClientRouting.ReasonInBuild(options, matchesSchannelBuild);
+
+        Assert.AreEqual(expected, actual);
     }
 
     // ADR-0985 (BL-4010): the OpenSSL build's traced handshake messages run on the hand-built

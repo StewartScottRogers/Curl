@@ -368,7 +368,12 @@ public sealed partial class EngineCompositionTests
         Diagnostics.Act("tls client options", transports.TlsClientOptions);
         Diagnostics.Assert("tls client options", expected, transports.TlsClientOptions);
         Assert.AreEqual(expected, transports.TlsClientOptions);
-        Assert.AreSame(transports.TlsClientOptions, CapturedDependency<TlsClientOptions>(transports.TlsProvider));
+        // The Schannel build's --ciphers list runs on the hand-built provider (ADR-1245), which may adjust its
+        // own copy of the options, so the provider is checked for the mapped values only.
+        TlsClientOptions held = CapturedDependency<TlsClientOptions>(transports.TlsProvider);
+        Assert.AreEqual(expected.Ciphers, held.Ciphers);
+        Assert.AreEqual(expected.Tls13Ciphers, held.Tls13Ciphers);
+        Assert.AreEqual(expected.CaCertificateDirectory, held.CaCertificateDirectory);
     }
 
 
