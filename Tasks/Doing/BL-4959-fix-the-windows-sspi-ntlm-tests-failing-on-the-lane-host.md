@@ -41,3 +41,4 @@ does not resolve there; BL-4908 ran its tests with a temporary local `global.jso
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: b258f801 3d836d5e.
