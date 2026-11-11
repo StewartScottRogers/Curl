@@ -4,7 +4,7 @@ namespace Curl.Original.Protocol.Ldap;
 
 /// <summary>
 /// Chooses the WinLDAP dialect's <see cref="LdapBindKind" /> from the auth mask and whether
-/// <c>-u</c> gave credentials, as curl 8.22.0's Schannel build does (ADR-1244): a simple bind
+/// <c>-u</c> gave credentials, as curl 8.22.0's Schannel build does (ADR-1246): a simple bind
 /// only with credentials and Basic in the mask, so <c>--ntlm</c>, <c>--digest</c> and
 /// <c>--negotiate</c> never send the password in clear; otherwise the first of Negotiate, NTLM
 /// and Digest the mask holds, or the logged-on user when there are no credentials or the mask

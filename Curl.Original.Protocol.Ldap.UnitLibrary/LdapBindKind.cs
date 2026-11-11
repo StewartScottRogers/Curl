@@ -2,7 +2,7 @@ namespace Curl.Original.Protocol.Ldap;
 
 /// <summary>
 /// How the WinLDAP dialect binds, as curl's <c>ldap_win_bind</c> and <c>ldap_win_bind_auth</c>
-/// choose from <c>-u</c> and the auth mask (ADR-1244).
+/// choose from <c>-u</c> and the auth mask (ADR-1246).
 /// </summary>
 public enum LdapBindKind
 {

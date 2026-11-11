@@ -1,4 +1,4 @@
-# ADR-1244 — The WinLDAP bind kind follows the auth mask
+# ADR-1246 — The WinLDAP bind kind follows the auth mask
 
 - Status: Accepted
 - Date: 2026-11-11
