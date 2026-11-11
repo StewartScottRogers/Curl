@@ -1,4 +1,4 @@
-# ADR-1238 — MCP requests carry curl's credentials and headers, and a 401 is exit 67
+# ADR-1243 — MCP requests carry curl's credentials and headers, and a 401 is exit 67
 
 - Status: Accepted
 - Date: 2026-11-11

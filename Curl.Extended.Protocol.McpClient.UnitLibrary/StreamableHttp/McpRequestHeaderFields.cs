@@ -5,7 +5,7 @@ namespace Curl.Extended.Protocol.McpClient.StreamableHttp;
 
 /// <summary>
 /// Builds the header fields every MCP Streamable HTTP request carries from curl's options, as curl sends them on HTTP
-/// (ADR-1238): <c>Authorization</c> from <c>--oauth2-bearer</c> (Bearer, Model Context Protocol 2025-06-18 "Authorization")
+/// (ADR-1243): <c>Authorization</c> from <c>--oauth2-bearer</c> (Bearer, Model Context Protocol 2025-06-18 "Authorization")
 /// or else <c>-u</c> (Basic), <c>User-Agent</c> from <c>-A</c> or curl's own, then each <c>-H</c> value.
 /// </summary>
 internal static class McpRequestHeaderFields

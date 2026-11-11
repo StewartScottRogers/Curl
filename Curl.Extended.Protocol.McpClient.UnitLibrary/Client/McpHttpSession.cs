@@ -37,7 +37,7 @@ internal sealed class McpHttpSession : IMcpSession
             HeaderFieldsOf(context));
     }
 
-    /// <summary>Gives the fields every request carries from <c>--oauth2-bearer</c>, <c>-u</c>, <c>-A</c> and <c>-H</c> (ADR-1238).</summary>
+    /// <summary>Gives the fields every request carries from <c>--oauth2-bearer</c>, <c>-u</c>, <c>-A</c> and <c>-H</c> (ADR-1243).</summary>
     private static IReadOnlyList<string> HeaderFieldsOf(ITransferContext context)
     {
         Curl.Protocol.Abstractions.HttpRequestOptions http = context.Http ?? new Curl.Protocol.Abstractions.HttpRequestOptions();

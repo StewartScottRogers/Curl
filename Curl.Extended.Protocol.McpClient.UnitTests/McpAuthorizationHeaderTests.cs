@@ -10,7 +10,7 @@ namespace Curl.Extended.Protocol.McpClient;
 
 /// <summary>
 /// Credentials, <c>-A</c> and <c>-H</c> on every MCP Streamable HTTP request as curl sends them on HTTP, and a persistent
-/// 401 as exit 67 (Model Context Protocol 2025-06-18 "Authorization", ADR-1238, BL-4906).
+/// 401 as exit 67 (Model Context Protocol 2025-06-18 "Authorization", ADR-1243, BL-4906).
 /// </summary>
 [TestClass]
 public sealed class McpAuthorizationHeaderTests

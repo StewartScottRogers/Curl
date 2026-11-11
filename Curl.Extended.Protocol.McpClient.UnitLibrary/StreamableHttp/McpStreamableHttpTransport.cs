@@ -31,7 +31,7 @@ public sealed class McpStreamableHttpTransport : IAsyncDisposable
     /// <param name="authority">The <c>Host</c> header's value, such as <c>example.com:8080</c>.</param>
     /// <param name="target">The MCP endpoint's request target in origin form, such as <c>/mcp</c>, already percent-encoded.</param>
     /// <param name="headerFields">Fields every request carries after <c>Host</c>, each as <c>Name: value</c> without its line
-    /// end, such as <c>Authorization</c> and <c>User-Agent</c> (ADR-1238); none when <see langword="null"/>.</param>
+    /// end, such as <c>Authorization</c> and <c>User-Agent</c> (ADR-1243); none when <see langword="null"/>.</param>
     public McpStreamableHttpTransport(Func<CancellationToken, ValueTask<IConnection>> openConnection, string authority, string target, IReadOnlyList<string>? headerFields = null)
     {
         ArgumentNullException.ThrowIfNull(openConnection);

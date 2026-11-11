@@ -4,7 +4,7 @@ using static Curl.Conformance.Extended.UnitTests.McpClient.McpClientRun;
 
 namespace Curl.Conformance.Extended.UnitTests.McpClient;
 
-/// <summary>MCP 2025-06-18 "Base Protocol &gt; Authorization" cases (BL-4906, ADR-1238).</summary>
+/// <summary>MCP 2025-06-18 "Base Protocol &gt; Authorization" cases (BL-4906, ADR-1243).</summary>
 [TestClass]
 public sealed class McpAuthorizationCases
 {
