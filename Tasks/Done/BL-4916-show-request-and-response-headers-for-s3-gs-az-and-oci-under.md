@@ -35,10 +35,10 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
-Notes (lane 8): headers reported via per-library HeadReporter (ADR-1238); unit tests pin it with recorded connections, quality run clean. Mock-server criteria met by the unit-level equivalents (>= 4 request lines: request line, Host, Authorization-type fields, empty line; < 3 response lines).
+Notes (lane 8): headers reported via per-library HeadReporter (ADR-1244); unit tests pin it with recorded connections, quality run clean. Mock-server criteria met by the unit-level equivalents (>= 4 request lines: request line, Host, Authorization-type fields, empty line; < 3 response lines).
 
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 6fc45e75 a6952bd9 a0b49a29.
-- 2026-11-11: Doing -> Done. Heads reported for s3, gs, az, oci (ADR-1238)
+- 2026-11-11: Doing -> Done. Heads reported for s3, gs, az, oci (ADR-1244)

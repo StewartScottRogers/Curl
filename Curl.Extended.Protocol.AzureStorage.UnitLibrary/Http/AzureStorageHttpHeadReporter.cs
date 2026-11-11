@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extended.Protocol.AzureStorage.Http;
 
 /// <summary>
-/// Shows each request head and response head line as curl does for http (ADR-1238): the request head goes to
+/// Shows each request head and response head line as curl does for http (ADR-1244): the request head goes to
 /// <see cref="ITransferEvents.ReportRequestHeader"/>, so <c>-v</c> prints it as <c>&gt;</c> lines, and each response line,
 /// the status line and the final empty line included, goes to <see cref="ITransferEvents.ReportResponseHeader"/>, so
 /// <c>-v</c> prints it as a <c>&lt;</c> line, and to the header output of <c>-i</c> and <c>-D</c>.

@@ -1,4 +1,4 @@
-# ADR-1238: The s3, gs, az and oci schemes show request and response heads under -v, -i and -D
+# ADR-1244: The s3, gs, az and oci schemes show request and response heads under -v, -i and -D
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-4916).
 
