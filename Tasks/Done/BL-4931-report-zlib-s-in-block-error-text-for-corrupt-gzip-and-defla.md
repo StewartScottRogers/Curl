@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpContentDecoder.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpContentCodingDecoder.cs, Curl.Original.Protocol.Http.UnitTests/CorruptDeflateMessageTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4931 — Report zlib's in-block error text for corrupt gzip and deflate responses
 
@@ -40,3 +40,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 9091f8de a0b49a29.
+- 2026-11-11: Doing -> Done. Corrupt gzip and deflate bodies now print zlib's in-block text (invalid block type, invalid code lengths set, invalid stored block lengths); fast tests green

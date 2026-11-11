@@ -1,6 +1,6 @@
 using System.Text;
-using Curl.Http2;
 using Curl.Protocol.Abstractions;
+using Curl.Http2;
 
 namespace Curl.Original.Protocol.Http;
 
