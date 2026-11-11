@@ -30,3 +30,4 @@ Found by BL-4907's quality run on 2026-11-11 (lane 11). Both tests fail on this 
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 490e00b4 a0b49a29.
