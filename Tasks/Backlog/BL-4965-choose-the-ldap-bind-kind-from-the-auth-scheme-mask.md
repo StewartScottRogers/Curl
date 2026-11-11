@@ -1,5 +1,5 @@
 ---
-id: BL-4951
+id: BL-4965
 title: Choose the LDAP bind kind from the auth-scheme mask
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4951 — Choose the LDAP bind kind from the auth-scheme mask
+# BL-4965 — Choose the LDAP bind kind from the auth-scheme mask
 
 ## Goal
 

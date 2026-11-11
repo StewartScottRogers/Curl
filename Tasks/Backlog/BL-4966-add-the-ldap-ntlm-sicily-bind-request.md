@@ -1,5 +1,5 @@
 ---
-id: BL-4952
+id: BL-4966
 title: Add the LDAP NTLM (sicily) bind request
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4952 — Add the LDAP NTLM (sicily) bind request
+# BL-4966 — Add the LDAP NTLM (sicily) bind request
 
 ## Goal
 

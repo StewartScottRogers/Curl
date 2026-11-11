@@ -1,16 +1,16 @@
 ---
-id: BL-4954
+id: BL-4968
 title: Wire the LDAP bind choice into the handler so --ntlm, --digest and --negotiate never send a cleartext simple bind
 priority: High
 assignee: Claude
 pipeline: protocol
-depends-on: [BL-4951, BL-4952, BL-4953]
+depends-on: [BL-4965, BL-4966, BL-4967]
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapAuthSchemeBindTests.cs]
 requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4954 — Wire the LDAP bind choice into the handler so --ntlm, --digest and --negotiate never send a cleartext simple bind
+# BL-4968 — Wire the LDAP bind choice into the handler so --ntlm, --digest and --negotiate never send a cleartext simple bind
 
 ## Goal
 
@@ -18,7 +18,7 @@ LDAP --ntlm, --digest and --negotiate bind with NTLM/DIGEST-MD5 instead of a cle
 
 ## Context
 
-Fitness review STD-001 (2026-11-11): LDAP --ntlm, --digest and --negotiate send the password as a cleartext simple bind (tag 0x80). REF curl 8.22.0 (Schannel) ldap_win_bind: simple bind only when Basic is allowed; NTLM/Negotiate bind name NTLM tag 0x8a with NTLMSSP payload; Digest binds tag 0xa3 DIGEST-MD5 (SASL). Mock stand-ins are PowerShell or C# file-based apps, never Python. Parent task: BL-4899. Use LdapBindKindChoice (BL-4951), LdapSicilyBind (BL-4952) and LdapDigestMd5Bind (BL-4953) from StartTlsAndBindAsync.
+Fitness review STD-001 (2026-11-11): LDAP --ntlm, --digest and --negotiate send the password as a cleartext simple bind (tag 0x80). REF curl 8.22.0 (Schannel) ldap_win_bind: simple bind only when Basic is allowed; NTLM/Negotiate bind name NTLM tag 0x8a with NTLMSSP payload; Digest binds tag 0xa3 DIGEST-MD5 (SASL). Mock stand-ins are PowerShell or C# file-based apps, never Python. Parent task: BL-4899. Use LdapBindKindChoice (BL-4965), LdapSicilyBind (BL-4966) and LdapDigestMd5Bind (BL-4967) from StartTlsAndBindAsync.
 
 ## Acceptance criteria
 

@@ -1,5 +1,5 @@
 ---
-id: BL-4953
+id: BL-4967
 title: Add the LDAP DIGEST-MD5 SASL bind request
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-11
 completed:
 ---
-# BL-4953 — Add the LDAP DIGEST-MD5 SASL bind request
+# BL-4967 — Add the LDAP DIGEST-MD5 SASL bind request
 
 ## Goal
 
