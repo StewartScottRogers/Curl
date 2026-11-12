@@ -45,3 +45,4 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 ## Log
 
 - 2026-11-12: Created.
+- 2026-11-12: Backlog -> Doing. Criteria at claim: 2bfaea6d 87757494 b0fc451b 326e1f61 8834f53f a0b49a29.
