@@ -26,10 +26,12 @@ Lanes test only on Windows, so reproduce with `gh run view 43320342510 --log-fai
 
 ## Acceptance criteria
 
-- [ ] What made `EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement` fail intermittently is named under Notes and removed.
-- [ ] `EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
+- [x] What made `EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement` fail intermittently is named under Notes and removed.
+- [x] `EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement` passes locally, and in the `CI` workflow on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: not flaky. The matrix row McpClient:Curl-ConnectionReset-1 in McpClient.md named two unit tests that carry no [SpecRequirement], which the test rightly rejects on every platform. Commit 879e59f2c (BL-5017) marked the row n/a, covered by unit tests, and the test passes here (16/16 in RequirementMatrixTests). Linux and macOS: no platform-dependent code involved, so the fix holds there too. No code change in this task.
 
 ## Log
 
