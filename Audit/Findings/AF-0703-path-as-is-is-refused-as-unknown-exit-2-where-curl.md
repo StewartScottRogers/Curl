@@ -7,8 +7,8 @@ status: accepted
 reason: Rejected by Stewart (2026-11-12: "reject AF-0703"): not a defect in Curl. It is audit 20261111-200237's planted defect (the seeder removed the path-as-is NegatableFlag row from CommandLineOptionTable); the real tree registers --path-as-is at Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:332.
 key: conformance:--path-as-is:--path-as-is:refused-option
 reproduction: none
-task: none
-tasks:
+task: BL-5006
+tasks: BL-5006
 found: 2026-11-11
 found-at: df2273e7663bedd3179f7d3166167d9ce99c6ca0
 scorecard: 2026-11-11_2002.md
