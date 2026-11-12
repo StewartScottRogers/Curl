@@ -56,11 +56,7 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
                 ? await PushAsync(context, session, reference, upload)
                 : await PullAsync(context, session, reference);
             await context.Output.WriteAsync(body, context.CancellationToken);
-<<<<<<< HEAD
-            return TransferResult.Success(body.Length) with { Report = headReporter.Report?.WithDownloadSize(body.Length) };
-=======
             return TransferResult.Success(body.Length) with { Report = headReporter.ReportWith(body.Length) };
->>>>>>> 6462aa6a1 (fix(extended): report size_download for -w on s3, gs, az, abfs, oci and grpc downloads (BL-4997))
         }
         catch (OciTransferException failure)
         {
