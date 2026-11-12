@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extended.Protocol.Grpc.Client;
 
 /// <summary>A connection that gives its scripted bytes to reads, then the end of the stream, and records what is written.</summary>
-internal sealed class ScriptedConnection(byte[] reply) : IConnection
+internal sealed class ScriptedConnection(byte[] reply, IOException? readFailure = null, IOException? writeFailure = null) : IConnection
 {
     private readonly MemoryStream reads = new(reply);
     private readonly MemoryStream writes = new();
@@ -19,10 +19,15 @@ internal sealed class ScriptedConnection(byte[] reply) : IConnection
     public byte[] Sent => writes.ToArray();
 
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(reads.Read(buffer.Span));
+        readFailure is not null && reads.Position == reads.Length ? throw readFailure : ValueTask.FromResult(reads.Read(buffer.Span));
 
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
+        if (writeFailure is not null)
+        {
+            throw writeFailure;
+        }
+
         writes.Write(buffer.Span);
         return ValueTask.CompletedTask;
     }

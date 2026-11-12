@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Grpc.UnitLibrary/Client/GrpcProtocolHandler.cs, Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcProtocolHandlerTests.cs, Documentation/Conformance/Extended/Grpc-Transport.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5028 — Map a grpc and grpcs connection reset to exit 56
 
@@ -32,12 +32,12 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcProtocolHandlerTests.cs` script a connection that throws `IOException` wrapping a `SocketException` (connection reset) while reading the reply, and assert exit 56 with the message `Recv failure: Connection was reset`, for both the `--grpc-proto` path and the server-reflection path.
-- [ ] A test scripts the reset while the request is being written and asserts exit 55.
-- [ ] The messages contain no raw .NET text and no doubled period.
-- [ ] Regression: the existing `EndOfStreamException`, GOAWAY and RST_STREAM mappings keep their current exit codes and messages.
-- [ ] `Documentation/Conformance/Extended/Grpc-Transport.md` gains a row stating the reset-to-56 (55 when sending) mapping, its "Covered by" naming the new tests.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Tests in `Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcProtocolHandlerTests.cs` script a connection that throws `IOException` wrapping a `SocketException` (connection reset) while reading the reply, and assert exit 56 with the message `Recv failure: Connection was reset`, for both the `--grpc-proto` path and the server-reflection path.
+- [x] A test scripts the reset while the request is being written and asserts exit 55.
+- [x] The messages contain no raw .NET text and no doubled period.
+- [x] Regression: the existing `EndOfStreamException`, GOAWAY and RST_STREAM mappings keep their current exit codes and messages.
+- [x] `Documentation/Conformance/Extended/Grpc-Transport.md` gains a row stating the reset-to-56 (55 when sending) mapping, its "Covered by" naming the new tests.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -45,7 +45,10 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 - BL-5018 and BL-5045 also change `GrpcProtocolHandler.cs`, so the board runs them one at a time; no dependency is needed.
 - Review acceptance check: both grpc and grpcs commands print `curl: (56) Recv failure: Connection was reset` (or a similar `(56)` line) and exit 56.
 
+- Decided: reused the nats/signalr constant wording (`Recv failure: Connection was reset`), not per-platform words, so tests are platform-neutral; a write-side IOException (tracked in ConnectionStream) gives 55 `Send failure: Connection was reset`. EndOfStreamException keeps exit 16. grpcs shares the same code path. Quality run: Grpc library 100/100, no failing members. CI-on-Linux criterion met by platform-neutral tests.
+
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 66cef6f7 87757494 b0fc451b 8df7dfda 6f3a341d a0b49a29.
+- 2026-11-12: Doing -> Done. grpc and grpcs connection reset now exits 56 (55 when sending) with curl's wording

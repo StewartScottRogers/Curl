@@ -493,6 +493,46 @@ public sealed class GrpcProtocolHandlerTests
         CollectionAssert.AreEqual(HelloWorld, call.Single());
     }
 
+    private static IOException Reset() => new("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset));
+
+    [TestMethod]
+    public async Task ExecuteAsync_ResetWhileReadingWithGrpcProto_FailsWithExit56()
+    {
+        using var proto = new ProtoFixture();
+        var connection = new ScriptedConnection([], readFailure: Reset());
+        var context = new GrpcProtoContext(new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream(), PostData = Encoding.UTF8.GetBytes("{}") }, proto.GreeterPath);
+
+        TransferResult result = await new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection, null))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Recv failure: Connection was reset", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ResetWhileReadingReflection_FailsWithExit56()
+    {
+        var connection = new ScriptedConnection([], readFailure: Reset());
+        var context = new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream(), PostData = Encoding.UTF8.GetBytes("{}") };
+
+        TransferResult result = await new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection, null))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Recv failure: Connection was reset", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ResetWhileWritingTheRequest_FailsWithExit55()
+    {
+        using var proto = new ProtoFixture();
+        var connection = new ScriptedConnection([], writeFailure: Reset());
+        var context = new GrpcProtoContext(new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream(), PostData = Encoding.UTF8.GetBytes("{}") }, proto.GreeterPath);
+
+        TransferResult result = await new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection, null))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("Send failure: Connection was reset", result.ErrorMessage);
+    }
+
     private static async Task<(List<HeaderField> Headers, byte[] Data)> SentRequestAsync(byte[] sent)
     {
         using var stream = new MemoryStream(sent, Http2Connection.ClientPreface.Length, sent.Length - Http2Connection.ClientPreface.Length);

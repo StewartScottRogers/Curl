@@ -9,6 +9,9 @@ namespace Curl.Extended.Protocol.Grpc.Client;
 /// <param name="connection">The connection; the caller owns it.</param>
 internal sealed class ConnectionStream(IConnection connection) : Stream
 {
+    /// <summary>Gets whether a write failed with an <see cref="IOException" />, which makes the failure a send failure rather than a receive failure.</summary>
+    public bool WriteFailed { get; private set; }
+
     /// <inheritdoc />
     public override bool CanRead => true;
 
@@ -35,8 +38,16 @@ internal sealed class ConnectionStream(IConnection connection) : Stream
     /// <inheritdoc />
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        await connection.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
-        await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await connection.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            WriteFailed = true;
+            throw;
+        }
     }
 
     /// <inheritdoc />

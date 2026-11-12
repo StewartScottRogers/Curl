@@ -29,6 +29,10 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
     public static bool Serves(CurlUrl url) =>
         string.Equals(url.Scheme, Scheme, StringComparison.OrdinalIgnoreCase) || IsSecure(url);
 
+    private const string RecvFailure = "Recv failure: Connection was reset";
+
+    private const string SendFailure = "Send failure: Connection was reset";
+
     /// <inheritdoc />
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
@@ -138,7 +142,22 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
     /// </summary>
     private static async Task<TransferResult> CallOverAsync(ITransferContext context, IConnection connection, GrpcRequestTarget target, GrpcProtoMethod? method, byte[]? request, ReadOnlyMemory<byte>? body)
     {
-        GrpcHttp2Session session = await GrpcHttp2Session.OpenAsync(new ConnectionStream(connection), context.CancellationToken).ConfigureAwait(false);
+        var stream = new ConnectionStream(connection);
+        try
+        {
+            return await CallOverStreamAsync(context, stream, target, method, request, body).ConfigureAwait(false);
+        }
+        catch (IOException failure) when (failure is not EndOfStreamException)
+        {
+            return TransferResult.Failure(
+                stream.WriteFailed ? CurlExitCode.SendError : CurlExitCode.RecvError,
+                stream.WriteFailed ? SendFailure : RecvFailure);
+        }
+    }
+
+    private static async Task<TransferResult> CallOverStreamAsync(ITransferContext context, ConnectionStream stream, GrpcRequestTarget target, GrpcProtoMethod? method, byte[]? request, ReadOnlyMemory<byte>? body)
+    {
+        GrpcHttp2Session session = await GrpcHttp2Session.OpenAsync(stream, context.CancellationToken).ConfigureAwait(false);
         GrpcRequestHeaderValues headerValues = HeaderValuesOf(context);
         method ??= await ServerReflectionClient.DescribeAsync(session, target, headerValues, context.CancellationToken).ConfigureAwait(false);
         request ??= GrpcMessageJson.Encode(method.Input, body);
