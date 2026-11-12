@@ -36,3 +36,4 @@ A lane whose commits change a requirement matrix (`Documentation/Conformance/Ext
 ## Log
 
 - 2026-11-12: Created.
+- 2026-11-12: Backlog -> Doing. Criteria at claim: 73354786 625f16ff 5360a3fa 32432757.
