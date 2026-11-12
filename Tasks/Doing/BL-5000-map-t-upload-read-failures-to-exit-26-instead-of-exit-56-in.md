@@ -36,3 +36,4 @@ The SignalR and Socket.IO handlers got the same catch but do not read the upload
 ## Log
 
 - 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 4b263255 c7b0d3dd 812235f9 88ec633d.
