@@ -57,9 +57,24 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
                 Method = exchange.Method,
                 EffectiveUrl = exchange.Url,
                 ContentType = headers.FirstOrDefault(field => field.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase)).Value,
+                RedirectUrl = RedirectTarget(exchange, headers),
             },
         };
     }
+
+    /// <summary>The recorded 3xx's <c>Location</c> resolved against the request URL, or <see langword="null" /> when there is none.</summary>
+    private static string? RedirectTarget(RecordedExchange exchange, IReadOnlyList<KeyValuePair<string, string>> headers)
+    {
+        var location = headers.FirstOrDefault(field => field.Key.Equals("Location", StringComparison.OrdinalIgnoreCase)).Value;
+        return exchange.StatusCode is >= 300 and < 400 ? Resolve(exchange.Url, location) : null;
+    }
+
+    private static string? Resolve(string requestUrl, string? location) =>
+        !string.IsNullOrEmpty(location)
+            && Uri.TryCreate(requestUrl, UriKind.Absolute, out var request)
+            && Uri.TryCreate(request, location, out var target)
+            ? target.AbsoluteUri
+            : null;
 
     private static async Task<TransferResult> RecordAsync(
         ExchangeDirectory directory,

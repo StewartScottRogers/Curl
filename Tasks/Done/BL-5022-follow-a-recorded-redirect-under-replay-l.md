@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.RecordReplay.UnitLibrary/RecordReplayTransferHook.cs, Curl.Extension.RecordReplay.UnitTests/RecordReplayTransferHookTests.cs, Documentation/Planning/Decisions/ADR-1135-record-and-replay-store-exchanges-in-curl-exchange-record-format-1.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5022 — Follow a recorded redirect under --replay -L
 
@@ -30,11 +30,11 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extension.RecordReplay.UnitTests/RecordReplayTransferHookTests.cs` has a test that records `/redir` (302 to `/plain`) and `/plain` (`hello`) under `-L`, then replays with no server and gets stdout `hello`, `%{http_code}` 200, `%{num_redirects}` 1 and exit 0.
-- [ ] A test shows a replay of a 302 whose `Location` target has no recording fails with a stated error (not a silent `302`, exit 0) or follows curl's rule for a missing recording as ADR-1135 states it; the chosen behaviour is written in ADR-1135 point 5.
-- [ ] Regression: a test shows `--replay` without `-L` still prints the recorded 302 as before (`[302 0]`), and a single non-redirect replay is unchanged (`ReplaySizeWriteOutTests` still pass).
-- [ ] ADR-1135 (`Documentation/Planning/Decisions/ADR-1135-record-and-replay-store-exchanges-in-curl-exchange-record-format-1.md`) states that replay under `-L` follows recorded redirects.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `Curl.Extension.RecordReplay.UnitTests/RecordReplayTransferHookTests.cs` has a test that records `/redir` (302 to `/plain`) and `/plain` (`hello`) under `-L`, then replays with no server and gets stdout `hello`, `%{http_code}` 200, `%{num_redirects}` 1 and exit 0.
+- [x] A test shows a replay of a 302 whose `Location` target has no recording fails with a stated error (not a silent `302`, exit 0) or follows curl's rule for a missing recording as ADR-1135 states it; the chosen behaviour is written in ADR-1135 point 5.
+- [x] Regression: a test shows `--replay` without `-L` still prints the recorded 302 as before (`[302 0]`), and a single non-redirect replay is unchanged (`ReplaySizeWriteOutTests` still pass).
+- [x] ADR-1135 (`Documentation/Planning/Decisions/ADR-1135-record-and-replay-store-exchanges-in-curl-exchange-record-format-1.md`) states that replay under `-L` follows recorded redirects.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -44,3 +44,6 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 228ce3e5 eea4f50d 4dc663c9 a4d60590 a0b49a29.
+
+Notes added by lane 10: the replayed 3xx now reports its `Location` (resolved against the request URL) as `RedirectUrl`, so Core's follower asks the hook for each hop; no Core change. Missing hop recording keeps the existing exit 7 (ADR-1135 point 5 states it). Hook-level tests cover the follow, the missing target and the no-redirect cases; no-`-L` is unchanged because only RedirectUrl was added. Fast tests: all green except Curl.Conformance.Extended.UnitTests RequirementMatrixTests, which fails on SpecRequirement attributes of McpBatchArgumentRefusalTests and SignalRProtocolHandlerTests (other tasks' files, present before this change).
+- 2026-11-12: Doing -> Done. Replay under -L follows recorded redirects

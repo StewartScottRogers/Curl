@@ -138,6 +138,62 @@ public sealed class RecordReplayTransferHookTests
         Assert.AreSame(context, sent);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ReplayOfA302_ReportsTheLocationResolvedAgainstTheRequestUrl_Adr1135Section5()
+    {
+        await Hook(record: _directory).ExecuteAsync(Context(), new FakeServer("HTTP/1.1 302 Found\r\nLocation: /plain\r\n\r\n", string.Empty).Invoke);
+        await Hook(record: _directory).ExecuteAsync(Context("http://example.com/plain"), new FakeServer(Head, "hello").Invoke);
+
+        var first = await Hook(replay: _directory).ExecuteAsync(Context(), NeverCalled);
+        var second = await Hook(replay: _directory).ExecuteAsync(Context(first.Report!.RedirectUrl!), NeverCalled);
+
+        Assert.AreEqual(302, first.Report.ResponseCode);
+        Assert.AreEqual("http://example.com/plain", first.Report.RedirectUrl);
+        Assert.AreEqual(200, second.Report!.ResponseCode);
+        Assert.IsNull(second.Report.RedirectUrl);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReplayOfARedirectWhoseTargetIsNotRecorded_FailsWithExit7_Adr1135Section5()
+    {
+        await Hook(record: _directory).ExecuteAsync(Context(), new FakeServer("HTTP/1.1 302 Found\r\nLocation: /gone\r\n\r\n", string.Empty).Invoke);
+        var first = await Hook(replay: _directory).ExecuteAsync(Context(), NeverCalled);
+
+        var second = await Hook(replay: _directory).ExecuteAsync(Context(first.Report!.RedirectUrl!), NeverCalled);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, second.ExitCode);
+        Assert.AreEqual($"No recorded exchange for GET http://example.com/gone in {_directory}", second.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 302 Found\r\n\r\n")]
+    [DataRow("HTTP/1.1 302 Found\r\nLocation: http://[bad\r\n\r\n")]
+    [DataRow("HTTP/1.1 200 OK\r\nLocation: /plain\r\n\r\n")]
+    public async Task ExecuteAsync_ReplayWithoutAUsableRedirect_ReportsNoRedirectUrl_Adr1135Section5(string head)
+    {
+        await Hook(record: _directory).ExecuteAsync(Context(), new FakeServer(head, string.Empty).Invoke);
+
+        var result = await Hook(replay: _directory).ExecuteAsync(Context(), NeverCalled);
+
+        Assert.IsNull(result.Report!.RedirectUrl);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReplayOfAnExchangeWhoseRecordedUrlIsNotAbsolute_ReportsNoRedirectUrl_Adr1135Section5()
+    {
+        var key = ExchangeKey.For("GET", "http://example.com/r", default);
+        Directory.CreateDirectory(_directory);
+        const string recordedHead = "HTTP/1.1 302 Found\r\nLocation: /plain\r\n\r\n";
+        await File.WriteAllBytesAsync(
+            Path.Combine(_directory, key + ".exchange"),
+            Encoding.Latin1.GetBytes("CURL-EXCHANGE 1\nGET relative\n302 " + recordedHead.Length + " 0\n" + recordedHead));
+
+        var result = await Hook(replay: _directory).ExecuteAsync(Context(), NeverCalled);
+
+        Assert.AreEqual(302, result.Report!.ResponseCode);
+        Assert.IsNull(result.Report.RedirectUrl);
+    }
+
     private static ValueTask<TransferResult> NeverCalled(ITransferContext context) => throw new AssertFailedException("The server was contacted.");
 
     private static string Text(Stream stream) => Encoding.Latin1.GetString(((MemoryStream)stream).ToArray());
@@ -158,9 +214,9 @@ public sealed class RecordReplayTransferHookTests
         return RecordReplayExtension.HookFor(new(values))!;
     }
 
-    private static TransferContext Context(bool headerOutputs = true, ReadOnlyMemory<byte>? postData = null) => new()
+    private static TransferContext Context(string url = "http://example.com/r", bool headerOutputs = true, ReadOnlyMemory<byte>? postData = null) => new()
     {
-        Url = CurlUrl.Parse("http://example.com/r"),
+        Url = CurlUrl.Parse(url),
         Output = new MemoryStream(),
         HeaderOutput = headerOutputs ? new MemoryStream() : null,
         DumpHeaderOutput = headerOutputs ? new MemoryStream() : null,
