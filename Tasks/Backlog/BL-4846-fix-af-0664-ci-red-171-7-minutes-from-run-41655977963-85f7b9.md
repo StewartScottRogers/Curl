@@ -51,6 +51,8 @@ Measured 2026-11-06 over shift 20261106-051223: no infrastructure-only red time 
 
 Fix (2026-11-04, interactive): the CI watch now reruns the failed jobs of the newest CI run on the branch whose only bad jobs never got a runner (`gh run rerun --failed`, at most twice per run, `Invoke-CiCapacityRerun` in `DarkFactory/CiWatch.ps1`), and reads the rerun afresh. AF-0664's spell was 165 minutes of such runs waiting for a push that got every runner. -TestCiWatch passes under Windows PowerShell and pwsh (three new BL-4846 cases); `dotnet build` clean and the fast tests pass (115 projects, 0 failed). Criterion 1 waits for a factory shift after the fix lands, so the task goes back to Backlog until then.
 
+Measured 2026-11-11 over today's shifts (20261111-082724, -101854, -190859; `Measure-FactoryProcess.ps1 -Since 2026-11-11 -LogRoot Z:\repos\Curl.logs` with a fresh `gh run list`): 5 red spells, 3 over 30 minutes - 131.8 min (run 43060203629, a real Quality gates failure, filed as BL-4969 22 minutes after the run ended), 74.0 min (run 43110153266, Quality gates, filed as BL-4995 6 minutes after) and 57.9 min (run 43127888162, the WriteOut_AfterADownload_ReportsEachVariable regression, filed as BL-4997/BL-4998 within a minute). No infrastructure-only red time, no failure left unread or unfiled, and every failure filed within minutes even across a shift hand-over, so the causes this finding named are fixed. The expected 'no spell over 30 minutes' still does not hold: CI's own run takes about 35 minutes (integration jobs), so any real regression's fix-and-rerun exceeds 30 minutes. Left in Backlog for the process auditor's re-audit to judge.
+
 ## Log
 
 - 2026-11-04: Created.

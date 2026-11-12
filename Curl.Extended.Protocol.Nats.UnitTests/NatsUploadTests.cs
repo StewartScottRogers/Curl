@@ -35,6 +35,44 @@ public sealed class NatsUploadTests
         Assert.AreEqual(Connect + "PUB foo 4\r\ndata\r\nPING\r\n", connection.Sent);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_AnUploadThatFailsToRead_ReportsReadErrorNotConnectionReset()
+    {
+        ScriptedConnection connection = ScriptedConnection.Of(Info, "PONG\r\n");
+
+        TransferResult result = await ExecuteAsync(connection, new TransferContext { Url = CurlUrl.Parse("nats://example.com/foo"), Output = new MemoryStream(), Upload = new FailingStream() });
+
+        Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Assert.Contains("disk gone", result.ErrorMessage ?? string.Empty);
+    }
+
+    private sealed class FailingStream : Stream
+    {
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new IOException("disk gone");
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => throw new IOException("disk gone");
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
     private static ValueTask<TransferResult> ExecuteAsync(ScriptedConnection connection, TransferContext context) =>
         new NatsProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection)), () => "_INBOX.t").ExecuteAsync(context);
 }

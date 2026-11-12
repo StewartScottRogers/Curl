@@ -20,7 +20,6 @@ public sealed class S3HttpHeadReporter(ITransferEvents events, Stream? headerOut
     private Version? httpVersion;
     private string? contentType;
     private long headerSize;
-    private bool expectsStatusLine;
 
     /// <summary>Gets a reporter that shows nothing.</summary>
     public static S3HttpHeadReporter None => new(NoTransferEvents.Instance, null);
@@ -42,7 +41,6 @@ public sealed class S3HttpHeadReporter(ITransferEvents events, Stream? headerOut
     /// <param name="head">The head's bytes.</param>
     public void ReportRequestHead(ReadOnlySpan<byte> head)
     {
-        expectsStatusLine = true;
         events.ReportRequestHeader(head);
     }
 
@@ -64,9 +62,8 @@ public sealed class S3HttpHeadReporter(ITransferEvents events, Stream? headerOut
     private void Remember(string line, int length)
     {
         headerSize += length;
-        if (expectsStatusLine)
+        if (line.StartsWith("HTTP/", StringComparison.Ordinal))
         {
-            expectsStatusLine = false;
             string[] parts = line.Split(' ', 3);
             httpVersion = parts[0] == "HTTP/1.0" ? new Version(1, 0) : new Version(1, 1);
             responseCode = parts.Length > 1 && int.TryParse(parts[1], out int code) ? code : 0;

@@ -84,7 +84,15 @@ public sealed class NatsProtocolHandler(IConnector connector, Func<string> newIn
         }
 
         using var body = new MemoryStream();
-        await upload.CopyToAsync(body, context.CancellationToken).ConfigureAwait(false);
+        try
+        {
+            await upload.CopyToAsync(body, context.CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException failure)
+        {
+            throw new NatsException(CurlExitCode.ReadError, "Failed to read the upload: " + failure.Message);
+        }
+
         return body.ToArray();
     }
 
