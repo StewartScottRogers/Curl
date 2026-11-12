@@ -145,6 +145,68 @@ public sealed class HandBuiltCertificateVerifierTests
         return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
     }
 
-    private static HandBuiltCertificateVerifier Verifier(TlsClientOptions options, bool matchesSchannelBuild = false) =>
-        new(new ServerCertificateVerification(options, matchesSchannelBuild, TimeProvider.System), null, [], null, "localhost");
+    [TestMethod]
+    [DataRow(true, "schannel: CertGetNameString() failed to match connection hostname (a.test) against server certificate names")]
+    [DataRow(false, "SSL: no alternative certificate subject name matches target hostname 'a.test'")]
+    public void Verify_WithASingleLabelWildcardCertificate_RejectsItWithExit60AndTheBuildsMessage(bool matchesSchannelBuild, string message)
+    {
+        using var certificate = CertificateNamed("*.test");
+        Diagnostics.Arrange("certificate", "SAN DNS:*.test, host a.test");
+
+        var verdict = Verifier(new TlsClientOptions(Insecure: true, ChecksHostNameWhenInsecure: true, CaCertificateFile: "ca.pem"), matchesSchannelBuild, "a.test")
+            .Verify(new ServerCertificateChain([certificate.RawData], "a.test", null));
+
+        var rejection = ((CurlExitCode ExitCode, string Message))verdict.Rejection!;
+        Diagnostics.Act("rejection", rejection);
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, rejection.ExitCode);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, rejection.ExitCode);
+        Assert.AreEqual(message, rejection.Message);
+    }
+
+    [TestMethod]
+    [DataRow("*.a.test", "x.a.test", true)]
+    [DataRow("*.test", "b.a.test", false)]
+    [DataRow("f*.test", "f.test", false)]
+    [DataRow("*", "a.test", false)]
+    [DataRow("a.test", "a.test", true)]
+    public void Verify_WithWildcardPatterns_AcceptsOnlyWhatCurlMatches(string pattern, string host, bool accepted)
+    {
+        using var certificate = CertificateNamed(pattern);
+        Diagnostics.Arrange("certificate", $"SAN DNS:{pattern}, host {host}");
+
+        var verdict = Verifier(new TlsClientOptions(Insecure: true, ChecksHostNameWhenInsecure: true), false, host)
+            .Verify(new ServerCertificateChain([certificate.RawData], host, null));
+
+        Diagnostics.Assert("accepted", accepted, verdict.IsAccepted);
+        Assert.AreEqual(accepted, verdict.IsAccepted);
+    }
+
+    [TestMethod]
+    public void Verify_WithAnIpAddressTarget_KeepsDotNetsAnswer()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var request = new CertificateRequest("CN=x", key, HashAlgorithmName.SHA256);
+        var names = new SubjectAlternativeNameBuilder();
+        names.AddIpAddress(System.Net.IPAddress.Loopback);
+        request.CertificateExtensions.Add(names.Build());
+        using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+
+        var verdict = Verifier(new TlsClientOptions(Insecure: true, ChecksHostNameWhenInsecure: true), false, "127.0.0.1")
+            .Verify(new ServerCertificateChain([certificate.RawData], "127.0.0.1", null));
+
+        Assert.IsTrue(verdict.IsAccepted);
+    }
+
+    private static X509Certificate2 CertificateNamed(string dnsName)
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var request = new CertificateRequest("CN=x", key, HashAlgorithmName.SHA256);
+        var names = new SubjectAlternativeNameBuilder();
+        names.AddDnsName(dnsName);
+        request.CertificateExtensions.Add(names.Build());
+        return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+    }
+
+    private static HandBuiltCertificateVerifier Verifier(TlsClientOptions options, bool matchesSchannelBuild = false, string host = "localhost") =>
+        new(new ServerCertificateVerification(options, matchesSchannelBuild, TimeProvider.System), null, [], null, host);
 }

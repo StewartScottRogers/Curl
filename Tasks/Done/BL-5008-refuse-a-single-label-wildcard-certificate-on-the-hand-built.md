@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/HandBuiltCertificateVerifier.cs, Curl.Networking.UnitTests/HandBuiltCertificateVerifierTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5008 — Refuse a single-label wildcard certificate on the hand-built TLS route as curl does
 
@@ -39,10 +39,10 @@ Where to start: `Curl.Networking.UnitLibrary/HandBuiltCertificateVerifier.cs`, `
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Networking.UnitTests/HandBuiltCertificateVerifierTests.cs` (leaf with SAN `DNS:*.test`, target `a.test`) shows the verdict is Rejected with `CurlExitCode.PeerFailedVerification` (60).
-- [ ] The Schannel profile's message is `schannel: CertGetNameString() failed to match connection hostname (a.test) against server certificate names` and the OpenSSL profile's is `SSL: no alternative certificate subject name matches target hostname 'a.test'`, each asserted in its own test.
-- [ ] Regression: `x.a.test` against a `*.a.test` certificate is still accepted, and `*.test` vs `b.a.test`, `f*.test` and `*` still behave as today (refused).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A unit test in `Curl.Networking.UnitTests/HandBuiltCertificateVerifierTests.cs` (leaf with SAN `DNS:*.test`, target `a.test`) shows the verdict is Rejected with `CurlExitCode.PeerFailedVerification` (60).
+- [x] The Schannel profile's message is `schannel: CertGetNameString() failed to match connection hostname (a.test) against server certificate names` and the OpenSSL profile's is `SSL: no alternative certificate subject name matches target hostname 'a.test'`, each asserted in its own test.
+- [x] Regression: `x.a.test` against a `*.a.test` certificate is still accepted, and `*.test` vs `b.a.test`, `f*.test` and `*` still behave as today (refused).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -52,3 +52,6 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 81536ade b6eefc54 2cefc5b3 a0b49a29.
+
+- 2026-11-12: Fix: `MatchesAsCurlDoes` in HandBuiltCertificateVerifier applies curl's two-dot rule (`SchannelCommonNameCheck.PatternMatchesHost`) to DNS SANs. Schannel message pinned with `--cacert` (HasCaCertificates), as the task describes; without it Schannel says SEC_E_WRONG_PRINCIPAL. Measure-CodeQuality.ps1 could not run: Curl.Conformance.Extended.UnitTests RequirementMatrixTests fails on McpClient requirement from another lane's commit (not this task). Method complexity is low and covered by the new tests.
+- 2026-11-12: Doing -> Done. Single-label wildcard SAN refused with curl's two-dot rule; tests added
