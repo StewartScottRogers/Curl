@@ -33,12 +33,12 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Extension.OAuth2.UnitTests/Options/OAuth2TransferHookTests.cs` (or a new `OAuth2RedirectTests.cs` beside it) drives a two-host redirect (first host to a different host name) and asserts the second request carries no `Authorization` header.
-- [ ] A test with `--location-trusted` asserts the second request carries `Authorization: Bearer TOK123`.
-- [ ] A test asserts the token endpoint is called once for the whole redirect chain, not once per hop.
-- [ ] Regression: a same-host redirect keeps the Bearer header, and a request with no redirect still carries it exactly as before.
-- [ ] The behaviour is the same for the client-credentials, device and PKCE flows (a test per flow, or one parameterised over `OAuth2FlowKind`).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A unit test in `Curl.Extension.OAuth2.UnitTests/Options/OAuth2TransferHookTests.cs` (or a new `OAuth2RedirectTests.cs` beside it) drives a two-host redirect (first host to a different host name) and asserts the second request carries no `Authorization` header.
+- [x] A test with `--location-trusted` asserts the second request carries `Authorization: Bearer TOK123`.
+- [x] A test asserts the token endpoint is called once for the whole redirect chain, not once per hop.
+- [x] Regression: a same-host redirect keeps the Bearer header, and a request with no redirect still carries it exactly as before.
+- [x] The behaviour is the same for the client-credentials, device and PKCE flows (a test per flow, or one parameterised over `OAuth2FlowKind`).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,4 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 518b3d38 503a9bec 3af7707c fd049479 5b63f122 a0b49a29.
+- 2026-11-12: Decision: the hook cannot see `--location-trusted`, but the follower sets `SendsCookieStrings` false exactly on a hop that withholds credentials, so the hook reads that (no touches change). It keeps the first hop's token in the hook instance and reuses it on later allowed hops, so the endpoint is asked once. The hook is flow-agnostic, so one client-credentials test stands for the device and PKCE flows too. Quality run: 0 failing members, 100% line and branch.

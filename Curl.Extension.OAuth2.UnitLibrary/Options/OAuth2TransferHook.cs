@@ -24,6 +24,8 @@ internal sealed class OAuth2TransferHook(OAuth2Configuration? configuration, str
     /// <summary>The failure when the host gives no connector.</summary>
     public const string NoServicesMessage = "The OAuth 2.0 options need curl's connector, which this transfer was not given.";
 
+    private string? firstHopToken;
+
     /// <summary>Gets what the options ask for, or <see langword="null"/> when they are wrong.</summary>
     public OAuth2Configuration? Configuration => configuration;
 
@@ -40,20 +42,65 @@ internal sealed class OAuth2TransferHook(OAuth2Configuration? configuration, str
             return TransferResult.Failure(CurlExitCode.FailedInit, optionError!);
         }
 
+        if (TryHopWithoutAsking(context, out var hop))
+        {
+            return await next(hop);
+        }
+
+        var (accessToken, failure) = await GetAccessTokenAsync(context, services);
+        if (accessToken is null)
+        {
+            return failure!;
+        }
+
+        Volatile.Write(ref firstHopToken, accessToken);
+        return await next(WithBearer(context, accessToken));
+    }
+
+    /// <summary>
+    /// Gives the transfer for a followed hop without asking the token endpoint again: without the token when curl withholds its
+    /// credentials there (another origin, no <c>--location-trusted</c>), with the first hop's token otherwise.
+    /// </summary>
+    private bool TryHopWithoutAsking(ITransferContext context, out ITransferContext hop)
+    {
+        hop = context;
+        if (context.Http is not { RedirectsFollowed: > 0 } http)
+        {
+            return false;
+        }
+
+        if (!http.SendsCookieStrings)
+        {
+            return true;
+        }
+
+        if (Volatile.Read(ref firstHopToken) is not { } kept)
+        {
+            return false;
+        }
+
+        hop = WithBearer(context, kept);
+        return true;
+    }
+    private async ValueTask<(string? AccessToken, TransferResult? Failure)> GetAccessTokenAsync(ITransferContext context, TransferHookServices services)
+    {
         OAuth2HttpClient httpClient = new(services.Connector);
-        var flow = configuration.FlowFor(httpClient, services, context.TimeProvider, messages, randomBytes);
+        var flow = configuration!.FlowFor(httpClient, services, context.TimeProvider, messages, randomBytes);
         var result = configuration.CacheDirectory is { } directory
             ? await new OAuth2CachedTokenSource(new OAuth2TokenCache(new OAuth2TokenCacheFile(directory), httpClient, context.TimeProvider))
                 .GetTokenAsync(configuration.Request, flow, context.CancellationToken)
             : await flow.RunAsync(context.CancellationToken);
         if (result.Token is not { } token)
         {
-            return TransferResult.Failure(result.ExitCode, result.Message!);
+            return (null, TransferResult.Failure(result.ExitCode, result.Message!));
         }
 
         return string.Equals(token.TokenType, "Bearer", StringComparison.OrdinalIgnoreCase)
-            ? await next(context.WithRequestHeaders([$"Authorization: Bearer {token.AccessToken}"]))
-            : TransferResult.Failure(
-                CurlExitCode.WeirdServerReply, $"The token endpoint gave a token of type \"{token.TokenType}\", which curl cannot send.");
+            ? (token.AccessToken, null)
+            : (null, TransferResult.Failure(
+                CurlExitCode.WeirdServerReply, $"The token endpoint gave a token of type \"{token.TokenType}\", which curl cannot send."));
     }
+
+    private static ITransferContext WithBearer(ITransferContext context, string accessToken) =>
+        context.WithRequestHeaders([$"Authorization: Bearer {accessToken}"]);
 }
