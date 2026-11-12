@@ -38,8 +38,13 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
             Task<long> transfer = context.Url.Scheme == "az"
                 ? new AzureBlobOperations(client, blockSize, maxBlockCount).TransferAsync(endpoint, context.Upload, context.Output)
                 : new AzureDataLakeOperations(client, blockSize).TransferAsync(endpoint, context.Upload, context.Output);
+<<<<<<< HEAD
             long bytes = await transfer;
             return TransferResult.Success(bytes) with { Report = headReporter.Report?.WithDownloadSize(bytes) };
+=======
+            long downloaded = await transfer;
+            return TransferResult.Success(downloaded) with { Report = headReporter.ReportWith(context.Upload is null ? downloaded : 0) };
+>>>>>>> 6462aa6a1 (fix(extended): report size_download for -w on s3, gs, az, abfs, oci and grpc downloads (BL-4997))
         }
         catch (AzureStorageRequestException failure)
         {

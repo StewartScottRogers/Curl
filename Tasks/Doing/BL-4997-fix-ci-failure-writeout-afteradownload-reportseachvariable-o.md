@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
+touches: [Curl.Conformance.Extended.UnitTests, Curl.Extended.Protocol.S3.UnitLibrary, Curl.Extended.Protocol.S3.UnitTests, Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary, Curl.Extended.Protocol.GoogleCloudStorage.UnitTests, Curl.Extended.Protocol.AzureStorage.UnitLibrary, Curl.Extended.Protocol.AzureStorage.UnitTests, Curl.Extended.Protocol.OciRegistry.UnitLibrary, Curl.Extended.Protocol.OciRegistry.UnitTests, Curl.Extended.Protocol.Grpc.UnitLibrary]
 requirement: none
 created: 2026-11-11
 completed:
@@ -26,7 +26,7 @@ Lanes test only on Windows, so reproduce with `gh run view 43127888162 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `WriteOut_AfterADownload_ReportsEachVariable` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `WriteOut_AfterADownload_ReportsEachVariable` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
 

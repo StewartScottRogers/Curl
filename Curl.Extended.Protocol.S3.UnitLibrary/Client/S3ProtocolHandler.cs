@@ -36,8 +36,13 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
         S3Operations operations = new(new S3Client(connector, context, configuration, endpoint, headReporter), endpoint, bucket, partSize, context.CancellationToken);
         try
         {
+<<<<<<< HEAD
             long bytes = await TransferAsync(operations, context, KeyOf(context.Url));
             return TransferResult.Success(bytes) with { Report = headReporter.Report?.WithDownloadSize(bytes) };
+=======
+            long downloaded = await TransferAsync(operations, context, KeyOf(context.Url));
+            return TransferResult.Success(downloaded) with { Report = headReporter.ReportWith(context.Upload is null ? downloaded : 0) };
+>>>>>>> 6462aa6a1 (fix(extended): report size_download for -w on s3, gs, az, abfs, oci and grpc downloads (BL-4997))
         }
         catch (S3TransferException failure)
         {

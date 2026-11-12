@@ -42,6 +42,19 @@ public sealed class GcsHttpHeadReporterTests
     }
 
     [TestMethod]
+    public async Task ReportWith_AfterAResponseHead_CarriesTheDownloadSize()
+    {
+        var reporter = new GcsHttpHeadReporter(NoTransferEvents.Instance, null);
+
+        Assert.IsNull(reporter.ReportWith(5));
+        reporter.ReportRequestHead("GET / HTTP/1.1\r\n\r\n"u8);
+        await reporter.ReportResponseLineAsync("HTTP/1.1 200 OK", CancellationToken.None);
+
+        Assert.AreEqual(5, reporter.ReportWith(5)!.DownloadSize);
+        Assert.AreEqual(0, reporter.Report!.DownloadSize);
+    }
+
+    [TestMethod]
     public async Task ReportResponseLineAsync_WithHeaderOutput_WritesTheLineWithCrlfToBothPlaces()
     {
         var events = new HeadEvents();

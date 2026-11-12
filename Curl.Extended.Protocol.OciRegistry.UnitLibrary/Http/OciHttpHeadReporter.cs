@@ -29,9 +29,14 @@ public sealed class OciHttpHeadReporter(ITransferEvents events, Stream? headerOu
     /// Gets what <c>-w</c> reports about the exchange so far: the last response's status code, HTTP version and
     /// <c>Content-Type</c>, and the size of every response head read; <see langword="null"/> before any response head.
     /// </summary>
-    public TransferReport? Report => httpVersion is null
+    public TransferReport? Report => ReportWith(0);
+
+    /// <summary>Gets what <see cref="Report"/> gets, with the body bytes received added for <c>%{size_download}</c>; <see langword="null"/> before any response head.</summary>
+    /// <param name="downloadSize">The body bytes received.</param>
+    /// <returns>The report, or <see langword="null"/>.</returns>
+    public TransferReport? ReportWith(long downloadSize) => httpVersion is null
         ? null
-        : new TransferReport { ResponseCode = responseCode, HttpVersion = httpVersion, ContentType = contentType, HeaderSize = headerSize };
+        : new TransferReport { ResponseCode = responseCode, HttpVersion = httpVersion, ContentType = contentType, HeaderSize = headerSize, DownloadSize = downloadSize };
 
     /// <summary>Reports a request head exactly as written, its CRLFs and final empty line included.</summary>
     /// <param name="head">The head's bytes.</param>
