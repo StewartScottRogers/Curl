@@ -83,4 +83,22 @@ public sealed class SmtpProtocolHandlerSaslAuthErrorTests
         Diagnostics.AssertValues("challenges", 0, sasl.Challenges.Count);
         Assert.IsEmpty(sasl.Challenges);
     }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmServerAnswersType1With235_FailsLoginDeniedSendingNothingMore()
+    {
+        // RFC 4422 section 3.6: NTLM must finish, so a 235 before the Type 2 is refused (BL-5012).
+        var sasl = new RankedSaslAuthenticator(("NTLM", "type1"u8.ToArray(), ["type3"u8.ToArray()]));
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(
+            Diagnostics,
+            new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Credentials = new NetworkCredential("user", "secret") },
+            new ScriptedConnection(Encoding.Latin1.GetBytes(
+                "220 localhost ESMTP\r\n250-localhost\r\n250 AUTH NTLM\r\n334 \r\n235 ok\r\n" + SmtpRun.HelpReply + "221 Bye\r\n")),
+            sasl);
+
+        Diagnostics.Diff("sent", "EHLO x\r\nAUTH NTLM\r\ndHlwZTE=\r\n", run.Sent);
+        Assert.AreEqual("EHLO x\r\nAUTH NTLM\r\ndHlwZTE=\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
+    }
 }

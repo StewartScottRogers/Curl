@@ -34,13 +34,17 @@ Where to start: `Curl.Original.Protocol.Smtp.UnitLibrary/SmtpSaslAuthentication.
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Original.Protocol.Smtp.UnitTests/SmtpProtocolHandlerSaslAuthErrorTests.cs` (NTLM-only server replying `235 ok` to the Type-1 message) shows the result is `CurlExitCode` 67 with message `Login denied` and that the scripted connection received no command after the Type-1 line (no MAIL FROM, RCPT TO or DATA).
-- [ ] Regression: in `Curl.Original.Protocol.Smtp.UnitTests/SmtpProtocolHandlerAuthenticationTests.cs`, a PLAIN-only server answering `235` after the PLAIN response still logs in and the transfer completes (exit 0); a complete NTLM exchange (Type-1, Type-2, Type-3, then `235`) still succeeds.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A unit test in `Curl.Original.Protocol.Smtp.UnitTests/SmtpProtocolHandlerSaslAuthErrorTests.cs` (NTLM-only server replying `235 ok` to the Type-1 message) shows the result is `CurlExitCode` 67 with message `Login denied` and that the scripted connection received no command after the Type-1 line (no MAIL FROM, RCPT TO or DATA).
+- [x] Regression: in `Curl.Original.Protocol.Smtp.UnitTests/SmtpProtocolHandlerAuthenticationTests.cs`, a PLAIN-only server answering `235` after the PLAIN response still logs in and the transfer completes (exit 0); a complete NTLM exchange (Type-1, Type-2, Type-3, then `235`) still succeeds.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text. Keep the fix in the SMTP library; if a shared change to `ISaslExchange` (in `Curl.Authentication.UnitLibrary`) is needed to ask whether the mechanism has finished, check first whether it already exposes that, and if not file it as a separate task that this one depends on.
+
+## Notes (continued)
+
+Fix kept in SMTP library: ISaslExchange has no "finished" query, so NTLM accepts 235 only after the Type-2 challenge was handed to the exchange (challengesHanded > 0). Quality run: 0 failing members. Windows-only run; tests are platform-neutral.
 
 ## Log
 

@@ -507,4 +507,17 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
 
     private Task<SmtpRun> RunAsync(TransferContext context, string replies, FakeSaslAuthenticator sasl) =>
         SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), sasl);
+
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmCompleteExchange_LogsIn()
+    {
+        var sasl = new RankedSaslAuthenticator(("NTLM", "type1"u8.ToArray(), ["type3"u8.ToArray()]));
+
+        const string Replies = Greeting + "250-localhost\r\n250-AUTH NTLM\r\n250 OK\r\n334 \r\n334 dHlwZTI=\r\n" + Accepted + HelpReplyAndBye;
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, Context(), new ScriptedConnection(Encoding.Latin1.GetBytes(Replies)), sasl);
+
+        Diagnostics.Diff("sent", Ehlo + "AUTH NTLM\r\ndHlwZTE=\r\ndHlwZTM=\r\n" + HelpAndQuit, run.Sent);
+        Assert.AreEqual(Ehlo + "AUTH NTLM\r\ndHlwZTE=\r\ndHlwZTM=\r\n" + HelpAndQuit, run.Sent);
+        Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
+    }
 }
