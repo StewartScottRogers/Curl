@@ -2764,7 +2764,7 @@ internal sealed class CurlCommandRunner(
             return (UploadUrlMalformedFailure, givenUrl, transferUrl);
         }
 
-        if (RemoteNameExtractionFailureOf(options, transfer, transferUrl) is { } extractionFailure)
+        if (RemoteNameExtractionFailureOf(dispatch.Dispatcher, options, transfer, transferUrl) is { } extractionFailure)
         {
             return (await RefuseRemoteNameExtractionAsync(options, extractionFailure).ConfigureAwait(false), givenUrl, transferUrl);
         }
@@ -3035,11 +3035,12 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The accepted command line.</param>
     /// <param name="transfer">The transfer.</param>
     /// <param name="transferUrl">The URL, with its guessed scheme.</param>
+    /// <param name="dispatcher">The dispatcher, whose handlers (extensions included) serve schemes the URL API does not list.</param>
     /// <returns>
     /// <see cref="RemoteNameUrlMalformedFailure" />, <see cref="RemoteNameUnsupportedSchemeFailure" />, or
     /// <see langword="null" /> when the transfer names no remote file or its name can be taken.
     /// </returns>
-    private static TransferResult? RemoteNameExtractionFailureOf(CommandLineOptions options, UrlTransfer transfer, string transferUrl)
+    private static TransferResult? RemoteNameExtractionFailureOf(ProtocolDispatcher dispatcher, CommandLineOptions options, UrlTransfer transfer, string transferUrl)
     {
         if (transfer.OutputFileName is not null || !transfer.UsesRemoteName)
         {
@@ -3051,7 +3052,7 @@ internal sealed class CurlCommandRunner(
             return RemoteNameUrlMalformedFailure;
         }
 
-        return UrlHandleParts.IsSupportedScheme(parsed.Scheme) ? null : RemoteNameUnsupportedSchemeFailure;
+        return UrlHandleParts.IsSupportedScheme(parsed.Scheme) || dispatcher.Serves(parsed.Scheme) ? null : RemoteNameUnsupportedSchemeFailure;
     }
 
     /// <summary>
