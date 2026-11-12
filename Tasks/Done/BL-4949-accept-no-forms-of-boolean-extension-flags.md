@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Composition.UnitLibrary, Curl.Cli.UnitLibrary]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4949 — Accept --no- forms of boolean extension flags
 
@@ -43,3 +43,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 6928193b 76b07451 a7ad9bc2 51b584e0 a0b49a29.
+- 2026-11-11: Doing -> Done. --no- forms of extension flags accepted, listed in help; tests and quality green
