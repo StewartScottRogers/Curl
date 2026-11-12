@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5054 — Fix flaky CI test EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement that failed once on Linux
 
@@ -37,3 +37,4 @@ Cause: not flaky. The matrix row McpClient:Curl-ConnectionReset-1 in McpClient.m
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: a92d0f65 a503e71a.
+- 2026-11-12: Doing -> Done. Fixed by 879e59f2c (BL-5017); test passes
