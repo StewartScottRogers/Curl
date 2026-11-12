@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Nats.UnitLibrary/NatsProtocolHandler.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-5000 — Map nats -T upload read failures to exit 26 instead of exit 56
 
@@ -26,14 +26,17 @@ The SignalR and Socket.IO handlers got the same catch but do not read the upload
 
 ## Acceptance criteria
 
-- [ ] `RequestBodyAsync` in `NatsProtocolHandler.cs` runs outside the `catch (IOException)` that maps to `RecvError`, or its `IOException` is caught on its own and mapped to `CurlExitCode.ReadError`.
-- [ ] A unit test in `Curl.Extended.Protocol.Nats.UnitTests` gives a `-T` upload stream that throws `IOException` on read and asserts exit 26, not 56.
-- [ ] The existing NATS test for a connection reset still asserts exit 56.
-- [ ] `dotnet build` is clean and the fast tests pass; the library stays at 100% line and branch coverage.
+- [x] `RequestBodyAsync` in `NatsProtocolHandler.cs` runs outside the `catch (IOException)` that maps to `RecvError`, or its `IOException` is caught on its own and mapped to `CurlExitCode.ReadError`.
+- [x] A unit test in `Curl.Extended.Protocol.Nats.UnitTests` gives a `-T` upload stream that throws `IOException` on read and asserts exit 26, not 56.
+- [x] The existing NATS test for a connection reset still asserts exit 56.
+- [x] `dotnet build` is clean and the fast tests pass; the library stays at 100% line and branch coverage.
 
 ## Notes
+
+- IOException from the upload copy is now caught inside RequestBodyAsync and thrown as NatsException(ReadError, "Failed to read the upload: ..."), so it maps to exit 26. Network resets still map to 56. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 4b263255 c7b0d3dd 812235f9 88ec633d.
+- 2026-11-11: Doing -> Done. nats -T read failures map to exit 26
