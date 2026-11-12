@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs, Curl.Original.Protocol.File.UnitTests/FileProtocolHandlerUploadSizeTests.cs, Curl.Output.UnitTests/TransferWriteOutVariablesTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5025 — Report file:// uploads as size_upload in -w, not size_download
 
@@ -43,3 +43,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 2c6e2a92 a0ad802a c93d26ed fc55c716 a0b49a29.
+- 2026-11-12: Doing -> Done. file:// uploads report UploadSize; tests added, build and fast tests green
