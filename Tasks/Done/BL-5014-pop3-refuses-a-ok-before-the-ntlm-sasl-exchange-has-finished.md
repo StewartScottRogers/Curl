@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Pop3.UnitLibrary/Pop3Login.cs, Curl.Original.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerSaslAuthErrorTests.cs, Curl.Original.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerLoginTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5014 — POP3 refuses a +OK before the NTLM SASL exchange has finished with exit 67
 
@@ -34,9 +34,9 @@ Where to start: `Curl.Original.Protocol.Pop3.UnitLibrary/Pop3Login.cs`, about li
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Original.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerSaslAuthErrorTests.cs` (NTLM-only server replying `+OK` to the Type-1 message) shows the result is `CurlExitCode` 67 with message `Login denied` and that the scripted connection received no command after the Type-1 line (no RETR).
-- [ ] Regression: in `Curl.Original.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerLoginTests.cs`, a PLAIN-only server answering `+OK` after the PLAIN response still logs in (exit 0); a complete NTLM exchange (Type-1, Type-2, Type-3, then `+OK`) still succeeds.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A unit test in `Curl.Original.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerSaslAuthErrorTests.cs` (NTLM-only server replying `+OK` to the Type-1 message) shows the result is `CurlExitCode` 67 with message `Login denied` and that the scripted connection received no command after the Type-1 line (no RETR).
+- [x] Regression: in `Curl.Original.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerLoginTests.cs`, a PLAIN-only server answering `+OK` after the PLAIN response still logs in (exit 0); a complete NTLM exchange (Type-1, Type-2, Type-3, then `+OK`) still succeeds.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -46,3 +46,5 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: ddba1fe3 58097ba0 a0b49a29.
+- 2026-11-12: Fix kept in Pop3Login.cs: NTLM +OK with no Type-2 challenge handed is Login denied (no ISaslExchange change; the exchange exposes no completion, so the check is NTLM-specific). Tests added in both named files. Pop3 quality run: 0 failing members.
+- 2026-11-12: Doing -> Done. POP3 NTLM +OK before Type-2 is Login denied; tests added

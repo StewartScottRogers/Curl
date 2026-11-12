@@ -82,4 +82,23 @@ public sealed class Pop3ProtocolHandlerSaslAuthErrorTests
         Diagnostics.AssertValues("sasl.Challenges count", 0, sasl.Challenges.Count());
         Assert.IsEmpty(sasl.Challenges);
     }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmServerSaysOkToTheType1Message_DeniesTheLoginSendingNothingMore()
+    {
+        // BL-5014: +OK before the Type-2 challenge is a mechanism that has not finished.
+        var sasl = new ScriptedSaslAuthenticator(("NTLM", ["T1", "T3"]));
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes("+OK hi\r\n+OK\r\nSASL NTLM\r\n.\r\n+ \r\n+OK early\r\n+OK message\r\n"));
+        var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Credentials = new NetworkCredential("user", "secret") };
+        Diagnostics.ArrangeRun(Url, connection.Script);
+
+        TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider(), sasl)
+            .ExecuteAsync(context);
+        Diagnostics.ActResult(result);
+
+        string sent = Encoding.Latin1.GetString(connection.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+        Assert.StartsWith("CAPA\r\nAUTH NTLM\r\nVDE=\r\n", sent);
+        Assert.DoesNotContain("RETR", sent);
+    }
 }
