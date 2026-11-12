@@ -1,4 +1,8 @@
+using System.Net;
 using System.Text;
+using Curl.Original.Protocol.Ldap.Fakes;
+using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Original.Protocol.Ldap;
 
@@ -81,5 +85,80 @@ public sealed class LdapDigestMd5BindTests
         byte[]? request = LdapDigestMd5Bind.AnswerRequest(Writer, 1, Encoding.ASCII.GetBytes("nonce=\"abc\",x=\"y\\"), "u", "p", "ldap/h", "c");
 
         Assert.IsNotNull(request);
+    }
+
+    private const string PlainBindSuccess = "30 0c 02 01 01 61 07 0a 01 00 04 00 04 00";
+
+    private const string BindSuccess2 = "30 0c 02 01 02 61 07 0a 01 00 04 00 04 00";
+
+    private const string BindInvalidCredentials = "30 0c 02 01 01 61 07 0a 01 31 04 00 04 00";
+
+    private const string SearchEntry = "30 0d 02 01 02 64 08 04 04 63 6e 3d 61 30 00";
+
+    private const string SearchDone3 = "30 0c 02 01 02 65 07 0a 01 00 04 00 04 00";
+
+    private const string DigestSearchEntry = "30 0d 02 01 03 64 08 04 04 63 6e 3d 61 30 00";
+
+    private const string DigestSearchDone = "30 0c 02 01 03 65 07 0a 01 00 04 00 04 00";
+
+    [TestMethod]
+    public async Task ExecuteAsync_DigestAnsweredWithPlainSuccess_FailsWith38ProtocolErrorAndSendsNoSearch()
+    {
+        (TransferResult result, byte[] sent, string output) = await RunAsync(HttpAuthSchemes.Digest, PlainBindSuccess, SearchEntry, SearchDone3);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Protocol Error"), result);
+        Assert.IsFalse(sent.Contains((byte)0x63), "No SearchRequest (tag 0x63) may be sent.");
+        Assert.AreEqual(string.Empty, output);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DigestRefusedByTheServer_FailsWith38WithTheServersResult()
+    {
+        (TransferResult result, _, _) = await RunAsync(HttpAuthSchemes.Digest, BindInvalidCredentials);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Invalid Credentials"), result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DigestChallengeAnswered_BindsAndReturnsTheEntry()
+    {
+        (TransferResult result, byte[] sent, string output) = await RunAsync(HttpAuthSchemes.Digest, ChallengeReply(), BindSuccess2, DigestSearchEntry, DigestSearchDone);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsTrue(Encoding.ASCII.GetString(sent).Contains("digest-uri", StringComparison.Ordinal));
+        StringAssert.Contains(output, "cn=a");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_BasicAgainstAlwaysSuccessServer_BindsAndReturnsTheEntry()
+    {
+        (TransferResult result, _, string output) = await RunAsync(HttpAuthSchemes.Basic, PlainBindSuccess, SearchEntry, SearchDone3);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        StringAssert.Contains(output, "cn=a");
+    }
+
+    private static string ChallengeReply()
+    {
+        byte[] creds = Encoding.ASCII.GetBytes("realm=\"r\",nonce=\"abc\",qop=\"auth\",charset=utf-8,algorithm=md5-sess");
+        return $"30 {(creds.Length + 14):x2} 02 01 01 61 {(creds.Length + 9):x2} 0a 01 0e 04 00 04 00 87 {creds.Length:x2} {Convert.ToHexString(creds)}";
+    }
+
+    private static async Task<(TransferResult Result, byte[] Sent, string Output)> RunAsync(HttpAuthSchemes schemes, params string[] replies)
+    {
+        var connection = new ScriptedConnection([.. replies.Select(Hex.Bytes)]);
+        var handler = new LdapProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)), LdapDialect.WinLdap, new FakeLogonTokenSource(2));
+        var output = new MemoryStream();
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse("ldap://127.0.0.1:18389/dc=example"),
+            Output = output,
+            Credentials = new NetworkCredential("cn=admin,dc=x", "pw"),
+            Http = new Curl.Protocol.Abstractions.HttpRequestOptions { AuthSchemes = schemes },
+        };
+
+        TransferResult result = await handler.ExecuteAsync(context);
+
+        return (result, connection.Sent, Encoding.UTF8.GetString(output.ToArray()));
     }
 }

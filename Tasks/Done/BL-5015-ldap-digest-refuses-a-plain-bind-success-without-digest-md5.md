@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5BindTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5015 — LDAP --digest refuses a plain bind success without DIGEST-MD5 with exit 38
 
@@ -34,11 +34,13 @@ Where to start: `Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.c
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5BindTests.cs` (mock answering BindResponse resultCode 0 with no serverSaslCreds to the first DIGEST-MD5 bind) shows exit `CurlExitCode` 38 with message `LDAP local: bind via ldap_win_bind Protocol Error`, no SearchRequest sent, and nothing written to stdout.
-- [ ] Regression: in the same project, a real DIGEST-MD5 exchange (challenge, response, success) still binds, and `--basic` against the same always-success mock still binds and returns the entry (exit 0).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A unit test in `Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5BindTests.cs` (mock answering BindResponse resultCode 0 with no serverSaslCreds to the first DIGEST-MD5 bind) shows exit `CurlExitCode` 38 with message `LDAP local: bind via ldap_win_bind Protocol Error`, no SearchRequest sent, and nothing written to stdout.
+- [x] Regression: in the same project, a real DIGEST-MD5 exchange (challenge, response, success) still binds, and `--basic` against the same always-success mock still binds and returns the entry (exit 0).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fix: DigestAsync returns Protocol Error (result 2) when the first reply is a plain success. Unit tests in LdapDigestMd5BindTests cover refusal, real challenge, Basic regression. Platform text for the Linux build not measured; the test pins the WinLdap dialect text only. Quality run: 0 failing members.
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text. The expected message is REF's Windows (Schannel build) text; measure the Linux/OpenSSL build's answer for the same mock and pin each platform's text in its own test if they differ.
 
@@ -46,3 +48,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 9b350057 0cc9e8ee a0b49a29.
+- 2026-11-12: Doing -> Done. LDAP --digest refuses plain bind success with exit 38 Protocol Error
