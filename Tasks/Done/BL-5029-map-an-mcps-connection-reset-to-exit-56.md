@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.McpClient.UnitLibrary/StreamableHttp/McpStreamableHttpTransport.cs, Curl.Extended.Protocol.McpClient.UnitTests/StreamableHttp/McpStreamableHttpTransportTests.cs, Documentation/Conformance/Extended/McpClient.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5029 — Map an mcps connection reset to exit 56
 
@@ -30,19 +30,22 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Extended.Protocol.McpClient.UnitTests/StreamableHttp/McpStreamableHttpTransportTests.cs` script a connection (`RecordedConnection`) that throws `IOException` wrapping a `SocketException` (connection reset) while reading the reply, and assert exit 56 with the message `Recv failure: Connection was reset`.
-- [ ] A test scripts the reset while the request is being written and asserts exit 55.
-- [ ] The messages contain no raw .NET text and no doubled period.
-- [ ] Regression: the existing HTTP failure mappings (`McpHttpException`, `McpHttpFailure`) keep their current exit codes and messages.
-- [ ] `Documentation/Conformance/Extended/McpClient.md` gains a row stating the reset-to-56 (55 when sending) mapping, its "Covered by" naming the new tests.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Tests in `Curl.Extended.Protocol.McpClient.UnitTests/StreamableHttp/McpStreamableHttpTransportTests.cs` script a connection (`RecordedConnection`) that throws `IOException` wrapping a `SocketException` (connection reset) while reading the reply, and assert exit 56 with the message `Recv failure: Connection was reset`.
+- [x] A test scripts the reset while the request is being written and asserts exit 55.
+- [x] The messages contain no raw .NET text and no doubled period.
+- [x] Regression: the existing HTTP failure mappings (`McpHttpException`, `McpHttpFailure`) keep their current exit codes and messages.
+- [x] `Documentation/Conformance/Extended/McpClient.md` gains a row stating the reset-to-56 (55 when sending) mapping, its "Covered by" naming the new tests.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check: `mcps://127.0.0.1:46040/m` prints `curl: (56) Recv failure: Connection was reset` (or a similar `(56)` line) and exits 56.
 
+- Mapped IOException/SocketException to 55 (write) or 56 (read) via McpClientException in McpStreamableHttpTransport; extended test RecordedConnection (UnitTests/StreamableHttp/RecordedConnection.cs) with readFailure/writeFailure; added conformance row. Quality run: 0 failing members.
+
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 2bfaea6d 87757494 b0fc451b 326e1f61 8834f53f a0b49a29.
+- 2026-11-12: Doing -> Done. mcp/mcps connection reset exits 56 (55 when sending) with curl-style text
