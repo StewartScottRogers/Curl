@@ -27,13 +27,15 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] With `sse` in config file `cfg`, `curl -K cfg --no-sse http://127.0.0.1:18800/plain` prints `hello`.
-- [ ] Each listed `--no-` form is accepted.
-- [ ] `--ai-help` and `--extended-help` show the `--no-` forms.
-- [ ] With `CURL_EXTENSIONS=0` the `--no-` forms are unknown options, like the flags themselves.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With `sse` in config file `cfg`, `curl -K cfg --no-sse http://127.0.0.1:18800/plain` prints `hello`.
+- [x] Each listed `--no-` form is accepted.
+- [x] `--ai-help` and `--extended-help` show the `--no-` forms.
+- [x] With `CURL_EXTENSIONS=0` the `--no-` forms are unknown options, like the flags themselves.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Decided: a flag extension option is negated in the parser (`NegateExtensionFlag`) by forgetting its value; value options and unknown names stay unknown; listings show `--x, --no-x`. Verified by unit tests and the quality run (0 failing members).
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 

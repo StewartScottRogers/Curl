@@ -531,7 +531,7 @@ public static class CommandLineParser
         string negatedName = longName[NegationPrefix.Length..];
         if (!TryFindLongOption(options, negatedName, out CommandLineOption? option))
         {
-            return RefuseUnlistedName(argument);
+            return NegateExtensionFlag(options, argument, negatedName);
         }
 
         if (option.Negate is null)
@@ -540,6 +540,21 @@ public static class CommandLineParser
         }
 
         return option.Negate(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
+    }
+
+    /// <summary>
+    /// Reads <c>--no-&lt;name&gt;</c> for an extension flag (BL-4949): turns the flag off, so one set in a config file can
+    /// be switched off per run; refuses it as unknown when the name is no extension flag.
+    /// </summary>
+    private static CommandLineRefusal? NegateExtensionFlag(CommandLineOptions options, string argument, string flagName)
+    {
+        if (!options.ExtensionOptions.TryGetValue(flagName, out CommandLineExtensionOption? flag) || flag.TakesValue)
+        {
+            return RefuseUnlistedName(argument);
+        }
+
+        options.RemoveExtensionOptionValue(flag.LongName);
+        return null;
     }
 
     /// <summary>

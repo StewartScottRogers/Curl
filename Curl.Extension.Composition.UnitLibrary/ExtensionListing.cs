@@ -51,7 +51,7 @@ public static class ExtensionListing
     /// <returns>The lines, in order.</returns>
     internal static IReadOnlyList<string> LinesOf(IEnumerable<ExtensionDescription> descriptions) =>
         [.. descriptions.Select(description =>
-            $"{description.Name}: {description.Summary} Schemes: {ListOf(description.Schemes, scheme => scheme)}. Options: {ListOf(description.Options, option => "--" + option.Name)}.")];
+            $"{description.Name}: {description.Summary} Schemes: {ListOf(description.Schemes, scheme => scheme)}. Options: {ListOf(description.Options, LineOptionText)}.")];
 
     /// <summary>Builds the <c>--ai-help extensions</c> Markdown for <paramref name="descriptions" />.</summary>
     /// <param name="descriptions">The extensions' descriptions.</param>
@@ -85,7 +85,10 @@ public static class ExtensionListing
     private static string OptionText(ExtensionOption option) =>
         option.Argument == ExtensionOptionArgument.Value
             ? $"`--{option.Name} <value>` ({option.Help})"
-            : $"`--{option.Name}` ({option.Help})";
+            : $"`--{option.Name}` or `--no-{option.Name}` ({option.Help})";
+
+    private static string LineOptionText(ExtensionOption option) =>
+        option.Argument == ExtensionOptionArgument.Value ? "--" + option.Name : $"--{option.Name}, --no-{option.Name}";
 
     private static string ListOf<T>(IReadOnlyList<T> items, Func<T, string> format) =>
         items.Count == 0 ? "none" : string.Join(", ", items.Select(format));

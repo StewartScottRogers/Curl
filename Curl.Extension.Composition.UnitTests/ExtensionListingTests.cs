@@ -42,7 +42,7 @@ public sealed class ExtensionListingTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "cache: Keeps responses on disk. Schemes: cache, caches. Options: --cache-dir, --cache-off.",
+                "cache: Keeps responses on disk. Schemes: cache, caches. Options: --cache-dir, --cache-off, --no-cache-off.",
                 "plain: Adds nothing. Schemes: none. Options: none.",
             },
             ExtensionListing.LinesOf([Cache, Plain]).ToArray());
@@ -54,7 +54,7 @@ public sealed class ExtensionListingTests
         string markdown = ExtensionListing.MarkdownOf([Cache, Plain], off: false);
 
         StringAssert.StartsWith(markdown, "# extensions\n\n");
-        StringAssert.Contains(markdown, "## cache\n\nKeeps responses on disk.\n\n- Schemes: `cache://`, `caches://`\n- Options: `--cache-dir <value>` (Keep responses in <dir>), `--cache-off` (Skip the cache)\n- Specification: <https://example.com/cache>\n\n");
+        StringAssert.Contains(markdown, "## cache\n\nKeeps responses on disk.\n\n- Schemes: `cache://`, `caches://`\n- Options: `--cache-dir <value>` (Keep responses in <dir>), `--cache-off` or `--no-cache-off` (Skip the cache)\n- Specification: <https://example.com/cache>\n\n");
         StringAssert.EndsWith(markdown, "## plain\n\nAdds nothing.\n\n- Schemes: none\n- Options: none\n- Specification: <https://example.com/plain>\n\n");
     }
 
