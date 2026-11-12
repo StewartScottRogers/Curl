@@ -42,10 +42,12 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Acceptance criteria
 
-- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
+- [x] Every CI failure on `work/dark-factory` in a window of the live logs written after the fix landed is filed as a task, covered by a live task, or green again within 30 minutes of its run ending (Stewart, 2026-11-12: "every failure filed within 30 minutes", replacing "no red spell over 30 minutes", which CI's own ~35-minute run makes unreachable); Notes name the window and the slowest time.
 - [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Measured 2026-11-12 against the new criterion over 2026-11-11 15:00Z onward (shifts 20261111-101854 and -190859; `gh run list --workflow CI --branch work/dark-factory` and the coordinators' "ci" trace lines): 14 failed CI runs, every one read by the coordinator within 0-22 minutes of ending. The slowest was run 43060203629 (Quality gates; ended 10:05 Arizona, filed as BL-4969 at 10:27, 22 minutes). The rest were filed (BL-4974, BL-4995, BL-4997/BL-4998), covered by a live task, or green again within minutes. The criterion holds.
 
 ## Log
 
