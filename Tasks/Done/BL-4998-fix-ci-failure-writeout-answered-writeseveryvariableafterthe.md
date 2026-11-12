@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4998 — Fix CI failure WriteOut_Answered_WritesEveryVariableAfterTheBody on Linux and Windows
 
@@ -28,11 +28,14 @@ Lanes test only on Windows, so reproduce with `gh run view 43127888162 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `WriteOut_Answered_WritesEveryVariableAfterTheBody` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `WriteOut_Answered_WritesEveryVariableAfterTheBody` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: BL-4938 made the grpc handler return a TransferReport, which replaced the engine default whose DownloadSize was the bytes written, so %{size_download} printed 0. The handler now sets DownloadSize to the bytes written; the report is non-null by construction (GrpcCallResult.Report). Platform-neutral; grpc and conformance fast tests green, grpc library quality 100/100.
 
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 047f8d90.
+- 2026-11-11: Doing -> Done. grpc report keeps size_download

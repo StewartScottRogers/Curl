@@ -77,8 +77,8 @@ internal static class GrpcHttp2Call
         /// <summary>Gets the messages read so far.</summary>
         public List<GrpcMessage> Messages { get; } = [];
 
-        /// <summary>Gets what <c>-w</c> reports about the response head, or <see langword="null" /> before it is read.</summary>
-        public TransferReport? Report { get; private set; }
+        /// <summary>Gets what <c>-w</c> reports about the response head, or an empty report before it is read.</summary>
+        public TransferReport Report { get; private set; } = new();
 
         /// <summary>Reads one frame; gives the call's status when the frame ended it, otherwise <see langword="null" />.</summary>
         public GrpcStatus? Read(Http2StreamFrame frame)

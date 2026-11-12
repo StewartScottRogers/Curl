@@ -50,6 +50,7 @@ public sealed class GrpcProtocolHandlerTests
         TransferReport report = result.Report!;
         Assert.AreEqual(200, report.ResponseCode);
         Assert.AreEqual(new Version(2, 0), report.HttpVersion);
+        Assert.AreEqual(0, report.DownloadSize);
         Assert.AreEqual("application/grpc", report.ContentType);
         Assert.AreEqual("HTTP/2 200 \r\n".Length + "content-type: application/grpc\r\n".Length + "grpc-status: 0\r\n".Length + 2, report.HeaderSize);
     }
