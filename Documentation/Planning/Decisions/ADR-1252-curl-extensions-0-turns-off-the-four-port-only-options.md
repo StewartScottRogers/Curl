@@ -1,4 +1,4 @@
-# ADR-1251 — CURL_EXTENSIONS=0 turns off --ai-help, --extended-help, --log-level and --log-file
+# ADR-1252 — CURL_EXTENSIONS=0 turns off --ai-help, --extended-help, --log-level and --log-file
 
 - Status: Accepted
 - Date: 2026-11-11

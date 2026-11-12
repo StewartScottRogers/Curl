@@ -36,10 +36,10 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
-Decision (ADR-1251): the parser hides the four names under CURL_EXTENSIONS=0 (also `--no-`/`--expand-` spellings); `--help` pages drop the `--ai-help` line/row so they equal the reference bytes (reference files already in Curl.Cli.UnitTests); `--extended-help` / `--ai-help extensions` list `--log-level`/`--log-file` as a `diagnostic-log` entry (added in the runner, since no extension owns them). Extended conformance cases Listing-2 and Listing-4 now pin the unknown-option refusal (touches widened; no other Doing task holds them). Not run live against Schannel curl: the unknown-option text is the existing parser refusal. Quality run: Cli and Console 100/100, CRAP 10.
+Decision (ADR-1252): the parser hides the four names under CURL_EXTENSIONS=0 (also `--no-`/`--expand-` spellings); `--help` pages drop the `--ai-help` line/row so they equal the reference bytes (reference files already in Curl.Cli.UnitTests); `--extended-help` / `--ai-help extensions` list `--log-level`/`--log-file` as a `diagnostic-log` entry (added in the runner, since no extension owns them). Extended conformance cases Listing-2 and Listing-4 now pin the unknown-option refusal (touches widened; no other Doing task holds them). Not run live against Schannel curl: the unknown-option text is the existing parser refusal. Quality run: Cli and Console 100/100, CRAP 10.
 
 ## Log
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 1e602075 4d306ed5 701a25cc a0b49a29.
-- 2026-11-11: Doing -> Done. CURL_EXTENSIONS=0 now refuses the four port-only options and --help is curl's bytes (ADR-1251)
+- 2026-11-11: Doing -> Done. CURL_EXTENSIONS=0 now refuses the four port-only options and --help is curl's bytes (ADR-1252)

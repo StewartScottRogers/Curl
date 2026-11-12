@@ -1298,4 +1298,4 @@ Each option and the specific reason it lost.
 | [1249](ADR-1249-storage-schemes-refuse-a-method-they-cannot-send.md) | s3, gs, az and oci refuse -I and a -X they cannot send, with exit 4 before any request (BL-4904) | Accepted | 2026-11-11 |
 | [1250](ADR-1250-schannel-ciphers-measured-against-a-local-tls-12-server.md) | Schannel --ciphers CALG_AES_128 and CALG_RSA_KEYX negotiate the same suites as curl 8.22.0 against a local TLS 1.2 server (BL-4992) | Accepted | 2026-11-11 |
 | [1251](ADR-1251-a-refused-stomp-or-mqtt5-login-ends-with-exit-67.md) | A refused STOMP or MQTT 5 login ends with exit 67, superseding ADR-1059 and ADR-1049 for those cases (BL-4941) | Accepted | 2026-11-11 |
-| [1251](ADR-1251-curl-extensions-0-turns-off-the-four-port-only-options.md) | CURL_EXTENSIONS=0 turns off --ai-help, --extended-help, --log-level and --log-file (BL-4937) | Accepted | 2026-11-11 |
+| [1252](ADR-1252-curl-extensions-0-turns-off-the-four-port-only-options.md) | CURL_EXTENSIONS=0 turns off --ai-help, --extended-help, --log-level and --log-file (BL-4937) | Accepted | 2026-11-11 |
