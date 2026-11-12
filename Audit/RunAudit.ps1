@@ -147,12 +147,12 @@ $commonGit = "$(& git -C $PSScriptRoot rev-parse --path-format=absolute --git-co
 if ($OnWindows) { $commonGit = $commonGit -replace '/', '\' }
 $repo = if ($commonGit) { Split-Path $commonGit -Parent } else { (Resolve-Path (Join-Path $PSScriptRoot '..')).Path }
 $Order = @('quality', 'security', 'conformance', 'truthfulness', 'process')
-# Every auditor runs on Sonnet to save tokens (Stewart, 2026-11-11: "move the auditors to sonnet too").
-# History: quality, truthfulness and process went from Sonnet to Opus on 2026-10-03 (BL-1364) because
-# on Sonnet they cut their methods short in three audits running. If the scorecard marks an auditor
-# unreliable (a missed planted defect, no report block), put that one auditor back on opus here and
-# in its .claude/agents/audit-<name>.md.
-$Models = @{ quality = 'sonnet'; security = 'sonnet'; conformance = 'sonnet'; truthfulness = 'sonnet'; process = 'sonnet'; seeder = 'sonnet' }
+# Auditors run on Sonnet to save tokens (Stewart, 2026-11-11), except where Sonnet proved unreliable.
+# Audit 20261111-200237, the first all-Sonnet audit, marked quality (0 of 2 planted caught), conformance
+# (2 of 3) and truthfulness (0 of 1) unreliable, so those three are back on Opus; security and process
+# caught every planted defect on Sonnet and stay there. History: BL-1364 (2026-10-03) moved quality,
+# truthfulness and process to Opus when they cut their methods short on Sonnet.
+$Models = @{ quality = 'opus'; security = 'sonnet'; conformance = 'opus'; truthfulness = 'opus'; process = 'sonnet'; seeder = 'sonnet' }
 $Method = @{ quality = 'Quality'; security = 'Security'; conformance = 'Conformance'; truthfulness = 'Truthfulness'; process = 'Process' }
 $Dot = [char]0x00B7
 $Started = Get-Date

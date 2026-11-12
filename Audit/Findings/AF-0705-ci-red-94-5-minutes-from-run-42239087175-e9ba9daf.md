@@ -3,12 +3,12 @@ id: AF-0705
 title: CI red 94.5 minutes from run 42239087175 (e9ba9daf, SocketAction_TimeoutAgainstASilentServer_TellsTheTimeout)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: process:logs:run-42239087175:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-5002
+tasks: BL-5002
 found: 2026-11-11
 found-at: df2273e7663bedd3179f7d3166167d9ce99c6ca0
 scorecard: 2026-11-11_2002.md
@@ -44,4 +44,5 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Log
 
+- 2026-11-12: accepted. Accepted under Stewart's standing accept of 2026-11-02.
 - 2026-11-11: filed proposed.
