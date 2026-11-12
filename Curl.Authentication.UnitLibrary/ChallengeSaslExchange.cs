@@ -18,6 +18,9 @@ internal sealed class ChallengeSaslExchange(string mechanism, params Func<byte[]
 {
     private int challengesAnswered;
 
+    /// <summary>Gets the reason the last answer was not given, as curl's -v line words it, or <see langword="null" /> when it was.</summary>
+    public string? CancelReason { get; set; }
+
     /// <inheritdoc />
     public string Mechanism => mechanism;
 

@@ -162,7 +162,7 @@ public sealed class SaslAuthenticator(
         return name switch
         {
             SaslMechanismRanking.CramMd5 => new ChallengeSaslExchange(name, challenge => CramMd5Answer(request, challenge)),
-            SaslMechanismRanking.DigestMd5 => new ChallengeSaslExchange(name, challenge => DigestMd5Answer(request, challenge), _ => []),
+            SaslMechanismRanking.DigestMd5 => BeginDigestMd5(name, request),
             _ => throw new ArgumentException($"The SASL mechanism '{mechanism}' is not built.", nameof(mechanism)),
         };
     }
@@ -213,6 +213,24 @@ public sealed class SaslAuthenticator(
                 ?? throw DigestMd5Failed()
             : SaslDigestMd5.AnswerAsCurl(challenge, credentialEncoding, UserOf(request), PasswordOf(request), digestUri, createClientNonce());
     }
+
+    // An empty challenge is cancelled with * and the next mechanism tried, as curl does
+    // (BL-5033); the rspauth answer that follows is empty.
+    private ChallengeSaslExchange BeginDigestMd5(string name, SaslRequest request)
+    {
+        ChallengeSaslExchange? exchange = null;
+        exchange = new ChallengeSaslExchange(
+            name,
+            challenge =>
+            {
+                exchange!.CancelReason = challenge.Length == 0 ? EmptyDigestMd5ChallengeReason : null;
+                return challenge.Length == 0 ? null : DigestMd5Answer(request, challenge);
+            },
+            _ => []);
+        return exchange;
+    }
+
+    private const string EmptyDigestMd5ChallengeReason = "DIGEST-MD5 handshake failure (empty challenge message)";
 
     private SaslAuthenticationFailedException DigestMd5Failed()
     {

@@ -66,6 +66,36 @@ public sealed class SaslDigestMd5Tests
     }
 
     [TestMethod]
+    public async Task Begin_DigestMd5EmptyChallengeSspi_AnswersNullWithACancelReasonThatTheNextMechanismFollows()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", "(empty)");
+        Curl.Protocol.Abstractions.ISaslExchange exchange = new SaslAuthenticator(Encoding.UTF8, () => "c", answerDigestMd5AsSspi: true, securityContexts: new ScriptedSecurityContextFactory())
+            .Begin("DIGEST-MD5", new Curl.Protocol.Abstractions.SaslRequest(new System.Net.NetworkCredential("u", "s3cret"), null, null, null, "smtp", "127.0.0.1"));
+
+        byte[]? answer = await exchange.RespondAsync(Array.Empty<byte>(), CancellationToken.None);
+
+        diagnostics.Act("answer", answer is null ? "(null)" : "bytes");
+        diagnostics.Act("cancel reason", exchange.CancelReason ?? "(null)");
+        Assert.IsNull(answer);
+        Assert.AreEqual("DIGEST-MD5 handshake failure (empty challenge message)", exchange.CancelReason);
+    }
+
+    [TestMethod]
+    public async Task Begin_DigestMd5ReadableChallengeCurlBuild_AnswersWithoutACancelReason()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        Curl.Protocol.Abstractions.ISaslExchange exchange = new SaslAuthenticator(Encoding.UTF8, () => "c", answerDigestMd5AsSspi: false, securityContexts: null)
+            .Begin("DIGEST-MD5", new Curl.Protocol.Abstractions.SaslRequest(new System.Net.NetworkCredential("u", "s3cret"), null, null, null, "smtp", "127.0.0.1"));
+
+        byte[]? answer = await exchange.RespondAsync("realm=\"localhost\",nonce=\"n\",qop=\"auth\",algorithm=md5-sess"u8.ToArray(), CancellationToken.None);
+
+        diagnostics.Act("answer", answer is null ? "(null)" : "bytes");
+        Assert.IsNotNull(answer);
+        Assert.IsNull(exchange.CancelReason);
+    }
+
+    [TestMethod]
     public void AnswerAsCurl_ValuesCutAtCurlsBufferSizes()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
