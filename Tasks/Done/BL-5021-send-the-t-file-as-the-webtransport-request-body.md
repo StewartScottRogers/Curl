@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.WebTransport.UnitLibrary/WebTransportProtocolHandler.cs, Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportProtocolHandlerTests.cs, Documentation/Conformance/Extended/WebTransport.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5021 — Send the -T file as the webtransport request body
 
@@ -42,3 +42,4 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: bf16039e 47a4d9c7 8f31984b a0b49a29.
 - 2026-11-12: Done. Handler reads `Upload` when `PostData` is null; two tests added; quality run clean (0 failing members). Note: `cond ? null : byte[]` silently makes empty non-null PostData, so the test casts the null.
+- 2026-11-12: Doing -> Done. webtransport sends the -T file as the request body when -d is absent; tests and docs row added
