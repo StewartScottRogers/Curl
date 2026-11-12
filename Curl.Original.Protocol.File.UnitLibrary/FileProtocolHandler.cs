@@ -820,7 +820,12 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         Stream upload)
     {
         long connectionNumber = connectionNumbers.NumberNextConnection();
-        TransferResult result = await UploadIntoDestinationAsync(context, path, upload).ConfigureAwait(false);
+
+        // Measured before the destination opens: truncating a destination that is the
+        // source itself empties the source, and curl sizes the upload before that (exit 26,
+        // only 0/6 read), so measuring afterwards would report success.
+        long? needed = RemainingLength(upload);
+        TransferResult result = await UploadIntoDestinationAsync(context, path, upload, needed).ConfigureAwait(false);
 
         return ReportConnectionEnd(context, result, connectionNumber);
     }
@@ -833,11 +838,13 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// <param name="upload">
     /// The stream to upload from, owned by the caller and so left undisposed here.
     /// </param>
+    /// <param name="needed">The source length measured before the destination opened.</param>
     /// <returns>The outcome of the upload.</returns>
     private async ValueTask<TransferResult> UploadIntoDestinationAsync(
         ITransferContext context,
         FileUrlPath path,
-        Stream upload)
+        Stream upload,
+        long? needed)
     {
         // curl 8.21.0's lib/file.c tests the value of the resume offset, not whether one
         // was supplied: -C 0 truncates exactly as no -C at all does, so only a positive
@@ -879,7 +886,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
                 ? opened.Length
                 : context.ResumeFrom.GetValueOrDefault();
 
-            return await UploadIntoAsync(context, upload, destination, skip).ConfigureAwait(false);
+            return await UploadIntoAsync(context, upload, destination, skip, needed).ConfigureAwait(false);
         }
     }
 
@@ -903,17 +910,18 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// The source bytes to skip: the <c>-C</c>/<c>--continue-at</c> offset, or for <c>-C -</c>
     /// the destination's size.
     /// </param>
+    /// <param name="needed">The source length measured before the destination opened, or null when unknown.</param>
     /// <returns>The outcome of the upload.</returns>
     private static async ValueTask<TransferResult> UploadIntoAsync(
         ITransferContext context,
         Stream upload,
         Stream destination,
-        long skip)
+        long skip,
+        long? needed)
     {
         // curl knows the length of a -T file and not of standard input, and only a known
         // length turns a failed read into exit 26; the curl tool reports a failed read as the
         // end of the file, so with no length to fall short of, the upload simply ends there.
-        long? needed = RemainingLength(upload);
 
         bool skipped = await TrySkipAsync(upload, skip, context.CancellationToken)
             .ConfigureAwait(false);
@@ -930,9 +938,15 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         // only 131072/200000, with size_upload 131062, 61072 and 0.
         int firstChunkSize = UploadChunkSize - (int)(skip % UploadChunkSize);
 
-        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = CreateUploadChunkConverter(context);
+        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertUploadChunk = CreateUploadChunkConverter(context);
+        long bytesRead = 0;
+        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = chunk =>
+        {
+            bytesRead += chunk.Length;
+            return convertUploadChunk(chunk);
+        };
 
-        return await CopyAsync(
+        TransferResult copied = await CopyAsync(
                 upload,
                 destination,
                 UploadChunkSize,
@@ -956,7 +970,28 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
                     FileTransferMessages.DestinationWriteFailed),
                 context.CancellationToken)
             .ConfigureAwait(false);
+
+        return FailWhenSourceEndedEarly(copied, needed, skip, bytesRead);
     }
+
+    /// <summary>
+    /// Turns a successful copy of a source that ended before the length measured at the start
+    /// - emptied by a destination that is the source itself - into a failed read, as curl does.
+    /// </summary>
+    /// <param name="copied">The outcome of the copy.</param>
+    /// <param name="needed">The source length measured before the destination opened, or null when unknown.</param>
+    /// <param name="skip">The source bytes skipped before the copy.</param>
+    /// <param name="bytesRead">The source bytes the copy read.</param>
+    /// <returns>The copy outcome, or exit 26 when the source fell short.</returns>
+    private static TransferResult FailWhenSourceEndedEarly(TransferResult copied, long? needed, long skip, long bytesRead) =>
+        copied.ExitCode == CurlExitCode.Ok && needed is { } expected && bytesRead < expected - skip
+            ? new TransferResult(
+                CurlExitCode.ReadError,
+                copied.BytesTransferred,
+                FileTransferMessages.UploadSourceReadFailed(
+                    (skip + bytesRead) / UploadChunkSize * UploadChunkSize,
+                    expected))
+            : copied;
 
     /// <summary>
     /// Measures how many bytes an upload source has left to give.

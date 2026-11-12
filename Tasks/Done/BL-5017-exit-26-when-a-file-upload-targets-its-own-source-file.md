@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs, Curl.Original.Protocol.File.UnitTests/FileUploadOntoOwnSourceTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5017 — Exit 26 when a file:// upload targets its own source file
 
@@ -29,11 +29,11 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A new test class `Curl.Original.Protocol.File.UnitTests/FileUploadOntoOwnSourceTests.cs` asserts that uploading a 6-byte source to its own path returns the failure that maps to `CurlExitCode` 26 with the message `client read function EOF fail, only 0/6 of needed bytes read`.
-- [ ] The same holds when the destination URL ends in `/` so the file name is appended and the target is the source.
-- [ ] Regression: uploading a source to a different destination still copies it and succeeds, and an upload onto an existing different file still truncates and replaces it.
-- [ ] Tests use drive-less `file:///dir/x` URLs or the handler's injected file abstractions, so they pass on Windows, Linux and macOS.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test class `Curl.Original.Protocol.File.UnitTests/FileUploadOntoOwnSourceTests.cs` asserts that uploading a 6-byte source to its own path returns the failure that maps to `CurlExitCode` 26 with the message `client read function EOF fail, only 0/6 of needed bytes read`.
+- [x] The same holds when the destination URL ends in `/` so the file name is appended and the target is the source.
+- [x] Regression: uploading a source to a different destination still copies it and succeeds, and an upload onto an existing different file still truncates and replaces it.
+- [x] Tests use drive-less `file:///dir/x` URLs or the handler's injected file abstractions, so they pass on Windows, Linux and macOS.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -43,3 +43,5 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 4bb8548d 32a89d40 bc32856b fc55c716 a0b49a29.
+- 2026-11-12: Fix: UploadAsync measures the source length before the destination opens; UploadIntoAsync fails with exit 26 when fewer bytes were read than were needed. The tool appends the name for a `/`-ending URL, so both cases reach the handler as one URL. Not measured against real curl: the message text is the one the task quotes from REF. Quality run: 0 failing members. CI platform check: tests are drive-less and use fakes.
+- 2026-11-12: Doing -> Done. Own-source file upload now exits 26
