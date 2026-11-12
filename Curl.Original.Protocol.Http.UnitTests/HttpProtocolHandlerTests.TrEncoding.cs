@@ -26,6 +26,8 @@ public sealed partial class HttpProtocolHandlerTests
 
     private const string WriteFailed = "Failed writing received data to disk/application";
 
+    private const long GzipHelloLength = 25;
+
     private const string GzipOfGzipHello =
         "1F8B0800000000000400" + "93EFE66000011686D31E674F9E6467685B2660C60A1400005D6C48CB19000000";
 
@@ -217,10 +219,10 @@ public sealed partial class HttpProtocolHandlerTests
 
             WriteResult(result);
             Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
-            Diagnostics.Assert("bytes transferred", 42L, result.BytesTransferred);
+            Diagnostics.Assert("bytes transferred", GzipHelloLength, result.BytesTransferred);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
-            Assert.AreEqual(42L, result.BytesTransferred, $"Chunk size {chunkSize}");
+            Assert.AreEqual(GzipHelloLength, result.BytesTransferred, $"Chunk size {chunkSize}");
         }
     }
 

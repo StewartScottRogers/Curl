@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, Curl.Original.Protocol.Http.UnitTests/HttpResponseBodyReaderTransferEncodingSizeTests.cs]
+touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpContentDecoder.cs, Curl.Original.Protocol.Http.UnitTests/HttpResponseBodyReaderTransferEncodingSizeTests.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.TrEncoding.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5036 — Count --tr-encoding bodies after decoding in size_download
 
@@ -27,16 +27,19 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A new test file `Curl.Original.Protocol.Http.UnitTests/HttpResponseBodyReaderTransferEncodingSizeTests.cs` reads the gzip+chunked response above through `HttpResponseBodyReader` and asserts the reported download size is 600 while the decoded body is unchanged.
-- [ ] `%{size_header}` is unchanged (126 for the repro response).
-- [ ] Regression: with `Content-Encoding: gzip` and `--compressed`, the count stays the encoded 39 bytes; a plain chunked response without a Transfer-Encoding coding counts the dechunked body as before.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test file `Curl.Original.Protocol.Http.UnitTests/HttpResponseBodyReaderTransferEncodingSizeTests.cs` reads the gzip+chunked response above through `HttpResponseBodyReader` and asserts the reported download size is 600 while the decoded body is unchanged.
+- [x] `%{size_header}` is unchanged (126 for the repro response).
+- [x] Regression: with `Content-Encoding: gzip` and `--compressed`, the count stays the encoded 39 bytes; a plain chunked response without a Transfer-Encoding coding counts the dechunked body as before.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text.
 
+Decision: size_download counts the bytes the Transfer-Encoding codings produce (curl counts after transfer decoding, before content decoding); with both Transfer- and Content-Encoding it is the transfer-decoded size, so the existing combined test now expects 25 (inner gzip) not 42. HttpContentDecoder gained TransferCodingCount/TransferDecodedBytes; touches widened for it and the old test. Quality run: 0 failing members.
+
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 33862ef7 aa72b337 3e5eaa82 a0b49a29.
+- 2026-11-12: Doing -> Done. size_download counts Transfer-Encoding bodies after decoding
