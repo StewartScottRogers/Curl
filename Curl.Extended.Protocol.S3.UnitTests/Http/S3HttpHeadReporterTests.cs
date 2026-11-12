@@ -29,6 +29,22 @@ public sealed class S3HttpHeadReporterTests
     }
 
     [TestMethod]
+    public async Task Report_AnInterimHeadThenTheFinalHead_GivesTheFinalStatusAndContentType()
+    {
+        var reporter = new S3HttpHeadReporter(NoTransferEvents.Instance, null);
+
+        foreach (string line in new[] { "HTTP/1.1 100 Continue", "", "HTTP/1.1 200 OK", "Content-Type: text/plain", "" })
+        {
+            await reporter.ReportResponseLineAsync(line, CancellationToken.None);
+        }
+
+        TransferReport report = reporter.Report!;
+        Assert.AreEqual(200, report.ResponseCode);
+        Assert.AreEqual("text/plain", report.ContentType);
+        Assert.AreEqual(23 + 2 + 17 + 26 + 2, report.HeaderSize);
+    }
+
+    [TestMethod]
     public async Task Report_AnHttp10ResponseWithABadStatus_GivesVersion10AndCodeZero()
     {
         var reporter = new S3HttpHeadReporter(NoTransferEvents.Instance, null);

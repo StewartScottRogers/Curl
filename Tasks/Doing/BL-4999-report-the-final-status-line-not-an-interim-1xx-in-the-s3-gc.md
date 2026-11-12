@@ -24,11 +24,13 @@ Found by the shift-end review of 2026-11-11 (ADR-0710), code-reviewer, in the di
 
 ## Acceptance criteria
 
-- [ ] Each of the four reporters re-parses the code and HTTP version and resets the content type on every response line that starts with `HTTP/`, not only the first one after a request head.
-- [ ] Each of the four libraries' `.UnitTests` has a test that reports a `100` or `103` head followed by a `200` head with a `Content-Type`, and asserts `ResponseCode` 200 and the final head's `ContentType`, with `HeaderSize` counting both heads.
-- [ ] `dotnet build` is clean and the fast tests pass; the four libraries stay at 100% line and branch coverage.
+- [x] Each of the four reporters re-parses the code and HTTP version and resets the content type on every response line that starts with `HTTP/`, not only the first one after a request head.
+- [x] Each of the four libraries' `.UnitTests` has a test that reports a `100` or `103` head followed by a `200` head with a `Content-Type`, and asserts `ResponseCode` 200 and the final head's `ContentType`, with `HeaderSize` counting both heads.
+- [x] `dotnet build` is clean and the fast tests pass; the four libraries stay at 100% line and branch coverage.
 
 ## Notes
+
+The four reporters now re-parse on every `HTTP/` line (the `expectsStatusLine` flag is gone). Measure-CodeQuality on all four libraries: 0 failing members.
 
 ## Log
 
