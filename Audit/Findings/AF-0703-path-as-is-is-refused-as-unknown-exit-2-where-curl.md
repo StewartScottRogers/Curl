@@ -3,8 +3,8 @@ id: AF-0703
 title: --path-as-is is refused as unknown (exit 2) where curl accepts it and sends the request
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:--path-as-is:--path-as-is:refused-option
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-11-11: filed proposed.
+- 2026-11-12: proposed -> accepted.
