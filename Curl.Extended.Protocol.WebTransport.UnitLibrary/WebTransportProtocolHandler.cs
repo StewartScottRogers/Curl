@@ -56,7 +56,15 @@ public sealed class WebTransportProtocolHandler : IProtocolHandler
 
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
     {
-        WebTransportRequest request = WebTransportRequest.Of(context.Url, context.PostData);
+        ReadOnlyMemory<byte>? body = context.PostData;
+        if (body is null && context.Upload is { } upload)
+        {
+            using MemoryStream file = new();
+            await upload.CopyToAsync(file, context.CancellationToken).ConfigureAwait(false);
+            body = file.ToArray();
+        }
+
+        WebTransportRequest request = WebTransportRequest.Of(context.Url, body);
         await using IMultiplexedConnection connection = await dial(request, context.CancellationToken).ConfigureAwait(false);
         context.Progress.ReportTransferStarted();
         long written = await new WebTransportSession(connection, context).RunAsync(request).ConfigureAwait(false);

@@ -28,10 +28,10 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportProtocolHandlerTests.cs` with an upload of a known payload asserts the request body sent on the WebTransport stream equals the file's bytes (the same bytes `-d` with that payload sends).
-- [ ] Regression: `-d` still sends its payload, and `-d` wins when both `-d` and `-T` are given; with neither, behaviour is unchanged.
-- [ ] `Documentation/Conformance/Extended/WebTransport.md` gains a row stating `-T` sends the file as the request body exactly as `-d` does, its "Covered by" naming the new test.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A test in `Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportProtocolHandlerTests.cs` with an upload of a known payload asserts the request body sent on the WebTransport stream equals the file's bytes (the same bytes `-d` with that payload sends).
+- [x] Regression: `-d` still sends its payload, and `-d` wins when both `-d` and `-T` are given; with neither, behaviour is unchanged.
+- [x] `Documentation/Conformance/Extended/WebTransport.md` gains a row stating `-T` sends the file as the request body exactly as `-d` does, its "Covered by" naming the new test.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -41,3 +41,4 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: bf16039e 47a4d9c7 8f31984b a0b49a29.
+- 2026-11-12: Done. Handler reads `Upload` when `PostData` is null; two tests added; quality run clean (0 failing members). Note: `cond ? null : byte[]` silently makes empty non-null PostData, so the test casts the null.
