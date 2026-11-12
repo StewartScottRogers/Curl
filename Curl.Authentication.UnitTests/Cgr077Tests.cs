@@ -31,7 +31,6 @@ public sealed class Cgr077Tests
     [DataRow("Digest realm=\"testrealm\", algorithm=MD5, algorithm=MD5, nonce=\"1\", nonce=\"2\"", DisplayName = "two nonces")]
     [DataRow("Digest realm=\"a\", , nonce=\"abc123\"", DisplayName = "empty element")]
     [DataRow("Digest realm=\"a\", nonce=\"abc123\", foo", DisplayName = "key without value")]
-    [DataRow("Digest realm=\"a\", nonce=\"abc123\", algorithm=MD5-sess", DisplayName = "MD5-sess without qop")]
     [DataRow("Digest realm=\"a\", nonce=\"abc", DisplayName = "unclosed quote")]
     [DataRow("Digest realm=\"a\", nonce=\"abc\\", DisplayName = "unclosed quote ending in a backslash")]
     [DataRow("Digest realm=\"a\", nonce=\"abc\"x", DisplayName = "text after a quoted value")]

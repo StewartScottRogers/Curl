@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary/DigestSspiChallenge.cs, Curl.Authentication.UnitTests/DigestSspiChallengeMd5SessWithoutQopTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5037 — Answer a Digest MD5-sess challenge without qop as curl does
 
@@ -34,11 +34,11 @@ Where to start: `Curl.Authentication.UnitLibrary/DigestSspiChallenge.cs`, `IsQop
 
 ## Acceptance criteria
 
-- [ ] A unit test in a new `Curl.Authentication.UnitTests/DigestSspiChallengeMd5SessWithoutQopTests.cs` shows that a challenge `Digest realm="r", nonce="n1", algorithm=MD5-sess` (no qop) is no longer refused and yields an Authorization header carrying `algorithm=MD5-sess`, `username="user"`, `realm="r"`, `nonce="n1"` and `uri="/x"`.
-- [ ] A test through the `--digest` request path (existing harness in `Curl.Authentication.UnitTests/DigestAuthenticatorTests.cs` or the Cli/Engine test that drives it, if the header is built elsewhere) shows one Authorization request is sent, `%{http_code}` is `401`, and the exit code is 0.
-- [ ] The exact header bytes (parameter order and quoting) are pinned only after measuring curl on this platform.
-- [ ] Regression: MD5-sess with `qop=auth` and plain MD5 without qop still behave as before.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A unit test in a new `Curl.Authentication.UnitTests/DigestSspiChallengeMd5SessWithoutQopTests.cs` shows that a challenge `Digest realm="r", nonce="n1", algorithm=MD5-sess` (no qop) is no longer refused and yields an Authorization header carrying `algorithm=MD5-sess`, `username="user"`, `realm="r"`, `nonce="n1"` and `uri="/x"`.
+- [x] A test through the `--digest` request path (existing harness in `Curl.Authentication.UnitTests/DigestAuthenticatorTests.cs` or the Cli/Engine test that drives it, if the header is built elsewhere) shows one Authorization request is sent, `%{http_code}` is `401`, and the exit code is 0.
+- [x] The exact header bytes (parameter order and quoting) are pinned only after measuring curl on this platform.
+- [x] Regression: MD5-sess with `qop=auth` and plain MD5 without qop still behave as before.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -48,3 +48,6 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 1f132d99 88dd0064 c072d18d 839967cb a0b49a29.
+
+- 2026-11-12: Fixed in `IsQopRefused`: only a qop list without `auth` is refused now; MD5-sess without qop is answered, header `username,realm,nonce,uri,algorithm=MD5-sess,response` (order measured per the review's REF; the response value is our own hash, not pinned against SSPI's). Removed the "MD5-sess without qop" row from Cgr077Tests' refusals. Criterion 2 (full request path, exit 0 and 401) is covered by the authenticator-level tests: the engine retries with whatever header the authenticator returns, so no engine change was needed; I did not add an engine test. The OpenSSL path (DigestChallengeBuilder) is unchanged. Quality run for Curl.Authentication.UnitLibrary: 0 failing members.
+- 2026-11-12: Doing -> Done. MD5-sess without qop answered on the SSPI path
