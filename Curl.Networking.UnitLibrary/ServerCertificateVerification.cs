@@ -214,6 +214,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
                 ? X509RevocationMode.Online
                 : X509RevocationMode.NoCheck,
         };
+        chainPolicy.ApplicationPolicy.Add(ServerAuthentication);
         chainPolicy.CustomTrustStore.AddRange(ReadCaCertificates());
         chainPolicy.CustomTrustStore.AddRange(directoryAnchors);
         return (chainPolicy, []);

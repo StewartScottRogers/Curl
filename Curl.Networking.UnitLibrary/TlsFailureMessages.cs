@@ -861,7 +861,13 @@ internal static class TlsFailureMessages
             return "unable to get local issuer certificate (20)";
         }
 
-        return ChainStatus(chain) == X509ChainStatusFlags.NotTimeValid ? OpenSslValidityError(chain) : OpenSslTrustError(chain);
+        var status = ChainStatus(chain);
+        if (status.HasFlag(X509ChainStatusFlags.NotValidForUsage))
+        {
+            return "unsuitable certificate purpose (26)";
+        }
+
+        return status == X509ChainStatusFlags.NotTimeValid ? OpenSslValidityError(chain) : OpenSslTrustError(chain);
     }
 
     // curl's Schannel build checks the chain's trust errors in this order. An untrusted root

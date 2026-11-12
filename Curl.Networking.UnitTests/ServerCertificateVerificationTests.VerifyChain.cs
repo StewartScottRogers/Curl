@@ -131,6 +131,68 @@ public sealed class ServerCertificateVerificationVerifyChainTests
         Assert.AreEqual("targetHost", noHost.ParamName);
     }
 
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void ReadTrustAnchors_WithCaCertificates_RequiresTheServerAuthApplicationPolicy(bool matchesSchannelBuild)
+    {
+        using var trusted = IssuedChain.Create();
+        var verification = new ServerCertificateVerification(trusted.TrustingOptions(), matchesSchannelBuild, TimeProvider.System);
+
+        var policy = verification.ReadTrustAnchors().ChainPolicy;
+
+        Diagnostics.Act("application policy", string.Join(",", policy!.ApplicationPolicy.Cast<Oid>().Select(oid => oid.Value)));
+        Assert.AreEqual("1.3.6.1.5.5.7.3.1", policy.ApplicationPolicy.Cast<Oid>().Single().Value);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void Verify_ClientAuthOnlyLeafUnderCaCertificate_IsRejectedWithExit60(bool matchesSchannelBuild)
+    {
+        using var issued = IssuedChain.Create("1.3.6.1.5.5.7.3.2");
+
+        var verdict = HandBuiltVerdict(issued, matchesSchannelBuild);
+
+        Diagnostics.Act("rejection", verdict.Rejection);
+        Assert.IsFalse(verdict.IsAccepted);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, RejectionOf(verdict).ExitCode);
+    }
+
+    [TestMethod]
+    public void Verify_ClientAuthOnlyLeafInTheOpenSslBuild_ReportsUnsuitableCertificatePurpose()
+    {
+        using var issued = IssuedChain.Create("1.3.6.1.5.5.7.3.2");
+
+        var verdict = HandBuiltVerdict(issued, matchesSchannelBuild: false);
+
+        Diagnostics.Act("message", RejectionOf(verdict).Message);
+        StringAssert.Contains(RejectionOf(verdict).Message, "OpenSSL verify result: unsuitable certificate purpose (26)");
+    }
+
+    [TestMethod]
+    [DataRow("1.3.6.1.5.5.7.3.1")]
+    [DataRow(null)]
+    public void Verify_LeafWithServerAuthOrNoExtendedKeyUsageUnderCaCertificate_IsAccepted(string? usage)
+    {
+        using var issued = IssuedChain.Create(usage);
+
+        var verdict = HandBuiltVerdict(issued, matchesSchannelBuild: false);
+
+        Diagnostics.Act("rejection", verdict.Rejection);
+        Assert.IsTrue(verdict.IsAccepted);
+    }
+
+    private static (CurlExitCode ExitCode, string Message) RejectionOf(ServerCertificateVerdict verdict) =>
+        ((CurlExitCode ExitCode, string Message))verdict.Rejection!;
+
+    private static ServerCertificateVerdict HandBuiltVerdict(IssuedChain issued, bool matchesSchannelBuild)
+    {
+        var verification = new ServerCertificateVerification(issued.TrustingOptions(), matchesSchannelBuild, TimeProvider.System);
+        var anchors = verification.ReadTrustAnchors();
+        var verifier = new HandBuiltCertificateVerifier(verification, anchors.ChainPolicy, anchors.AnchorsBesideSystemStore, anchors.RevocationLists, Host);
+        return verifier.Verify(new ServerCertificateChain([issued.Leaf.RawData, issued.Ca.RawData], Host, null));
+    }
     private static ITlsProvider Provider(TlsClientOptions options, bool handBuilt, bool matchesSchannelBuild = false) =>
         handBuilt
             ? new HandBuiltTlsProvider(options, matchesSchannelBuild, TimeProvider.System, new SystemClientCertificateStore(), SystemTlsRandomSource.Instance)
@@ -149,7 +211,7 @@ public sealed class ServerCertificateVerificationVerifyChainTests
 
         public X509Certificate2 Leaf { get; }
 
-        public static IssuedChain Create()
+        public static IssuedChain Create(string? usage = "1.3.6.1.5.5.7.3.1")
         {
             var now = DateTimeOffset.UtcNow;
             using var caKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -166,7 +228,11 @@ public sealed class ServerCertificateVerificationVerifyChainTests
             leafRequest.CertificateExtensions.Add(names.Build());
             leafRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
             leafRequest.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
-            leafRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid("1.3.6.1.5.5.7.3.1")], false));
+            if (usage is not null)
+            {
+                leafRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid(usage)], false));
+            }
+
             leafRequest.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(ca, true, false));
             var leaf = leafRequest.Create(ca, now.AddHours(-1), now.AddDays(10), RandomNumberGenerator.GetBytes(8));
             return new IssuedChain(ca, leaf);
