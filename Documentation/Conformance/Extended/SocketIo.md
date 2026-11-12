@@ -43,3 +43,7 @@ scripted Engine.IO packets; it references no `Curl.Extended.Protocol.*` project.
 | SocketIo:RFC6455-5.4-1 | MUST | A message fragmented over a text frame and continuations is reassembled. | SocketIoEngineIoCases.FragmentedTextMessage_IsReassembled |
 | SocketIo:RFC6455-5.5.2-1 | MUST | A Ping is answered with a Pong carrying its payload. | SocketIoEngineIoCases.WebSocketPing_IsAnsweredWithAPongCarryingItsPayload |
 | SocketIo:RFC6455-5.5.1-1 | MUST | A Close received is answered with a Close. | SocketIoEngineIoCases.WebSocketClose_IsAnsweredWithAClose |
+
+## What `-T` does
+
+`-T file` sends the file as the event exactly as `-d` does, and does not change the namespace: the file name the core appends to a URL ending in `/` is cut off again, so `socketio://host/` stays the main namespace. When both are given, `-d` wins (BL-5020). Pinned by `SocketIoProtocolHandlerTests.ExecuteAsync_AnUploadToANamedNamespace_SendsTheFileAsTheEvent`, `ExecuteAsync_AnUploadWhoseFileNameWasAppendedToTheURL_KeepsTheMainNamespace` and `ExecuteAsync_AnUploadAndPostData_SendsThePostData` in `Curl.Extended.Protocol.SocketIo.UnitTests`.

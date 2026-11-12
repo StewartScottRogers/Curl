@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoProtocolHandler.cs, Curl.Extended.Protocol.SocketIo.UnitTests/SocketIoProtocolHandlerTests.cs, Documentation/Conformance/Extended/SocketIo.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5020 — Send the -T file as the socketio event
 
@@ -33,11 +33,11 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Extended.Protocol.SocketIo.UnitTests/SocketIoProtocolHandlerTests.cs` with an upload of `["e",1]` to `/ns` asserts the scripted server receives `42/ns,["e",1]`.
-- [ ] A test with a URL ending in `/` (`socketio://host/`) and `-T ev.json` asserts the namespace stays `/` (not `/ev.json`) and the event is sent.
-- [ ] Regression: `-d '["e",1]'` still sends the same event, `-d` wins when both are given, and with neither the handler still only listens.
-- [ ] `Documentation/Conformance/Extended/SocketIo.md` gains a row stating `-T` sends the file as the event exactly as `-d` does and does not change the namespace, its "Covered by" naming the new tests.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A test in `Curl.Extended.Protocol.SocketIo.UnitTests/SocketIoProtocolHandlerTests.cs` with an upload of `["e",1]` to `/ns` asserts the scripted server receives `42/ns,["e",1]`.
+- [x] A test with a URL ending in `/` (`socketio://host/`) and `-T ev.json` asserts the namespace stays `/` (not `/ev.json`) and the event is sent.
+- [x] Regression: `-d '["e",1]'` still sends the same event, `-d` wins when both are given, and with neither the handler still only listens.
+- [x] `Documentation/Conformance/Extended/SocketIo.md` gains a row stating `-T` sends the file as the event exactly as `-d` does and does not change the namespace, its "Covered by" naming the new tests.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -48,3 +48,6 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 1b19d2d0 f0275f32 e28c4069 a40a5c8a a0b49a29.
+- Decision: the context carries only the retargeted URL, so the handler cuts the last path segment again when the upload is a FileStream whose file name equals it (an explicit `/ns/ev.json` with `-T ev.json` is indistinguishable and also reads as `/ns/`; accepted, curl itself would not append there). Conformance doc uses a "What -T does" section (as Nats.md) because its matrix check requires [SpecRequirement] tests for table rows.
+- Fast tests of SocketIo and Conformance.Extended pass; Measure-CodeQuality for the SocketIo library: 0 failing members.
+- 2026-11-12: Doing -> Done. Send the -T file as the socketio event

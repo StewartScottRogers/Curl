@@ -117,9 +117,82 @@ public sealed class SocketIoProtocolHandlerTests
     private static ValueTask<TransferResult> ExecuteAsync(ScriptedConnection connection, string url, Stream output, string? emit = null) =>
         new SocketIoProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection)), new ZeroRandomSource()).ExecuteAsync(Context(url, output, emit));
 
-    private static TransferContext Context(string url, Stream output, string? emit = null) =>
-        new() { Url = CurlUrl.Parse(url), Output = output, PostData = emit is null ? null : (ReadOnlyMemory<byte>?)Encoding.UTF8.GetBytes(emit) };
+    private static TransferContext Context(string url, Stream output, string? emit = null, Stream? upload = null) =>
+        new() { Url = CurlUrl.Parse(url), Output = output, PostData = emit is null ? null : (ReadOnlyMemory<byte>?)Encoding.UTF8.GetBytes(emit), Upload = upload };
 
+    [TestMethod]
+    public async Task ExecuteAsync_AnUploadToANamedNamespace_SendsTheFileAsTheEvent()
+    {
+        ScriptedConnection connection = Server(Open, "40/ns,{\"sid\":\"x\"}", "41/ns,");
+
+        TransferResult result = await RunUploadAsync(connection, "socketio://example.com/ns", "[\"e\",1]", false);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "1:40/ns,", "1:42/ns,[\"e\",1]" }, connection.SentFrames());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AnUploadWhoseFileNameWasAppendedToTheURL_KeepsTheMainNamespace()
+    {
+        ScriptedConnection connection = Server(Open, "40{\"sid\":\"x\"}", "41");
+
+        TransferResult result = await RunUploadAsync(connection, "socketio://example.com/ev.json", "[\"e\",1]", false);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "1:40", "1:42[\"e\",1]" }, connection.SentFrames());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AnUploadWhoseFileNameIsNotTheLastSegment_KeepsTheNamespaceAsItIs()
+    {
+        ScriptedConnection connection = Server(Open, "40/ns/other.json,{\"sid\":\"x\"}", "41/ns/other.json,");
+
+        TransferResult result = await RunUploadAsync(connection, "socketio://example.com/ns/other.json", "[\"e\",1]", false);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "1:40/ns/other.json,", "1:42/ns/other.json,[\"e\",1]" }, connection.SentFrames());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AnUploadAndPostData_SendsThePostData()
+    {
+        ScriptedConnection connection = Server(Open, "40{\"sid\":\"x\"}", "41");
+
+        TransferResult result = await RunUploadAsync(connection, "socketio://example.com/", "[\"e\",1]", true);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "1:40", "1:42[\"d\"]" }, connection.SentFrames());
+    }
+
+    private static async Task<TransferResult> RunUploadAsync(ScriptedConnection connection, string url, string content, bool withPostData)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string file = Path.Combine(directory, "ev.json");
+            await File.WriteAllTextAsync(file, content);
+            await using FileStream upload = new(file, FileMode.Open, FileAccess.Read);
+            TransferContext context = Context(url, new MemoryStream(), withPostData ? "[\"d\"]" : null, upload);
+            return await new SocketIoProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection)), new ZeroRandomSource()).ExecuteAsync(context);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AnUploadOfAStreamWithoutAFileName_SendsItAndKeepsTheNamespace()
+    {
+        ScriptedConnection connection = Server(Open, "40/ns,{\"sid\":\"x\"}", "41/ns,");
+        TransferContext context = Context("socketio://example.com/ns", new MemoryStream(), null, new MemoryStream(Encoding.UTF8.GetBytes("[\"e\",1]")));
+
+        TransferResult result = await new SocketIoProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection)), new ZeroRandomSource()).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "1:40/ns,", "1:42/ns,[\"e\",1]" }, connection.SentFrames());
+    }
     [TestMethod]
     public async Task ExecuteAsync_TheConnectionIsReset_FailsWithExit56()
     {
