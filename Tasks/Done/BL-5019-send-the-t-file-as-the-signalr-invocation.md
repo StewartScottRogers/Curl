@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SignalR.UnitLibrary/Client/SignalRProtocolHandler.cs, Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRProtocolHandlerTests.cs, Documentation/Conformance/Extended/SignalR.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5019 — Send the -T file as the signalr invocation
 
@@ -33,10 +33,10 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRProtocolHandlerTests.cs` with an upload of `{"type":1,"target":"A","arguments":[]}` asserts the scripted hub receives an invocation with `"target":"A"` and the transfer does not time out.
-- [ ] Regression: `-d` with the same JSON sends the same invocation, and `-d` wins when both `-d` and `-T` are given; with neither, the handler still goes into listen mode as before.
-- [ ] `Documentation/Conformance/Extended/SignalR.md` gains a row stating `-T` sends the file as the invocation exactly as `-d` does, its "Covered by" naming the new test.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A test in `Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRProtocolHandlerTests.cs` with an upload of `{"type":1,"target":"A","arguments":[]}` asserts the scripted hub receives an invocation with `"target":"A"` and the transfer does not time out.
+- [x] Regression: `-d` with the same JSON sends the same invocation, and `-d` wins when both `-d` and `-T` are given; with neither, the handler still goes into listen mode as before.
+- [x] `Documentation/Conformance/Extended/SignalR.md` gains a row stating `-T` sends the file as the invocation exactly as `-d` does, its "Covered by" naming the new test.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -48,3 +48,5 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: d474e6d6 076f57e2 11c2b0bb a0b49a29.
+- 2026-11-12: Added CallBodyAsync (-d wins, else -T upload, else listen). Quality run: 0 failing members. SignalR tests 134 pass.
+- 2026-11-12: Doing -> Done. -T upload sent as the signalr invocation

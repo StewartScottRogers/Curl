@@ -52,3 +52,4 @@ listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt` fail today and
 | SignalR:RFC6455-5.5.2-1 | MUST | A Ping is answered with a Pong carrying its payload. | SignalRWebSocketCases.WebSocketPing_IsAnsweredWithAPongCarryingItsPayload |
 | SignalR:RFC6455-5.5.1-1 | MUST | A Close received is answered with a Close. | SignalRWebSocketCases.WebSocketClose_IsAnsweredWithAClose |
 | SignalR:RFC6455-1.4-1 | SHOULD | The client ends the WebSocket with a Close frame, not by dropping the TCP connection. | SignalRWebSocketCases.CallCompleted_ClosesTheWebSocketWithACloseFrame |
+| SignalR:CURL-Upload-1 | MAY | `-T file` sends the file as the invocation exactly as `-d` does; `-d` wins when both are given. | SignalRProtocolHandlerTests.Upload_IsSentAsTheInvocationExactlyAsDataWould, SignalRProtocolHandlerTests.DataAndUpload_DataWins |

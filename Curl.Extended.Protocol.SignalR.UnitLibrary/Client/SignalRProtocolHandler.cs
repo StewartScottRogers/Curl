@@ -63,9 +63,22 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
         return builder.Uri;
     }
 
+    /// <summary>Gives the call's body: <c>-d</c>'s data, else <c>-T</c>'s upload read whole, else none (listen).</summary>
+    internal static async ValueTask<ReadOnlyMemory<byte>?> CallBodyAsync(ITransferContext context)
+    {
+        if (context.PostData is not null || context.Upload is not { } upload)
+        {
+            return context.PostData;
+        }
+
+        using var body = new MemoryStream();
+        await upload.CopyToAsync(body, context.CancellationToken).ConfigureAwait(false);
+        return body.ToArray();
+    }
+
     private async Task<long> TransferAsync(ITransferContext context)
     {
-        byte[]? callRecord = SignalRCall.RecordFor(context.PostData);
+        byte[]? callRecord = SignalRCall.RecordFor(await CallBodyAsync(context).ConfigureAwait(false));
         IReadOnlyList<KeyValuePair<string, string>> requestFields = HandshakeHeaderFields.Of(context);
         var negotiator = new SignalRNegotiator(async (url, cancellationToken) =>
         {
