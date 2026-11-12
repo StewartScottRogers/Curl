@@ -47,3 +47,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 ## Log
 
 - 2026-11-12: Created.
+- 2026-11-12: Backlog -> Doing. Criteria at claim: 0deefb6f da2c2878 8d134e0b 84bd9464 a0b49a29.
