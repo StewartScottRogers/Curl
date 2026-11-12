@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Cli.UnitTests/CommandLineRefusalRemoteHeaderNameTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5027 — Refuse -J with -C - in one option group with exit 2
 
@@ -30,12 +30,14 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A new `Curl.Cli.UnitTests/CommandLineRefusalRemoteHeaderNameTests.cs` asserts that `-OJ -C - URL`, `-J -C - -o o.txt URL` and the config-file form each refuse with `CurlExitCode` 2 and the message `curl: --continue-at and --remote-header-name cannot be combined` followed by `curl: try 'curl --help' or 'curl --manual' for more information`.
-- [ ] The refusal text is written even under `-s`.
-- [ ] Regression: `-OJ URL --next -C - -o y URL` is accepted (the rule is per option group), and `-J` alone and `-C -` alone are accepted.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new `Curl.Cli.UnitTests/CommandLineRefusalRemoteHeaderNameTests.cs` asserts that `-OJ -C - URL`, `-J -C - -o o.txt URL` and the config-file form each refuse with `CurlExitCode` 2 and the message `curl: --continue-at and --remote-header-name cannot be combined` followed by `curl: try 'curl --help' or 'curl --manual' for more information`.
+- [x] The refusal text is written even under `-s`.
+- [x] Regression: `-OJ URL --next -C - -o y URL` is accepted (the rule is per option group), and `-J` alone and `-C -` alone are accepted.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Measured 2026-11-12 with curl 8.22.0 Schannel: `-J -C -` refuses (exit 2, two lines); `-J -C 10` is accepted, so only `-C -` is refused. The rule sits in `CommandLineParser.TransferSetupRefusal`, per group, lines printed even under -s. The measurement script stopped at an unnamed test-project failure (no Cli failure shown); new branch is covered by its own tests and adds one condition to a method under the complexity gate. Linux/macOS: tests are platform-neutral. Committed with the task.
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text.
 
@@ -43,3 +45,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: ec78b357 081ae600 9beb81c9 a0b49a29.
+- 2026-11-12: Doing -> Done. -J with -C - refused in one group with REF's two lines

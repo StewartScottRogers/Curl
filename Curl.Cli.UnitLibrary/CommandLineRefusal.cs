@@ -361,6 +361,14 @@ public sealed class CommandLineRefusal
         return new(CurlExitCode.FailedInit, [], lines, foundAtTransferSetup: true);
     }
 
+    /// <summary>
+    /// Refuses <c>-C -</c> beside <c>-J</c>/<c>--remote-header-name</c> in one option group, as curl 8.22.0 (Schannel) does,
+    /// measured 2026-11-12 (BL-5027): both lines are written even under <c>-s</c>, and a numeric <c>-C 10</c> is not refused.
+    /// </summary>
+    /// <returns>A refusal of two lines, exit 2.</returns>
+    public static CommandLineRefusal ContinueAtWithRemoteHeaderName() =>
+        new(CurlExitCode.FailedInit, [], ["curl: --continue-at and --remote-header-name cannot be combined", TryHelpLine], foundAtTransferSetup: true);
+
     /// <summary>Refuses a command line that has arguments but names no URL.</summary>
     /// <returns>A refusal whose first line is <c>curl: (2) no URL specified</c>, <see cref="FoundAtTransferSetup"/>.</returns>
     public static CommandLineRefusal NoUrlSpecified() =>

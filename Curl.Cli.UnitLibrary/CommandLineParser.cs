@@ -343,6 +343,11 @@ public static class CommandLineParser
             return CommandLineRefusal.NoUrlSpecified();
         }
 
+        if (group.RemoteHeaderName && group.ResumeFromOutputSize)
+        {
+            return CommandLineRefusal.ContinueAtWithRemoteHeaderName();
+        }
+
         bool formPost = group.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost;
         if (formPost && group.PostData is not null)
         {
