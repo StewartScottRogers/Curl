@@ -47,7 +47,7 @@ the named log files).
 | Rule | Threshold | What to find out |
 | --- | --- | --- |
 | Redone work | a task claimed 3 or more times, or requeued twice | why, from its `Log` and its run logs (`<ID>-<stamp>-L<n>.jsonl`, `.err.txt`) |
-| CI red | `ciRedMinutes` over 60, or any one of `ciRedSpells` over 30 minutes | for each such spell, its run id, the commit and test that turned it red, and how long until a task was filed and fixed |
+| CI red | a failed CI run not filed as a task, covered by a live task, or green again within 30 minutes of its run ending (see below) | for each such run, its run id, the commit and test that turned it red, and how long until a task was filed and fixed |
 | Overlap waits | `waitOverlapMinutes` over 20% of `laneMinutes` | the `touches` that serialised lanes (often a shared file such as `RunDarkFactory.ps1` or `Curl.slnx`), and whether a narrower `touches` would have been true |
 | Empty queue | `waitNothingReadyMinutes` over 20% of `laneMinutes`, with ready tasks assigned to Stewart or interactive only | which tasks were waiting on him or on an interactive session |
 | Cost outliers | one task over 3 times the median `costUsd` and over 5 US dollars | the 5 costliest tasks, and what in their runs drove the cost (turns, retries, rereading) |
@@ -55,6 +55,17 @@ the named log files).
 
 The 5-dollar floor is Stewart's (2026-10-24, rejecting AF-0415): with a median task near 50
 cents, 3 times the median flagged ordinary 2-dollar runs that finished their task in one run.
+
+The CI red rule is Stewart's (2026-11-12: "every failure filed within 30 minutes"). It replaced
+"`ciRedMinutes` over 60, or any spell over 30 minutes": CI's own run takes about 35 minutes, so
+fixing and re-running any real failure kept a spell red for more than 30 minutes, however fast the
+factory acted. For each failed run in `ciRedSpells` (and each later failed run inside a spell), take
+the run's end from `ci-runs.json`. Then find the first coordinator `ci` trace line
+(`DarkFactory-<stamp>.log`) that names the run with a filed task (`filed`), a live task that covers
+it (`covered`, `flaky, covered`, or a test a live task names), or `passed since`; or the next green
+run's end, whichever is earliest. The rule is crossed when that is more than 30 minutes after the
+run ended, or never happens in the window. Report `ciRedMinutes` and the spells as numbers either
+way, and give the slowest time-to-file on the rule's summary line.
 
 Lane time (`laneMinutes`) is the sum, over every lane in the period, of the time from its first to
 its last log line.
