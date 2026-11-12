@@ -8,7 +8,7 @@ layers it brings.
   `Curl.Extension.Composition` registers.
 - `StructuredFieldsTransferHook` parses the response's known Structured Fields after the transfer, reports each as
   the `-v` line `* Structured field <name>: <readable>`, and gives `-w` `%{structured_fields}` and
-  `%{structured_field.<lowercase name>}`. It sends nothing and changes no output.
+  `%{structured_field.<name>}`. It sends nothing and changes no output.
 - `KnownStructuredFields` names the known response fields and their top-level types (`StructuredFieldType`) and
   gives a field's readable line; `StructuredFieldParser` is RFC 9651 §4.2 into the `StructuredValues` records;
   `ReadableStructuredValue` writes them as one line that names every type.
