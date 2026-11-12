@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.OAuth2.UnitLibrary/Options/OAuth2TransferHook.cs, Curl.Extension.OAuth2.UnitTests/Options/OAuth2TransferHookTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5011 — Drop the OAuth2 Bearer token on a cross-host -L redirect unless --location-trusted
 
@@ -50,3 +50,4 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 518b3d38 503a9bec 3af7707c fd049479 5b63f122 a0b49a29.
 - 2026-11-12: Decision: the hook cannot see `--location-trusted`, but the follower sets `SendsCookieStrings` false exactly on a hop that withholds credentials, so the hook reads that (no touches change). It keeps the first hop's token in the hook instance and reuses it on later allowed hops, so the endpoint is asked once. The hook is flow-agnostic, so one client-credentials test stands for the device and PKCE flows too. Quality run: 0 failing members, 100% line and branch.
+- 2026-11-12: Doing -> Done. Hook keeps the first hop's token and sends none on a hop curl withholds credentials from; tests and quality gate green.
