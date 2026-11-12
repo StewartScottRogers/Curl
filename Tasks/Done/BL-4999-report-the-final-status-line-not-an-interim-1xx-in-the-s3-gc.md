@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpHeadReporter.cs, Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Http/GcsHttpHeadReporter.cs, Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http/AzureStorageHttpHeadReporter.cs, Curl.Extended.Protocol.OciRegistry.UnitLibrary/Http/OciHttpHeadReporter.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4999 — Report the final status line, not an interim 1xx, in the S3, GCS, Azure and OCI HTTP head reporters
 
@@ -36,3 +36,4 @@ The four reporters now re-parse on every `HTTP/` line (the `expectsStatusLine` f
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: ab8d9510 30fe593d 7e3b9a33.
+- 2026-11-11: Doing -> Done. Reporters re-parse on every HTTP/ line; tests and quality gates pass
