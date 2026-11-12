@@ -657,6 +657,22 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void TryGetVariableText_FileUploadReport_PrintsUploadSizeAndSpeedNotDownload()
+    {
+        // curl -T s6.txt file:///dir/w.out prints up=6 down=0 and a non-zero speed_upload (BL-5025).
+        TransferReport report = new()
+        {
+            UploadSize = 6,
+            Timings = new TransferTimings(Started: 0, Connect: null, RequestReady: null, RequestSent: null, FirstByteReceived: null, Completed: 1_000_000),
+        };
+        TransferWriteOutVariables variables = WithReport(report);
+
+        Assert.AreEqual("6", Get(variables, "size_upload"));
+        Assert.AreEqual("0", Get(variables, "size_download"));
+        Assert.AreEqual("6", Get(variables, "speed_upload"));
+    }
+
+    [TestMethod]
     public void TryGetVariableText_FileTransfer_PrintsTheFixedVariablesAsCurl()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

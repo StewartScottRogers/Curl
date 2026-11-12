@@ -167,7 +167,8 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
         Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.IsNull(result.Report);
+        Assert.IsNotNull(result.Report);
+        Assert.AreEqual(0, result.Report.PseudoHeaders.Count);
     }
 
     // Not measurable on Windows (see FileTransferMessages.PseudoHeaders): without a

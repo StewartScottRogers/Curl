@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs, Curl.Original.Protocol.File.UnitTests/FileProtocolHandlerUploadSizeTests.cs]
+touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs, Curl.Original.Protocol.File.UnitTests/FileProtocolHandlerUploadSizeTests.cs, Curl.Output.UnitTests/TransferWriteOutVariablesTests.cs]
 requirement: none
 created: 2026-11-12
 completed:
@@ -27,17 +27,19 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A new test class `Curl.Original.Protocol.File.UnitTests/FileProtocolHandlerUploadSizeTests.cs` uploads a 6-byte source through `FileProtocolHandler` and asserts the result's `TransferReport.UploadSize` is 6 and its download size is 0.
-- [ ] A write-out test (in that class, or in `Curl.Output.UnitTests/TransferWriteOutVariablesTests.cs`) renders `up=%{size_upload} down=%{size_download}` from that report as `up=6 down=0`, and `%{speed_upload}` is non-zero for a timed upload.
-- [ ] Regression: a `file://` download still reports `%{size_download}` as the bytes read and `%{size_upload}` as 0; the uploaded file contents are unchanged.
-- [ ] Tests use drive-less `file:///dir/x` URLs or the handler's injected file abstractions, so they pass on Windows, Linux and macOS.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test class `Curl.Original.Protocol.File.UnitTests/FileProtocolHandlerUploadSizeTests.cs` uploads a 6-byte source through `FileProtocolHandler` and asserts the result's `TransferReport.UploadSize` is 6 and its download size is 0.
+- [x] A write-out test (in that class, or in `Curl.Output.UnitTests/TransferWriteOutVariablesTests.cs`) renders `up=%{size_upload} down=%{size_download}` from that report as `up=6 down=0`, and `%{speed_upload}` is non-zero for a timed upload.
+- [x] Regression: a `file://` download still reports `%{size_download}` as the bytes read and `%{size_upload}` as 0; the uploaded file contents are unchanged.
+- [x] Tests use drive-less `file:///dir/x` URLs or the handler's injected file abstractions, so they pass on Windows, Linux and macOS.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text.
 
 ## Log
+
+- Notes: UploadAsync now attaches a TransferReport with UploadSize; the write-out test went in Curl.Output.UnitTests (added to touches); the existing upload "ReportsNoHeaders" test now expects a report with no pseudo-headers. Platform-neutral drive-less URLs. Quality run: 0 failing members.
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 2c6e2a92 a0ad802a c93d26ed fc55c716 a0b49a29.

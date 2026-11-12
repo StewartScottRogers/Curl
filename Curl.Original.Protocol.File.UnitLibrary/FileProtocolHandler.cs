@@ -827,6 +827,10 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         long? needed = RemainingLength(upload);
         TransferResult result = await UploadIntoDestinationAsync(context, path, upload, needed).ConfigureAwait(false);
 
+        // The bytes moved are sent, not received: the report makes them %{size_upload}
+        // and leaves %{size_download} 0, as curl's file:// upload does.
+        result = result with { Report = new TransferReport { UploadSize = result.BytesTransferred } };
+
         return ReportConnectionEnd(context, result, connectionNumber);
     }
 
