@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs, Curl.Extension.Composition.UnitLibrary/BodyReplacingHookExclusivity.cs, Curl.Extension.Composition.UnitTests/BodyReplacingHookExclusivityTests.cs, Documentation/Planning/Decisions/ADR-1026-graphql-is-a-transfer-hook-extension-with-four-options.md, Documentation/Planning/Decisions/ADR-1028-jsonrpc-sends-calls-named-in-one-option-value-and-pairs-replies-by-id.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5023 — Refuse two body-replacing extension options together with exit 2
 
@@ -46,3 +46,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: dfc3ce4d 9a0ba671 7b90601a a2f04a3e 3db828d4 a0b49a29.
 - 2026-11-12: Done. Added BodyReplacingHookExclusivity (first catalogue entry), tests, ADR-1261, amended ADR-1026 and ADR-1028. `--graphql-introspect` counts as GraphQL's body. Connect RPC and gRPC-Web have no ADR file found by name; ADR-1261 covers them. The `--ai-help` criterion is not met here: the option help strings live in four other extension libraries outside `touches`; filed as a follow-up. Measure-CodeQuality.ps1 could not finish: the Conformance.Extended test `EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement` fails on McpClient:Stdio-BatchArguments-1 and SignalR:CURL-Upload-1 (other lanes' work, not this change). The new code has complexity 3 and full test coverage by BodyReplacingHookExclusivityTests (44 Composition tests pass).
+- 2026-11-12: Doing -> Done. Two body-replacing extension options are refused with exit 2 (ADR-1261); help text follow-up is BL-5051
