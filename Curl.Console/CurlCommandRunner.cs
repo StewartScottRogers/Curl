@@ -618,6 +618,12 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol");
 
     /// <summary>
+    /// Set when a <c>Content-Disposition</c> name was blank; <see cref="TransferIntoOutputFileAsync" /> reads
+    /// and clears it once the transfer returns (BL-5016).
+    /// </summary>
+    private bool remoteHeaderNameWasBlank;
+
+    /// <summary>
     /// The line curl 8.21.0 prints when <c>-G</c> or <c>--url-query</c> asks for a query on an
     /// <c>ipfs://</c> or <c>ipns://</c> URL (measured 2026-10-26, CGR-161, BL-3690 Notes).
     /// </summary>
@@ -5185,8 +5191,29 @@ internal sealed class CurlCommandRunner(
         OutputFileTarget target,
         DeferredOutputFileStream output) =>
         target.TakesContentDispositionName
-            ? chosen => new RemoteHeaderNameStream(output, chosen, name => RemoteNamePath(options, name), options.FollowRedirects)
+            ? chosen => new RemoteHeaderNameStream(output, chosen, name => RemoteHeaderNamePath(options, name), options.FollowRedirects)
             : null;
+
+    /// <summary>
+    /// Names the file a <c>Content-Disposition</c> <c>filename=</c> value opens. A non-empty value with nothing but
+    /// white space leaves curl no name to extract, so it is remembered in
+    /// <see cref="remoteHeaderNameWasBlank" /> for <see cref="TransferIntoOutputFileAsync" /> to end the run,
+    /// and the transfer stops with an <see cref="IOException" /> before any file is opened (BL-5016).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="name">The header's file name.</param>
+    /// <returns>The path to open.</returns>
+    /// <exception cref="IOException">The name is blank.</exception>
+    private string RemoteHeaderNamePath(CommandLineOptions options, string name)
+    {
+        if (name.Length > 0 && string.IsNullOrWhiteSpace(name))
+        {
+            remoteHeaderNameWasBlank = true;
+            throw new IOException("The Content-Disposition file name is blank.");
+        }
+
+        return RemoteNamePath(options, name);
+    }
 
     /// <summary>
     /// Sets <paramref name="outputFile" />'s last-write time to the source's for <c>-R</c>, and
@@ -5350,6 +5377,12 @@ internal sealed class CurlCommandRunner(
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
+            if (remoteHeaderNameWasBlank)
+            {
+                remoteHeaderNameWasBlank = false;
+                return await RefuseRemoteNameExtractionAsync(options, RemoteNameUrlMalformedFailure).ConfigureAwait(false);
+            }
+
             TransferResult completed = await output.CompleteAsync(fileResult).ConfigureAwait(false);
             Running.SucceededBeforeOutputFileCreationFailed = fileResult.IsSuccess && !completed.IsSuccess;
 

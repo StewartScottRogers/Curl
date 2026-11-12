@@ -29,3 +29,4 @@ completed:
 ## Log
 
 - 2026-11-12: Created.
+- 2026-11-12: Backlog -> Deferred. Done inside BL-5016

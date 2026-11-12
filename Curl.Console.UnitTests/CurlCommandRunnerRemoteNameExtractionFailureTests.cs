@@ -1,3 +1,6 @@
+using Curl.Authentication;
+using Curl.Original.Protocol.Http;
+using Curl.Testing;
 using System.Text;
 using Curl.Core;
 using Curl.Engine;
@@ -80,6 +83,31 @@ public sealed class CurlCommandRunnerRemoteNameExtractionFailureTests
         Assert.IsTrue(fileSystem.Written.ContainsKey("good.txt"));
         Assert.IsTrue(fileSystem.Written.ContainsKey("other.txt"));
         Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RemoteHeaderNameThatIsBlank_PrintsTheExtractionLineAndExits3()
+    {
+        string response = "HTTP/1.1 200 OK\r\nContent-Disposition: attachment; filename=\" \"\r\nContent-Length: 5\r\n\r\nhello";
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes(response)]);
+        HttpProtocolHandler scripted = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+        CurlCommandRunner runner = new(
+            _ => new TransferDispatch(new ProtocolDispatcher([scripted])),
+            fileSystem,
+            fileSystem,
+            standardOutput,
+            standardError,
+            new MemoryStream(),
+            false,
+            outputPaths: fileSystem);
+
+        int exitCode = await runner.RunAsync(["-OJ", "http://127.0.0.1:18239/u.txt"]);
+
+        Assert.AreEqual(
+            ExtractionLine + NewLine + "curl: (3) URL using bad/illegal format or missing URL" + NewLine,
+            StandardErrorText);
+        Assert.AreEqual(3, exitCode);
+        Assert.IsEmpty(fileSystem.Written);
     }
 
     private async Task<int> RunAsync(IReadOnlyList<string> arguments)
