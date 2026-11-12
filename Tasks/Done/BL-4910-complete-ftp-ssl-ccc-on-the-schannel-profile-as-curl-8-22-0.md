@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Networking.UnitLibrary/SslStreamConnection.cs, Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/SslStreamConnectionClearTlsTests.cs, Curl.Networking.UnitTests/HandBuiltTlsConnectionClearTlsTests.cs, Curl.Networking.UnitTests/CloseNotifyOnDisposeTests.cs, Curl.Networking.UnitTests/ConnectionSocketHandleTests.cs, Curl.Networking.UnitTests/HandBuiltTlsProviderTests.SessionTickets.cs, Curl.Original.Protocol.Ftp.UnitTests/FtpClearCommandChannelTests.cs, Record-CurlExchange.ps1]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-12
 ---
 # BL-4910 — Complete --ftp-ssl-ccc on the Schannel profile as curl 8.22.0 does instead of exit 81
 
@@ -49,3 +49,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Blocked -> Deferred. Decided by Claude under Stewart's delegation: real curl 8.22.0 Schannel (System32 and Git) exits 81 on --ftp-ssl-ccc in both modes (ADR-1241), so Curl already matches the platform curl; the review's exit 0 did not reproduce. Look again only if a later review names a server stack where 8.22.0 completes CCC.
 - 2026-11-12: Deferred -> Backlog. Reopened: fitness review 2026-11-12 STD-007 names the server stack (OpenSSL unwrap) where curl 8.22.0 Schannel completes CCC with exit 0.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: a2cbc8ec eebf7ab8 7f05f209 a0b49a29.
+- 2026-11-12: Doing -> Done. --ftp-ssl-ccc on the Schannel profile sends close_notify and goes on in plain text once the server answers it, with curl 8.22.0's schannel -v lines (ADR-1261)
