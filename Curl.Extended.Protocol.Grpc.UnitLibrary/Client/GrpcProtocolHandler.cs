@@ -82,10 +82,26 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
 
     private static bool IsSecure(CurlUrl url) => string.Equals(url.Scheme, SecureScheme, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Gives the request message's JSON: <c>-d</c>'s body, else <c>-T</c>'s upload read whole, else none.
+    /// </summary>
+    private static async ValueTask<ReadOnlyMemory<byte>?> RequestBodyAsync(ITransferContext context)
+    {
+        if (context.PostData is not null || context.Upload is not { } upload)
+        {
+            return context.PostData;
+        }
+
+        using var body = new MemoryStream();
+        await upload.CopyToAsync(body, context.CancellationToken).ConfigureAwait(false);
+        return body.ToArray();
+    }
+
     private async Task<TransferResult> CallAsync(ITransferContext context)
     {
         GrpcMethodPath target = GrpcMethodPath.Parse(context.Url.AbsolutePath);
-        (GrpcProtoMethod? method, byte[]? request) = FromProtoFile(context, target);
+        ReadOnlyMemory<byte>? body = await RequestBodyAsync(context).ConfigureAwait(false);
+        (GrpcProtoMethod? method, byte[]? request) = FromProtoFile(context, target, body);
         bool secure = IsSecure(context.Url);
         ConnectResult connected = await connector.ConnectAsync(TargetOf(context, secure), context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
@@ -97,7 +113,7 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
         {
             return secure && connected.ApplicationProtocol != "h2"
                 ? TransferResult.Failure(CurlExitCode.Http2, $"The server at {context.Url.Host} did not negotiate h2 with ALPN, so it cannot take a gRPC call")
-                : await CallOverAsync(context, connection, new GrpcRequestTarget(secure ? "https" : "http", AuthorityOf(context.Url), target.Service, target.Method), method, request).ConfigureAwait(false);
+                : await CallOverAsync(context, connection, new GrpcRequestTarget(secure ? "https" : "http", AuthorityOf(context.Url), target.Service, target.Method), method, request, body).ConfigureAwait(false);
         }
     }
 
@@ -105,7 +121,7 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
     /// Reads the method's types from the <c>--grpc-proto</c> file and encodes <c>-d</c> before connecting; both are
     /// <see langword="null" /> without the option, and server reflection gives them once connected.
     /// </summary>
-    private static (GrpcProtoMethod? Method, byte[]? Request) FromProtoFile(ITransferContext context, GrpcMethodPath target)
+    private static (GrpcProtoMethod? Method, byte[]? Request) FromProtoFile(ITransferContext context, GrpcMethodPath target, ReadOnlyMemory<byte>? body)
     {
         if (context is not GrpcProtoContext proto)
         {
@@ -113,19 +129,19 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
         }
 
         GrpcProtoMethod method = GrpcProtoMethod.Load(proto.ProtoPath, target);
-        return (method, GrpcMessageJson.Encode(method.Input, context.PostData));
+        return (method, GrpcMessageJson.Encode(method.Input, body));
     }
 
     /// <summary>
     /// Makes the call on the open connection and writes its reply; without <c>--grpc-proto</c>, first learns the method's
     /// types by server reflection on the same connection (ADR-1149).
     /// </summary>
-    private static async Task<TransferResult> CallOverAsync(ITransferContext context, IConnection connection, GrpcRequestTarget target, GrpcProtoMethod? method, byte[]? request)
+    private static async Task<TransferResult> CallOverAsync(ITransferContext context, IConnection connection, GrpcRequestTarget target, GrpcProtoMethod? method, byte[]? request, ReadOnlyMemory<byte>? body)
     {
         GrpcHttp2Session session = await GrpcHttp2Session.OpenAsync(new ConnectionStream(connection), context.CancellationToken).ConfigureAwait(false);
         GrpcRequestHeaderValues headerValues = HeaderValuesOf(context);
         method ??= await ServerReflectionClient.DescribeAsync(session, target, headerValues, context.CancellationToken).ConfigureAwait(false);
-        request ??= GrpcMessageJson.Encode(method.Input, context.PostData);
+        request ??= GrpcMessageJson.Encode(method.Input, body);
         context.Progress.ReportTransferStarted();
         var headers = GrpcRequestHeaders.Build(target, headerValues);
         GrpcCallResult result = await GrpcHttp2Call.RunAsync(session, headers, request, context.CancellationToken).ConfigureAwait(false);

@@ -447,6 +447,52 @@ public sealed class GrpcProtocolHandlerTests
         CollectionAssert.AreEqual(new[] { "grpc", "grpcs" }, new GrpcProtocolHandler(null!).SupportedSchemes.ToArray());
 
     /// <summary>Reads the request's header fields and its DATA bytes from what the client sent after the connection preface.</summary>
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithGrpcProto_SendsTheFileAsTheRequestMessage()
+    {
+        using var proto = new ProtoFixture();
+        var call = new Call(GrpcServerReply.Of(GrpcServerReply.Headers(false, GrpcServerReply.OkHeaders), GrpcServerReply.Message(ReplyHi), GrpcServerReply.Trailers(0)));
+
+        TransferResult result = await call.RunAsync(GreeterUrl, proto.GreeterPath, null, upload: "{\"name\":\"zed\"}");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        (_, byte[] data) = await SentRequestAsync(call.Connection.Sent);
+        CollectionAssert.AreEqual((byte[])[0, 0, 0, 0, 5, 0x0A, 0x03, 0x7A, 0x65, 0x64], data);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DataAndUpload_SendsTheDataNotTheFile()
+    {
+        using var proto = new ProtoFixture();
+        var call = new Call(GrpcServerReply.Of(GrpcServerReply.Headers(false, GrpcServerReply.OkHeaders), GrpcServerReply.Message(ReplyHi), GrpcServerReply.Trailers(0)));
+
+        TransferResult result = await call.RunAsync(GreeterUrl, proto.GreeterPath, "{\"name\":\"zed\"}", upload: "{\"name\":\"other\"}");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        (_, byte[] data) = await SentRequestAsync(call.Connection.Sent);
+        CollectionAssert.AreEqual((byte[])[0, 0, 0, 0, 5, 0x0A, 0x03, 0x7A, 0x65, 0x64], data);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithoutGrpcProto_SendsTheFileAsTheRequestMessageAfterReflection()
+    {
+        byte[] reply = Reflection.ReflectionFixture.Server(
+            Reflection.ReflectionFixture.Headers(1, false, GrpcServerReply.OkHeaders),
+            Reflection.ReflectionFixture.Message(1, Reflection.ReflectionFixture.FilesResponse(Reflection.ReflectionFixture.HelloWorldFile)),
+            Reflection.ReflectionFixture.Trailers(1, 0),
+            Reflection.ReflectionFixture.Headers(3, false, GrpcServerReply.OkHeaders),
+            Reflection.ReflectionFixture.Message(3, ReplyHi),
+            Reflection.ReflectionFixture.Trailers(3, 0));
+        var connection = new ScriptedConnection(reply);
+        var context = new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream(), Upload = new MemoryStream(Encoding.UTF8.GetBytes("{\"name\":\"World\"}")) };
+
+        TransferResult result = await new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection, null))).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        List<byte[]> call = await Reflection.ReflectionFixture.SentMessagesAsync(connection.Sent, 3);
+        CollectionAssert.AreEqual(HelloWorld, call.Single());
+    }
+
     private static async Task<(List<HeaderField> Headers, byte[] Data)> SentRequestAsync(byte[] sent)
     {
         using var stream = new MemoryStream(sent, Http2Connection.ClientPreface.Length, sent.Length - Http2Connection.ClientPreface.Length);
@@ -478,14 +524,15 @@ public sealed class GrpcProtocolHandlerTests
 
         public string Output => Encoding.UTF8.GetString(output.ToArray());
 
-        public async Task<TransferResult> RunAsync(string url, string protoPath, string? data, TimeSpan? maxTime = null, Curl.Protocol.Abstractions.HttpRequestOptions? http = null)
+        public async Task<TransferResult> RunAsync(string url, string protoPath, string? data, TimeSpan? maxTime = null, Curl.Protocol.Abstractions.HttpRequestOptions? http = null, string? upload = null)
         {
             var connector = new RecordingConnector(this, applicationProtocol);
             var context = new TransferContext
             {
                 Url = CurlUrl.Parse(url),
                 Output = output,
-                PostData = data is null ? null : Encoding.UTF8.GetBytes(data),
+                PostData = data is null ? default(ReadOnlyMemory<byte>?) : Encoding.UTF8.GetBytes(data),
+                Upload = upload is null ? null : new MemoryStream(Encoding.UTF8.GetBytes(upload)),
                 MaxTime = maxTime,
                 Http = http,
             };

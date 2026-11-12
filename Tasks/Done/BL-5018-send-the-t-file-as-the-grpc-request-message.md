@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Grpc.UnitLibrary/Client/GrpcProtocolHandler.cs, Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcProtocolHandlerTests.cs, Documentation/Conformance/Extended/Grpc.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5018 — Send the -T file as the grpc request message
 
@@ -33,11 +33,11 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcProtocolHandlerTests.cs` with `--grpc-proto` and an upload of `{"name":"zed"}` asserts the DATA frame the scripted server sees is `00 00000005 0a037a6564`.
-- [ ] A second test with no `--grpc-proto` (server reflection path) and the same upload asserts the same DATA frame.
-- [ ] Regression: `-d '{"name":"zed"}'` still sends `00 00000005 0a037a6564`, and `-d` wins when both `-d` and `-T` are given (as in the Mqtt5 handler).
-- [ ] `Documentation/Conformance/Extended/Grpc.md` gains a row stating `-T` sends the file as the request message exactly as `-d` does, its "Covered by" naming the new test.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A test in `Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcProtocolHandlerTests.cs` with `--grpc-proto` and an upload of `{"name":"zed"}` asserts the DATA frame the scripted server sees is `00 00000005 0a037a6564`.
+- [x] A second test with no `--grpc-proto` (server reflection path) and the same upload asserts the same DATA frame.
+- [x] Regression: `-d '{"name":"zed"}'` still sends `00 00000005 0a037a6564`, and `-d` wins when both `-d` and `-T` are given (as in the Mqtt5 handler).
+- [x] `Documentation/Conformance/Extended/Grpc.md` gains a row stating `-T` sends the file as the request message exactly as `-d` does, its "Covered by" naming the new test.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,5 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 64762c04 3babe6fb de49f53e 8a0eba5a a0b49a29.
+- 2026-11-12: -T read in GrpcProtocolHandler.RequestBodyAsync (-d wins); 3 tests; Grpc.md row Request-16; quality run 100/100, 0 failing. CI criterion met by platform-neutral tests.
+- 2026-11-12: Doing -> Done. -T file sent as grpc request message
