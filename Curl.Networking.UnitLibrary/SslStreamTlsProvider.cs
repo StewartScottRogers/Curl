@@ -712,6 +712,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     internal static TlsTrustEvent DescribeTrust(TlsClientOptions options, string targetHost) => new()
     {
         UsesAutomaticClientCertificate = options.AutoClientCertificate,
+        HasCipherList = options.Ciphers is not null,
         TargetsIpAddress = IPAddress.TryParse(targetHost.Trim('[', ']'), out _),
         VerifiesPeer = !options.Insecure,
         CaCertificateFile = options.CaCertificateFile ?? OpenSslDefaultCaCertificateFile,

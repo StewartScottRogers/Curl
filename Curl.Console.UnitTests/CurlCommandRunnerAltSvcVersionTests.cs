@@ -55,6 +55,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     private string StandardErrorLines => StandardErrorText.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task RunAsync_SecondRunAfterAnH3AltSvcHeader_ConnectsOverHttp3()
     {
         ScriptedConnector firstServer = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nAlt-Svc: h3=\":18443\"\r\n\r\nhi")]);
@@ -78,6 +79,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     }
 
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task RunAsync_H3EntryForTheOriginAndQuicFails_FallsBackToTcpAndWritesTheRenewedEntry()
     {
         CacheFileHolds(SameOriginH3Entry);
@@ -99,6 +101,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     }
 
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task RunAsync_H3EntryForAnotherPort_ConnectsThereOverHttp3AloneWithAltUsed()
     {
         CacheFileHolds(OtherPortH3Entry);
@@ -122,6 +125,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     }
 
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task RunAsync_H3EntryForAnotherPortAndQuicFails_FailsWithTheQuicErrorWithoutTryingTcp()
     {
         CacheFileHolds(OtherPortH3Entry);
@@ -140,6 +144,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     }
 
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task RunAsync_H2EntryForAnotherPortAndAlpnAgreesH2_ConnectsThereOverHttp2()
     {
         CacheFileHolds(OtherPortH2Entry);
@@ -158,7 +163,8 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     }
 
     [TestMethod]
-    public async Task RunAsync_H2EntryForAnotherPortOnWindowsWithoutAVersionOption_OffersH2AloneAndSpeaksHttp2()
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task RunAsync_H2EntryForAnotherPortWithoutAVersionOption_OffersH2AloneAndSpeaksHttp2()
     {
         // curl.se 8.18.0, "h1 127.0.0.1 18736 h2 127.0.0.1 18735 ...": * ALPN: curl offers h2 (BL-733 Notes case 4).
         CacheFileHolds(OtherPortH2Entry);
@@ -379,7 +385,32 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
         Assert.AreEqual(new AltSvcRoute("h3", new AltSvcAlternative("h3", "localhost", 18444)), secondServer.QuicTargets.Single().AltSvcRoute);
     }
 
+    /// <summary>
+    /// curl 8.22.0's Schannel build allows no <c>h2</c> or <c>h3</c> alternative without a version option, so an
+    /// entry naming either leaves the transfer on the origin over HTTP/1.1 (BL-4912 STD-009 and STD-013, ADR-1238).
+    /// </summary>
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow(OtherPortH2Entry)]
+    [DataRow(OtherPortH3Entry)]
+    public async Task RunAsync_H2OrH3EntryForAnotherPortOnWindowsWithoutAVersionOption_StaysOnTheOrigin(string entry)
+    {
+        CacheFileHolds(entry);
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")]);
+
+        int exitCode = await RunAsync(server, ["-sS", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "ok|1.1", StandardOutputText);
+        Diagnostics.Assert("alt-svc route", "<null>", RouteText(server.Targets.Single().AltSvcRoute));
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.AreEqual("ok|1.1", StandardOutputText);
+        Assert.IsNull(server.Targets.Single().AltSvcRoute);
+        Assert.AreEqual(18443, server.Targets.Single().Port);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task RunAsync_RedirectFromAnH3AlternativeToAnotherOrigin_ConnectsToItOverTcp()
     {
         CacheFileHolds(OtherPortH3Entry);

@@ -27,6 +27,33 @@ internal static class DnsPresentation
         return builder.ToString();
     }
 
+    /// <summary>Undoes <see cref="CharacterString" />: a backslash and three digits is that octet, a backslash and any other character is that character.</summary>
+    /// <param name="presentation">The presentation text.</param>
+    /// <returns>The raw text, one character per octet.</returns>
+    public static string RawCharacterString(string presentation)
+    {
+        StringBuilder builder = new(presentation.Length);
+        for (int index = 0; index < presentation.Length; index++)
+        {
+            char character = presentation[index];
+            if (character != '\\' || index + 1 >= presentation.Length)
+            {
+                builder.Append(character);
+            }
+            else if (index + 3 < presentation.Length && char.IsAsciiDigit(presentation[index + 1]))
+            {
+                builder.Append((char)int.Parse(presentation.AsSpan(index + 1, 3), CultureInfo.InvariantCulture));
+                index += 3;
+            }
+            else
+            {
+                builder.Append(presentation[++index]);
+            }
+        }
+
+        return builder.ToString();
+    }
+
     private static void AppendEscaped(StringBuilder builder, ReadOnlySpan<byte> octets, int lowestPrintable, string specials)
     {
         foreach (byte octet in octets)

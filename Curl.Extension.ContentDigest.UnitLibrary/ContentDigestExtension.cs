@@ -21,7 +21,7 @@ public static class ContentDigestExtension
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "content-digest",
-        "Sends SHA-256 Content-Digest and Repr-Digest fields with uploads and checks the server's digest fields against the response body (RFC 9530).",
+        "Sends SHA-256 Content-Digest and Repr-Digest fields with -d data and checks the server's digest fields against the response body (RFC 9530).",
         [],
         [Option],
         new Uri("https://www.rfc-editor.org/rfc/rfc9530"));

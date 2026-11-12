@@ -322,4 +322,9 @@ public sealed record TransferReport
     /// change one of curl's. Empty, the default, for every transfer no extension reported on.
     /// </summary>
     public IReadOnlyDictionary<string, string> ExtensionWriteOutValues { get; init; } = ReadOnlyDictionary<string, string>.Empty;
+
+    /// <summary>Gets a copy of this report whose <see cref="DownloadSize" /> is <paramref name="size" />.</summary>
+    /// <param name="size">The body bytes received.</param>
+    /// <returns>The copy.</returns>
+    public TransferReport WithDownloadSize(long size) => this with { DownloadSize = size };
 }

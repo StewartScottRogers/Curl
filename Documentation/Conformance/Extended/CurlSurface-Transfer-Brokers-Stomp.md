@@ -6,7 +6,7 @@ in clear) and `stomps` (port 61614, over TLS with `-k`), run through the real cu
 scheme and the shared checks in `StompTransferChecks`). The answered transfer subscribes to `/q` and writes the one
 MESSAGE frame's body. Expected values come from curl's manual page for curl 8.22.0 (curl.se/docs/manpage.html) and
 ADR-1059. `--fail` and `--fail-with-body` concern HTTP response codes and STOMP has none: ADR-1059 deliberately ends an
-`ERROR` frame with exit 8 (`STOMP server sent ERROR: <message>`) with or without them, so those rows pin exit 8, not 22.
+`ERROR` frame with exit 8 (`STOMP server sent ERROR: <message>`) with or without them, so those rows pin exit 8, not 22; an `ERROR` answering `CONNECT` ends with exit 67 (ADR-1251).
 IDs are `CurlSurface:Stomp<option>-<n>`, `n` 1 for `stomp` and 2 for `stomps`.
 
 | ID | Level | Requirement | Covered by |

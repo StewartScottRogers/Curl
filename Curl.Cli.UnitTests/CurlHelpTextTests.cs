@@ -57,6 +57,18 @@ public sealed class CurlHelpTextTests
     }
 
     [TestMethod]
+    [DataRow(null, "help.txt")]
+    [DataRow("all", "help-all.txt")]
+    [DataRow("curl", "help-curl.txt")]
+    [DataRow("ai-help", "help-bogus.txt")]
+    public void Lines_WithoutAiHelp_AreCurlsOwnBytes(string? subject, string referenceFile)
+    {
+        IReadOnlyList<string> lines = CurlHelpText.Lines(subject, CurlHelpText.DefaultColumns, listsAiHelp: false);
+
+        CollectionAssert.AreEqual(ReferenceLines(referenceFile), lines.ToArray());
+    }
+
+    [TestMethod]
     [DataRow(null, 21, "help-21-columns.txt")]
     [DataRow(null, 40, "help-40-columns.txt")]
     [DataRow(null, 200, "help-200-columns.txt")]

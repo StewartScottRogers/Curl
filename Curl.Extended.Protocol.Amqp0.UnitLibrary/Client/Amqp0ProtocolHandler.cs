@@ -4,7 +4,7 @@ namespace Curl.Extended.Protocol.Amqp0.Client;
 
 /// <summary>
 /// Serves <c>amqp://</c> (port 5672) and <c>amqps://</c> (port 5671, TLS from the connector) as an AMQP 0-9-1 client
-/// (ADR-1060): it declares the URL's queue in the URL's virtual host, and with a body (<c>-d</c>) publishes it there,
+/// (ADR-1060): it declares the URL's queue in the URL's virtual host, and with a body (<c>-d</c>, or the file <c>-T</c> uploads) publishes it there,
 /// otherwise takes one message with basic.get and writes its body to the output. <c>--user</c> is the PLAIN login,
 /// guest/guest without it. The exchange itself is <see cref="Amqp0ClientFlow"/>.
 /// </summary>
@@ -47,6 +47,19 @@ public sealed class Amqp0ProtocolHandler(IConnector connector) : IProtocolHandle
         };
     }
 
+    /// <summary>The body to publish: <c>-d</c>s data, else the whole <c>-T</c> upload, else none (basic.get).</summary>
+    private static async ValueTask<ReadOnlyMemory<byte>?> RequestBodyAsync(ITransferContext context)
+    {
+        if (context.PostData is not null || context.Upload is not { } upload)
+        {
+            return context.PostData;
+        }
+
+        using var body = new MemoryStream();
+        await upload.CopyToAsync(body, context.CancellationToken).ConfigureAwait(false);
+        return body.ToArray();
+    }
+
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context, Amqp0UrlQueue queue)
     {
         ConnectResult connect = await connector.ConnectAsync(TargetOf(context), context.CancellationToken).ConfigureAwait(false);
@@ -61,7 +74,7 @@ public sealed class Amqp0ProtocolHandler(IConnector connector) : IProtocolHandle
             var flow = new Amqp0ClientFlow(connection, context.Output, context.Progress, context.CancellationToken);
             try
             {
-                await flow.RunAsync(queue, context.Credentials, context.PostData).ConfigureAwait(false);
+                await flow.RunAsync(queue, context.Credentials, await RequestBodyAsync(context).ConfigureAwait(false)).ConfigureAwait(false);
                 return TransferResult.Success(flow.BytesWritten);
             }
             catch (Amqp0ClientException failure)

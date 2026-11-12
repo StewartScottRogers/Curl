@@ -1,6 +1,6 @@
 # ADR-1187: The Schannel build fails a P12 client certificate at AcquireCredentialsHandle, as Schannel curl does
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-1240
 - **Date:** 2026-11-02
 - **Supersedes:** ADR-0794, ADR-0826
 

@@ -21,27 +21,55 @@ public sealed class CurlCommandRunnerExtensionsTests
     private readonly RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
 
     [TestMethod]
-    [DataRow(null)]
-    [DataRow("0")]
-    public async Task RunAsync_ExtendedHelp_PrintsTheListingAndTransfersNothing(string? switchValue)
+    public async Task RunAsync_ExtendedHelp_PrintsTheListingAndTransfersNothing()
     {
-        Func<string, string?> environment = name => name == "CURL_EXTENSIONS" ? switchValue : null;
+        Func<string, string?> environment = _ => null;
 
         int exitCode = await RunAsync(["--extended-help", "file:///x"], environment);
 
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(string.Concat(ExtensionListing.Lines(environment).Select(line => line + Environment.NewLine)), StandardOutputText());
+        string listing = string.Concat(ExtensionListing.Lines(environment).Select(line => line + Environment.NewLine));
+        StringAssert.StartsWith(StandardOutputText(), listing);
+        StringAssert.Contains(StandardOutputText(), "Options: --log-level, --log-file.");
         Assert.AreEqual(0, standardError.Length);
         Assert.IsEmpty(file.Contexts);
     }
 
     [TestMethod]
-    public async Task RunAsync_ExtendedHelpWithExtensionsOff_SaysTheyAreOff()
+    [DataRow("--extended-help")]
+    [DataRow("--ai-help")]
+    [DataRow("--log-level")]
+    [DataRow("--log-file")]
+    [DataRow("--no-log-file")]
+    [DataRow("--expand-log-file")]
+    public async Task RunAsync_PortOnlyOptionWithExtensionsOff_FailsAsAnUnknownOption(string option)
     {
-        int exitCode = await RunAsync(["--extended-help"], name => name == "CURL_EXTENSIONS" ? "0" : null);
+        int exitCode = await RunAsync([option, "warning", "file:///x"], name => name == "CURL_EXTENSIONS" ? "0" : null);
 
-        Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(ExtensionListing.OffLine + Environment.NewLine, StandardOutputText());
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(0, standardOutput.Length);
+        StringAssert.Contains(Encoding.UTF8.GetString(standardError.ToArray()), $"option {option}: is unknown");
+        Assert.IsEmpty(file.Contexts);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HelpWithExtensionsOff_LeavesOutTheAiHelpLineAndRow()
+    {
+        Func<string, string?> off = name => name == "CURL_EXTENSIONS" ? "0" : null;
+
+        foreach (string subject in new[] { string.Empty, "all", "curl" })
+        {
+            standardOutput.SetLength(0);
+            string[] arguments = subject.Length == 0 ? ["--help"] : ["--help", subject];
+            Assert.AreEqual(0, await RunAsync(arguments, off));
+            Assert.DoesNotContain("ai-help", StandardOutputText());
+        }
+
+        standardOutput.SetLength(0);
+        standardError.SetLength(0);
+        Assert.AreEqual(0, await RunAsync(["--help", "--ai-help"], off));
+        Assert.AreEqual(0, standardOutput.Length);
+        Assert.AreNotEqual(0, standardError.Length);
     }
 
     [TestMethod]
@@ -58,16 +86,17 @@ public sealed class CurlCommandRunnerExtensionsTests
     }
 
     [TestMethod]
-    [DataRow("extensions", null)]
-    [DataRow("EXTENSIONS", "0")]
-    public async Task RunAsync_AiHelpExtensions_PrintsTheExtensionsMarkdown(string subject, string? switchValue)
+    [DataRow("extensions")]
+    [DataRow("EXTENSIONS")]
+    public async Task RunAsync_AiHelpExtensions_PrintsTheExtensionsMarkdown(string subject)
     {
-        Func<string, string?> environment = name => name == "CURL_EXTENSIONS" ? switchValue : null;
+        Func<string, string?> environment = _ => null;
 
         int exitCode = await RunAsync(["--ai-help", subject], environment);
 
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(ExtensionListing.Markdown(environment), StandardOutputText());
+        StringAssert.StartsWith(StandardOutputText(), ExtensionListing.Markdown(environment));
+        StringAssert.Contains(StandardOutputText(), "## diagnostic-log");
         Assert.IsEmpty(file.Contexts);
     }
 

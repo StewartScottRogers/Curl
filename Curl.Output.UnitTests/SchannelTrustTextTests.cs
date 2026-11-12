@@ -71,6 +71,25 @@ public sealed class SchannelTrustTextTests
         CollectionAssert.AreEqual(expected, actual);
     }
 
+    // Measured: curl 8.22.0 (Schannel) -v --ciphers CALG_AES_128 (BL-4992, ADR-1250).
+    [TestMethod]
+    public void Lines_CipherList_AddsTheLessSecureWarningBeforeTheSniLine()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("event", "HasCipherList=true, TargetsIpAddress=true");
+        string[] expected =
+        [
+            "schannel: disabled automatic use of client certificate",
+            "schannel: WARNING: This version of Schannel negotiates a less-secure TLS version than TLS 1.3 because the user set an algorithm cipher list.",
+            "schannel: using IP address, SNI is not supported by OS.",
+        ];
+
+        string[] actual = SchannelTrustText.Lines(new TlsTrustEvent { VerifiesPeer = false, HasCipherList = true, TargetsIpAddress = true }).ToArray();
+
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+    }
+
     private static void Report(TestDiagnostics diagnostics, string[] expected, string[] actual)
     {
         string expectedText = string.Join("\n", expected);

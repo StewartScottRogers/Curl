@@ -43,6 +43,28 @@ public sealed class CommandLineExtensionOptionTests
     }
 
     [TestMethod]
+    public void Parse_NoFormOfAnExtensionFlag_ForgetsTheFlag()
+    {
+        CommandLineParseResult result = Parse(["--sse", "--no-sse", Url], Sse);
+
+        Assert.IsNull(result.Refusal);
+        Assert.IsFalse(result.Options!.ExtensionOptionValues.ContainsKey("sse"));
+    }
+
+    [TestMethod]
+    public void Parse_NoFormOfAnExtensionValueOptionOrUnknownName_IsAnUnknownOption()
+    {
+        CommandLineParseResult valueOption = Parse(["--no-cache-dir", Url], CacheDirectory);
+        CommandLineParseResult unknown = Parse(["--no-nothing", Url], Sse);
+        CommandLineParseResult extensionsOff = Parse(["--no-sse", Url]);
+
+        Assert.IsNotNull(valueOption.Refusal);
+        Assert.IsNotNull(unknown.Refusal);
+        Assert.IsNotNull(extensionsOff.Refusal);
+        Assert.AreEqual(CurlExitCode.FailedInit, extensionsOff.Refusal.ExitCode);
+    }
+
+    [TestMethod]
     public void Parse_AnExtensionOptionWithNoValue_RefusesAsCurlRefusesAMissingValue()
     {
         CommandLineParseResult withExtension = Parse(["--cache-dir"], CacheDirectory);

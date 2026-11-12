@@ -40,6 +40,34 @@ public sealed class GrpcProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Reply_ReportsStatusVersionContentTypeAndHeaderSizeForWriteOut()
+    {
+        using var proto = new ProtoFixture();
+        var call = new Call(GrpcServerReply.Of(GrpcServerReply.Headers(true, ":status", "200", "content-type", "application/grpc", "grpc-status", "0")));
+
+        TransferResult result = await call.RunAsync(GreeterUrl, proto.GreeterPath, null);
+
+        TransferReport report = result.Report!;
+        Assert.AreEqual(200, report.ResponseCode);
+        Assert.AreEqual(new Version(2, 0), report.HttpVersion);
+        Assert.AreEqual(0, report.DownloadSize);
+        Assert.AreEqual("application/grpc", report.ContentType);
+        Assert.AreEqual("HTTP/2 200 \r\n".Length + "content-type: application/grpc\r\n".Length + "grpc-status: 0\r\n".Length + 2, report.HeaderSize);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ErrorStatus_StillReportsTheResponseHead()
+    {
+        using var proto = new ProtoFixture();
+        var call = new Call(GrpcServerReply.Of(GrpcServerReply.Headers(true, ":status", "200", "content-type", "application/grpc", "grpc-status", "5")));
+
+        TransferResult result = await call.RunAsync(GreeterUrl, proto.GreeterPath, null);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual(200, result.Report!.ResponseCode);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_UserAgentAndHeadersGiven_SendsThemAfterTheCallDefinition()
     {
         using var proto = new ProtoFixture();

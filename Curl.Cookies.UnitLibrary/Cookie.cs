@@ -9,8 +9,8 @@ namespace Curl.Cookies;
 /// <param name="Domain">
 /// The host the cookie belongs to, without a leading dot: the <c>Domain</c> attribute when one was
 /// accepted, otherwise the request's host. Kept in the case it was written in. <see langword="null"/> for a
-/// cookie read from a <c>Set-Cookie:</c> line of a cookie file without a <c>Domain</c>: it is sent to every
-/// host, sorts as an empty domain, and is never written to the jar.
+/// cookie read from a <c>Set-Cookie:</c> line of a cookie file without a <c>Domain</c>: it is sent only to a
+/// host that is an IP address (as curl does), never to a host name, sorts as an empty domain, and is never written to the jar.
 /// </param>
 /// <param name="IncludesSubdomains">
 /// <see langword="true"/> when a <c>Domain</c> attribute named a host name, so the cookie is also sent

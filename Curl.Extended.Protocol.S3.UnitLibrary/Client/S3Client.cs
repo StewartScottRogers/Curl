@@ -17,7 +17,8 @@ namespace Curl.Extended.Protocol.S3.Client;
 /// <param name="context">The transfer, for its clock, proxy, events and cancellation.</param>
 /// <param name="configuration">The credentials and session token.</param>
 /// <param name="endpoint">The server the request goes to.</param>
-internal sealed class S3Client(IConnector connector, ITransferContext context, S3Configuration configuration, S3Endpoint endpoint)
+/// <param name="headReporter">Shows the heads and keeps what <c>-w</c> reports about the response.</param>
+internal sealed class S3Client(IConnector connector, ITransferContext context, S3Configuration configuration, S3Endpoint endpoint, S3HttpHeadReporter headReporter)
 {
     /// <summary>Sends a request and reads its successful response.</summary>
     /// <typeparam name="T">What the response gives.</typeparam>
@@ -45,7 +46,7 @@ internal sealed class S3Client(IConnector connector, ITransferContext context, S
         // ConfigureAwait gives a struct to dispose, so the compiler adds no null check.
         await using (connection.ConfigureAwait(false))
         {
-            S3HttpResponse response = await new S3HttpClientConnection(connection).SendAsync(request, context.CancellationToken);
+            S3HttpResponse response = await new S3HttpClientConnection(connection, headReporter).SendAsync(request, context.CancellationToken);
             if (response.StatusCode >= 300)
             {
                 throw await FailureOfAsync(response);

@@ -18,6 +18,10 @@ public sealed class NatsExtensionTests
     }
 
     [TestMethod]
+    public void Description_ShowsTheTokenFormWithATrailingColon() =>
+        StringAssert.Contains(NatsExtension.Description.Summary, "-u token:");
+
+    [TestMethod]
     public void CreateHandler_GivesTheNatsHandler() =>
         Assert.IsInstanceOfType<NatsProtocolHandler>(NatsExtension.CreateHandler(Services));
 

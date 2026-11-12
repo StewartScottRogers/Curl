@@ -36,3 +36,8 @@ broker closes the connection on an API it does not serve (exit 56).
 | Kafka:Guide-Sasl-3 | MUST | SaslAuthenticate v0 carries the RFC 4616 PLAIN message, authzid NUL authcid NUL passwd, as BYTES. | KafkaSaslTests.Sasl_PlainOffered_AuthenticatesBeforeMetadata |
 | Kafka:Guide-Sasl-4 | MUST | A SaslAuthenticate error_code ends the connection's authentication with its error_message (exit 67). | KafkaSaslTests.Sasl_AuthenticateRefused_FailsWithLoginDenied |
 | Kafka:Guide-Tls-1 | MUST | `kafkas://` speaks the same protocol over TLS (port 9093). | KafkaMetadataTests.Kafkas_TlsListener_CarriesTheSameRequests |
+
+## Upload with `-T`
+
+`curl -T up.txt kafka://host/topic/partition` publishes the file's whole content as the record value of one Produce
+request, exactly as `-d` does; it never subscribes or fetches (BL-4955). `-d` wins when both are given.

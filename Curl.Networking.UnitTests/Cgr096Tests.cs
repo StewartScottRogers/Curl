@@ -8,10 +8,9 @@ using Curl.Testing;
 namespace Curl.Networking;
 
 /// <summary>
-/// CGR-096: a PKCS#12 <c>--cert</c> file that opens with its passphrase fails in the Schannel
-/// build with exit 35 and AcquireCredentialsHandle's <c>SEC_E_UNKNOWN_CREDENTIALS</c>, as
-/// curl 8.22.0 and 8.21.0 Schannel do on Windows, before any ClientHello (ADR-1187). The
-/// OpenSSL build still loads it.
+/// CGR-096: a PKCS#12 <c>--cert</c> file that opens with its passphrase is loaded with its key
+/// in the Schannel build, as curl 8.22.0 Schannel presents it on Windows (ADR-1240). The
+/// OpenSSL build loads it too.
 /// </summary>
 [TestClass]
 public sealed class Cgr096Tests
@@ -32,7 +31,7 @@ public sealed class Cgr096Tests
     [TestMethod]
     [DataRow(TlsVersion.SystemDefault)]
     [DataRow(TlsVersion.Tls12)]
-    public void Load_Pkcs12WithItsPassphraseInTheSchannelBuild_FailsWithExit35UnknownCredentials(TlsVersion maximumVersion)
+    public void Load_Pkcs12WithItsPassphraseInTheSchannelBuild_LoadsTheCertificateWithItsKey(TlsVersion maximumVersion)
     {
         var path = WritePkcs12("secret");
         var options = new TlsClientOptions(Insecure: true, ClientCertificate: path, Passphrase: "secret", CertificateType: "P12", MaximumVersion: maximumVersion);
@@ -43,12 +42,10 @@ public sealed class Cgr096Tests
         Diagnostics.Act("exit code", failure?.ExitCode);
         Diagnostics.Act("message", failure?.ErrorMessage);
 
-        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, failure?.ExitCode);
-        Assert.IsNull(certificate);
-        Assert.AreEqual(CurlExitCode.SslConnectError, failure?.ExitCode);
-        Assert.AreEqual(
-            "schannel: AcquireCredentialsHandle failed: SEC_E_UNKNOWN_CREDENTIALS (0x8009030d) - The credentials supplied to the package were not recognized",
-            failure?.ErrorMessage);
+        Diagnostics.Assert("loaded with its key", true, certificate?.HasPrivateKey);
+        Assert.IsNull(failure);
+        Assert.IsTrue(certificate?.HasPrivateKey);
+        certificate?.Dispose();
     }
 
     [TestMethod]

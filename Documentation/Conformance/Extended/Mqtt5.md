@@ -91,7 +91,7 @@ and WebSocket and TLS in [Mqtt5-Transports.md](Mqtt5-Transports.md) (BL-4486).
 | Mqtt5:MQTT-3.2.2-6 | MUST | A CONNACK with a non-zero Reason Code has Session Present 0. | n/a: binds the server |
 | Mqtt5:MQTT-3.2.2-7 | MUST | A server sending a Reason Code of 0x80 or above closes the connection. | n/a: binds the server |
 | Mqtt5:MQTT-3.2.2-8 | MUST | The server sends a Connect Reason Code table 3-1 lists. | n/a: binds the server |
-| Mqtt5:MQTT5-3.2.2.2-1 | MUST | A client receiving a Connect Reason Code of 0x80 or above ends the connection and sends nothing after CONNECT (sections 3.2.2.2 and 4.13). | ConnackCases.Connack_FailureReasonCode_EndsTheTransferAfterConnectWithExit8 |
+| Mqtt5:MQTT5-3.2.2.2-1 | MUST | A client receiving a Connect Reason Code of 0x80 or above ends the connection and sends nothing after CONNECT (sections 3.2.2.2 and 4.13); exit 8, or exit 67 for 0x86 and 0x87, a refused login (ADR-1251). | ConnackCases.Connack_FailureReasonCode_EndsTheTransferAfterConnectWithExit8Or67ForALoginRefusal |
 | Mqtt5:MQTT-3.2.2-9 | MUST | A server not supporting QoS 1 or 2 sends Maximum QoS. | n/a: binds the server |
 | Mqtt5:MQTT-3.2.2-10 | MUST | A server still accepts a SUBSCRIBE above its Maximum QoS. | n/a: binds the server |
 | Mqtt5:MQTT-3.2.2-11 | MUST NOT | The client sends no PUBLISH above the Maximum QoS. | ConnackCases.Connack_ReceiveMaximumOneMaximumQos0NoRetainNoTopicAlias_PublishesAtQos0UnretainedWithNoAlias |
@@ -139,3 +139,9 @@ and WebSocket and TLS in [Mqtt5-Transports.md](Mqtt5-Transports.md) (BL-4486).
 | Mqtt5:MQTT-4.13.1-1 | MUST | A server detecting a Malformed Packet or Protocol Error closes the connection. | n/a: binds the server |
 | Mqtt5:MQTT5-4.13.1-1 | SHOULD | A client detecting a Malformed Packet or Protocol Error sends DISCONNECT with Reason Code 0x81 or 0x82 before it closes the connection (section 4.13.1). | ErrorHandlingCases.Connack_ReasonStringNotWellFormedUtf8_IsAnsweredByDisconnect0x81 |
 | Mqtt5:MQTT-4.13.2-1 | MUST | With a CONNACK or DISCONNECT Reason Code of 0x80 or above, the connection is closed whether or not the packet was sent. | DisconnectAuthCases.Subscribe_ServerDisconnectsWithServerShuttingDown_EndsTheTransferWithExit8 |
+
+## `-T` (upload)
+
+`curl -T up.txt mqtt5://host/topic` (and `mqtt5+ws://`) publishes the file's bytes as the PUBLISH payload, exactly as `-d` does
+(BL-4954): it never subscribes, fetches or consumes. When both `-d` and `-T` are given, the `-d` body is published. Covered by
+`Mqtt5UploadTests`.

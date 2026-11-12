@@ -15,7 +15,8 @@ namespace Curl.Extended.Protocol.AzureStorage.Client;
 /// <param name="context">The transfer, for its proxy, events and cancellation.</param>
 /// <param name="authorizer">Addresses and authorizes each request.</param>
 /// <param name="credential">What authorizes each request.</param>
-internal sealed class AzureStorageClient(IConnector connector, ITransferContext context, AzureStorageRequestAuthorizer authorizer, AzureStorageCredential credential)
+/// <param name="headReporter">Shows the heads and keeps what <c>-w</c> reports about the response.</param>
+internal sealed class AzureStorageClient(IConnector connector, ITransferContext context, AzureStorageRequestAuthorizer authorizer, AzureStorageCredential credential, AzureStorageHttpHeadReporter headReporter)
 {
     /// <summary>The port every request goes to: Azure Storage is reached over HTTPS.</summary>
     internal const int HttpsPort = 443;
@@ -58,7 +59,7 @@ internal sealed class AzureStorageClient(IConnector connector, ITransferContext 
         // ConfigureAwait gives a struct to dispose, so the compiler adds no null check.
         await using (connection.ConfigureAwait(false))
         {
-            AzureStorageHttpResponse response = await new AzureStorageHttpClientConnection(connection).SendAsync(request, context.CancellationToken);
+            AzureStorageHttpResponse response = await new AzureStorageHttpClientConnection(connection, headReporter).SendAsync(request, context.CancellationToken);
             if (response.StatusCode >= 300)
             {
                 string errorBody = await ReadTextAsync(response);

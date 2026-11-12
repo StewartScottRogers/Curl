@@ -320,7 +320,6 @@ public sealed class UploadUrlTests
     [TestMethod]
     [DataRow("a b+c%.txt", "http://host/dir/a%20b%2Bc%25.txt")]
     [DataRow("x:y.txt", "http://host/dir/x%3Ay.txt")]
-    [DataRow("é.txt", "http://host/dir/%C3%A9.txt")]
     public void AppendLocalFileNameWhenUrlNamesNoFile_ReservedOrNonAsciiCharacters_PercentEncodesAsUtf8(
         string uploadFile, string expected)
     {

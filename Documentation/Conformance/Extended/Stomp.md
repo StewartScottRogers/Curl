@@ -31,7 +31,7 @@ client relies on) that binds a client is a row; statements that bind only a serv
 | Stomp:STOMP12-Connect-5 | MUST | The client sends no further frame until the server answers CONNECT with CONNECTED. | StompConnectCases.Publish_ErrorAtConnect_FailsWithItsMessageAndSendsNothingMore |
 | Stomp:STOMP12-Connect-6 | MAY | A client may send STOMP in place of CONNECT. | n/a: curl sends CONNECT, which every 1.2 server accepts |
 | Stomp:STOMP12-Negotiation-1 | MUST | CONNECTED's `version` is the version the session speaks, 1.0 when absent; curl speaks only 1.2 and fails otherwise. | StompConnectCases.Subscribe_ServerChoosesVersion11_FailsBeforeSubscribing |
-| Stomp:STOMP12-Negotiation-2 | MUST | A server sharing no version with the client answers ERROR and closes; the client fails. | StompConnectCases.Publish_ErrorAtConnect_FailsWithItsMessageAndSendsNothingMore |
+| Stomp:STOMP12-Negotiation-2 | MUST | A server sharing no version with the client answers ERROR and closes; the client fails with exit 67, a refused login (ADR-1251). | StompConnectCases.Publish_ErrorAtConnect_FailsWithItsMessageAndSendsNothingMore |
 | Stomp:STOMP12-HeartBeat-1 | MUST | A side that agreed to send heart-beats sends an EOL when it has no frame to send. | n/a: curl offers `0,0`, so no heart-beating is agreed |
 | Stomp:STOMP12-HeartBeat-2 | MAY | A side that agreed to receive heart-beats may treat a silent connection as dead. | n/a: curl offers `0,0`; `-m` bounds the transfer instead |
 | Stomp:STOMP12-Send-1 | REQUIRED | SEND carries `destination`. | StompConnectCases.Publish_NoCredentials_SendsConnectSendAndDisconnectAndEndsOnTheReceipt |
@@ -54,3 +54,4 @@ client relies on) that binds a client is a row; statements that bind only a serv
 | Stomp:STOMP12-Error-1 | SHOULD | An ERROR carries a short `message`; the client reports it. | StompConnectCases.Publish_ErrorAtConnect_FailsWithItsMessageAndSendsNothingMore |
 | Stomp:STOMP12-Error-2 | MUST | A server closes the connection after an ERROR; the client treats ERROR as the end of the session. | StompConnectCases.Publish_ErrorAtConnect_FailsWithItsMessageAndSendsNothingMore |
 | Stomp:STOMP12-Transport-1 | MAY | STOMP runs over any reliable two-way stream; `stomps://` is TLS from the first byte on port 61614. | StompConnectCases.Publish_Stomps_SpeaksTlsFromTheFirstByteOnPort61614 |
+| Stomp:STOMP12-Send-3 | MAY | SEND's body is the client's payload; curl takes it from `-d`, or from the `-T` file when `-d` is absent (`-d` wins when both are given), and never subscribes for an upload. | StompConnectCases.Publish_UploadFile_SendsTheFileAsTheSendBodyAndNeverSubscribes |

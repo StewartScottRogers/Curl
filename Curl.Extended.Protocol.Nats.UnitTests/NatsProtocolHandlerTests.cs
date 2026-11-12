@@ -219,4 +219,29 @@ public sealed class NatsProtocolHandlerTests
 
     private static TransferContext Context(string url, Stream output, string? data = null) =>
         new() { Url = CurlUrl.Parse(url), Output = output, PostData = data is null ? null : (ReadOnlyMemory<byte>?)Encoding.UTF8.GetBytes(data) };
+
+    [TestMethod]
+    public async Task ExecuteAsync_TheConnectionIsReset_FailsWithExit56()
+    {
+        TransferResult result = await new NatsProtocolHandler(new ScriptedConnector(ConnectResult.Connected(new ResettingConnection())), () => "_INBOX.t").ExecuteAsync(Context("nats://example.com/a", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Recv failure: Connection was reset", result.ErrorMessage);
+    }
+
+    private sealed class ResettingConnection : IConnection
+    {
+        public bool IsSecure => false;
+
+        public EndPoint? RemoteEndPoint => null;
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            throw new IOException("An existing connection was forcibly closed by the remote host.");
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 }

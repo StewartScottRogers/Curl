@@ -10,6 +10,25 @@ namespace Curl.Conformance.Extended.UnitTests.Stomp;
 public sealed class StompConnectCases
 {
     [TestMethod]
+    [SpecRequirement("Stomp:STOMP12-Send-3")]
+    public async Task Publish_UploadFile_SendsTheFileAsTheSendBodyAndNeverSubscribes()
+    {
+        string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
+        await File.WriteAllTextAsync(file, "hi");
+        try
+        {
+            CurlRunResult result = await StompRun.RunAsync(StompRun.PublishAnswered(), "-T", file, "stomp://localhost/q");
+
+            StompRun.AssertExit(result, 0, string.Empty);
+            Assert.AreEqual(StompRun.PlainConnect + "SEND\ndestination:/q\ncontent-length:2\ncontent-type:application/octet-stream\n\nhi\0" + StompRun.Disconnect, StompRun.ClientText(result));
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [TestMethod]
     [SpecRequirement("Stomp:STOMP12-Frames-1")]
     [SpecRequirement("Stomp:STOMP12-Frames-3")]
     [SpecRequirement("Stomp:STOMP12-Connect-1")]
@@ -89,7 +108,7 @@ public sealed class StompConnectCases
             "hi",
             "stomp://localhost/q");
 
-        StompRun.AssertExit(result, 8, "curl: (8) STOMP server sent ERROR: Supported protocol versions are 1.0\n");
+        StompRun.AssertExit(result, 67, "curl: (67) STOMP server sent ERROR: Supported protocol versions are 1.0\n");
         Assert.AreEqual(StompRun.PlainConnect, StompRun.ClientText(result));
     }
 

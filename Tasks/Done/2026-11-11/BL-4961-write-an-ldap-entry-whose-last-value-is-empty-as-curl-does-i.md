@@ -1,0 +1,46 @@
+---
+id: BL-4961
+title: Write an LDAP entry whose last value is empty, as curl does, instead of its DN line alone
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: []
+touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapSearchResponse.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapSearchResponseTests.cs]
+requirement: none
+created: 2026-11-11
+completed: 2026-11-11
+---
+# BL-4961 — Write an LDAP entry whose last value is empty, as curl does, instead of its DN line alone
+
+## Goal
+
+An LDAP SearchResultEntry whose only (or last) attribute holds one empty value is written as curl 8.22.0 writes it (`	db: 
+
+` after the DN line), not as the DN line alone.
+
+## Context
+
+Found by BL-4913 with `Record-CurlExchange.ps1 -Script`: bind success, then entry `cn=a` with one attribute `db` holding one empty value (`30 0a 04 02 64 62 31 04 04 00`), then SearchResultDone. curl 8.22.0 (Schannel, WinLDAP) prints `DN: cn=a
+	db: 
+
+`; Curl prints `DN: cn=a
+`, the "attributes could not be read" path of `LdapEntryFormatter`. The `empty-win` recording in `LdapProtocolHandlerTests.Output.cs`, where the empty value is followed by another attribute, passes, so the reader likely trips on an empty OCTET STRING that ends the entry. Start in `LdapSearchResponse.cs`.
+
+## Acceptance criteria
+
+- [x] The entry above prints exactly `DN: cn=a
+	db: 
+
+` with `-sS -u cn=admin,dc=x:pw`, as curl 8.22.0 does.
+- [x] A focused unit test in `Curl.Original.Protocol.Ldap.UnitTests` pins it.
+- [x] `dotnet build` is clean and the fast tests pass.
+
+## Notes
+
+- Could not reproduce: the entry `cn=a` with one attribute `db` holding one empty value (well-formed BER: `30 0a 30 08 04 02 64 62 31 02 04 00`; the task's hex is truncated and not valid BER) already prints `DN: cn=a`, tab, `db: `, blank line. No production change needed; the entry is pinned as the `emptylast-win` row of `ExecuteAsync_WinLdapEntries_WritesWhatWinLdapWrote`. The real bug, if any, needs the exact recorded bytes.
+
+## Log
+
+- 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 4207d817 f494e859 3d836d5e.
+- 2026-11-11: Doing -> Done. Already correct; pinned by emptylast-win test

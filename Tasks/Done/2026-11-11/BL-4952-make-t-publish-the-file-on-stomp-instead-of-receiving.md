@@ -1,0 +1,37 @@
+---
+id: BL-4952
+title: Make -T publish the file on stomp:// instead of receiving
+priority: High
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompProtocolHandler.cs, Curl.Extended.Protocol.Stomp.UnitTests/StompUploadTests.cs, Documentation/Conformance/Extended/Stomp.md]
+requirement: none
+created: 2026-11-11
+completed: 2026-11-11
+---
+# BL-4952 — Make -T publish the file on stomp:// instead of receiving
+
+## Goal
+
+`curl -T up.txt stomp://host/...` publishes the file's bytes as `-d` does: the server receives a SEND frame with body filebody. It never subscribes, fetches or consumes.
+
+## Context
+
+Split from BL-4903 (outside fitness review 2026-11-11, finding EXT-008). Today the handler reads only `context.PostData`, so `-T` falls through to the receive path. `Curl.Extended.Protocol.Amqp1.UnitLibrary/Client/Amqp1ProtocolHandler.cs` `RequestBodyAsync` shows the pattern: when `PostData` is null and `context.Upload` is set, copy the upload stream into the body and take the publish path.
+
+## Acceptance criteria
+
+- [x] `-T up.txt` (holding `filebody`) on stomp:// sends `filebody` as the publish payload, or exits 2 before connecting where an upload has no meaning; a unit test in `Curl.Extended.Protocol.Stomp.UnitTests` pins it.
+- [x] `Documentation/Conformance/Extended/Stomp.md` states what `-T` does.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+Decision: -T copies the upload into the SEND body; -d wins when both are given (as Amqp1 does). Pinned by StompUploadTests; documented as STOMP12-Send-3.
+
+## Log
+
+- 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: 48be352d 4ff61769 a0b49a29.
+- 2026-11-11: Doing -> Done. -T publishes the file as the SEND body; tests and docs done

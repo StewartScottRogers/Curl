@@ -85,6 +85,21 @@ public sealed class Mqtt5ProtocolHandler : IProtocolHandler
             Password = credentials is { Password.Length: > 0 } ? System.Text.Encoding.UTF8.GetBytes(credentials.Password) : null,
         };
 
+    /// <summary>
+    /// Gives the payload to publish: <c>-d</c>'s body, else <c>-T</c>'s upload read whole, else none (subscribe).
+    /// </summary>
+    internal static async ValueTask<ReadOnlyMemory<byte>?> PublishPayloadAsync(ITransferContext context)
+    {
+        if (context.PostData is not null || context.Upload is not { } upload)
+        {
+            return context.PostData;
+        }
+
+        using var body = new MemoryStream();
+        await upload.CopyToAsync(body, context.CancellationToken).ConfigureAwait(false);
+        return body.ToArray();
+    }
+
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context, string topic)
     {
         ConnectResult connect = await connector.ConnectAsync(TargetOf(context), context.CancellationToken).ConfigureAwait(false);
@@ -99,7 +114,7 @@ public sealed class Mqtt5ProtocolHandler : IProtocolHandler
             var flow = new Mqtt5ClientFlow(connection, context.Output, context.Progress, context.TimeProvider, context.CancellationToken);
             try
             {
-                await flow.RunAsync(ConnectFor(ClientIdentifierPrefix + clientIdentifierSuffixSource(), context.Credentials), topic, context.PostData).ConfigureAwait(false);
+                await flow.RunAsync(ConnectFor(ClientIdentifierPrefix + clientIdentifierSuffixSource(), context.Credentials), topic, await PublishPayloadAsync(context).ConfigureAwait(false)).ConfigureAwait(false);
                 return TransferResult.Success(flow.BytesWritten);
             }
             catch (Mqtt5ClientException failure)

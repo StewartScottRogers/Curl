@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 namespace Curl.Cli;
 
 /// <summary>
@@ -275,7 +276,7 @@ public static class CommandLineParser
         {
             CommandLineOptions group = options.CurrentGroup;
             CommandLineRefusal? refusal = reader.OptionsEnded
-                ? AddPositionalUrl(group, argument)
+                ? AddPositionalUrl(group, argument, reader)
                 : ParseArgument(group, argument, reader);
             if (refusal is not null)
             {
@@ -398,18 +399,48 @@ public static class CommandLineParser
             return ParseShortBundle(options, argument, reader);
         }
 
-        return AddPositionalUrl(options, argument);
+        return AddPositionalUrl(options, argument, reader);
     }
 
-    private static CommandLineRefusal? AddPositionalUrl(CommandLineOptions options, string argument)
+    /// <summary>
+    /// Adds a non-option argument as a URL. One that starts with <c>@</c> names a URL-list file and is
+    /// applied as <c>--url @file</c> is, as curl 8.13 and later hand every non-option argument to
+    /// <c>--url</c>'s parser (BL-4907); a missing file is refused naming the argument as typed.
+    /// </summary>
+    private static CommandLineRefusal? AddPositionalUrl(CommandLineOptions options, string argument, ArgumentReader reader)
     {
         if (argument.Length == 0)
         {
             return CommandLineRefusal.BlankArgument(string.Empty);
         }
 
+        if (argument[0] == '@')
+        {
+            _ = CommandLineOptionTable.TryFindLong("url", out CommandLineOption? url);
+            return url!.Apply(options, argument, argument, reader.PathExists, reader.DataFileReader);
+        }
+
         return options.AddUrl(argument, argument);
     }
+
+    /// <summary>
+    /// Finds a long option in the table, except that under <c>CURL_EXTENSIONS=0</c> the options only Curl has
+    /// (<see cref="CommandLineOptionTable.PortOnlyLongNames"/>) are not found, so the parser refuses each as curl
+    /// refuses an unknown option (BL-4937).
+    /// </summary>
+    private static bool TryFindLongOption(CommandLineOptions options, string longName, [NotNullWhen(true)] out CommandLineOption? option)
+    {
+        if (CommandLineOptionTable.PortOnlyLongNames.Contains(longName) && options.ReadEnvironmentVariable(ExtensionsSwitchVariable) == "0")
+        {
+            option = null;
+            return false;
+        }
+
+        return CommandLineOptionTable.TryFindLong(longName, out option);
+    }
+
+    /// <summary>The environment variable whose value <c>0</c> turns every Curl-only extension off.</summary>
+    private const string ExtensionsSwitchVariable = "CURL_EXTENSIONS";
 
     private static CommandLineRefusal? ParseLong(CommandLineOptions options, string argument, ArgumentReader reader)
     {
@@ -418,7 +449,7 @@ public static class CommandLineParser
         string longName = equals >= 0 ? nameAndValue[..equals] : nameAndValue;
         string? attachedValue = equals >= 0 ? nameAndValue[(equals + 1)..] : null;
         options.FirstOptionOfArgument = true;
-        if (CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
+        if (TryFindLongOption(options, longName, out CommandLineOption? option))
         {
             return ApplyLong(options, option, argument, attachedValue, reader);
         }
@@ -498,9 +529,9 @@ public static class CommandLineParser
         }
 
         string negatedName = longName[NegationPrefix.Length..];
-        if (!CommandLineOptionTable.TryFindLong(negatedName, out CommandLineOption? option))
+        if (!TryFindLongOption(options, negatedName, out CommandLineOption? option))
         {
-            return RefuseUnlistedName(argument);
+            return NegateExtensionFlag(options, argument, negatedName);
         }
 
         if (option.Negate is null)
@@ -509,6 +540,21 @@ public static class CommandLineParser
         }
 
         return option.Negate(options, string.Empty, argument, reader.PathExists, reader.DataFileReader);
+    }
+
+    /// <summary>
+    /// Reads <c>--no-&lt;name&gt;</c> for an extension flag (BL-4949): turns the flag off, so one set in a config file can
+    /// be switched off per run; refuses it as unknown when the name is no extension flag.
+    /// </summary>
+    private static CommandLineRefusal? NegateExtensionFlag(CommandLineOptions options, string argument, string flagName)
+    {
+        if (!options.ExtensionOptions.TryGetValue(flagName, out CommandLineExtensionOption? flag) || flag.TakesValue)
+        {
+            return RefuseUnlistedName(argument);
+        }
+
+        options.RemoveExtensionOptionValue(flag.LongName);
+        return null;
     }
 
     /// <summary>
@@ -546,7 +592,7 @@ public static class CommandLineParser
     /// </summary>
     private static CommandLineRefusal? ParseExpandedLong(CommandLineOptions options, string argument, string longName, string? attachedValue, ArgumentReader reader)
     {
-        if (!CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
+        if (!TryFindLongOption(options, longName, out CommandLineOption? option))
         {
             return RefuseUnlistedName(argument);
         }

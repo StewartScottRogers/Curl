@@ -9,7 +9,7 @@ public static class NatsExtension
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "nats",
-        "Talks to NATS servers (port 4222; natss:// is TLS from the first byte): without -d subscribes to the URL path's subject and writes each message's payload and a newline until the server closes or ?count=N messages arrived; with -d publishes the data; with ?request publishes it with a reply subject and writes the one reply. -u gives a user and password, or a token alone.",
+        "Talks to NATS servers (port 4222; natss:// is TLS from the first byte): without -d subscribes to the URL path's subject and writes each message's payload and a newline until the server closes or ?count=N messages arrived; with -d publishes the data; with ?request publishes it with a reply subject and writes the one reply. -u gives a user and password, or a token as `-u token:` (the trailing colon stops the password prompt).",
         ["nats", "natss"],
         [],
         new Uri("https://docs.nats.io/reference/reference-protocols/nats-protocol"));

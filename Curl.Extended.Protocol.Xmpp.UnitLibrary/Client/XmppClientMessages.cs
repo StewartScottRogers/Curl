@@ -3,6 +3,9 @@ namespace Curl.Extended.Protocol.Xmpp.Client;
 /// <summary>The error messages an XMPP transfer ends with (ADR-1068).</summary>
 internal static class XmppClientMessages
 {
+    /// <summary><c>--ssl-reqd</c> made TLS required and the server offers no STARTTLS on a plaintext connection.</summary>
+    internal const string TlsRequired = "Requested SSL level failed";
+
     /// <summary>The connection ended where an element was due.</summary>
     internal const string Disconnected = "Connection disconnected";
 

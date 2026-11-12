@@ -1,6 +1,6 @@
 # ADR-0280 — FTP's `CCC` clears TLS through `IConnection.ClearTlsAsync`, and fails with exit 81 as the Schannel build does
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-1241](ADR-1241-ftp-ccc-on-the-schannel-profile-stays-exit-81-as-measured-on-curl-8-22-0.md) (2026-11-11: its 8.21.0 measurement, repeated on 8.22.0)
 - **Date:** 2026-09-30
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-636.

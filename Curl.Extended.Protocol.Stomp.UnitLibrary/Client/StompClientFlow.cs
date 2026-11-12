@@ -7,7 +7,7 @@ namespace Curl.Extended.Protocol.Stomp.Client;
 /// The STOMP 1.2 exchange over any byte transport (ADR-1059): <c>CONNECT</c> and <c>CONNECTED</c>, then with a body
 /// <c>SEND</c> and a <c>DISCONNECT</c> whose <c>RECEIPT</c> confirms the server processed it, otherwise
 /// <c>SUBSCRIBE</c> and each <c>MESSAGE</c> body written to the output until the server closes the connection.
-/// An <c>ERROR</c> frame, or any frame the exchange does not expect, ends the transfer with exit 8.
+/// An <c>ERROR</c> frame answering CONNECT ends the transfer with exit 67 (ADR-1251); any other <c>ERROR</c> frame, or any frame the exchange does not expect, with exit 8.
 /// </summary>
 internal sealed class StompClientFlow(IConnection transport, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
 {
@@ -26,7 +26,7 @@ internal sealed class StompClientFlow(IConnection transport, Stream output, ITra
     internal async ValueTask RunAsync(StompFrame connect, string destination, ReadOnlyMemory<byte>? body, string contentType = SendContentType)
     {
         await SendAsync(connect).ConfigureAwait(false);
-        StompFrame connected = await ReceiveAsync("CONNECTED").ConfigureAwait(false);
+        StompFrame connected = await ReceiveAsync("CONNECTED", CurlExitCode.LoginDenied).ConfigureAwait(false);
         if (connected.HeaderValue("version") != "1.2")
         {
             throw new StompClientException(CurlExitCode.WeirdServerReply, StompClientMessages.UnsupportedVersion(connected.HeaderValue("version")));
@@ -80,11 +80,11 @@ internal sealed class StompClientFlow(IConnection transport, Stream output, ITra
         }
     }
 
-    private async ValueTask<StompFrame> ReceiveAsync(string expectedCommand)
+    private async ValueTask<StompFrame> ReceiveAsync(string expectedCommand, CurlExitCode errorFrameExitCode = CurlExitCode.WeirdServerReply)
     {
         StompFrame frame = await ReadFrameAsync().ConfigureAwait(false)
             ?? throw new StompClientException(CurlExitCode.RecvError, StompClientMessages.Disconnected);
-        return frame.Command == expectedCommand ? frame : throw Unexpected(frame);
+        return frame.Command == expectedCommand ? frame : throw Unexpected(frame, errorFrameExitCode);
     }
 
     private async ValueTask ReceiveReceiptAsync()
@@ -92,7 +92,7 @@ internal sealed class StompClientFlow(IConnection transport, Stream output, ITra
         StompFrame receipt = await ReceiveAsync("RECEIPT").ConfigureAwait(false);
         if (receipt.HeaderValue("receipt-id") != DisconnectReceipt)
         {
-            throw Unexpected(receipt);
+            throw Unexpected(receipt, CurlExitCode.WeirdServerReply);
         }
     }
 
@@ -102,15 +102,17 @@ internal sealed class StompClientFlow(IConnection transport, Stream output, ITra
         {
             if (frame.Command != "MESSAGE")
             {
-                throw Unexpected(frame);
+                throw Unexpected(frame, CurlExitCode.WeirdServerReply);
             }
 
             await WriteOutputAsync(frame.Body).ConfigureAwait(false);
         }
     }
 
-    private static StompClientException Unexpected(StompFrame frame) =>
-        new(CurlExitCode.WeirdServerReply, frame.Command == "ERROR" ? StompClientMessages.ServerError(frame.HeaderValue("message")) : StompClientMessages.UnexpectedFrame(frame.Command));
+    private static StompClientException Unexpected(StompFrame frame, CurlExitCode errorFrameExitCode) =>
+        frame.Command == "ERROR"
+            ? new(errorFrameExitCode, StompClientMessages.ServerError(frame.HeaderValue("message")))
+            : new(CurlExitCode.WeirdServerReply, StompClientMessages.UnexpectedFrame(frame.Command));
 
     private async ValueTask WriteOutputAsync(byte[] body)
     {

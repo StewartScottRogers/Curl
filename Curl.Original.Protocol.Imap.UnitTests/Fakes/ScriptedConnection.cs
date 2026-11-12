@@ -37,6 +37,16 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// </summary>
     public bool FailReadsWhenExhausted { get; set; }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the server still looks open once the script is
+    /// exhausted; by default the connection reports <see cref="IConnection.HasPeerClosed" />
+    /// then, as a socket whose server hung up after its last byte does.
+    /// </summary>
+    public bool PeerStaysOpen { get; set; }
+
+    /// <inheritdoc />
+    public bool HasPeerClosed => !PeerStaysOpen && nextRead == reads.Length;
+
     /// <inheritdoc />
     public bool IsSecure => false;
 

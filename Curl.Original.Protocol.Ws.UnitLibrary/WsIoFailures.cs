@@ -28,7 +28,11 @@ internal static class WsIoFailures
     /// <param name="exception">What the connection threw.</param>
     /// <returns>The failure to throw.</returns>
     internal static WsTransferException ReceiveFailed(IOException exception) =>
-        new(CurlExitCode.RecvError, CurlSocketErrorText.ReceiveFailure(exception) ?? ReceiveFailedMessage);
+        new(
+            CurlExitCode.RecvError,
+            exception is MissingCloseNotifyException
+                ? exception.Message
+                : CurlSocketErrorText.ReceiveFailure(exception) ?? ReceiveFailedMessage);
 
     /// <summary>Makes the exit 23 failure for a <c>-D</c> or output write that threw <paramref name="exception" />.</summary>
     /// <param name="passed">How many bytes were passed to the write.</param>

@@ -86,7 +86,7 @@ public sealed class AltSvcTransferCacheTests
     public async Task ApplyTo_EntryForAnotherHost_RoutesToTheAlternative()
     {
         Diagnostics.Arrange("alt-svc header", "h2=\"other.test:8443\"");
-        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System, onWindows: false);
         cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), "h2=\"other.test:8443\"", System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
 
         AltSvcRoute? actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions()).AltSvcRoute;
@@ -151,7 +151,7 @@ public sealed class AltSvcTransferCacheTests
     {
         string header = $"{alpn}=\":443\"";
         Diagnostics.Arrange("alt-svc header", header);
-        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System, onWindows: false);
         cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), header, System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
 
         HttpVersionPreference actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions()).Version;
@@ -179,6 +179,49 @@ public sealed class AltSvcTransferCacheTests
         Assert.AreEqual(HttpVersionPreference.Http3, actual);
     }
 
+    /// <summary>
+    /// With no version option the Windows (Schannel) build may switch to <c>h1</c> alone and the other builds to
+    /// <c>h1</c>, <c>h2</c> and <c>h3</c>, as curl 8.22.0's builds allow; a version option allows the same on
+    /// every platform (BL-4912, ADR-1238).
+    /// </summary>
+    [TestMethod]
+    [DataRow(HttpVersion.None, true, "H1")]
+    [DataRow(HttpVersion.None, false, "H1,H2,H3")]
+    [DataRow(HttpVersion.Http2, true, "H1,H2")]
+    [DataRow(HttpVersion.Http3, true, "H1,H2,H3")]
+    [DataRow(HttpVersion.Http3, false, "H1,H2,H3")]
+    public void LookupOf_VersionOptionAndPlatform_AllowsThePlatformBuildsAlternatives(HttpVersion version, bool isWindows, string expected)
+    {
+        Diagnostics.Arrange("version and windows", $"{version} {isWindows}");
+
+        string actual = string.Join(",", AltSvcTransferCache.LookupOf(version, isWindows).Allowed.Order());
+        Diagnostics.Act("allowed", actual);
+
+        Diagnostics.Assert("allowed", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    /// <summary>
+    /// On Windows an <c>h2</c> or <c>h3</c> entry for another port leaves a transfer with no version option on the
+    /// origin, with no route and the version it asked for (BL-4912 STD-009, STD-013).
+    /// </summary>
+    [TestMethod]
+    [DataRow("h2")]
+    [DataRow("h3")]
+    public async Task ApplyTo_H2OrH3EntryForAnotherHostOnWindowsWithNoVersionOption_StaysOnTheOrigin(string alpn)
+    {
+        string header = $"{alpn}=\"other.test:8443\"";
+        Diagnostics.Arrange("alt-svc header", header);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System, onWindows: true);
+        cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), header, System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
+
+        HttpRequestOptions actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions());
+        Diagnostics.Act("route", actual.AltSvcRoute);
+
+        Diagnostics.Assert("route", (AltSvcRoute?)null, actual.AltSvcRoute);
+        Assert.IsNull(actual.AltSvcRoute);
+        Assert.AreEqual(HttpVersionPreference.Http11, actual.Version);
+    }
     /// <summary>A file system the cache must never touch: an empty <c>--alt-svc</c> name reads and writes nothing.</summary>
     private sealed class UnusedFileSystem : IFileSystem
     {

@@ -17,6 +17,8 @@ public sealed class SocketIoProtocolHandler(IConnector connector, IWebSocketRand
 
     private const int KeyLength = 16;
 
+    private const string ConnectionReset = "Recv failure: Connection was reset";
+
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes { get; } = ["socketio", SecureScheme];
 
@@ -27,6 +29,10 @@ public sealed class SocketIoProtocolHandler(IConnector connector, IWebSocketRand
         try
         {
             return await TransferAsync(context).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            return TransferResult.Failure(CurlExitCode.RecvError, ConnectionReset);
         }
         catch (SocketIoException failure)
         {
@@ -83,7 +89,7 @@ public sealed class SocketIoProtocolHandler(IConnector connector, IWebSocketRand
         byte[] keyBytes = new byte[KeyLength];
         randomSource.Fill(keyBytes);
         string key = Convert.ToBase64String(keyBytes);
-        await connection.WriteAsync(SocketIoUpgrade.Request(context.Url, key), context.CancellationToken).ConfigureAwait(false);
+        await connection.WriteAsync(SocketIoUpgrade.Request(context.Url, key, HandshakeHeaderFields.Of(context)), context.CancellationToken).ConfigureAwait(false);
         await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
         ReadOnlyMemory<byte> afterHead = await SocketIoUpgrade.ReadReplyAsync(connection, key, context.CancellationToken).ConfigureAwait(false);
         var channel = new WebSocketMessageChannel(connection, randomSource, afterHead);

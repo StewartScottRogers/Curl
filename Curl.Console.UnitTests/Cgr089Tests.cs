@@ -44,14 +44,14 @@ public sealed class Cgr089Tests
     }
 
     [TestMethod]
-    public async Task RunAsync_QueryAppendedToARejectedUrl_UrlPrintsItAsTypedWithoutTheQuery()
+    public async Task RunAsync_QueryAppendedToARejectedUrl_UrlPrintsItWithTheQueryUnnormalised()
     {
         int exitCode = await RunAsync(["-s", "-o", "out", "-w", "%{url}|%{url.query}", "-G", "-d", "a=b", "http://a b/p"]);
 
         Diagnostics.Assert("exit code", 3, exitCode);
         Assert.AreEqual(3, exitCode);
-        Diagnostics.Assert("stdout", "http://a b/p|", StandardOutputText);
-        Assert.AreEqual("http://a b/p|", StandardOutputText);
+        Diagnostics.Assert("stdout", "http://a b/p?a=b|", StandardOutputText);
+        Assert.AreEqual("http://a b/p?a=b|", StandardOutputText);
     }
 
     private string StandardOutputText => Encoding.ASCII.GetString(standardOutput.ToArray());

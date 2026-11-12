@@ -59,34 +59,34 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithPkcs12AndItsPassphraseInTheSchannelBuild_FailsAcquiringTheCredentials()
+    public async Task AuthenticateAsClientAsync_WithPkcs12AndItsPassphraseInTheSchannelBuild_PresentsIt()
     {
         var file = WriteCertificateFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12, Passphrase));
 
         var handshake = await HandshakeWithClientCertificateRequestAsync(ClientCertificate($"{file}:{Passphrase}"), SchannelBuild);
 
-        AssertCredentialsRefused(handshake);
+        AssertPresented(handshake);
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithPkcs12WithoutAPassphraseInTheSchannelBuild_FailsAcquiringTheCredentials()
+    public async Task AuthenticateAsClientAsync_WithPkcs12WithoutAPassphraseInTheSchannelBuild_PresentsIt()
     {
         var file = WriteCertificateFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12));
 
         var handshake = await HandshakeWithClientCertificateRequestAsync(ClientCertificate(file), SchannelBuild);
 
-        AssertCredentialsRefused(handshake);
+        AssertPresented(handshake);
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithPkcs12AndAMissingKeyFileInTheSchannelBuild_IgnoresTheKeyFileAndFailsAcquiringTheCredentials()
+    public async Task AuthenticateAsClientAsync_WithPkcs12AndAMissingKeyFileInTheSchannelBuild_IgnoresTheKeyFileAndPresentsIt()
     {
         var file = WriteCertificateFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12));
         var options = ClientCertificate(file) with { PrivateKey = Path.Combine(_caFileDirectory, "missing.pem") };
 
         var handshake = await HandshakeWithClientCertificateRequestAsync(options, SchannelBuild);
 
-        AssertCredentialsRefused(handshake);
+        AssertPresented(handshake);
     }
 
     [TestMethod]
@@ -341,14 +341,15 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithAPkcs12ClientCertificateAndAnUnusableCaCertificateFileInTheSchannelBuild_FailsAcquiringTheCredentialsFirst()
+    public async Task AuthenticateAsClientAsync_WithAPkcs12ClientCertificateAndAnUnusableCaCertificateFileInTheSchannelBuild_FailsWithSslCacertBadfile()
     {
         var file = WriteCertificateFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12));
         var options = new TlsClientOptions(CaCertificateFile: _caFileDirectory, ClientCertificate: file);
 
         var handshake = await HandshakeWithClientCertificateRequestAsync(options, SchannelBuild);
 
-        AssertCredentialsRefused(handshake);
+        Diagnostics.Assert("exit code", CurlExitCode.SslCacertBadfile, handshake.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, handshake.Result.ExitCode, handshake.Result.ErrorMessage);
     }
 
     [TestMethod]
@@ -364,13 +365,14 @@ public sealed partial class SslStreamTlsProviderTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_WithAPkcs12ClientCertificateAndAnUntrustedServerInTheSchannelBuild_FailsAcquiringTheCredentialsFirst()
+    public async Task AuthenticateAsClientAsync_WithAPkcs12ClientCertificateAndAnUntrustedServerInTheSchannelBuild_FailsWithPeerFailedVerification()
     {
         var file = WriteCertificateFile("client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12));
 
         var handshake = await HandshakeWithClientCertificateRequestAsync(new TlsClientOptions(ClientCertificate: file), SchannelBuild);
 
-        AssertCredentialsRefused(handshake);
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, handshake.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, handshake.Result.ExitCode, handshake.Result.ErrorMessage);
     }
 
     private static X509Certificate2 CreateClientCertificate(RSA key)
@@ -411,11 +413,6 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.IsNotNull(handshake.Received);
         Assert.AreEqual(s_clientCertificate.GetCertHashString(), handshake.Received.GetCertHashString());
     }
-
-    // Schannel curl refuses an imported PKCS#12 key at AcquireCredentialsHandle, before any
-    // ClientHello (ADR-1187).
-    private void AssertCredentialsRefused((ConnectResult Result, X509Certificate? Received, bool PlaintextDisposed) handshake) =>
-        AssertFailed(handshake, CurlExitCode.SslConnectError, TlsFailureMessages.SchannelClientCertificateCredentialsUnknown);
 
     private void AssertFailed(
         (ConnectResult Result, X509Certificate? Received, bool PlaintextDisposed) handshake,

@@ -39,10 +39,13 @@ public static class RecordReplayExtension
         ArgumentNullException.ThrowIfNull(values);
         var record = values.ValueOf(RecordOption);
         var replay = values.ValueOf(ReplayOption);
-        return record is null && replay is null
+        return EmptyPathHook(record, RecordOption) ?? EmptyPathHook(replay, ReplayOption) ?? (record is null && replay is null
             ? null
-            : new RecordReplayTransferHook(DirectoryOrNone(replay), DirectoryOrNone(record));
+            : new RecordReplayTransferHook(DirectoryOrNone(replay), DirectoryOrNone(record)));
     }
+
+    private static ITransferHook? EmptyPathHook(string? path, ExtensionOption option) =>
+        path is { Length: 0 } ? new EmptyPathTransferHook(option.Name) : null;
 
     private static ExchangeDirectory? DirectoryOrNone(string? path) => path is null ? null : new ExchangeDirectory(path);
 }

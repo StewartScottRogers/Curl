@@ -26,6 +26,7 @@ a negative `ResumeFrom` as exit 36 for both before either starts.
 | `ITransferContext` member | Download | Upload |
 | --- | --- | --- |
 | `ResumeFrom` | honoured: start of the window sent (`TryResolveWindow`) | honoured: a positive offset opens the destination for append and skips that many source bytes (`UploadAsync`, `UploadIntoAsync`) |
+| `ResumeUploadFromUnknownOffset` | ignored | honoured: `-C -` with no `ResumeFrom` opens the destination for append and skips as many source bytes as it already holds (`UploadIntoDestinationAsync`, BL-4902) |
 | `Range` | honoured: the window sent, when `ResumeFrom` is not set (`TryResolveWindow`) | ignored |
 | `RangeText` | honoured only to refuse text that names no range (`RangeText` set, `Range` null) with exit 33, after the open and the `-i` headers and never under `-I` (`DownloadBodyAsync`, BL-1334) | ignored |
 | `NoBody` | honoured: headers only, then success (`DownloadFromAsync`) | ignored |
@@ -48,8 +49,8 @@ starts or stops reading a member, change its row in the same commit.
 A directory takes the download path's listing branch (`ListDirectoryAsync`, BL-1401) on
 every platform, as curl 8.22.0 does (BL-2166), when the `IFileSystem` is also an
 `IDirectoryLister`; it honours `TimeCondition`, `HeaderOutput`
-(only `Last-Modified`), `NoBody` and `MaxFileSize` as a file does, and ignores `Range`,
-`RangeText` and `ResumeFrom` beyond skipping `-z`. Otherwise a directory is exit 37.
+(only `Last-Modified`), `NoBody` and `MaxFileSize` as a file does, and honours `Range` and `ResumeFrom` against a size of zero (BL-4930), ignores
+`RangeText`. Otherwise a directory is exit 37.
 
 `TimeProvider` only times the diagnostic log's transfer-end line: nothing in a local file
 transfer is timed out or retried, and `-z`/`--time-cond` compares against the timestamp the open

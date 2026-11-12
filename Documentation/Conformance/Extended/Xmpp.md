@@ -8,6 +8,12 @@ and SCRAM-SHA-256 (RFC 7677), RFC 6121's message stanza and XEP-0030's disco que
 after `<proceed/>`, checks SCRAM client proofs and computes server signatures itself, binds a server-assigned resource
 and sends the answer the case scripts. Server-only requirements are `n/a`.
 
+`--ssl-reqd` follows curl's rule for its STARTTLS protocols (smtp, imap, pop3, ftp) and RFC 6120 13.8: on `xmpp://`,
+when the server's first `<stream:features/>` offers no `<starttls/>`, the transfer ends with `curl: (64) Requested SSL
+level failed` before any `<auth/>`, so no credential crosses a plaintext connection. Without it, and under `--ssl`,
+the client logs in in plaintext when STARTTLS is not offered; `xmpps://` is secure from the start. The unit tests in
+`Curl.Extended.Protocol.Xmpp.UnitTests/Client/XmppSslRequiredTests.cs` pin both paths.
+
 | ID | Level | Requirement | Covered by |
 |----|-------|-------------|------------|
 | Xmpp:RFC6120-4.1-1 | MUST | A stream is read as XML however its bytes arrive across reads. | XmppStreamCases.SplitStanza_DiscoAnswerAcrossThreeReads_IsReadWhole |
@@ -45,3 +51,6 @@ and sends the answer the case scripts. Server-only requirements are `n/a`.
 | Xmpp:RFC6121-5.2-1 | MUST | A chat message's text goes in `<body/>`, escaped as XML character data. | XmppStanzaCases.Message_FromData_IsAMessageStanzaToThePathJid |
 | Xmpp:XEP0030-3-1 | MUST | A disco#info query is an `iq` of type `get` holding an empty `query` in `http://jabber.org/protocol/disco#info`. | XmppStanzaCases.Disco_InfoQuery_IsAnIqGetAndItsResultIsPrinted |
 | Xmpp:XEP0368-1 | MUST | Direct TLS opens the XML stream only after the TLS handshake, with no STARTTLS. | XmppStreamCases.Xmpps_DirectTls_OpensTheStreamBehindTlsWithoutStartTls |
+
+`-T file` publishes like `-d`: the file's bytes become the message `<body/>` sent to the path JID (the upload stream is
+read into memory first when `-d` gave no data). It never receives or consumes; `XmppUploadTests` pins it.

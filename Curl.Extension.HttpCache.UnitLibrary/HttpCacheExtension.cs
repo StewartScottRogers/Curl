@@ -31,6 +31,11 @@ public static class HttpCacheExtension
     public static ITransferHook? HookFor(ExtensionOptionValues values)
     {
         ArgumentNullException.ThrowIfNull(values);
-        return values.ValueOf(Option) is { } path ? new HttpCacheTransferHook(new CacheDirectory(path)) : null;
+        return values.ValueOf(Option) switch
+        {
+            null => null,
+            { Length: 0 } => new EmptyPathTransferHook(Option.Name),
+            var path => new HttpCacheTransferHook(new CacheDirectory(path)),
+        };
     }
 }

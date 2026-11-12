@@ -6,8 +6,8 @@ namespace Curl.Original.Protocol.Ldap;
 
 /// <summary>
 /// Pins the printable test both builds apply to a value between the bytes BL-588 recorded
-/// (<see cref="LdapProtocolHandlerTests" /> holds the recordings): control bytes other than
-/// tab, line feed, vertical tab, form feed and carriage return send a value to base64.
+/// (<see cref="LdapProtocolHandlerTests" /> holds the recordings): a control byte sends a value
+/// to base64 (<see cref="LdapValueBase64RuleTests" /> pins the rest of curl 8.22.0's rule).
 /// </summary>
 [TestClass]
 public sealed class LdapEntryFormatterTests

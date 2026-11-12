@@ -36,6 +36,13 @@ public sealed class ContentDigestExtensionTests
     }
 
     [TestMethod]
+    public void Description_Summary_NamesDashDDataNotUploads()
+    {
+        StringAssert.Contains(ContentDigestExtension.Description.Summary, "with -d data");
+        Assert.DoesNotContain("uploads", ContentDigestExtension.Description.Summary);
+    }
+
+    [TestMethod]
     public void Composition_ListsTheDescriptionInExtensionsAndAiHelp()
     {
         Assert.IsTrue(ExtensionListing.Lines(_ => null).Any(line => line.Contains("content-digest", StringComparison.Ordinal)));

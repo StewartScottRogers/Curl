@@ -680,13 +680,13 @@ public sealed class CookieStore : ICookieStore
     }
 
     /// <summary>
-    /// curl's domain test in <c>Curl_cookie_getlist</c>; a cookie without a domain goes to every host, and a host that
-    /// is an IP address gets only a cookie whose domain is that address, even one that includes subdomains (upstream test8).
+    /// curl's domain test in <c>Curl_cookie_getlist</c>; a cookie without a domain goes only to a host that
+    /// is an IP address (BL-4929), and a host that is an IP address gets only a cookie whose domain is that address, even one that includes subdomains (upstream test8).
     /// </summary>
     private static bool DomainMatches(Cookie cookie, string host) =>
         cookie.Domain switch
         {
-            null => true,
+            null => IsIpAddressLiteral(host),
             string domain when cookie.IncludesSubdomains && !IsIpAddressLiteral(host) => CookieOrigin.IsDomainOrSubdomain(domain, host),
             string domain => string.Equals(domain, host, StringComparison.OrdinalIgnoreCase),
         };

@@ -93,6 +93,12 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer,
     public ValueTask<LdapBindReply> SaslBindAsync(string mechanism, byte[] credentials, CancellationToken cancellationToken) =>
         BindWithAsync("SASL BindRequest", messageId => LdapRequests.SaslBind(writer, messageId, mechanism, credentials), cancellationToken);
 
+    /// <summary>Sends the BindRequest <paramref name="encode" /> writes for the next messageID and reads the server's answer.</summary>
+    /// <param name="encode">Writes the whole LDAPMessage for a messageID.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The server's answer.</returns>
+    public ValueTask<LdapBindReply> BindWithRequestAsync(Func<int, byte[]> encode, CancellationToken cancellationToken) =>
+        BindWithAsync("SASL BindRequest", encode, cancellationToken);
     /// <summary>Sends a BindRequest with a Sicily authentication choice and reads the server's answer.</summary>
     /// <param name="name">The BindRequest's name.</param>
     /// <param name="choice">The authentication choice's tag number, 10 or 11.</param>

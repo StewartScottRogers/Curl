@@ -36,7 +36,7 @@ internal sealed record GeneratedRequest(
     internal static GeneratedRequest From(ITransferContext context)
     {
         var http = context.Http ?? new HttpRequestOptions();
-        var body = http.Body is BytesBody bytes ? bytes.Content.ToArray() : context.PostData?.ToArray();
+        var body = BodyOf(context, http);
         return new GeneratedRequest(
             http.CustomMethod ?? DefaultMethod(context, http),
             UrlOf(context.Url),
@@ -67,6 +67,34 @@ internal sealed record GeneratedRequest(
                 return null;
             }
         }
+    }
+
+    /// <summary>The most a body read ahead may hold: a multipart form larger than this is sent by curl but not written into the code.</summary>
+    internal const long MaxReadAheadBytes = 1024 * 1024;
+
+    private static byte[]? BodyOf(ITransferContext context, HttpRequestOptions http) =>
+        http.Body switch
+        {
+            BytesBody bytes => bytes.Content.ToArray(),
+            StreamBody stream => ReadAhead(stream),
+            _ => context.PostData?.ToArray(),
+        };
+
+    /// <summary>Reads a body held in a seekable stream of known, modest size (a <c>-F</c> form) and puts the stream back where it was, so the transfer still sends it; any other stream gives <see langword="null" />.</summary>
+    private static byte[]? ReadAhead(StreamBody body)
+    {
+        var stream = body.Content;
+        if (!stream.CanSeek || !stream.CanRead || stream.Length is not (> 0 and <= MaxReadAheadBytes))
+        {
+            return null;
+        }
+
+        var start = stream.Position;
+        stream.Position = 0;
+        var bytes = new byte[stream.Length];
+        stream.ReadExactly(bytes);
+        stream.Position = start;
+        return bytes;
     }
 
     private static string DefaultMethod(ITransferContext context, HttpRequestOptions http)

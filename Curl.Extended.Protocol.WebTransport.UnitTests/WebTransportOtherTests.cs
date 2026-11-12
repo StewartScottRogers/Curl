@@ -22,6 +22,10 @@ public sealed class WebTransportExtensionTests
     }
 
     [TestMethod]
+    public void Description_NamesTheTypedUrlForm() =>
+        StringAssert.Contains(WebTransportExtension.Description.Summary, "webtransport://host[:port]/path");
+
+    [TestMethod]
     public void CreateHandler_GivesTheWebTransportHandler() =>
         Assert.IsInstanceOfType<WebTransportProtocolHandler>(WebTransportExtension.CreateHandler(Services));
 

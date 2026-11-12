@@ -90,6 +90,11 @@ internal sealed class SegmentedDownloadTransferHook(int count) : ITransferHook
             await context.Output.WriteAsync(segment.Body, context.CancellationToken);
         }
 
-        return segments[0].Result with { BytesTransferred = completeLength };
+        var first = segments[0].Result;
+        return first with
+        {
+            BytesTransferred = completeLength,
+            Report = first.Report! with { DownloadSize = completeLength, DeliveredSize = null },
+        };
     }
 }

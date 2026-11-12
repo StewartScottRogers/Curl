@@ -22,6 +22,11 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (GcsRequestMethod.RefusalOf(context) is { } refusal)
+        {
+            return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
+        }
+
         string? emulatorHost = environment("STORAGE_EMULATOR_HOST");
         if (GcsEndpoint.For(emulatorHost) is not { } endpoint)
         {
@@ -29,18 +34,20 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
         }
 
         GcsHmacKey? hmacKey = context.Credentials is { } user ? new GcsHmacKey(user.UserName, user.Password, RegionOf(context)) : null;
-        GcsOperations operations = new(new GcsClient(connector, context, endpoint, BearerTokenOf(context), hmacKey), context.Url.Host, context.CancellationToken);
+        GcsHttpHeadReporter headReporter = new(context.Events, context.HeaderOutput);
+        GcsOperations operations = new(new GcsClient(connector, context, endpoint, BearerTokenOf(context), hmacKey, headReporter), context.Url.Host, context.CancellationToken);
         try
         {
-            return TransferResult.Success(await TransferAsync(operations, context, ObjectNameOf(context.Url)));
+            long downloaded = await TransferAsync(operations, context, ObjectNameOf(context.Url));
+            return TransferResult.Success(downloaded) with { Report = headReporter.ReportWith(context.Upload is null ? downloaded : 0) };
         }
         catch (GcsTransferException failure)
         {
-            return TransferResult.Failure(failure.ExitCode, failure.Message);
+            return TransferResult.Failure(failure.ExitCode, failure.Message) with { Report = headReporter.Report };
         }
         catch (GcsHttpException failure)
         {
-            return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message);
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message) with { Report = headReporter.Report };
         }
     }
 

@@ -95,7 +95,7 @@ internal static class DnsJsonRenderer
                 writer.WriteStartArray(field.Name);
                 foreach (string value in field.Values)
                 {
-                    writer.WriteStringValue(value);
+                    writer.WriteStringValue(DnsPresentation.RawCharacterString(value));
                 }
 
                 writer.WriteEndArray();

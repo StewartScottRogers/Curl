@@ -36,7 +36,7 @@ public sealed class ClientCertificateLoaderTests
     }
 
     [TestMethod]
-    public void LoadAsSchannelBuild_Pkcs12RsaKey_FailsAcquiringTheCredentialsWithExit35()
+    public void LoadAsSchannelBuild_Pkcs12RsaKey_LoadsTheCertificateWithItsKey()
     {
         Diagnostics.Arrange("file name", "client.p12");
         Diagnostics.Arrange("key", "RSA 2048");
@@ -47,10 +47,11 @@ public sealed class ClientCertificateLoaderTests
         Diagnostics.Act("loaded", loaded?.Subject ?? "(none)");
         Diagnostics.Act("exit code", failure?.ExitCode);
 
-        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, failure?.ExitCode);
-        Assert.IsNull(loaded);
-        Assert.AreEqual(CurlExitCode.SslConnectError, failure?.ExitCode);
-        Assert.AreEqual(TlsFailureMessages.SchannelClientCertificateCredentialsUnknown, failure?.ErrorMessage);
+        Diagnostics.Assert("exit code", null, failure?.ExitCode);
+        Assert.IsNull(failure);
+        Assert.IsNotNull(loaded);
+        Assert.IsTrue(loaded.HasPrivateKey);
+        loaded.Dispose();
     }
 
     [TestMethod]

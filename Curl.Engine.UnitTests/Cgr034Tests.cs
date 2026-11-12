@@ -103,6 +103,14 @@ public sealed partial class Cgr034Tests
         multi.Add(easy);
         (_, int running) = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
         (_, running) = await multi.SocketActionAsync(socket!.Value, CurlSocketSelect.Out, CancellationToken.None);
+        // The transfer reaches its read wait on its own thread; a scheduler that is slow to run it (macOS CI) has not told
+        // CURL_POLL_IN yet when the action returns, so drive the engine until it has, well before the 4 s deadline (BL-4991).
+        for (int wait = 0; running > 0 && !calls.Contains("S=1") && wait < 100; wait++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
+            (_, running) = await multi.SocketActionAsync(socket!.Value, CurlSocketSelect.Out, CancellationToken.None);
+        }
+
         for (int step = 0; running > 0 && step < 100; step++)
         {
             // Past the deadline the timer named, not on it (BL-4082): a Windows timer can wake a few milliseconds early,

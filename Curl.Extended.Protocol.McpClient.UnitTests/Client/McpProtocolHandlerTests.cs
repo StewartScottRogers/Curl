@@ -101,7 +101,7 @@ public sealed class McpProtocolHandlerTests
         Assert.DoesNotContain("MCP-Protocol-Version", requests[1]);
         StringAssert.Contains(requests[3], "Mcp-Session-Id: s-2\r\n");
         StringAssert.Contains(requests[3], "\"method\":\"tools/list\"");
-        StringAssert.Contains(renewed.Written, "DELETE /mcp HTTP/1.1\r\nHost: example.com\r\nMcp-Session-Id: s-2\r\n");
+        StringAssert.Contains(renewed.Written, "DELETE /mcp HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.22.0\r\nMcp-Session-Id: s-2\r\n");
     }
 
     [TestMethod]

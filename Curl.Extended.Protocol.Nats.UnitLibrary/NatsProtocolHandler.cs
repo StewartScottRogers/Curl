@@ -5,7 +5,7 @@ namespace Curl.Extended.Protocol.Nats;
 /// <summary>
 /// Serves <c>nats://[user[:password]@]host[:port]/subject[?request][&amp;count=N]</c> and its TLS form
 /// <c>natss://</c> (ADR-1065): without <c>-d</c> it subscribes to the subject and writes each message's
-/// payload and a newline; with <c>-d</c> it publishes the data; with <c>?request</c> it publishes the
+/// payload and a newline; with <c>-d</c> or <c>-T</c> it publishes the data or the uploaded file; with <c>?request</c> it publishes the
 /// data with a reply subject and writes the one reply.
 /// </summary>
 /// <param name="connector">Opens the connection, with TLS from the first byte for <c>natss</c>.</param>
@@ -16,6 +16,8 @@ public sealed class NatsProtocolHandler(IConnector connector, Func<string> newIn
     public const int DefaultPort = 4222;
 
     private const string SecureScheme = "natss";
+
+    private const string ConnectionReset = "Recv failure: Connection was reset";
 
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes { get; } = ["nats", SecureScheme];
@@ -32,6 +34,10 @@ public sealed class NatsProtocolHandler(IConnector connector, Func<string> newIn
         {
             return await TransferAsync(context).ConfigureAwait(false);
         }
+        catch (IOException)
+        {
+            return TransferResult.Failure(CurlExitCode.RecvError, ConnectionReset);
+        }
         catch (NatsException failure)
         {
             return TransferResult.Failure(failure.ExitCode, failure.Message);
@@ -40,7 +46,7 @@ public sealed class NatsProtocolHandler(IConnector connector, Func<string> newIn
 
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
     {
-        NatsRequest request = NatsRequest.Of(context.Url, context.PostData);
+        NatsRequest request = NatsRequest.Of(context.Url, await RequestBodyAsync(context).ConfigureAwait(false));
         if (request.Kind != NatsRequestKind.Subscribe)
         {
             NatsSubject.RefuseWildcardToPublish(request.Subject);
@@ -64,6 +70,22 @@ public sealed class NatsProtocolHandler(IConnector connector, Func<string> newIn
         TransferResult result = await ExchangeAsync(new NatsSession(connection, context, newInbox), request, isSecure).ConfigureAwait(false);
         await connection.DisposeAsync().ConfigureAwait(false);
         return result;
+    }
+
+    /// <summary>
+    /// Gives the payload to publish: <c>-d</c>'s data when there is any, otherwise the whole
+    /// <c>-T</c> upload, otherwise none (a subscription).
+    /// </summary>
+    private static async ValueTask<ReadOnlyMemory<byte>?> RequestBodyAsync(ITransferContext context)
+    {
+        if (context.PostData is not null || context.Upload is not { } upload)
+        {
+            return context.PostData;
+        }
+
+        using var body = new MemoryStream();
+        await upload.CopyToAsync(body, context.CancellationToken).ConfigureAwait(false);
+        return body.ToArray();
     }
 
     private static async ValueTask<TransferResult> ExchangeAsync(NatsSession session, NatsRequest request, bool isSecure)

@@ -1,0 +1,48 @@
+---
+id: BL-4901
+title: Stop oci:// sending --user credentials to a plain http:// token realm
+priority: High
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Extended.Protocol.OciRegistry.UnitLibrary/Auth/OciTokenRequestBuilder.cs, Curl.Extended.Protocol.OciRegistry.UnitTests/OciTokenRealmSchemeTests.cs]
+requirement: none
+created: 2026-11-11
+completed: 2026-11-11
+---
+# BL-4901 — Stop oci:// sending --user credentials to a plain http:// token realm
+
+## Goal
+
+When the registry is HTTPS, credentials are never sent to a non-HTTPS token realm: the transfer fails naming the realm.
+
+## Context
+
+From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `curl-win-x64.zip`, Windows 11 x64; REF = curl 8.22.0 Schannel), finding EXT-006 (Medium (release blocker), confirmed: reproduced at least twice).
+
+- Repro: TLS OCI mock on 18704 that, for repositories named `httprealm`, answers 401 with `WWW-Authenticate: Bearer realm="http://127.0.0.1:18701/token",service="reg",scope="repository:httprealm:pull"`; a plain HTTP logger on 18701. `curl.exe -sS -k -u user:pass oci://127.0.0.1:18704/httprealm:1.0`
+- Expected: No credentials to a non-HTTPS realm when the registry is HTTPS (the downgrade curl guards against for redirects, CVE-2022-27774): refuse with a clear error.
+- Actual: The plain-HTTP logger receives `GET /token?service=reg&scope=...` with `Authorization: Basic dXNlcjpwYXNz`.
+- Where to start: `OciTokenRequestBuilder.cs` accepts any absolute http/https realm.
+
+## Acceptance criteria
+
+- [x] No Authorization header reaches the 18701 logger and the command exits non-zero with a message naming the non-HTTPS realm.
+- [x] An `https://` realm still works, and a unit test covers both.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
+
+- 2026-11-11 (lane 2): Took lane 8's fix (3ad9bbb65) from factory/BL-4901-lane-8-20261111-082724. It builds clean here on the pinned SDK. Lane 8's integration failure was its missing SDK, not the code. `OciTokenRequestBuilder.Build` throws `OciTransferException` (exit 67) with `Refusing to send credentials to the non-HTTPS token realm <realm>.` when `-u` is set and the realm is plain `http`. Anonymous token requests to `http` realms still go out. The check pushed `Build` to complexity 12, past the gate, so I moved the Basic header and the refusal into `BasicCredentialsFor`. The quality run now reports 0 failing members, 100%/100%. ADR-1247 records the decision.
+- Criterion 1: checked through the code path, not a live TLS mock. The exception is thrown before any request is built, so nothing reaches the realm. `OciRegistryProtocolHandler` catches `OciTransferException` and fails the transfer with its exit code and message. `OciTokenRealmSchemeTests` pins the http refusal, the https success and the anonymous http case.
+- Criterion 3: full `dotnet build` clean, and fast tests green in all 115 test assemblies.
+
+## Log
+
+- 2026-11-11: Created.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: aab36c7c 80b0c93c a0b49a29.
+- 2026-11-11: Doing -> Backlog. Lane 8 could not integrate: build failed, and still build failed after a repair run after rebasing onto the other lanes' work. The work is on branch factory/BL-4901-lane-8-20261111-082724; start with git cherry-pick --no-commit factory/BL-4901-lane-8-20261111-082724 and fix it.
+- 2026-11-11: Backlog -> Doing. Criteria at claim: aab36c7c 80b0c93c a0b49a29.
+- 2026-11-11: Doing -> Done. oci:// refuses to send -u credentials to a plain http token realm, failing with exit 67 naming the realm

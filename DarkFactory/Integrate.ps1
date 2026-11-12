@@ -155,8 +155,20 @@ function Test-QualityGates {
     Write-Trace $Id 'quality' "measuring $($libraries -join ', ') before integrating"
     $output = @(& $Measure -Libraries $libraries -JsonPath $json)
     if (-not (Test-Path $json)) {
-        $tail = Get-Short ((@($output | ForEach-Object { "$_" } | Where-Object { $_.Trim() } | Select-Object -Last 5)) -join ' | ') 60
-        Write-Trace $Id 'quality' "no report (left to build and tests); it said: $tail" 'DarkYellow'
+        # A PowerShell error's last lines are its "+ ~~~~" pointer, not its message (19 of 192
+        # measures on 2026-11-11, BL-4994), so the whole output is kept in the shift's log folder.
+        $lines = @($output | ForEach-Object { "$_" } | Where-Object { $_.Trim() })
+        $dir = if ($LogDir) { $LogDir } else { [IO.Path]::GetTempPath() }
+        $file = Join-Path $dir "quality-$Id-$(Get-Date -Format 'yyyyMMdd-HHmmss').txt"
+        $saved = $true
+        try { New-Item -ItemType Directory -Force -Path $dir | Out-Null; Set-Content -Path $file -Value $lines }
+        catch { $saved = $false }
+        # Write-Trace cuts a line at 118 characters, so the file's name and the message are two lines.
+        $message = @($lines | Where-Object { $_ -notmatch '^\s*(At |\+|\s*~)' } | Select-Object -Last 1)
+        $said = Get-Short ($message -join '') 90
+        if ($saved) { Write-Trace $Id 'quality' "no report (left to build and tests); whole output: $(Split-Path $file -Leaf) in $(Split-Path $file -Parent)" 'DarkYellow' }
+        else { Write-Trace $Id 'quality' 'no report (left to build and tests); its output could not be saved' 'DarkYellow' }
+        Write-Trace $Id 'quality' "it said: $said" 'DarkYellow'
         return ''
     }
     try { $report = Get-Content $json -Raw | ConvertFrom-Json }
@@ -529,6 +541,20 @@ if ($TestIntegrateLock) {
                 $trace = ($all | Out-String)
                 & $fresh
                 "'$($returned -join '')' $($trace -match 'CS1002 somewhere')" })
+            ,@('a measure that writes no report saves its whole output to a file in the log folder and the trace names it (BL-4994)', "'' True True", {
+                & $fresh
+                New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Curl.Foo.UnitLibrary') | Out-Null
+                Set-Content -Path (Join-Path $repo 'Curl.Foo.UnitLibrary\Whole.cs') -Value 'class Whole { }'
+                git -C $repo add -A 2>&1 | Out-Null; git -C $repo commit -q -m whole 2>&1 | Out-Null
+                $savedLogDir = $script:LogDir
+                $script:LogDir = Join-Path $temp 'quality-logs'
+                $all = Test-QualityGates -Id 'BL-001' -Base 'origin/work' -Measure { param($Libraries, $JsonPath) 'dotnet test failed with exit code 1.'; 'line two'; '+ ~~~~' } 6>&1
+                $script:LogDir = $savedLogDir
+                $file = @(Get-ChildItem (Join-Path $temp 'quality-logs') -Filter 'quality-BL-001-*.txt' -ErrorAction SilentlyContinue)
+                $kept = $file.Count -eq 1 -and ((Get-Content $file[0].FullName -Raw) -match 'dotnet test failed')
+                $named = $file.Count -eq 1 -and (($all | Out-String -Width 1000) -match [regex]::Escape($file[0].Name))
+                & $fresh
+                "'$(@($all | Where-Object { $_ -is [string] }) -join '')' $kept $named" })
             ,@('a repair run whose add or commit fails returns a reason rather than measuring the unfixed commit (BL-4785)', "'RED; the repair run's changes could not be staged' 'RED; the repair run's commit failed'", {
                 $QualityRepairPrompt = 'fix {RED}'; $LaneForbidden = @()
                 function Set-HeartbeatStep { param($Step) }

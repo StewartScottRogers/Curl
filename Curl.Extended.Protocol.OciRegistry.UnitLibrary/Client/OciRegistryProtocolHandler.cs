@@ -35,6 +35,11 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (OciRegistryRequestMethod.RefusalOf(context) is { } refusal)
+        {
+            return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
+        }
+
         return OciPullReference.Parse(context.Url.AbsolutePath) is { } reference
             ? await TransferAsync(context, reference)
             : TransferResult.Failure(CurlExitCode.UrlMalformat, NoReferenceMessage);
@@ -42,7 +47,8 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
 
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context, OciPullReference reference)
     {
-        var session = new OciRegistrySession(new OciHttpClient(new TransferEventsConnector(connector, context)), context.Credentials);
+        var headReporter = new OciHttpHeadReporter(context.Events, context.HeaderOutput);
+        var session = new OciRegistrySession(new OciHttpClient(new TransferEventsConnector(connector, context), headReporter), context.Credentials);
         context.Progress.ReportTransferStarted();
         try
         {
@@ -50,7 +56,7 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
                 ? await PushAsync(context, session, reference, upload)
                 : await PullAsync(context, session, reference);
             await context.Output.WriteAsync(body, context.CancellationToken);
-            return TransferResult.Success(body.Length);
+            return TransferResult.Success(body.Length) with { Report = headReporter.ReportWith(body.Length) };
         }
         catch (OciTransferException failure)
         {
@@ -60,7 +66,7 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
                 await context.Output.WriteAsync(failure.ErrorBody, context.CancellationToken);
             }
 
-            return TransferResult.Failure(failure.ExitCode, failure.Message);
+            return TransferResult.Failure(failure.ExitCode, failure.Message) with { Report = headReporter.Report };
         }
     }
 

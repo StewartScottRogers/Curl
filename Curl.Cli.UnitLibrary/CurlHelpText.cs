@@ -94,10 +94,11 @@ public static class CurlHelpText
     /// category name in any case; anything else gives the unknown-category page.
     /// </param>
     /// <param name="columns">The terminal width, as curl's <c>get_terminal_columns</c> gives it; at least 1.</param>
+    /// <param name="listsAiHelp"><see langword="false"/> under <c>CURL_EXTENSIONS=0</c>: the pages leave out Curl's own <c>--ai-help</c> line and row.</param>
     /// <returns>The lines, without line terminators.</returns>
     /// <exception cref="ArgumentException"><paramref name="subject"/> starts with <c>-</c> (see <see cref="IsOptionSubject"/>).</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="columns"/> is less than 1.</exception>
-    public static IReadOnlyList<string> Lines(string? subject, int columns)
+    public static IReadOnlyList<string> Lines(string? subject, int columns, bool listsAiHelp = true)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(columns, 1);
         if (IsOptionSubject(subject))
@@ -107,17 +108,17 @@ public static class CurlHelpText
 
         if (string.IsNullOrEmpty(subject))
         {
-            return UsageLines(columns);
+            return UsageLines(columns, listsAiHelp);
         }
 
-        return SubjectText(subject, columns).Split('\n')[..^1];
+        return SubjectText(subject, columns, listsAiHelp).Split('\n')[..^1];
     }
 
-    private static string SubjectText(string subject, int columns)
+    private static string SubjectText(string subject, int columns, bool listsAiHelp)
     {
         if (subject.Equals("all", StringComparison.OrdinalIgnoreCase))
         {
-            return CategoryOptionsText(CurlHelpCategories.All, columns);
+            return CategoryOptionsText(CurlHelpCategories.All, columns, listsAiHelp);
         }
 
         if (subject.Equals("category", StringComparison.OrdinalIgnoreCase))
@@ -125,46 +126,46 @@ public static class CurlHelpText
             return CategoryListText();
         }
 
-        if (subject.Equals("ai-help", StringComparison.OrdinalIgnoreCase))
+        if (listsAiHelp && subject.Equals("ai-help", StringComparison.OrdinalIgnoreCase))
         {
             return string.Concat(AiHelpSectionLines.Select(line => line + "\n"));
         }
 
-        return CategoryText(subject, columns);
+        return CategoryText(subject, columns, listsAiHelp);
     }
 
     /// <summary>The named category's heading and options, or the unknown-category page when none has the name.</summary>
-    private static string CategoryText(string subject, int columns)
+    private static string CategoryText(string subject, int columns, bool listsAiHelp)
     {
         foreach ((string name, string description, CurlHelpCategories category) in Categories)
         {
             if (subject.Equals(name, StringComparison.OrdinalIgnoreCase))
             {
-                return $"{name}: {description}\n" + CategoryOptionsText(category, columns);
+                return $"{name}: {description}\n" + CategoryOptionsText(category, columns, listsAiHelp);
             }
         }
 
         return "Unknown category provided, here is a list of all categories:\n\n" + CategoryListText();
     }
 
-    private static IReadOnlyList<string> UsageLines(int columns)
+    private static IReadOnlyList<string> UsageLines(int columns, bool listsAiHelp)
     {
         string text =
             "Usage: curl [options...] <url>\n"
-            + CategoryOptionsText(CurlHelpCategories.Important, columns)
+            + CategoryOptionsText(CurlHelpCategories.Important, columns, listsAiHelp)
             + "\nThis is not the full help; this menu is split into categories.\n"
             + "Use \"--help category\" to get an overview of all categories, which are:\n"
             + CategoryNamesText(columns)
             + "Use \"--help all\" to list all options\n"
             + "Use \"--help [option]\" to view documentation for a given option\n"
-            + AiHelpUsageLine + "\n";
+            + (listsAiHelp ? AiHelpUsageLine + "\n" : string.Empty);
         return text.Split('\n')[..^1];
     }
 
     /// <summary>curl's <c>print_category</c>: each row in the category, its option padded to a shared width.</summary>
-    private static string CategoryOptionsText(CurlHelpCategories category, int columns)
+    private static string CategoryOptionsText(CurlHelpCategories category, int columns, bool listsAiHelp)
     {
-        List<CurlHelpEntry> entries = [.. CurlHelpTable.Entries.Where(entry => (entry.Categories & category) != 0)];
+        List<CurlHelpEntry> entries = [.. CurlHelpTable.Entries.Where(entry => (entry.Categories & category) != 0 && (listsAiHelp || entry.Option != AiHelpOption))];
         int longestOption = Math.Max(5, entries.Max(entry => entry.Option.Length));
         int longestDescription = Math.Max(5, entries.Max(entry => entry.Description.Length));
         int optionWidth = SharedOptionWidth(longestOption, longestDescription, columns);

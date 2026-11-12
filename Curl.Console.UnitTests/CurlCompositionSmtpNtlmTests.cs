@@ -67,7 +67,8 @@ public sealed class CurlCompositionSmtpNtlmTests
         Diagnostics.Assert("second line sent", "AUTH NTLM", lines[1]);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("AUTH NTLM", lines[1]);
-        StringAssert.StartsWith(lines[2], "TlRMTVNTUAABAAAAB4IIog");
+        // SSPI chooses the Type 1 flags, and they differ by Windows build (0xA2088207 measured, 0xE2088297 on build 26300), so only the Type 1 header is pinned.
+        StringAssert.StartsWith(lines[2], "TlRMTVNTUAABAAAA");
         StringAssert.StartsWith(lines[3], "TlRMTVNTUAADAAAA");
         Assert.AreEqual("MAIL FROM:<a@b>", lines[4]);
     }

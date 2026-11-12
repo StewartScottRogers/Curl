@@ -1,5 +1,5 @@
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ldap.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Original.Protocol.Ldap;

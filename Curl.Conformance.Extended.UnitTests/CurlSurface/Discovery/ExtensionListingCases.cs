@@ -33,15 +33,15 @@ public sealed class ExtensionListingCases
 
     [TestMethod]
     [SpecRequirement("CurlSurface:Listing-2")]
-    public Task ExtendedHelp_WithExtensionsOff_SaysTheyAreOff() =>
+    public Task ExtendedHelp_WithExtensionsOff_IsRefusedAsAnUnknownOption() =>
         Known.RunCaseAsync(
             ["CurlSurface:Listing-2"],
             async () =>
             {
                 CurlRunResult result = await RunAsync(Off, "--extended-help");
 
-                Assert.AreEqual(0, result.ExitCode, "CurlSurface:Listing-2: exit code");
-                Assert.AreEqual("Extensions are off: CURL_EXTENSIONS is 0.", OutputOf(result).TrimEnd('\r', '\n'), "CurlSurface:Listing-2");
+                Assert.AreEqual(2, result.ExitCode, "CurlSurface:Listing-2: exit code");
+                StringAssert.Contains(ErrorOf(result), "option --extended-help: is unknown", "CurlSurface:Listing-2");
             });
 
     [TestMethod]
@@ -70,17 +70,15 @@ public sealed class ExtensionListingCases
 
     [TestMethod]
     [SpecRequirement("CurlSurface:Listing-4")]
-    public Task AiHelpExtensions_WithExtensionsOff_SaysTheyAreOffAndHasNoSection() =>
+    public Task AiHelpExtensions_WithExtensionsOff_IsRefusedAsAnUnknownOption() =>
         Known.RunCaseAsync(
             ["CurlSurface:Listing-4"],
             async () =>
             {
                 CurlRunResult result = await RunAsync(Off, "--ai-help", "extensions");
-                string markdown = OutputOf(result);
 
-                Assert.AreEqual(0, result.ExitCode, "CurlSurface:Listing-4: exit code");
-                StringAssert.Contains(markdown, MarkdownOffLine, "CurlSurface:Listing-4");
-                Assert.IsFalse(markdown.Contains("\n## ", StringComparison.Ordinal), $"CurlSurface:Listing-4: {markdown}");
+                Assert.AreEqual(2, result.ExitCode, "CurlSurface:Listing-4: exit code");
+                StringAssert.Contains(ErrorOf(result), "option --ai-help: is unknown", "CurlSurface:Listing-4");
             });
 
     [TestMethod]

@@ -9,6 +9,10 @@ namespace Curl.Output;
 /// </summary>
 internal static class SchannelTrustText
 {
+    // Measured: curl 8.22.0 (Schannel) -v --ciphers CALG_AES_128 (BL-4992, ADR-1250).
+    private const string LessSecureTlsWarning =
+        "schannel: WARNING: This version of Schannel negotiates a less-secure TLS version than TLS 1.3 because the user set an algorithm cipher list.";
+
     /// <summary>Returns the lines for the trust.</summary>
     /// <param name="trust">The trust.</param>
     /// <returns>The lines, without the <c>* </c> prefix.</returns>
@@ -22,8 +26,17 @@ internal static class SchannelTrustText
         var clientCertificateLine = trust.UsesAutomaticClientCertificate
             ? "schannel: enabled automatic use of client certificate"
             : "schannel: disabled automatic use of client certificate";
-        return trust.TargetsIpAddress
-            ? [clientCertificateLine, "schannel: using IP address, SNI is not supported by OS."]
-            : [clientCertificateLine];
+        List<string> lines = [clientCertificateLine];
+        if (trust.HasCipherList)
+        {
+            lines.Add(LessSecureTlsWarning);
+        }
+
+        if (trust.TargetsIpAddress)
+        {
+            lines.Add("schannel: using IP address, SNI is not supported by OS.");
+        }
+
+        return lines;
     }
 }

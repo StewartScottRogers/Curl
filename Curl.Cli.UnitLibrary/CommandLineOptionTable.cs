@@ -478,6 +478,9 @@ public static partial class CommandLineOptionTable
         "next",
         "disable");
 
+    /// <summary>The long names of the options only Curl has, which <c>CURL_EXTENSIONS=0</c> turns off (BL-4937).</summary>
+    internal static IReadOnlySet<string> PortOnlyLongNames { get; } = FrozenSet.Create(StringComparer.Ordinal, "ai-help", "extended-help", "log-level", "log-file");
+
     /// <summary>The <c>--log-level</c> values, matched ignoring case, and the level each names.</summary>
     private static readonly FrozenDictionary<string, DiagnosticLogLevel> DiagnosticLogLevelsByName =
         new Dictionary<string, DiagnosticLogLevel>

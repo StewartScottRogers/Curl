@@ -29,6 +29,7 @@ internal sealed class OpenTelemetryTransferHook(string endpoint, Action<Span<byt
             return await next(context);
         }
 
+        WarnWhenEndpointIsNotAnHttpUrl(context);
         var sent = WithTraceParent(context, out var traceParent);
         var start = context.TimeProvider.GetUtcNow();
         var result = await next(sent);
@@ -40,6 +41,14 @@ internal sealed class OpenTelemetryTransferHook(string endpoint, Action<Span<byt
         }
 
         return result;
+    }
+
+    private void WarnWhenEndpointIsNotAnHttpUrl(ITransferContext context)
+    {
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var parsed) || parsed.Scheme is not ("http" or "https"))
+        {
+            context.DiagnosticLog.Write(DiagnosticLogLevel.Warning, LogComponent, $"--otel-endpoint {endpoint} is not an http or https URL");
+        }
     }
 
     private ITransferContext WithTraceParent(ITransferContext context, out TraceParent traceParent)

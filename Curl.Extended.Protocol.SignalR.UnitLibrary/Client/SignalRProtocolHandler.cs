@@ -15,6 +15,8 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
 {
     private const string SecureScheme = "signalrs";
 
+    private const string ConnectionReset = "Recv failure: Connection was reset";
+
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes { get; } = ["signalr", SecureScheme];
 
@@ -38,6 +40,10 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
         {
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, $"SignalR: {failure.Message}");
         }
+        catch (IOException)
+        {
+            return TransferResult.Failure(CurlExitCode.RecvError, ConnectionReset);
+        }
     }
 
     /// <summary>
@@ -60,11 +66,19 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
     private async Task<long> TransferAsync(ITransferContext context)
     {
         byte[]? callRecord = SignalRCall.RecordFor(context.PostData);
-        var negotiator = new SignalRNegotiator((url, cancellationToken) => OpenAsync(url, context, cancellationToken));
+        IReadOnlyList<KeyValuePair<string, string>> requestFields = HandshakeHeaderFields.Of(context);
+        var negotiator = new SignalRNegotiator(async (url, cancellationToken) =>
+        {
+            IConnection negotiation = await OpenAsync(url, context, cancellationToken).ConfigureAwait(false);
+
+            // Past connect: curl sends the negotiate POST as the transfer's request, so -m during it is "Operation timed out".
+            context.Progress.ReportTransferStarted();
+            return negotiation;
+        }, requestFields);
         NegotiatedWebSocketEndpoint endpoint = await negotiator.NegotiateAsync(EndpointUrlOf(context.Url), context.CancellationToken);
         await using IConnection connection = await OpenAsync(endpoint.WebSocketUrl, context, context.CancellationToken);
         SignalRWebSocketSession session = await SignalRWebSocketUpgrade.UpgradeAsync(
-            connection, endpoint.WebSocketUrl, endpoint.AccessToken, randomSource, context.CancellationToken);
+            connection, endpoint.WebSocketUrl, endpoint.AccessToken, randomSource, context.CancellationToken, requestFields);
         context.Progress.ReportTransferStarted();
         return await new SignalRHubSession(session, callRecord, context.Output).RunAsync(context.CancellationToken);
     }

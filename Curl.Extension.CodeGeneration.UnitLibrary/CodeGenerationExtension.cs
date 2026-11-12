@@ -38,11 +38,21 @@ public static class CodeGenerationExtension
     public static ITransferHook? HookFor(ExtensionOptionValues values)
     {
         ArgumentNullException.ThrowIfNull(values);
+        var csharp = values.ValueOf(CSharpOption);
+        var powerShell = values.ValueOf(PowerShellOption);
+        if ((EmptyPathHook(csharp, CSharpOption) ?? EmptyPathHook(powerShell, PowerShellOption)) is { } refusal)
+        {
+            return refusal;
+        }
+
         List<CodeFile> files = [];
-        AddWhenGiven(files, values.ValueOf(CSharpOption), CSharpProgram.For);
-        AddWhenGiven(files, values.ValueOf(PowerShellOption), PowerShellScript.For);
+        AddWhenGiven(files, csharp, CSharpProgram.For);
+        AddWhenGiven(files, powerShell, PowerShellScript.For);
         return files.Count == 0 ? null : new CodeGenerationTransferHook(files);
     }
+
+    private static ITransferHook? EmptyPathHook(string? path, ExtensionOption option) =>
+        path is { Length: 0 } ? new EmptyPathTransferHook(option.Name) : null;
 
     private static void AddWhenGiven(List<CodeFile> files, string? path, Func<IReadOnlyList<GeneratedRequest>, string> writer)
     {

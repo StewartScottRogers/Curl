@@ -43,11 +43,11 @@ public sealed class ConnackCases
     [DataRow((byte)0x9C, "UseAnotherServer")]
     [DataRow((byte)0x9D, "ServerMoved")]
     [DataRow((byte)0x9F, "ConnectionRateExceeded")]
-    public async Task Connack_FailureReasonCode_EndsTheTransferAfterConnectWithExit8(byte reasonCode, string name)
+    public async Task Connack_FailureReasonCode_EndsTheTransferAfterConnectWithExit8Or67ForALoginRefusal(byte reasonCode, string name)
     {
         (CurlRunResult result, Mqtt5ReferenceBroker broker) = await PublishAsync(Mqtt5ConnAckBytes.Build(0, reasonCode));
 
-        AssertFailed(result, 8, $"MQTT 5 CONNACK reason code 0x{reasonCode:X2} {name}");
+        AssertFailed(result, reasonCode is 0x86 or 0x87 ? 67 : 8, $"MQTT 5 CONNACK reason code 0x{reasonCode:X2} {name}");
         AssertSentOnlyConnect(result, broker);
     }
 

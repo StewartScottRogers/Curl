@@ -123,7 +123,7 @@ public sealed class RtspProtocolHandlerAdversarialTests
         Diagnostics.ActResult(result);
         Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(5L, result.Report!.DownloadSize);
+        Assert.AreEqual(0L, result.Report!.DownloadSize);
     }
 
     [TestMethod]
@@ -280,7 +280,7 @@ public sealed class RtspProtocolHandlerAdversarialTests
 
             Diagnostics.Act("split offset", offset);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"split at {offset}");
-            Assert.AreEqual(4L, result.Report!.DownloadSize, $"split at {offset}");
+            Assert.AreEqual(0L, result.Report!.DownloadSize, $"split at {offset}");
             Assert.AreEqual(reply[..^4], Encoding.Latin1.GetString(headers.ToArray()), $"split at {offset}");
         }
     }

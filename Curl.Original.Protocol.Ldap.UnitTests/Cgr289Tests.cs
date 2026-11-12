@@ -1,6 +1,6 @@
 using System.Net.Security;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ldap.Fakes;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Original.Protocol.Ldap;
 

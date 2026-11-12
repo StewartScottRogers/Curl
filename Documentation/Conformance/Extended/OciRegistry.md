@@ -46,3 +46,7 @@ Authentication Specification).
 | OciRegistry:TOKEN-Response-2 | MUST | For OAuth 2.0 compatibility the token is also accepted as `access_token`. | OciTokenAuthCases.TokenResponseWithAccessToken_IsUsedAsTheBearerToken |
 | OciRegistry:TOKEN-Response-3 | SHOULD | A client caches a token until its `expires_in` and may refresh it with `refresh_token`. | n/a: one transfer asks for at most one token and keeps none past it |
 | OciRegistry:TOKEN-Scope-1 | MUST | A push asks for the `repository:<name>:push,pull` scope. | OciTokenAuthCases.ManifestPush_AsksForThePushAndPullScope |
+
+## Request methods
+
+`oci://` sends only the methods its operations need: GET to pull, and with `-T` the push's HEAD, POST, PUT and PATCH. `-X GET` without `-T` and `-X PUT` with it are accepted, since they name what is sent anyway. `-I`/`--head` and every other `-X` (`DELETE`, `HEAD`, `POST`, ...) fail with exit 4 and `oci:// does not support ...` before any connection, so a destructive method is never reported done while a GET was sent instead (ADR-1238, `OciRegistryRequestMethodTests`).

@@ -470,10 +470,33 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
             ?? WithPseudoHeaders(
                 context.NoBody
                     ? TransferResult.Success(0)
-                    : await WriteEntryNamesAsync(context, path, lister).ConfigureAwait(false),
+                    : await ListWithinWindowAsync(context, path, lister).ConfigureAwait(false),
                 headers);
 
         return EndDownload(context, result, connectionNumber, lastWrite);
+    }
+
+    /// <summary>
+    /// Applies <c>-C</c> and <c>-r</c> to a listing as curl 8.22.0 does: the listing's size
+    /// reads as zero, so a start past zero is exit 36, a suffix is exit 36 with its own
+    /// message, and a range with a positive byte count cuts the listing to that many bytes.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <param name="path">The parsed URL path.</param>
+    /// <param name="lister">The lister to read the entry names from.</param>
+    /// <returns>The outcome of the listing.</returns>
+    private static ValueTask<TransferResult> ListWithinWindowAsync(
+        ITransferContext context,
+        FileUrlPath path,
+        IDirectoryLister lister)
+    {
+        if (!TryResolveWindow(context, 0, out _, out _, out string resumeErrorMessage))
+        {
+            return ValueTask.FromResult(
+                TransferResult.Failure(CurlExitCode.BadDownloadResume, resumeErrorMessage));
+        }
+
+        return WriteEntryNamesAsync(context, path, lister, CountOfUnknownSize(context));
     }
 
     /// <summary>
@@ -484,6 +507,7 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     /// <param name="context">The transfer being performed.</param>
     /// <param name="path">The parsed URL path.</param>
     /// <param name="lister">The lister to read the entry names from.</param>
+    /// <param name="limit">The most bytes to write; the listing is cut there as a success.</param>
     /// <returns>
     /// A success carrying the bytes written; exit 26 when the directory cannot be listed;
     /// exit 23 when the output refused a write; exit 63 at <c>--max-filesize</c>.
@@ -491,7 +515,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     private static async ValueTask<TransferResult> WriteEntryNamesAsync(
         ITransferContext context,
         FileUrlPath path,
-        IDirectoryLister lister)
+        IDirectoryLister lister,
+        long limit)
     {
         if (await lister.ListEntryNamesAsync(path.OsPath, context.CancellationToken).ConfigureAwait(false) is not { } names)
         {
@@ -505,7 +530,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         {
             context.CancellationToken.ThrowIfCancellationRequested();
             context.Events.ReportDataReceived(piece);
-            int allowed = (int)Math.Min(piece.Length, maxWritten - transferred);
+            int wanted = (int)Math.Min(piece.Length, limit - transferred);
+            int allowed = (int)Math.Min(wanted, maxWritten - transferred);
 
             if (await TryWriteInSlicesAsync(context.Output, piece.AsMemory(0, allowed), ChunkSize, context.CancellationToken)
                     .ConfigureAwait(false) is { } failure)
@@ -518,16 +544,38 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
 
             transferred += allowed;
 
-            if (allowed < piece.Length)
+            if (EndOfListingAfterWrite(piece.Length, wanted, allowed, transferred, maxWritten) is { } ended)
             {
-                return new TransferResult(
-                    CurlExitCode.FilesizeExceeded,
-                    transferred,
-                    FileTransferMessages.MaxFileSizeExceeded(maxWritten, transferred));
+                return ended;
             }
         }
 
         return TransferResult.Success(transferred);
+    }
+
+    /// <summary>
+    /// Decides whether a listing write that was cut short ends the listing: a cut at the
+    /// range's byte count is a success, a cut at <c>--max-filesize</c> is exit 63.
+    /// </summary>
+    /// <param name="pieceLength">The bytes the write offered.</param>
+    /// <param name="wanted">The bytes the range allows.</param>
+    /// <param name="allowed">The bytes both the range and <c>--max-filesize</c> allow.</param>
+    /// <param name="transferred">The bytes written so far, this write included.</param>
+    /// <param name="maxWritten">The <c>--max-filesize</c> limit, or the largest long when none.</param>
+    /// <returns>The outcome that ends the listing, or null when the whole write went out.</returns>
+    private static TransferResult? EndOfListingAfterWrite(int pieceLength, int wanted, int allowed, long transferred, long maxWritten)
+    {
+        if (wanted < pieceLength && allowed == wanted)
+        {
+            return TransferResult.Success(transferred);
+        }
+
+        return allowed < pieceLength
+            ? new TransferResult(
+                CurlExitCode.FilesizeExceeded,
+                transferred,
+                FileTransferMessages.MaxFileSizeExceeded(maxWritten, transferred))
+            : null;
     }
 
     /// <summary>
@@ -799,7 +847,12 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
         // lib/file.c opens it in the transfer phase rather than at connect.
         context.Progress.ReportTransferStarted();
 
-        FileWriteMode mode = context.ResumeFrom is > 0
+        // -C - (ResumeUploadFromUnknownOffset) takes its offset from the destination's size,
+        // as curl 8.22.0's file_upload does from a stat of it, so the destination is opened
+        // for append: a missing or empty one is created or kept empty, the same as curl's
+        // offset 0 truncating it, and the size of an existing one is the offset (BL-4902).
+        bool resumeFromDestinationSize = IsResumedFromDestinationSize(context);
+        FileWriteMode mode = context.ResumeFrom is > 0 || resumeFromDestinationSize
             ? FileWriteMode.Append
             : FileWriteMode.Truncate;
 
@@ -822,28 +875,45 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
 
         await using (destination.ConfigureAwait(false))
         {
-            return await UploadIntoAsync(context, upload, destination).ConfigureAwait(false);
+            long skip = resumeFromDestinationSize
+                ? opened.Length
+                : context.ResumeFrom.GetValueOrDefault();
+
+            return await UploadIntoAsync(context, upload, destination, skip).ConfigureAwait(false);
         }
     }
 
     /// <summary>
-    /// Skips whatever <c>-C</c>/<c>--continue-at</c> asked for, then moves the body,
+    /// Tells whether the upload resumes from the destination's size: <c>-C -</c> asked for
+    /// it and no explicit offset overrides it.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <returns><see langword="true" /> when the offset is the destination's size.</returns>
+    private static bool IsResumedFromDestinationSize(ITransferContext context) =>
+        context.ResumeUploadFromUnknownOffset && context.ResumeFrom is null;
+
+    /// <summary>
+    /// Skips the resume offset's worth of the source, then moves the rest of the body,
     /// converting line endings on the way when <c>--crlf</c> asked for it.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <param name="upload">The stream to upload from.</param>
     /// <param name="destination">The opened destination, which this method does not dispose.</param>
+    /// <param name="skip">
+    /// The source bytes to skip: the <c>-C</c>/<c>--continue-at</c> offset, or for <c>-C -</c>
+    /// the destination's size.
+    /// </param>
     /// <returns>The outcome of the upload.</returns>
     private static async ValueTask<TransferResult> UploadIntoAsync(
         ITransferContext context,
         Stream upload,
-        Stream destination)
+        Stream destination,
+        long skip)
     {
         // curl knows the length of a -T file and not of standard input, and only a known
         // length turns a failed read into exit 26; the curl tool reports a failed read as the
         // end of the file, so with no length to fall short of, the upload simply ends there.
         long? needed = RemainingLength(upload);
-        long skip = context.ResumeFrom.GetValueOrDefault();
 
         bool skipped = await TrySkipAsync(upload, skip, context.CancellationToken)
             .ConfigureAwait(false);

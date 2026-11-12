@@ -122,7 +122,15 @@ public sealed class StompProtocolHandlerTests
     }
 
     [TestMethod]
-    [DataRow("ERROR\nmessage:Bad login\n\n\0", "STOMP server sent ERROR: Bad login")]
+    public async Task ExecuteAsync_ErrorAtConnect_EndsWithLoginDenied()
+    {
+        TransferResult result = await ExecuteAsync(ScriptedStompConnection.Replaying("ERROR\nmessage:Bad login\n\n\0"), "stomp://broker/q", new MemoryStream(), "hi");
+
+        Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
+        Assert.AreEqual("STOMP server sent ERROR: Bad login", result.ErrorMessage);
+    }
+
+    [TestMethod]
     [DataRow("RECEIPT\nreceipt-id:x\n\n\0", "Unexpected STOMP RECEIPT frame")]
     [DataRow("CONNECTED\nversion:1.1\n\n\0", "STOMP server speaks version 1.1, not 1.2")]
     [DataRow("CONNECTED\n\n\0", "STOMP server speaks version 1.0, not 1.2")]

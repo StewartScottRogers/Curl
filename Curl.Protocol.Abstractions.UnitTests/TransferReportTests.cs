@@ -177,4 +177,13 @@ public sealed class TransferReportTests
         Assert.AreEqual("http://example.com/last", fromFollower.EffectiveUrl);
         Assert.AreEqual(1, fromFollower.RedirectCount);
     }
+
+    [TestMethod]
+    public void WithDownloadSize_CopiesTheReportWithTheGivenDownloadSize()
+    {
+        TransferReport report = new TransferReport { ResponseCode = 200 }.WithDownloadSize(15);
+
+        Assert.AreEqual(15, report.DownloadSize);
+        Assert.AreEqual(200, report.ResponseCode);
+    }
 }

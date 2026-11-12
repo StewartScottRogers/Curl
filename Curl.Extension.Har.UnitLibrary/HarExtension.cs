@@ -30,6 +30,11 @@ public static class HarExtension
     public static ITransferHook? HookFor(ExtensionOptionValues values)
     {
         ArgumentNullException.ThrowIfNull(values);
-        return values.ValueOf(Option) is { } path ? new HarTransferHook(path) : null;
+        return values.ValueOf(Option) switch
+        {
+            null => null,
+            { Length: 0 } => new EmptyPathTransferHook(Option.Name),
+            var path => new HarTransferHook(path),
+        };
     }
 }

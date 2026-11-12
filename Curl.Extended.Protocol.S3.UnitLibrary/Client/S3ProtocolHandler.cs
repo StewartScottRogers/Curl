@@ -20,6 +20,11 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (S3RequestMethod.RefusalOf(context) is { } refusal)
+        {
+            return TransferResult.Failure(CurlExitCode.NotBuiltIn, refusal);
+        }
+
         string bucket = context.Url.Host;
         S3Configuration configuration = S3Configuration.From(environment, context.Credentials);
         if (S3Endpoint.For(bucket, configuration.Region, configuration.EndpointUrl) is not { } endpoint)
@@ -27,18 +32,20 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
             return TransferResult.Failure(CurlExitCode.UrlMalformat, $"The S3 endpoint \"{configuration.EndpointUrl}\" is not an http or https URL");
         }
 
-        S3Operations operations = new(new S3Client(connector, context, configuration, endpoint), endpoint, bucket, partSize, context.CancellationToken);
+        S3HttpHeadReporter headReporter = new(context.Events, context.HeaderOutput);
+        S3Operations operations = new(new S3Client(connector, context, configuration, endpoint, headReporter), endpoint, bucket, partSize, context.CancellationToken);
         try
         {
-            return TransferResult.Success(await TransferAsync(operations, context, KeyOf(context.Url)));
+            long downloaded = await TransferAsync(operations, context, KeyOf(context.Url));
+            return TransferResult.Success(downloaded) with { Report = headReporter.ReportWith(context.Upload is null ? downloaded : 0) };
         }
         catch (S3TransferException failure)
         {
-            return TransferResult.Failure(failure.ExitCode, failure.Message);
+            return TransferResult.Failure(failure.ExitCode, failure.Message) with { Report = headReporter.Report };
         }
         catch (S3HttpException failure)
         {
-            return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message);
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, failure.Message) with { Report = headReporter.Report };
         }
     }
 

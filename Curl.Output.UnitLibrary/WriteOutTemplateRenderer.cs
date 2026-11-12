@@ -334,7 +334,8 @@ public sealed class WriteOutTemplateRenderer(
             }
 
             // curl's name buffer refuses a name this long, and its loop ends there silently.
-            if (renderer.textEncoding.GetByteCount(name) >= VariableNameBufferBytes)
+            // Only a dotted extension variable such as structured_field.<name> (curl has none) may be longer and still known.
+            if (renderer.textEncoding.GetByteCount(name) >= VariableNameBufferBytes && !(name.Contains('.', StringComparison.Ordinal) && variables.TryGetVariableText(name, out _)))
             {
                 position = template.Length;
                 return;

@@ -27,8 +27,9 @@ internal static class SocketIoUpgrade
     /// <summary>Gives the upgrade request for <paramref name="url" />, its query appended to the Engine.IO one.</summary>
     /// <param name="url">The <c>socketio</c> or <c>socketios</c> URL.</param>
     /// <param name="key">The <c>Sec-WebSocket-Key</c>.</param>
+    /// <param name="requestFields">The fields curl's options add (<c>-H</c>, <c>-A</c>, <c>-b</c>, <c>-u</c>, <c>--oauth2-bearer</c>), or <see langword="null"/> for none.</param>
     /// <returns>The request's bytes.</returns>
-    public static byte[] Request(CurlUrl url, string key)
+    public static byte[] Request(CurlUrl url, string key, IReadOnlyList<KeyValuePair<string, string>>? requestFields = null)
     {
         string query = string.IsNullOrEmpty(url.Query) ? string.Empty : "&" + url.Query;
         string host = url.IdnHost.Contains(':', StringComparison.Ordinal) ? $"[{url.IdnHost}]" : url.IdnHost;
@@ -39,7 +40,9 @@ internal static class SocketIoUpgrade
             "Upgrade: websocket\r\n" +
             "Connection: Upgrade\r\n" +
             $"Sec-WebSocket-Key: {key}\r\n" +
-            "Sec-WebSocket-Version: 13\r\n\r\n");
+            "Sec-WebSocket-Version: 13\r\n" +
+            string.Concat((requestFields ?? []).Select(field => $"{field.Key}: {field.Value}\r\n")) +
+            "\r\n");
     }
 
     /// <summary>Gives the <c>Sec-WebSocket-Accept</c> a server must answer <paramref name="key" /> with (RFC 6455 section 4.2.2).</summary>

@@ -51,10 +51,26 @@ internal sealed class KafkaProtocolHandler(IConnector connector) : IProtocolHand
         return TargetAt(context, url.IdnHost, port, useTls);
     }
 
-    private static ValueTask RunAsync(KafkaClientFlow flow, ITransferContext context, KafkaAddress address) =>
-        context.PostData is { } value
+    private static ValueTask RunAsync(KafkaClientFlow flow, ITransferContext context, KafkaAddress address, ReadOnlyMemory<byte>? body) =>
+        body is { } value
             ? flow.ProduceAsync(address, value, context.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds())
             : flow.ConsumeAsync(address);
+
+    /// <summary>
+    /// Gives the record value to produce: the <c>-d</c> body, else the whole <c>-T</c> upload, else
+    /// <see langword="null"/> to consume.
+    /// </summary>
+    private static async ValueTask<ReadOnlyMemory<byte>?> RequestBodyAsync(ITransferContext context)
+    {
+        if (context.PostData is not null || context.Upload is not { } upload)
+        {
+            return context.PostData;
+        }
+
+        using var body = new MemoryStream();
+        await upload.CopyToAsync(body, context.CancellationToken).ConfigureAwait(false);
+        return body.ToArray();
+    }
 
     /// <summary>
     /// Gives where the partition's leader is when it is another broker than <paramref name="target"/>, with
@@ -76,6 +92,7 @@ internal sealed class KafkaProtocolHandler(IConnector connector) : IProtocolHand
 
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context, KafkaAddress address)
     {
+        ReadOnlyMemory<byte>? body = await RequestBodyAsync(context).ConfigureAwait(false);
         ConnectTarget target = TargetOf(context);
         ConnectTarget? leader = null;
         TransferResult result = await TransferOverAsync(context, target, async flow =>
@@ -83,10 +100,10 @@ internal sealed class KafkaProtocolHandler(IConnector connector) : IProtocolHand
             leader = RedirectOf(context, target, await flow.FindLeaderAsync(address).ConfigureAwait(false));
             if (leader is null)
             {
-                await RunAsync(flow, context, address).ConfigureAwait(false);
+                await RunAsync(flow, context, address, body).ConfigureAwait(false);
             }
         }).ConfigureAwait(false);
-        return leader is null ? result : await TransferOverAsync(context, leader, flow => RunAsync(flow, context, address)).ConfigureAwait(false);
+        return leader is null ? result : await TransferOverAsync(context, leader, flow => RunAsync(flow, context, address, body)).ConfigureAwait(false);
     }
 
     private async ValueTask<TransferResult> TransferOverAsync(ITransferContext context, ConnectTarget target, Func<KafkaClientFlow, ValueTask> exchange)

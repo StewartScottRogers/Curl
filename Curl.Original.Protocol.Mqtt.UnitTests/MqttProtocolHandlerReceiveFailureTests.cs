@@ -48,6 +48,16 @@ public sealed class MqttProtocolHandlerReceiveFailureTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ConnackReadMissingCloseNotify_IsTheTlsText()
+    {
+        const string text = "schannel: server closed abruptly (missing close_notify)";
+
+        Run run = await RunAsync(new ScriptedConnection([null]) { ReadFailure = new MissingCloseNotifyException(text) });
+
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, text), run.Result with { Report = null });
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ConnackReadFailsWithoutSocketError_IsFallbackTextWithNoLine()
     {
         Run run = await RunAsync(new ScriptedConnection([null]) { ReadFailure = new IOException("The read failed.") });

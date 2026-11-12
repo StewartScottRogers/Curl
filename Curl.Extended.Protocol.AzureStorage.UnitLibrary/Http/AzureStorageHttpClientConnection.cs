@@ -13,8 +13,16 @@ namespace Curl.Extended.Protocol.AzureStorage.Http;
 /// is not sent, so no interim 1xx response is awaited. Every failure of the exchange is an <see cref="AzureStorageHttpException"/>.
 /// </remarks>
 /// <param name="connection">The connection; the caller disposes it.</param>
-public sealed class AzureStorageHttpClientConnection(IConnection connection)
+/// <param name="headReporter">Shows the request and response heads for <c>-v</c>, <c>-i</c> and <c>-D</c>.</param>
+public sealed class AzureStorageHttpClientConnection(IConnection connection, AzureStorageHttpHeadReporter headReporter)
 {
+    /// <summary>Initializes a new instance of the <see cref="AzureStorageHttpClientConnection"/> class that shows no heads.</summary>
+    /// <param name="connection">The connection; the caller disposes it.</param>
+    public AzureStorageHttpClientConnection(IConnection connection)
+        : this(connection, AzureStorageHttpHeadReporter.None)
+    {
+    }
+
     private const int BodyBufferSize = 65536;
 
     private readonly AzureStorageHttpConnectionReader reader = new(connection);
@@ -26,7 +34,9 @@ public sealed class AzureStorageHttpClientConnection(IConnection connection)
     public async Task<AzureStorageHttpResponse> SendAsync(AzureStorageHttpRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        await connection.WriteAsync(Encoding.Latin1.GetBytes(FormatHead(request)), cancellationToken);
+        byte[] head = Encoding.Latin1.GetBytes(FormatHead(request));
+        await connection.WriteAsync(head, cancellationToken);
+        headReporter.ReportRequestHead(head);
         if (request.Body is not null)
         {
             await WriteBodyAsync(request.Body, request.BodyLength, cancellationToken);
@@ -78,7 +88,7 @@ public sealed class AzureStorageHttpClientConnection(IConnection connection)
 
     private async Task<AzureStorageHttpResponse> ReadResponseAsync(string method, CancellationToken cancellationToken)
     {
-        var (statusCode, reasonPhrase, isHttp11) = AzureStorageHttpResponseHead.ParseStatusLine(await reader.ReadLineAsync(cancellationToken) ?? throw ClosedEarly());
+        var (statusCode, reasonPhrase, isHttp11) = AzureStorageHttpResponseHead.ParseStatusLine(await ReadReportedLineAsync(cancellationToken));
         var headers = new List<KeyValuePair<string, string>>();
         for (var line = await ReadHeadLineAsync(cancellationToken); line.Length > 0; line = await ReadHeadLineAsync(cancellationToken))
         {
@@ -101,9 +111,16 @@ public sealed class AzureStorageHttpClientConnection(IConnection connection)
 
     private async ValueTask<string> ReadHeadLineAsync(CancellationToken cancellationToken)
     {
-        var line = await reader.ReadLineAsync(cancellationToken) ?? throw ClosedEarly();
+        var line = await ReadReportedLineAsync(cancellationToken);
         return line.Length > 0 && (line[0] == ' ' || line[0] == '\t')
             ? throw new AzureStorageHttpException(AzureStorageHttpFailure.MalformedHeaderField, "The response folds a header field line (obs-fold).")
             : line;
+    }
+
+    private async ValueTask<string> ReadReportedLineAsync(CancellationToken cancellationToken)
+    {
+        var line = await reader.ReadLineAsync(cancellationToken) ?? throw ClosedEarly();
+        await headReporter.ReportResponseLineAsync(line, cancellationToken);
+        return line;
     }
 }

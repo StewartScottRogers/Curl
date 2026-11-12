@@ -42,10 +42,11 @@ internal sealed class ServerSentEventsTransferHook : ITransferHook
             return await next(context).ConfigureAwait(false);
         }
 
-        EventStreamWritingStream events = new(_parser, context.Output);
+        ResponseHeadWatchingStream head = new(context.HeaderOutput);
+        EventStreamWritingStream events = new(_parser, context.Output, () => head.IsEventStream);
         try
         {
-            return await next(context.WithOutputs(events, context.HeaderOutput, context.DumpHeaderOutput)).ConfigureAwait(false);
+            return await next(context.WithOutputs(events, head, context.DumpHeaderOutput)).ConfigureAwait(false);
         }
         finally
         {
@@ -55,11 +56,7 @@ internal sealed class ServerSentEventsTransferHook : ITransferHook
 
     /// <inheritdoc />
     public TimeSpan? RepeatAfter(TransferResult result) =>
-        result.Report is { ResponseCode: 200, ContentType: { } contentType } && IsEventStream(contentType)
+        result.Report is { ResponseCode: 200, ContentType: { } contentType } && ResponseHeadWatchingStream.IsEventStreamType(contentType)
             ? TimeSpan.FromMilliseconds(Math.Min(_parser.ReconnectionTimeMilliseconds ?? DefaultReconnectionTimeMilliseconds, LongestReconnectionTimeMilliseconds))
             : null;
-
-    /// <summary>Whether a <c>Content-Type</c> value names <c>text/event-stream</c>, whatever its parameters and case.</summary>
-    private static bool IsEventStream(string contentType) =>
-        contentType.Split(';')[0].Trim().Equals(EventStreamMediaType, StringComparison.OrdinalIgnoreCase);
 }

@@ -351,6 +351,10 @@ public sealed class CommandLineOptions
     /// <summary>Records <paramref name="value"/> as this group's value of the extension option <paramref name="longName"/>, replacing an earlier one.</summary>
     internal void SetExtensionOptionValue(string longName, string value) => extensionOptionValues[longName] = value;
 
+    /// <summary>Forgets the value an earlier argument or config file gave an extension option (<c>--no-&lt;name&gt;</c>).</summary>
+    /// <param name="longName">The long name of the option.</param>
+    internal void RemoveExtensionOptionValue(string longName) => extensionOptionValues.Remove(longName);
+
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get => globals.Silent; internal set => globals.Silent = value; }
 
@@ -2364,12 +2368,15 @@ public sealed class CommandLineOptions
     /// opened or created. A value from a UTF-8 config file on Windows is re-spelled by
     /// <see cref="AsWireText"/>, so the name is the file's bytes read in the ANSI code page, as the
     /// curl 8.22.0 mingw build opens it (<c>output = "café.bin"</c> creates <c>cafÃ©.bin</c>, BL-3900).
+    /// The <c>-o</c> replaces the remote name <see cref="RemoteNameAll"/> would give that URL, so
+    /// <c>--remote-name-all -o - u</c> writes the body to standard output, as curl 8.22.0 does (BL-4908).
     /// </summary>
     /// <param name="outputFile">A <c>-o</c> / <c>--output</c> value.</param>
     internal void AddOutputFile(string outputFile)
     {
         UrlOutput output = urlOutputs.Find(output => !output.HasOutputOption) ?? AddUrlOutput();
         output.FileName = AsWireText(outputFile);
+        output.UsesRemoteName = false;
         output.HasOutputOption = true;
     }
 

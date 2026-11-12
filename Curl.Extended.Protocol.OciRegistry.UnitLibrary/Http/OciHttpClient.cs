@@ -11,8 +11,16 @@ namespace Curl.Extended.Protocol.OciRegistry.Http;
 /// never an exception, except cancellation.
 /// </remarks>
 /// <param name="connector">Opens the connection to the URL's host.</param>
-public sealed class OciHttpClient(IConnector connector)
+/// <param name="headReporter">Shows the request and response heads for <c>-v</c>, <c>-i</c> and <c>-D</c>.</param>
+public sealed class OciHttpClient(IConnector connector, OciHttpHeadReporter headReporter)
 {
+    /// <summary>Initializes a new instance of the <see cref="OciHttpClient"/> class that shows no heads.</summary>
+    /// <param name="connector">Opens the connection to the URL's host.</param>
+    public OciHttpClient(IConnector connector)
+        : this(connector, OciHttpHeadReporter.None)
+    {
+    }
+
     /// <summary>Sends <paramref name="request"/> and reads the response.</summary>
     /// <param name="request">The request; its URL must be an absolute <c>http</c> or <c>https</c> URL.</param>
     /// <param name="cancellationToken">Cancels the exchange.</param>
@@ -47,6 +55,6 @@ public sealed class OciHttpClient(IConnector connector)
         var connect = await connector.ConnectAsync(new ConnectTarget(url.IdnHost, url.Port, url.Scheme == Uri.UriSchemeHttps), cancellationToken);
         await using var connection = connect.Connection
             ?? throw new OciHttpException(OciHttpFailure.ConnectFailed, connect.ExitCode, connect.ErrorMessage!);
-        return await OciHttpExchange.ExchangeAsync(connection, request, cancellationToken);
+        return await OciHttpExchange.ExchangeAsync(connection, request, headReporter, cancellationToken);
     }
 }

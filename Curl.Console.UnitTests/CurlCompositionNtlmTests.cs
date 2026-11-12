@@ -148,7 +148,8 @@ public sealed class CurlCompositionNtlmTests
         Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         string[] authorizations = AuthorizationsOf(server);
-        StringAssert.StartsWith(authorizations[0], "NTLM TlRMTVNTUAABAAAAB4IIog");
+        // SSPI chooses the Type 1 flags, and they differ by Windows build (0xA2088207 measured, 0xE2088297 on build 26300), so only the Type 1 header is pinned.
+        StringAssert.StartsWith(authorizations[0], "NTLM TlRMTVNTUAABAAAA");
         StringAssert.StartsWith(authorizations[1], "NTLM TlRMTVNTUAADAAAAGAAYA");
         Diagnostics.Assert("run.StandardOutput", "ok", run.StandardOutput);
         Assert.AreEqual("ok", run.StandardOutput);

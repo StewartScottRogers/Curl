@@ -9,7 +9,7 @@ public sealed class EventStreamWritingStreamTests
     public async Task WriteAsync_WritesEachCompletedEventNormalised_Section926()
     {
         MemoryStream output = new();
-        EventStreamWritingStream stream = new(new EventStreamParser(), output);
+        EventStreamWritingStream stream = new(new EventStreamParser(), output, () => true);
 
         await stream.WriteAsync(Encoding.UTF8.GetBytes(": comment\nid: 7\nevent: add\ndata: a\ndata:b\nfoo: x\n\ndata: pen"));
 
@@ -20,7 +20,7 @@ public sealed class EventStreamWritingStreamTests
     public async Task WriteAsync_ArrayOverload_WritesTheEventsOfTheGivenRange()
     {
         MemoryStream output = new();
-        EventStreamWritingStream stream = new(new EventStreamParser(), output);
+        EventStreamWritingStream stream = new(new EventStreamParser(), output, () => true);
         byte[] bytes = Encoding.UTF8.GetBytes("xxdata: one\n\nyy");
 
         await stream.WriteAsync(bytes, 2, bytes.Length - 4, CancellationToken.None);
@@ -32,7 +32,7 @@ public sealed class EventStreamWritingStreamTests
     public void Write_ArrayAndSpan_WriteTheEventsSynchronously()
     {
         MemoryStream output = new();
-        EventStreamWritingStream stream = new(new EventStreamParser(), output);
+        EventStreamWritingStream stream = new(new EventStreamParser(), output, () => true);
         byte[] bytes = Encoding.UTF8.GetBytes("data: one\n");
 
         stream.Write(bytes, 0, bytes.Length);
@@ -47,7 +47,7 @@ public sealed class EventStreamWritingStreamTests
     {
         FlushCountingStream output = new();
 
-        await new EventStreamWritingStream(new EventStreamParser(), output).FlushAsync();
+        await new EventStreamWritingStream(new EventStreamParser(), output, () => true).FlushAsync();
 
         Assert.AreEqual(1, output.Flushes);
     }
@@ -55,7 +55,7 @@ public sealed class EventStreamWritingStreamTests
     [TestMethod]
     public void Stream_IsWriteOnlyAndUnseekable()
     {
-        EventStreamWritingStream stream = new(new EventStreamParser(), new MemoryStream());
+        EventStreamWritingStream stream = new(new EventStreamParser(), new MemoryStream(), () => true);
 
         Assert.IsFalse(stream.CanRead);
         Assert.IsFalse(stream.CanSeek);

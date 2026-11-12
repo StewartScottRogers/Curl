@@ -691,14 +691,6 @@ internal static class TlsFailureMessages
     public static string SchannelClientCertificatePasswordBad(string clientCertificateFile) =>
         $"schannel: Failed to import cert file {clientCertificateFile}, password is bad";
 
-    /// <summary>
-    /// The Schannel build's message for exit 35 when a PKCS#12 <c>--cert</c> file opens with
-    /// its passphrase but AcquireCredentialsHandle does not accept the imported key (ADR-1187,
-    /// measured with curl 8.22.0 and 8.21.0 on Windows 11).
-    /// </summary>
-    public const string SchannelClientCertificateCredentialsUnknown =
-        "schannel: AcquireCredentialsHandle failed: SEC_E_UNKNOWN_CREDENTIALS (0x8009030d) - The credentials supplied to the package were not recognized";
-
     /// <summary>OpenSSL's error string for a file that does not exist.</summary>
     public const string OpenSslNoSuchFile = "error:80000002:system library::No such file or directory";
 

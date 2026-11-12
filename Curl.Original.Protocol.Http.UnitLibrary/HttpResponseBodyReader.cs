@@ -450,12 +450,14 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// that pieces of <see cref="WriteSize" /> would (AF-0144, BL-2043), then reports them as
     /// data events in pieces of at most <see cref="WriteSize" />, each followed by the count
     /// downloaded once any of it is written: all of them, or, when the write fails, those up to
-    /// and including the piece it stopped in, as curl's client writes would.
+    /// and including the piece it stopped in, as curl's client writes would. The first piece is
+    /// reported before the write, so a body written to the stream a trace shares follows its data entry (BL-4924).
     /// </summary>
     /// <returns>How many bytes were written.</returns>
     private async ValueTask<int> WriteReadAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
     {
         long before = BytesWritten;
+        ReportReceived(bytes[..Math.Min(bytes.Length, WriteSize)]);
         try
         {
             return await WriteAsync(output, bytes, WriteSize, cancellationToken).ConfigureAwait(false);
@@ -477,7 +479,11 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         for (int start = 0; start < reported; start += WriteSize)
         {
             int end = Math.Min(start + WriteSize, reported);
-            ReportReceived(bytes[start..end]);
+            if (start > 0)
+            {
+                ReportReceived(bytes[start..end]);
+            }
+
             if (stoppedAt > start)
             {
                 Progress.ReportDownloaded(before + Math.Min(end, stoppedAt), ExpectedLength);

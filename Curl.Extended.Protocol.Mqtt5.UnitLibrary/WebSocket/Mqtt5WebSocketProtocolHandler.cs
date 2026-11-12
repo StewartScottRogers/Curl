@@ -80,7 +80,7 @@ public sealed class Mqtt5WebSocketProtocolHandler : IProtocolHandler
             try
             {
                 Mqtt5Connect connectPacket = Mqtt5ProtocolHandler.ConnectFor(Mqtt5ProtocolHandler.ClientIdentifierPrefix + clientIdentifierSuffixSource(), context.Credentials);
-                await flow.RunAsync(connectPacket, topic, context.PostData).ConfigureAwait(false);
+                await flow.RunAsync(connectPacket, topic, await Mqtt5ProtocolHandler.PublishPayloadAsync(context).ConfigureAwait(false)).ConfigureAwait(false);
                 return TransferResult.Success(flow.BytesWritten);
             }
             catch (Mqtt5ClientException failure)

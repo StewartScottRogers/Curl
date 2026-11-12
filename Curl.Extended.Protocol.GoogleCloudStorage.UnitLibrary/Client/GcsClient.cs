@@ -18,7 +18,8 @@ namespace Curl.Extended.Protocol.GoogleCloudStorage.Client;
 /// <param name="endpoint">The server the request goes to.</param>
 /// <param name="bearerToken">The OAuth 2.0 access token from <c>--oauth2-bearer</c>, or <see langword="null"/>.</param>
 /// <param name="hmacKey">The HMAC key from <c>--user</c>, used when there is no bearer token, or <see langword="null"/>.</param>
-internal sealed class GcsClient(IConnector connector, ITransferContext context, GcsEndpoint endpoint, string? bearerToken, GcsHmacKey? hmacKey)
+/// <param name="headReporter">Shows the heads and keeps what <c>-w</c> reports about the response.</param>
+internal sealed class GcsClient(IConnector connector, ITransferContext context, GcsEndpoint endpoint, string? bearerToken, GcsHmacKey? hmacKey, GcsHttpHeadReporter headReporter)
 {
     /// <summary>Sends a request and reads its successful response.</summary>
     /// <typeparam name="T">What the response gives.</typeparam>
@@ -46,7 +47,7 @@ internal sealed class GcsClient(IConnector connector, ITransferContext context, 
         // ConfigureAwait gives a struct to dispose, so the compiler adds no null check.
         await using (connection.ConfigureAwait(false))
         {
-            GcsHttpResponse response = await new GcsHttpClientConnection(connection).SendAsync(request, context.CancellationToken);
+            GcsHttpResponse response = await new GcsHttpClientConnection(connection, headReporter).SendAsync(request, context.CancellationToken);
             if (response.StatusCode >= 300)
             {
                 throw ErrorOf(response.StatusCode, await ReadErrorBodyAsync(response));

@@ -451,7 +451,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         {
             await WritePieceAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
         }
-        catch (HttpTransferException failed) when (waited && failed.ExitCode == CurlExitCode.SendError)
+        catch (HttpTransferException failed) when (waited && failed.ExitCode == CurlExitCode.SendError && !AnsweredWithFinal2xx)
         {
             throw await ReceiveFailureOrAsync(failed, cancellationToken).ConfigureAwait(false);
         }
@@ -544,11 +544,19 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
             await WritePieceAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
         }
-        catch (HttpTransferException failed) when (waitedOnSource && failed.ExitCode == CurlExitCode.SendError)
+        catch (HttpTransferException failed) when (waitedOnSource && failed.ExitCode == CurlExitCode.SendError && !AnsweredWithFinal2xx)
         {
             throw await ReceiveFailureOrAsync(failed, cancellationToken).ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Gets a value indicating whether the wait for <c>100 Continue</c> was answered with a final
+    /// 2xx (<see cref="HttpContinueWaitConnection.AnsweredWithFinal2xx" />): a write that then fails
+    /// stays a send failure, exit 55, as curl 8.22.0 reports it after delivering that response
+    /// (measured, BL-4909), and the connection is not read for a failure of its own.
+    /// </summary>
+    private bool AnsweredWithFinal2xx => EarlyResponseWatch is { AnsweredWithFinal2xx: true };
 
     /// <summary>
     /// Reads the connection after a write that failed once the writer had waited on its upload

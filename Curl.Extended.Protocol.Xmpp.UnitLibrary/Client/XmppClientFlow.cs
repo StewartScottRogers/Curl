@@ -9,12 +9,13 @@ namespace Curl.Extended.Protocol.Xmpp.Client;
 
 /// <summary>
 /// The XMPP client exchange (RFC 6120; ADR-1068): opens the stream (4.2), negotiates STARTTLS when the server offers it
-/// and the connection is not yet secure (5.4), authenticates with the most preferred SASL mechanism in
+/// and the connection is not yet secure (5.4), fails with exit 64 before any credential is sent when it is not offered and
+/// <c>--ssl-reqd</c> made TLS required (RFC 6120, 13.8), authenticates with the most preferred SASL mechanism in
 /// <see cref="XmppSaslMechanisms"/> the server offers (6.4; ADR-1077), restarting the stream after each (4.3.3), binds a
 /// server-chosen resource (7.6), sends the request stanza, writes a disco answer's payload to the output, then closes the
 /// stream (4.4) and reads until the server closes its own.
 /// </summary>
-internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsProvider, string domain, Stream output, ITransferProgress progress, Func<string> createClientNonce, CancellationToken cancellationToken)
+internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsProvider, string domain, Stream output, ITransferProgress progress, Func<string> createClientNonce, bool tlsRequired, CancellationToken cancellationToken)
     : IAsyncDisposable
 {
     /// <summary>The <c>id</c> of the resource binding <c>&lt;iq/&gt;</c>.</summary>
@@ -40,9 +41,11 @@ internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsPro
     internal async ValueTask RunAsync(NetworkCredential? credentials, XElement request)
     {
         XElement features = await OpenStreamAsync().ConfigureAwait(false);
-        if (!transport.IsSecure && features.Element(XmppNamespaces.Tls + "starttls") is not null)
+        if (!transport.IsSecure)
         {
-            features = await StartTlsAsync().ConfigureAwait(false);
+            features = features.Element(XmppNamespaces.Tls + "starttls") is not null
+                ? await StartTlsAsync().ConfigureAwait(false)
+                : tlsRequired ? throw new XmppClientException(CurlExitCode.UseSslFailed, XmppClientMessages.TlsRequired) : features;
         }
 
         await AuthenticateAsync(features, credentials).ConfigureAwait(false);

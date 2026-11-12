@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Globalization;
 
 using Curl.Protocol.Abstractions;
+using Curl.Tls;
 
 namespace Curl.Networking;
 
@@ -97,6 +98,86 @@ internal static class SchannelAlgorithmList
             : algorithmIds.Count == 0 || algorithmIds.Exists(AcceptedAlgorithmIds.Contains) ? null
             : ConnectResult.Failed(CurlExitCode.SslConnectError, TlsFailureMessages.SchannelAlgorithmMismatch);
     }
+
+    /// <summary>
+    /// Gets the cipher suites the Schannel build offers for a <c>--ciphers</c> list (ADR-1245):
+    /// within each algorithm class (key exchange, signature, bulk cipher, hash) the list names
+    /// an accepted algorithm of, a suite is offered only when its algorithm of that class is
+    /// named; a class the list names nothing of is not restricted (measured, curl 8.22.0
+    /// Schannel: <c>CALG_AES_128</c> negotiates <c>ECDHE-RSA-AES128-GCM-SHA256</c>,
+    /// <c>CALG_RSA_KEYX</c> offers only RSA key exchange suites). An AEAD suite's hash is its PRF's.
+    /// </summary>
+    /// <param name="ciphers">The <c>--ciphers</c> value, or <see langword="null" />.</param>
+    /// <param name="profileSuites">The suites the build offers with no list, in order.</param>
+    /// <returns>
+    /// <see cref="Refusal" />'s failure; or <see langword="null" /> suites when no accepted
+    /// algorithm is named, so the profile's are offered; or the suites left, and exit 35 for
+    /// Schannel's algorithm mismatch when none is.
+    /// </returns>
+    internal static (IReadOnlyList<ushort>? Suites, ConnectResult? Failure) OfferedSuites(string? ciphers, IReadOnlyList<ushort> profileSuites)
+    {
+        var refusal = Refusal(ciphers);
+        int[] named = refusal is null && ciphers is not null ? [.. AlgorithmIdsOf(ciphers)!.Where(AcceptedAlgorithmIds.Contains)] : [];
+        if (named.Length == 0)
+        {
+            return (null, refusal);
+        }
+
+        ushort[] offered = [.. profileSuites.Where(code => Allows(named, code))];
+        return offered.Length == 0
+            ? (null, ConnectResult.Failed(CurlExitCode.SslConnectError, TlsFailureMessages.SchannelAlgorithmMismatch))
+            : (offered, null);
+    }
+
+    // A suite with no TLS 1.2 description (a TLS 1.3 suite) is not restricted by the list.
+    private static bool Allows(int[] named, ushort code) =>
+        Tls12CipherSuite.Find(code) is not { } suite
+        || Array.TrueForAll(AlgorithmIdsOf(suite), algorithmId => named.Contains(algorithmId) || !Array.Exists(named, name => (name & AlgorithmClassMask) == (algorithmId & AlgorithmClassMask)));
+
+    // GET_ALG_CLASS: the top three bits of an ALG_ID.
+    private const int AlgorithmClassMask = 0xE000;
+
+    // An algorithm Schannel has no ALG_ID for is its class with no sub-identifier, which no
+    // list can name.
+    private static int[] AlgorithmIdsOf(Tls12CipherSuite suite) =>
+    [
+        KeyExchangeIds.GetValueOrDefault(suite.KeyExchange, 0xA000),
+        AuthenticationIds.GetValueOrDefault(suite.Authentication, 0x2000),
+        BulkCipherIds.GetValueOrDefault(suite.BulkCipher, 0x6000),
+        suite.MacAlgorithm == Tls12MacAlgorithm.None ? (suite.UsesSha384Prf ? 0x800D : 0x800C) : MacIds.GetValueOrDefault(suite.MacAlgorithm, 0x8000),
+    ];
+
+    private static readonly FrozenDictionary<Tls12KeyExchange, int> KeyExchangeIds = new Dictionary<Tls12KeyExchange, int>
+    {
+        [Tls12KeyExchange.Rsa] = 0xA400,
+        [Tls12KeyExchange.Dhe] = 0xAA02,
+        [Tls12KeyExchange.Ecdhe] = 0xAE06,
+    }.ToFrozenDictionary();
+
+    private static readonly FrozenDictionary<Tls12Authentication, int> AuthenticationIds = new Dictionary<Tls12Authentication, int>
+    {
+        [Tls12Authentication.Rsa] = 0x2400,
+        [Tls12Authentication.Dss] = 0x2200,
+        [Tls12Authentication.Ecdsa] = 0x2203,
+    }.ToFrozenDictionary();
+
+    private static readonly FrozenDictionary<Tls12BulkCipher, int> BulkCipherIds = new Dictionary<Tls12BulkCipher, int>
+    {
+        [Tls12BulkCipher.TripleDesEdeCbc] = 0x6603,
+        [Tls12BulkCipher.Rc4128] = 0x6801,
+        [Tls12BulkCipher.Aes128Cbc] = 0x660E,
+        [Tls12BulkCipher.Aes128Gcm] = 0x660E,
+        [Tls12BulkCipher.Aes256Cbc] = 0x6610,
+        [Tls12BulkCipher.Aes256Gcm] = 0x6610,
+    }.ToFrozenDictionary();
+
+    private static readonly FrozenDictionary<Tls12MacAlgorithm, int> MacIds = new Dictionary<Tls12MacAlgorithm, int>
+    {
+        [Tls12MacAlgorithm.HmacMd5] = 0x8003,
+        [Tls12MacAlgorithm.HmacSha1] = 0x8004,
+        [Tls12MacAlgorithm.HmacSha256] = 0x800C,
+        [Tls12MacAlgorithm.HmacSha384] = 0x800D,
+    }.ToFrozenDictionary();
 
     /// <summary>
     /// Gets the options the Schannel build connects with: a <c>--ciphers</c> list whose range

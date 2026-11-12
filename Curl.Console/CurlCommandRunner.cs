@@ -932,7 +932,9 @@ internal sealed class CurlCommandRunner(
             await WriteErrorLineAsync(RunDiagnosticLog.LogFileOpenFailedPrefix + options.DiagnosticLogFile).ConfigureAwait(false);
         }
 
-        diagnosticLog = runDiagnosticLog.Log;
+        diagnosticLog = options.Silent
+            ? runDiagnosticLog.Log
+            : ExtensionWarningDiagnosticLog.OverStandardError(runDiagnosticLog.Log, () => standardError, standardErrorTextEncoding);
         transferContextFactory.DiagnosticLog = diagnosticLog;
         transferContextFactory.HstsStore = hstsClock is null ? Hsts : new ClockOverridingHstsStore(Hsts, hstsClock);
         lateBoundDiagnosticLog?.Bind(diagnosticLog);
@@ -3386,7 +3388,7 @@ internal sealed class CurlCommandRunner(
     /// <c>-G</c> or <c>--url-query</c> appends a query, which curl's tool does by rebuilding the URL with its URL API
     /// and storing the result in place of the typed one. That URL is normalised as <c>%{url_effective}</c> is, keeps
     /// no scheme the user did not type (curl 8.21.0 Schannel: <c>-G -d a=b 127.0.0.1:1/p</c> prints
-    /// <c>127.0.0.1:1/p?a=b</c>), and stays as typed, without the query, when curl rejects it (CGR-089, BL-3618).
+    /// <c>127.0.0.1:1/p?a=b</c>), and keeps the query, otherwise as given, when curl rejects it (CGR-089, BL-3618, BL-4926).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="givenUrl">
@@ -3397,12 +3399,14 @@ internal sealed class CurlCommandRunner(
     private static string WriteOutGivenUrl(CommandLineOptions options, string givenUrl, string transferUrl)
     {
         string queriedUrl = QueryUrl.Append(transferUrl, options);
-        if (queriedUrl == transferUrl || !CurlUrl.TryParse(queriedUrl, pathAsIs: false, out _))
+        if (queriedUrl == transferUrl || transferUrl.Length == 0)
         {
             return givenUrl;
         }
 
-        string url = UrlEffective.Normalize(queriedUrl, pathAsIs: false);
+        string url = CurlUrl.TryParse(queriedUrl, pathAsIs: false, out _)
+            ? UrlEffective.Normalize(queriedUrl, pathAsIs: false)
+            : queriedUrl;
         return UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol) == givenUrl
             ? url
             : url[(url.IndexOf("://", StringComparison.Ordinal) + "://".Length)..];
@@ -4822,7 +4826,7 @@ internal sealed class CurlCommandRunner(
         }
         else
         {
-            state.Progress.Finish(result.IsSuccess || state.SucceededBeforeOutputFileCreationFailed);
+            state.Progress.Finish(result.IsSuccess || result.WriteOutErrorMessage is not null || state.SucceededBeforeOutputFileCreationFailed);
         }
     }
 
@@ -5890,9 +5894,21 @@ internal sealed class CurlCommandRunner(
         { VersionRequested: true } => CurlVersionText.Lines(runsOnWindows, OperatingSystem.IsMacOS()),
         { ManualRequested: true } => CurlManual.Lines(),
         { HelpRequested: true, HelpSubject: var subject } when !CurlHelpText.IsOptionSubject(subject) =>
-            CurlHelpText.Lines(subject, terminalColumns),
+            CurlHelpText.Lines(subject, terminalColumns, ExtensionsAreOn),
         _ => ExtensionsOrBuildInformationLines(options),
     };
+
+    /// <summary>The section <c>--ai-help extensions</c> ends with: Curl's own diagnostic-log options, which belong to no extension and are unknown under <c>CURL_EXTENSIONS=0</c> (BL-4937).</summary>
+    private const string CurlOnlyOptionsMarkdown = "## diagnostic-log\n\nCurl's own diagnostic log, not curl's -v.\n\n- Schemes: none\n- Options: `--log-level <level>` (none, error, warning, info or verbose), `--log-file <file>` (where the log is written)\n\n";
+
+    /// <summary>The <c>--extended-help</c> line for the options of <see cref="CurlOnlyOptionsMarkdown" />.</summary>
+    private static readonly string[] CurlOnlyOptionLines =
+    [
+        "diagnostic-log: Curl's own diagnostic log, not curl's -v: --log-level <level> sets how much is logged and --log-file <file> where. Schemes: none. Options: --log-level, --log-file.",
+    ];
+
+    /// <summary>Whether <c>CURL_EXTENSIONS</c> is anything but <c>0</c>: under <c>0</c> the help pages are curl's own.</summary>
+    private bool ExtensionsAreOn => EnvironmentVariables(ExtensionProtocolHandlers.SwitchVariable) != "0";
 
     /// <summary>
     /// The lines <see cref="InformationLines" /> gives for the rest: <see cref="ExtensionListing" />'s for
@@ -5902,7 +5918,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The lines, or <see langword="null" /> when no such option was given.</returns>
     private IReadOnlyList<string>? ExtensionsOrBuildInformationLines(CommandLineOptions options) =>
         options.ExtendedHelpRequested
-            ? ExtensionListing.Lines(EnvironmentVariables)
+            ? [.. ExtensionListing.Lines(EnvironmentVariables), .. CurlOnlyOptionLines]
             : TlsBuildInformation.Lines(EasyOptionsFromCommandLine.TlsOf(options), options.CaEmbedDumpRequested);
 
     /// <summary>
@@ -5923,7 +5939,7 @@ internal sealed class CurlCommandRunner(
                 continue;
             }
 
-            await WriteStandardOutputLinesAsync(CurlHelpText.Lines(subject, terminalColumns)).ConfigureAwait(false);
+            await WriteStandardOutputLinesAsync(CurlHelpText.Lines(subject, terminalColumns, ExtensionsAreOn)).ConfigureAwait(false);
         }
     }
 
@@ -5936,7 +5952,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>A task that completes when the output is flushed.</returns>
     private async Task WriteOptionManualSectionAsync(string subject)
     {
-        if (CurlOptionManualSection.TryGetLines(subject, out IReadOnlyList<string> lines))
+        if (CurlOptionManualSection.TryGetLines(subject, out IReadOnlyList<string> lines, ExtensionsAreOn))
         {
             await WriteStandardOutputLinesAsync(lines).ConfigureAwait(false);
         }
@@ -5957,7 +5973,7 @@ internal sealed class CurlCommandRunner(
     {
         if (CurlAiHelpText.IsExtensionsSubject(subject))
         {
-            await standardOutput.WriteAsync(Encoding.UTF8.GetBytes(ExtensionListing.Markdown(EnvironmentVariables))).ConfigureAwait(false);
+            await standardOutput.WriteAsync(Encoding.UTF8.GetBytes(ExtensionListing.Markdown(EnvironmentVariables) + CurlOnlyOptionsMarkdown)).ConfigureAwait(false);
             await standardOutput.FlushAsync().ConfigureAwait(false);
         }
         else if (CurlAiHelpText.TryGetMarkdown(subject, out string markdown))

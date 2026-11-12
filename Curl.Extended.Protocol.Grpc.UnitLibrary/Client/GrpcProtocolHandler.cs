@@ -155,10 +155,11 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
             written += json.Length;
         }
 
+        TransferReport report = result.Report with { DownloadSize = written };
         GrpcStatus status = result.Status;
         return status.Code == GrpcStatusCode.Ok
-            ? TransferResult.Success(written)
-            : TransferResult.Failure(CurlExitCode.HttpReturnedError, $"grpc-status {(int)status.Code} ({status.CodeName}): {status.Message}", written);
+            ? TransferResult.Success(written) with { Report = report }
+            : TransferResult.Failure(CurlExitCode.HttpReturnedError, $"grpc-status {(int)status.Code} ({status.CodeName}): {status.Message}", written) with { Report = report };
     }
 
     // A grpcs:// target carries PoolScheme https, the one scheme whose TLS handshake offers the

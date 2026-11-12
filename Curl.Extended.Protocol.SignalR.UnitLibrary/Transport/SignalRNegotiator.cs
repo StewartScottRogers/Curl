@@ -9,7 +9,10 @@ namespace Curl.Extended.Protocol.SignalR.Transport;
 /// token, and give the WebSocket URL of the connection the server opened.
 /// </summary>
 /// <param name="openConnection">Opens a connection to the host and port of a URL; each exchange has its own, disposed after it.</param>
-internal sealed class SignalRNegotiator(Func<Uri, CancellationToken, ValueTask<IConnection>> openConnection)
+/// <param name="requestFields">The fields curl's options add to each request, or <see langword="null"/> for none.</param>
+internal sealed class SignalRNegotiator(
+    Func<Uri, CancellationToken, ValueTask<IConnection>> openConnection,
+    IReadOnlyList<KeyValuePair<string, string>>? requestFields = null)
 {
     /// <summary>Negotiates with the endpoint at <paramref name="endpointUrl"/>.</summary>
     /// <exception cref="SignalRTransportException">
@@ -50,7 +53,7 @@ internal sealed class SignalRNegotiator(Func<Uri, CancellationToken, ValueTask<I
         byte[] request = HttpRequestWriter.Write(
             "POST",
             negotiateUrl,
-            [.. HttpRequestWriter.BearerAuthorization(accessToken), new("Content-Length", "0")]);
+            HttpRequestWriter.Combine([new("Content-Length", "0")], requestFields, accessToken));
         await connection.WriteAsync(request, cancellationToken);
         await connection.FlushAsync(cancellationToken);
 

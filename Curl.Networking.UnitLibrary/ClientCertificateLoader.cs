@@ -103,7 +103,7 @@ internal static class ClientCertificateLoader
     /// refused once the file is found.
     /// </param>
     /// <param name="certificateStore">Opens the store a store path names.</param>
-    /// <returns>The certificate from a store with its key, or the exit 58 or exit 35 failure.</returns>
+    /// <returns>The certificate from a store or a PKCS#12 file with its key, or the exit 58 failure.</returns>
     public static (X509Certificate2? Certificate, ConnectResult? Failure) LoadAsSchannelBuild(
         string path,
         string? passphrase,
@@ -144,12 +144,7 @@ internal static class ClientCertificateLoader
         string? passphrase,
         string? certificateType)
     {
-        byte[] contents;
-        try
-        {
-            contents = File.ReadAllBytes(path);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        if (ReadFileOrNothing(path) is not { } contents)
         {
             return Failed(TlsFailureMessages.SchannelClientCertificateNotFound(path));
         }
@@ -171,16 +166,28 @@ internal static class ClientCertificateLoader
 
         try
         {
-            X509CertificateLoader.LoadPkcs12(contents, passphrase, Pkcs12KeyStorage).Dispose();
+            // Schannel curl imports the file and presents its certificate and key (ADR-1240,
+            // measured with curl 8.22.0 Schannel on 2026-11-11).
+            return (X509CertificateLoader.LoadPkcs12(contents, passphrase, Pkcs12KeyStorage), null);
         }
         catch (CryptographicException)
         {
             return Failed(TlsFailureMessages.SchannelClientCertificatePasswordBad(path));
         }
+    }
 
-        // Schannel curl imports the file into an ephemeral key set and AcquireCredentialsHandle
-        // then refuses it, before any ClientHello is sent (ADR-0794, ADR-1187).
-        return (null, ConnectResult.Failed(CurlExitCode.SslConnectError, TlsFailureMessages.SchannelClientCertificateCredentialsUnknown));
+    // The file's bytes, or null when it cannot be read: missing, a directory, refused, or a
+    // path the platform does not accept.
+    private static byte[]? ReadFileOrNothing(string path)
+    {
+        try
+        {
+            return File.ReadAllBytes(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

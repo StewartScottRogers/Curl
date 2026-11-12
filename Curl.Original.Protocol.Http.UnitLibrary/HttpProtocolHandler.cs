@@ -1440,7 +1440,7 @@ public sealed class HttpProtocolHandler(
             ThrowIfChunkedResendToHttp10(plan);
             ThrowIfAuthorizationFailed(plan);
             exchange.RequestReady = context.TimeProvider.GetTimestamp();
-            bool bodyLeftUnsent = await SendBodyAsync(context, framing, responseConnection, upload, cancellationToken).ConfigureAwait(false);
+            (bool bodyLeftUnsent, HttpTransferException? sendFailedAfter2xx) = await SendBodyBefore2xxAsync(context, framing, responseConnection, upload, headReader, cancellationToken).ConfigureAwait(false);
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
             exchangeLog.RequestSent(framing.Method, context.Url.AbsolutePath, request);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
@@ -1475,6 +1475,7 @@ public sealed class HttpProtocolHandler(
             headReader.ReportHeldLines();
             await ReadBodyAsync(plan, actedOn, body, TrailerStreamOf(requestStream, connection), delivery, ignoresBody, cancellationToken).ConfigureAwait(false);
             await upload.WriteRestAfterResponseAsync(cancellationToken).ConfigureAwait(false);
+            ThrowIfSendFailedUnlessClosing(sendFailedAfter2xx, actedOn);
             ThrowIfFailing(fail, HttpFailMode.FailWithBody, actedOn);
         }
         catch (HttpTransferException failure)
@@ -3351,6 +3352,48 @@ public sealed class HttpProtocolHandler(
         options.Compressed && !options.PassesContentCoding;
 
     /// <summary>
+    /// Sends the request body as <see cref="SendBodyAsync" /> does, and holds a send failure after a
+    /// final 2xx answered the wait for <c>100 Continue</c> instead of throwing it, so that response is
+    /// read and delivered first, as curl 8.22.0 does (measured, BL-4909).
+    /// </summary>
+    /// <returns>
+    /// Whether the body was left unsent, as <see cref="SendBodyAsync" /> gives it, and the send
+    /// failure held, or <see langword="null" /> for none.
+    /// </returns>
+    private static async ValueTask<(bool BodyLeftUnsent, HttpTransferException? SendFailedAfter2xx)> SendBodyBefore2xxAsync(
+        ITransferContext context,
+        HttpRequestFraming framing,
+        IConnection responseConnection,
+        HttpRequestBodyWriter upload,
+        HttpResponseHeadReader headReader,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return (await SendBodyAsync(context, framing, responseConnection, upload, headReader, cancellationToken).ConfigureAwait(false), null);
+        }
+        catch (HttpTransferException failure) when (failure.ExitCode == CurlExitCode.SendError && responseConnection is HttpContinueWaitConnection { AnsweredWithFinal2xx: true })
+        {
+            return (false, failure);
+        }
+    }
+
+    /// <summary>
+    /// Throws the send failure <see cref="SendBodyBefore2xxAsync" /> held once the 2xx that answered
+    /// the wait for <c>100 Continue</c> has been delivered, unless that response names
+    /// <c>Connection: close</c>: curl 8.22.0 then ends the transfer with the response, exit 0, and
+    /// otherwise reports <c>Send failure</c>, exit 55, after it (measured, BL-4909).
+    /// </summary>
+    /// <exception cref="HttpTransferException"><paramref name="sendFailedAfter2xx" />, when the response does not close the connection.</exception>
+    private static void ThrowIfSendFailedUnlessClosing(HttpTransferException? sendFailedAfter2xx, HttpResponseHead actedOn)
+    {
+        if (sendFailedAfter2xx is not null && !HttpConnectionPersistence.NamesConnectionClose(actedOn))
+        {
+            throw sendFailedAfter2xx;
+        }
+    }
+
+    /// <summary>
     /// Sends the request head and body, if there is one: the head alone when there is no body
     /// or the request waits for <c>100 Continue</c>, and else with the body's first read, so a
     /// body whose first read fails sends nothing (measured, BL-184 Notes); the body at once, or
@@ -3366,6 +3409,7 @@ public sealed class HttpProtocolHandler(
         HttpRequestFraming framing,
         IConnection responseConnection,
         HttpRequestBodyWriter upload,
+        HttpResponseHeadReader headReader,
         CancellationToken cancellationToken)
     {
         if (framing.Body is not { } requestBody)
@@ -3383,6 +3427,10 @@ public sealed class HttpProtocolHandler(
             }
 
             ReportContinueWaitRanOut(context.Events, waiting);
+            if (waiting.AnsweredWithInformational)
+            {
+                await headReader.ReadInterimHeadAsync(cancellationToken).ConfigureAwait(false);
+            }
         }
 
         await upload.WriteAsync(requestBody, framing.IsChunked, cancellationToken).ConfigureAwait(false);
