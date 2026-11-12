@@ -2774,17 +2774,40 @@ internal sealed class CurlCommandRunner(
             return (etagFailure, givenUrl, transferUrl);
         }
 
+        (TransferResult result, string finalUrl) = await TransferAfterSetupAsync(dispatch, options, transfer, givenUrl, transferUrl, uploadFile).ConfigureAwait(false);
+        return (result, givenUrl, finalUrl);
+    }
+
+    /// <summary>
+    /// Runs the part of one transfer that follows the URL's checks: the transfer events, the setopt check, the
+    /// <c>-b</c> files, the alt-svc cache and HSTS, then the transfer itself.
+    /// </summary>
+    /// <param name="dispatch">The option group's dispatch.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="givenUrl">The URL as given, after any IPFS rewrite.</param>
+    /// <param name="transferUrl">The URL to transfer.</param>
+    /// <param name="uploadFile">The <c>-T</c> file, or <see langword="null" />.</param>
+    /// <returns>The transfer's result and the URL transferred, after any HSTS switch.</returns>
+    private async Task<(TransferResult Result, string TransferUrl)> TransferAfterSetupAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        string givenUrl,
+        string transferUrl,
+        string? uploadFile)
+    {
         ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(options, transfer);
         if (TransferPerformer.RefuseMalformedSetopt(EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TransferSettingsOf(options), eventsBeforeConnecting) is { } setoptFailure)
         {
-            return (setoptFailure, givenUrl, transferUrl);
+            return (setoptFailure, transferUrl);
         }
 
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
         TraceTransferStart(options, eventsBeforeConnecting);
         if (await transferPerformer.LoadCookieFilesAsync(dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), transferUrl, fileSystem, standardInput, eventsBeforeConnecting).ConfigureAwait(false) is { } cookieFileFailure)
         {
-            return (cookieFileFailure, givenUrl, transferUrl);
+            return (cookieFileFailure, transferUrl);
         }
 
         EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
@@ -2794,7 +2817,7 @@ internal sealed class CurlCommandRunner(
         Running.RequestUrl = WriteOutRequestUrl(options, transferUrl, givenUrl);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
-        return (result, givenUrl, transferUrl);
+        return (result, transferUrl);
     }
 
     /// <summary>
@@ -5384,16 +5407,28 @@ internal sealed class CurlCommandRunner(
                 return await RefuseRemoteNameExtractionAsync(options, RemoteNameUrlMalformedFailure).ConfigureAwait(false);
             }
 
-            TransferResult completed = await output.CompleteAsync(fileResult).ConfigureAwait(false);
-            Running.SucceededBeforeOutputFileCreationFailed = fileResult.IsSuccess && !completed.IsSuccess;
-
-            if (!options.Silent && output.OpenFailureWarning is { } warning)
-            {
-                await WriteOrHoldOutputFileOpenWarningAsync(warning).ConfigureAwait(false);
-            }
-
-            return completed;
+            return await CompleteOutputFileAsync(options, output, fileResult).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Completes an <c>-o</c> file after its transfer and prints or holds its open-failure warning.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="output">The deferred output file.</param>
+    /// <param name="fileResult">The transfer's result.</param>
+    /// <returns>The result after the file is completed.</returns>
+    private async Task<TransferResult> CompleteOutputFileAsync(CommandLineOptions options, DeferredOutputFileStream output, TransferResult fileResult)
+    {
+        TransferResult completed = await output.CompleteAsync(fileResult).ConfigureAwait(false);
+        Running.SucceededBeforeOutputFileCreationFailed = fileResult.IsSuccess && !completed.IsSuccess;
+
+        if (!options.Silent && output.OpenFailureWarning is { } warning)
+        {
+            await WriteOrHoldOutputFileOpenWarningAsync(warning).ConfigureAwait(false);
+        }
+
+        return completed;
     }
 
     /// <summary>
