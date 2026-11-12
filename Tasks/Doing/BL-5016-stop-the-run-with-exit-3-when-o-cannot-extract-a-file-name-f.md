@@ -31,12 +31,12 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A new test file `Curl.Console.UnitTests/CurlCommandRunnerRemoteNameExtractionFailureTests.cs` (using the existing runner test harness and fake connections) asserts that `-O "http://host/f/a b" -O http://host/f/good.txt` writes `curl: Failed to extract a filename from the URL to use for storage` then `curl: (3) URL using bad/illegal format or missing URL`, returns exit 3, makes no request for the second URL and writes no file.
-- [ ] The same assertions hold for `--remote-name-all` with two URLs and for a single `-O "http://host/f/a b"`.
-- [ ] `-O "foo://x/z" -O http://host/f/good.txt` prints the "Failed to extract" line then `curl: (1) Unsupported protocol` and returns exit 1 without fetching the second URL.
-- [ ] A `-OJ` response with `Content-Disposition: attachment; filename=" "` gives the "Failed to extract" line, the `(3)` line and exit 3.
-- [ ] Regression: `-O http://host/f/good.txt` and `-O` with several valid URLs still save each file and exit 0.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test file `Curl.Console.UnitTests/CurlCommandRunnerRemoteNameExtractionFailureTests.cs` (using the existing runner test harness and fake connections) asserts that `-O "http://host/f/a b" -O http://host/f/good.txt` writes `curl: Failed to extract a filename from the URL to use for storage` then `curl: (3) URL using bad/illegal format or missing URL`, returns exit 3, makes no request for the second URL and writes no file.
+- [x] The same assertions hold for `--remote-name-all` with two URLs and for a single `-O "http://host/f/a b"`.
+- [x] `-O "foo://x/z" -O http://host/f/good.txt` prints the "Failed to extract" line then `curl: (1) Unsupported protocol` and returns exit 1 without fetching the second URL.
+- [ ] (moved to BL-5051) A `-OJ` response with `Content-Disposition: attachment; filename=" "` gives the "Failed to extract" line, the `(3)` line and exit 3.
+- [x] Regression: `-O http://host/f/good.txt` and `-O` with several valid URLs still save each file and exit 0.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -46,3 +46,5 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 70e0cc6f 55de1741 3cbc98af 588824dd 3d46f9a9 a0b49a29.
+
+Notes (lane 8): `TransferUrlAsync` now calls `RemoteNameExtractionFailureOf` after the scheme guess: with `-O`/`--remote-name-all` and no `-o`, a URL the parser rejects prints the "Failed to extract" line then `(3) URL using bad/illegal format or missing URL`, and a parsed URL with an unsupported scheme prints it then `(1) Unsupported protocol`; both are run-ending (`RunEndingFailures`), so later URLs are not fetched. Neither line prints under `-s` without `-S`. The `-OJ` `filename=" "` criterion lives in `RemoteHeaderNameStream`/`ContentDispositionFileName`, outside this task's `touches`: filed as BL-5051. Fast tests for Curl.Console.UnitTests are green; Measure-CodeQuality.ps1 was not run (Curl.Console only gained two short, covered methods, no branches past complexity 10).

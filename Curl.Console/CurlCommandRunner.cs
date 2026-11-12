@@ -604,6 +604,20 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol");
 
     /// <summary>
+    /// The result of <c>-O</c> on a URL the URL API rejects: exit 3 after the "Failed to extract" line,
+    /// ending the run (BL-5016).
+    /// </summary>
+    private static readonly TransferResult RemoteNameUrlMalformedFailure =
+        TransferResult.Failure(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL");
+
+    /// <summary>
+    /// The result of <c>-O</c> on a URL whose scheme the URL API does not support: exit 1 after the
+    /// "Failed to extract" line, ending the run (BL-5016).
+    /// </summary>
+    private static readonly TransferResult RemoteNameUnsupportedSchemeFailure =
+        TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol");
+
+    /// <summary>
     /// The line curl 8.21.0 prints when <c>-G</c> or <c>--url-query</c> asks for a query on an
     /// <c>ipfs://</c> or <c>ipns://</c> URL (measured 2026-10-26, CGR-161, BL-3690 Notes).
     /// </summary>
@@ -2744,6 +2758,11 @@ internal sealed class CurlCommandRunner(
             return (UploadUrlMalformedFailure, givenUrl, transferUrl);
         }
 
+        if (RemoteNameExtractionFailureOf(options, transfer, transferUrl) is { } extractionFailure)
+        {
+            return (await RefuseRemoteNameExtractionAsync(options, extractionFailure).ConfigureAwait(false), givenUrl, transferUrl);
+        }
+
         if (await PrepareEtagFilesAsync(options).ConfigureAwait(false) is { } etagFailure)
         {
             return (etagFailure, givenUrl, transferUrl);
@@ -3000,6 +3019,50 @@ internal sealed class CurlCommandRunner(
         }
 
         return IpfsRemoteNameFailure;
+    }
+
+    /// <summary>
+    /// Tells which failure ends the run when <c>-O</c> or <c>--remote-name-all</c> cannot take a file
+    /// name from the URL: curl's tool asks the URL API for the path before it names the file, so a URL
+    /// the API rejects ends the run with exit 3 and one whose scheme it does not support with exit 1.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="transferUrl">The URL, with its guessed scheme.</param>
+    /// <returns>
+    /// <see cref="RemoteNameUrlMalformedFailure" />, <see cref="RemoteNameUnsupportedSchemeFailure" />, or
+    /// <see langword="null" /> when the transfer names no remote file or its name can be taken.
+    /// </returns>
+    private static TransferResult? RemoteNameExtractionFailureOf(CommandLineOptions options, UrlTransfer transfer, string transferUrl)
+    {
+        if (transfer.OutputFileName is not null || !transfer.UsesRemoteName)
+        {
+            return null;
+        }
+
+        if (!TransferPerformer.TryParseTransferUrl(QueryUrl.Append(transferUrl, options), options.DisallowUsernameInUrl, QueryUrl.KeepsPathAsIs(options), out CurlUrl? parsed, out _))
+        {
+            return RemoteNameUrlMalformedFailure;
+        }
+
+        return UrlHandleParts.IsSupportedScheme(parsed.Scheme) ? null : RemoteNameUnsupportedSchemeFailure;
+    }
+
+    /// <summary>
+    /// Prints curl's <see cref="IpfsRemoteNameMessage" /> line unless <c>-s</c> was given without
+    /// <c>-S</c>; the <c>curl: (N)</c> line follows as any failure's does.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="failure">The failure that ends the run.</param>
+    /// <returns><paramref name="failure" />.</returns>
+    private async Task<TransferResult> RefuseRemoteNameExtractionAsync(CommandLineOptions options, TransferResult failure)
+    {
+        if (ShowsErrors(options))
+        {
+            await WriteErrorLineAsync("curl: " + IpfsRemoteNameMessage).ConfigureAwait(false);
+        }
+
+        return failure;
     }
 
     /// <summary>
@@ -3764,6 +3827,8 @@ internal sealed class CurlCommandRunner(
         IpfsMalformedGatewayOptionFailure,
         IpfsMalformedTargetUrlFailure,
         IpfsRemoteNameFailure,
+        RemoteNameUrlMalformedFailure,
+        RemoteNameUnsupportedSchemeFailure,
         IpfsQueryFailure,
         TransferPerformer.InterfaceSetoptFailure,
         TransferPerformer.EchSetoptFailure,
