@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.VerifyChain.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5009 — Refuse a server certificate whose keyUsage forbids TLS server use on the OpenSSL profile
 
@@ -35,10 +35,10 @@ Where to start: `Curl.Networking.UnitLibrary/ServerCertificateVerification.cs`, 
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.VerifyChain.cs` (leaf with `keyUsage=keyCertSign` only, OpenSSL profile) shows exit `CurlExitCode.PeerFailedVerification` (60) with `SSL certificate OpenSSL verify result: unsuitable certificate purpose (26)`.
-- [ ] A test with the Schannel profile and the same leaf shows it is still accepted (as REF 8.22.0 Schannel does).
-- [ ] Regression: an OpenSSL-profile leaf with no keyUsage extension, and one with digitalSignature (and one with keyEncipherment), is still accepted.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A unit test in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.VerifyChain.cs` (leaf with `keyUsage=keyCertSign` only, OpenSSL profile) shows exit `CurlExitCode.PeerFailedVerification` (60) with `SSL certificate OpenSSL verify result: unsuitable certificate purpose (26)`.
+- [x] A test with the Schannel profile and the same leaf shows it is still accepted (as REF 8.22.0 Schannel does).
+- [x] Regression: an OpenSSL-profile leaf with no keyUsage extension, and one with digitalSignature (and one with keyEncipherment), is still accepted.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -48,3 +48,6 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 455cd545 73faea11 df445898 a0b49a29.
+
+Notes (2026-11-12): Added `OpenSslKeyUsageRefusal` (leaf keyUsage present and neither digitalSignature nor keyEncipherment); `WithNameMismatchOpenSslFinds` adds chain errors for it on the OpenSSL profile only and `TlsFailureMessages.OpenSslVerifyError` names it `unsuitable certificate purpose (26)`. Tests added in the VerifyChain test file; Networking fast tests green (4061 passed). Measure-CodeQuality.ps1 could not finish: an unrelated failure in Curl.Conformance.Extended.UnitTests (RequirementMatrixTests: McpClient Curl-ConnectionReset-1 has no [SpecRequirement] test, from commit 0210afd29), not touched here. New code branches are all exercised by the new tests. Linux/macOS: driven via the matchesSchannelBuild flag, platform-neutral.
+- 2026-11-12: Doing -> Done. OpenSSL profile refuses a leaf whose keyUsage forbids TLS server use (exit 60, purpose 26); Schannel unchanged

@@ -862,7 +862,7 @@ internal static class TlsFailureMessages
         }
 
         var status = ChainStatus(chain);
-        if (status.HasFlag(X509ChainStatusFlags.NotValidForUsage))
+        if (status.HasFlag(X509ChainStatusFlags.NotValidForUsage) || OpenSslKeyUsageRefusal.ForbidsServerUse(chain.ChainElements[0].Certificate))
         {
             return "unsuitable certificate purpose (26)";
         }

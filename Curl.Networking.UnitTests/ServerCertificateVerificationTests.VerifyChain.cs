@@ -183,6 +183,43 @@ public sealed class ServerCertificateVerificationVerifyChainTests
         Assert.IsTrue(verdict.IsAccepted);
     }
 
+    [TestMethod]
+    public void Verify_KeyCertSignOnlyLeafInTheOpenSslBuild_ReportsUnsuitableCertificatePurposeWithExit60()
+    {
+        using var issued = IssuedChain.Create(keyUsage: X509KeyUsageFlags.KeyCertSign);
+
+        var verdict = HandBuiltVerdict(issued, matchesSchannelBuild: false);
+
+        Diagnostics.Act("rejection", verdict.Rejection);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, RejectionOf(verdict).ExitCode);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: unsuitable certificate purpose (26)", RejectionOf(verdict).Message);
+    }
+
+    [TestMethod]
+    public void Verify_KeyCertSignOnlyLeafInTheSchannelBuild_IsAccepted()
+    {
+        using var issued = IssuedChain.Create(keyUsage: X509KeyUsageFlags.KeyCertSign);
+
+        var verdict = HandBuiltVerdict(issued, matchesSchannelBuild: true);
+
+        Diagnostics.Act("rejection", verdict.Rejection);
+        Assert.IsTrue(verdict.IsAccepted);
+    }
+
+    [TestMethod]
+    [DataRow(null)]
+    [DataRow(X509KeyUsageFlags.DigitalSignature)]
+    [DataRow(X509KeyUsageFlags.KeyEncipherment)]
+    public void Verify_LeafWithNoKeyUsageOrOneForServerUseInTheOpenSslBuild_IsAccepted(X509KeyUsageFlags? keyUsage)
+    {
+        using var issued = IssuedChain.Create(keyUsage: keyUsage);
+
+        var verdict = HandBuiltVerdict(issued, matchesSchannelBuild: false);
+
+        Diagnostics.Act("rejection", verdict.Rejection);
+        Assert.IsTrue(verdict.IsAccepted);
+    }
+
     private static (CurlExitCode ExitCode, string Message) RejectionOf(ServerCertificateVerdict verdict) =>
         ((CurlExitCode ExitCode, string Message))verdict.Rejection!;
 
@@ -211,7 +248,7 @@ public sealed class ServerCertificateVerificationVerifyChainTests
 
         public X509Certificate2 Leaf { get; }
 
-        public static IssuedChain Create(string? usage = "1.3.6.1.5.5.7.3.1")
+        public static IssuedChain Create(string? usage = "1.3.6.1.5.5.7.3.1", X509KeyUsageFlags? keyUsage = X509KeyUsageFlags.DigitalSignature)
         {
             var now = DateTimeOffset.UtcNow;
             using var caKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -227,7 +264,11 @@ public sealed class ServerCertificateVerificationVerifyChainTests
             names.AddDnsName(Host);
             leafRequest.CertificateExtensions.Add(names.Build());
             leafRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
-            leafRequest.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
+            if (keyUsage is { } flags)
+            {
+                leafRequest.CertificateExtensions.Add(new X509KeyUsageExtension(flags, true));
+            }
+
             if (usage is not null)
             {
                 leafRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid(usage)], false));

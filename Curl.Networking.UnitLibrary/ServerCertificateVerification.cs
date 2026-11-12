@@ -549,11 +549,23 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
     // curl's OpenSSL build never matches a host name by the common name of a certificate
     // whose subjectAltName holds only IP addresses, which .NET on Windows does (BL-460).
-    private static SslPolicyErrors WithNameMismatchOpenSslFinds(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
-        chain is { ChainElements.Count: > 0 }
-        && OpenSslCommonNameRefusal.RefusesHostName(chain.ChainElements[0].Certificate, targetHost)
+    private static SslPolicyErrors WithNameMismatchOpenSslFinds(SslPolicyErrors errors, X509Chain? chain, string targetHost)
+    {
+        if (chain is not { ChainElements.Count: > 0 })
+        {
+            return errors;
+        }
+
+        var leaf = chain.ChainElements[0].Certificate;
+        if (OpenSslKeyUsageRefusal.ForbidsServerUse(leaf))
+        {
+            errors |= SslPolicyErrors.RemoteCertificateChainErrors;
+        }
+
+        return OpenSslCommonNameRefusal.RefusesHostName(leaf, targetHost)
             ? errors | SslPolicyErrors.RemoteCertificateNameMismatch
             : errors;
+    }
 
     // With --cacert curl's Schannel build checks the name itself and, for a certificate
     // with no DNS subjectAltName, matches the common name, which .NET's check does not
