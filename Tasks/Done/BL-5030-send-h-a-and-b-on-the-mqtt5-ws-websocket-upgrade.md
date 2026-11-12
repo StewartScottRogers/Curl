@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Mqtt5.UnitLibrary/WebSocket/Mqtt5WebSocketUpgrade.cs, Curl.Extended.Protocol.Mqtt5.UnitTests/WebSocket/Mqtt5WebSocketUpgradeTests.cs, Documentation/Conformance/Extended/Mqtt5-Transports.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5030 — Send -H, -A and -b on the mqtt5+ws WebSocket upgrade
 
@@ -32,13 +32,15 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Extended.Protocol.Mqtt5.UnitTests/WebSocket/Mqtt5WebSocketUpgradeTests.cs` assert the captured GET contains `User-Agent: agentX`, `Authorization: Bearer abc` and `Cookie: c=1` for `-A agentX -H "Authorization: Bearer abc" -b c=1`.
-- [ ] A test asserts that with no `-A` the default curl User-Agent is sent, as `ws://` does.
-- [ ] Regression: `Host`, `Upgrade`, `Connection`, `Sec-WebSocket-Key`, `Sec-WebSocket-Version` and `Sec-WebSocket-Protocol: mqtt` are still sent exactly once each, and a refused upgrade still exits 22 with `Refused WebSocket upgrade: 403`.
-- [ ] `Documentation/Conformance/Extended/Mqtt5-Transports.md` gains a row stating the upgrade carries `-H`, `-A` and `-b`, its "Covered by" naming the new tests.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Tests in `Curl.Extended.Protocol.Mqtt5.UnitTests/WebSocket/Mqtt5WebSocketUpgradeTests.cs` assert the captured GET contains `User-Agent: agentX`, `Authorization: Bearer abc` and `Cookie: c=1` for `-A agentX -H "Authorization: Bearer abc" -b c=1`.
+- [x] A test asserts that with no `-A` the default curl User-Agent is sent, as `ws://` does.
+- [x] Regression: `Host`, `Upgrade`, `Connection`, `Sec-WebSocket-Key`, `Sec-WebSocket-Version` and `Sec-WebSocket-Protocol: mqtt` are still sent exactly once each, and a refused upgrade still exits 22 with `Refused WebSocket upgrade: 403`.
+- [x] `Documentation/Conformance/Extended/Mqtt5-Transports.md` gains a row stating the upgrade carries `-H`, `-A` and `-b`, its "Covered by" naming the new tests.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Done: `Mqtt5WebSocketUpgrade.Request` now takes the transfer context and sends Authorization (Bearer, else Basic), User-Agent (curl default `curl/8.22.0` as socketio), Cookie, then each `-H`; a `-H` naming a field the upgrade sets (Host, Upgrade...) replaces or removes it so it is still sent once, as curl does. Logic is copied (not shared) because the Mqtt5 library may not reference SocketIo. Quality run: 100% line and branch, 0 failing. CI on Linux and macOS: tests are platform-neutral.
 
 - Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). The unit tests use the existing `Curl.Extended.Protocol.Mqtt5.UnitTests/WebSocket` stand-ins.
 - Review acceptance check: the captured GET contains `User-Agent: agentX`, `Authorization: Bearer abc` and `Cookie: c=1`.
@@ -47,3 +49,4 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 67c358bd 1506b1f6 1768b93d b8619031 a0b49a29.
+- 2026-11-12: Doing -> Done. mqtt5+ws upgrade sends -H, -A, -b

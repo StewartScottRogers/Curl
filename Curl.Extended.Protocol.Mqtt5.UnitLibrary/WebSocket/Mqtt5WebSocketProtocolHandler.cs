@@ -93,7 +93,7 @@ public sealed class Mqtt5WebSocketProtocolHandler : IProtocolHandler
     private async ValueTask<Mqtt5WebSocketConnection> UpgradeAsync(ITransferContext context, IConnection connection)
     {
         string key = Mqtt5WebSocketUpgrade.NewKey(randomSource);
-        await Mqtt5WebSocketUpgrade.SendRequestAsync(connection, Mqtt5WebSocketUpgrade.Request(context.Url, key), context.CancellationToken).ConfigureAwait(false);
+        await Mqtt5WebSocketUpgrade.SendRequestAsync(connection, Mqtt5WebSocketUpgrade.Request(context.Url, key, context), context.CancellationToken).ConfigureAwait(false);
         ReadOnlyMemory<byte> received = await Mqtt5WebSocketUpgrade.ReadReplyAsync(connection, key, context.CancellationToken).ConfigureAwait(false);
         return new Mqtt5WebSocketConnection(connection, randomSource, received);
     }
