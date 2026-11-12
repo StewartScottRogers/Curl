@@ -36,7 +36,8 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
         S3Operations operations = new(new S3Client(connector, context, configuration, endpoint, headReporter), endpoint, bucket, partSize, context.CancellationToken);
         try
         {
-            return TransferResult.Success(await TransferAsync(operations, context, KeyOf(context.Url))) with { Report = headReporter.Report };
+            long bytes = await TransferAsync(operations, context, KeyOf(context.Url));
+            return TransferResult.Success(bytes) with { Report = headReporter.Report?.WithDownloadSize(bytes) };
         }
         catch (S3TransferException failure)
         {

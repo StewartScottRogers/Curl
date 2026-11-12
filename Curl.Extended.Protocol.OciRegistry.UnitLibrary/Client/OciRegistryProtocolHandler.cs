@@ -56,7 +56,7 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
                 ? await PushAsync(context, session, reference, upload)
                 : await PullAsync(context, session, reference);
             await context.Output.WriteAsync(body, context.CancellationToken);
-            return TransferResult.Success(body.Length) with { Report = headReporter.Report };
+            return TransferResult.Success(body.Length) with { Report = headReporter.Report?.WithDownloadSize(body.Length) };
         }
         catch (OciTransferException failure)
         {

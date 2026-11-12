@@ -38,7 +38,8 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
             Task<long> transfer = context.Url.Scheme == "az"
                 ? new AzureBlobOperations(client, blockSize, maxBlockCount).TransferAsync(endpoint, context.Upload, context.Output)
                 : new AzureDataLakeOperations(client, blockSize).TransferAsync(endpoint, context.Upload, context.Output);
-            return TransferResult.Success(await transfer) with { Report = headReporter.Report };
+            long bytes = await transfer;
+            return TransferResult.Success(bytes) with { Report = headReporter.Report?.WithDownloadSize(bytes) };
         }
         catch (AzureStorageRequestException failure)
         {

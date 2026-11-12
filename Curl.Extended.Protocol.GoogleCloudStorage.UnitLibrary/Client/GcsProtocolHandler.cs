@@ -38,7 +38,8 @@ internal sealed class GcsProtocolHandler(IConnector connector, Func<string, stri
         GcsOperations operations = new(new GcsClient(connector, context, endpoint, BearerTokenOf(context), hmacKey, headReporter), context.Url.Host, context.CancellationToken);
         try
         {
-            return TransferResult.Success(await TransferAsync(operations, context, ObjectNameOf(context.Url))) with { Report = headReporter.Report };
+            long bytes = await TransferAsync(operations, context, ObjectNameOf(context.Url));
+            return TransferResult.Success(bytes) with { Report = headReporter.Report?.WithDownloadSize(bytes) };
         }
         catch (GcsTransferException failure)
         {
