@@ -47,6 +47,35 @@ public sealed class ImapProtocolHandlerSaslAuthErrorTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_OkBeforeTheNtlmTypeTwo_FailsWithLoginDeniedSendingNothingMore()
+    {
+        var sasl = new RankedSaslAuthenticator(("NTLM", Encoding.Latin1.GetBytes("T1"), [Encoding.Latin1.GetBytes("T3")]));
+
+        ImapRun run = await ImapRun.ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse(Url + "INBOX/;UID=1"), Output = Stream.Null, Credentials = new NetworkCredential("user", "secret") },
+            new ScriptedConnection(Encoding.Latin1.GetBytes(
+                "* OK ready\r\n* CAPABILITY IMAP4rev1 AUTH=NTLM\r\nA001 OK done\r\n+ \r\nA002 OK auth\r\n")),
+            sasl);
+
+        Report("NTLM OK before Type 2", "A001 CAPABILITY\r\nA002 AUTHENTICATE NTLM\r\nVDE=\r\n", run);
+        Assert.AreEqual("A001 CAPABILITY\r\nA002 AUTHENTICATE NTLM\r\nVDE=\r\n", run.Sent);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CompleteNtlmExchange_LogsIn()
+    {
+        var sasl = new RankedSaslAuthenticator(("NTLM", Encoding.Latin1.GetBytes("T1"), [Encoding.Latin1.GetBytes("T3")]));
+
+        ImapRun run = await ImapRun.ExecuteAsync(
+            new TransferContext { Url = CurlUrl.Parse(Url + "INBOX/;UID=1"), Output = Stream.Null, Credentials = new NetworkCredential("user", "secret") },
+            new ScriptedConnection(Encoding.Latin1.GetBytes(
+                "* OK ready\r\n* CAPABILITY IMAP4rev1 AUTH=NTLM\r\nA001 OK done\r\n+ \r\n+ VDI=\r\nA002 OK auth\r\n")),
+            sasl);
+
+        StringAssert.StartsWith(run.Sent, "A001 CAPABILITY\r\nA002 AUTHENTICATE NTLM\r\nVDE=\r\nVDM=\r\nA003 ");
+    }
+    [TestMethod]
     public async Task ExecuteAsync_ServerOffersSaslIrToAMechanismWithNoInitialResponse_SendsTheBareCommandAndAnswersTheChallenge()
     {
         var sasl = new RejectingSaslAuthenticator("DIGEST-MD5");
