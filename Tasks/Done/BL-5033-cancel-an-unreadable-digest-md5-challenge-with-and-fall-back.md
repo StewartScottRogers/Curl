@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary/SaslAuthenticator.cs, Curl.Original.Protocol.Smtp.UnitLibrary/SmtpSaslAuthentication.cs, Curl.Authentication.UnitTests/SaslDigestMd5Tests.cs, Curl.Original.Protocol.Smtp.UnitTests/SmtpProtocolHandlerSaslCancelTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5033 — Cancel an unreadable DIGEST-MD5 challenge with * and fall back to the next SASL mechanism
 
@@ -54,3 +54,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - Cause: in the Schannel (SSPI) build an empty DIGEST-MD5 challenge is curl's CURLE_BAD_CONTENT_ENCODING ("DIGEST-MD5 handshake failure (empty challenge message)"), which cancels with `*`; the port only had the exit 94 path for SSPI rejections. Fix: `SaslAuthenticator.BeginDigestMd5` answers null with a `CancelReason` for an empty challenge; `ChallengeSaslExchange` gained a settable `CancelReason`. The handler's existing cancel path then sends `*` and tries NTLM. A non-empty challenge SSPI rejects still fails with exit 94 (BL-781, unchanged). DIGEST-MD5 alone with an empty challenge ends "Authentication cancelled" (exit 67) through the existing cancel path; not re-measured against real curl here.
 - The criterion's QUIT after NTLM refusal: the handler sends none after a refused login (existing case (b) tests pin that), so the new test pins no QUIT; not widened.
 - Quality run for Curl.Authentication.UnitLibrary: 0 failing members. Fast tests green for Authentication and Smtp test projects. No POP3/IMAP follow-up filed (they share the SASL handler path untested here).
+- 2026-11-12: Doing -> Done. An empty DIGEST-MD5 challenge is cancelled with * and the next mechanism tried
