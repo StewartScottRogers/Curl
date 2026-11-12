@@ -44,15 +44,15 @@ public sealed class Cgr071Tests
     }
 
     [TestMethod]
-    [DataRow("gzip", "1F8B080000000000000AFFFFFFFFFFFFFFFFFFFF", DisplayName = "gzip: corrupt data read together")]
-    [DataRow("deflate", "000100FEFF4107", DisplayName = "deflate: raw block after decoded output")]
-    public void Decode_CorruptDeflateData_ThrowsTheGenericMessage(string coding, string hex)
+    [DataRow("gzip", "1F8B080000000000000AFFFFFFFFFFFFFFFFFFFF", "Error while processing content unencoding: invalid block type", DisplayName = "gzip: corrupt data read together")]
+    [DataRow("deflate", "000100FEFF4107", Generic, DisplayName = "deflate: raw block after decoded output")]
+    public void Decode_CorruptDeflateData_ThrowsZlibsText(string coding, string hex, string message)
     {
         byte[] encoded = Convert.FromHexString(hex);
 
         HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(() => DecodeInto([], coding, encoded, encoded.Length));
 
-        Assert.AreEqual(Generic, thrown.Message);
+        Assert.AreEqual(message, thrown.Message);
     }
 
     [TestMethod]
