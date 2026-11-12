@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.McpClient.UnitLibrary/Stdio, Curl.Extended.Protocol.McpClient.UnitLibrary/Client/McpStdioClientSession.cs, Curl.Extended.Protocol.McpClient.UnitTests/Stdio, Documentation/Conformance/Extended/McpClient-Stdio.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5010 — Refuse unsafe mcp+stdio arguments to a .cmd or .bat MCP server with exit 7
 
@@ -43,12 +43,12 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] Unit tests in `Curl.Extended.Protocol.McpClient.UnitTests/Stdio/McpBatchArgumentRefusalTests.cs` (new) prove that for a program ending in `.cmd` or `.bat` (any letter case), an argument holding each of `&`, `|`, `<`, `>`, `^`, `"`, `%` and a control character is refused before any process starts, and that the refusal surfaces as `CurlExitCode.CouldntConnect` (exit 7) with message `Failed to start the MCP server srv.cmd: ...`.
-- [ ] A test covers the repro arguments: `a&echo.>pwn_mcp1.txt`, `a"&echo.>pwn_mcp2.txt&"` and `%PATH%` are all refused for `srv.cmd`, including when the program is given as a path (`C:/t/mcpsrv/srv.cmd`).
-- [ ] Regression: arguments `plain` and `args` to `srv.cmd` are passed unchanged (the stand-in starter receives `["plain", "args"]`), and an unsafe argument to a non-batch program (for example `srv.exe` or `srv`) is passed unchanged, as before.
-- [ ] The isolation rule holds: `McpClient` has no reference to `Curl.Extended.Protocol.Plugin.*`, and `dotnet build Curl.Extended.Protocol.McpClient.UnitLibrary -warnaserror` is clean (the `VerifyExtensionIsolation` target passes).
-- [ ] `Documentation/Conformance/Extended/McpClient-Stdio.md` gains a MUST row (ID following the existing `McpClient:` scheme, naming ADR-1248) stating the refusal, exit 7 and message, each row's "Covered by" naming a test from this task; the mcp text of `--extended-help` states it if it describes stdio arguments.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Unit tests in `Curl.Extended.Protocol.McpClient.UnitTests/Stdio/McpBatchArgumentRefusalTests.cs` (new) prove that for a program ending in `.cmd` or `.bat` (any letter case), an argument holding each of `&`, `|`, `<`, `>`, `^`, `"`, `%` and a control character is refused before any process starts, and that the refusal surfaces as `CurlExitCode.CouldntConnect` (exit 7) with message `Failed to start the MCP server srv.cmd: ...`.
+- [x] A test covers the repro arguments: `a&echo.>pwn_mcp1.txt`, `a"&echo.>pwn_mcp2.txt&"` and `%PATH%` are all refused for `srv.cmd`, including when the program is given as a path (`C:/t/mcpsrv/srv.cmd`).
+- [x] Regression: arguments `plain` and `args` to `srv.cmd` are passed unchanged (the stand-in starter receives `["plain", "args"]`), and an unsafe argument to a non-batch program (for example `srv.exe` or `srv`) is passed unchanged, as before.
+- [x] The isolation rule holds: `McpClient` has no reference to `Curl.Extended.Protocol.Plugin.*`, and `dotnet build Curl.Extended.Protocol.McpClient.UnitLibrary -warnaserror` is clean (the `VerifyExtensionIsolation` target passes).
+- [x] `Documentation/Conformance/Extended/McpClient-Stdio.md` gains a MUST row (ID following the existing `McpClient:` scheme, naming ADR-1248) stating the refusal, exit 7 and message, each row's "Covered by" naming a test from this task; the mcp text of `--extended-help` states it if it describes stdio arguments.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -60,3 +60,5 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: ff5d2c89 1a5fe848 a7c84aa8 8482c63f 883bc44a a0b49a29.
+- 2026-11-12: Done. Refusal lives in new internal Stdio/McpBatchArgumentRefusal.cs (ADR-1248 character set, duplicated not shared because of extension isolation), called from McpStdioClientSession.Start before the starter so every starter is covered and the existing exit 7 path reports it. Quality run: 0 failing members. Build and fast tests green; platform-neutral tests.
+- 2026-11-12: Doing -> Done. Unsafe mcp+stdio arguments to .cmd/.bat refused with exit 7
