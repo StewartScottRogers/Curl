@@ -23,10 +23,10 @@ namespace Curl.Networking;
 /// stored for it is removed; <see langword="null" /> when none was.
 /// </param>
 /// <param name="missingCloseNotifyMessage">The message a read fails with when <c>close_notify</c> never came.</param>
-/// <param name="clearsTls">
-/// Whether <see cref="ClearTlsAsync" /> hands back <paramref name="plaintext" /> as curl's
-/// OpenSSL build clears TLS, or, <see langword="false" />, sends <c>close_notify</c> and fails
-/// as curl 8.21.0's Schannel build does (ADR-0280).
+/// <param name="matchesOpenSslBuild">
+/// Whether <see cref="ClearTlsAsync" /> clears TLS as curl's OpenSSL build does, sending
+/// <c>close_notify</c> first only when asked, or, <see langword="false" />, as curl 8.22.0's
+/// Schannel build does, always sending it first and writing its <c>schannel:</c> lines (ADR-1261).
 /// </param>
 internal sealed class SslStreamConnection(
     SslStream sslStream,
@@ -34,8 +34,24 @@ internal sealed class SslStreamConnection(
     IConnection plaintext,
     X509Certificate2? clientCertificate,
     string missingCloseNotifyMessage,
-    bool clearsTls) : IConnection
+    bool matchesOpenSslBuild) : IConnection
 {
+    /// <summary>The Schannel build's line once the server's <c>close_notify</c> has cleared TLS.</summary>
+    internal const string SchannelCloseNotifyReceivedLine = "schannel: server close notification received (close_notify)";
+
+    /// <summary>Gets the host name the handshake verified, which the Schannel build's shutting-down line names.</summary>
+    internal string PeerHostName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the Schannel build's line as it shuts TLS down for <c>CCC</c>, naming the host and the
+    /// server's port (0 when the connection has no IP end point).
+    /// </summary>
+    /// <param name="hostName">The host name the handshake verified.</param>
+    /// <param name="remoteEndPoint">The connection's remote end point.</param>
+    /// <returns>The line.</returns>
+    internal static string SchannelShutdownLine(string hostName, EndPoint? remoteEndPoint) =>
+        $"schannel: shutting down SSL/TLS connection with {hostName} port {(remoteEndPoint as IPEndPoint)?.Port ?? 0}";
+
     // Set once close_notify has been sent or TLS cleared, so disposing sends no second one.
     private bool _tlsEnded;
 
@@ -50,7 +66,8 @@ internal sealed class SslStreamConnection(
 
     /// <summary>
     /// Gets where each session ticket record <see cref="TicketRecords" /> counts is reported, as
-    /// a received <c>NewSessionTicket</c> <see cref="TlsMessageEvent" />, the handshake's events.
+    /// a received <c>NewSessionTicket</c> <see cref="TlsMessageEvent" />, the handshake's events;
+    /// the Schannel build's <c>CCC</c> lines are reported there too.
     /// </summary>
     internal ITransferEvents TicketEvents { get; init; } = NoTransferEvents.Instance;
 
@@ -134,20 +151,37 @@ internal sealed class SslStreamConnection(
     /// <remarks>
     /// Measured with <c>--ftp-ssl-ccc</c> (BL-636): curl's OpenSSL build sends
     /// <c>close_notify</c> first only in active mode, and in either mode goes on in plain text
-    /// once the server's has arrived; curl 8.21.0's Schannel build sends <c>close_notify</c> and
-    /// fails, whichever side goes first.
+    /// once the server's has arrived; curl 8.22.0's Schannel build writes its shutting-down line,
+    /// sends <c>close_notify</c> in either mode, and goes on in plain text once the server's has
+    /// arrived, writing its close-notification line (BL-4910, ADR-1261). Data or an end in place
+    /// of the server's <c>close_notify</c> fails it in both builds.
     /// </remarks>
     public async ValueTask<IConnection?> ClearTlsAsync(bool sendCloseNotifyFirst, CancellationToken cancellationToken)
     {
         _tlsEnded = true;
         try
         {
-            if (sendCloseNotifyFirst || !clearsTls)
+            if (!matchesOpenSslBuild)
+            {
+                TicketEvents.ReportInfo(SchannelShutdownLine(PeerHostName, plaintext.RemoteEndPoint));
+            }
+
+            if (sendCloseNotifyFirst || !matchesOpenSslBuild)
             {
                 await sslStream.ShutdownAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            return clearsTls && await ReadsCloseNotifyAsync(cancellationToken).ConfigureAwait(false) ? plaintext : null;
+            if (!await ReadsCloseNotifyAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return null;
+            }
+
+            if (!matchesOpenSslBuild)
+            {
+                TicketEvents.ReportInfo(SchannelCloseNotifyReceivedLine);
+            }
+
+            return plaintext;
         }
         catch (IOException)
         {

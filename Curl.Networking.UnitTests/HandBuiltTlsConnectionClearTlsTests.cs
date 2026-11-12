@@ -88,14 +88,32 @@ public sealed class HandBuiltTlsConnectionClearTlsTests
     [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
-    public Task ClearTlsAsync_OverTls12AsTheSchannelBuild_SendsCloseNotifyAndReturnsNull(bool sendCloseNotifyFirst) =>
+    public Task ClearTlsAsync_OverTls12AsTheSchannelBuildWhenTheServerEnds_SendsCloseNotifyAndReturnsNull(bool sendCloseNotifyFirst) =>
         AssertSchannelBuildSendsCloseNotifyAndReturnsNullAsync(SslProtocols.Tls12, sendCloseNotifyFirst);
+
+    [TestMethod]
+    public async Task ClearTlsAsync_PassiveOverTls12AsTheSchannelBuild_SendsCloseNotifyThenPlainText()
+    {
+        ArrangeClear(SslProtocols.Tls12, "Schannel", sendCloseNotifyFirst: false, "close_notify, then reads PWD and answers 257");
+
+        byte[] sent;
+        using (Diagnostics.Phase("handshake, clear TLS and PWD"))
+        {
+            sent = await ClearAndSendPwdAsync(SslProtocols.Tls12, sendCloseNotifyFirst: false, matchesSchannelBuild: true);
+        }
+
+        Diagnostics.Bytes("bytes the server read after its close_notify", sent);
+        Diagnostics.Assert("first record type", $"0x{CloseNotifyRecordType(SslProtocols.Tls12):x2}", $"0x{sent[0]:x2}");
+        Diagnostics.Diff("trailing plaintext", "PWD\r\n", Encoding.ASCII.GetString(sent[^5..]));
+        Assert.AreEqual(CloseNotifyRecordType(SslProtocols.Tls12), sent[0], "close_notify goes first even in passive mode.");
+        Assert.AreEqual("PWD\r\n", Encoding.ASCII.GetString(sent[^5..]));
+    }
 
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)]
     [DataRow(true)]
     [DataRow(false)]
-    public Task ClearTlsAsync_OverTls13AsTheSchannelBuild_SendsCloseNotifyAndReturnsNull(bool sendCloseNotifyFirst) =>
+    public Task ClearTlsAsync_OverTls13AsTheSchannelBuildWhenTheServerEnds_SendsCloseNotifyAndReturnsNull(bool sendCloseNotifyFirst) =>
         AssertSchannelBuildSendsCloseNotifyAndReturnsNullAsync(SslProtocols.Tls13, sendCloseNotifyFirst);
 
     [TestMethod]
@@ -159,6 +177,7 @@ public sealed class HandBuiltTlsConnectionClearTlsTests
             _ = await HandshakeAsync(server, protocol);
             var first = new byte[1];
             _ = await server.ReadAsync(first);
+            await server.DisposeAsync();
             return first[0];
         });
         ArrangeClear(protocol, "Schannel", sendCloseNotifyFirst, "reads the first byte the client sends");
@@ -239,7 +258,7 @@ public sealed class HandBuiltTlsConnectionClearTlsTests
     // Clears TLS matching the OpenSSL build, sends "PWD\r\n" over the plaintext connection
     // and reads the server's plain "257\r\n"; returns the raw bytes the server read after its
     // own close_notify.
-    private static async Task<byte[]> ClearAndSendPwdAsync(SslProtocols protocol, bool sendCloseNotifyFirst)
+    private static async Task<byte[]> ClearAndSendPwdAsync(SslProtocols protocol, bool sendCloseNotifyFirst, bool matchesSchannelBuild = false)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(async () =>
@@ -258,7 +277,7 @@ public sealed class HandBuiltTlsConnectionClearTlsTests
             await server.WriteAsync("257\r\n"u8.ToArray());
             return received.ToArray();
         });
-        await using var connection = await ConnectAsync(client, protocol, matchesSchannelBuild: false);
+        await using var connection = await ConnectAsync(client, protocol, matchesSchannelBuild);
 
         var plaintext = await connection.ClearTlsAsync(sendCloseNotifyFirst, CancellationToken.None);
         Assert.IsNotNull(plaintext);

@@ -59,7 +59,7 @@ public sealed class ConnectionSocketHandleTests
     {
         ScriptedConnection plaintext = Inner();
         using var sslStream = new SslStream(new MemoryStream());
-        var connection = new SslStreamConnection(sslStream, new ConnectionStream(plaintext), plaintext, null, string.Empty, clearsTls: false);
+        var connection = new SslStreamConnection(sslStream, new ConnectionStream(plaintext), plaintext, null, string.Empty, matchesOpenSslBuild: false);
 
         Assert.AreEqual(InnerHandle, connection.SocketHandle);
     }
@@ -67,7 +67,7 @@ public sealed class ConnectionSocketHandleTests
     [TestMethod]
     public void SocketHandle_OfAHandBuiltTlsConnection_IsThePlaintextConnections()
     {
-        var connection = new HandBuiltTlsConnection(new MemoryStream(), Inner(), null, string.Empty, clearsTls: false);
+        var connection = new HandBuiltTlsConnection(new MemoryStream(), Inner(), null, string.Empty, matchesOpenSslBuild: false);
 
         Assert.AreEqual(InnerHandle, connection.SocketHandle);
     }

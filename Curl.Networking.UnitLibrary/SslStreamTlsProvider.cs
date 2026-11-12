@@ -474,11 +474,12 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             NameRenegotiatedHandshake(transport.TicketRecords, handshake);
             ReportRevocationCheckIncomplete(events, peerVerification);
             return ConnectResult.Connected(
-                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild)
+                new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), matchesOpenSslBuild: !_matchesSchannelBuild)
                 {
                     MatchesSchannelBuild = _matchesSchannelBuild,
                     TicketRecords = FollowTicketRecordsAfterHandshake(transport, sslStream.SslProtocol),
                     TicketEvents = events,
+                    PeerHostName = targetHost,
                 },
                 new ConnectTimings(handshakeStarted, null, handshakeStarted, _timeProvider.GetTimestamp()),
                 peerCertificates: peerCertificates,

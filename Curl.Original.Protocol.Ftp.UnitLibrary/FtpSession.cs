@@ -770,11 +770,12 @@ internal sealed class FtpSession(
     /// Under <c>--ftp-ssl-ccc</c>, once <c>PBSZ</c> and <c>PROT</c> went out over TLS, sends
     /// <c>CCC</c>: a reply of 500 or more leaves the control connection in TLS, as curl 8.21.0
     /// ignores it; any other clears TLS, sending <c>close_notify</c> first only under
-    /// <c>--ftp-ssl-ccc-mode active</c>, and carries on in plain text (BL-636, ADR-0280).
+    /// <c>--ftp-ssl-ccc-mode active</c> (always on the Schannel profile), and carries on in plain
+    /// text once the server's <c>close_notify</c> has come (BL-636, ADR-0280, ADR-1261).
     /// </summary>
     /// <returns>
     /// <see langword="null" /> to go on to <c>PWD</c>; exit 81 with no <c>QUIT</c> when TLS
-    /// could not be cleared, as it never can on curl's Schannel build.
+    /// could not be cleared: the server sent data or ended in place of its <c>close_notify</c>.
     /// </returns>
     private async ValueTask<TransferResult?> ClearControlTlsAsync()
     {

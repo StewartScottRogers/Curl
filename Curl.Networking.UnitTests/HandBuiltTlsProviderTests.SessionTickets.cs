@@ -72,7 +72,7 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         var events = new RecordingTransferEvents();
         await using var connection = new HandBuiltTlsConnection(
-            new MemoryStream([1, 2, 3]), new StreamConnection(new MemoryStream(), ServerEndPoint), null, "unused", clearsTls: false)
+            new MemoryStream([1, 2, 3]), new StreamConnection(new MemoryStream(), ServerEndPoint), null, "unused", matchesOpenSslBuild: false)
         {
             TicketEvents = events,
         };

@@ -107,7 +107,7 @@ public sealed class SslStreamConnectionClearTlsTests
     [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
-    public async Task ClearTlsAsync_AsTheSchannelBuild_SendsCloseNotifyAndReturnsNull(bool sendCloseNotifyFirst)
+    public async Task ClearTlsAsync_AsTheSchannelBuildWhenTheServerEnds_SendsCloseNotifyAndReturnsNull(bool sendCloseNotifyFirst)
     {
         Diagnostics.Arrange("send close_notify first", sendCloseNotifyFirst);
         Diagnostics.Arrange("matches Schannel build", true);
@@ -118,6 +118,7 @@ public sealed class SslStreamConnectionClearTlsTests
             _ = await HandshakeAsync(server);
             var first = new byte[1];
             _ = await server.ReadAsync(first);
+            await server.DisposeAsync();
             return first[0];
         });
         IConnection? plaintext;
@@ -138,6 +139,44 @@ public sealed class SslStreamConnectionClearTlsTests
         Diagnostics.Act("first byte the server read", firstByteTheServerRead);
         Diagnostics.Assert("first byte the server read", AlertRecordType, firstByteTheServerRead);
         Assert.AreEqual(AlertRecordType, firstByteTheServerRead);
+
+    }
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task ClearTlsAsync_AsTheSchannelBuildWhenTheServerSendsCloseNotify_SendsCloseNotifyThenPlainTextAndWritesSchannelLines(bool sendCloseNotifyFirst)
+    {
+        Diagnostics.Arrange("send close_notify first", sendCloseNotifyFirst);
+        Diagnostics.Arrange("matches Schannel build", true);
+        var events = new RecordingTransferEvents();
+
+        byte[] sent;
+        using (Diagnostics.Phase("clear TLS and send PWD"))
+        {
+            sent = await ClearAndSendPwdAsync(sendCloseNotifyFirst, matchesSchannelBuild: true, events);
+        }
+
+        string[] expected =
+        [
+            "schannel: shutting down SSL/TLS connection with localhost port 990",
+            SslStreamConnection.SchannelCloseNotifyReceivedLine,
+        ];
+        string[] schannelLines = [.. events.Info.Where(line => line.Contains("shutting down", StringComparison.Ordinal) || line.Contains("close notification", StringComparison.Ordinal))];
+        Diagnostics.Act("first record type", sent[0]);
+        Diagnostics.Assert("first record type", AlertRecordType, sent[0]);
+        Diagnostics.Diff("schannel lines", string.Join('\n', expected), string.Join('\n', schannelLines));
+
+        Assert.AreEqual(AlertRecordType, sent[0], "close_notify goes first in either mode.");
+        Assert.AreEqual("PWD\r\n", Encoding.ASCII.GetString(sent[^5..]));
+        CollectionAssert.AreEqual(expected, schannelLines);
+    }
+
+    [TestMethod]
+    public void SchannelShutdownLine_NoIpEndPoint_NamesPortZero()
+    {
+        var line = SslStreamConnection.SchannelShutdownLine("example.com", null);
+
+        Assert.AreEqual("schannel: shutting down SSL/TLS connection with example.com port 0", line);
     }
 
     [TestMethod]
@@ -184,7 +223,7 @@ public sealed class SslStreamConnectionClearTlsTests
     // Clears TLS matching the OpenSSL build, sends "PWD\r\n" over the plaintext connection
     // and reads the server's plain "257\r\n"; returns the raw bytes the server read after its
     // own close_notify.
-    private static async Task<byte[]> ClearAndSendPwdAsync(bool sendCloseNotifyFirst)
+    private static async Task<byte[]> ClearAndSendPwdAsync(bool sendCloseNotifyFirst, bool matchesSchannelBuild = false, RecordingTransferEvents? events = null)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(async () =>
@@ -203,7 +242,7 @@ public sealed class SslStreamConnectionClearTlsTests
             await server.WriteAsync("257\r\n"u8.ToArray());
             return received.ToArray();
         });
-        await using var connection = await ConnectAsync(client, matchesSchannelBuild: false);
+        await using var connection = await ConnectAsync(client, matchesSchannelBuild, events);
 
         var plaintext = await connection.ClearTlsAsync(sendCloseNotifyFirst, CancellationToken.None);
         Assert.IsNotNull(plaintext);
@@ -219,11 +258,11 @@ public sealed class SslStreamConnectionClearTlsTests
         return await serverTask;
     }
 
-    private static async Task<IConnection> ConnectAsync(InMemoryDuplexStream client, bool matchesSchannelBuild)
+    private static async Task<IConnection> ConnectAsync(InMemoryDuplexStream client, bool matchesSchannelBuild, RecordingTransferEvents? events = null)
     {
         var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), matchesSchannelBuild);
         var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+            new StreamConnection(client, ServerEndPoint), CertificateHost, events ?? new RecordingTransferEvents(), isProxy: false, [], CancellationToken.None);
         return result.Connection!;
     }
 
