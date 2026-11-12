@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-11-03
-completed:
+completed: 2026-11-12
 ---
 # BL-4798 — Fix AF-0625: CI red 122.97 minutes from run 41688300433 (28cbd2df): failure log unreadable and no shift watching CI
 
@@ -63,3 +63,5 @@ Measured 2026-11-12 against the new criterion over 2026-11-11 15:00Z onward (shi
 - 2026-11-03: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: 2ab4542b 9742157d.
 - 2026-11-04: Doing -> Backlog. Fix landed 2026-11-04 05:24:14 MST (3e4d0d43d with BL-4783; 41688300433 had no failing test and does not count under ADR-1235); the window starts there and no factory shift has run since, so criterion 1 waits in Backlog for an interactive session to measure it.
+- 2026-11-12: Backlog -> Doing. Criteria at claim: 9ae5ba4d 9742157d.
+- 2026-11-12: Doing -> Done. Every CI failure since 2026-11-11 15:00Z was filed, covered or green within 30 minutes (slowest 22 min, run 43060203629 -> BL-4969); build clean, 115 fast test projects pass at c5b05b80b. The finding closes only on the process auditor's re-audit.

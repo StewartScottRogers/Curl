@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-11-04
-completed:
+completed: 2026-11-12
 ---
 # BL-4846 — Fix AF-0664: CI red 171.7 minutes from run 41655977963 (85f7b9d8), though its failing test was fixed within 4 minutes
 
@@ -60,3 +60,5 @@ Measured 2026-11-12 against the new criterion over 2026-11-11 15:00Z onward (shi
 - 2026-11-04: Created.
 - 2026-11-04: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
 - 2026-11-04: Doing -> Backlog. Fix landed; criterion 1 waits for a factory shift's logs after it.
+- 2026-11-12: Backlog -> Doing. Criteria at claim: 9ae5ba4d 9742157d.
+- 2026-11-12: Doing -> Done. Every CI failure since 2026-11-11 15:00Z was filed, covered or green within 30 minutes (slowest 22 min, run 43060203629 -> BL-4969); build clean, 115 fast test projects pass at c5b05b80b. The finding closes only on the process auditor's re-audit.
