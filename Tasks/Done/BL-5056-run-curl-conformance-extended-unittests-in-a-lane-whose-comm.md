@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/AffectedTests.ps1]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5056 — Run Curl.Conformance.Extended.UnitTests in a lane whose commits change an extended protocol or its requirement matrix
 
@@ -26,10 +26,10 @@ A lane whose commits change a requirement matrix (`Documentation/Conformance/Ext
 
 ## Acceptance criteria
 
-- [ ] What let these commits reach the shared branch without the lane running the failing test is named under Notes, with the commit that shows it.
-- [ ] `Get-AffectedTestProjects` selects `Curl.Conformance.Extended.UnitTests` when the commits change a file under `Documentation/Conformance/Extended/`: `RunDarkFactory.ps1 -TestAffectedTests` gains a case that proves it.
-- [ ] `Get-AffectedTestProjects` selects `Curl.Conformance.Extended.UnitTests` when the commits change any `Curl.Extended.Protocol.*` project: a `-TestAffectedTests` case proves it.
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAffectedTests` passes, as does the same command under `pwsh`.
+- [x] What let these commits reach the shared branch without the lane running the failing test is named under Notes, with the commit that shows it.
+- [x] `Get-AffectedTestProjects` selects `Curl.Conformance.Extended.UnitTests` when the commits change a file under `Documentation/Conformance/Extended/`: `RunDarkFactory.ps1 -TestAffectedTests` gains a case that proves it.
+- [x] `Get-AffectedTestProjects` selects `Curl.Conformance.Extended.UnitTests` when the commits change any `Curl.Extended.Protocol.*` project: a `-TestAffectedTests` case proves it.
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAffectedTests` passes, as does the same command under `pwsh`.
 
 ## Notes
 
@@ -37,3 +37,4 @@ A lane whose commits change a requirement matrix (`Documentation/Conformance/Ext
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 73354786 625f16ff 5360a3fa 32432757.
+- 2026-11-12: Doing -> Done. Extended conformance tests now selected for matrix and extended protocol changes
