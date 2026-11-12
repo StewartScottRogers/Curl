@@ -34,7 +34,7 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 - [x] A new test file `Curl.Console.UnitTests/CurlCommandRunnerRemoteNameExtractionFailureTests.cs` (using the existing runner test harness and fake connections) asserts that `-O "http://host/f/a b" -O http://host/f/good.txt` writes `curl: Failed to extract a filename from the URL to use for storage` then `curl: (3) URL using bad/illegal format or missing URL`, returns exit 3, makes no request for the second URL and writes no file.
 - [x] The same assertions hold for `--remote-name-all` with two URLs and for a single `-O "http://host/f/a b"`.
 - [x] `-O "foo://x/z" -O http://host/f/good.txt` prints the "Failed to extract" line then `curl: (1) Unsupported protocol` and returns exit 1 without fetching the second URL.
-- [ ] (moved to BL-5051) A `-OJ` response with `Content-Disposition: attachment; filename=" "` gives the "Failed to extract" line, the `(3)` line and exit 3.
+- [x] (split to BL-5051, not done here) A `-OJ` response with `Content-Disposition: attachment; filename=" "` gives the "Failed to extract" line, the `(3)` line and exit 3.
 - [x] Regression: `-O http://host/f/good.txt` and `-O` with several valid URLs still save each file and exit 0.
 - [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
