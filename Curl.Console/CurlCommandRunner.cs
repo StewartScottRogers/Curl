@@ -932,7 +932,9 @@ internal sealed class CurlCommandRunner(
             await WriteErrorLineAsync(RunDiagnosticLog.LogFileOpenFailedPrefix + options.DiagnosticLogFile).ConfigureAwait(false);
         }
 
-        diagnosticLog = runDiagnosticLog.Log;
+        diagnosticLog = options.Silent
+            ? runDiagnosticLog.Log
+            : ExtensionWarningDiagnosticLog.OverStandardError(runDiagnosticLog.Log, () => standardError, standardErrorTextEncoding);
         transferContextFactory.DiagnosticLog = diagnosticLog;
         transferContextFactory.HstsStore = hstsClock is null ? Hsts : new ClockOverridingHstsStore(Hsts, hstsClock);
         lateBoundDiagnosticLog?.Bind(diagnosticLog);

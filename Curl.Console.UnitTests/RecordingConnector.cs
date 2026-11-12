@@ -10,9 +10,13 @@ internal sealed class RecordingConnector(CurlExitCode exitCode, string message) 
 {
     public List<ConnectTarget> Targets { get; } = [];
 
+    /// <summary>Gets or sets what to do with the connect target's diagnostic log when a connect is asked for.</summary>
+    public Action<IDiagnosticLog>? WritesOnConnect { get; set; }
+
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         Targets.Add(target);
+        WritesOnConnect?.Invoke(target.DiagnosticLog);
 
         return ValueTask.FromResult(ConnectResult.Failed(exitCode, message));
     }

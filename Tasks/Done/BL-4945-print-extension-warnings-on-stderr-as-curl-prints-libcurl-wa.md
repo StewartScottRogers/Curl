@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.CodeGeneration.UnitLibrary/CodeGenerationTransferHook.cs, Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs, Curl.Console/CurlCommandRunner.cs]
+touches: [Curl.Console/ExtensionWarningDiagnosticLog.cs, Curl.Console.UnitTests, Curl.Extension.OpenTelemetry.UnitTests, Curl.Extension.CodeGeneration.UnitLibrary/CodeGenerationTransferHook.cs, Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs, Curl.Console/CurlCommandRunner.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4945 — Print extension warnings on stderr as curl prints --libcurl warnings
 
@@ -27,11 +27,13 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] Both failures print a `Warning:` line on stderr, and none with `-s`.
-- [ ] `--otel-endpoint notaurl` is refused (exit 2) or warned about.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Both failures print a `Warning:` line on stderr, and none with `-s`.
+- [x] `--otel-endpoint notaurl` is refused (exit 2) or warned about.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Done (ADR-1253): new Curl.Console/ExtensionWarningDiagnosticLog.cs (added to touches) wraps the run log unless -s and prints code-generation/otel Warning/Error entries as "Warning: ..." on stderr; the otel hook warns for a non-http(s) endpoint (warned, not refused). Fast tests green in Curl.Console.UnitTests and OpenTelemetry.UnitTests; Measure-CodeQuality: 0 failing members. Cross-platform: no paths used.
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
 
@@ -39,3 +41,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: 9f0e1af2 eebf94bb a0b49a29.
+- 2026-11-11: Doing -> Done. Extension warnings (--csharp/--powershell write failure, otel export failure, non-URL otel endpoint) print Warning: on stderr unless -s

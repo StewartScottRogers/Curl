@@ -85,10 +85,26 @@ public sealed partial class CurlCompositionTests
         await RunWithFakeConnectorsAsync(url, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
 
         ConnectTarget expected = new("h", port, useTls) { PoolScheme = poolScheme };
-        ConnectTarget actual = connector.Targets.Single() with { Events = NoTransferEvents.Instance };
+        ConnectTarget actual = connector.Targets.Single() with { Events = NoTransferEvents.Instance, DiagnosticLog = NoDiagnosticLog.Instance };
         Diagnostics.Act("connector target", actual);
         Diagnostics.Assert("connector target", expected, actual);
         Assert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
+    public async Task CreateRunner_AnExtensionLogsAWarning_PrintsItOnStandardErrorAsAWarningLine()
+    {
+        RecordingConnector connector = new(CurlExitCode.CouldntConnect, ConnectFailure)
+        {
+            WritesOnConnect = log => log.Write(DiagnosticLogLevel.Warning, "otel", "export failed"),
+        };
+
+        (_, string standardErrorText) = await RunWithFakeConnectorsAsync(
+            "dict://h/d:x",
+            connector,
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
+
+        StringAssert.Contains(standardErrorText, "Warning: export failed" + Environment.NewLine);
     }
 
     [TestMethod]

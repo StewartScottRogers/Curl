@@ -99,6 +99,32 @@ public sealed class OpenTelemetryTransferHookTests
             log.Lines);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_TheEndpointIsAnHttpsUrl_LogsNoWarning()
+    {
+        var hook = new OpenTelemetryTransferHook("https://collector/v1/traces", bytes => bytes.Fill(0xab));
+        var connector = new RecordedConnector(new RecordedConnection("HTTP/1.1 200 OK\r\n\r\n"));
+        var log = new RecordedDiagnosticLog();
+
+        await hook.ExecuteAsync(Context(log), new TransferHookServices(connector, connector), context => Capture(context, out _));
+
+        Assert.IsEmpty(log.Lines);
+    }
+
+    [TestMethod]
+    [DataRow("notaurl")]
+    [DataRow("ftp://collector/x")]
+    public async Task ExecuteAsync_TheEndpointIsNotAnHttpUrl_LogsAWarning(string endpoint)
+    {
+        var hook = new OpenTelemetryTransferHook(endpoint, bytes => bytes.Fill(0xab));
+        var connector = new RecordedConnector(ConnectResult.Failed(CurlExitCode.CouldntConnect, "Connection refused"));
+        var log = new RecordedDiagnosticLog();
+
+        await hook.ExecuteAsync(Context(log), new TransferHookServices(connector, connector), context => Capture(context, out _));
+
+        Assert.AreEqual($"Warning otel: --otel-endpoint {endpoint} is not an http or https URL", log.Lines[0]);
+    }
+
     private static TransferContext Context(IDiagnosticLog? log = null, IReadOnlyList<string>? headers = null) => new()
     {
         Url = CurlUrl.Parse("http://example.com/"),

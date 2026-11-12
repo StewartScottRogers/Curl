@@ -1301,3 +1301,4 @@ Each option and the specific reason it lost.
 | [1252](ADR-1252-curl-extensions-0-turns-off-the-four-port-only-options.md) | CURL_EXTENSIONS=0 turns off --ai-help, --extended-help, --log-level and --log-file (BL-4937) | Accepted | 2026-11-11 |
 | [1187](ADR-1187-extended-protocols-conform-to-their-own-specifications.md) | Extended protocols are measured against their own specifications, not curl: runs take an injected `TimeProvider`, reference servers never reuse client codecs, and only the hosts reach the extensions (BL-4503) | Accepted | 2026-11-02 |
 | [1260](ADR-1260-storage-and-grpc-report-the-response-for-write-out.md) | s3, gs, az, oci and grpc report status, HTTP version, content type and header size for -w (BL-4938) | Accepted | 2026-11-11 |
+| [1253](ADR-1253-extension-warnings-reach-standard-error.md) | Extension warnings (--csharp, --powershell, --otel-endpoint) reach standard error as Warning: lines unless -s (BL-4945) | Accepted | 2026-11-11 |
