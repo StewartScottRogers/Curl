@@ -42,6 +42,8 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0139-sasl-cram-md5-and-
 
 ## Re-audits
 
+- 2026-11-11 | 2026-11-11_2002.md | reproduces: no | Ran the reproduction. ADR-0139 no longer says 'cannot yet be expressed'; lines 46-49 and the BL-781 amendment (lines 71-76) state that a DIGEST-MD5 challenge SSPI rejects fails with exit 94, and that only the OpenSSL path still answers null (exit 67). Curl.Authentication.UnitLibrary/SaslAuthenticator.cs:213 has '?? throw DigestMd5Failed()' and line 220 returns new SaslAuthenticationFailedException(CurlExitCode.AuthError, AuthErrorMessage). The ADR and the code agree.
+
 ## Log
 
 - 2026-11-05: filed proposed.

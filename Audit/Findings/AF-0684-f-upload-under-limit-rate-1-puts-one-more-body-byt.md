@@ -43,6 +43,7 @@ dotnet build Curl.Console -c Release; & ./Record-CurlExchange.ps1 -Port 63871 -C
 ## Re-audits
 
 - 2026-11-05 | 2026-11-05_2025.md | not re-audited | Ran the reproduction 3 times against curl 8.22.0 (x86_64-w64-mingw32) Schannel. request.bin lengths (curl, Curl): (194, 198), (195, 194), (194, 195); both exit 56 every time. The count depends on timing in both binaries, and Curl sometimes sends fewer bytes than curl, so the reproduction does not reliably tell.
+- 2026-11-11 | 2026-11-11_2002.md | reproduces: no | Ran the reproduction on Release build. Run 1: curl 195 bytes, Curl 194, both exit 56. Run 2: 196 vs 196. Run 3: 194 vs 194. Reference curl's own count varies 194 to 196 with timing and Curl falls in the same range. Curl never sent more than curl. The single 1-byte difference was Curl one lower, which is the opposite of the finding's claim, and it did not repeat. No deterministic extra byte.
 
 ## Log
 
