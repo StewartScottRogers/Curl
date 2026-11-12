@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Extended.Protocol.S3.UnitLibrary, Curl.Extended.Protocol.S3.UnitTests, Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary, Curl.Extended.Protocol.GoogleCloudStorage.UnitTests, Curl.Extended.Protocol.AzureStorage.UnitLibrary, Curl.Extended.Protocol.AzureStorage.UnitTests, Curl.Extended.Protocol.OciRegistry.UnitLibrary, Curl.Extended.Protocol.OciRegistry.UnitTests, Curl.Extended.Protocol.Grpc.UnitLibrary]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-11
 ---
 # BL-4997 — Fix CI failure WriteOut_AfterADownload_ReportsEachVariable on Linux and Windows
 
@@ -34,3 +34,4 @@ Lanes test only on Windows, so reproduce with `gh run view 43127888162 --log-fai
 
 - 2026-11-11: Created.
 - 2026-11-11: Backlog -> Doing. Criteria at claim: dad07897.
+- 2026-11-11: Doing -> Done. Handlers now pass the downloaded bytes into the TransferReport, so size_download is right for s3, gs, az, abfs, oci and grpc
