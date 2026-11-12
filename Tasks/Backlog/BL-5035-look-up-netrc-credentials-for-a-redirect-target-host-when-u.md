@@ -4,8 +4,8 @@ title: Look up netrc credentials for a redirect target host when -u is also give
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitTests/TransferCredentialLookupRedirectNetrcTests.cs]
+depends-on: [BL-5016]
+touches: [Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitTests/TransferCredentialLookupRedirectNetrcTests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Preparation.cs]
 requirement: none
 created: 2026-11-12
 completed:
@@ -35,7 +35,10 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text. Do not weaken the existing rule that `-u` credentials are not sent to a different host without `--location-trusted`; only the netrc entry of the new host is added.
 
+- 2026-11-12 (lane 4, no code edited): the fix cannot live in TransferCredentialLookup.cs alone. `ForRedirectHops` returns a selector that REPLACES RedirectFollower's origin rules (a null from it means "no credentials", not "fall back"), and it receives only the hop URL. So under -u it must also know the first URL's host and whether --location-trusted is set, to keep -u for a same-host hop and for trusted hops while sending the hop's netrc entry otherwise. Plan: add optional `firstUrl` and `locationTrusted` parameters to `ForRedirectHops`; for -u with a netrc option return a selector that gives the hop host's netrc entry when found, else -u when trusted or same host, else nothing; pass both from CurlCommandRunner.cs:4206 and ManagedEasyTransfer.Preparation.cs:119. Added both files to touches; BL-5016 holds CurlCommandRunner.cs, so depends-on BL-5016.
+
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 5b0255c6 f9a85a99 a0b49a29.
+- 2026-11-12: Doing -> Backlog. Needs Curl.Console/CurlCommandRunner.cs, held by BL-5016 (depends-on added)
