@@ -600,6 +600,34 @@ if ($TestIntegrateLock) {
                 Remove-Item (Get-LockPriorityPath)
                 $lock = Enter-Lock -Priority; $held = & $testLockHeld; $lock.Dispose()
                 "$fresh3 $stale3 $own $held $(Test-Path (Get-LockPriorityPath))" })
+            ,@('waiters queued A, B, C behind a holder get their turns in that order (BL-5055)', 'True False False | True False | True', {
+                $now = (Get-Date).Ticks
+                foreach ($entry in @(@(3, 0), @(4, 1), @(5, 2))) { Set-Content -Path (Get-LockTicketPath $entry[0]) -Value ($now + $entry[1]) }
+                $turns = { param($lanes) $rows = foreach ($who in $lanes) { $script:Lane = $who; Test-LockTurn }; ($rows | ForEach-Object { "$_" }) -join ' ' }
+                $row0 = & $turns 3, 4, 5
+                Remove-Item (Get-LockTicketPath 3)
+                $row1 = & $turns 4, 5
+                Remove-Item (Get-LockTicketPath 4)
+                $row2 = & $turns 5
+                Remove-Item (Get-LockTicketPath 5)
+                $script:Lane = 9
+                "$row0 | $row1 | $row2" })
+            ,@('a fresh -Priority marker holds an ordinary waiter back, an earlier live ticket does too, and a dead waiter''s stale ticket blocks nobody (BL-5055)', 'False True True True', {
+                $now = (Get-Date).Ticks
+                Set-Content -Path (Get-LockTicketPath 3) -Value $now
+                Set-Content -Path (Get-LockTicketPath) -Value ($now + 1)
+                $behindLive = Test-LockTurn
+                (Get-Item (Get-LockTicketPath 3)).LastWriteTime = (Get-Date).AddMinutes(-5)
+                $behindDead = Test-LockTurn
+                Remove-Item (Get-LockTicketPath 3), (Get-LockTicketPath)
+                Set-Content -Path (Get-LockPriorityPath 2) -Value 'x'
+                $priorityHolds = Test-LockPriorityWaiting
+                $lock = Enter-Lock -Priority; $held = & $testLockHeld; $lock.Dispose()
+                Remove-Item (Get-LockPriorityPath 2)
+                "$behindLive $behindDead $priorityHolds $held" })
+            ,@('Enter-Lock leaves no ticket behind once it holds the lock', 'True False', {
+                $lock = Enter-Lock; $held = & $testLockHeld; $lock.Dispose()
+                "$held $(Test-Path (Get-LockTicketPath))" })
             ,@('an integration of a CI fix asks for the lock with -Priority', 'True', {
                 "$((& $source 'Integrate.ps1') -match 'Enter-Lock -Priority:\$ciFix')" })
             ,@('a claim asks for the lock with -Priority, ahead of ordinary integrations (BL-4779)', 'True', {

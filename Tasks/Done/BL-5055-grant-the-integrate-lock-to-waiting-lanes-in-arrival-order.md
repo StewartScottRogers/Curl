@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Claim.ps1, DarkFactory/Integrate.ps1]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5055 — Grant the integrate lock to waiting lanes in arrival order
 
@@ -26,14 +26,17 @@ One approach that keeps the operating system's release-on-death: each waiter wri
 
 ## Acceptance criteria
 
-- [ ] `Enter-Lock` grants the lock in arrival order: `RunDarkFactory.ps1 -TestIntegrateLock` gains a case where three waiters queue in order A, B, C behind a holder and get the lock in that order.
-- [ ] A CI-fix waiter (`-Priority`) still gets the lock before ordinary waiters that arrived earlier: a `-TestIntegrateLock` case proves it.
-- [ ] A ticket left by a waiter that died does not block the queue: a `-TestIntegrateLock` case proves it.
-- [ ] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestIntegrateLock` passes, as does the same command under `pwsh`.
+- [x] `Enter-Lock` grants the lock in arrival order: `RunDarkFactory.ps1 -TestIntegrateLock` gains a case where three waiters queue in order A, B, C behind a holder and get the lock in that order.
+- [x] A CI-fix waiter (`-Priority`) still gets the lock before ordinary waiters that arrived earlier: a `-TestIntegrateLock` case proves it.
+- [x] A ticket left by a waiter that died does not block the queue: a `-TestIntegrateLock` case proves it.
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestIntegrateLock` passes, as does the same command under `pwsh`.
 
 ## Notes
+
+Decision: tickets (`integrate.ticket-L<n>`, content = arrival ticks, refreshed every 3 s, stale after 1 minute like the priority marker) in DarkFactory/Claim.ps1; `Test-LockTurn` gates the open. Staleness by refresh, not by lane pid, because the refresh already proves liveness. Claims use -Priority so they are unchanged. Tests prove order, priority, dead ticket and cleanup by the turn predicate (three live waiters need no processes); both shells pass 33 cases.
 
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: e021bb3f f1da603d 61734bb0 c6c4153d.
+- 2026-11-12: Doing -> Done. Enter-Lock grants in arrival order via tickets
