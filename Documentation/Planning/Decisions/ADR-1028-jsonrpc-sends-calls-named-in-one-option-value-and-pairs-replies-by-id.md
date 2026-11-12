@@ -58,3 +58,7 @@ one value.
 `curl --jsonrpc 'sum [1,2,4]; !notify_hello [7]; get_data' https://host/rpc` sends one batch and
 prints the two replies in call order. The tests in `Curl.Extension.JsonRpc.UnitTests` check the
 request and reply bytes against the specification's sections, with no network.
+
+## Amendment (BL-5023, ADR-1261)
+
+`--jsonrpc` cannot be combined with `--graphql`, `--connect-rpc` or `--grpc-web`: each replaces the request body, so the transfer exits 2 and sends nothing.

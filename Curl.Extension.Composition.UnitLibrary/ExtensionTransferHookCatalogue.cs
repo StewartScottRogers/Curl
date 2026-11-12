@@ -16,6 +16,7 @@ public static class ExtensionTransferHookCatalogue
     /// <summary>Gets the activators, in the order their hooks see the request.</summary>
     public static IReadOnlyList<Func<ExtensionOptionValues, ITransferHook?>> Entries { get; } =
     [
+        BodyReplacingHookExclusivity.HookFor,
         GraphQl.GraphQlTransferHook.ActivatedBy,
         Curl.Extension.JsonRpc.JsonRpcExtension.HookFor,
         ConnectRpc.ConnectRpcExtension.HookFor,
