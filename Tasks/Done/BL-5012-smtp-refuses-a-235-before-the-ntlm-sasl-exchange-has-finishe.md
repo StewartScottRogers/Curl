@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Smtp.UnitLibrary/SmtpSaslAuthentication.cs, Curl.Original.Protocol.Smtp.UnitTests/SmtpProtocolHandlerSaslAuthErrorTests.cs, Curl.Original.Protocol.Smtp.UnitTests/SmtpProtocolHandlerAuthenticationTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5012 — SMTP refuses a 235 before the NTLM SASL exchange has finished with exit 67
 
@@ -50,3 +50,4 @@ Fix kept in SMTP library: ISaslExchange has no "finished" query, so NTLM accepts
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 9e3543e9 21f8543a a0b49a29.
+- 2026-11-12: Doing -> Done. NTLM 235 before the Type-2 challenge is now refused with exit 67; tests and quality run green
