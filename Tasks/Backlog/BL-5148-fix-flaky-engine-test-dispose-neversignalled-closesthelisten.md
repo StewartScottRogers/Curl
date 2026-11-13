@@ -1,5 +1,5 @@
 ---
-id: BL-5141
+id: BL-5148
 title: Fix flaky Engine test Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-13
 completed:
 ---
-# BL-5141 — Fix flaky Engine test Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing
+# BL-5148 — Fix flaky Engine test Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing
 
 ## Goal
 
