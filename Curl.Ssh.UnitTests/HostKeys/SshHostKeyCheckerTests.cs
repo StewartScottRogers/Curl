@@ -130,17 +130,6 @@ public sealed partial class SshHostKeyCheckerTests
     }
 
     [TestMethod]
-    public void NarrowHostKeys_WithSha256_StillNarrows()
-    {
-        KnownHostsFile file = KnownHostsFile.Parse($"127.0.0.1 ssh-rsa {KnownHostsFileTests.HostKeyBase64}");
-
-        SshAlgorithmPreferences narrowed = Narrow(new SshOptions { HostPublicKeySha256 = Sha256 }, file);
-
-        AssertHostKeyList("rsa-sha2-256,rsa-sha2-512,ssh-rsa", narrowed);
-        Assert.AreEqual("rsa-sha2-256,rsa-sha2-512,ssh-rsa", string.Join(',', narrowed.ServerHostKey));
-    }
-
-    [TestMethod]
     public void NarrowHostKeys_WithMd5_LeavesTheList()
     {
         SshAlgorithmPreferences narrowed = Narrow(new SshOptions { HostPublicKeyMd5 = Md5 }, KnownHostsFile.Parse($"127.0.0.1 ssh-ed25519 {KnownHostsFileTests.HostKeyBase64}"));

@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Ssh.UnitLibrary/HostKeys/SshHostKeyChecker.cs, Curl.Ssh.UnitTests/HostKeys/HostPublicKeySha256NarrowingTests.cs]
+touches: [Curl.Ssh.UnitLibrary/HostKeys/SshHostKeyChecker.cs, Curl.Ssh.UnitTests/HostKeys/HostPublicKeySha256NarrowingTests.cs, Curl.Ssh.UnitTests/HostKeys/SshHostKeyCheckerTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5106 — Skip host-key type narrowing when --hostpubsha256 is given
 
@@ -34,18 +34,21 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Ssh.UnitTests/HostKeys/HostPublicKeySha256NarrowingTests.cs` prove that with a SHA256 fingerprint option set and known_hosts content whose first entry is ssh-rsa, the offered host-key algorithm list is not narrowed (same as the MD5 case), and no host-key-type verbose line is emitted.
-- [ ] A regression test proves narrowing from known_hosts still happens when neither fingerprint option is set.
-- [ ] A test proves a wrong SHA256 fingerprint is still refused with exit 60.
-- [ ] Tests are platform-neutral and use in-memory known_hosts content.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Ssh.UnitTests/HostKeys/HostPublicKeySha256NarrowingTests.cs` prove that with a SHA256 fingerprint option set and known_hosts content whose first entry is ssh-rsa, the offered host-key algorithm list is not narrowed (same as the MD5 case), and no host-key-type verbose line is emitted.
+- [x] A regression test proves narrowing from known_hosts still happens when neither fingerprint option is set.
+- [x] A test proves a wrong SHA256 fingerprint is still refused with exit 60.
+- [x] Tests are platform-neutral and use in-memory known_hosts content.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check, as a hand check on Linux: step 4 exits 0 and prints the file.
 
+- Removed NarrowHostKeys_WithSha256_StillNarrows from SshHostKeyCheckerTests.cs: it pinned the old (non-upstream) behaviour. Extracted IsFingerprintGiven to keep complexity at 10. Linux hand check not run (Windows lane); platform-neutral tests.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 11ac5260 98d07668 3183c2de b3b4034e a0b49a29.
+- 2026-11-13: Doing -> Done. SHA256 fingerprint skips host-key narrowing; tests and quality green
