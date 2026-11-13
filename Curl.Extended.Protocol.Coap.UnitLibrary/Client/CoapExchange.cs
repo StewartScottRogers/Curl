@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Sockets;
 using Curl.Extended.Protocol.Coap.Wire;
 using Curl.Protocol.Abstractions;
@@ -83,7 +84,15 @@ internal sealed class CoapExchange(IDatagramChannel channel, TimeProvider timePr
                 continue;
             }
 
-            CoapMessage? message = Decoded(buffer.AsSpan(0, (await ReceivedAsync(receive).ConfigureAwait(false)).Length));
+            DatagramReceived received = await ReceivedAsync(receive).ConfigureAwait(false);
+            if (!IsFromServer(channel.ServerEndPoint, received.RemoteEndPoint))
+            {
+                // RFC 7252 section 5.3.2: a datagram from another endpoint is not a response; the timers run on.
+                receive = channel.ReceiveAsync(buffer, stop).AsTask();
+                continue;
+            }
+
+            CoapMessage? message = Decoded(buffer.AsSpan(0, received.Length));
             Reply reply = Classify(request, message);
             await AnswerAsync(message, reply, stop).ConfigureAwait(false);
             switch (reply)
@@ -102,6 +111,15 @@ internal sealed class CoapExchange(IDatagramChannel channel, TimeProvider timePr
             receive = channel.ReceiveAsync(buffer, stop).AsTask();
         }
     }
+
+    /// <summary>Gives <see langword="true" /> when <paramref name="source" /> is the server endpoint, an IPv4-mapped IPv6 address counting as its IPv4 form (RFC 7252 section 5.3.2).</summary>
+    /// <param name="server">The endpoint the request went to.</param>
+    /// <param name="source">The endpoint a datagram came from.</param>
+    /// <returns>Whether the datagram came from the server.</returns>
+    internal static bool IsFromServer(EndPoint server, EndPoint source) =>
+        server is IPEndPoint serverIp && source is IPEndPoint sourceIp
+            ? serverIp.Port == sourceIp.Port && serverIp.Address.MapToIPv6().Equals(sourceIp.Address.MapToIPv6())
+            : server.Equals(source);
 
     private static void ThrowWhenOutOfTime(bool acknowledged, int retransmissions)
     {

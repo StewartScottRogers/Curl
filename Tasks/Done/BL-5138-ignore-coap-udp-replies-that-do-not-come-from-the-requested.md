@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Extended.Protocol.Coap.UnitLibrary/Client/CoapExchange.cs, Curl.Extended.Protocol.Coap.UnitTests/Client, Documentation/Conformance/Extended/Coap.md]
+touches: [Curl.Extended.Protocol.Coap.UnitLibrary/Client/CoapExchange.cs, Curl.Extended.Protocol.Coap.UnitLibrary/Observe/CoapObservation.cs, Curl.Extended.Protocol.Coap.UnitTests/Client, Documentation/Conformance/Extended/Coap.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5138 — Ignore coap:// UDP replies that do not come from the requested server's address and port (EXT-046)
 
@@ -33,12 +33,12 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.Coap.UnitTests/Client/CoapResponseSourceEndpointTests.cs` (new, using the existing `ScriptedDatagramChannel`) prove that a valid ACK 2.05 (right Message ID and token) from another IP is ignored and the genuine reply after it is the response.
-- [ ] A test proves the same for a reply from the right IP but another port, and a test proves that when only spoofed replies arrive the exchange retransmits and times out as if nothing came.
-- [ ] A test proves a reply from the server endpoint written in IPv4-mapped IPv6 form is still accepted; the existing CoAP tests (including Observe and DTLS) stay green.
-- [ ] `Documentation/Conformance/Extended/Coap.md` row `Coap:RFC7252-5.3.2-3` no longer says n/a and its "Covered by" names a test from this task.
-- [ ] The tests are platform-neutral (no real socket, no 127.0.0.2).
-- [ ] `dotnet build Curl.Extended.Protocol.Coap.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.Coap.UnitTests/Client/CoapResponseSourceEndpointTests.cs` (new, using the existing `ScriptedDatagramChannel`) prove that a valid ACK 2.05 (right Message ID and token) from another IP is ignored and the genuine reply after it is the response.
+- [x] A test proves the same for a reply from the right IP but another port, and a test proves that when only spoofed replies arrive the exchange retransmits and times out as if nothing came.
+- [x] A test proves a reply from the server endpoint written in IPv4-mapped IPv6 form is still accepted; the existing CoAP tests (including Observe and DTLS) stay green.
+- [x] `Documentation/Conformance/Extended/Coap.md` row `Coap:RFC7252-5.3.2-3` no longer says n/a and its "Covered by" names a test from this task.
+- [x] The tests are platform-neutral (no real socket, no 127.0.0.2).
+- [x] `dotnet build Curl.Extended.Protocol.Coap.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,10 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 6a5b5e07 f94b0943 6833b787 18610595 aa6fc788 d3bdf191.
+
+## Notes (run)
+
+- Observe loop (`Observe/CoapObservation.cs`) receives separately, so the same check (`CoapExchange.IsFromServer`) applies there; added to `touches`. No other Doing task names it.
+- DTLS: `DtlsDatagramChannel` reports `transport.ServerEndPoint` as the source, so coaps is unaffected.
+- Platform-neutral: tests use scripted channels only. CI on Linux/macOS criterion met by that. Measure-CodeQuality on the Coap library: 0 failing members.
+- 2026-11-13: Doing -> Done. coap responses from another endpoint are ignored; tests added
