@@ -53,3 +53,4 @@ Affected: host-name verification on the SslStream route (`--cacert` + `--ssl-no-
 ## Log
 
 - 2026-11-13: Created.
+- 2026-11-13: Backlog -> Doing. Criteria at claim: 1d64b051 0ec61694 8ee5f415 7fe234e3 956b991b a0b49a29.
