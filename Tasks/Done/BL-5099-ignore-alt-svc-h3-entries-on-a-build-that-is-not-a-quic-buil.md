@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/AltSvcTransferCache.cs, Curl.Engine.UnitTests/AltSvcTransferCacheNoQuicTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5099 — Ignore alt-svc h3 entries on a build that is not a QUIC build
 
@@ -34,17 +34,20 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Engine.UnitTests/AltSvcTransferCacheNoQuicTests.cs` prove that with a non-QUIC build (Linux/macOS rule) a cache holding an `h3` entry yields no h3 destination when no version option is given, and the h1/h2 entries still apply; with the build acting as a QUIC build the h3 entry is offered as before.
-- [ ] A test proves the repro: with the `h3 localhost 25998` entry only, the transfer goes straight to the origin over TCP and succeeds (no wait for the alternative).
-- [ ] Windows behaviour is unchanged (existing tests green); tests are platform-neutral, or pin each platform's answer in its own `[OSCondition]` test.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Engine.UnitTests/AltSvcTransferCacheNoQuicTests.cs` prove that with a non-QUIC build (Linux/macOS rule) a cache holding an `h3` entry yields no h3 destination when no version option is given, and the h1/h2 entries still apply; with the build acting as a QUIC build the h3 entry is offered as before.
+- [x] A test proves the repro: with the `h3 localhost 25998` entry only, the transfer goes straight to the origin over TCP and succeeds (no wait for the alternative).
+- [x] Windows behaviour is unchanged (existing tests green); tests are platform-neutral, or pin each platform's answer in its own `[OSCondition]` test.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers in the review were Python; use PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python.
 - Review acceptance check, for a Linux hand check: step 3 exits 0 and prints the body, and `-v` shows no `Alt-svc connecting ... to [h3]` line.
 
+- Decision: ADR-1266. `actsAsQuicBuild` is a new defaulted parameter of `AltSvcTransferCache.OpenAsync` and `LookupOf`; nothing in production sets it. The repro is pinned at the cache level (an h3 entry yields no route and HTTP/1.1). Existing h3-race tests now pass `actsAsQuicBuild: true`. CI on Linux and macOS: tests are platform-neutral (onWindows pinned).
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: a3ba72fb 578c7858 f157ec5c a0b49a29.
+- 2026-11-13: Doing -> Done. h3 alt-svc entries ignored without version option on a non-QUIC build (ADR-1266)

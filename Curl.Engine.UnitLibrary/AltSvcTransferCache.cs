@@ -70,7 +70,11 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
 
     private static readonly IReadOnlySet<AltSvcAlpn> EveryAlpn = new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 };
 
+    private static readonly IReadOnlySet<AltSvcAlpn> NoQuicBuildAlpns = new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2 };
+
     private readonly AltSvcCache cache;
+
+    private readonly bool actsAsQuicBuild;
 
     private readonly string file;
 
@@ -82,8 +86,9 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
 
     private readonly bool isWindows;
 
-    private AltSvcTransferCache(AltSvcCache cache, string file, HttpVersion requestedVersion, IReadOnlyList<string> connectToEntries, bool usesOverHttp, bool isWindows)
+    private AltSvcTransferCache(AltSvcCache cache, string file, HttpVersion requestedVersion, IReadOnlyList<string> connectToEntries, bool usesOverHttp, bool isWindows, bool actsAsQuicBuild)
     {
+        this.actsAsQuicBuild = actsAsQuicBuild;
         this.usesOverHttp = usesOverHttp;
         this.isWindows = isWindows;
         this.cache = cache;
@@ -114,6 +119,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// <c>CURL_ALTSVC_HTTP</c> (ADR-0497, BL-2263); off by default, as in curl's release build.
     /// </param>
     /// <param name="onWindows">Whether to look alternatives up as the Windows build does; <see langword="null" /> asks the running system (tests pin either).</param>
+    /// <param name="actsAsQuicBuild">Whether the build acts as a QUIC build; off, an <c>h3</c> entry is ignored when no version option is given (BL-5099).</param>
     /// <returns>The cache.</returns>
     internal static async Task<AltSvcTransferCache> OpenAsync(
         EasyHttpOptions http,
@@ -122,7 +128,8 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
         TimeProvider clock,
         IDiagnosticLog? diagnosticLog = null,
         bool usesOverHttp = false,
-        bool? onWindows = null)
+        bool? onWindows = null,
+        bool actsAsQuicBuild = false)
     {
         string file = http.AltSvc ?? string.Empty;
         HttpVersion requestedVersion = http.HttpVersion;
@@ -132,7 +139,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
             cache.ReadFile(await ReadTextAsync(file, fileSystem).ConfigureAwait(false));
         }
 
-        return new AltSvcTransferCache(cache, file, requestedVersion, connectToEntries, usesOverHttp, onWindows ?? OperatingSystem.IsWindows());
+        return new AltSvcTransferCache(cache, file, requestedVersion, connectToEntries, usesOverHttp, onWindows ?? OperatingSystem.IsWindows(), actsAsQuicBuild);
     }
 
     /// <summary>
@@ -248,7 +255,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
             return null;
         }
 
-        (IReadOnlyList<AltSvcAlpn> lookedUpUnder, IReadOnlySet<AltSvcAlpn> allowed) = LookupOf(requestedVersion, isWindows);
+        (IReadOnlyList<AltSvcAlpn> lookedUpUnder, IReadOnlySet<AltSvcAlpn> allowed) = LookupOf(requestedVersion, isWindows, actsAsQuicBuild);
         return cache.FindForOrigin(lookedUpUnder, url.IdnHost, url.Port, allowed);
     }
 
@@ -263,10 +270,11 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// <param name="version">The version option.</param>
     /// <param name="isWindows">Whether the running system is Windows.</param>
     /// <returns>The origin versions looked up under and the destination versions allowed.</returns>
-    internal static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(HttpVersion version, bool isWindows) =>
+    /// <param name="actsAsQuicBuild">Whether the build acts as a curl built with a QUIC library; without it, and with no version option, an <c>h3</c> entry is ignored off Windows (BL-5099).</param>
+    internal static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(HttpVersion version, bool isWindows, bool actsAsQuicBuild = false) =>
         version switch
         {
-            HttpVersion.None => ([AltSvcAlpn.H2, AltSvcAlpn.H1], NoVersionOptionDestinations(isWindows)),
+            HttpVersion.None => ([AltSvcAlpn.H2, AltSvcAlpn.H1], NoVersionOptionDestinations(isWindows, actsAsQuicBuild)),
             HttpVersion.Http11 => ([AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1 }),
             HttpVersion.Http2 => ([AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2 }),
             HttpVersion.Http3 => ([AltSvcAlpn.H3, AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 }),
@@ -278,8 +286,8 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// The destination versions a transfer with no version option may switch to: <c>h1</c> alone on Windows,
     /// as the Schannel build, and <c>h1</c>, <c>h2</c> and <c>h3</c> elsewhere, as the OpenSSL builds.
     /// </summary>
-    private static IReadOnlySet<AltSvcAlpn> NoVersionOptionDestinations(bool isWindows) =>
-        isWindows ? SchannelBuildAlpns : EveryAlpn;
+    private static IReadOnlySet<AltSvcAlpn> NoVersionOptionDestinations(bool isWindows, bool actsAsQuicBuild) =>
+        isWindows ? SchannelBuildAlpns : actsAsQuicBuild ? EveryAlpn : NoQuicBuildAlpns;
 
     /// <summary>
     /// The version a connection to the origin itself uses when its entry names <paramref name="destination" />:
