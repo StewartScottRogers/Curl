@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5077 — Fix AF-0718: Surviving mutant: a hand-built TLS connection can try a second close_notify after ShutDownSendingAsync
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The audit guard refuses a lane `Audit/Tools`, so the mutation script was not run. By hand: with line 114 flipped to `_tlsEnded = false;` the new `CloseNotifyOnDisposeTests.DisposeAsync_OfAHandBuiltTlsConnectionAfterSendingWasShutDown_TriesNoSecondCloseNotify` fails (killed); restored, it passes. The hand-built streams ignore a second shutdown, so the wire cannot tell; only a timer-counting clock can. `HandBuiltTlsConnectionCloseNotifyTests` also pins one TLS record on the wire after ShutDownSendingAsync and dispose.
+- Criterion 1 is ticked on that by-hand check; the re-audit confirms it.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Added a clock-counting test that kills the AF-0718 mutant (verified by hand; the audit script is off limits to lanes)

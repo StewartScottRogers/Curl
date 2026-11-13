@@ -92,6 +92,38 @@ public sealed class HandBuiltTlsConnectionCloseNotifyTests
     }
 
     [TestMethod]
+    public async Task DisposeAsync_AfterSendingWasShutDown_SendsNoSecondCloseNotify()
+    {
+        Diagnostics.Arrange("sending shut down first", true);
+
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = Task.Run(async () =>
+        {
+            _ = await HandshakeAsync(server, SslProtocols.Tls12);
+            return await ReadToEndAsync(server);
+        });
+        var connection = await ConnectAsync(client, SslProtocols.Tls12, matchesSchannelBuild: false);
+        await connection.ShutDownSendingAsync(CancellationToken.None);
+
+        using (Diagnostics.Phase("dispose the connection"))
+        {
+            await connection.DisposeAsync();
+        }
+
+        var sent = await serverTask;
+        var records = 0;
+        for (var offset = 0; offset < sent.Length; offset += 5 + ((sent[offset + 3] << 8) | sent[offset + 4]))
+        {
+            records++;
+        }
+
+        Diagnostics.Bytes("bytes the server read after the handshake", sent);
+        Diagnostics.Assert("TLS records the server read", 1, records);
+
+        Assert.AreEqual(1, records, "Disposing after ShutDownSendingAsync sent a second close_notify.");
+    }
+
+    [TestMethod]
     public async Task DisposeAsync_WhenTheTransportIsGone_DoesNotThrow()
     {
         Diagnostics.Arrange("client stream disposed first", true);

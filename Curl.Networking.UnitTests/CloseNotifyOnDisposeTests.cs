@@ -85,6 +85,25 @@ public sealed class CloseNotifyOnDisposeTests
         Assert.AreEqual(1, clock.TimersCreated, "Disposing a second time tried to send close_notify again.");
     }
 
+    // ShutDownSendingAsync sends close_notify itself, so disposing after it must not try again;
+    // the stream refuses a second one, so only the clock tells (AF-0718).
+    [TestMethod]
+    public async Task DisposeAsync_OfAHandBuiltTlsConnectionAfterSendingWasShutDown_TriesNoSecondCloseNotify()
+    {
+        var plaintext = new StallingConnection();
+        var clock = new TimerCountingTimeProvider();
+        var connection = new HandBuiltTlsConnection(new MemoryStream(), plaintext, null, string.Empty, matchesOpenSslBuild: false)
+        {
+            CloseNotifyTimeout = s_bound,
+            TimeProvider = clock,
+        };
+
+        await connection.ShutDownSendingAsync(CancellationToken.None);
+        await connection.DisposeAsync().AsTask().WaitAsync(s_generousWait);
+
+        Assert.AreEqual(0, clock.TimersCreated, "Disposing after ShutDownSendingAsync tried to send close_notify again.");
+    }
+
     [TestMethod]
     public async Task DisposeAsync_OfAnSslStreamConnectionWhoseStreamDisposalThrows_StillDisposesTheTransport()
     {
