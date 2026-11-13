@@ -88,6 +88,12 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
     /// <returns>The outcome of the transfer.</returns>
     internal async ValueTask<TransferResult> RunAsync(TftpRequestFile file)
     {
+        TftpTransferTimings timings = new(context.TimeProvider, startTimestamp);
+        return timings.Stamp(await RunUnstampedAsync(file).ConfigureAwait(false));
+    }
+
+    private async ValueTask<TransferResult> RunUnstampedAsync(TftpRequestFile file)
+    {
         schedule = limits.RequestSchedule();
         events.TimeoutsSet(TftpTransferEvents.StartState, schedule);
         var transferSize = upload.CanSeek ? upload.Length - upload.Position : 0;

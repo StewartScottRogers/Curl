@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Original.Protocol.Tftp.UnitLibrary/TftpUpload.cs, Curl.Original.Protocol.Tftp.UnitLibrary/TftpDownload.cs, Curl.Original.Protocol.Tftp.UnitTests/TftpTransferTimingsTests.cs]
+touches: [Curl.Original.Protocol.Tftp.UnitLibrary/TftpTransferTimings.cs, Curl.Original.Protocol.Tftp.UnitLibrary/TftpUpload.cs, Curl.Original.Protocol.Tftp.UnitLibrary/TftpDownload.cs, Curl.Original.Protocol.Tftp.UnitTests/TftpTransferTimingsTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5102 — Report time_* and speed_* write-out variables for tftp:// transfers
 
@@ -33,17 +33,20 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Tftp.UnitTests/TftpTransferTimingsTests.cs`, driven by a fake `TimeProvider` that advances, prove a TFTP download and a TFTP upload produce a `TransferReport` with non-zero total, pretransfer, start-transfer and name-lookup/connect timings, and speeds equal size divided by total time.
-- [ ] Existing size-report tests (`TftpUploadSizeReportTests.cs`) stay green.
-- [ ] Tests are platform-neutral (in-memory UDP stand-ins).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Tftp.UnitTests/TftpTransferTimingsTests.cs`, driven by a fake `TimeProvider` that advances, prove a TFTP download and a TFTP upload produce a `TransferReport` with non-zero total, pretransfer, start-transfer and name-lookup/connect timings, and speeds equal size divided by total time.
+- [x] Existing size-report tests (`TftpUploadSizeReportTests.cs`) stay green.
+- [x] Tests are platform-neutral (in-memory UDP stand-ins).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers in the review were Python; use PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python.
 - Review acceptance check, for a hand check: both `tftp://` commands print non-zero `tt`, `tpt` and `tn`; the download prints non-zero `spd` and the upload non-zero `spu`.
 
+- Done: new TftpTransferTimings stamps Report.Timings in TftpDownload/TftpUpload.RunAsync (new file added to touches). Decision: the datagram channel is open before the transfer starts, so namelookup, connect and pretransfer share one timestamp; starttransfer = completion on success (null on failure). Quality run: Tftp library 100% line and branch, 0 failing members.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 7a9a7505 957057ea 860f6216 a0b49a29.
+- 2026-11-13: Doing -> Done. tftp:// transfers report time_* and speed_* write-out variables
