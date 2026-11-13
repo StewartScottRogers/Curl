@@ -18,7 +18,22 @@ public sealed class PhysicalOutputPathsDirectoryModeTests
     public void CreateRoot() => Directory.CreateDirectory(root);
 
     [TestCleanup]
-    public void DeleteRoot() => Directory.Delete(root, recursive: true);
+    public void DeleteRoot()
+    {
+        try
+        {
+            Directory.Delete(root, recursive: true);
+        }
+        catch (DirectoryNotFoundException) when (!OperatingSystem.IsWindows())
+        {
+            // .NET cannot name a raw-byte directory, so the shell removes what is left.
+            var start = new System.Diagnostics.ProcessStartInfo("/bin/rm");
+            start.ArgumentList.Add("-rf");
+            start.ArgumentList.Add(root);
+            using var process = System.Diagnostics.Process.Start(start)!;
+            process.WaitForExit();
+        }
+    }
 
     [TestMethod]
     public void UnixDirectoryMode_IsOctal0750()
