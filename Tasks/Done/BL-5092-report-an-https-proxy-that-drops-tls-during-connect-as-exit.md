@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/HttpProxyTunnel.cs, Curl.Networking.UnitTests/HttpProxyTunnelMissingCloseNotifyTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5092 — Report an HTTPS proxy that drops TLS during CONNECT as exit 56, not 2
 
@@ -30,17 +30,19 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Networking.UnitTests/HttpProxyTunnelMissingCloseNotifyTests.cs` prove that a missing-close_notify failure while reading the CONNECT reply is reported with `CurlExitCode` 56 (RecvError) and the message `schannel: server closed abruptly (missing close_notify)`, using an in-memory connection stand-in, not a network.
-- [ ] A regression test proves the plain-proxy "Proxy CONNECT aborted" exit 56 and the existing socket-error handling are unchanged.
-- [ ] The tests are platform-neutral (no Windows-only error text outside an `[OSCondition]`-marked test).
-- [ ] `dotnet build Curl.Networking.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Networking.UnitTests/HttpProxyTunnelMissingCloseNotifyTests.cs` prove that a missing-close_notify failure while reading the CONNECT reply is reported with `CurlExitCode` 56 (RecvError) and the message `schannel: server closed abruptly (missing close_notify)`, using an in-memory connection stand-in, not a network.
+- [x] A regression test proves the plain-proxy "Proxy CONNECT aborted" exit 56 and the existing socket-error handling are unchanged.
+- [x] The tests are platform-neutral (no Windows-only error text outside an `[OSCondition]`-marked test).
+- [x] `dotnet build Curl.Networking.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check, as a hand check: the repro command exits 56 with the same stderr line.
+- Fix: `ReadReplyAsync` now treats `MissingCloseNotifyException` as a receive failure (message kept verbatim, exit 56); with part of the head read it is "Proxy CONNECT aborted". Quality run for Curl.Networking.UnitLibrary: 0 failing members. Hand repro with a live HTTPS proxy not run (lane).
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 48fc9223 dd02aed2 c3c68286 0aaa6f77.
+- 2026-11-13: Doing -> Done. Missing close_notify during CONNECT reply is exit 56
