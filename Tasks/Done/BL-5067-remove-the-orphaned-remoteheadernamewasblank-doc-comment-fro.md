@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5067 — Remove the orphaned remoteHeaderNameWasBlank doc comment from CurlCommandRunner
 
@@ -24,9 +24,9 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Console/CurlCommandRunner.cs` has no `<summary>` that mentions a blank `Content-Disposition` name above `IpfsQueryMessage`.
-- [ ] `grep -n "remoteHeaderNameWasBlank" Curl.Console/*.cs` finds nothing.
-- [ ] `dotnet build` is clean and the fast tests for `Curl.Console.UnitTests` are green.
+- [x] `Curl.Console/CurlCommandRunner.cs` has no `<summary>` that mentions a blank `Content-Disposition` name above `IpfsQueryMessage`.
+- [x] `grep -n "remoteHeaderNameWasBlank" Curl.Console/*.cs` finds nothing.
+- [x] `dotnet build` is clean and the fast tests for `Curl.Console.UnitTests` are green.
 
 ## Notes
 
@@ -34,3 +34,4 @@ completed:
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: edb1d69b 2b841772 a100380f.
+- 2026-11-12: Doing -> Done. Removed the orphaned summary; build clean, Console fast tests green

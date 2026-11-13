@@ -618,11 +618,6 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol");
 
     /// <summary>
-    /// Set when a <c>Content-Disposition</c> name was blank; <see cref="TransferIntoOutputFileAsync" /> reads
-    /// and clears it once the transfer returns (BL-5016).
-    /// </summary>
-
-    /// <summary>
     /// The line curl 8.21.0 prints when <c>-G</c> or <c>--url-query</c> asks for a query on an
     /// <c>ipfs://</c> or <c>ipns://</c> URL (measured 2026-10-26, CGR-161, BL-3690 Notes).
     /// </summary>
