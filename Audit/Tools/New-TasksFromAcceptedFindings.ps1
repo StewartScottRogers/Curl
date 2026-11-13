@@ -18,7 +18,13 @@
 
     then fills the task's Goal, Context (the finding's ID, evidence and reproduction, and that
     the finding closes only when a re-audit confirms the fix) and Acceptance criteria (the
-    reproduction no longer reproduces; the build and the fast tests pass) - for a finding whose
+    reproduction no longer reproduces; the build and the fast tests pass). A lane-eligible task
+    names no audit path, since the audit guard refuses a lane every read of Audit/ and Gap/: it
+    does not point at the finding file, and a reproduction that runs an audit tool is replaced -
+    for a surviving mutant (`reproduction: mutation <file>:<line>:<operator>`) by a by-hand check
+    (apply the mutant, see a fast test fail, revert) and a criterion naming the killing test, for
+    any other by a criterion asking for a test that fails before the fix and passes after - and
+    the audit office reruns the reproduction itself on the re-audit. For a finding whose
     key ends in :cost-outlier, instead, a Goal and criteria to find what drove the past run's
     cost and fix it or record that nothing can be, and a Context saying the first audit after the
     task is Done closes the finding - and writes the new
@@ -85,7 +91,7 @@ function Read-Finding([string]$Path) {
     $section = { param([string]$Name) if ($text -match "(?s)## $Name\r?\n(.*?)(\r?\n## |\z)") { $Matches[1].Trim() } else { '' } }
     $location = if ($text -match '(?m)^Location: `([^`]*)`') { $Matches[1] } else { '' }
     $tasks = @("$($fields['tasks'])" -split ',\s*' | Where-Object { $_ -match '^BL-\d+$' })
-    return [pscustomobject]@{ Path = $Path; Text = $text; Id = $fields['id']; Title = $fields['title']; Auditor = $fields['auditor']; Severity = $fields['severity']; Status = $fields['status']; Key = "$($fields['key'])"; Task = $fields['task']; Tasks = $tasks; Location = $location; Evidence = (& $section 'Evidence'); Reproduction = (& $section 'Reproduction') }
+    return [pscustomobject]@{ Path = $Path; Text = $text; Id = $fields['id']; Title = $fields['title']; Auditor = $fields['auditor']; Severity = $fields['severity']; Status = $fields['status']; Key = "$($fields['key'])"; Task = $fields['task']; Tasks = $tasks; Location = $location; Evidence = (& $section 'Evidence'); Reproduction = (& $section 'Reproduction'); ReproductionKind = "$($fields['reproduction'])" }
 }
 
 # The front matter keys in template order; the same as Write-AuditFindings.ps1.
@@ -179,6 +185,12 @@ function Get-TaskTouches([string]$Location, [string]$Root) {
     return @($touches | Select-Object -Unique)
 }
 
+function Test-NamesAuditPath([string]$Text) {
+    # Whether the text names a path the audit guard refuses a lane: Audit/, Gap/, or an auditor or
+    # gap analyst agent (ADR-0267, ADR-0433).
+    return $Text -match '(?i)(^|[\s`''"(=])(Audit|Gap)[\\/]|\.claude[\\/]agents[\\/](audit|gap)-'
+}
+
 function Set-TaskBody([string]$Path, $Finding, $Reopen, [string[]]$Earlier) {
     $goal = "The defect the audit office reported as $($Finding.Id) is fixed: its reproduction no longer reproduces, so a re-audit can close the finding."
     # A finding about one past run's cost cannot stop reproducing: its task is the evidence, and the
@@ -198,21 +210,39 @@ function Set-TaskBody([string]$Path, $Finding, $Reopen, [string[]]$Earlier) {
             $Reopen.Line
             '')
     }
+    # A lane-eligible task never names an audit path: the audit guard refuses a lane every read of
+    # Audit/ and Gap/, so a task that points at the finding file or tells it to run an audit tool
+    # (Invoke-MutationTest.ps1 above all) costs the lane a refused turn and leaves the criterion
+    # unprovable. Such a task carries what the lane needs instead, and the audit office reruns the
+    # reproduction itself on the re-audit. An interactive-only process task keeps both (ADR-0761).
+    $laneEligible = -not $liveWindow
+    $findingLine = if ($laneEligible) { "Filed from audit finding $($Finding.Id) ($($Finding.Severity), $($Finding.Auditor) auditor), which Stewart accepted. The finding's file is on the audit office's paths, which a dark factory lane may not read or run; everything this task needs is below." } else { "Filed from audit finding $($Finding.Id) ($($Finding.Severity), $($Finding.Auditor) auditor), which Stewart accepted. The finding is ``Audit/Findings/$(Split-Path $Finding.Path -Leaf)``." }
+    $reproduction = @('Reproduction, from the finding:', '', $Finding.Reproduction)
+    $criteria = "- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.`n- [ ] ``dotnet build`` and the fast tests (``dotnet test --filter `"TestCategory!=Integration`"``) pass."
+    if ($laneEligible -and (Test-NamesAuditPath $Finding.Reproduction)) {
+        if ($Finding.ReproductionKind -match '^mutation\s+(\S+):(\d+):(.+)$') {
+            $site = "$($Matches[1]) line $($Matches[2])"
+            $reproduction = @(
+                "Reproduction: the audit office's mutation test changed ``$site`` as the evidence above describes (the mutant operator is ``$($Matches[3].Trim())``), and every test still passed. Check it by hand, not with the audit tools: make that one change, run the library's ``.UnitTests`` project, see a test fail, and revert the change. The audit office reruns its mutation test on the re-audit.")
+            $criteria = "- [ ] With the mutant the evidence describes applied by hand at ``$site``, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.`n- [ ] ``dotnet build`` and the fast tests (``dotnet test --filter `"TestCategory!=Integration`"``) pass."
+        }
+        else {
+            $reproduction = @("Reproduction: the finding's reproduction runs an audit office tool, which a lane may not run; the audit office reruns it on the re-audit. Prove the fix with a test instead.")
+            $criteria = "- [ ] A fast test fails on the code as the evidence above describes it and passes after the fix; Notes name the test.`n- [ ] ``dotnet build`` and the fast tests (``dotnet test --filter `"TestCategory!=Integration`"``) pass."
+        }
+    }
     $context = @(
-        "Filed from audit finding $($Finding.Id) ($($Finding.Severity), $($Finding.Auditor) auditor), which Stewart accepted. The finding is ``Audit/Findings/$(Split-Path $Finding.Path -Leaf)``."
+        $findingLine
         ''
         $again
         "Location: ``$($Finding.Location)``"
         ''
         $Finding.Evidence
         ''
-        'Reproduction, from the finding:'
-        ''
-        $Finding.Reproduction
+        $reproduction
         ''
         $closing
     ) -join "`n"
-    $criteria = "- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.`n- [ ] ``dotnet build`` and the fast tests (``dotnet test --filter `"TestCategory!=Integration`"``) pass."
     if ($historical) {
         $goal = "What drove the past run's cost that the audit office reported as $($Finding.Id) is found, and any avoidable waste in it is fixed, or the task records that there is none."
         $criteria = "- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.`n- [ ] ``dotnet build`` and the fast tests (``dotnet test --filter `"TestCategory!=Integration`"``) pass."
@@ -313,10 +343,12 @@ if ($SelfTest) {
     New-Item -ItemType Directory -Force (Join-Path $work 'Curl.Cli.UnitTests'), (Join-Path $work 'findings') | Out-Null
     $failed = 0
     function Check([string]$Name, [bool]$Ok, [string]$Detail) { if (-not $Ok) { $script:failed++ }; Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Detail" }
-    $finding = { param($Id, $Status, $Task, $Severity, $Auditor, $Key)
+    $finding = { param($Id, $Status, $Task, $Severity, $Auditor, $Key, $Command, $Kind)
         if (-not $Key) { $Key = "k:$Id" }
+        if (-not $Command) { $Command = 'Select-String x' }
+        if (-not $Kind) { $Kind = 'none' }
         $t = [IO.File]::ReadAllText((Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md'))
-        $t = $t.Replace('{{ID}}', $Id).Replace('{{TITLE}}', "Finding $Id").Replace('{{AUDITOR}}', $Auditor).Replace('{{SEVERITY}}', $Severity).Replace('{{KEY}}', $Key).Replace('{{FOUND}}', '2026-10-14').Replace('{{FOUND_AT}}', 'abc').Replace('{{SCORECARD}}', '2026-10-14_0930.md').Replace('{{SUMMARY}}', 's').Replace('{{LOCATION}}', 'Curl.Cli.UnitTests/ParserTests.cs:30').Replace('{{EVIDENCE}}', 'IsNotNull only').Replace('{{REPRODUCTION_COMMAND}}', 'Select-String x').Replace('{{REPRODUCTION_EXPECTED}}', 'e').Replace('{{REPRODUCTION_ACTUAL}}', 'a')
+        $t = $t.Replace('{{ID}}', $Id).Replace('{{TITLE}}', "Finding $Id").Replace('{{AUDITOR}}', $Auditor).Replace('{{SEVERITY}}', $Severity).Replace('{{KEY}}', $Key).Replace('{{FOUND}}', '2026-10-14').Replace('{{FOUND_AT}}', 'abc').Replace('{{SCORECARD}}', '2026-10-14_0930.md').Replace('{{SUMMARY}}', 's').Replace('{{LOCATION}}', 'Curl.Cli.UnitTests/ParserTests.cs:30').Replace('{{EVIDENCE}}', 'IsNotNull only').Replace('{{REPRODUCTION_COMMAND}}', $Command).Replace('{{REPRODUCTION}}', $Kind).Replace('{{REPRODUCTION_EXPECTED}}', 'e').Replace('{{REPRODUCTION_ACTUAL}}', 'a')
         $t = $t.Replace('status: proposed', "status: $Status").Replace('task: none', "task: $Task")
         [IO.File]::WriteAllText((Join-Path $work "findings\$Id-x.md"), $t, $Utf8)
     }
@@ -357,7 +389,11 @@ if ($SelfTest) {
     & $reaudit 'AF-0012' @('- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | BL-800 still cost 4 times the median')
     & $finding 'AF-0013' 'accepted' 'none' 'Low' 'process' 'process:logs:BL-801:cost-outlier'
     # Any other process finding measures a frozen log copy: its task measures the live logs (ADR-0761).
-    & $finding 'AF-0014' 'accepted' 'none' 'Medium' 'process' 'process:logs:BL-802:requeues'
+    & $finding 'AF-0014' 'accepted' 'none' 'Medium' 'process' 'process:logs:BL-802:requeues' 'powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-14'
+    # A lane-eligible task never names an audit path: a surviving mutant gets a by-hand check, any
+    # other audit-tool reproduction a test to write (the audit guard refuses a lane both tools).
+    & $finding 'AF-0015' 'accepted' 'none' 'High' 'quality' 'quality:m' 'powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Cli.UnitTests/Parser.cs:30:>= -Member Read' 'mutation Curl.Cli.UnitTests/Parser.cs:30:>='
+    & $finding 'AF-0016' 'accepted' 'none' 'Medium' 'security' 'security:s' 'powershell -NoProfile -File Audit/Tools/Find-SecretsInDiagnostics.ps1'
     & $reaudit 'AF-0011' @('- 2026-10-06 | 2026-10-06_0900.md | reproduces: yes | still fails', '- 2026-10-07 | 2026-10-07_0844.md | not re-audited | overlaps planted defect PD-303 in Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, so the auditor''s verdict (reproduces yes) is set aside: 282 options')
     $before = @{}; foreach ($f in Get-ChildItem (Join-Path $work 'findings')) { $before[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
     $board = Join-Path $repo '.claude\skills\task-board\task-board.ps1'
@@ -401,6 +437,15 @@ if ($SelfTest) {
         $liveText = if ($liveTask.Count -eq 1) { [IO.File]::ReadAllText($liveTask[0].FullName) } else { '' }
         Check 'a process finding''s task measures the live logs after the fix, not the frozen copy' ($liveTask.Count -eq 1 -and $liveText -match 'run over the live logs written after the fix landed' -and $liveText -match 'ADR-0761' -and $liveText -notmatch 'run from the repository root, gives the expected result' -and $liveText -match 'confirms the fix' -and $liveText -notmatch '<!--') "$($liveTask.Count)"
         Check 'a process finding''s task is interactive only' ($liveText -match '(?m)^lane: no\r?$') 'AF-0014'
+        Check 'an interactive-only task keeps the finding file and the audit tool' ($liveText -match 'Audit/Findings/AF-0014-x\.md' -and $liveText -match 'Measure-FactoryProcess\.ps1') 'AF-0014'
+        $bodyOf = { param($Id) $hit = @(Get-ChildItem (Join-Path $work 'Tasks\Backlog') -Filter 'BL-*.md' | Where-Object { [IO.File]::ReadAllText($_.FullName) -match "(?m)^title: Fix $Id" }); if ($hit.Count -eq 1) { [IO.File]::ReadAllText($hit[0].FullName) } else { '' } }
+        $mutantText = & $bodyOf 'AF-0015'
+        Check 'a surviving mutant''s lane task names no audit path' ($mutantText -and -not (Test-NamesAuditPath $mutantText)) 'AF-0015'
+        Check 'a surviving mutant''s lane task checks the mutant by hand at its site' ($mutantText -match 'Check it by hand' -and $mutantText -match '- \[ \] With the mutant the evidence describes applied by hand at `Curl\.Cli\.UnitTests/Parser\.cs line 30`' -and $mutantText -notmatch 'run from the repository root, gives the expected result' -and $mutantText -notmatch '<!--') 'AF-0015'
+        $toolText = & $bodyOf 'AF-0016'
+        Check 'any other audit-tool reproduction asks for a test instead, naming no audit path' ($toolText -and -not (Test-NamesAuditPath $toolText) -and $toolText -match 'Prove the fix with a test instead' -and $toolText -match '- \[ \] A fast test fails on the code') 'AF-0016'
+        $plainText = & $bodyOf 'AF-0001'
+        Check 'a reproduction that needs no audit tool is kept, and the task names no audit path' ($plainText -and -not (Test-NamesAuditPath $plainText) -and $plainText -match 'Select-String x' -and $plainText -match 'run from the repository root, gives the expected result') 'AF-0001'
         if ($tasks.Count -eq 1) {
             $t = [IO.File]::ReadAllText($tasks[0].FullName)
             $id = ($tasks[0].Name -split '-')[0..1] -join '-'
