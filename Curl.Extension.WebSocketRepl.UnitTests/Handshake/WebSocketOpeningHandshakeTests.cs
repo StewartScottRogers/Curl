@@ -65,6 +65,19 @@ public sealed class WebSocketOpeningHandshakeTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_ResponseBeginsWithAnEmptyLine_RefusesAtOnceWithoutReadingOn()
+    {
+        ScriptedConnection connection = new((1, Encoding.ASCII.GetBytes("\r\n\r\n")));
+
+        WebSocketHandshakeResult result = await new WebSocketOpeningHandshake(RfcNonce)
+            .PerformAsync(connection, "server.example.com", "/chat", TestContext.CancellationToken);
+
+        Assert.IsNotNull(result.Failure);
+        Assert.AreNotEqual("the connection closed before the response head ended", result.Failure);
+        Assert.IsTrue(result.AlreadyReceived.IsEmpty);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_HeadLongerThanTheLimit_Fails()
     {
         byte[] longHead = new byte[WebSocketOpeningHandshake.LongestResponseHead / 2];
