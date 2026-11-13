@@ -27,14 +27,16 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A new `Curl.Original.Protocol.Http.UnitTests/HttpDownloadConditionsResumeInfoLineTests.cs` asserts that the 200-without-Range case reports the info line `HTTP server does not seem to support byte ranges. Cannot resume.` through the transfer-event/verbose channel before throwing, with the failure still mapping to `CurlExitCode` 33.
-- [ ] The info line appears between `< Content-Length: 1000` and the blank `< ` line, matching REF's order, in a handler-level test; the `curl: (33) ...` final line is unchanged.
-- [ ] Regression: a `206` response to `-C 10` still resumes with no such line, and the `-f` and `--max-filesize` info lines are unchanged.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new `Curl.Original.Protocol.Http.UnitTests/HttpDownloadConditionsResumeInfoLineTests.cs` asserts that the 200-without-Range case reports the info line `HTTP server does not seem to support byte ranges. Cannot resume.` through the transfer-event/verbose channel before throwing, with the failure still mapping to `CurlExitCode` 33.
+- [x] The info line appears between `< Content-Length: 1000` and the blank `< ` line, matching REF's order, in a handler-level test; the `curl: (33) ...` final line is unchanged.
+- [x] Regression: a `206` response to `-C 10` still resumes with no such line, and the `-f` and `--max-filesize` info lines are unchanged.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text.
+
+- Notes: info line reported in DecideResume before the exit-33 throw; it sits at the same spot as the other http_firstwrite info lines. Quality run: 0 failing members.
 
 ## Log
 

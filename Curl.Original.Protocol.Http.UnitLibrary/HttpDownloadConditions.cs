@@ -74,7 +74,7 @@ internal static class HttpDownloadConditions
         }
 
         long resumeFrom = context.ResumeFrom.GetValueOrDefault();
-        return resumeFrom > 0 ? DecideResume(head, resumeFrom, sendsBody) : DecideTimeCondition(context, head);
+        return resumeFrom > 0 ? DecideResume(context, head, resumeFrom, sendsBody) : DecideTimeCondition(context, head);
     }
 
     /// <summary>
@@ -162,7 +162,7 @@ internal static class HttpDownloadConditions
     /// <summary>
     /// Decides a resume: a request with a body is not checked, as curl checks only a GET.
     /// </summary>
-    private static HttpBodyDelivery DecideResume(HttpResponseHead head, long resumeFrom, bool sendsBody)
+    private static HttpBodyDelivery DecideResume(ITransferContext context, HttpResponseHead head, long resumeFrom, bool sendsBody)
     {
         if (sendsBody)
         {
@@ -179,8 +179,12 @@ internal static class HttpDownloadConditions
             return HttpBodyDelivery.Deliver;
         }
 
-        return HttpContentLength.Find(head.Headers) == resumeFrom
-            ? HttpBodyDelivery.NothingLeftToResume
-            : throw new HttpTransferException(CurlExitCode.RangeError, HttpTransferMessages.ResumeNotSupported);
+        if (HttpContentLength.Find(head.Headers) == resumeFrom)
+        {
+            return HttpBodyDelivery.NothingLeftToResume;
+        }
+
+        context.Events.ReportInfo(HttpTransferMessages.ResumeNotSupported);
+        throw new HttpTransferException(CurlExitCode.RangeError, HttpTransferMessages.ResumeNotSupported);
     }
 }
