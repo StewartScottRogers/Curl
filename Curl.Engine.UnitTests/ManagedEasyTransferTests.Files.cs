@@ -47,6 +47,42 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task DisposeAsync_HttpPerformWithNoCookieOptionsAfterOneWithAJar_StillWritesTheEarlierJar()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(SetsCookie), Encoding.ASCII.GetBytes(SetsCookie)]);
+        MemoryFileSystem files = new();
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
+        easy.Host = HostOf(files);
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://example.com/x" }, Http = new EasyHttpOptions { CookieJar = "out.txt" } };
+        await easy.PerformAsync(CancellationToken.None);
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://example.com/y" } };
+        await easy.PerformAsync(CancellationToken.None);
+
+        await easy.DisposeAsync();
+
+        StringAssert.Contains(Encoding.ASCII.GetString(files.Files["out.txt"]), "\tgot\t2");
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_NonHttpPerformWithCookiesAfterOneWithAJar_KeepsTheHttpJar()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(SetsCookie)]);
+        MemoryFileSystem files = new() { Files = { ["in.txt"] = Encoding.ASCII.GetBytes("ftp.example\tFALSE\t/\tFALSE\t0\tftpcookie\t1\n") } };
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
+        easy.Host = HostOf(files);
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://example.com/x" }, Http = new EasyHttpOptions { CookieJar = "out.txt" } };
+        await easy.PerformAsync(CancellationToken.None);
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "ftp://ftp.example/x" }, Http = new EasyHttpOptions { CookieFiles = ["in.txt"] } };
+        await easy.PerformAsync(CancellationToken.None);
+
+        await easy.DisposeAsync();
+
+        string jar = Encoding.ASCII.GetString(files.Files["out.txt"]);
+        StringAssert.Contains(jar, "\tgot\t2");
+        Assert.DoesNotContain("ftpcookie", jar);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_AltSvcAndHstsFiles_ReadsThemBeforeAndWritesHstsAfterTheTransferAndAltSvcAtCleanup()
     {
         const string LearnsBoth = "HTTP/1.1 200 OK\r\nAlt-Svc: h2=\"alt:443\"; ma=3600\r\nStrict-Transport-Security: max-age=31536000\r\nContent-Length: 0\r\n\r\n";

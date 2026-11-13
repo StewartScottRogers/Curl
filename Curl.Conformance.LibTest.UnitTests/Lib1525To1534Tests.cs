@@ -75,6 +75,17 @@ public sealed class Lib1525To1534Tests
     }
 
     [TestMethod]
+    public void HelloCloudReader_IntoABufferExactlyTheDataSize_CopiesTheWholeData()
+    {
+        byte[] buffer = new byte[13];
+
+        long count = LibProxyTunnelUpload.HelloCloudReader.Read(buffer);
+
+        Assert.AreEqual(13L, count);
+        Assert.AreEqual("Hello Cloud!\n", Encoding.ASCII.GetString(buffer));
+    }
+
+    [TestMethod]
     public void HelloCloudReader_IntoASmallerBuffer_CopiesNothingYetAnswersTheLength()
     {
         byte[] buffer = new byte[4];

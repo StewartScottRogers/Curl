@@ -384,6 +384,16 @@ public sealed class OpenSslPeerCertificateTextTests
             RecordOf(text, "CT Precertificate SCTs"));
     }
 
+    [TestMethod]
+    public void Format_SmallestVersionOneTimestampOf47Bytes_PrintsNoExtensionsAndAnEmptySignature()
+    {
+        byte[] smallest = Sct(0, 0x0403, [], []);
+        string text = Format(SctExtension(smallest));
+
+        Assert.HasCount(47, smallest);
+        StringAssert.Contains(RecordOf(text, "CT Precertificate SCTs"), "    Extensions: none\n    Signature : ecdsa-with-SHA256\n");
+    }
+
     // Follows ct_prn: an extension prints as hex, a SHA-256 RSA signature by its name, any other as unknown.
     [TestMethod]
     [DataRow(0x0401, "sha256WithRSAEncryption")]

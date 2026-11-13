@@ -40,6 +40,22 @@ public sealed class Lib530Tests
     }
 
     [TestMethod]
+    public async Task RunAsync_SentHeader_TracesItWithoutTheTimeAndWithTheHexColumn()
+    {
+        var engine = new FakeCurlEngine();
+        var multi = engine.Multi;
+        multi.SocketActing = (_, _) => Finish(multi, (CurlMultiCode.Ok, 0));
+        var run = new PortRun(engine, 530, "http://127.0.0.1/file530");
+
+        _ = await new Lib530(new ManualTimeProvider(DateTimeOffset.UnixEpoch)).RunAsync(run.Context, CancellationToken.None);
+        int traced = multi.Added!.Options.Callbacks.Debug!(CurlInfoType.HeaderOut, "GET\r\n"u8);
+
+        Assert.AreEqual(0, traced);
+        StringAssert.EndsWith(run.Error.ToString(), "=> Send header, 5 bytes (0x5)\n0000: 47 45 54 0d 0a                                  GET..\n");
+        Assert.DoesNotContain("00:00:00", run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task TestAsync_FirstRunFails_WritesFailed()
     {
         var engine = new FakeCurlEngine();

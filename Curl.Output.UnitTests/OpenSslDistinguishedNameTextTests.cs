@@ -161,6 +161,22 @@ public sealed class OpenSslDistinguishedNameTextTests
     }
 
     [TestMethod]
+    public void Format_ContextSpecificPrimitiveWithStringTagNumber_DumpsTheDerInHex()
+    {
+        // [CONTEXT 19] primitive, one byte 'A': numbered like a PrintableString but not one.
+        string? actual = Format([[EncodedAttribute(CommonName, [0x93, 0x01, 0x41])]]);
+        Assert.AreEqual("CN=#930141", actual);
+    }
+
+    [TestMethod]
+    public void Format_ConstructedUniversalStringTag_DumpsTheDerInHex()
+    {
+        // Constructed PrintableString (0x33) wrapping a primitive one: dumped, not printed.
+        string? actual = Format([[EncodedAttribute(CommonName, [0x33, 0x03, 0x13, 0x01, 0x41])]]);
+        Assert.AreEqual("CN=#3303130141", actual);
+    }
+
+    [TestMethod]
     public void Format_ConstructedValue_DumpsTheDerInHex()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);

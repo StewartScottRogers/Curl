@@ -41,6 +41,28 @@ public sealed class Cgr145Tests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_SockoptWithoutOpenSocket_SeesTcpNoDelayOnTheSocketLikeCurlsDefault()
+    {
+        using Socket listener = Listen();
+        List<bool> noDelay = [];
+        SocketCallbackConnector connector = Create(new EasyCallbackOptions
+        {
+            SocketOption = (socket, _) =>
+            {
+                using Socket view = new(new SafeSocketHandle(socket.Handle, ownsHandle: false));
+                noDelay.Add(view.NoDelay);
+                return SocketOptionResult.Ok;
+            },
+        });
+
+        ConnectResult result = await connector.ConnectAsync(TargetOf(listener), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        await using IConnection connection = result.Connection!;
+        CollectionAssert.AreEqual(new[] { true }, noDelay);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_SockoptReturnsErrorWithoutOpenSocket_ClosesTheSocketItSawAndMakesNoConnection()
     {
         using Socket listener = Listen();

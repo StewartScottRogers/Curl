@@ -106,6 +106,35 @@ public sealed class EasyAuthenticationOptionsMappingTests
     }
 
     [TestMethod]
+    [DataRow(null, "ed25519")]
+    [DataRow("ed25519", "ed25519")]
+    [DataRow("ED25519", "ed25519")]
+    [DataRow("hmac-sha256", "hmac-sha256")]
+    public void HttpSignatureSetupOf_AlgorithmGivenOrDefaulted_UsesTheSupportedAlgorithm(string? given, string expected)
+    {
+        EasyAuthenticationOptions authentication = new() { HttpSignatureAlgorithm = given, HttpSignatureKey = "00112233", HttpSignatureKeyId = "k1" };
+        Diagnostics.Arrange("algorithm", given);
+
+        HttpSignatureSetup setup = HttpSignatureSetup.Of(authentication);
+        Diagnostics.Act("exit / settings", $"{setup.ExitCode} / {setup.Settings}");
+
+        Assert.AreEqual(CurlExitCode.Ok, setup.ExitCode);
+        Assert.IsNull(setup.ErrorLine);
+        Assert.AreEqual(new HttpSignatureSettings(expected, "00112233", "k1", null), setup.Settings);
+    }
+
+    [TestMethod]
+    public void HttpSignatureSetupOf_UnsupportedAlgorithm_RefusesWithExit2()
+    {
+        EasyAuthenticationOptions authentication = new() { HttpSignatureAlgorithm = "rsa", HttpSignatureKey = "00112233", HttpSignatureKeyId = "k1" };
+
+        HttpSignatureSetup setup = HttpSignatureSetup.Of(authentication);
+
+        Assert.AreEqual(CurlExitCode.FailedInit, setup.ExitCode);
+        Assert.AreEqual("curl: --httpsig-algo: unsupported algorithm 'rsa'", setup.ErrorLine);
+    }
+
+    [TestMethod]
     public void MailFromCommandLine_Record_CopiesTheLoginSaslBearerAndServiceName()
     {
         EasyAuthenticationOptions authentication = new()

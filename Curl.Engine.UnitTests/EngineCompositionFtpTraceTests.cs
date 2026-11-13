@@ -86,6 +86,32 @@ public sealed class EngineCompositionFtpTraceTests
     }
 
     [TestMethod]
+    public async Task CreateProtocolHandlers_FtpTransferWithoutTracesFtp_WritesNoFtpLines()
+    {
+        // ManagedCurlEngine's libcurl path builds the handlers without tracesFtp, so the default decides.
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes(ControlReplies), "hello"u8.ToArray()]);
+        IProtocolHandler ftp = EngineComposition
+            .CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())
+            .Single(handler => handler.SupportedSchemes.Contains("ftp"));
+        InfoRecordingEvents events = new();
+
+        TransferResult result = await ftp.ExecuteAsync(new TransferContext
+        {
+            Url = CurlUrl.Parse("ftp://127.0.0.1/file.txt"),
+            Output = new MemoryStream(),
+            Events = events,
+        });
+        int ftpLines = events.Info.Count(line => line.StartsWith("[FTP] ", StringComparison.Ordinal));
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("[FTP] line count", ftpLines);
+
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("[FTP] line count", 0, ftpLines);
+        Assert.AreEqual(0, ftpLines);
+    }
+
+    [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
     public async Task CreateProtocolHandlers_FtpTransfer_WritesTheFtpLinesOnlyWhenTraced(bool tracesFtp)

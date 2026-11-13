@@ -28,6 +28,7 @@ public sealed class WebSocketReplExtensionTests
     {
         Assert.AreEqual("ws-repl", WebSocketReplExtension.Description.Name);
         Assert.AreSame(WebSocketReplExtension.Option, WebSocketReplExtension.Description.Options.Single());
+        Assert.AreEqual(new Uri("https://www.rfc-editor.org/rfc/rfc6455"), WebSocketReplExtension.Description.Specification);
     }
 
     // With CURL_EXTENSIONS=0 the option is not registered, so curl's parser refuses --ws-repl as an unknown option (exit 2).

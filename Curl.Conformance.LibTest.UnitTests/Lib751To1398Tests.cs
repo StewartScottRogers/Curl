@@ -140,7 +140,7 @@ public sealed class Lib751To1398Tests
     [DataRow(1, "curl_multi_perform() failed")]
     [DataRow(2, "curl_multi_wait() returned 2\n")]
     [DataRow(3, "curl_multi_add_handle() failed")]
-    [DataRow(4, "multi_perform() -> 1 running\nLib753.cs:171 curl_multi_perform() failed")]
+    [DataRow(4, "multi_perform() -> 1 running\nLib753.cs:175 curl_multi_perform() failed")]
     public async Task Lib753_OnAFailingMultiCall_StopsAndWritesTheError(int failing, string expected)
     {
         var engine = new FakeCurlEngine();
