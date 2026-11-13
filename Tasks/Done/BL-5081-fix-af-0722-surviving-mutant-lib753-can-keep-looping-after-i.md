@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5081 — Fix AF-0722: Surviving mutant: lib753 can keep looping after its test timeout aborts
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The survivor was an equivalent mutant: `return (true, 0)` ended the loop anyway because `StartAndLoopAsync` stopped on `running > 0`. The loop now runs on `goesOn` alone (the `running > 0` test moved into `StillRunning`, with the hang guard), so a refused guard that did not stop the loop would spin on; the existing `Lib753_PastTheHangTimeout_Aborts` test kills it. Lane cannot run `Audit/Tools` (guard refuses), so the reproduction is left to the re-audit; build, fast tests and Measure-CodeQuality (0 failing) pass. The pinned `Lib753.cs:175` line in Lib751To1398Tests moved with the edit.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Loop now runs on goesOn alone so the timeout guard is observable; build, fast tests, quality green

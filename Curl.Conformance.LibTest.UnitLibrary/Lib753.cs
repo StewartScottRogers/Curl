@@ -117,7 +117,8 @@ public sealed class Lib753(TimeProvider timeProvider) : ILibTest
             }
 
             var (goesOn, running) = await PerformAsync(multi, cancellationToken).ConfigureAwait(false);
-            while (goesOn && running > 0)
+            goesOn = goesOn && running > 0;
+            while (goesOn)
             {
                 (goesOn, running) = await TurnAsync(multi, status, cancellationToken).ConfigureAwait(false);
             }
@@ -145,8 +146,11 @@ public sealed class Lib753(TimeProvider timeProvider) : ILibTest
             }
 
             var (goesOn, running) = await PerformAsync(multi, cancellationToken).ConfigureAwait(false);
-            return (goesOn && steps.AbortOnTestTimeout(clock), running);
+            return (StillRunning(goesOn, running), running);
         }
+
+        // The loop goes on while the perform did, the hang guard allows it and a transfer is still running.
+        private bool StillRunning(bool goesOn, int running) => goesOn && steps.AbortOnTestTimeout(clock) && running > 0;
 
         // EASY1 cleaned up while still in the multi handle, then EASY2, which does not pause, added.
         private async ValueTask<bool> SwapAsync(CurlMulti multi)
