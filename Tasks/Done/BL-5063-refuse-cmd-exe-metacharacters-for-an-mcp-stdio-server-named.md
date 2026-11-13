@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.McpClient.UnitLibrary/Stdio/McpBatchArgumentRefusal.cs, Curl.Extended.Protocol.McpClient.UnitTests/Stdio/McpBatchArgumentRefusalTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5063 — Refuse cmd.exe metacharacters for an MCP stdio server named with a trailing dot or space after .cmd or .bat
 
@@ -40,3 +40,4 @@ TrimEnd of dots and spaces before the extension check; quality run: 0 failing me
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 3fb92545 58fcdbec 58acf080 3d836d5e.
+- 2026-11-12: Doing -> Done. Trailing dots and spaces are trimmed before the .cmd/.bat check; tests added
