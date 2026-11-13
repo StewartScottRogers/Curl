@@ -1,5 +1,5 @@
 ---
-id: BL-5146
+id: BL-5149
 title: Check --sigstore only against the body of the final response when -L follows redirects
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-13
 completed:
 ---
-# BL-5146 — Check --sigstore only against the body of the final response when -L follows redirects
+# BL-5149 — Check --sigstore only against the body of the final response when -L follows redirects
 
 ## Goal
 

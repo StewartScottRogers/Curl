@@ -43,7 +43,7 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - Review acceptance check, for a hand check: step 1 exits 0 and `o.txt` contains `hello`; step 2 exits 61 with `got sha256:5891b5...`.
 - Keep `--ai-help` and `--extended-help` right if their `--checksum` text says anything about redirects.
-- Done: `ChecksumTransferHook` skips judging a hop the follower will follow (-L, max-redirs not reached, 3xx with Location). `--ai-help` says nothing about redirects. Sigstore hook has the same per-hop shape (`next` per hop, no redirect check): filed BL-5146. Quality run on Checksum library: 0 failing. CI criterion met by platform-neutral tests (no socket).
+- Done: `ChecksumTransferHook` skips judging a hop the follower will follow (-L, max-redirs not reached, 3xx with Location). `--ai-help` says nothing about redirects. Sigstore hook has the same per-hop shape (`next` per hop, no redirect check): filed BL-5149. Quality run on Checksum library: 0 failing. CI criterion met by platform-neutral tests (no socket).
 
 ## Log
 
