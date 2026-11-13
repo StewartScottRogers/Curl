@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5073 — Fix AF-0714: Surviving mutant: a handle's cookie jar can be dropped or taken from a non-HTTP transfer at cleanup
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The audit guard refuses a lane running Invoke-MutationTest.ps1, so the mutant (`&&` to `||` at ManagedEasyTransfer.SetUp.cs:78) was applied by hand: both new tests in ManagedEasyTransferTests.Files.cs (`DisposeAsync_HttpPerformWithNoCookieOptionsAfterOneWithAJar_StillWritesTheEarlierJar`, `DisposeAsync_NonHttpPerformWithCookiesAfterOneWithAJar_KeepsTheHttpJar`) failed with it and pass without it. Fast Engine tests green (3014 passed). Test-only change, no production code touched.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Two tests kill the mutant
