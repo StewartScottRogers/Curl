@@ -106,7 +106,7 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
             while (true)
             {
                 DatagramReceived received = await channel.ReceiveAsync(buffer, waiting.Token).ConfigureAwait(false);
-                if (IsAnswerTo(buffer.AsSpan(0, received.Length), query))
+                if (IsFromServer(channel.ServerEndPoint, received.RemoteEndPoint) && IsAnswerTo(buffer.AsSpan(0, received.Length), query))
                 {
                     return buffer[..received.Length];
                 }
@@ -157,6 +157,17 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
 
         return offset + 1;
     }
+
+    /// <summary>
+    /// Tells whether a datagram came from the server queried: the same port and the same address, an IPv4-mapped IPv6
+    /// address counting as its IPv4 form (RFC 5452 section 9.1). A server endpoint that is not an IP endpoint cannot be
+    /// compared and accepts any source.
+    /// </summary>
+    private static bool IsFromServer(EndPoint server, EndPoint source) =>
+        server is not IPEndPoint expected
+        || (source is IPEndPoint actual && actual.Port == expected.Port && Unmapped(actual.Address).Equals(Unmapped(expected.Address)));
+
+    private static IPAddress Unmapped(IPAddress address) => address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
 
     private static bool IsTruncated(byte[] answer) =>
         (BinaryPrimitives.ReadUInt16BigEndian(answer.AsSpan(2)) & DnsHeader.TruncatedFlag) != 0;

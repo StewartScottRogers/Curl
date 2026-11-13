@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Extended.Protocol.DnsQuery.UnitLibrary/Transport/Udp/DnsUdpTransport.cs, Curl.Extended.Protocol.DnsQuery.UnitTests/Transport, Documentation/Conformance/Extended/DnsQuery.md]
+touches: [Curl.Extended.Protocol.DnsQuery.UnitLibrary/Transport/Udp/DnsUdpTransport.cs, Curl.Extended.Protocol.DnsQuery.UnitTests/Transport, Documentation/Conformance/Extended/DnsQuery.md, Curl.Conformance.Extended.UnitLibrary/Harness, Curl.Conformance.Extended.UnitTests/DnsQuery/DnsQueryMessageTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5135 — Ignore dns:// UDP replies that do not come from the queried server's address and port (EXT-046)
 
@@ -41,12 +41,12 @@ That is: the queried server's socket (127.0.0.1:29061) receives the query; a dif
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.DnsQuery.UnitTests/Transport/DnsUdpSourceEndpointTests.cs` (new, using the existing `ScriptedDnsServer` or an in-memory `IDatagramChannel`) prove that a well-formed reply with the right ID and question from another IP is ignored and the genuine reply after it is the answer.
-- [ ] A test proves the same for a reply from the right IP but another port, and a test proves that when only spoofed replies arrive the attempt times out like a lost reply (the existing retry path) instead of accepting one.
-- [ ] A test proves a reply from the server endpoint written in IPv4-mapped IPv6 form is still accepted, and the existing UDP tests stay green.
-- [ ] `Documentation/Conformance/Extended/DnsQuery.md` gains a MUST row (RFC 5452 section 9.1, source address and port of a UDP reply) whose "Covered by" names a test from this task.
-- [ ] The tests are platform-neutral (no real socket outside loopback unit tests already used, no second loopback address such as 127.0.0.2 in a unit test, since macOS does not route it by default).
-- [ ] `dotnet build Curl.Extended.Protocol.DnsQuery.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.DnsQuery.UnitTests/Transport/DnsUdpSourceEndpointTests.cs` (new, using the existing `ScriptedDnsServer` or an in-memory `IDatagramChannel`) prove that a well-formed reply with the right ID and question from another IP is ignored and the genuine reply after it is the answer.
+- [x] A test proves the same for a reply from the right IP but another port, and a test proves that when only spoofed replies arrive the attempt times out like a lost reply (the existing retry path) instead of accepting one.
+- [x] A test proves a reply from the server endpoint written in IPv4-mapped IPv6 form is still accepted, and the existing UDP tests stay green.
+- [x] `Documentation/Conformance/Extended/DnsQuery.md` gains a MUST row (RFC 5452 section 9.1, source address and port of a UDP reply) whose "Covered by" names a test from this task.
+- [x] The tests are platform-neutral (no real socket outside loopback unit tests already used, no second loopback address such as 127.0.0.2 in a unit test, since macOS does not route it by default).
+- [x] `dotnet build Curl.Extended.Protocol.DnsQuery.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -57,3 +57,10 @@ That is: the queried server's socket (127.0.0.1:29061) receives the query; a dif
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 07b84187 b7de9068 8270dfc0 e3dd03fe 81f2b45f 024c2e36.
+
+## Notes
+
+- Fix: `DnsUdpTransport.IsFromServer` drops datagrams whose source port or address differs from `channel.ServerEndPoint` (IPv4-mapped IPv6 equals IPv4); a non-IP server endpoint accepts any source (cannot be compared).
+- Widened `touches` to the conformance harness: the matrix requires a `[SpecRequirement]` test for the new row `DnsQuery:RFC5452-9.1-3`, so the in-process reference datagram channel gained `ISourcedDatagramReferenceServer`/`SourcedDatagram` (replies with their own source) and `DnsQueryMessageTests.ReplyFromAnotherPort_...` covers it. No other Doing task held those files.
+- The Linux/macOS criterion is met by platform-neutral tests (no second loopback address). Quality runs for both libraries: 0 failing members.
+- 2026-11-13: Doing -> Done. Done: dns:// UDP replies taken only from the queried server's address and port
