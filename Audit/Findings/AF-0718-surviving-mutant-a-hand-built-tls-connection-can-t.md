@@ -3,8 +3,8 @@ id: AF-0718
 title: Surviving mutant: a hand-built TLS connection can try a second close_notify after ShutDownSendingAsync
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs:ShutDownSendingAsync-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs:114:true
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
