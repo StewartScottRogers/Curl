@@ -19,3 +19,10 @@ gives two of `--graphql` (or `--graphql-introspect`), `--jsonrpc`, `--connect-rp
 that fails the transfer with exit 2 (`CurlExitCode.FailedInit`) and `--<first> and --<second> cannot be used together`,
 the options in that order, without calling the next handler, so nothing is sent. Giving one of them, or one with a
 non-body option such as `--har`, is unchanged. This applies to ADR-1026 and ADR-1028 alike.
+
+## Addendum (BL-5124, EXT-051)
+
+The same hook is also given when only one of the four options is given: it fails the transfer with exit 2
+(`CurlExitCode.FailedInit`) and `--<option> cannot be used with -T` when the transfer has an upload stream, or
+`--<option> cannot be used with -I` when it has no body, and otherwise calls the next handler unchanged. The call body
+the option builds would otherwise be dropped (`-T`) or sent as a POST whose reply is hidden (`-I`).

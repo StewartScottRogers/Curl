@@ -36,31 +36,32 @@ public sealed class BodyReplacingHookExclusivityTests
     }
 
     [TestMethod]
-    public void HookFor_GraphQlDocumentWithIntrospect_IsOneBodyAndNotRefused()
+    public async Task HookFor_GraphQlDocumentWithIntrospect_IsOneBodyAndNotRefusedAsTwo()
     {
-        Assert.IsNull(BodyReplacingHookExclusivity.HookFor(Given("graphql", "graphql-introspect", "graphql-variables")));
+        var hook = BodyReplacingHookExclusivity.HookFor(Given("graphql", "graphql-introspect", "graphql-variables"))!;
+        var expected = TransferResult.Failure(CurlExitCode.Ok, "next");
+
+        var result = await hook.ExecuteAsync(ContextWith(null, false), _ => ValueTask.FromResult(expected));
+
+        Assert.AreEqual(expected, result);
     }
 
     [TestMethod]
-    public void HookFor_OneBodyOptionOrABodyOptionWithHar_IsNotRefused()
+    public void HookFor_NoBodyOptionOrHarAlone_GivesNoHook()
     {
-        foreach (string name in Names)
-        {
-            Assert.IsNull(BodyReplacingHookExclusivity.HookFor(Given(name)));
-            Assert.IsNull(BodyReplacingHookExclusivity.HookFor(Given(name, "har")));
-        }
+        Assert.IsNull(BodyReplacingHookExclusivity.HookFor(Given("har")));
 
         Assert.IsNull(BodyReplacingHookExclusivity.HookFor(ExtensionOptionValues.None));
         Assert.ThrowsExactly<ArgumentNullException>(() => BodyReplacingHookExclusivity.HookFor(null!));
     }
 
     [TestMethod]
-    public void Catalogue_EachBodyOptionAloneActivatesItsOwnHookAndNoRefusal()
+    public void Catalogue_EachBodyOptionAloneActivatesItsOwnHookAndTheUploadAndHeadRefusal()
     {
         foreach (string name in Names)
         {
             var hooks = TransferHooks.ActivatedBy(Given(name), ExtensionTransferHookCatalogue.Entries).Hooks;
-            Assert.AreEqual(1, hooks.Count, name);
+            Assert.AreEqual(2, hooks.Count, name);
         }
     }
 
@@ -72,5 +73,49 @@ public sealed class BodyReplacingHookExclusivityTests
         var result = await hooks[0].ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("http://example.com/"), Output = Stream.Null }, _ => throw new AssertFailedException("A request was sent."));
 
         Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+    }
+
+    private static TransferContext ContextWith(Stream? upload, bool noBody) =>
+        new() { Url = CurlUrl.Parse("http://example.com/"), Output = Stream.Null, Upload = upload, NoBody = noBody };
+
+    [TestMethod]
+    [DataRow("graphql")]
+    [DataRow("jsonrpc")]
+    [DataRow("grpc-web")]
+    [DataRow("connect-rpc")]
+    public async Task HookFor_OneBodyOptionWithUpload_RefusesNamingOptionAndT(string name)
+    {
+        var hook = BodyReplacingHookExclusivity.HookFor(Given(name))!;
+
+        var result = await hook.ExecuteAsync(ContextWith(new MemoryStream(), false), _ => throw new AssertFailedException("A request was sent."));
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        Assert.AreEqual($"--{name} cannot be used with -T", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow("graphql")]
+    [DataRow("jsonrpc")]
+    [DataRow("grpc-web")]
+    [DataRow("connect-rpc")]
+    public async Task HookFor_OneBodyOptionWithNoBody_RefusesNamingOptionAndI(string name)
+    {
+        var hook = BodyReplacingHookExclusivity.HookFor(Given(name))!;
+
+        var result = await hook.ExecuteAsync(ContextWith(null, true), _ => throw new AssertFailedException("A request was sent."));
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        Assert.AreEqual($"--{name} cannot be used with -I", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task HookFor_OneBodyOptionWithoutUploadOrNoBody_CallsNextUnchanged()
+    {
+        var hook = BodyReplacingHookExclusivity.HookFor(Given("graphql"))!;
+        var expected = TransferResult.Failure(CurlExitCode.Ok, "next");
+
+        var result = await hook.ExecuteAsync(ContextWith(null, false), _ => ValueTask.FromResult(expected));
+
+        Assert.AreEqual(expected, result);
     }
 }
