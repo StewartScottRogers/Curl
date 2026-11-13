@@ -3,8 +3,8 @@ id: AF-0722
 title: Surviving mutant: lib753 can keep looping after its test timeout aborts
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib753.cs:StartAndLoopAsync-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib753.cs:144:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
