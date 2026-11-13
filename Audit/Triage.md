@@ -32,7 +32,10 @@ order:
    in its finding, so a task the gap office filed meanwhile keeps its ID. The Audit tab's release
    (`.github/workflows/release-approved-findings.yml`) already does this (BL-2013).
 4. **The factory works the tasks** like any other: they change product code, not audit paths, so
-   lanes may take them. The finding stays `accepted` while its task is worked and after it is
+   lanes may take them. A lane-eligible task names no audit path either, since the audit guard
+   refuses a lane every read of `Audit/`: a surviving mutant's task asks for a by-hand check
+   (apply the mutant, see a fast test fail, revert) and any other audit-tool reproduction for a
+   test, and the audit office reruns the reproduction on the re-audit. The finding stays `accepted` while its task is worked and after it is
    Done; only evidence closes it - a later re-audit that finds the reproduction no longer
    reproduces, backed by the audit run's own mechanical rerun, a reliable auditor, or a second
    consecutive "no" ([Closing](Findings/README.md#closing), ADR-0422). A finding about one past
