@@ -1,0 +1,51 @@
+---
+id: BL-5077
+title: Fix AF-0718: Surviving mutant: a hand-built TLS connection can try a second close_notify after ShutDownSendingAsync
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Networking.UnitLibrary]
+requirement: none
+created: 2026-11-13
+completed:
+---
+# BL-5077 — Fix AF-0718: Surviving mutant: a hand-built TLS connection can try a second close_notify after ShutDownSendingAsync
+
+## Goal
+
+The defect the audit office reported as AF-0718 is fixed: its reproduction no longer reproduces, so a re-audit can close the finding.
+
+## Context
+
+Filed from audit finding AF-0718 (Medium, quality auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0718-surviving-mutant-a-hand-built-tls-connection-can-t.md`.
+
+Location: `Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs:114`
+
+Location: `Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs:114`
+
+Mutant '_tlsEnded = true;' -> '_tlsEnded = false;' survived. DisposeAsync's remarks say close_notify is sent 'unless ClearTlsAsync or ShutDownSendingAsync already ended TLS'. With the mutant, DisposeAsync writes another TLS record after the send side was shut down. No test disposes a connection after ShutDownSendingAsync and checks the wire.
+
+Reproduction, from the finding:
+
+Run from the repository root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs:114:true -Member ShutDownSendingAsync -ExcludeBaselineFailures -TimeoutSeconds 600
+```
+
+- Expected: killed
+- Actual: survived
+
+The finding closes only when a later re-audit by the quality auditor confirms the fix, never because this task reaches Done.
+
+## Acceptance criteria
+
+- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+## Log
+
+- 2026-11-13: Created.
