@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Smtp.UnitLibrary/SmtpCommandTransfer.cs, Curl.Original.Protocol.Smtp.UnitTests/SmtpCustomCommandDecodingTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5096 — Percent-decode the SMTP -X custom command and refuse control characters with exit 3
 
@@ -50,3 +50,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 4b2f0e09 8bf1f707 9bf0f82e a0b49a29.
 - Decision: followed IMAP's rule (decode %XX, refuse any char < space); reproduced inside the SMTP library. Quality run: 100% line/branch, 0 failing members.
+- 2026-11-13: Doing -> Done. SMTP -X is percent-decoded; control characters give exit 3 with only EHLO and QUIT sent.
