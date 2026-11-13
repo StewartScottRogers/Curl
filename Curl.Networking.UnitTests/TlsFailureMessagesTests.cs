@@ -888,4 +888,20 @@ public sealed partial class TlsFailureMessagesTests
             DateTimeOffset.UtcNow.AddHours(1),
             [1, 2, 3, 4, 5, 6, 7, 8]);
     }
+
+    [TestMethod]
+    [DataRow(X509ChainStatusFlags.NotSignatureValid, "schannel: error 0x00000008")]
+    [DataRow(X509ChainStatusFlags.InvalidBasicConstraints, "schannel: error 0x00000400")]
+    [DataRow(X509ChainStatusFlags.NotValidForUsage, "schannel: error 0x00000010")]
+    [DataRow(X509ChainStatusFlags.HasNotPermittedNameConstraint, "schannel: error 0x00004000")]
+    [DataRow(X509ChainStatusFlags.NotSignatureValid | X509ChainStatusFlags.UntrustedRoot, "schannel: error 0x00000008")]
+    [DataRow(X509ChainStatusFlags.Cyclic, "schannel: error 0x00000080")]
+    public void SchannelCaCertificateFileChainError_OtherChainStatus_NamesItsCertTrustValue(X509ChainStatusFlags status, string expected) =>
+        Assert.AreEqual(expected, TlsFailureMessages.SchannelCaCertificateFileChainError(status));
+
+    [TestMethod]
+    public void SchannelCaCertificateFileChainError_UntrustedRootOnly_IsStillTheUntrustedRootLine() =>
+        Assert.AreEqual(
+            "schannel: the certificate or certificate chain is based on an untrusted root",
+            TlsFailureMessages.SchannelCaCertificateFileChainError(X509ChainStatusFlags.UntrustedRoot));
 }

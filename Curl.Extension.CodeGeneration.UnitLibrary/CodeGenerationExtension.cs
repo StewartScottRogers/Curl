@@ -16,13 +16,13 @@ public static class CodeGenerationExtension
     public static ExtensionOption CSharpOption { get; } = new(
         "csharp",
         ExtensionOptionArgument.Value,
-        "Write C# using HttpClient that sends this command line's requests to <file>");
+        "Write C# using HttpClient that sends this command line's requests to <file> (a file path; - is not accepted)");
 
     /// <summary>Gets the <c>--powershell</c> option.</summary>
     public static ExtensionOption PowerShellOption { get; } = new(
         "powershell",
         ExtensionOptionArgument.Value,
-        "Write a PowerShell script using Invoke-RestMethod that sends this command line's requests to <file>");
+        "Write a PowerShell script using Invoke-RestMethod that sends this command line's requests to <file> (a file path; - is not accepted)");
 
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
@@ -52,7 +52,12 @@ public static class CodeGenerationExtension
     }
 
     private static ITransferHook? EmptyPathHook(string? path, ExtensionOption option) =>
-        path is { Length: 0 } ? new EmptyPathTransferHook(option.Name) : null;
+        path switch
+        {
+            { Length: 0 } => new EmptyPathTransferHook(option.Name, "expects a non-empty path"),
+            "-" => new EmptyPathTransferHook(option.Name, "expects a file path; - (standard output) is not accepted"),
+            _ => null,
+        };
 
     private static void AddWhenGiven(List<CodeFile> files, string? path, Func<IReadOnlyList<GeneratedRequest>, string> writer)
     {

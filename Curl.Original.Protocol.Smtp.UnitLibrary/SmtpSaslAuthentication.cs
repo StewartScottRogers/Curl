@@ -248,7 +248,7 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
             SmtpReply reply = await ReadReplyAsync().ConfigureAwait(false);
             if (reply.Code != Continuation)
             {
-                return Outcome(reply, messageSent);
+                return Outcome(reply, messageSent, exchange.Mechanism);
             }
 
             if (await AnswerAsync(exchange, reply, pending).ConfigureAwait(false) is { } end)
@@ -368,8 +368,14 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
         return null;
     }
 
-    private static ExchangeOutcome Outcome(SmtpReply reply, bool messageSent) =>
-        reply.Code == Authenticated && messageSent ? ExchangeOutcome.Accepted : ExchangeOutcome.Refused;
+    /// <summary>
+    /// Accepts a <c>235</c> once a message was sent, and for NTLM only after the Type-2 challenge was
+    /// answered, since RFC 4422 section 3.6 has the mechanism finish before success (BL-5012).
+    /// </summary>
+    private ExchangeOutcome Outcome(SmtpReply reply, bool messageSent, string mechanism) =>
+        reply.Code == Authenticated && messageSent && (challengesHanded > 0 || !mechanism.Equals("NTLM", StringComparison.OrdinalIgnoreCase))
+            ? ExchangeOutcome.Accepted
+            : ExchangeOutcome.Refused;
 
     /// <summary>
     /// Sends <c>AUTH</c>, with the initial response on the line when it goes there. curl makes

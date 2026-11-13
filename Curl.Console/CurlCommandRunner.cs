@@ -604,6 +604,26 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol");
 
     /// <summary>
+    /// The result of <c>-O</c> on a URL the URL API rejects: exit 3 after the "Failed to extract" line,
+    /// ending the run (BL-5016).
+    /// </summary>
+    private static readonly TransferResult RemoteNameUrlMalformedFailure =
+        TransferResult.Failure(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL");
+
+    /// <summary>
+    /// The result of <c>-O</c> on a URL whose scheme the URL API does not support: exit 1 after the
+    /// "Failed to extract" line, ending the run (BL-5016).
+    /// </summary>
+    private static readonly TransferResult RemoteNameUnsupportedSchemeFailure =
+        TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol");
+
+    /// <summary>
+    /// Set when a <c>Content-Disposition</c> name was blank; <see cref="TransferIntoOutputFileAsync" /> reads
+    /// and clears it once the transfer returns (BL-5016).
+    /// </summary>
+    private bool remoteHeaderNameWasBlank;
+
+    /// <summary>
     /// The line curl 8.21.0 prints when <c>-G</c> or <c>--url-query</c> asks for a query on an
     /// <c>ipfs://</c> or <c>ipns://</c> URL (measured 2026-10-26, CGR-161, BL-3690 Notes).
     /// </summary>
@@ -828,6 +848,9 @@ internal sealed class CurlCommandRunner(
     /// <see langword="null" /> until it is opened.
     /// </summary>
     private HoldableStream? eventStandardError;
+
+    /// <summary>Whether the last <c>--stderr -</c> redirect makes standard error standard output (BL-5040).</summary>
+    private bool standardErrorIsStandardOutput;
 
     /// <summary>
     /// The run's diagnostic log (ADR-0222), which owns the <c>--log-file</c>; <see langword="null" />
@@ -1116,6 +1139,7 @@ internal sealed class CurlCommandRunner(
     /// </remarks>
     private async Task RedirectStandardErrorAsync(StandardErrorRedirect redirect)
     {
+        standardErrorIsStandardOutput = redirect.File == StandardOutputStandardErrorFile;
         if (redirect.File == StandardOutputStandardErrorFile)
         {
             await CloseStandardErrorFileAsync().ConfigureAwait(false);
@@ -1188,7 +1212,14 @@ internal sealed class CurlCommandRunner(
 
         if (InformationLines(options) is { } informationLines)
         {
-            await WriteStandardOutputLinesAsync(informationLines).ConfigureAwait(false);
+            try
+            {
+                await WriteStandardOutputLinesAsync(informationLines).ConfigureAwait(false);
+            }
+            catch (IOException) when (options.ManualRequested)
+            {
+                // A pipe that closed early (curl --manual | head -1) ends the manual quietly with exit 0, as curl does (BL-5042).
+            }
 
             return (int)CurlExitCode.Ok;
         }
@@ -1775,7 +1806,7 @@ internal sealed class CurlCommandRunner(
 
         eventStandardError = new HoldableStream(standardError);
         transferEventOutput = await TransferEventOutput
-            .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider, () => standardOutputSwitchedToBinary)
+            .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider, () => standardOutputSwitchedToBinary, standardErrorIsStandardOutput)
             .ConfigureAwait(false);
     }
 
@@ -2744,22 +2775,50 @@ internal sealed class CurlCommandRunner(
             return (UploadUrlMalformedFailure, givenUrl, transferUrl);
         }
 
+        if (RemoteNameExtractionFailureOf(dispatch.Dispatcher, options, transfer, transferUrl) is { } extractionFailure)
+        {
+            return (await RefuseRemoteNameExtractionAsync(options, extractionFailure).ConfigureAwait(false), givenUrl, transferUrl);
+        }
+
         if (await PrepareEtagFilesAsync(options).ConfigureAwait(false) is { } etagFailure)
         {
             return (etagFailure, givenUrl, transferUrl);
         }
 
+        (TransferResult result, string finalUrl) = await TransferAfterSetupAsync(dispatch, options, transfer, givenUrl, transferUrl, uploadFile).ConfigureAwait(false);
+        return (result, givenUrl, finalUrl);
+    }
+
+    /// <summary>
+    /// Runs the part of one transfer that follows the URL's checks: the transfer events, the setopt check, the
+    /// <c>-b</c> files, the alt-svc cache and HSTS, then the transfer itself.
+    /// </summary>
+    /// <param name="dispatch">The option group's dispatch.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="givenUrl">The URL as given, after any IPFS rewrite.</param>
+    /// <param name="transferUrl">The URL to transfer.</param>
+    /// <param name="uploadFile">The <c>-T</c> file, or <see langword="null" />.</param>
+    /// <returns>The transfer's result and the URL transferred, after any HSTS switch.</returns>
+    private async Task<(TransferResult Result, string TransferUrl)> TransferAfterSetupAsync(
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        string givenUrl,
+        string transferUrl,
+        string? uploadFile)
+    {
         ITransferEvents eventsBeforeConnecting = SetUpTransferEvents(options, transfer);
         if (TransferPerformer.RefuseMalformedSetopt(EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TransferSettingsOf(options), eventsBeforeConnecting) is { } setoptFailure)
         {
-            return (setoptFailure, givenUrl, transferUrl);
+            return (setoptFailure, transferUrl);
         }
 
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
         TraceTransferStart(options, eventsBeforeConnecting);
         if (await transferPerformer.LoadCookieFilesAsync(dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), transferUrl, fileSystem, standardInput, eventsBeforeConnecting).ConfigureAwait(false) is { } cookieFileFailure)
         {
-            return (cookieFileFailure, givenUrl, transferUrl);
+            return (cookieFileFailure, transferUrl);
         }
 
         EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
@@ -2769,7 +2828,7 @@ internal sealed class CurlCommandRunner(
         Running.RequestUrl = WriteOutRequestUrl(options, transferUrl, givenUrl);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
-        return (result, givenUrl, transferUrl);
+        return (result, transferUrl);
     }
 
     /// <summary>
@@ -3000,6 +3059,51 @@ internal sealed class CurlCommandRunner(
         }
 
         return IpfsRemoteNameFailure;
+    }
+
+    /// <summary>
+    /// Tells which failure ends the run when <c>-O</c> or <c>--remote-name-all</c> cannot take a file
+    /// name from the URL: curl's tool asks the URL API for the path before it names the file, so a URL
+    /// the API rejects ends the run with exit 3 and one whose scheme it does not support with exit 1.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="transferUrl">The URL, with its guessed scheme.</param>
+    /// <param name="dispatcher">The dispatcher, whose handlers (extensions included) serve schemes the URL API does not list.</param>
+    /// <returns>
+    /// <see cref="RemoteNameUrlMalformedFailure" />, <see cref="RemoteNameUnsupportedSchemeFailure" />, or
+    /// <see langword="null" /> when the transfer names no remote file or its name can be taken.
+    /// </returns>
+    private static TransferResult? RemoteNameExtractionFailureOf(ProtocolDispatcher dispatcher, CommandLineOptions options, UrlTransfer transfer, string transferUrl)
+    {
+        if (transfer.OutputFileName is not null || !transfer.UsesRemoteName)
+        {
+            return null;
+        }
+
+        if (!TransferPerformer.TryParseTransferUrl(QueryUrl.Append(transferUrl, options), options.DisallowUsernameInUrl, QueryUrl.KeepsPathAsIs(options), out CurlUrl? parsed, out _))
+        {
+            return RemoteNameUrlMalformedFailure;
+        }
+
+        return UrlHandleParts.IsSupportedScheme(parsed.Scheme) || dispatcher.Serves(parsed.Scheme) ? null : RemoteNameUnsupportedSchemeFailure;
+    }
+
+    /// <summary>
+    /// Prints curl's <see cref="IpfsRemoteNameMessage" /> line unless <c>-s</c> was given without
+    /// <c>-S</c>; the <c>curl: (N)</c> line follows as any failure's does.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="failure">The failure that ends the run.</param>
+    /// <returns><paramref name="failure" />.</returns>
+    private async Task<TransferResult> RefuseRemoteNameExtractionAsync(CommandLineOptions options, TransferResult failure)
+    {
+        if (ShowsErrors(options))
+        {
+            await WriteErrorLineAsync("curl: " + IpfsRemoteNameMessage).ConfigureAwait(false);
+        }
+
+        return failure;
     }
 
     /// <summary>
@@ -3764,6 +3868,8 @@ internal sealed class CurlCommandRunner(
         IpfsMalformedGatewayOptionFailure,
         IpfsMalformedTargetUrlFailure,
         IpfsRemoteNameFailure,
+        RemoteNameUrlMalformedFailure,
+        RemoteNameUnsupportedSchemeFailure,
         IpfsQueryFailure,
         TransferPerformer.InterfaceSetoptFailure,
         TransferPerformer.EchSetoptFailure,
@@ -4194,17 +4300,6 @@ internal sealed class CurlCommandRunner(
         EasyProxyOptions proxyOptions = EasyOptionsFromCommandLine.ProxyOf(options);
         EasyAuthenticationOptions authentication = EasyOptionsFromCommandLine.AuthenticationOf(options);
 
-        // The callback below selects the proxy and checks the URL credentials of each hop, so a redirect
-        // is judged afresh; the follower is built per transfer because the options are the group's.
-        RedirectFollower follower = new(
-            dispatch.Dispatcher,
-            (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
-                TransferProxySelection.TrySelect(dispatch.ProxySelector, proxyOptions, options.UnixSocketPath is not null, options.ProxyCredentials, hopUrl, out hopProxy, out hopFailure, diagnosticLog)
-                && TransferCredentialLookup.TryCheckUrlCredentials(authentication, hopUrl, out hopFailure),
-            hsts: Hsts,
-            selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
-            selectHopCredentials: CredentialLookup.ForRedirectHops(authentication));
-
         if (!TryParseQueriedUrl(url, options, transfer, out CurlUrl? transferUrl, out TransferResult? urlFailure))
         {
             return urlFailure;
@@ -4214,6 +4309,18 @@ internal sealed class CurlCommandRunner(
         {
             return refusal;
         }
+
+        // The callback below selects the proxy and checks the URL credentials of each hop, so a redirect
+        // is judged afresh; the follower is built per transfer because the options are the group's, and
+        // after the URL is parsed because a -u transfer's netrc lookup for a hop compares it (BL-5035).
+        RedirectFollower follower = new(
+            dispatch.Dispatcher,
+            (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
+                TransferProxySelection.TrySelect(dispatch.ProxySelector, proxyOptions, options.UnixSocketPath is not null, options.ProxyCredentials, hopUrl, out hopProxy, out hopFailure, diagnosticLog)
+                && TransferCredentialLookup.TryCheckUrlCredentials(authentication, hopUrl, out hopFailure),
+            hsts: Hsts,
+            selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
+            selectHopCredentials: CredentialLookup.ForRedirectHops(authentication, transferUrl));
 
         ByteRange? range = ParseRange(options.Range);
 
@@ -5120,8 +5227,29 @@ internal sealed class CurlCommandRunner(
         OutputFileTarget target,
         DeferredOutputFileStream output) =>
         target.TakesContentDispositionName
-            ? chosen => new RemoteHeaderNameStream(output, chosen, name => RemoteNamePath(options, name), options.FollowRedirects)
+            ? chosen => new RemoteHeaderNameStream(output, chosen, name => RemoteHeaderNamePath(options, name), options.FollowRedirects)
             : null;
+
+    /// <summary>
+    /// Names the file a <c>Content-Disposition</c> <c>filename=</c> value opens. A non-empty value with nothing but
+    /// white space leaves curl no name to extract, so it is remembered in
+    /// <see cref="remoteHeaderNameWasBlank" /> for <see cref="TransferIntoOutputFileAsync" /> to end the run,
+    /// and the transfer stops with an <see cref="IOException" /> before any file is opened (BL-5016).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="name">The header's file name.</param>
+    /// <returns>The path to open.</returns>
+    /// <exception cref="IOException">The name is blank.</exception>
+    private string RemoteHeaderNamePath(CommandLineOptions options, string name)
+    {
+        if (name.Length > 0 && string.IsNullOrWhiteSpace(name))
+        {
+            remoteHeaderNameWasBlank = true;
+            throw new IOException("The Content-Disposition file name is blank.");
+        }
+
+        return RemoteNamePath(options, name);
+    }
 
     /// <summary>
     /// Sets <paramref name="outputFile" />'s last-write time to the source's for <c>-R</c>, and
@@ -5285,16 +5413,34 @@ internal sealed class CurlCommandRunner(
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
-            TransferResult completed = await output.CompleteAsync(fileResult).ConfigureAwait(false);
-            Running.SucceededBeforeOutputFileCreationFailed = fileResult.IsSuccess && !completed.IsSuccess;
-
-            if (!options.Silent && output.OpenFailureWarning is { } warning)
+            if (remoteHeaderNameWasBlank)
             {
-                await WriteOrHoldOutputFileOpenWarningAsync(warning).ConfigureAwait(false);
+                remoteHeaderNameWasBlank = false;
+                return await RefuseRemoteNameExtractionAsync(options, RemoteNameUrlMalformedFailure).ConfigureAwait(false);
             }
 
-            return completed;
+            return await CompleteOutputFileAsync(options, output, fileResult).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Completes an <c>-o</c> file after its transfer and prints or holds its open-failure warning.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="output">The deferred output file.</param>
+    /// <param name="fileResult">The transfer's result.</param>
+    /// <returns>The result after the file is completed.</returns>
+    private async Task<TransferResult> CompleteOutputFileAsync(CommandLineOptions options, DeferredOutputFileStream output, TransferResult fileResult)
+    {
+        TransferResult completed = await output.CompleteAsync(fileResult).ConfigureAwait(false);
+        Running.SucceededBeforeOutputFileCreationFailed = fileResult.IsSuccess && !completed.IsSuccess;
+
+        if (!options.Silent && output.OpenFailureWarning is { } warning)
+        {
+            await WriteOrHoldOutputFileOpenWarningAsync(warning).ConfigureAwait(false);
+        }
+
+        return completed;
     }
 
     /// <summary>

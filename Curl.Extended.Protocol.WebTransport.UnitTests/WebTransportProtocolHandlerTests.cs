@@ -401,6 +401,41 @@ public sealed class WebTransportProtocolHandlerTests
             await new WebTransportProtocolHandler((_, _) => ValueTask.FromResult<IMultiplexedConnection>(connection)).ExecuteAsync(context));
     }
 
+    [TestMethod]
+    [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task ExecuteAsync_UploadOnly_SendsTheFileAsTheRequestBody()
+    {
+        (TransferResult result, string output) = await RunWithUploadAsync(null, "file-bytes");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+
+        Assert.AreEqual("file-bytes", output);
+    }
+
+    [TestMethod]
+    [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
+    public async Task ExecuteAsync_PostDataAndUpload_PostDataWins()
+    {
+        (_, string output) = await RunWithUploadAsync("from-d", "from-T");
+
+        Assert.AreEqual("from-d", output);
+    }
+
+    private static async Task<(TransferResult Result, string Output)> RunWithUploadAsync(string? data, string file)
+    {
+        ScriptedHttp3Connection connection = new() { AnswerStream = Echo };
+        MemoryStream output = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("webtransport://example.com/"),
+            PostData = data is null ? default(ReadOnlyMemory<byte>?) : Encoding.UTF8.GetBytes(data),
+            Upload = new MemoryStream(Encoding.UTF8.GetBytes(file)),
+            Output = output,
+        };
+        TransferResult result = await new WebTransportProtocolHandler((_, _) => ValueTask.FromResult<IMultiplexedConnection>(connection)).ExecuteAsync(context);
+        return (result, Encoding.UTF8.GetString(output.ToArray()));
+    }
+
     private sealed class FailingStream : MemoryStream
     {
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) => throw new IOException("disk full");

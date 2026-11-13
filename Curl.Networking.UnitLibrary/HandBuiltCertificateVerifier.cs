@@ -143,8 +143,22 @@ internal sealed class HandBuiltCertificateVerifier(
 
         chain.ChainPolicy.ExtraStore.AddRange(sent.Skip(1).ToArray());
         var errors = chain.Build(sent[0]) ? SslPolicyErrors.None : SslPolicyErrors.RemoteCertificateChainErrors;
-        return sent[0].MatchesHostname(SslStreamTlsProvider.VerifiedHostName(targetHost, insecure: false)!)
+        return MatchesAsCurlDoes(sent[0], SslStreamTlsProvider.VerifiedHostName(targetHost, insecure: false)!)
             ? errors
             : errors | SslPolicyErrors.RemoteCertificateNameMismatch;
+    }
+
+    // .NET lets "*.test" stand for "a.test"; curl needs two dots in a wildcard pattern, so a
+    // certificate whose DNS names match only that way is refused (BL-5008).
+    private static bool MatchesAsCurlDoes(X509Certificate2 certificate, string host)
+    {
+        if (!certificate.MatchesHostname(host) || System.Net.IPAddress.TryParse(host, out _))
+        {
+            return certificate.MatchesHostname(host);
+        }
+
+        var dnsNames = certificate.Extensions.OfType<X509SubjectAlternativeNameExtension>()
+            .SelectMany(names => names.EnumerateDnsNames()).ToList();
+        return dnsNames.Count == 0 || dnsNames.Any(name => SchannelCommonNameCheck.PatternMatchesHost(name, host));
     }
 }

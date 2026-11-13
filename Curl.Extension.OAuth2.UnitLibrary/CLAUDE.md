@@ -61,7 +61,7 @@ cache and its refresh first, runs the flow only when they give nothing, and cach
 the transfer with exit 2) and makes the flow. `OAuth2TransferHook` gets the token through
 `TransferHookServices`' connector and listener, from the cache by default, and sends the transfer
 with `Authorization: Bearer <token>` added after curl's own headers; a failed flow fails the
-transfer with its exit code, and the request is never sent.
+transfer with its exit code, and the request is never sent. It asks the token endpoint on the first hop only: a followed hop keeps that token, and a hop curl withholds credentials from (another origin without `--location-trusted`, seen as `SendsCookieStrings` false) gets none (BL-5011).
 
 Tested against the RFCs, not against curl. Held to the four quality gates in the root `CLAUDE.md`.
 Its tests are in `Curl.Extension.OAuth2.UnitTests`.

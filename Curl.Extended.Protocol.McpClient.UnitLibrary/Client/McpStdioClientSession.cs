@@ -16,6 +16,7 @@ internal sealed class McpStdioClientSession(McpStdioSession session) : IMcpSessi
         IMcpServerProcess process;
         try
         {
+            McpBatchArgumentRefusal.RefuseUnsafeArguments(command.FileName, command.Arguments);
             process = starter.Start(command.FileName, command.Arguments);
         }
         catch (Exception failure) when (failure is Win32Exception or InvalidOperationException)

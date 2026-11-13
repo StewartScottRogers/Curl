@@ -88,7 +88,13 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// Gets how many response headers the transfer has stored: <see cref="HeadersStoredBefore" />
     /// and the chunked body's trailers decoded so far.
     /// </summary>
-    internal int HeadersStored => HeadersStoredBefore + (decoder?.TrailerCount ?? 0);
+    internal int HeadersStored => HeadersStoredBefore + ChunkedTrailerCount;
+
+    /// <summary>
+    /// Gets how many trailers the chunked body's decoder has read so far (0 without chunked framing);
+    /// <c>%{num_headers}</c> prints it instead of the head's header count (BL-5039).
+    /// </summary>
+    internal int ChunkedTrailerCount => decoder?.TrailerCount ?? 0;
 
     /// <summary>
     /// Gets or sets a value indicating whether <c>--max-filesize</c> was given, so a
@@ -304,7 +310,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// <param name="decodeTransfer">
     /// <see langword="true" /> for <c>--tr-encoding</c> when the body is not discarded: the
     /// Transfer-Encoding codings other than <c>chunked</c> are decoded, before any
-    /// Content-Encoding, and <see cref="BytesWritten" /> still counts the encoded bytes.
+    /// Content-Encoding, and <see cref="BytesWritten" /> counts the bytes the Transfer-Encoding codings decoded, as curl does.
     /// </param>
     /// <param name="cancellationToken">Cancels every read and write.</param>
     /// <returns>A task that completes when the whole body is written.</returns>
@@ -333,12 +339,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
         IReadOnlyList<HttpResponseHeader> framingHeaders = FramingHeadersOf(head);
         HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(framingHeaders, PassesTransferCoding, IgnoresContentLength, DecodesTransferCoding);
-        IEnumerable<string> contentCodings = decodeContent ? HttpContentDecoder.ContentCodings(framingHeaders) : [];
-        IEnumerable<string> transferCodings = decodeTransfer ? framing.TransferCodings : [];
-        string[] decodedCodings = [.. contentCodings.Concat(transferCodings)];
-        Log.BodyFramed(framing, decodedCodings);
-        contentDecoder = HttpContentDecoder.ForCodings(decodedCodings);
-        contentDecoder?.MaximumDeliveredSize = MaximumBodySize;
+        contentDecoder = DecoderFor(framingHeaders, framing, decodeContent, decodeTransfer);
         ExpectedLength = framing.ContentLength;
         Progress.ReportDownloaded(BytesWritten, ExpectedLength);
         try
@@ -382,6 +383,22 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
         bool lengthCounts = HasBody(head, noBody: false) && !IgnoresContentLength;
         Progress.ReportDownloaded(0, lengthCounts ? HttpContentLength.Find(head.Headers) : null);
+    }
+
+    /// <summary>
+    /// Builds the decoder for the Content-Encoding and Transfer-Encoding codings to decode, and
+    /// notes whether the download is counted after the Transfer-Encoding ones.
+    /// </summary>
+    private HttpContentDecoder? DecoderFor(IReadOnlyList<HttpResponseHeader> framingHeaders, HttpResponseBodyFraming framing, bool decodeContent, bool decodeTransfer)
+    {
+        IEnumerable<string> contentCodings = decodeContent ? HttpContentDecoder.ContentCodings(framingHeaders) : [];
+        IEnumerable<string> transferCodings = decodeTransfer ? framing.TransferCodings : [];
+        string[] decodedCodings = [.. contentCodings.Concat(transferCodings)];
+        Log.BodyFramed(framing, decodedCodings);
+        HttpContentDecoder? codingDecoder = HttpContentDecoder.ForCodings(decodedCodings);
+        codingDecoder?.TransferCodingCount = transferCodings.Count(HttpContentDecoder.Decodes);
+        codingDecoder?.MaximumDeliveredSize = MaximumBodySize;
+        return codingDecoder;
     }
 
     /// <summary>
@@ -707,6 +724,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     private async ValueTask<int> WriteWithinLimitAsync(Stream output, ReadOnlyMemory<byte> bytes, int pieceSize, CancellationToken cancellationToken)
     {
+        long deliveredBefore = 0;
         if (bytes.IsEmpty)
         {
             return 0;
@@ -714,6 +732,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
         try
         {
+            deliveredBefore = contentDecoder?.TransferDecodedBytes ?? 0;
             await WriteDecodedAsync(output, bytes, cancellationToken).ConfigureAwait(false);
         }
         catch (OutputWriteFailedException failure)
@@ -725,7 +744,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             throw WriteFailed(bytes.Length, 0, pieceSize);
         }
 
-        BytesWritten += bytes.Length;
+        BytesWritten += contentDecoder?.TransferCodingCount > 0 ? contentDecoder!.TransferDecodedBytes - deliveredBefore : bytes.Length;
         if (pieceSize == WholeWrite)
         {
             Progress.ReportDownloaded(BytesWritten, ExpectedLength);

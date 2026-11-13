@@ -31,9 +31,50 @@ function Test-LockPriorityWaiting {
         Where-Object { $_.Name -ne $mine -and $_.LastWriteTime -gt (Get-Date).AddMinutes(-1) }).Count)
 }
 
+function Get-LockTicketPath {
+    # The ticket a lane waiting without -Priority keeps beside the lock: integrate.ticket-L<n>.
+    # Its content is the tick count of the moment the lane started waiting (BL-5055).
+    param([int]$ForLane = $Lane)
+    return (Join-Path $LanesDir "integrate.ticket-L$ForLane")
+}
+
+function Set-LockTicket {
+    # Writes this lane's ticket, keeping the arrival time of a live one so refreshing every
+    # few seconds does not send the lane to the back; a stale ticket (a dead earlier run of
+    # this lane) starts over.
+    $path = Get-LockTicketPath
+    $item = Get-Item -LiteralPath $path -ErrorAction SilentlyContinue
+    $arrival = (Get-Date).Ticks
+    if ($item -and $item.LastWriteTime -gt (Get-Date).AddMinutes(-1)) {
+        $kept = 0L
+        if ([long]::TryParse(((Get-Content -LiteralPath $path -ErrorAction SilentlyContinue) -join '').Trim(), [ref]$kept) -and $kept -gt 0) { $arrival = $kept }
+    }
+    Set-Content -Path $path -Value "$arrival" -Encoding ASCII
+}
+
+function Test-LockTurn {
+    # Whether no other lane has waited longer: every other live ticket (rewritten in the last
+    # minute, so a dead lane's goes stale and holds nobody back) is younger than this lane's,
+    # ties going to the lower lane number. Lanes get the lock in the order they started waiting.
+    $mine = Split-Path (Get-LockTicketPath) -Leaf
+    $myArrival = (Get-Date).Ticks
+    [void][long]::TryParse(((Get-Content -LiteralPath (Get-LockTicketPath) -ErrorAction SilentlyContinue) -join '').Trim(), [ref]$myArrival)
+    foreach ($ticket in @(Get-ChildItem $LanesDir -Filter 'integrate.ticket-L*' -ErrorAction SilentlyContinue)) {
+        if ($ticket.Name -eq $mine -or $ticket.LastWriteTime -le (Get-Date).AddMinutes(-1)) { continue }
+        $arrival = 0L
+        if (-not [long]::TryParse(((Get-Content -LiteralPath $ticket.FullName -ErrorAction SilentlyContinue) -join '').Trim(), [ref]$arrival)) { $arrival = $ticket.LastWriteTime.Ticks }
+        $theirLane = [int]($ticket.Name -replace '^integrate\.ticket-L', '')
+        if ($arrival -lt $myArrival -or ($arrival -eq $myArrival -and $theirLane -lt $Lane)) { return $false }
+    }
+    return $true
+}
+
 function Enter-Lock {
     # Claims and integrations take turns across every lane. Holding the file open with no
     # sharing is the lock; the operating system releases it if the lane dies.
+    # A lane waiting without -Priority tries the lock only when it has waited longest, by the
+    # tickets in Set-LockTicket, so the order is arrival order, not whoever retries as the
+    # holder lets go (BL-5055: two lanes waited 80 minutes while later arrivals integrated).
     # -Priority (a lane integrating a CI fix) goes before every lane that waits without it:
     # while its marker is fresh they do not try the lock, so it is next once the holder lets
     # go. BL-4308's fix waited 27 minutes behind eight ordinary integrations while CI stayed
@@ -44,7 +85,8 @@ function Enter-Lock {
     try {
         while ($true) {
             if ($Priority) { Set-Content -Path $marker -Value (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') -Encoding ASCII }
-            if ($Priority -or -not (Test-LockPriorityWaiting)) {
+            if (-not $Priority) { Set-LockTicket }
+            if ($Priority -or ((Test-LockTurn) -and -not (Test-LockPriorityWaiting))) {
                 try { return [IO.File]::Open($LockFile, 'OpenOrCreate', 'ReadWrite', 'None') }
                 catch { }
             }
@@ -52,6 +94,7 @@ function Enter-Lock {
         }
     } finally {
         if ($Priority) { Remove-Item -LiteralPath $marker -ErrorAction SilentlyContinue }
+        else { Remove-Item -LiteralPath (Get-LockTicketPath) -ErrorAction SilentlyContinue }
     }
 }
 

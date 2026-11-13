@@ -49,3 +49,7 @@ transfer hook (ADR-1007, ADR-1019) activated by its options.
 
 The hook is listed by `curl --extensions` and `curl --ai-help extensions`, and with
 `CURL_EXTENSIONS=0` its options are unknown options (exit 2) like any other extension's.
+
+## Amendment (BL-5023, ADR-1262)
+
+`--graphql` cannot be combined with `--jsonrpc`, `--connect-rpc` or `--grpc-web`: each replaces the request body, so the transfer exits 2 and sends nothing.

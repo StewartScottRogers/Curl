@@ -289,7 +289,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
             Pop3Response response = await channel.ReadResponseAsync().ConfigureAwait(false);
             if (response.IsOk)
             {
-                return (false, unsent is null && !initialResponseDue ? LoggedIn("SASL " + exchange.Mechanism) : LoginDenied());
+                return (false, unsent is null && !initialResponseDue && !NtlmUnfinished(exchange.Mechanism) ? LoggedIn("SASL " + exchange.Mechanism) : LoginDenied());
             }
 
             if (await AnswerToAsync(response, unsent, initialResponseDue, exchange).ConfigureAwait(false) is not { } answer)
@@ -308,6 +308,13 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
             await channel.SendAsync(answer, Pop3DiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Whether <paramref name="mechanism" /> is NTLM and the server has not yet sent the Type-2
+    /// challenge, so a <c>+OK</c> now comes before the exchange has finished (RFC 4422 section 3.6, BL-5014).
+    /// </summary>
+    private bool NtlmUnfinished(string mechanism) =>
+        mechanism.Equals("NTLM", StringComparison.OrdinalIgnoreCase) && challengesHanded == 0;
 
     /// <summary>
     /// Sends <c>AUTH &lt;mechanism&gt;</c>, with the initial response on the line when it goes

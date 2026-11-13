@@ -23,6 +23,19 @@ public sealed class WebSocketCases
     private static readonly byte[] Disconnect = [0xE0, 0x00];
 
     [TestMethod]
+    [SpecRequirement("Mqtt5:CURL-WS-HEADERS-1")]
+    public async Task Handshake_HeaderUserAgentAndCookieOptions_AreSentOnTheUpgrade()
+    {
+        (CurlRunResult result, Mqtt5WebSocketReferenceServer server) = await RunAsync(new Mqtt5WebSocketReferenceServer(), "-d", "hi", "-H", "X-Probe: 1", "-A", "agentX", "-b", "c=1");
+
+        AssertSucceeded(result, string.Empty);
+        string[] lines = server.UpgradeRequest!.Split("\r\n");
+        CollectionAssert.Contains(lines, "X-Probe: 1");
+        CollectionAssert.Contains(lines, "User-Agent: agentX");
+        CollectionAssert.Contains(lines, "Cookie: c=1");
+    }
+
+    [TestMethod]
     [SpecRequirement("Mqtt5:MQTT-6.0.0-3")]
     [SpecRequirement("Mqtt5:RFC6455-4.1-1")]
     [SpecRequirement("Mqtt5:RFC6455-4.1-2")]

@@ -19,7 +19,8 @@ namespace Curl.Extended.Protocol.SignalR.Client;
 /// <param name="session">The upgraded WebSocket.</param>
 /// <param name="callRecord">The Invocation or StreamInvocation record <see cref="SignalRCall"/> gave, or <see langword="null"/>.</param>
 /// <param name="output">Where the lines go.</param>
-internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]? callRecord, Stream output)
+/// <param name="progress">Told the running byte total after each line, so a timeout message can count it.</param>
+internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]? callRecord, Stream output, ITransferProgress progress)
 {
     /// <summary>The error of the Completion curl sends for a hub call that expects a client result: the .NET client's text.</summary>
     internal const string NoClientResultError = "Client didn't provide a result.";
@@ -133,5 +134,6 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
         await output.WriteAsync(line, cancellationToken);
         await output.FlushAsync(cancellationToken);
         bytesWritten += line.Length;
+        progress.ReportDownloaded(bytesWritten, null);
     }
 }

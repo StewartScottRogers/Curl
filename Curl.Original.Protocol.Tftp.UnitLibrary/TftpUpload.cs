@@ -378,7 +378,8 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
 
         if (lastBlockSent)
         {
-            return TransferResult.Success(bytesTransferred);
+            // The bytes sent are %{size_upload}, and none were downloaded.
+            return TransferResult.Success(bytesTransferred) with { Report = new TransferReport { UploadSize = bytesTransferred } };
         }
 
         retries = 0;

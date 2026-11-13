@@ -343,6 +343,14 @@ public static class CommandLineParser
             return CommandLineRefusal.NoUrlSpecified();
         }
 
+        return group.RemoteHeaderName && group.ResumeFromOutputSize
+            ? CommandLineRefusal.ContinueAtWithRemoteHeaderName()
+            : BodyRefusal(group);
+    }
+
+    /// <summary>The refusal curl 8.21.0 meets for a group's form post, <c>-d</c> body and <c>-C</c> offset; <see langword="null"/> when there is none.</summary>
+    private static CommandLineRefusal? BodyRefusal(CommandLineOptions group)
+    {
         bool formPost = group.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost;
         if (formPost && group.PostData is not null)
         {

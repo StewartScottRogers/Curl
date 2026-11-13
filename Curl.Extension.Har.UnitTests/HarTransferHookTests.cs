@@ -55,6 +55,27 @@ public sealed class HarTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_CookieStringsAndNoUserAgent_ListsCookieAndDefaultUserAgentOnceEachAndLeavesCookiesEmpty()
+    {
+        var http = new HttpRequestOptions { CookieStrings = "sid=abc", Headers = ["X-One: 1"] };
+
+        var request = (await EntryOfAsync(Context(http), Origin(200, string.Empty))).GetProperty("request");
+
+        CollectionAssert.AreEqual(new[] { "User-Agent: " + HarTransferHook.DefaultUserAgent, "Cookie: sid=abc", "X-One: 1" }, NameValues(request.GetProperty("headers")));
+        Assert.AreEqual(0, request.GetProperty("cookies").GetArrayLength());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UserAgentAndCookieGiven_ListsTheGivenValuesNotTheDefaultAndACookieHeaderWins()
+    {
+        var http = new HttpRequestOptions { UserAgent = "mine/1", CookieStrings = "sid=abc", Headers = ["cookie: x=y"] };
+
+        var request = (await EntryOfAsync(Context(http), Origin(200, string.Empty))).GetProperty("request");
+
+        CollectionAssert.AreEqual(new[] { "User-Agent: mine/1", "cookie: x=y" }, NameValues(request.GetProperty("headers")));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ADataBodyWithHeaders_WritesTheRequestsMethodUrlHeadersQueryAndPostData_Har12Request()
     {
         var http = new HttpRequestOptions

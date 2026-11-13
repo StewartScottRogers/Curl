@@ -466,6 +466,16 @@ public sealed class Pop3ProtocolHandlerLoginTests
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_CompleteNtlmExchange_LogsIn()
+    {
+        // BL-5014: Type-1, Type-2, Type-3, then +OK finishes the exchange.
+        var sasl = new ScriptedSaslAuthenticator(("NTLM", ["T1", "T3"]));
+        Pop3Run run = await RunAsync(Greeting + "+OK\r\nSASL NTLM\r\n.\r\n+ \r\n+ VDI=\r\n+OK Authenticated\r\n" + ListReply + Bye, sasl: sasl);
+
+        Assert.AreEqual(Capa + "AUTH NTLM\r\nVDE=\r\nVDM=\r\n" + List + Quit, run.Sent);
+        Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
+    }
     private static ScriptedSaslAuthenticator PlainAndLogin() =>
         new(("PLAIN", ["\0u\0p"]), ("LOGIN", ["u", "p"]));
 

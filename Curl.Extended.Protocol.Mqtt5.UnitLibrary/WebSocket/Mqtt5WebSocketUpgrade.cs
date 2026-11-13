@@ -22,6 +22,8 @@ internal static class Mqtt5WebSocketUpgrade
     /// <summary>The longest reply head read before the transfer fails.</summary>
     internal const int LongestHead = 65536;
 
+    private const string DefaultUserAgent = "curl/8.22.0";
+
     private const int KeyLength = 16;
 
     private const int ReadSize = 4096;
@@ -47,20 +49,89 @@ internal static class Mqtt5WebSocketUpgrade
     }
 
     /// <summary>Gives the upgrade request to <paramref name="url"/>'s host with <paramref name="key"/>.</summary>
-    internal static byte[] Request(CurlUrl url, string key)
+    /// <param name="url">The <c>mqtt5+ws</c> URL.</param>
+    /// <param name="key">The <c>Sec-WebSocket-Key</c>.</param>
+    /// <param name="context">The transfer whose <c>-H</c>, <c>-A</c>, <c>-b</c>, <c>-u</c> and <c>--oauth2-bearer</c> add header fields, or <see langword="null"/> for none.</param>
+    internal static byte[] Request(CurlUrl url, string key, ITransferContext? context = null)
     {
         string host = url.IdnHost.Contains(':', StringComparison.Ordinal) ? $"[{url.IdnHost}]" : url.IdnHost;
         string port = url.Port < 0 ? string.Empty : ":" + url.Port.ToString(CultureInfo.InvariantCulture);
+        List<KeyValuePair<string, string>> fields =
+        [
+            new("Host", host + port),
+            new("Upgrade", "websocket"),
+            new("Connection", "Upgrade"),
+            new("Sec-WebSocket-Key", key),
+            new("Sec-WebSocket-Version", "13"),
+            new("Sec-WebSocket-Protocol", Subprotocol),
+        ];
+        AddOptionFields(fields, context);
         return System.Text.Encoding.ASCII.GetBytes(
-            $"GET {RequestPath} HTTP/1.1\r\n" +
-            $"Host: {host}{port}\r\n" +
-            "Upgrade: websocket\r\n" +
-            "Connection: Upgrade\r\n" +
-            $"Sec-WebSocket-Key: {key}\r\n" +
-            "Sec-WebSocket-Version: 13\r\n" +
-            $"Sec-WebSocket-Protocol: {Subprotocol}\r\n\r\n");
+            $"GET {RequestPath} HTTP/1.1\r\n" + string.Concat(fields.Select(field => $"{field.Key}: {field.Value}\r\n")) + "\r\n");
     }
 
+    private static void AddOptionFields(List<KeyValuePair<string, string>> fields, ITransferContext? context)
+    {
+        if (context is null)
+        {
+            return;
+        }
+
+        if (AuthorizationOf(context) is { } authorization)
+        {
+            fields.Add(new("Authorization", authorization));
+        }
+
+        AddUserAgentAndCookie(fields, context.Http);
+        foreach (string header in context.Http?.Headers ?? [])
+        {
+            ApplyCustomHeader(fields, header.Split('\r', '\n')[0]);
+        }
+    }
+
+    private static void AddUserAgentAndCookie(List<KeyValuePair<string, string>> fields, Curl.Protocol.Abstractions.HttpRequestOptions? http)
+    {
+        string agent = http?.UserAgent ?? DefaultUserAgent;
+        if (agent.Length > 0)
+        {
+            fields.Add(new("User-Agent", agent));
+        }
+
+        if (!string.IsNullOrEmpty(http?.CookieStrings))
+        {
+            fields.Add(new("Cookie", http.CookieStrings));
+        }
+    }
+    private static string? AuthorizationOf(ITransferContext context)
+    {
+        if (!string.IsNullOrEmpty(context.Http?.BearerToken))
+        {
+            return "Bearer " + context.Http.BearerToken;
+        }
+
+        return context.Credentials is { } credentials
+            ? "Basic " + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{credentials.UserName}:{credentials.Password}"))
+            : null;
+    }
+    // As curl does: "Name: value" replaces a field of that name (even one the upgrade sets), "Name:" removes it, "Name;" sends it empty.
+    private static void ApplyCustomHeader(List<KeyValuePair<string, string>> fields, string header)
+    {
+        int colon = header.IndexOf(':', StringComparison.Ordinal);
+        if (colon > 0)
+        {
+            string name = header[..colon];
+            string value = header[(colon + 1)..].Trim(' ', '\t');
+            fields.RemoveAll(field => field.Key.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (value.Length > 0)
+            {
+                fields.Add(new(name, value));
+            }
+        }
+        else if (header.EndsWith(';') && header.Length > 1)
+        {
+            fields.Add(new(header[..^1], string.Empty));
+        }
+    }
     /// <summary>Gives the <c>Sec-WebSocket-Accept</c> a server must answer <paramref name="key"/> with (RFC 6455 section 4.2.2).</summary>
     internal static string AcceptFor(string key) =>
         Convert.ToBase64String(SHA1.HashData(System.Text.Encoding.ASCII.GetBytes(key + AcceptGuid)));

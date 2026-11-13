@@ -163,6 +163,17 @@ public sealed class SignalRProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task NegotiateRefusedWith401_FailsWithExit22()
+    {
+        ScriptedConnection negotiate = ScriptedConnection.FromText("HTTP/1.1 401 X\r\nContent-Length: 0\r\n\r\n");
+
+        TransferResult result = await Run(new ScriptedConnector(ConnectResult.Connected(negotiate)), "signalr://example.com/hub", new MemoryStream(), null);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("SignalR: The negotiate request failed with HTTP status 401.", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ConnectRefused_GivesTheConnectorsResult()
     {
         TransferResult result = await Run(new ScriptedConnector(ConnectResult.Refused("Failed to connect")), "signalrs://example.com/hub", new MemoryStream(), null);
@@ -203,6 +214,64 @@ public sealed class SignalRProtocolHandlerTests
     public void SupportedSchemes_AreSignalRAndSignalRs() =>
         CollectionAssert.AreEqual(new[] { "signalr", "signalrs" }, new SignalRProtocolHandler(new ScriptedConnector(), new RepeatingRandomSource(0)).SupportedSchemes.ToArray());
 
+    [TestMethod]
+    public async Task Upload_IsSentAsTheInvocationExactlyAsDataWould()
+    {
+        ScriptedConnection negotiate = Negotiate();
+        ScriptedConnection webSocket = Hub("{}", "{\"type\":3,\"invocationId\":\"1\",\"result\":1}");
+        var connector = new ScriptedConnector(ConnectResult.Connected(negotiate), ConnectResult.Connected(webSocket));
+
+        TransferResult result = await Run(connector, "signalr://example.com/hub", new MemoryStream(), null, "{\"type\":1,\"target\":\"A\",\"arguments\":[]}");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        StringAssert.Contains(webSocket.WrittenText, "\"target\":\"A\"");
+    }
+
+    [TestMethod]
+    public async Task DataAndUpload_DataWins()
+    {
+        ScriptedConnection webSocket = Hub("{}", "{\"type\":3,\"invocationId\":\"1\",\"result\":1}");
+
+        TransferResult result = await Run(Connector(webSocket), "signalr://example.com/hub", new MemoryStream(), "{\"target\":\"D\",\"arguments\":[]}", "{\"target\":\"U\",\"arguments\":[]}");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        StringAssert.Contains(webSocket.WrittenText, "\"target\":\"D\"");
+        Assert.IsFalse(webSocket.WrittenText.Contains("\"target\":\"U\"", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task CallBodyAsync_NeitherDataNorUpload_IsNone() =>
+        Assert.IsNull(await SignalRProtocolHandler.CallBodyAsync(new TransferContext { Url = CurlUrl.Parse("signalr://example.com/hub"), Output = new MemoryStream() }));
+
+    [TestMethod]
+    public async Task WithoutData_AfterAHubLine_ReportsTheBytesWrittenSoFarToTheProgress()
+    {
+        var progress = new RecordingProgress();
+        var output = new MemoryStream();
+        var handler = new SignalRProtocolHandler(Connector(Hub("{}", "{\"type\":1,\"target\":\"Send\",\"arguments\":[]}", "{\"type\":7}")), new RepeatingRandomSource(0));
+
+        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("signalr://example.com/chat"), Output = output, Progress = progress });
+
+        Assert.IsGreaterThan(0, output.Length);
+        Assert.AreEqual(output.Length, progress.Downloaded.Single());
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    private sealed class RecordingProgress : ITransferProgress
+    {
+        public List<long> Downloaded { get; } = [];
+
+        public void ReportTransferStarted()
+        {
+        }
+
+        public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => Downloaded.Add(bytesSoFar);
+
+        public void ReportUploaded(long bytesSoFar, long? expectedTotal)
+        {
+        }
+    }
+
     private static ScriptedConnection Negotiate() =>
         ScriptedConnection.FromText($"HTTP/1.1 200 OK\r\nContent-Length: {NegotiateBody.Length}\r\n\r\n{NegotiateBody}");
 
@@ -218,11 +287,12 @@ public sealed class SignalRProtocolHandlerTests
         return [first, (byte)bytes.Length, .. bytes];
     }
 
-    private static ValueTask<TransferResult> Run(ScriptedConnector connector, string url, MemoryStream output, string? data) =>
+    private static ValueTask<TransferResult> Run(ScriptedConnector connector, string url, MemoryStream output, string? data, string? upload = null) =>
         new SignalRProtocolHandler(connector, new RepeatingRandomSource(0)).ExecuteAsync(new TransferContext
         {
             Url = CurlUrl.Parse(url),
             Output = output,
+            Upload = upload is null ? null : new MemoryStream(Encoding.UTF8.GetBytes(upload)),
             PostData = data is null ? (ReadOnlyMemory<byte>?)null : new ReadOnlyMemory<byte>(Encoding.UTF8.GetBytes(data)),
         });
 

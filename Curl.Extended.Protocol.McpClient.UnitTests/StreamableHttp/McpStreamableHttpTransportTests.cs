@@ -82,6 +82,30 @@ public sealed class McpStreamableHttpTransportTests
         Assert.IsTrue(connection.IsDisposed);
     }
 
+    private static IOException Reset() => new("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset));
+
+    [TestMethod]
+    public async Task SendRequestAsync_ConnectionResetWhileReading_FailsWithExit56()
+    {
+        await using var transport = Transport(new RecordedConnection(string.Empty, readFailure: Reset()));
+
+        var exception = await Assert.ThrowsExactlyAsync<Client.McpClientException>(() => transport.SendRequestAsync(OutgoingRequest(), TestContext.CancellationToken));
+
+        Assert.AreEqual(CurlExitCode.RecvError, exception.ExitCode);
+        Assert.AreEqual("Recv failure: Connection was reset", exception.Message);
+    }
+
+    [TestMethod]
+    public async Task SendRequestAsync_ConnectionResetWhileWriting_FailsWithExit55()
+    {
+        await using var transport = Transport(new RecordedConnection(string.Empty, writeFailure: Reset()));
+
+        var exception = await Assert.ThrowsExactlyAsync<Client.McpClientException>(() => transport.SendRequestAsync(OutgoingRequest(), TestContext.CancellationToken));
+
+        Assert.AreEqual(CurlExitCode.SendError, exception.ExitCode);
+        Assert.AreEqual("Send failure: Connection was reset", exception.Message);
+    }
+
     [TestMethod]
     public async Task SendRequestAsync_JsonReplyForAnotherId_FailsWithNoResponse()
     {

@@ -23,7 +23,7 @@ catalogue lines. Upstream curl does no DANE, so the behaviour follows RFC 4033-4
   - secure records with a usable one matching the chain: the chain stands;
   - secure records none of which is usable: treated as no records, the chain stands (RFC 7671 section 4.1);
   - secure usable records none of which matches: exit 60;
-  - bogus: exit 60; no usable answer (timeout, unreachable resolver, error RCODE): exit 60, failing closed since the
+  - bogus: exit 60; no usable answer (timeout, unreachable resolver - a refused connection or a socket error such as an ICMP port unreachable - error RCODE): exit 60, failing closed since the
     user asked for DANE;
   - a proved-insecure delegation or a proved absence of TLSA records: the chain stands on curl's PKIX check alone.
 - A server named by an IP address has no TLSA name, so the hook lets its chain stand without a lookup. A connection

@@ -8,6 +8,17 @@ public sealed class StructuredFieldsTransferHookTests
     private readonly ITransferHook _hook = new StructuredFieldsTransferHook();
 
     [TestMethod]
+    public async Task ExecuteAsync_FieldVariableNames_AreFoundInAnyLetterCase()
+    {
+        var result = await _hook.ExecuteAsync(Context(new InfoRecordingTransferEvents()), Origin(("Cache-Status", "ExampleCache; hit; ttl=30"), ("Priority", "u=1, i")));
+
+        var values = result.Report!.ExtensionWriteOutValues;
+        Assert.AreEqual("Dictionary of 2: u=Integer 1; i=Boolean true", values["structured_field.Priority"]);
+        Assert.AreEqual("Dictionary of 2: u=Integer 1; i=Boolean true", values["structured_field.PRIORITY"]);
+        Assert.AreEqual("List of 1: Token ExampleCache [hit=Boolean true, ttl=Integer 30]", values["structured_field.Cache-Status"]);
+        Assert.AreEqual("kept", values["OTHER"]);
+    }
+    [TestMethod]
     public async Task ExecuteAsync_KnownFields_ReportsEachReadablyInVerboseOutput()
     {
         InfoRecordingTransferEvents events = new();

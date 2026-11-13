@@ -1,4 +1,6 @@
+using System.Net.Sockets;
 using System.Text;
+using Curl.Extended.Protocol.McpClient.Client;
 using Curl.Extended.Protocol.McpClient.Wire;
 using Curl.Protocol.Abstractions;
 
@@ -173,13 +175,21 @@ public sealed class McpStreamableHttpTransport : IAsyncDisposable
     {
         connection ??= await openConnection(cancellationToken);
         reader ??= new McpHttpConnectionReader(connection);
-        await connection.WriteAsync(Encoding.Latin1.GetBytes(FormatHead(method, body?.Length)), cancellationToken);
-        if (body is not null)
+        try
         {
-            await connection.WriteAsync(body, cancellationToken);
+            await connection.WriteAsync(Encoding.Latin1.GetBytes(FormatHead(method, body?.Length)), cancellationToken);
+            if (body is not null)
+            {
+                await connection.WriteAsync(body, cancellationToken);
+            }
+
+            await connection.FlushAsync(cancellationToken);
+        }
+        catch (Exception failure) when (failure is IOException or SocketException)
+        {
+            throw new McpClientException(CurlExitCode.SendError, "Send failure: Connection was reset");
         }
 
-        await connection.FlushAsync(cancellationToken);
         return await McpHttpResponseHeadReader.ReadAsync(reader, cancellationToken);
     }
 
@@ -262,7 +272,14 @@ public sealed class McpStreamableHttpTransport : IAsyncDisposable
             await CloseConnectionAsync();
         }
 
-        return (await exchange).Value;
+        try
+        {
+            return (await exchange).Value;
+        }
+        catch (Exception failure) when (failure is IOException or SocketException)
+        {
+            throw new McpClientException(CurlExitCode.RecvError, "Recv failure: Connection was reset");
+        }
     }
 
     private async ValueTask CloseConnectionAsync()

@@ -48,6 +48,17 @@ internal sealed class HttpContentDecoder : IDisposable
     internal long BytesDelivered { get; private set; }
 
     /// <summary>
+    /// Gets or sets how many of the leading codings are Transfer-Encoding ones, decoded first.
+    /// </summary>
+    internal int TransferCodingCount { get; set; }
+
+    /// <summary>
+    /// Gets how many bytes the Transfer-Encoding codings have decoded so far, curl's
+    /// <c>%{size_download}</c> under <c>--tr-encoding</c> (BL-5036).
+    /// </summary>
+    internal long TransferDecodedBytes { get; private set; }
+
+    /// <summary>
     /// Gets or sets the most decoded bytes the output may be given, <c>--max-filesize</c>'s
     /// limit, or <see langword="null" /> for none. A body that decodes past it - a
     /// decompression bomb - fails with exit 63 before the decoded piece that would cross the
@@ -63,6 +74,11 @@ internal sealed class HttpContentDecoder : IDisposable
     /// <returns>The decoder, or <see langword="null" /> when the body has no coding to decode.</returns>
     internal static HttpContentDecoder? For(IReadOnlyList<HttpResponseHeader> headers) => ForCodings(ContentCodings(headers));
 
+    /// <summary>Gets whether a coding is decoded rather than skipped as <c>identity</c> or <c>none</c>.</summary>
+    /// <param name="coding">The coding, without blanks.</param>
+    /// <returns><see langword="true" /> when the coding is decoded.</returns>
+    internal static bool Decodes(string coding) => !Is(coding, "identity") && !Is(coding, "none");
+
     /// <summary>
     /// Builds the decoder for <paramref name="codings" />, in the order the server applied
     /// them: the Content-Encoding codings, then, for <c>--tr-encoding</c>, the Transfer-Encoding
@@ -73,7 +89,7 @@ internal sealed class HttpContentDecoder : IDisposable
     /// <param name="codings">The codings, each without blanks.</param>
     /// <returns>The decoder, or <see langword="null" /> when there is no coding to decode.</returns>
     internal static HttpContentDecoder? ForCodings(IEnumerable<string> codings) =>
-        Of([.. codings.Where(coding => !Is(coding, "identity") && !Is(coding, "none")).Select(CodingOf)]);
+        Of([.. codings.Where(Decodes).Select(CodingOf)]);
 
     /// <summary>
     /// Lists every Content-Encoding header's codings in order, without blanks or empty items.
@@ -163,6 +179,11 @@ internal sealed class HttpContentDecoder : IDisposable
 
         foreach (ReadOnlyMemory<byte> decoded in layers[layer].Decode(bytes))
         {
+            if (layer == TransferCodingCount - 1)
+            {
+                TransferDecodedBytes += decoded.Length;
+            }
+
             await WriteThroughAsync(layer + 1, decoded, output, cancellationToken).ConfigureAwait(false);
         }
     }

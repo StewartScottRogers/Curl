@@ -9,15 +9,15 @@ namespace Curl.Extension.HttpCache;
 internal static class StoredResponseOutput
 {
     /// <summary>Writes <paramref name="stored" /> to <paramref name="context" />'s outputs.</summary>
-    /// <returns>The number of body bytes written.</returns>
-    public static async Task<long> WriteAsync(StoredResponse stored, ITransferContext context)
+    /// <returns>The number of body bytes and of header bytes written.</returns>
+    public static async Task<(long BodyLength, long HeadLength)> WriteAsync(StoredResponse stored, ITransferContext context)
     {
         var head = Encoding.Latin1.GetBytes(
             stored.StatusLine + "\r\n" + string.Concat(stored.Headers.Select(field => field.Key + ": " + field.Value + "\r\n")) + "\r\n");
         await WriteIfGivenAsync(context.HeaderOutput, head, context.CancellationToken);
         await WriteIfGivenAsync(context.DumpHeaderOutput, head, context.CancellationToken);
         await context.Output.WriteAsync(stored.Body, context.CancellationToken);
-        return stored.Body.Length;
+        return (stored.Body.Length, head.Length);
     }
 
     /// <summary>Writes <paramref name="bytes" /> to <paramref name="output" /> when there is one.</summary>

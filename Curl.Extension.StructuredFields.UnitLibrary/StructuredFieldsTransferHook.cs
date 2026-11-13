@@ -27,7 +27,7 @@ internal sealed class StructuredFieldsTransferHook : ITransferHook
         }
 
         var fields = DescribedFields(report.ResponseHeaders);
-        Dictionary<string, string> values = new(report.ExtensionWriteOutValues)
+        Dictionary<string, string> values = new(report.ExtensionWriteOutValues, StringComparer.OrdinalIgnoreCase)
         {
             [AllFieldsVariable] = string.Join("\n", fields.Select(field => field.Name + ": " + field.Text)),
         };

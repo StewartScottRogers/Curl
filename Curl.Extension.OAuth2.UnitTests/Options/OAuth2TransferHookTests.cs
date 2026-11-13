@@ -92,6 +92,71 @@ public sealed class OAuth2TransferHookTests
         Assert.AreEqual(OAuth2TransferHook.NoServicesMessage, result.ErrorMessage);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_HopToAnotherOriginWithoutLocationTrusted_SendsNoTokenAndAsksNoEndpoint()
+    {
+        var connector = new QueuedConnector(new RecordedConnection(FlowResponses.Token("TOK123")));
+        var hook = Hook(null);
+        List<string> headers = [];
+        await hook.ExecuteAsync(Context(), Services(connector), Recording(headers));
+        ITransferContext? hop = null;
+
+        await hook.ExecuteAsync(Context(1, false), Services(connector), context =>
+        {
+            hop = context;
+            return ValueTask.FromResult(TransferResult.Success(0));
+        });
+
+        CollectionAssert.AreEqual(new[] { "X-Own: 1" }, hop?.Http?.Headers.ToArray());
+        Assert.AreEqual(1, connector.ConnectCount);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TrustedOrSameOriginHop_KeepsTheTokenFromTheFirstHopWithoutAskingAgain()
+    {
+        var connector = new QueuedConnector(new RecordedConnection(FlowResponses.Token("TOK123")));
+        var hook = Hook(null);
+        List<string> headers = [];
+
+        await hook.ExecuteAsync(Context(), Services(connector), Recording(headers));
+        await hook.ExecuteAsync(Context(1, true), Services(connector), Recording(headers));
+
+        CollectionAssert.AreEqual(new[] { "Authorization: Bearer TOK123", "Authorization: Bearer TOK123" }, headers);
+        Assert.AreEqual(1, connector.ConnectCount);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HopBeforeAnyTokenWasKept_GetsATokenAsForTheFirstHop()
+    {
+        var connector = new QueuedConnector(new RecordedConnection(FlowResponses.Token("TOK123")));
+        List<string> headers = [];
+
+        await Hook(null).ExecuteAsync(Context(1, true), Services(connector), Recording(headers));
+
+        CollectionAssert.AreEqual(new[] { "Authorization: Bearer TOK123" }, headers);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TransferIsNotHttp_SendsItUnchanged()
+    {
+        var connector = new QueuedConnector(new RecordedConnection(FlowResponses.Token("TOK123")));
+        ITransferContext? sent = null;
+        var context = new TransferContext { Url = CurlUrl.Parse("ftp://files.example.com/x"), Output = new MemoryStream() };
+
+        await Hook(null).ExecuteAsync(context, Services(connector), inner =>
+        {
+            sent = inner;
+            return ValueTask.FromResult(TransferResult.Success(0));
+        });
+
+        Assert.IsNull(sent?.Http);
+    }
+    private static TransferContext Context(int redirectsFollowed, bool sendsCredentials) => new()
+    {
+        Url = CurlUrl.Parse("https://other.example.com/resource"),
+        Output = new MemoryStream(),
+        Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Headers = ["X-Own: 1"], RedirectsFollowed = redirectsFollowed, SendsCookieStrings = sendsCredentials },
+    };
     private static OAuth2TransferHook Hook(string? cacheDirectory) => new(
         new OAuth2Configuration(
             OAuth2FlowKind.ClientCredentials,

@@ -16,7 +16,7 @@ namespace Curl.Authentication;
 /// without <c>=</c>, an empty element or a trailing comma, a quoted value never closed or
 /// followed by more than blanks before its comma, no <c>nonce</c> or more than one, an
 /// <c>algorithm</c> other than MD5 and MD5-sess in any case, a <c>qop</c> list without
-/// <c>auth</c>, and MD5-sess without one (whose answer SSPI hashes in a way not reproduced).
+/// <c>auth</c>. MD5-sess without a qop is answered (BL-5037).
 /// A repeated parameter of another kind takes its last value; <c>userhash</c> and unknown
 /// keys are ignored. The realm is not SSPI's: it is the one curl reads itself, the last
 /// <c>realm</c> among the pairs curl's own parser reads, which curl gives SSPI as the
@@ -63,11 +63,11 @@ internal static class DigestSspiChallenge
 
     // Not exactly one nonce, an algorithm SSPI does not answer, or a qop it refuses.
     private static bool IsRefused(int nonceCount, [NotNullWhen(false)] DigestAlgorithm? algorithm, string? qopList, string? qop) =>
-        nonceCount != 1 || algorithm is not { IsAnsweredBySspi: true } || IsQopRefused(qopList, qop, algorithm);
+        nonceCount != 1 || algorithm is not { IsAnsweredBySspi: true } || IsQopRefused(qopList, qop);
 
-    // A qop list without auth, or MD5-sess without a qop.
-    private static bool IsQopRefused(string? qopList, string? qop, DigestAlgorithm algorithm) =>
-        qopList is null ? algorithm.IsSession : qop != "auth";
+    // A qop list without auth; MD5-sess without a qop is answered (BL-5037).
+    private static bool IsQopRefused(string? qopList, string? qop) =>
+        qopList is not null && qop != "auth";
 
     private static string? NameAsSspiWrites(string? algorithmName, DigestAlgorithm algorithm) =>
         algorithmName is null ? null : (algorithm.IsSession ? "MD5-sess" : "MD5");

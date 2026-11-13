@@ -79,7 +79,8 @@ internal static class LdapAuthenticatedBind
         LdapBindReply initial = await exchange.BindWithRequestAsync(messageId => LdapDigestMd5Bind.InitialRequest(exchange.Writer, messageId), cancellationToken).ConfigureAwait(false);
         if (initial.Status != LdapBindReplyStatus.Answered || initial.ResultCode != LdapBindReply.SaslBindInProgress)
         {
-            return initial;
+            // A plain success skipped the mechanism: refuse it as Protocol Error rather than treat it as bound.
+            return initial.IsSuccess ? new LdapBindReply(LdapBindReplyStatus.Answered, WinLdapResultText.ProtocolError) : initial;
         }
 
         string clientNonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(ClientNonceBytes));

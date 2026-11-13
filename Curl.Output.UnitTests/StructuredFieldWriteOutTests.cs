@@ -20,17 +20,31 @@ public sealed class StructuredFieldWriteOutTests
     }
 
     [TestMethod]
-    public async Task RenderAsync_UnknownVariableLongerThanNameBuffer_StillEndsTheOutput()
+    public async Task RenderAsync_MixedAndUpperCaseNames_RenderLikeTheLowerCaseName()
+    {
+        string output = await RenderAsync("A[%{structured_field.Priority}]B[%{structured_field.Cache-Status}]C[%{structured_field.PRIORITY}]D");
+
+        Assert.AreEqual("A[Dictionary of 2: u=Integer 1; i=Boolean true]B[List of 1: Token ExampleCache [hit=Boolean true, ttl=Integer 30]]C[Dictionary of 2: u=Integer 1; i=Boolean true]D", output);
+    }
+
+    [TestMethod]
+    public async Task RenderAsync_UnknownVariableLongerThanNameBuffer_PrintsNothingForItAndTheRestOfTheTemplate()
+    {
+        string output = await RenderAsync("A[%{structured_field.nosuchfield}]B");
+
+        Assert.AreEqual("A[]B", output);
+    }
+
+    private static async Task<string> RenderAsync(string template)
     {
         using MemoryStream output = new();
         using MemoryStream error = new();
         WriteOutTemplateRenderer renderer = new(new NoFiles(), false, WriteOutTimeDialect.WindowsCRuntime, TimeProvider.System);
 
-        await renderer.RenderAsync("A[%{structured_field.nosuchfield}]B", new Source(), output, error);
+        await renderer.RenderAsync(template, new Source(), output, error);
 
-        Assert.AreEqual("A[", Encoding.UTF8.GetString(output.ToArray()));
+        return Encoding.UTF8.GetString(output.ToArray());
     }
-
     private sealed class NoFiles : IWriteOutFileOpener
     {
         public bool TryOpen(string path, bool append, [NotNullWhen(true)] out Stream? stream)
@@ -46,7 +60,12 @@ public sealed class StructuredFieldWriteOutTests
 
         public bool TryGetVariableText(string name, [NotNullWhen(true)] out string? text)
         {
-            text = name == "structured_field.priority" ? "Dictionary of 2: u=Integer 1; i=Boolean true" : null;
+            text = name.ToLowerInvariant() switch
+            {
+                "structured_field.priority" => "Dictionary of 2: u=Integer 1; i=Boolean true",
+                "structured_field.cache-status" => "List of 1: Token ExampleCache [hit=Boolean true, ttl=Integer 30]",
+                _ => null,
+            };
             return text is not null;
         }
 

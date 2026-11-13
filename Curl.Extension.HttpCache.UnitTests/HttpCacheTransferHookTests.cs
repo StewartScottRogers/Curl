@@ -48,6 +48,44 @@ public sealed class HttpCacheTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_FreshHits_ReportTheBytesWrittenAsSizes_Adr1069()
+    {
+        await RunAsync(Noon, Origin(200, "OK", "fresh body", "Cache-Control: max-age=600").Invoke);
+        var headLength = "HTTP/1.1 200 OK\r\nCache-Control: max-age=600\r\n\r\n".Length;
+
+        for (var hit = 1; hit <= 2; hit++)
+        {
+            var result = await Hook().ExecuteAsync(Context(Noon.AddSeconds(hit)), NeverCalled);
+
+            Assert.AreEqual(10, result.Report!.DownloadSize);
+            Assert.AreEqual(headLength, result.Report.HeaderSize);
+        }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ARevalidated304_ReportsTheStoredResponsesSizesNotThe304s_Adr1069()
+    {
+        await RunAsync(Noon, Origin(200, "OK", "stored body", "ETag: \"v1\"", "Cache-Control: max-age=10").Invoke);
+        var later = Context(Noon.AddMinutes(5));
+
+        var result = await Hook().ExecuteAsync(later, Origin(304, "Not Modified", string.Empty, "ETag: \"v1\"").Invoke);
+
+        Assert.AreEqual(11, result.Report!.DownloadSize);
+        Assert.AreEqual(Text(later.HeaderOutput!).Length, result.Report.HeaderSize);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AStoredMiss_ReportsTheOriginsSizes_Adr1069()
+    {
+        var origin = TransferResult.Success(25) with { Report = new TransferReport { ResponseCode = 200, DownloadSize = 25, HeaderSize = 178 } };
+
+        var result = await Hook().ExecuteAsync(Context(Noon), _ => ValueTask.FromResult(origin));
+
+        Assert.AreEqual(25, result.Report!.DownloadSize);
+        Assert.AreEqual(178, result.Report.HeaderSize);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_AFirstFetch_WritesTheResponseAsReceived_Rfc9111Section3()
     {
         var context = Context(Noon);

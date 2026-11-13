@@ -29,7 +29,7 @@ public sealed class CloseNotifyOnDisposeTests
         await sslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions { TargetHost = "localhost" });
         await serverTask;
         var plaintext = new StallingConnection();
-        var connection = new SslStreamConnection(sslStream, new ConnectionStream(plaintext), plaintext, null, string.Empty, clearsTls: false)
+        var connection = new SslStreamConnection(sslStream, new ConnectionStream(plaintext), plaintext, null, string.Empty, matchesOpenSslBuild: false)
         {
             CloseNotifyTimeout = s_bound,
         };
@@ -54,7 +54,7 @@ public sealed class CloseNotifyOnDisposeTests
         await serverTask;
         var plaintext = new StallingConnection();
         var clock = new TimerCountingTimeProvider();
-        var connection = new SslStreamConnection(sslStream, new ConnectionStream(plaintext), plaintext, null, string.Empty, clearsTls: false)
+        var connection = new SslStreamConnection(sslStream, new ConnectionStream(plaintext), plaintext, null, string.Empty, matchesOpenSslBuild: false)
         {
             CloseNotifyTimeout = s_bound,
             TimeProvider = clock,
@@ -73,7 +73,7 @@ public sealed class CloseNotifyOnDisposeTests
     {
         var plaintext = new StallingConnection();
         var clock = new TimerCountingTimeProvider();
-        var connection = new HandBuiltTlsConnection(new MemoryStream(), plaintext, null, string.Empty, clearsTls: false)
+        var connection = new HandBuiltTlsConnection(new MemoryStream(), plaintext, null, string.Empty, matchesOpenSslBuild: false)
         {
             CloseNotifyTimeout = s_bound,
             TimeProvider = clock,
@@ -90,7 +90,7 @@ public sealed class CloseNotifyOnDisposeTests
     {
         var plaintext = new StallingConnection();
         var sslStream = new SslStream(new ThrowingOnDisposeStream());
-        var connection = new SslStreamConnection(sslStream, new ConnectionStream(plaintext), plaintext, null, string.Empty, clearsTls: false);
+        var connection = new SslStreamConnection(sslStream, new ConnectionStream(plaintext), plaintext, null, string.Empty, matchesOpenSslBuild: false);
 
         await connection.DisposeAsync();
 
@@ -101,7 +101,7 @@ public sealed class CloseNotifyOnDisposeTests
     public async Task DisposeAsync_OfAHandBuiltTlsConnectionWhoseStreamDisposalThrows_StillDisposesTheTransport()
     {
         var plaintext = new StallingConnection();
-        var connection = new HandBuiltTlsConnection(new ThrowingOnDisposeStream(), plaintext, null, string.Empty, clearsTls: false);
+        var connection = new HandBuiltTlsConnection(new ThrowingOnDisposeStream(), plaintext, null, string.Empty, matchesOpenSslBuild: false);
 
         await connection.DisposeAsync();
 

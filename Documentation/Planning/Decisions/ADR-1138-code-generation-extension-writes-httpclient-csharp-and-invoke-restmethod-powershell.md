@@ -40,7 +40,9 @@ transfer hook (ADR-1007) sees each transfer's request before running it unchange
 - A body curl streams (`-T`, or a `-F` form too large or unseekable to read ahead): its bytes are read only while
   sending, so the generated code keeps the method but sends no body. A seekable `-F` form of 1 MiB or less is read
   ahead and written into the code with its boundary (BL-4922); PowerShell writes a body with line breaks as base64.
-- `-` for standard output: the generated code would mix with the response body on the same stream.
+- `-` for standard output: the generated code would mix with the response body on the same stream. `--csharp -` and `--powershell -` are refused with exit 2 naming the option (BL-5050), rather than
+  creating a file named `-`. Decided by Claude under Stewart's delegation: the fitness review allowed either refusing or
+  writing to stdout, and refusing matches this exclusion.
 - TLS, proxy, cookie, timeout and authentication-negotiation options: HttpClient and Invoke-RestMethod configure them
   differently enough that a partial mapping would mislead; the request itself is what is generated.
 

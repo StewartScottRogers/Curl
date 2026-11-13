@@ -28,9 +28,12 @@ internal sealed record WebDavCollectionListing(TransferResult Result, IReadOnlyL
     /// the answer is not 207; exit 8 when the body is not a <c>multistatus</c> the reader accepts.
     /// </returns>
     public static Task<WebDavCollectionListing> ListAsync(ITransferContext context, CurlUrl url, Func<ITransferContext, ValueTask<TransferResult>> next) =>
-        context.Http is null
+        context.Http is null || !IsHttp(url)
             ? Task.FromResult(Failed(CurlExitCode.UnsupportedProtocol, NotHttpMessage))
             : PropfindAsync(context, url, next);
+
+    private static bool IsHttp(CurlUrl url) =>
+        url.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) || url.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase);
 
     private static async Task<WebDavCollectionListing> PropfindAsync(ITransferContext context, CurlUrl url, Func<ITransferContext, ValueTask<TransferResult>> next)
     {

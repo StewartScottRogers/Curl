@@ -21,17 +21,17 @@ namespace Curl.Networking;
 /// <param name="plaintext">The connection the handshake ran over.</param>
 /// <param name="clientCertificate">The <c>--cert</c> certificate, disposed with the connection.</param>
 /// <param name="missingCloseNotifyMessage">The message a read fails with when <c>close_notify</c> never came.</param>
-/// <param name="clearsTls">
-/// Whether <see cref="ClearTlsAsync" /> hands back <paramref name="plaintext" /> as curl's
-/// OpenSSL build clears TLS, or, <see langword="false" />, sends <c>close_notify</c> and fails
-/// as curl 8.21.0's Schannel build does (ADR-0280).
+/// <param name="matchesOpenSslBuild">
+/// Whether <see cref="ClearTlsAsync" /> sends <c>close_notify</c> first only when asked, as curl's
+/// OpenSSL build does, or, <see langword="false" />, always first, as curl 8.22.0's Schannel build
+/// does; either clears TLS once the server's <c>close_notify</c> has arrived (ADR-1261).
 /// </param>
 internal sealed class HandBuiltTlsConnection(
     Stream tlsStream,
     IConnection plaintext,
     X509Certificate2? clientCertificate,
     string missingCloseNotifyMessage,
-    bool clearsTls) : IConnection
+    bool matchesOpenSslBuild) : IConnection
 {
     private int _ticketsReported;
 
@@ -94,12 +94,12 @@ internal sealed class HandBuiltTlsConnection(
         _tlsEnded = true;
         try
         {
-            if (sendCloseNotifyFirst || !clearsTls)
+            if (sendCloseNotifyFirst || !matchesOpenSslBuild)
             {
                 await ShutdownAsync(tlsStream, cancellationToken).ConfigureAwait(false);
             }
 
-            return clearsTls && await ReadsCloseNotifyAsync(cancellationToken).ConfigureAwait(false) ? plaintext : null;
+            return await ReadsCloseNotifyAsync(cancellationToken).ConfigureAwait(false) ? plaintext : null;
         }
         catch (IOException)
         {

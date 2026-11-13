@@ -34,6 +34,79 @@ public sealed class Mqtt5WebSocketUpgradeTests
     }
 
     [TestMethod]
+    public void Request_HeaderUserAgentAndCookieOptions_AreSentOnTheUpgrade()
+    {
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("mqtt5+ws://broker/t"),
+            Output = new MemoryStream(),
+            Http = new Curl.Protocol.Abstractions.HttpRequestOptions { UserAgent = "agentX", CookieStrings = "c=1", Headers = ["Authorization: Bearer abc"] },
+        };
+
+        string request = System.Text.Encoding.ASCII.GetString(Mqtt5WebSocketUpgrade.Request(context.Url, "k", context));
+
+        StringAssert.Contains(request, "\r\nUser-Agent: agentX\r\n");
+        StringAssert.Contains(request, "\r\nAuthorization: Bearer abc\r\n");
+        StringAssert.Contains(request, "\r\nCookie: c=1\r\n");
+        AssertOnce(request, "Host:", "Upgrade:", "Connection:", "Sec-WebSocket-Key:", "Sec-WebSocket-Version:");
+        StringAssert.Contains(request, "\r\nSec-WebSocket-Protocol: mqtt\r\n");
+    }
+
+    [TestMethod]
+    public void Request_NoUserAgentOption_SendsCurlsDefault()
+    {
+        TransferContext context = new() { Url = CurlUrl.Parse("mqtt5+ws://broker/t"), Output = new MemoryStream(), Http = new Curl.Protocol.Abstractions.HttpRequestOptions() };
+
+        StringAssert.Contains(System.Text.Encoding.ASCII.GetString(Mqtt5WebSocketUpgrade.Request(context.Url, "k", context)), "\r\nUser-Agent: curl/");
+    }
+
+    [TestMethod]
+    public void Request_EmptyUserAgent_SendsNone()
+    {
+        TransferContext context = new() { Url = CurlUrl.Parse("mqtt5+ws://broker/t"), Output = new MemoryStream(), Http = new Curl.Protocol.Abstractions.HttpRequestOptions { UserAgent = string.Empty } };
+
+        Assert.DoesNotContain("User-Agent", System.Text.Encoding.ASCII.GetString(Mqtt5WebSocketUpgrade.Request(context.Url, "k", context)));
+    }
+
+    [TestMethod]
+    public void Request_BearerTokenAndCredentials_BearerWinsOverBasic()
+    {
+        TransferContext bearer = new() { Url = CurlUrl.Parse("mqtt5+ws://broker/t"), Output = new MemoryStream(), Http = new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = "tok" }, Credentials = new System.Net.NetworkCredential("u", "p") };
+        TransferContext basic = new() { Url = bearer.Url, Output = new MemoryStream(), Credentials = new System.Net.NetworkCredential("u", "p") };
+
+        StringAssert.Contains(System.Text.Encoding.ASCII.GetString(Mqtt5WebSocketUpgrade.Request(bearer.Url, "k", bearer)), "\r\nAuthorization: Bearer tok\r\n");
+        StringAssert.Contains(System.Text.Encoding.ASCII.GetString(Mqtt5WebSocketUpgrade.Request(basic.Url, "k", basic)), "\r\nAuthorization: Basic dTpw\r\n");
+    }
+
+    [TestMethod]
+    public void Request_HeaderNamingAFieldTheUpgradeSets_ReplacesItRemovesItOrSendsItEmpty()
+    {
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("mqtt5+ws://broker/t"),
+            Output = new MemoryStream(),
+            Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Headers = ["Host: other", "Upgrade:", "X-Empty;", "Not a header", "X-Two: a\r\nb"] },
+        };
+
+        string request = System.Text.Encoding.ASCII.GetString(Mqtt5WebSocketUpgrade.Request(context.Url, "k", context));
+
+        StringAssert.Contains(request, "\r\nHost: other\r\n");
+        AssertOnce(request, "Host:");
+        Assert.DoesNotContain("Upgrade: websocket", request);
+        StringAssert.Contains(request, "\r\nX-Empty: \r\n");
+        StringAssert.Contains(request, "\r\nX-Two: a\r\n");
+        Assert.DoesNotContain("Not a header", request);
+    }
+
+    private static void AssertOnce(string request, params string[] names)
+    {
+        foreach (string name in names)
+        {
+            Assert.AreEqual(1, request.Split("\r\n" + name).Length - 1, name);
+        }
+    }
+
+    [TestMethod]
     public void Request_Ipv6HostAndPort_BracketsTheHostAndAddsThePort()
     {
         byte[] request = Mqtt5WebSocketUpgrade.Request(CurlUrl.Parse("mqtt5+ws://[::1]:8080/t"), "k");

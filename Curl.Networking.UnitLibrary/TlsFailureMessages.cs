@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.ComponentModel;
+using System.Globalization;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -861,13 +862,22 @@ internal static class TlsFailureMessages
             return "unable to get local issuer certificate (20)";
         }
 
-        return ChainStatus(chain) == X509ChainStatusFlags.NotTimeValid ? OpenSslValidityError(chain) : OpenSslTrustError(chain);
+        var status = ChainStatus(chain);
+        if (status.HasFlag(X509ChainStatusFlags.NotValidForUsage) || OpenSslKeyUsageRefusal.ForbidsServerUse(chain.ChainElements[0].Certificate))
+        {
+            return "unsuitable certificate purpose (26)";
+        }
+
+        return status == X509ChainStatusFlags.NotTimeValid ? OpenSslValidityError(chain) : OpenSslTrustError(chain);
     }
 
     // curl's Schannel build checks the chain's trust errors in this order. An untrusted root
     // is also what anything else, or no chain at all, is reported as.
     private static string SchannelCaCertificateFileChainError(X509Chain? chain) =>
         SchannelCaCertificateFileChainError(ChainStatus(chain));
+
+    private const X509ChainStatusFlags SchannelStatusesThatAreNotNamedByValue =
+        X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation;
 
     internal static string SchannelCaCertificateFileChainError(X509ChainStatusFlags status)
     {
@@ -884,6 +894,13 @@ internal static class TlsFailureMessages
         if (status.HasFlag(X509ChainStatusFlags.PartialChain))
         {
             return SchannelChainIncomplete;
+        }
+
+        // Any other chain status is named by its CERT_TRUST_* value, which .NET's flags share (BL-5032).
+        var specific = status & ~SchannelStatusesThatAreNotNamedByValue;
+        if (specific != X509ChainStatusFlags.NoError)
+        {
+            return string.Create(CultureInfo.InvariantCulture, $"schannel: error 0x{(int)specific:x8}");
         }
 
         var untrustedOrUnknown = status & (X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.RevocationStatusUnknown);

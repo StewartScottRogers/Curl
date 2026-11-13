@@ -20,8 +20,10 @@ Curl serves two groups of URL schemes, each protocol in its own class library.
 
 - **Original**, curl's own, behaving like upstream curl: `http`, `https`, `ftp`, `ftps`,
   `file`, `dict`, `gopher`, `gophers`, `imap`, `imaps`, `ldap`, `ldaps`, `mqtt`, `mqtts`,
-  `pop3`, `pop3s`, `rtsp`, `scp`, `sftp`, `smb`, `smbs`, `smtp`, `smtps`, `telnet`,
-  `tftp`, `ws` and `wss`.
+  `pop3`, `pop3s`, `rtsp`, `scp`, `sftp`, `smtp`, `smtps`, `telnet`,
+  `tftp`, `ws` and `wss`. `smb` and `smbs` are known but disabled in every build: a transfer
+  fails with exit 1 and `Protocol "smb" is disabled`, and `curl -V` does not list them, as
+  curl 8.22.0 does (ADR-0835, ADR-1263).
 - **Extended**, schemes Curl adds that curl refuses: `amqp`, `amqps`, `amqp1`, `amqp1s`,
   `az`, `abfs`, `abfss`, `coap`, `coaps`, `dns`, `gs`, `grpc`, `grpcs`, `kafka`, `kafkas`,
   `mcp`, `mcps`, `mcp+stdio`, `mqtt5`, `mqtt5s`, `mqtt5+ws`, `nats`, `natss`, `oci`,

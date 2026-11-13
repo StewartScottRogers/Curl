@@ -267,6 +267,24 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("GSSAPI", StringComparison.Ordinal)));
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_EmptyDigestMd5ChallengeWithNtlmOffered_CancelsThenSendsNtlmType1AndFailsLoginDenied()
+    {
+        // BL-5033: DIGEST-MD5 given an empty 334 challenge is cancelled with *, then NTLM is tried.
+        byte[] type1 = [.. "NTLMSSP"u8, 0, 1, 0, 0, 0];
+        string type1Line = Convert.ToBase64String(type1);
+        var sasl = new RankedSaslAuthenticator(("DIGEST-MD5", null, []), ("NTLM", null, [type1])) { CancelReason = "DIGEST-MD5 handshake failure (empty challenge message)" };
+
+        SmtpRun run = await RunAsync(Offering("DIGEST-MD5 NTLM") + "334 \r\n" + Cancelled + "334 \r\n535 denied\r\n" + HelpReplyAndBye, sasl);
+
+        string expected = Ehlo + "AUTH DIGEST-MD5\r\n*\r\nAUTH NTLM\r\n" + type1Line + "\r\n"; // No QUIT: the handler sends none after a refused login, as case (b) above.
+        Diagnostics.Diff("sent", expected, run.Sent);
+        Assert.AreEqual(expected, run.Sent);
+        TransferResult denied = TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied");
+        Diagnostics.AssertResult(denied, run.Result);
+        Assert.AreEqual(denied, run.Result);
+    }
+
     private static string Offering(string mechanisms) => Greeting + "250-localhost\r\n250 AUTH " + mechanisms + "\r\n";
 
     private Task<SmtpRun> RunAsync(string replies, ISaslAuthenticator sasl, ITransferEvents? events = null)

@@ -38,7 +38,9 @@ namespace Curl.Engine;
 /// <para>
 /// When the netrc file is in use, the lookup is made again for every redirect hop's URL
 /// (<see cref="ForRedirectHops" />), so each hop sends its own host's entry, or none, under
-/// <c>--location-trusted</c> too, as curl 8.21.0 does (measured, BL-505 Notes; BL-790).
+/// <c>--location-trusted</c> too, as curl 8.21.0 does (measured, BL-505 Notes; BL-790). Under a
+/// <c>-u</c> with a user name, a hop <c>-u</c> is not sent to (another origin, without
+/// <c>--location-trusted</c>) is looked up the same way, as if <c>-u</c> were not given (BL-5035).
 /// </para>
 /// <para>
 /// Credentials holding a control character are refused before anything is sent, as curl 8.21.0's
@@ -281,19 +283,81 @@ internal sealed class TransferCredentialLookup(
     /// when <c>localhost</c> has no entry, <c>--location-trusted</c> or not (BL-790). A file problem
     /// on a hop sends the hop no netrc credentials rather than failing it.
     /// </summary>
+    /// <remarks>
+    /// With a <c>-u</c> user name and <paramref name="firstUrl" /> given, a hop the <c>-u</c> credentials
+    /// go to (one to <paramref name="firstUrl" />'s scheme, host and port, or any under
+    /// <c>--location-trusted</c>) sends them, as the first hop does; any other hop is looked up as if
+    /// <c>-u</c> were not given, so it sends its own host's entry, else its URL's credentials, else none,
+    /// as curl 8.22.0 sends <c>buser:bpass</c> after a redirect from <c>a.test</c> to <c>b.test</c> under
+    /// <c>-u user:pass --netrc-optional</c> (STD-040, BL-5035, ADR-1264).
+    /// </remarks>
     /// <param name="authentication">The transfer's authentication options: <c>-u</c> and the netrc options.</param>
+    /// <param name="firstUrl">The transfer's first URL, or <see langword="null" /> to leave a <c>-u</c> transfer's hops to <c>RedirectFollower</c>.</param>
     /// <returns>
-    /// The lookup, or <see langword="null" /> when no netrc option is in effect or a <c>-u</c> with a
-    /// user name wins, so the first hop's credentials follow <c>RedirectFollower</c>'s origin rules.
+    /// The lookup, or <see langword="null" /> when no netrc option is in effect, or a <c>-u</c> with a
+    /// user name wins and no <paramref name="firstUrl" /> is given, so the first hop's credentials
+    /// follow <c>RedirectFollower</c>'s origin rules.
     /// </returns>
-    internal HopCredentialSelector? ForRedirectHops(EasyAuthenticationOptions authentication) =>
-        authentication.Netrc == NetrcUsage.Ignored || UserOptionWins(authentication)
-            ? null
-            : hopUrl =>
-            {
-                _ = TryLookUp(authentication, hopUrl, out NetworkCredential? credentials, out _);
-                return credentials;
-            };
+    internal HopCredentialSelector? ForRedirectHops(EasyAuthenticationOptions authentication, CurlUrl? firstUrl = null)
+    {
+        if (authentication.Netrc == NetrcUsage.Ignored)
+        {
+            return null;
+        }
+
+        if (!UserOptionWins(authentication))
+        {
+            return hopUrl => LookedUpHopCredentials(authentication, hopUrl);
+        }
+
+        return firstUrl is null ? null : UserOptionOrNetrcHopSelector(authentication, firstUrl);
+    }
+
+    /// <summary>
+    /// Gets the selector for a transfer whose <c>-u</c> gives a user name: <c>-u</c>'s credentials for a hop
+    /// they are sent to, the hop host's own lookup without <c>-u</c> for any other.
+    /// </summary>
+    /// <param name="authentication">The transfer's authentication options, with a <c>-u</c> user name.</param>
+    /// <param name="firstUrl">The transfer's first URL.</param>
+    /// <returns>The selector.</returns>
+    private HopCredentialSelector UserOptionOrNetrcHopSelector(EasyAuthenticationOptions authentication, CurlUrl firstUrl)
+    {
+        EasyAuthenticationOptions withoutUserOption = authentication with { UserName = null, UserPassword = null, Password = null };
+        NetworkCredential userOption = UserOptionCredentials(authentication);
+        return hopUrl => authentication.UnrestrictedAuthentication || IsSameOrigin(firstUrl, hopUrl)
+            ? userOption
+            : LookedUpHopCredentials(withoutUserOption, hopUrl);
+    }
+
+    private NetworkCredential? LookedUpHopCredentials(EasyAuthenticationOptions authentication, CurlUrl hopUrl)
+    {
+        _ = TryLookUp(authentication, hopUrl, out NetworkCredential? credentials, out _);
+        return credentials;
+    }
+
+    /// <summary>
+    /// Gets <c>-u</c>'s credentials as the transfer's context carries them: <see cref="EasyAuthenticationOptions.UserPassword" />
+    /// split at its first colon, with <see cref="EasyAuthenticationOptions.UserName" /> and
+    /// <see cref="EasyAuthenticationOptions.Password" /> each replacing its half.
+    /// </summary>
+    /// <param name="authentication">The transfer's authentication options, with a <c>-u</c> user name.</param>
+    /// <returns>The credentials.</returns>
+    private static NetworkCredential UserOptionCredentials(EasyAuthenticationOptions authentication)
+    {
+        string[] halves = (authentication.UserPassword ?? string.Empty).Split(':', 2);
+        return new NetworkCredential(
+            authentication.UserName ?? halves[0],
+            authentication.Password ?? (halves.Length == 2 ? halves[1] : string.Empty));
+    }
+
+    /// <summary>Whether <paramref name="next" /> has <paramref name="first" />'s scheme, host and port, as <c>RedirectFollower</c> judges a hop.</summary>
+    /// <param name="first">The transfer's first URL.</param>
+    /// <param name="next">The hop's URL.</param>
+    /// <returns><see langword="true" /> for the same origin.</returns>
+    private static bool IsSameOrigin(CurlUrl first, CurlUrl next) =>
+        string.Equals(first.Scheme, next.Scheme, StringComparison.Ordinal)
+        && string.Equals(first.Host, next.Host, StringComparison.OrdinalIgnoreCase)
+        && first.Port == next.Port;
 
     /// <summary>
     /// Gets the credentials written in the URL, sent when no netrc option is in effect: its

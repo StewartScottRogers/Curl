@@ -100,6 +100,10 @@ function Get-AffectedTestProjects {
     $sharedHit = @($changed | Where-Object { $_ -match $shared -or ($_ -match $projectBuild -and ($_.Split('/')[0] -in $projects -or $_ -match '^([^/]+)/\1\.csproj$')) })
     if ($sharedHit.Count) { return [pscustomobject]@{ All = $true; Projects = $all; Why = "all $($all.Count) test projects: $(($sharedHit | Select-Object -First 3) -join ', ') changed" } }
     $touched = @($changed | Where-Object { $_.Contains('/') } | ForEach-Object { $_.Split('/')[0] } | Where-Object { $_ -in $projects } | Sort-Object -Unique)
+    # The extended requirement matrices and the extended protocols are checked together by one test
+    # (EveryMatrixAgreesWithTheTestsThatCarrySpecRequirement), and a matrix is no project (BL-5056).
+    $conformance = 'Curl.Conformance.Extended.UnitTests'
+    if ($conformance -in $projects -and (@($changed | Where-Object { $_ -match '^Documentation/Conformance/Extended/' }).Count -or @($touched | Where-Object { $_ -like 'Curl.Extended.Protocol.*' }).Count)) { $touched = @($touched) + @($conformance) | Sort-Object -Unique }
     # Who depends on whom. A ProjectReference passes a change on to every project above it. An
     # item that links a file in from another project's folder (Compile
     # Include="..\Curl.Kerberos.UnitTests\FakeKdc.cs") passes on only a change to that folder
@@ -145,6 +149,7 @@ if ($TestAffectedTests) {
         'Lib.B.UnitLibrary' = @('<ProjectReference Include="..\Lib.A.UnitLibrary\Lib.A.UnitLibrary.csproj" />')
         'Lib.B.UnitTests' = @('<ProjectReference Include="..\Lib.B.UnitLibrary\Lib.B.UnitLibrary.csproj" />')
         'Lib.C.UnitLibrary' = @(); 'Lib.C.UnitTests' = @('<ProjectReference Include="..\Lib.C.UnitLibrary\Lib.C.UnitLibrary.csproj" />')
+        'Curl.Conformance.Extended.UnitTests' = @(); 'Curl.Extended.Protocol.Foo.UnitLibrary' = @()
         'Lib.D.UnitTests' = @('<Compile Include="..\Lib.C.UnitTests\Fake.cs" Link="Fake.cs" />')
     }
     foreach ($project in $uses.Keys) {
@@ -152,7 +157,8 @@ if ($TestAffectedTests) {
         Set-Content -Path (Join-Path $repo "$project\$project.csproj") -Value (@('<Project Sdk="Microsoft.NET.Sdk">', '  <ItemGroup>') + @($uses[$project] | ForEach-Object { "    $_" }) + @('  </ItemGroup>', '</Project>'))
         Set-Content -Path (Join-Path $repo "$project\Code.cs") -Value '// code'
     }
-    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Tasks'), (Join-Path $repo 'Lib.C.UnitLibrary\Build') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'Tasks'), (Join-Path $repo 'Lib.C.UnitLibrary\Build'), (Join-Path $repo 'Documentation\Conformance\Extended') | Out-Null
+    Set-Content -Path (Join-Path $repo 'Documentation\Conformance\Extended\Foo.md') -Value 'matrix'
     Set-Content -Path (Join-Path $repo 'Directory.Build.props') -Value '<Project />'
     Set-Content -Path (Join-Path $repo 'Lib.C.UnitTests\Fake.cs') -Value '// fake'
     Set-Content -Path (Join-Path $repo 'Tasks\BL-001-x.md') -Value 'task'
@@ -176,8 +182,10 @@ if ($TestAffectedTests) {
         ,@('a change to the root Directory.Build.props selects all', 'all', (& $select @('Directory.Build.props')))
         ,@('a .props nested in a project folder selects all', 'all', (& $select @('Lib.C.UnitLibrary\Build\Extra.props')))
         ,@('a .csproj change selects all', 'all', (& $select @('Lib.C.UnitLibrary\Lib.C.UnitLibrary.csproj')))
+        ,@('a change to an extended requirement matrix selects the extended conformance tests', 'Curl.Conformance.Extended.UnitTests', (& $select @('Documentation\Conformance\Extended\Foo.md')))
+        ,@('a change to an extended protocol selects the extended conformance tests', 'Curl.Conformance.Extended.UnitTests', (& $select @('Curl.Extended.Protocol.Foo.UnitLibrary\Code.cs')))
         ,@('a base git cannot read selects all', 'all', (& $select @('Lib.C.UnitLibrary\Code.cs') 'no-such-ref'))
-        ,@('the trace line says how many and why', '1 of 4 test projects: Lib.C.UnitLibrary changed', $(& $select @('Lib.C.UnitLibrary\Code.cs') | Out-Null; (Get-AffectedTestProjects -Repo $repo -Base $base).Why)))
+        ,@('the trace line says how many and why', '1 of 5 test projects: Lib.C.UnitLibrary changed', $(& $select @('Lib.C.UnitLibrary\Code.cs') | Out-Null; (Get-AffectedTestProjects -Repo $repo -Base $base).Why)))
     $failed = 0
     foreach ($case in $cases) {
         if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }

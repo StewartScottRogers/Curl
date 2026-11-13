@@ -1,6 +1,6 @@
 # ADR-1241 — FTP's `CCC` on the Schannel profile stays exit 81, as measured on curl 8.22.0
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-1261](ADR-1261-ftp-ccc-on-the-schannel-profile-clears-tls-once-the-server-answers-close-notify.md)
 - **Date:** 2026-11-11
 - **Supersedes:** [ADR-0280](ADR-0280-ftp-ccc-clears-tls-through-iconnection-and-fails-with-exit-81-as-the-schannel-build-does.md) (its 8.21.0 measurement; its design stands)
 

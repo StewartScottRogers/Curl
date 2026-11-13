@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using Curl.Extension.Dane.Wire;
 using Curl.Protocol.Abstractions;
@@ -33,7 +34,7 @@ public sealed class DnssecQueryTransport(
     /// <param name="name">The query name.</param>
     /// <param name="type">The query type.</param>
     /// <param name="cancellationToken">Cancels the query.</param>
-    /// <returns>The decoded answer, or null when the server cannot be reached, times out or answers unreadably.</returns>
+    /// <returns>The decoded answer, or null when the server cannot be reached (refused, or a socket error such as an ICMP port unreachable), times out or answers unreadably.</returns>
     public async ValueTask<DnssecResponse?> QueryAsync(string name, DnssecRecordType type, CancellationToken cancellationToken)
     {
         ushort id = (ushort)RandomNumberGenerator.GetInt32(MaximumMessageSize + 1);
@@ -46,6 +47,10 @@ public sealed class DnssecQueryTransport(
             return response is { IsTruncated: true }
                 ? await QueryOverTcpAsync(query, id, linkedSource.Token).ConfigureAwait(false)
                 : response;
+        }
+        catch (SocketException)
+        {
+            return null;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
