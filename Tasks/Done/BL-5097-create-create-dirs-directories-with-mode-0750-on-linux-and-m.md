@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console/PhysicalOutputPaths.cs, Curl.Console.UnitTests/PhysicalOutputPathsDirectoryModeTests.cs]
+touches: [Curl.Console/PhysicalOutputPaths.cs, Curl.Console.UnitTests/PhysicalOutputPathsDirectoryModeTests.cs, Curl.Console/RawByteFileName.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5097 — Create --create-dirs directories with mode 0750 on Linux and macOS
 
@@ -30,10 +30,10 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Console.UnitTests/PhysicalOutputPathsDirectoryModeTests.cs`, `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]`, create nested directories in a temporary directory through `PhysicalOutputPaths` (both the normal and the raw-byte route) and assert mode 0750 for each directory created; a pre-existing directory is left unchanged.
-- [ ] A Windows-neutral test proves the Windows path still creates directories as before.
-- [ ] The directory mode honours the umask (the OS applies it; the test sets nothing it cannot restore, or asserts the requested mode passed to the creation call through a stand-in).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Console.UnitTests/PhysicalOutputPathsDirectoryModeTests.cs`, `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]`, create nested directories in a temporary directory through `PhysicalOutputPaths` (both the normal and the raw-byte route) and assert mode 0750 for each directory created; a pre-existing directory is left unchanged.
+- [x] A Windows-neutral test proves the Windows path still creates directories as before.
+- [x] The directory mode honours the umask (the OS applies it; the test sets nothing it cannot restore, or asserts the requested mode passed to the creation call through a stand-in).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -44,3 +44,7 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 7ab13906 660c736f 26880e21 a0b49a29.
+
+- 2026-11-13: Done. `PhysicalOutputPaths.MakeDirectories` passes `UnixDirectoryMode` (0750) to `Directory.CreateDirectory` off Windows; `RawByteFileName.MakeDirectoryUnderRawBytes` now passes 0x1E8 (0750) to mkdir. Added `RawByteFileName.cs` to touches (no other Doing task names it).
+- Decision: the OS applies the umask, so tests assert no bit beyond 0750 and owner rwx (true under any common umask) rather than setting the umask; the Windows-neutral test checks the constant is octal 750 and nested creation works. Fast tests green (3164 passed); Measure-CodeQuality Curl.Console: 0 failing members.
+- 2026-11-13: Doing -> Done. --create-dirs directories made with mode 0750 off Windows
