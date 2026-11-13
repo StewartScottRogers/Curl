@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.McpClient.UnitLibrary/Stdio/McpBatchArgumentRefusal.cs, Curl.Extended.Protocol.McpClient.UnitTests/Stdio/McpBatchArgumentRefusalTests.cs, Documentation/Conformance/Extended/McpClient-Stdio.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5129 — Refuse unsafe mcp+stdio arguments when the .cmd or .bat program name ends in whitespace or a control character (EXT-044, bypass of BL-5010)
 
@@ -46,18 +46,22 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.McpClient.UnitTests/Stdio/McpBatchArgumentRefusalTests.cs` prove that for programs `srv.cmd` followed by each of a tab, vertical tab, form feed, NBSP (U+00A0) and a mix such as `.cmd` + space + tab, and likewise for `.bat`, an argument `a&echo.>INJECTED.txt` is refused before any process starts and surfaces as `CurlExitCode.CouldntConnect` (exit 7) with `Failed to start the MCP server ...`.
-- [ ] A regression test proves `srv.cmd` with `plain` and `args` still starts (the stand-in starter receives `["plain", "args"]`) and that an unsafe argument to a non-batch program (`srv.exe`, `srv`) is passed unchanged, as before.
-- [ ] The tests are platform-neutral (no process is started, no Windows path), and the existing BL-5010 tests stay green.
-- [ ] `Documentation/Conformance/Extended/McpClient-Stdio.md` row `McpClient:Stdio-BatchArguments-1` (or a new MUST row beside it) states that trailing whitespace and control characters on the program name do not hide a batch file, with "Covered by" naming a test from this task.
-- [ ] `dotnet build Curl.Extended.Protocol.McpClient.UnitLibrary -warnaserror` is clean, the `VerifyExtensionIsolation` target passes, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.McpClient.UnitTests/Stdio/McpBatchArgumentRefusalTests.cs` prove that for programs `srv.cmd` followed by each of a tab, vertical tab, form feed, NBSP (U+00A0) and a mix such as `.cmd` + space + tab, and likewise for `.bat`, an argument `a&echo.>INJECTED.txt` is refused before any process starts and surfaces as `CurlExitCode.CouldntConnect` (exit 7) with `Failed to start the MCP server ...`.
+- [x] A regression test proves `srv.cmd` with `plain` and `args` still starts (the stand-in starter receives `["plain", "args"]`) and that an unsafe argument to a non-batch program (`srv.exe`, `srv`) is passed unchanged, as before.
+- [x] The tests are platform-neutral (no process is started, no Windows path), and the existing BL-5010 tests stay green.
+- [x] `Documentation/Conformance/Extended/McpClient-Stdio.md` row `McpClient:Stdio-BatchArguments-1` (or a new MUST row beside it) states that trailing whitespace and control characters on the program name do not hide a batch file, with "Covered by" naming a test from this task.
+- [x] `dotnet build Curl.Extended.Protocol.McpClient.UnitLibrary -warnaserror` is clean, the `VerifyExtensionIsolation` target passes, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers in the review were Python; build any stand-in in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python. The unit tests need no real process: use the in-memory starter stand-ins in `Curl.Extended.Protocol.McpClient.UnitTests/Stdio`.
 - Review acceptance check, for a Windows hand check: each of the four step-4 URLs exits 7 with `Failed to start the MCP server ...`, creates no file and writes nothing to `mcpargs.log`; `mcp+stdio://localhost/srv.cmd?plain&args` still starts and logs `[plain args]`.
 
+- Fix: McpBatchArgumentRefusal now strips trailing dots, whitespace (incl. NBSP) and control characters before classifying .cmd/.bat. 8.3 aliases are not resolved: a short name of a .cmd file still ends in .CMD, which is caught as before; an alias without extension is not resolved by the starter (exit 7). Quality run for the library: 0 failing members. Fast tests: 239 pass in McpClient.UnitTests.
+- Follow-up: Plugin SystemHelperProcessStarter.RefuseUnsafeBatchArgument has the same gap (no trimming at all); filed as a task. No ADR written: ADR-1248 covers the rule, this closes a bypass.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 600ff565 4137d9c5 c7fafb89 dd4dc622 82003f08.
+- 2026-11-13: Doing -> Done. mcp+stdio refuses unsafe args to .cmd/.bat even with trailing whitespace or control characters on the program name

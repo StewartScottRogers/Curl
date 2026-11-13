@@ -23,6 +23,16 @@ public sealed class McpBatchArgumentRefusalTests
     [DataRow("srv.cmd ", "a&b")]
     [DataRow("srv.bat.", "a&b")]
     [DataRow("srv.CMD. .", "a&b")]
+    [DataRow("srv.cmd	", "a&echo.>INJECTED.txt")]
+    [DataRow("srv.cmd", "a&echo.>INJECTED.txt")]
+    [DataRow("srv.cmd", "a&echo.>INJECTED.txt")]
+    [DataRow("srv.cmd ", "a&echo.>INJECTED.txt")]
+    [DataRow("srv.cmd 	", "a&echo.>INJECTED.txt")]
+    [DataRow("srv.bat	", "a&echo.>INJECTED.txt")]
+    [DataRow("srv.bat", "a&echo.>INJECTED.txt")]
+    [DataRow("srv.bat", "a&echo.>INJECTED.txt")]
+    [DataRow("srv.bat ", "a&echo.>INJECTED.txt")]
+    [DataRow("srv.bat 	", "a&echo.>INJECTED.txt")]
     public void Start_UnsafeArgumentToBatchFile_ExitsSevenBeforeAnyProcessStarts(string program, string argument)
     {
         var starter = new ScriptedMcpServerProcessStarter(new InMemoryMcpServerProcess(string.Empty));
@@ -48,6 +58,8 @@ public sealed class McpBatchArgumentRefusalTests
     [TestMethod]
     [DataRow("srv.exe")]
     [DataRow("srv")]
+    [DataRow("")]
+    [DataRow(" 	.")]
     public void Start_UnsafeArgumentToOtherProgram_IsPassedUnchanged(string program)
     {
         var starter = new ScriptedMcpServerProcessStarter(new InMemoryMcpServerProcess(string.Empty));
