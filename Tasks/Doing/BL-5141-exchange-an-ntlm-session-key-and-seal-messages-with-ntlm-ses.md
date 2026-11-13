@@ -37,3 +37,4 @@ Key exchange must be opt-in: curl's HTTP NTLM never sends a session key, so the 
 ## Log
 
 - 2026-11-13: Created.
+- 2026-11-13: Backlog -> Doing. Criteria at claim: e00f39bc 4bfc83d2 c415e06d d10f34b8 a0b49a29.
