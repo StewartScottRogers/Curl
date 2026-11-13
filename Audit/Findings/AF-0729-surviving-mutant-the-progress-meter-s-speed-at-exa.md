@@ -3,8 +3,8 @@ id: AF-0729
 title: Surviving mutant: the progress meter's speed at exactly one second can read as the maximum for huge sizes
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Output.UnitLibrary/ProgressMeterFields.cs:Speed-ge:surviving-mutant
 reproduction: mutation Curl.Output.UnitLibrary/ProgressMeterFields.cs:103:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Outpu
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
