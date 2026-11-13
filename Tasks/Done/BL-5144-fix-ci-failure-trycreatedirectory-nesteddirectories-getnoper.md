@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests, Curl.Console]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5144 — Fix CI failure TryCreateDirectory_NestedDirectories_GetNoPermissionBeyondMode0750 on Linux and macOS
 
@@ -36,3 +36,4 @@ Cause: .NET's Directory.CreateDirectory(path, mode) applies the mode only to the
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 62f6d1c1.
+- 2026-11-13: Doing -> Done. MakeDirectories creates each missing parent with 0750; Windows tests green
