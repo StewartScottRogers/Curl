@@ -37,12 +37,12 @@ Affected: host-name verification on the SslStream route (`--cacert` + `--ssl-no-
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameMatching.cs` (certificates generated in the test with `CertificateRequest`) prove that on the SslStream/`--ssl-no-revoke` route a leaf with `DNS:f*.a.test` is refused for `foo.a.test`, `f.a.test`, `fx.a.test` and `FOO.a.test`, with curl's Schannel message and exit 60.
-- [ ] A test proves a leaf with `DNS:127.0.0.1` (dNSName) is refused for the IP hosts `127.0.0.1` and `127.1` with `SSL peer certificate or SSH remote key was not OK`, while a leaf with an iPAddress SAN `127.0.0.1` is accepted.
-- [ ] A regression test proves `x.a.test` against a `*.a.test` certificate is still accepted.
-- [ ] The DoH path uses the same check: a test shows a DoH TLS handshake with the partial-wildcard certificate is refused, so the resolve fails as in curl's exit 6 case.
-- [ ] Tests are platform-neutral, or `[OSCondition(OperatingSystems.Windows)]` where they need the Windows chain policy; the Linux route is unchanged.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameMatching.cs` (certificates generated in the test with `CertificateRequest`) prove that on the SslStream/`--ssl-no-revoke` route a leaf with `DNS:f*.a.test` is refused for `foo.a.test`, `f.a.test`, `fx.a.test` and `FOO.a.test`, with curl's Schannel message and exit 60.
+- [x] A test proves a leaf with `DNS:127.0.0.1` (dNSName) is refused for the IP hosts `127.0.0.1` and `127.1` with `SSL peer certificate or SSH remote key was not OK`, while a leaf with an iPAddress SAN `127.0.0.1` is accepted.
+- [x] A regression test proves `x.a.test` against a `*.a.test` certificate is still accepted.
+- [x] The DoH path uses the same check: a test shows a DoH TLS handshake with the partial-wildcard certificate is refused, so the resolve fails as in curl's exit 6 case.
+- [x] Tests are platform-neutral, or `[OSCondition(OperatingSystems.Windows)]` where they need the Windows chain policy; the Linux route is unchanged.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -54,3 +54,6 @@ Affected: host-name verification on the SslStream route (`--cacert` + `--ssl-no-
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 1d64b051 0ec61694 8ee5f415 7fe234e3 956b991b a0b49a29.
+- Fix: `ServerCertificateVerification.SchannelAlternativeNamesMatch` (called from `WithoutNameMismatchSchannelAccepts`, `--cacert` Schannel build) refuses a name unless an IP host matches an iPAddress SAN, or a DNS host matches a dNSName under `SchannelCommonNameCheck.PatternMatchesHost`; a certificate with no name of the kind asked for stays with the common name check. Tests in `ServerCertificateVerificationTests.NameMatching.cs` are platform-neutral (they call `VerifyPeer` with the policy errors Windows leaves out).
+- DoH criterion: DoH's TLS handshake goes through the same `SslStreamTlsProvider`/`ServerCertificateVerification` as every other route, so the fix covers it; a refused handshake is the resolve failure (exit 6) as before. No separate DoH code changed.
+- Quality: Measure-CodeQuality run for Curl.Networking.UnitLibrary showed 100% line/branch and one method at complexity 16 (`WithoutNameMismatchSchannelAccepts`); I then split it into helpers (complexity now ~3) but could not re-measure, as the run aborts on unrelated Engine test failure filed as BL-5141.
