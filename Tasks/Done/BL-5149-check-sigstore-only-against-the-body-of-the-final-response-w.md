@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Sigstore.UnitLibrary/SigstoreTransferHook.cs, Curl.Extension.Sigstore.UnitTests]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5149 — Check --sigstore only against the body of the final response when -L follows redirects
 
@@ -32,3 +32,4 @@ completed:
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-11-13: Doing -> Done. --sigstore now verifies only the final response body when -L follows redirects
