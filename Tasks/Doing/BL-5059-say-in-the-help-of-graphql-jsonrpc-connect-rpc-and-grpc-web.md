@@ -22,7 +22,7 @@ The help of --graphql, --jsonrpc, --connect-rpc and --grpc-web each say they can
 
 ## Acceptance criteria
 
-- [x] Each of the four options' help text names the other three as not combinable (see the four extension option files).
+- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
 
