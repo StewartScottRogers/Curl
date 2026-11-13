@@ -3,12 +3,12 @@ id: AF-0728
 title: Surviving mutant: a long-form DER length whose bytes exactly fill the input can be refused
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Output.UnitLibrary/DerReader.cs:TryReadLength-gt:surviving-mutant
 reproduction: mutation Curl.Output.UnitLibrary/DerReader.cs:116:>
-task: none
-tasks:
+task: BL-5087
+tasks: BL-5087
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Outpu
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.

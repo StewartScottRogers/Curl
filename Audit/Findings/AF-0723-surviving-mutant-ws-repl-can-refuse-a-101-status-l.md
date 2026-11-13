@@ -3,12 +3,12 @@ id: AF-0723
 title: Surviving mutant: --ws-repl can refuse a 101 status line with no reason phrase
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Extension.WebSocketRepl.UnitLibrary/Handshake/WebSocketHandshakeResponseValidator.cs:IsSwitchingProtocols-ge:surviving-mutant
 reproduction: mutation Curl.Extension.WebSocketRepl.UnitLibrary/Handshake/WebSocketHandshakeResponseValidator.cs:30:>=
-task: none
-tasks:
+task: BL-5082
+tasks: BL-5082
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.

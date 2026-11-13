@@ -3,12 +3,12 @@ id: AF-0717
 title: Surviving mutant: libcurl transfers can trace FTP lines by default
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/EngineComposition.cs:CreateProtocolHandlers-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EngineComposition.cs:141:false
-task: none
-tasks:
+task: BL-5076
+tasks: BL-5076
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.

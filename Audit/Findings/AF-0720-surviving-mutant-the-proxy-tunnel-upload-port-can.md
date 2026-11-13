@@ -3,12 +3,12 @@ id: AF-0720
 title: Surviving mutant: the proxy-tunnel upload port can send an empty buffer when it is exactly the data's size
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/LibProxyTunnelUpload.cs:Read-ge:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/LibProxyTunnelUpload.cs:131:>=
-task: none
-tasks:
+task: BL-5079
+tasks: BL-5079
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.

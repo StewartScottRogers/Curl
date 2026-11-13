@@ -3,12 +3,12 @@ id: AF-0731
 title: CI red 74 minutes from run 43110153266 (27be8cbc); no filing trace, next green 74 min after
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:43110153266:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-5090
+tasks: BL-5090
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
