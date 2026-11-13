@@ -15,15 +15,16 @@ internal static class GrpcHttp2Call
     /// <param name="session">The HTTP/2 connection the call opens its stream on; the caller owns it.</param>
     /// <param name="headers">The Request-Headers, names lower case, pseudo-headers first.</param>
     /// <param name="message">The request message's binary form.</param>
+    /// <param name="onMessage">Takes each response message as soon as it is decoded, before the next frame is read.</param>
     /// <param name="cancellationToken">Cancels the call.</param>
-    /// <returns>The response's messages and status.</returns>
+    /// <returns>The response's status and head report; the messages went to <paramref name="onMessage" />.</returns>
     /// <exception cref="GrpcWireException">The response breaks PROTOCOL-HTTP2.md.</exception>
     /// <exception cref="GrpcClientException">The server closed the connection before the call ended (exit 16).</exception>
-    public static async Task<GrpcCallResult> RunAsync(GrpcHttp2Session session, IReadOnlyList<KeyValuePair<string, string>> headers, byte[] message, CancellationToken cancellationToken)
+    public static async Task<GrpcCallResult> RunAsync(GrpcHttp2Session session, IReadOnlyList<KeyValuePair<string, string>> headers, byte[] message, Func<GrpcMessage, ValueTask> onMessage, CancellationToken cancellationToken)
     {
         int streamId = await session.OpenStreamAsync(headers, cancellationToken).ConfigureAwait(false);
         Http2StreamFrame? early = await SendMessageAsync(session.Connection, streamId, LengthPrefixedMessage.Frame(message, isCompressed: false), cancellationToken).ConfigureAwait(false);
-        return await ReadResponseAsync(session, early, cancellationToken).ConfigureAwait(false);
+        return await ReadResponseAsync(session, early, onMessage, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -49,16 +50,23 @@ internal static class GrpcHttp2Call
         }
     }
 
-    private static async Task<GrpcCallResult> ReadResponseAsync(GrpcHttp2Session session, Http2StreamFrame? early, CancellationToken cancellationToken)
+    private static async Task<GrpcCallResult> ReadResponseAsync(GrpcHttp2Session session, Http2StreamFrame? early, Func<GrpcMessage, ValueTask> onMessage, CancellationToken cancellationToken)
     {
         Http2Connection connection = session.Connection;
         var response = new ResponseReader(session.Decoder);
         Http2StreamFrame? frame = early ?? await connection.ReadStreamFrameAsync(cancellationToken).ConfigureAwait(false);
+        int delivered = 0;
         while (frame is not null)
         {
-            if (response.Read(frame) is { } status)
+            GrpcStatus? status = response.Read(frame);
+            for (; delivered < response.Messages.Count; delivered++)
             {
-                return new GrpcCallResult(response.Messages, status, response.Report);
+                await onMessage(response.Messages[delivered]).ConfigureAwait(false);
+            }
+
+            if (status is { } ended)
+            {
+                return new GrpcCallResult(ended, response.Report);
             }
 
             frame = await connection.ReadStreamFrameAsync(cancellationToken).ConfigureAwait(false);

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Grpc.UnitLibrary/Client/GrpcHttp2Call.cs, Curl.Extended.Protocol.Grpc.UnitLibrary/Client/GrpcCallResult.cs, Curl.Extended.Protocol.Grpc.UnitLibrary/Client/GrpcProtocolHandler.cs, Curl.Extended.Protocol.Grpc.UnitLibrary/Client/GrpcHttp2Session.cs, Curl.Extended.Protocol.Grpc.UnitTests/Client, Documentation/Conformance/Extended/Grpc-Responses.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5140 — Write each gRPC server-streaming reply as it arrives so a -m timeout keeps the messages already received (EXT-047)
 
@@ -33,19 +33,22 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcStreamingOutputTests.cs` (new, using the existing `ScriptedConnection`/`GrpcServerReply`) prove that the first message of a server-streaming reply is written to the output before the later messages and the trailers arrive (the scripted connection is held open after the first message and the written bytes are asserted at that point).
-- [ ] A test proves that when the `-m` timeout fires after three of five messages, the three messages are in the output, the exit is `CurlExitCode.OperationTimedOut` (28) and the reported downloaded byte count equals the bytes written.
-- [ ] Regression tests prove a unary call and a completed server-streaming call write the same bytes as before, and that a call that ends with a non-OK status still writes the messages that preceded it (ADR-1147).
-- [ ] `Documentation/Conformance/Extended/Grpc-Responses.md` row `Grpc:Http2-Response-2` (or a new row) states that each message is written as it arrives and kept on a timeout, "Covered by" naming a test from this task.
-- [ ] The tests are platform-neutral (no real socket).
-- [ ] `dotnet build Curl.Extended.Protocol.Grpc.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcStreamingOutputTests.cs` (new, using the existing `ScriptedConnection`/`GrpcServerReply`) prove that the first message of a server-streaming reply is written to the output before the later messages and the trailers arrive (the scripted connection is held open after the first message and the written bytes are asserted at that point).
+- [x] A test proves that when the `-m` timeout fires after three of five messages, the three messages are in the output, the exit is `CurlExitCode.OperationTimedOut` (28) and the reported downloaded byte count equals the bytes written.
+- [x] Regression tests prove a unary call and a completed server-streaming call write the same bytes as before, and that a call that ends with a non-OK status still writes the messages that preceded it (ADR-1147).
+- [x] `Documentation/Conformance/Extended/Grpc-Responses.md` row `Grpc:Http2-Response-2` (or a new row) states that each message is written as it arrives and kept on a timeout, "Covered by" naming a test from this task.
+- [x] The tests are platform-neutral (no real socket).
+- [x] `dotnet build Curl.Extended.Protocol.Grpc.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Review acceptance check, for a hand check: step 2 prints the JSON objects for `slow0`, `slow1` and `slow2` before `curl: (28)`, and `size=` equals the stdout byte count.
 - Keep `--ai-help` and `--extended-help` right if any text there says replies are printed together.
 
+- Done: GrpcHttp2Call.RunAsync takes an onMessage callback; the handler writes, flushes and reports each message as it is decoded (GrpcCallResult no longer carries Messages). Tests in GrpcStreamingOutputTests. Grpc-Responses.md prose names them (the matrix Covered-by column must name one SpecRequirement carrier, so the row is unchanged). Quality run: 0 failing members. Ftp.UnitTests had one unrelated failure in the full run that passed alone.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 7feb67e1 797f2631 0bd81425 a025b6ed d6cd4299 77cac303.
+- 2026-11-13: Doing -> Done. gRPC server-streaming messages are written and counted as they arrive, kept on -m timeout

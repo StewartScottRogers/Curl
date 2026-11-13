@@ -163,8 +163,9 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
         method ??= await ServerReflectionClient.DescribeAsync(session, target, headerValues, context.CancellationToken).ConfigureAwait(false);
         request ??= GrpcMessageJson.Encode(method.Input, body);
         var headers = GrpcRequestHeaders.Build(target, headerValues);
-        GrpcCallResult result = await GrpcHttp2Call.RunAsync(session, headers, request, context.CancellationToken).ConfigureAwait(false);
-        return await WriteAsync(context, method.Output, result).ConfigureAwait(false);
+        long written = 0;
+        GrpcCallResult result = await GrpcHttp2Call.RunAsync(session, headers, request, async message => written += await WriteMessageAsync(context, method.Output, message, written).ConfigureAwait(false), context.CancellationToken).ConfigureAwait(false);
+        return Finish(result, written);
     }
 
     /// <summary>
@@ -174,22 +175,25 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
     private static GrpcRequestHeaderValues HeaderValuesOf(ITransferContext context) =>
         new(context.MaxTime, GrpcRequestHeaderValues.UserAgentFor(context.Http?.UserAgent), context.Http?.Headers ?? []);
 
-    /// <summary>Writes each response message as JSON, then ends the transfer by the call's status.</summary>
-    private static async Task<TransferResult> WriteAsync(ITransferContext context, Protobuf.DynamicMessages.DynamicMessageType type, GrpcCallResult result)
+    /// <summary>Writes one response message as JSON the moment it arrives, flushes it and reports the bytes downloaded so far.</summary>
+    /// <returns>The bytes written.</returns>
+    private static async ValueTask<long> WriteMessageAsync(ITransferContext context, Protobuf.DynamicMessages.DynamicMessageType type, GrpcMessage message, long writtenBefore)
     {
-        long written = 0;
-        foreach (GrpcMessage message in result.Messages)
+        if (message.IsCompressed)
         {
-            if (message.IsCompressed)
-            {
-                throw new GrpcClientException(CurlExitCode.BadContentEncoding, "The server sent a compressed gRPC message, which Curl never asks for");
-            }
-
-            byte[] json = GrpcMessageJson.Decode(type, message.Payload);
-            await context.Output.WriteAsync(json, context.CancellationToken).ConfigureAwait(false);
-            written += json.Length;
+            throw new GrpcClientException(CurlExitCode.BadContentEncoding, "The server sent a compressed gRPC message, which Curl never asks for");
         }
 
+        byte[] json = GrpcMessageJson.Decode(type, message.Payload);
+        await context.Output.WriteAsync(json, context.CancellationToken).ConfigureAwait(false);
+        await context.Output.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+        context.Progress.ReportDownloaded(writtenBefore + json.Length, null);
+        return json.Length;
+    }
+
+    /// <summary>Ends the transfer by the call's status, the messages having been written already.</summary>
+    private static TransferResult Finish(GrpcCallResult result, long written)
+    {
         TransferReport report = result.Report with { DownloadSize = written };
         GrpcStatus status = result.Status;
         return status.Code == GrpcStatusCode.Ok
