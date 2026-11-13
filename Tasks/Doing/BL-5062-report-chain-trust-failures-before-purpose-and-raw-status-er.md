@@ -46,3 +46,4 @@ Measure real curl with `Record-CurlExchange.ps1` for both cases before pinning t
 ## Log
 
 - 2026-11-12: Created.
+- 2026-11-12: Backlog -> Doing. Criteria at claim: fdc3cf38 7ea35bff be120577 3d836d5e.
