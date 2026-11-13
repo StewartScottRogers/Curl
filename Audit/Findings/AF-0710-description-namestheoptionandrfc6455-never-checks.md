@@ -3,8 +3,8 @@ id: AF-0710
 title: Description_NamesTheOptionAndRfc6455 never checks that the description names RFC 6455
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Extension.WebSocketRepl.UnitTests/WebSocketReplExtensionTests.cs:Description_NamesTheOptionAndRfc6455:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Extension.WebSocketRepl.UnitTests/WebSocketReplExtensio
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
