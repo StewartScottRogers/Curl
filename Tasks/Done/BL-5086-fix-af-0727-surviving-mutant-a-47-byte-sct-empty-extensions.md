@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5086 — Fix AF-0727: Surviving mutant: a 47-byte SCT (empty extensions and signature) can be refused in the certificate text
 
@@ -52,3 +52,4 @@ Added a test for the 47-byte SCT, which kills the `<= 47` mutant (it would throw
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Added a test pinning the 47-byte SCT minimum
