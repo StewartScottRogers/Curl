@@ -37,3 +37,4 @@ The shift-end review of 2026-11-12 found this in the BL-5028 change (silent-fail
 ## Log
 
 - 2026-11-12: Created.
+- 2026-11-12: Backlog -> Doing. Criteria at claim: fba1b063 1fd95b6f eeda0f41 3d836d5e.
