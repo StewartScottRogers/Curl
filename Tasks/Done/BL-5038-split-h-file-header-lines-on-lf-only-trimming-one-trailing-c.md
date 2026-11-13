@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/FormPartParameterReader.cs, Curl.Cli.UnitTests/CommandLineHeaderFileSplitTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5038 — Split -H @file header lines on LF only, trimming one trailing CR
 
@@ -41,3 +41,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 3e7486f5 13becb13 d3a31470 a0b49a29.
 - 2026-11-12: `-F ...;headers=@file` (AddHeaderFileLines) already split on LF only; pinned by new tests. Fixed `-H @file` split; extracted helper to keep AddHeaderValue within complexity 10. Cli quality run clean. Platform-neutral tests.
+- 2026-11-12: Doing -> Done. Header files split on LF only, one trailing CR trimmed
