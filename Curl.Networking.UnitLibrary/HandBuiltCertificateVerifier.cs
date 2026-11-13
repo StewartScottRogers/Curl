@@ -152,13 +152,18 @@ internal sealed class HandBuiltCertificateVerifier(
     // certificate whose DNS names match only that way is refused (BL-5008).
     private static bool MatchesAsCurlDoes(X509Certificate2 certificate, string host)
     {
-        if (!certificate.MatchesHostname(host) || System.Net.IPAddress.TryParse(host, out _))
+        if (System.Net.IPAddress.TryParse(host, out _))
         {
             return certificate.MatchesHostname(host);
         }
 
         var dnsNames = certificate.Extensions.OfType<X509SubjectAlternativeNameExtension>()
             .SelectMany(names => names.EnumerateDnsNames()).ToList();
-        return dnsNames.Count == 0 || dnsNames.Any(name => SchannelCommonNameCheck.PatternMatchesHost(name, host));
+
+        // With no DNS name OpenSSL curl matches the common name as it matches a DNS name,
+        // so CN=*.a.test serves x.a.test (BL-5105).
+        return dnsNames.Count == 0
+            ? SchannelCommonNameCheck.CommonNameMatches(certificate, host)
+            : certificate.MatchesHostname(host) && dnsNames.Any(name => SchannelCommonNameCheck.PatternMatchesHost(name, host));
     }
 }
