@@ -10,7 +10,7 @@ public static class GraphQlOptions
     public static ExtensionOption Document { get; } = new(
         "graphql",
         ExtensionOptionArgument.Value,
-        "Send the GraphQL document in <file> as a GraphQL-over-HTTP POST");
+        "Send the GraphQL document in <file> as a GraphQL-over-HTTP POST; cannot be combined with --jsonrpc, --connect-rpc or --grpc-web");
 
     /// <summary>Gets <c>--graphql-variables &lt;json&gt;</c>: the operation's variables, a JSON object or <c>@file</c> holding one.</summary>
     public static ExtensionOption Variables { get; } = new(

@@ -15,7 +15,7 @@ public static class GrpcWebExtension
     public static ExtensionOption Option { get; } = new(
         "grpc-web",
         ExtensionOptionArgument.None,
-        "Call a gRPC-Web method: send the -d data as one application/grpc-web+proto message, write the reply's messages and fail on a non-zero grpc-status");
+        "Call a gRPC-Web method: send the -d data as one application/grpc-web+proto message, write the reply's messages and fail on a non-zero grpc-status; cannot be combined with --graphql, --jsonrpc or --connect-rpc");
 
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(

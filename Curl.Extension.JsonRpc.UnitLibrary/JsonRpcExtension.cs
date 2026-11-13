@@ -14,7 +14,7 @@ public static class JsonRpcExtension
     public static ExtensionOption Option { get; } = new(
         "jsonrpc",
         ExtensionOptionArgument.Value,
-        "Send JSON-RPC 2.0 calls \"<method> [params]\", several separated by ';' as a batch, '!' before a method for a notification");
+        "Send JSON-RPC 2.0 calls \"<method> [params]\", several separated by ';' as a batch, '!' before a method for a notification; cannot be combined with --graphql, --connect-rpc or --grpc-web");
 
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(

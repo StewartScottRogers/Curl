@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-<!-- One sentence: the observable outcome once this task is done. -->
+The help of --graphql, --jsonrpc, --connect-rpc and --grpc-web each say they cannot be combined with the other three.
 
 ## Context
 
@@ -22,7 +22,7 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] Each of the four options' help text names the other three as not combinable (see the four extension option files).
 
 ## Notes
 

@@ -14,7 +14,7 @@ public static class ConnectRpcExtension
     public static ExtensionOption Option { get; } = new(
         "connect-rpc",
         ExtensionOptionArgument.Value,
-        "Send a Connect call, \"unary\" or \"stream\", with the JSON message(s) given by -d as the request");
+        "Send a Connect call, \"unary\" or \"stream\", with the JSON message(s) given by -d as the request; cannot be combined with --graphql, --jsonrpc or --grpc-web");
 
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
