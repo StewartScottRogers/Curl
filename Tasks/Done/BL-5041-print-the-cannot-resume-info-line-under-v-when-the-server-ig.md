@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpDownloadConditions.cs, Curl.Original.Protocol.Http.UnitTests/HttpDownloadConditionsResumeInfoLineTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5041 — Print the Cannot resume info line under -v when the server ignores Range
 
@@ -42,3 +42,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: ad8b8899 5683a6c9 1eb3f186 a0b49a29.
+- 2026-11-12: Doing -> Done. Resume-not-supported info line now reported before exit 33; tests and quality run green
