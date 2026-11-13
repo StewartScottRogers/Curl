@@ -8,7 +8,7 @@ depends-on: []
 touches: [README.md, Documentation/Protocols.md, Curl.Engine.UnitLibrary/EngineComposition.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5034 — Make the SMB documentation and curl -V agree on which builds serve smb
 
@@ -29,11 +29,11 @@ The standing rule is "match the platform's curl": the Schannel build on Windows 
 
 ## Acceptance criteria
 
-- [ ] An ADR under `Documentation/Planning/Decisions/`, marked "Decided by Claude under Stewart's delegation", records the decision: either serve SMB on the OpenSSL-profile builds (Linux, macOS) and keep it disabled on the Schannel build, or document it as disabled everywhere; with the reasoning (platform's curl, measured `curl -V` of the reference builds).
-- [ ] README.md's Protocols list and the SMB row of `Documentation/Protocols.md` state exactly what the ADR decided, per platform build, and agree with what `curl -V` lists.
-- [ ] If the decision is "disabled everywhere", the docs say smb/smbs are disabled in all builds and any claim that they are served is removed.
-- [ ] If the decision is to serve SMB on Linux/macOS, the code change (the platform-conditional registration in `EngineComposition.cs`, `curl -V` listing `smb smbs`, `curl -sS smb://127.0.0.1:1/s/x` exiting 7 there) is filed by this run as a follow-up task with its own acceptance criteria, depended on by nothing here; this task still ships the ADR and docs, worded as intent until that task is Done.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] An ADR under `Documentation/Planning/Decisions/`, marked "Decided by Claude under Stewart's delegation", records the decision: either serve SMB on the OpenSSL-profile builds (Linux, macOS) and keep it disabled on the Schannel build, or document it as disabled everywhere; with the reasoning (platform's curl, measured `curl -V` of the reference builds).
+- [x] README.md's Protocols list and the SMB row of `Documentation/Protocols.md` state exactly what the ADR decided, per platform build, and agree with what `curl -V` lists.
+- [x] If the decision is "disabled everywhere", the docs say smb/smbs are disabled in all builds and any claim that they are served is removed.
+- [x] If the decision is to serve SMB on Linux/macOS, the code change (the platform-conditional registration in `EngineComposition.cs`, `curl -V` listing `smb smbs`, `curl -sS smb://127.0.0.1:1/s/x` exiting 7 there) is filed by this run as a follow-up task with its own acceptance criteria, depended on by nothing here; this task still ships the ADR and docs, worded as intent until that task is Done.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -43,3 +43,5 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: ac6f7aa6 23e3103f 529361b4 25ec3a5d a0b49a29.
+- 2026-11-12: Decision: disabled everywhere (ADR-1263, confirming ADR-0835; the targeted 8.22.0 has no SMB, the review's 8.18.0 is not the target). README.md and Documentation/Protocols.md now say so. The "serve on Linux/macOS" criterion does not apply, so no follow-up task is filed. Docs-only change, no code touched, so no build or test run was needed.
+- 2026-11-12: Doing -> Done. ADR-1263 and docs say smb is disabled everywhere
