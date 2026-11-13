@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.NameMatching.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5095 — Apply curl's host-name matching rules on the Windows SslStream route with --ssl-no-revoke
 
@@ -57,3 +57,4 @@ Affected: host-name verification on the SslStream route (`--cacert` + `--ssl-no-
 - Fix: `ServerCertificateVerification.SchannelAlternativeNamesMatch` (called from `WithoutNameMismatchSchannelAccepts`, `--cacert` Schannel build) refuses a name unless an IP host matches an iPAddress SAN, or a DNS host matches a dNSName under `SchannelCommonNameCheck.PatternMatchesHost`; a certificate with no name of the kind asked for stays with the common name check. Tests in `ServerCertificateVerificationTests.NameMatching.cs` are platform-neutral (they call `VerifyPeer` with the policy errors Windows leaves out).
 - DoH criterion: DoH's TLS handshake goes through the same `SslStreamTlsProvider`/`ServerCertificateVerification` as every other route, so the fix covers it; a refused handshake is the resolve failure (exit 6) as before. No separate DoH code changed.
 - Quality: Measure-CodeQuality run for Curl.Networking.UnitLibrary showed 100% line/branch and one method at complexity 16 (`WithoutNameMismatchSchannelAccepts`); I then split it into helpers (complexity now ~3) but could not re-measure, as the run aborts on unrelated Engine test failure filed as BL-5141.
+- 2026-11-13: Doing -> Done. Schannel name rules (partial wildcards, dNSName IP strings) now apply on the SslStream route; tests added
