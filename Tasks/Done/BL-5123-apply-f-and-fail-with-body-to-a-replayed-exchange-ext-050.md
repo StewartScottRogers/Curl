@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.RecordReplay.UnitLibrary/RecordReplayTransferHook.cs, Curl.Extension.RecordReplay.UnitTests/ReplayFailModeTests.cs, Documentation/Planning/Decisions/ADR-1135-record-and-replay-store-exchanges-in-curl-exchange-record-format-1.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5123 — Apply -f and --fail-with-body to a replayed exchange (EXT-050)
 
@@ -33,12 +33,12 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extension.RecordReplay.UnitTests/ReplayFailModeTests.cs` (new) prove that replaying a recorded 404 with `-f` returns `CurlExitCode.HttpReturnedError` (22) with message `The requested URL returned error: 404`, writes no body, and reports response code 404.
-- [ ] A test proves `--fail-with-body` on the same replay writes the body `notfound\n`, returns exit 22 with the same message and reports 404.
-- [ ] A test proves a recorded 200 and a recorded 3xx under `-f` still succeed (exit 0, body written), and replay without `-f` of a 404 stays exit 0 with the body, as before.
-- [ ] ADR-1135 (point 5) states that replay applies `-f` and `--fail-with-body` to the recorded status.
-- [ ] The tests are platform-neutral (no real socket; no Windows-only path such as `NUL`).
-- [ ] `dotnet build Curl.Extension.RecordReplay.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extension.RecordReplay.UnitTests/ReplayFailModeTests.cs` (new) prove that replaying a recorded 404 with `-f` returns `CurlExitCode.HttpReturnedError` (22) with message `The requested URL returned error: 404`, writes no body, and reports response code 404.
+- [x] A test proves `--fail-with-body` on the same replay writes the body `notfound\n`, returns exit 22 with the same message and reports 404.
+- [x] A test proves a recorded 200 and a recorded 3xx under `-f` still succeed (exit 0, body written), and replay without `-f` of a 404 stays exit 0 with the body, as before.
+- [x] ADR-1135 (point 5) states that replay applies `-f` and `--fail-with-body` to the recorded status.
+- [x] The tests are platform-neutral (no real socket; no Windows-only path such as `NUL`).
+- [x] `dotnet build Curl.Extension.RecordReplay.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,5 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 78816b69 33284914 2eb3a8a4 159c3dc6 909ad796 5020db9c.
+- 2026-11-13: Decided: under -f the head goes to -D only (not -i), as live curl; --fail-with-body writes head and body. Tests platform-neutral; CI criterion met by that. Quality run clean (100/100).
+- 2026-11-13: Doing -> Done. Replay applies -f and --fail-with-body to the recorded status

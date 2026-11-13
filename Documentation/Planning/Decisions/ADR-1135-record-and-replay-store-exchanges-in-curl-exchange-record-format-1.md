@@ -44,7 +44,7 @@ response, which is all record and replay need.
    status, the header fields after the last status line, the method and the URL. A request with no recording fails
    with exit 7 (`CURLE_COULDNT_CONNECT`, the nearest of curl's codes to "no server to reach") and the message
    `No recorded exchange for <method> <url> in <dir>`, unless `--record` is given too: then it goes out and is
-   recorded there, so `--replay d --record d` fills in what a directory lacks. A replayed 3xx with a `Location`
+   recorded there, so `--replay d --record d` fills in what a directory lacks. Replay applies `-f` (no body, exit 22, `The requested URL returned error: <code>`) and `--fail-with-body` (body, then exit 22) to a recorded status of 400 or more, and still reports that status. A replayed 3xx with a `Location`
    reports the `Location` resolved against the request URL as its redirect URL, so under `-L` curl's follower asks
    the hook for each hop in turn: every hop answered from its own recording gives the final recorded body,
    `%{num_redirects}` and `%{http_code}`. A hop whose target has no recording fails as any unrecorded request does
