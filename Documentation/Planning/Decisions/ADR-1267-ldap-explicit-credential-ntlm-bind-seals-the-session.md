@@ -1,4 +1,4 @@
-# ADR-1266: The explicit-credential LDAP NTLM bind seals the session
+# ADR-1267: The explicit-credential LDAP NTLM bind seals the session
 
 - Status: Accepted
 - Date: 2026-11-13

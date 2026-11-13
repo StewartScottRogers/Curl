@@ -17,7 +17,7 @@ namespace Curl.Original.Protocol.Ldap;
 /// when the reply carries no decodable challenge; a server that refuses either step fails with
 /// its own result code. When the challenge grants sealing, the bind exchanges a session key and
 /// every later message goes through the SASL security layer sealed with NTLM session security
-/// (BL-5142, ADR-1266).
+/// (BL-5142, ADR-1267).
 /// </remarks>
 internal static class LdapAuthenticatedBind
 {

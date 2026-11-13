@@ -37,7 +37,7 @@ The remaining part of BL-5094 (finding STD-049, High: no integrity or confidenti
 
 - Filed by BL-5094's run on lane 4 as the last part of its split; carries BL-5094's acceptance criteria unchanged.
 - Added `LdapSearch.cs` to touches: a lost sealed reply after this bind must end `Unavailable`, not the current-user path's `Server Down`, so `Lost` now takes `LdapExchange.WinLdapLostResultCode`; no task in Doing on origin/work/dark-factory names any LDAP file.
-- Decision (ADR-1266): seal only when the negotiated flags hold SEAL, extended session security and 128-bit (what `NtlmSessionSecurity` supports); an NTLMv1 challenge (the existing tests' flags 0) stays unsealed. Wrap layout: 16-byte signature then sealed bytes, as the current-user path.
+- Decision (ADR-1267): seal only when the negotiated flags hold SEAL, extended session security and 128-bit (what `NtlmSessionSecurity` supports); an NTLMv1 challenge (the existing tests' flags 0) stays unsealed. Wrap layout: 16-byte signature then sealed bytes, as the current-user path.
 - Tests: `LdapAuthenticatedNtlmSealTests` drives the handler against a stand-in that recovers the exported session key from the Type-3 with the password, unseals the SearchRequest (0x63) and the unbind (0x42) and answers a sealed SearchResultDone; a scripted server that cannot unseal (plain notice of disconnection, close, short buffer, bad signature) ends `(39) LDAP remote: Unavailable`. No Windows-only API; platform-neutral.
 - Ldap tests 725 passed; fast tests green; Measure-CodeQuality for Curl.Original.Protocol.Ldap.UnitLibrary: 0 failing members.
 

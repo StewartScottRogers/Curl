@@ -10,7 +10,7 @@ namespace Curl.Original.Protocol.Ldap;
 
 /// <summary>
 /// Pins the sealed session after the explicit-credential (<c>-u</c>) NTLM bind of <c>--ntlm</c>
-/// and <c>--negotiate</c> (BL-5142, ADR-1266): the negotiate message offers SIGN and SEAL, and
+/// and <c>--negotiate</c> (BL-5142, ADR-1267): the negotiate message offers SIGN and SEAL, and
 /// every message after the bind is a 4-byte length and a sealed buffer.
 /// </summary>
 [TestClass]

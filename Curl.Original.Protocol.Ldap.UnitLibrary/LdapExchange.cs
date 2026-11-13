@@ -38,7 +38,7 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer,
     /// <param name="authentication">The logon bind's complete authentication.</param>
     /// <param name="winLdapLostResultCode">
     /// WinLDAP's result code for a search whose reply then cannot be read: <c>Server Down</c> after
-    /// the current-user bind, <c>Unavailable</c> after the explicit-credential one, as measured (ADR-1266).
+    /// the current-user bind, <c>Unavailable</c> after the explicit-credential one, as measured (ADR-1267).
     /// </param>
     public void StartSecurityLayer(ILdapLogonAuthentication authentication, int winLdapLostResultCode = WinLdapResultText.ServerDown)
     {
