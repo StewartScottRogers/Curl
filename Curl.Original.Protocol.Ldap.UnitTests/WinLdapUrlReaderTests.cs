@@ -92,6 +92,13 @@ public sealed class WinLdapUrlReaderTests
     }
 
     [TestMethod]
+    public void Read_AttributeOfExactly1024_IsKept()
+    {
+        string attribute = new('b', 1024);
+        CollectionAssert.AreEqual(new[] { "a", attribute, "c" }, Read("x?a," + attribute + ",c").Search!.Attributes.ToArray());
+    }
+
+    [TestMethod]
     public void Read_PartsAfterTheExtensions_AreIgnored()
     {
         LdapSearchParameters search = Read("dc=example?a?base?(cn=a)?x?y").Search!;
