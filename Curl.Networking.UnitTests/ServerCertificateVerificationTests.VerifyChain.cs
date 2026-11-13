@@ -220,6 +220,66 @@ public sealed class ServerCertificateVerificationVerifyChainTests
         Assert.IsTrue(verdict.IsAccepted);
     }
 
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void VerifyServerCertificateChain_SchannelIpTargetAgainstCertificateWithoutSubjectAltName_RejectsItWithExit60(bool handBuilt)
+    {
+        using var trusted = IssuedChain.Create(commonName: "127.0.0.1", withDnsName: false);
+        var provider = Provider(trusted.TrustingOptions(), handBuilt, matchesSchannelBuild: true);
+        Diagnostics.Arrange("chain", "leaf CN=127.0.0.1, no subjectAltName; Schannel profile, --cacert");
+
+        var verdict = provider.VerifyServerCertificateChain([trusted.Leaf.RawData], "127.0.0.1");
+
+        Diagnostics.Act("message", verdict.ErrorMessage);
+        Assert.IsFalse(verdict.IsAccepted);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, verdict.ExitCode);
+        Assert.AreEqual("schannel: CertFindExtension() returned no extension.", verdict.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void VerifyServerCertificateChain_OpenSslIpTargetAgainstCertificateWithoutSubjectAltName_AcceptsIt(bool handBuilt)
+    {
+        using var trusted = IssuedChain.Create(commonName: "127.0.0.1", withDnsName: false);
+        var provider = Provider(trusted.TrustingOptions(), handBuilt, matchesSchannelBuild: false);
+
+        var verdict = provider.VerifyServerCertificateChain([trusted.Leaf.RawData], "127.0.0.1");
+
+        Diagnostics.Act("message", verdict.ErrorMessage);
+        Assert.IsTrue(verdict.IsAccepted, verdict.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void VerifyServerCertificateChain_SchannelIpTargetAgainstCertificateWithIpSubjectAltName_AcceptsIt(bool handBuilt)
+    {
+        using var trusted = IssuedChain.Create(commonName: "127.0.0.1", withDnsName: false, ipAddressName: "127.0.0.1");
+        var provider = Provider(trusted.TrustingOptions(), handBuilt, matchesSchannelBuild: true);
+
+        var verdict = provider.VerifyServerCertificateChain([trusted.Leaf.RawData], "127.0.0.1");
+
+        Diagnostics.Act("message", verdict.ErrorMessage);
+        Assert.IsTrue(verdict.IsAccepted, verdict.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void VerifyServerCertificateChain_SchannelIpTargetAgainstCommonNameLocalhostWithDnsName_KeepsTheIpNotAmongNamesMessage(bool handBuilt)
+    {
+        using var trusted = IssuedChain.Create(commonName: "localhost");
+        var provider = Provider(trusted.TrustingOptions(), handBuilt, matchesSchannelBuild: true);
+
+        var verdict = provider.VerifyServerCertificateChain([trusted.Leaf.RawData], "127.0.0.1");
+
+        Diagnostics.Act("message", verdict.ErrorMessage);
+        Assert.IsFalse(verdict.IsAccepted);
+        Assert.AreNotEqual("schannel: CertFindExtension() returned no extension.", verdict.ErrorMessage);
+    }
+
     private static (CurlExitCode ExitCode, string Message) RejectionOf(ServerCertificateVerdict verdict) =>
         ((CurlExitCode ExitCode, string Message))verdict.Rejection!;
 
@@ -248,7 +308,12 @@ public sealed class ServerCertificateVerificationVerifyChainTests
 
         public X509Certificate2 Leaf { get; }
 
-        public static IssuedChain Create(string? usage = "1.3.6.1.5.5.7.3.1", X509KeyUsageFlags? keyUsage = X509KeyUsageFlags.DigitalSignature)
+        public static IssuedChain Create(
+            string? usage = "1.3.6.1.5.5.7.3.1",
+            X509KeyUsageFlags? keyUsage = X509KeyUsageFlags.DigitalSignature,
+            string commonName = Host,
+            bool withDnsName = true,
+            string? ipAddressName = null)
         {
             var now = DateTimeOffset.UtcNow;
             using var caKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -259,10 +324,23 @@ public sealed class ServerCertificateVerificationVerifyChainTests
             var ca = caRequest.CreateSelfSigned(now.AddDays(-1), now.AddDays(30));
 
             using var leafKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-            var leafRequest = new CertificateRequest("CN=" + Host, leafKey, HashAlgorithmName.SHA256);
-            var names = new SubjectAlternativeNameBuilder();
-            names.AddDnsName(Host);
-            leafRequest.CertificateExtensions.Add(names.Build());
+            var leafRequest = new CertificateRequest("CN=" + commonName, leafKey, HashAlgorithmName.SHA256);
+            if (withDnsName || ipAddressName is not null)
+            {
+                var names = new SubjectAlternativeNameBuilder();
+                if (withDnsName)
+                {
+                    names.AddDnsName(Host);
+                }
+
+                if (ipAddressName is not null)
+                {
+                    names.AddIpAddress(System.Net.IPAddress.Parse(ipAddressName));
+                }
+
+                leafRequest.CertificateExtensions.Add(names.Build());
+            }
+
             leafRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
             if (keyUsage is { } flags)
             {

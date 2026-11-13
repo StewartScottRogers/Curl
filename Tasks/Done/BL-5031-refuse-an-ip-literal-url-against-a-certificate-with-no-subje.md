@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.VerifyChain.cs, Curl.Networking.UnitTests/TlsFailureMessagesTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5031 — Refuse an IP-literal URL against a certificate with no subjectAltName on the Schannel profile
 
@@ -36,10 +36,10 @@ Where to start: `Curl.Networking.UnitLibrary/ServerCertificateVerification.cs`, 
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.VerifyChain.cs` (Schannel profile, `--cacert`, target `127.0.0.1`, leaf `CN=127.0.0.1` with no SAN extension) shows exit 60 with the message `schannel: CertFindExtension() returned no extension.`, on both the SslStream-route and hand-built-route judgments.
-- [ ] A test in `Curl.Networking.UnitTests/TlsFailureMessagesTests.cs` pins that message for this case.
-- [ ] Regression: the OpenSSL profile still accepts the same certificate; a Schannel-profile leaf that has an `IP:127.0.0.1` SAN is still accepted; the existing `CN=localhost` reached by IP still prints REF's message.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A unit test in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.VerifyChain.cs` (Schannel profile, `--cacert`, target `127.0.0.1`, leaf `CN=127.0.0.1` with no SAN extension) shows exit 60 with the message `schannel: CertFindExtension() returned no extension.`, on both the SslStream-route and hand-built-route judgments.
+- [x] A test in `Curl.Networking.UnitTests/TlsFailureMessagesTests.cs` pins that message for this case.
+- [x] Regression: the OpenSSL profile still accepts the same certificate; a Schannel-profile leaf that has an `IP:127.0.0.1` SAN is still accepted; the existing `CN=localhost` reached by IP still prints REF's message.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,5 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 4bf4f29c c3bb10d0 696fa81a a0b49a29.
+- 2026-11-12: Schannel + --cacert + IP-literal target + leaf with no subjectAltName extension is now a name mismatch in ServerCertificateVerification (message was already pinned in TlsFailureMessagesTests). Not re-measured against real curl: the task cites the REF measurement.
+- 2026-11-12: Doing -> Done. Schannel IP-literal target vs no-SAN certificate refused; tests and quality gate green

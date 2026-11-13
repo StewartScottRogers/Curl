@@ -570,12 +570,31 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     // With --cacert curl's Schannel build checks the name itself and, for a certificate
     // with no DNS subjectAltName, matches the common name, which .NET's check does not
     // (BL-415). Without --cacert Schannel's own check stands.
-    private SslPolicyErrors WithoutNameMismatchSchannelAccepts(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
-        HasCaCertificates
-        && errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
-        && SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
-            ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
-            : errors;
+    // An IP-literal target against a certificate with no subjectAltName extension at all is
+    // a mismatch there, whatever its common name (BL-5031, curl 8.22.0 Schannel:
+    // `CertFindExtension() returned no extension.`).
+    private SslPolicyErrors WithoutNameMismatchSchannelAccepts(SslPolicyErrors errors, X509Chain? chain, string targetHost)
+    {
+        if (!HasCaCertificates)
+        {
+            return errors;
+        }
+
+        if (IsIpTargetWithoutAlternativeNames(chain, targetHost))
+        {
+            return errors | SslPolicyErrors.RemoteCertificateNameMismatch;
+        }
+
+        return errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
+            && SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
+                ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
+                : errors;
+    }
+
+    private static bool IsIpTargetWithoutAlternativeNames(X509Chain? chain, string targetHost) =>
+        chain is { ChainElements.Count: > 0 }
+        && System.Net.IPAddress.TryParse(targetHost, out _)
+        && !chain.ChainElements[0].Certificate.Extensions.OfType<X509SubjectAlternativeNameExtension>().Any();
 
     // Taken while the chain is alive, whether or not -k lets the handshake go on, because
     // SslStream disposes the chain once its callback returns.
