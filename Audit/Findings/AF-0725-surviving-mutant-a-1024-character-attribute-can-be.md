@@ -3,8 +3,8 @@ id: AF-0725
 title: Surviving mutant: a 1024-character attribute can be dropped from the WinLDAP search request
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Original.Protocol.Ldap.UnitLibrary/WinLdapUrlReader.cs:ReadAttributes-gt:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Ldap.UnitLibrary/WinLdapUrlReader.cs:96:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Origi
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
