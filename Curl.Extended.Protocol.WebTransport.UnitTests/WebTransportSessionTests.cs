@@ -1,5 +1,6 @@
 using Curl.Extended.Protocol.WebTransport.Wire;
 using Curl.Http3;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.WebTransport.Session;
 
@@ -19,6 +20,30 @@ public sealed class WebTransportSessionTests
         bool taken = WebTransportSession.IsSessionUnidirectionalStream(peer, (WebTransportMode)mode);
 
         Assert.AreEqual(expected, taken);
+    }
+
+    [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task ConnectFields_TheOptions_FollowThePseudoHeadersInLowerCase()
+    {
+        ScriptedHttp3Connection connection = new() { AnswerStream = WebTransportProtocolHandlerTests.Echo };
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("webtransport://example.com/wt"),
+            PostData = "x"u8.ToArray(),
+            Output = new MemoryStream(),
+            Http = new Curl.Protocol.Abstractions.HttpRequestOptions { UserAgent = "agW", CookieStrings = "c=1", Headers = ["Authorization: Bearer t", "Host: evil", ":path: /evil"] },
+        };
+
+        await new WebTransportProtocolHandler((_, _) => ValueTask.FromResult<IMultiplexedConnection>(connection)).ExecuteAsync(context);
+
+        CollectionAssert.AreEqual(
+            new WebTransportProtocolHandlerTests.HeaderFieldText[]
+            {
+                new(":method", "CONNECT"), new(":protocol", "webtransport-h3"), new(":scheme", "https"), new(":authority", "example.com"), new(":path", "/wt"),
+                new("user-agent", "agW"), new("cookie", "c=1"), new("authorization", "Bearer t"),
+            },
+            WebTransportProtocolHandlerTests.DecodeRequest(connection.BidirectionalStreams[0].Written.ToArray()));
     }
 
     [TestMethod]

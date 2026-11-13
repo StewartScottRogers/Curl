@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.WebTransport.UnitLibrary/Session/WebTransportSession.cs, Curl.Extended.Protocol.WebTransport.UnitLibrary/Session/WebTransportRequest.cs, Curl.Extended.Protocol.WebTransport.UnitLibrary/Session/WebTransportConnectHeaderFields.cs, Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportSessionTests.cs, Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportConnectHeaderFieldsTests.cs, Documentation/Conformance/Extended/WebTransport.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5113 — Send -H, -A, -b and -u on the webtransport extended CONNECT (EXT-048)
 
@@ -35,18 +35,20 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportConnectHeaderFieldsTests.cs` (new) prove that `-H 'Authorization: Bearer t'` and `-A agW` appear in the CONNECT as `authorization: Bearer t` and `user-agent: agW` (lowercase names), `-b` appears as `cookie`, `--oauth2-bearer` and `-u` give the authorization field in the same precedence as `HandshakeHeaderFields`, and `-H 'Name:'` removes and `-H 'Name;'` sends empty.
-- [ ] A test in `WebTransportSessionTests.cs` using `ScriptedHttp3Connection` proves the CONNECT request the server sees carries those fields after the pseudo-headers, and that with no options it carries only the default `user-agent` as the SocketIo model does and no other extra field.
-- [ ] A test proves a `-H` naming a pseudo-header or `host` cannot replace or duplicate the pseudo-headers.
-- [ ] `Documentation/Conformance/Extended/WebTransport.md` gains a row stating the CONNECT carries `-H`, `-A`, `-b` and the authorization, "Covered by" naming a test from this task; the `--extended-help` and `--ai-help` text for webtransport is checked and corrected if it says otherwise.
-- [ ] The tests are platform-neutral (no real socket).
-- [ ] `dotnet build Curl.Extended.Protocol.WebTransport.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportConnectHeaderFieldsTests.cs` (new) prove that `-H 'Authorization: Bearer t'` and `-A agW` appear in the CONNECT as `authorization: Bearer t` and `user-agent: agW` (lowercase names), `-b` appears as `cookie`, `--oauth2-bearer` and `-u` give the authorization field in the same precedence as `HandshakeHeaderFields`, and `-H 'Name:'` removes and `-H 'Name;'` sends empty.
+- [x] A test in `WebTransportSessionTests.cs` using `ScriptedHttp3Connection` proves the CONNECT request the server sees carries those fields after the pseudo-headers, and that with no options it carries only the default `user-agent` as the SocketIo model does and no other extra field.
+- [x] A test proves a `-H` naming a pseudo-header or `host` cannot replace or duplicate the pseudo-headers.
+- [x] `Documentation/Conformance/Extended/WebTransport.md` gains a row stating the CONNECT carries `-H`, `-A`, `-b` and the authorization, "Covered by" naming a test from this task; the `--extended-help` and `--ai-help` text for webtransport is checked and corrected if it says otherwise.
+- [x] The tests are platform-neutral (no real socket).
+- [x] `dotnet build Curl.Extended.Protocol.WebTransport.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Review acceptance check, for a hand check: the logged CONNECT headers include `authorization: Bearer t` and `user-agent: agW`.
+- --extended-help/--ai-help text for webtransport does not mention the CONNECT fields, so nothing to correct. The `-H` on a pseudo-header, host or connection-specific name is dropped (HTTP/3 forbids them). Existing exact-field test in WebTransportProtocolHandlerTests gains the default user-agent. Quality run: 100/100, 0 failing.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 9e1a412a 7905ccf7 b1df1197 f16ae3a5 d6cd4299 37433153.
+- 2026-11-13: Doing -> Done. CONNECT carries -H, -A, -b, -u and --oauth2-bearer fields

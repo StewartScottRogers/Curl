@@ -40,7 +40,7 @@ internal sealed class WebTransportSession(IMultiplexedConnection connection, ITr
             throw new WebTransportException(CurlExitCode.WeirdServerReply, "The server does not offer WebTransport over HTTP/3");
         }
 
-        await connect.SendHeadersAsync(ConnectFields(request), endStream: false, cancellationToken).ConfigureAwait(false);
+        await connect.SendHeadersAsync(ConnectFields(request, context), endStream: false, cancellationToken).ConfigureAwait(false);
         await ReadSessionResponseAsync(connect, cancellationToken).ConfigureAwait(false);
         CancellationTokenSource exchangeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         await using StoppedWatcher watcher = new(WatchForServerCloseAsync(connect, exchangeCancellation), exchangeCancellation);
@@ -62,14 +62,16 @@ internal sealed class WebTransportSession(IMultiplexedConnection connection, ITr
 
     /// <summary>Gets the extended CONNECT's field section (section 3.2, RFC 9220 section 3).</summary>
     /// <param name="request">The request.</param>
+    /// <param name="context">The transfer, whose <c>-H</c>, <c>-A</c>, <c>-b</c>, <c>-u</c> and <c>--oauth2-bearer</c> follow the pseudo-headers.</param>
     /// <returns>The fields.</returns>
-    internal static IReadOnlyList<HeaderField> ConnectFields(WebTransportRequest request) =>
+    internal static IReadOnlyList<HeaderField> ConnectFields(WebTransportRequest request, ITransferContext context) =>
     [
         new(":method", "CONNECT"),
         new(":protocol", WebTransportWire.ProtocolToken),
         new(":scheme", "https"),
         new(":authority", request.Authority),
         new(":path", request.Path),
+        .. WebTransportConnectHeaderFields.Of(context),
     ];
 
     /// <summary>
