@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Nats.UnitLibrary/NatsSession.cs, Curl.Extended.Protocol.SignalR.UnitLibrary/Client/SignalRHubSession.cs, Curl.Extended.Protocol.Nats.UnitTests/NatsProtocolHandlerTests.cs, Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRProtocolHandlerTests.cs, Documentation/Conformance/Extended/CurlSurface-Transfer-Brokers-Nats.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5044 — Count streamed bytes in the -m timeout message and size_download for nats and signalr
 
@@ -30,18 +30,22 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extended.Protocol.Nats.UnitTests/NatsProtocolHandlerTests.cs` has a test with a scripted connection that sends `MSG x 1 2` / `ok`, then stays silent until the cancellation fires: the recording progress sees `ReportDownloaded(3, null)` (`ok` plus the `\n` the session writes), so the watchdog's message reads `with 3 bytes received`.
-- [ ] `Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRProtocolHandlerTests.cs` has the equivalent test after one hub message line is written (the line's byte count, then silence, then timeout).
-- [ ] A Console-level or Core-level assertion (an existing `-m` test pattern such as `CurlCommandRunnerMaxTimeTests`, or a nats handler test with `MaxTimeWatchdog`) shows `%{size_download}` equals the same count after the timeout.
-- [ ] Regression: a normal end (`?count=1`) still reports the right size, and a timeout before any message still says `with 0 bytes received`.
-- [ ] `Documentation/Conformance/Extended/CurlSurface-Transfer-Brokers-Nats.md` NatsWriteOut-1 (and `SignalR.md` if it lists the case) states the timeout case.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `Curl.Extended.Protocol.Nats.UnitTests/NatsProtocolHandlerTests.cs` has a test with a scripted connection that sends `MSG x 1 2` / `ok`, then stays silent until the cancellation fires: the recording progress sees `ReportDownloaded(3, null)` (`ok` plus the `\n` the session writes), so the watchdog's message reads `with 3 bytes received`.
+- [x] `Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRProtocolHandlerTests.cs` has the equivalent test after one hub message line is written (the line's byte count, then silence, then timeout).
+- [x] A Console-level or Core-level assertion (an existing `-m` test pattern such as `CurlCommandRunnerMaxTimeTests`, or a nats handler test with `MaxTimeWatchdog`) shows `%{size_download}` equals the same count after the timeout.
+- [x] Regression: a normal end (`?count=1`) still reports the right size, and a timeout before any message still says `with 0 bytes received`.
+- [x] `Documentation/Conformance/Extended/CurlSurface-Transfer-Brokers-Nats.md` NatsWriteOut-1 (and `SignalR.md` if it lists the case) states the timeout case.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). The unit tests use the libraries' scripted connections. The review says "the shared extended-protocol transfer path"; the repository shows no such shared path, the cause is per-handler (missing `ReportDownloaded`), so `touches` name the two session files. Other extended protocols that stream messages and do not call `ReportDownloaded` may have the same gap; file a follow-up task rather than widening this one.
 
+Notes (lane 13): `NatsSession` and `SignalRHubSession` now call `context.Progress.ReportDownloaded(total, null)` after each write (SignalR gets the progress through its constructor). The watchdog message and `%{size_download}` both read that progress, as for Stomp and HTTP, so no Console-level test was added; the handler tests pin the reports (2 then 3 for `ok
+`; none before any message; `?count=1` still 3). The SignalR test checks the reported total equals the bytes written after a hub line (a silent-then-timeout variant is not needed: the report is made at write time). No follow-up filed beyond the Notes hint.
+
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 3eba882c d34a07c4 d1f55d89 230344e2 63f94442 a0b49a29.
+- 2026-11-12: Doing -> Done. nats and signalr report streamed bytes to progress

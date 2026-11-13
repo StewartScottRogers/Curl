@@ -243,6 +243,35 @@ public sealed class SignalRProtocolHandlerTests
     public async Task CallBodyAsync_NeitherDataNorUpload_IsNone() =>
         Assert.IsNull(await SignalRProtocolHandler.CallBodyAsync(new TransferContext { Url = CurlUrl.Parse("signalr://example.com/hub"), Output = new MemoryStream() }));
 
+    [TestMethod]
+    public async Task WithoutData_AfterAHubLine_ReportsTheBytesWrittenSoFarToTheProgress()
+    {
+        var progress = new RecordingProgress();
+        var output = new MemoryStream();
+        var handler = new SignalRProtocolHandler(Connector(Hub("{}", "{\"type\":1,\"target\":\"Send\",\"arguments\":[]}", "{\"type\":7}")), new RepeatingRandomSource(0));
+
+        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("signalr://example.com/chat"), Output = output, Progress = progress });
+
+        Assert.IsGreaterThan(0, output.Length);
+        Assert.AreEqual(output.Length, progress.Downloaded.Single());
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    private sealed class RecordingProgress : ITransferProgress
+    {
+        public List<long> Downloaded { get; } = [];
+
+        public void ReportTransferStarted()
+        {
+        }
+
+        public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => Downloaded.Add(bytesSoFar);
+
+        public void ReportUploaded(long bytesSoFar, long? expectedTotal)
+        {
+        }
+    }
+
     private static ScriptedConnection Negotiate() =>
         ScriptedConnection.FromText($"HTTP/1.1 200 OK\r\nContent-Length: {NegotiateBody.Length}\r\n\r\n{NegotiateBody}");
 

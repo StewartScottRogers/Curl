@@ -214,6 +214,81 @@ public sealed class NatsProtocolHandlerTests
         Assert.AreNotEqual(first, NatsProtocolHandler.NewInbox());
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_TimeoutAfterAMessage_ReportsTheBytesWrittenSoFar()
+    {
+        RecordingProgress progress = new();
+        using CancellationTokenSource cancellation = new();
+        cancellation.CancelAfter(TimeSpan.FromMilliseconds(200));
+        MemoryStream output = new();
+        NatsProtocolHandler handler = new(new ScriptedConnector(ConnectResult.Connected(new SilentAfter(ScriptedConnection.Of(Info, "MSG x 1 2\r\nok\r\n")))), () => "_INBOX.t");
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("nats://example.com/x"), Output = output, Progress = progress, CancellationToken = cancellation.Token }));
+
+        Assert.AreEqual("ok\n", Encoding.UTF8.GetString(output.ToArray()));
+        CollectionAssert.AreEqual(new long[] { 2, 3 }, progress.Downloaded);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TimeoutBeforeAnyMessage_ReportsNoBytes()
+    {
+        RecordingProgress progress = new();
+        using CancellationTokenSource cancellation = new();
+        cancellation.CancelAfter(TimeSpan.FromMilliseconds(200));
+        NatsProtocolHandler handler = new(new ScriptedConnector(ConnectResult.Connected(new SilentAfter(ScriptedConnection.Of(Info)))), () => "_INBOX.t");
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("nats://example.com/x"), Output = new MemoryStream(), Progress = progress, CancellationToken = cancellation.Token }));
+
+        Assert.AreEqual(0, progress.Downloaded.Count);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NormalEndAfterOneMessage_ReportsTheSizeTransferred()
+    {
+        TransferResult result = await ExecuteAsync(ScriptedConnection.Of(Info, "MSG x 1 2\r\nok\r\n"), "nats://example.com/x?count=1", new MemoryStream());
+
+        Assert.AreEqual(3, result.BytesTransferred);
+    }
+
+    private sealed class SilentAfter(ScriptedConnection inner) : IConnection
+    {
+        public bool IsSecure => false;
+
+        public EndPoint? RemoteEndPoint => null;
+
+        public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            int read = await inner.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+
+            return read;
+        }
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => inner.WriteAsync(buffer, cancellationToken);
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
+
+    private sealed class RecordingProgress : ITransferProgress
+    {
+        public List<long> Downloaded { get; } = [];
+
+        public void ReportTransferStarted()
+        {
+        }
+
+        public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => Downloaded.Add(bytesSoFar);
+
+        public void ReportUploaded(long bytesSoFar, long? expectedTotal)
+        {
+        }
+    }
+
     private static ValueTask<TransferResult> ExecuteAsync(ScriptedConnection connection, string url, Stream output, string? data = null) =>
         new NatsProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection)), () => "_INBOX.t").ExecuteAsync(Context(url, output, data));
 

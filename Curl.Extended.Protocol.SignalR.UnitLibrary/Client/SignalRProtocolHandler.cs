@@ -97,7 +97,7 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
         SignalRWebSocketSession session = await SignalRWebSocketUpgrade.UpgradeAsync(
             connection, endpoint.WebSocketUrl, endpoint.AccessToken, randomSource, context.CancellationToken, requestFields);
         context.Progress.ReportTransferStarted();
-        return await new SignalRHubSession(session, callRecord, context.Output).RunAsync(context.CancellationToken);
+        return await new SignalRHubSession(session, callRecord, context.Output, context.Progress).RunAsync(context.CancellationToken);
     }
 
     private async ValueTask<IConnection> OpenAsync(Uri url, ITransferContext context, CancellationToken cancellationToken)

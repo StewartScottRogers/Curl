@@ -109,6 +109,7 @@ internal sealed class NatsSession(IConnection connection, ITransferContext conte
         byte[] payload = await reader.ReadPayloadAsync(message.PayloadLength, context.CancellationToken).ConfigureAwait(false);
         await context.Output.WriteAsync(payload, context.CancellationToken).ConfigureAwait(false);
         written += payload.Length;
+        context.Progress.ReportDownloaded(written, null);
         if (request.Kind == NatsRequestKind.Request)
         {
             return true;
@@ -116,6 +117,7 @@ internal sealed class NatsSession(IConnection connection, ITransferContext conte
 
         await context.Output.WriteAsync("\n"u8.ToArray(), context.CancellationToken).ConfigureAwait(false);
         written++;
+        context.Progress.ReportDownloaded(written, null);
         received++;
         return received == request.MaxMessages;
     }
