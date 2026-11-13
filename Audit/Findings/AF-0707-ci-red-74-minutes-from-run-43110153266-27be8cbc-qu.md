@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-12 | 2026-11-12_2105.md | reproduces: yes | ciRedSpells over the window shows run 43110153266 as a 74 min spell, over 30; the Quality gates 'Measure coverage' cause recurred in spell 7.
+
 ## Log
 
 - 2026-11-12: accepted. Accepted under Stewart's standing accept of 2026-11-02.

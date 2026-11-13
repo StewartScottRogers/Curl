@@ -42,6 +42,8 @@ Select-String -Path Curl.Extension.ObliviousDoh.UnitTests/Wire/ObliviousDohWireT
 
 ## Re-audits
 
+- 2026-11-12 | 2026-11-12_2105.md | reproduces: no | Ran the Select-String: 'FollowsTheKey' no longer matches. The test is now Config_KeyId_FollowsThePublicKey (ObliviousDohWireTests.cs:78), which compares KeyId() for P256Key against otherKey with the same KEM, KDF and AEAD.
+
 ## Log
 
 - 2026-11-05: filed proposed.

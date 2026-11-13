@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/PortUnreachableReportingDatagramCh
 
 ## Re-audits
 
+- 2026-11-12 | 2026-11-12_2105.md | reproduces: no | Ran the Select-String: the test is now ReceiveAsync_PortClosed_ThrowsCouldntConnectTextWithTheElapsedTime (line 26). It no longer names exit 7 and asserts the text it names (Assert.AreEqual("Failed to connect to localhost:1 after 5 ms: Could not connect to server", ...), Assert.EndsWith(CouldntConnectWords, ...)).
+
 ## Log
 
 - 2026-11-05: filed proposed.
