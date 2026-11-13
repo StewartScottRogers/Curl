@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Ntlm.UnitLibrary/NtlmChallengeAnswerer.cs, Curl.Ntlm.UnitLibrary/NtlmAuthenticateMessage.cs, Curl.Ntlm.UnitLibrary/NtlmSessionSecurity.cs, Curl.Ntlm.UnitTests/NtlmSessionSecurityTests.cs, Curl.Ntlm.UnitTests/NtlmChallengeAnswererKeyExchangeTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5141 — Exchange an NTLM session key and seal messages with NTLM session security
 
@@ -24,17 +24,19 @@ Key exchange must be opt-in: curl's HTTP NTLM never sends a session key, so the 
 
 ## Acceptance criteria
 
-- [ ] An opt-in answer (a new method or parameter on `NtlmChallengeAnswerer`) draws a 16-byte exported session key from `INtlmRandomSource`, writes `RC4K(KeyExchangeKey, ExportedSessionKey)` as the AUTHENTICATE message's EncryptedRandomSessionKey when the challenge negotiates KEY_EXCH, and hands the exported session key to its caller; the existing `Answer` encodes the same bytes as before (existing tests green).
-- [ ] `NtlmSessionSecurity` (client side and server side, from the exported session key and negotiated flags with extended session security, 128-bit) derives the MS-NLMP sign and seal keys, and seals/signs (`RC4(SealKey, message)` plus the 16-byte signature: version 1, `RC4(HMAC_MD5(SignKey, seq + message)[0..8])` under KEY_EXCH, sequence number) and unseals/verifies, with a sequence number per direction; a tampered message or signature fails verification.
-- [ ] Tests pin the keys and a sealed message against the MS-NLMP 4.2.4 test vectors (NTLMv2 with extended session security).
-- [ ] `Curl.Ntlm.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 (`Measure-CodeQuality.ps1 -Library Curl.Ntlm.UnitLibrary`).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] An opt-in answer (a new method or parameter on `NtlmChallengeAnswerer`) draws a 16-byte exported session key from `INtlmRandomSource`, writes `RC4K(KeyExchangeKey, ExportedSessionKey)` as the AUTHENTICATE message's EncryptedRandomSessionKey when the challenge negotiates KEY_EXCH, and hands the exported session key to its caller; the existing `Answer` encodes the same bytes as before (existing tests green).
+- [x] `NtlmSessionSecurity` (client side and server side, from the exported session key and negotiated flags with extended session security, 128-bit) derives the MS-NLMP sign and seal keys, and seals/signs (`RC4(SealKey, message)` plus the 16-byte signature: version 1, `RC4(HMAC_MD5(SignKey, seq + message)[0..8])` under KEY_EXCH, sequence number) and unseals/verifies, with a sequence number per direction; a tampered message or signature fails verification.
+- [x] Tests pin the keys and a sealed message against the MS-NLMP 4.2.4 test vectors (NTLMv2 with extended session security).
+- [x] `Curl.Ntlm.UnitLibrary` stays at 100% line and branch coverage, complexity at most 10 (`Measure-CodeQuality.ps1 -Library Curl.Ntlm.UnitLibrary`).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Filed by BL-5094's run on lane 4, which split that task for size before any edit.
+- Added `AnswerWithKeyExchange` (opt-in; `Answer` bytes unchanged), `NtlmAuthenticateMessage.EncryptedRandomSessionKey` and `NtlmSessionSecurity` (client and server). Vector from MS-NLMP 4.2.4 (seal key, sealed Plaintext, signature) passes. Quality: Ntlm 100/100, max complexity 10. Fast tests green.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: e00f39bc 4bfc83d2 c415e06d d10f34b8 a0b49a29.
+- 2026-11-13: Doing -> Done. NTLM key exchange answer and session security seal/unseal
