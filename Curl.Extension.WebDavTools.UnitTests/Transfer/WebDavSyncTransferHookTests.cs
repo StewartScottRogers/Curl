@@ -199,5 +199,16 @@ public sealed class WebDavSyncTransferHookTests
         return TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 207 } };
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_AnFtpUrlWithHttpOptions_FailsWithExit1WithoutContactingTheServer()
+    {
+        var context = new TransferContext { Url = CurlUrl.Parse("ftp://example.com/dav/"), Output = Stream.Null, Http = new HttpRequestOptions() };
+
+        var result = await Hook().ExecuteAsync(context, _ => throw new AssertFailedException("The server was contacted."));
+
+        Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Assert.AreEqual(WebDavCollectionListing.NotHttpMessage, result.ErrorMessage);
+    }
+
     private static TransferContext Context(Stream output) => new() { Url = Url, Output = output, Http = new HttpRequestOptions() };
 }

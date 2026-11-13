@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.WebDavTools.UnitLibrary/Transfer/WebDavCollectionListing.cs, Curl.Extension.WebDavTools.UnitTests/Transfer/WebDavListTransferHookTests.cs, Curl.Extension.WebDavTools.UnitTests/Transfer/WebDavSyncTransferHookTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5047 — Refuse --webdav-list and --webdav-sync on a non-HTTP URL with exit 1 before connecting
 
@@ -30,13 +30,15 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extension.WebDavTools.UnitTests/Transfer/WebDavListTransferHookTests.cs` has tests that an ftp URL and a file URL (use a drive-less `file:///dir/x`) give exit 1 (`CurlExitCode.UnsupportedProtocol`) with message `--webdav-list and --webdav-sync need an HTTP or HTTPS URL`, and that the `next` delegate is never called (no connection).
-- [ ] `Curl.Extension.WebDavTools.UnitTests/Transfer/WebDavSyncTransferHookTests.cs` has the same test for `--webdav-sync` with an ftp URL.
-- [ ] Regression: http and https URLs still run PROPFIND as before (the existing list and sync tests pass).
-- [ ] ADR-1164 (`Documentation/Planning/Decisions/ADR-1164-webdav-tools-list-and-sync-a-collection-through-curls-http-stack.md`) is checked against the behaviour and corrected only if it says anything different.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `Curl.Extension.WebDavTools.UnitTests/Transfer/WebDavListTransferHookTests.cs` has tests that an ftp URL and a file URL (use a drive-less `file:///dir/x`) give exit 1 (`CurlExitCode.UnsupportedProtocol`) with message `--webdav-list and --webdav-sync need an HTTP or HTTPS URL`, and that the `next` delegate is never called (no connection).
+- [x] `Curl.Extension.WebDavTools.UnitTests/Transfer/WebDavSyncTransferHookTests.cs` has the same test for `--webdav-sync` with an ftp URL.
+- [x] Regression: http and https URLs still run PROPFIND as before (the existing list and sync tests pass).
+- [x] ADR-1164 (`Documentation/Planning/Decisions/ADR-1164-webdav-tools-list-and-sync-a-collection-through-curls-http-stack.md`) is checked against the behaviour and corrected only if it says anything different.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Done: ListAsync now also requires an http or https scheme (case-insensitive), so ftp and file URLs with Http options set fail with exit 1 before next runs. ADR-1164 already says this; no change needed. Linux and macOS CI: tests are platform-neutral (drive-less file URL). Quality gate run: 0 failing members.
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). The review's file repro uses a drive-letter URL; tests must use a drive-less `file:///dir/x` (CLAUDE.md, tests pass on Windows, Linux and macOS), since off Windows curl rejects a drive letter with exit 3 before the hook runs.
 
@@ -44,3 +46,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 28ae6b06 6b834cb4 054e53e5 01d72800 a0b49a29.
+- 2026-11-12: Doing -> Done. Scheme checked before PROPFIND

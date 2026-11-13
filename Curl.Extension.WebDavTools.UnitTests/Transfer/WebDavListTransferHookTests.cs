@@ -100,6 +100,19 @@ public sealed class WebDavListTransferHookTests
         Assert.AreEqual(WebDavCollectionListing.NotHttpMessage, result.ErrorMessage);
     }
 
+    [TestMethod]
+    [DataRow("ftp://example.com/dav/")]
+    [DataRow("file:///dir/x")]
+    public async Task ExecuteAsync_ANonHttpUrlWithHttpOptions_FailsWithExit1WithoutContactingTheServer(string url)
+    {
+        var context = new TransferContext { Url = CurlUrl.Parse(url), Output = Stream.Null, Http = new HttpRequestOptions() };
+
+        var result = await new WebDavListTransferHook().ExecuteAsync(context, _ => throw new AssertFailedException("The server was contacted."));
+
+        Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Assert.AreEqual(WebDavCollectionListing.NotHttpMessage, result.ErrorMessage);
+    }
+
     private static TransferContext Context(Stream output, Stream? headers = null) =>
         new() { Url = Url, Output = output, HeaderOutput = headers, Http = new HttpRequestOptions() };
 }
