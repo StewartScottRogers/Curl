@@ -3,8 +3,8 @@ id: AF-0726
 title: Surviving mutant: a certificate name value with a non-universal or constructed tag can print as text instead of #hex
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Output.UnitLibrary/OpenSslDistinguishedNameText.cs:AppendValue-or:surviving-mutant
 reproduction: mutation Curl.Output.UnitLibrary/OpenSslDistinguishedNameText.cs:163:||
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Outpu
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
