@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.CodeGeneration.UnitLibrary/CodeFile.cs, Curl.Extension.CodeGeneration.UnitLibrary/EmptyPathTransferHook.cs, Curl.Extension.CodeGeneration.UnitLibrary/CodeGenerationExtension.cs, Curl.Extension.CodeGeneration.UnitTests/EmptyPathTransferHookTests.cs, Curl.Extension.CodeGeneration.UnitTests/CodeGenerationExtensionTests.cs, Documentation/Planning/Decisions/ADR-1138-code-generation-extension-writes-httpclient-csharp-and-invoke-restmethod-powershell.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5050 — Refuse --csharp - and --powershell - instead of writing a file named -
 
@@ -30,18 +30,21 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extension.CodeGeneration.UnitTests/EmptyPathTransferHookTests.cs` (or `CodeGenerationExtensionTests.cs`) has a test that `--csharp -` gives exit 2 (`CurlExitCode.FailedInit`) with a message naming `--csharp`, and that the wrapped handler is not called and no file is created.
-- [ ] The same tests for `--powershell -`, with a message naming `--powershell`.
-- [ ] Regression: `--csharp <path>` and `--powershell <path>` with a real path still write the generated code, and the empty-path refusal is unchanged.
-- [ ] ADR-1138 (`Documentation/Planning/Decisions/ADR-1138-code-generation-extension-writes-httpclient-csharp-and-invoke-restmethod-powershell.md`) states that `-` is refused with exit 2 and why.
-- [ ] `--ai-help` stays right: the option descriptions in `Curl.Extension.CodeGeneration.UnitLibrary/CodeGenerationExtension.cs` say `-` is not accepted, and any test that pins the help text is updated.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `Curl.Extension.CodeGeneration.UnitTests/EmptyPathTransferHookTests.cs` (or `CodeGenerationExtensionTests.cs`) has a test that `--csharp -` gives exit 2 (`CurlExitCode.FailedInit`) with a message naming `--csharp`, and that the wrapped handler is not called and no file is created.
+- [x] The same tests for `--powershell -`, with a message naming `--powershell`.
+- [x] Regression: `--csharp <path>` and `--powershell <path>` with a real path still write the generated code, and the empty-path refusal is unchanged.
+- [x] ADR-1138 (`Documentation/Planning/Decisions/ADR-1138-code-generation-extension-writes-httpclient-csharp-and-invoke-restmethod-powershell.md`) states that `-` is refused with exit 2 and why.
+- [x] `--ai-help` stays right: the option descriptions in `Curl.Extension.CodeGeneration.UnitLibrary/CodeGenerationExtension.cs` say `-` is not accepted, and any test that pins the help text is updated.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Unit tests use a fake file system or the hook's scripted context; none touches the real disk or a server.
 
+- Decision: refuse `-` with exit 2 (ADR-1138). Quality run: 0 failing members.
+
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 196cd5a9 6ddc46b7 1be3a879 da0f3504 fd8ebd9e a0b49a29.
+- 2026-11-12: Doing -> Done. Refused - for --csharp and --powershell
