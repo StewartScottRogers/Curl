@@ -26,9 +26,11 @@ Lanes test only on Windows, so reproduce with `gh run view 43527663292 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `RunAsync_H3EntryForAnotherPort_ConnectsThereOverHttp3AloneWithAltUsed` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `RunAsync_H3EntryForAnotherPort_ConnectsThereOverHttp3AloneWithAltUsed` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: BL-5154 changed the test to `--http3-only`, which looks entries up under `h3` only, so the `h1` entry for port 18444 never matched and the route was null (it also failed on Windows once the OSCondition was lifted). Fix: the test uses `--http3` (looks up h3, h2, h1; an h1 entry naming h3 switches to HTTP/3 alone) and drops the Windows exclusion. Test-only change; CI on Linux/macOS met by being platform-neutral, fast tests green here.
 
 ## Log
 

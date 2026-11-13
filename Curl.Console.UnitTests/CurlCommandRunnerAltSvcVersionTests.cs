@@ -99,7 +99,6 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     }
 
     [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task RunAsync_H3EntryForAnotherPort_ConnectsThereOverHttp3AloneWithAltUsed()
     {
         CacheFileHolds(OtherPortH3Entry);
@@ -108,7 +107,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
             MultiplexedConnectResult.Connected(new ScriptedMultiplexedConnection(stream) { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 18444) }, null),
             new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
 
-        int exitCode = await RunAsync(connector, ["-sS", "-w", "|%{http_version}", "--http3-only", "--alt-svc", CacheFile, Origin]);
+        int exitCode = await RunAsync(connector, ["-sS", "-w", "|%{http_version}", "--http3", "--alt-svc", CacheFile, Origin]);
 
         Diagnostics.Assert("exit code", 0, exitCode);
         Diagnostics.Assert("stdout", "hello|3", StandardOutputText);
