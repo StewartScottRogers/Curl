@@ -110,14 +110,26 @@ public sealed class SocketActionGatedResolverTests
     {
         LoopbackLookupWakeup wakeup = LoopbackLookupWakeup.Open();
         nint handle = wakeup.Handle;
-        Assert.IsNotNull(LocalEndPointOf(handle));
+        IPEndPoint original = LocalEndPointOf(handle);
 
         wakeup.Dispose();
         wakeup.Signal();
 
         // Not a connect to the old port: a parallel test may have been given that ephemeral port since, so the
         // connect would succeed against its listener (BL-5058). The closed handle no longer names a socket.
-        Assert.ThrowsExactly<SocketException>(() => LocalEndPointOf(handle));
+        // A parallel test may also have been given the same handle number, so a socket answering is fine as long as it\r
+        // is not the listener: a closed listener never still holds its endpoint (BL-5148).\r
+        IPEndPoint? now = null;
+        try
+        {
+            now = LocalEndPointOf(handle);
+        }
+        catch (SocketException)
+        {
+            // The handle names no socket: the listener is closed.
+        }
+
+        Assert.AreNotEqual(original, now);
     }
 
     private static IPEndPoint LocalEndPointOf(nint handle)

@@ -14,15 +14,15 @@ completed:
 
 ## Goal
 
-<!-- One sentence: the observable outcome once this task is done. -->
+The test no longer fails when a parallel test is given the closed listener's handle number.
 
 ## Context
 
-<!-- Why this matters, and where to start: requirement IDs, ADRs, projects, files, upstream curl links with the curl version. -->
+LoopbackLookupWakeup disposal closes the handle, but another test may be given the same handle number, so asserting the handle names no socket was racy.
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] The test passes whether or not the handle number is reused: it checks the endpoint no longer belongs to the closed listener.
 
 ## Notes
 
