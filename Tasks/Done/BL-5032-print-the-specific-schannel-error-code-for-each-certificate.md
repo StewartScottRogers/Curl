@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitTests/TlsFailureMessagesTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5032 — Print the specific schannel error code for each certificate-chain failure
 
@@ -56,3 +56,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: c37c30b3 591cabf5 80a3b137 a0b49a29.
 - 2026-11-12: Chain statuses other than expired/revoked/incomplete/untrusted-root print `schannel: error 0x<CERT_TRUST_* value>` (.NET flag values equal CERT_TRUST_*). Fast tests (Networking) green, Measure-CodeQuality clean for Curl.Networking.UnitLibrary.
+- 2026-11-12: Doing -> Done. Schannel chain failures print schannel: error 0x<CERT_TRUST value>
