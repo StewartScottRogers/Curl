@@ -42,3 +42,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 5b0255c6 f9a85a99 a0b49a29.
 - 2026-11-12: Doing -> Backlog. Needs Curl.Console/CurlCommandRunner.cs, held by BL-5016 (depends-on added)
+- 2026-11-12: Backlog -> Doing. Criteria at claim: 5b0255c6 f9a85a99 a0b49a29.
