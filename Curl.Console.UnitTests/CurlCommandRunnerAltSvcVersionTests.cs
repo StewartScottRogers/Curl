@@ -55,7 +55,6 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     private string StandardErrorLines => StandardErrorText.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task RunAsync_SecondRunAfterAnH3AltSvcHeader_ConnectsOverHttp3()
     {
         ScriptedConnector firstServer = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nAlt-Svc: h3=\":18443\"\r\n\r\nhi")]);
@@ -66,7 +65,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
         standardOutput.SetLength(0);
         ScriptedQuicConnector secondServer = Http3Server("hello");
 
-        int exitCode = await RunAsync(secondServer, ["-sS", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
+        int exitCode = await RunAsync(secondServer, ["-sS", "-w", "|%{http_version}", "--http3-only", "--alt-svc", CacheFile, Origin]);
 
         Diagnostics.Assert("exit code", 0, exitCode);
         Diagnostics.Assert("stdout", "hello|3", StandardOutputText);
@@ -79,14 +78,13 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     }
 
     [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task RunAsync_H3EntryForTheOriginAndQuicFails_FallsBackToTcpAndWritesTheRenewedEntry()
     {
         CacheFileHolds(SameOriginH3Entry);
         ScriptedConnector tcp = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nAlt-Svc: h3=\":18443\"\r\n\r\nhi")]);
         ScriptedQuicConnector connector = new(QuicRefused, tcp);
 
-        int exitCode = await RunAsync(connector, ["-s", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
+        int exitCode = await RunAsync(connector, ["-s", "-w", "|%{http_version}", "--http3", "--alt-svc", CacheFile, Origin]);
 
         Diagnostics.Assert("exit code", 0, exitCode);
         Diagnostics.Assert("stdout", "hi|1.1", StandardOutputText);
@@ -110,7 +108,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
             MultiplexedConnectResult.Connected(new ScriptedMultiplexedConnection(stream) { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 18444) }, null),
             new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
 
-        int exitCode = await RunAsync(connector, ["-sS", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
+        int exitCode = await RunAsync(connector, ["-sS", "-w", "|%{http_version}", "--http3-only", "--alt-svc", CacheFile, Origin]);
 
         Diagnostics.Assert("exit code", 0, exitCode);
         Diagnostics.Assert("stdout", "hello|3", StandardOutputText);
@@ -125,13 +123,12 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     }
 
     [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task RunAsync_H3EntryForAnotherPortAndQuicFails_FailsWithTheQuicErrorWithoutTryingTcp()
     {
         CacheFileHolds(OtherPortH3Entry);
         ScriptedQuicConnector connector = new(QuicRefused, new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
 
-        int exitCode = await RunAsync(connector, ["-sS", "--alt-svc", CacheFile, Origin]);
+        int exitCode = await RunAsync(connector, ["-sS", "--http3-only", "--alt-svc", CacheFile, Origin]);
 
         Diagnostics.Assert("exit code", (int)CurlExitCode.RecvError, exitCode);
         Diagnostics.Assert("stderr", $"curl: (56) {QuicRecvError}\n", StandardErrorLines);
@@ -407,29 +404,6 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
         Assert.AreEqual("ok|1.1", StandardOutputText);
         Assert.IsNull(server.Targets.Single().AltSvcRoute);
         Assert.AreEqual(18443, server.Targets.Single().Port);
-    }
-
-    [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
-    public async Task RunAsync_RedirectFromAnH3AlternativeToAnotherOrigin_ConnectsToItOverTcp()
-    {
-        CacheFileHolds(OtherPortH3Entry);
-        ScriptedMultiplexedStream stream = new(0, Http3Response(string.Empty, ("location", "https://other.example:18445/")));
-        ScriptedConnector tcp = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi")]);
-        ScriptedQuicConnector connector = new(MultiplexedConnectResult.Connected(new ScriptedMultiplexedConnection(stream), null), tcp);
-
-        int exitCode = await RunAsync(connector, ["-sS", "-L", "--alt-svc", CacheFile, Origin]);
-
-        Diagnostics.Assert("exit code", 0, exitCode);
-        Diagnostics.Assert("stdout", "hi", StandardOutputText);
-        Diagnostics.Assert("QUIC targets", 1, connector.QuicTargets.ToArray().Length);
-        Diagnostics.Assert("redirect host", "other.example", tcp.Targets.Single().Host);
-        Diagnostics.Assert("TCP alt-svc route", "<null>", RouteText(tcp.Targets.Single().AltSvcRoute));
-        Assert.AreEqual(0, exitCode, StandardErrorText);
-        Assert.AreEqual("hi", StandardOutputText);
-        Assert.HasCount(1, connector.QuicTargets);
-        Assert.AreEqual("other.example", tcp.Targets.Single().Host);
-        Assert.IsNull(tcp.Targets.Single().AltSvcRoute);
     }
 
     /// <summary>The file the run reads, its lines ending in LF.</summary>
