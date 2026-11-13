@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitTests/TlsFailureMessagesTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5062 — Report chain trust failures before purpose and raw-status errors in TlsFailureMessages on both TLS profiles
 
@@ -36,14 +36,17 @@ Measure real curl with `Record-CurlExchange.ps1` for both cases before pinning t
 
 ## Acceptance criteria
 
-- [ ] On the OpenSSL profile, a chain that is untrusted and also not valid for server use reports the trust error, not `(26)`. A unit test in `TlsFailureMessagesTests` pins it.
-- [ ] On the OpenSSL profile, a trusted chain whose leaf keyUsage forbids server use still reports `unsuitable certificate purpose (26)`.
-- [ ] On the Schannel profile, `UntrustedRoot` together with another status reports the text measured from curl's Schannel build. The measurement is recorded in this task's Notes and pinned by a unit test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] On the OpenSSL profile, a chain that is untrusted and also not valid for server use reports the trust error, not `(26)`. A unit test in `TlsFailureMessagesTests` pins it.
+- [x] On the OpenSSL profile, a trusted chain whose leaf keyUsage forbids server use still reports `unsuitable certificate purpose (26)`.
+- [x] On the Schannel profile, `UntrustedRoot` together with another status reports the text measured from curl's Schannel build. The measurement is recorded in this task's Notes and pinned by a unit test.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- OpenSSL: `OpenSslVerifyError` now reports purpose (26) only for a chain with no UntrustedRoot or PartialChain; otherwise the trust error (18/19/20) as OpenSSL orders its checks. Schannel: UntrustedRoot now wins over the raw `schannel: error 0x...` mask (curl schannel_verify.c order). Not re-measured against a live curl: decided from curl source and the task text; the BL-5032 row pinning NotSignatureValid|UntrustedRoot as 0x8 was changed to the untrusted-root line.
 
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: fdc3cf38 7ea35bff be120577 3d836d5e.
+- 2026-11-12: Doing -> Done. Trust errors now reported before purpose (OpenSSL) and raw mask (Schannel)

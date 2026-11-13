@@ -863,13 +863,18 @@ internal static class TlsFailureMessages
         }
 
         var status = ChainStatus(chain);
-        if (status.HasFlag(X509ChainStatusFlags.NotValidForUsage) || OpenSslKeyUsageRefusal.ForbidsServerUse(chain.ChainElements[0].Certificate))
+        if (RefusesPurposeOfATrustedChain(status, chain))
         {
             return "unsuitable certificate purpose (26)";
         }
 
         return status == X509ChainStatusFlags.NotTimeValid ? OpenSslValidityError(chain) : OpenSslTrustError(chain);
     }
+
+    // OpenSSL checks trust (errors 18, 19, 20) before purpose, so only a chain it trusts is refused for purpose (BL-5062).
+    private static bool RefusesPurposeOfATrustedChain(X509ChainStatusFlags status, X509Chain chain) =>
+        (status & (X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.PartialChain)) == X509ChainStatusFlags.NoError
+        && (status.HasFlag(X509ChainStatusFlags.NotValidForUsage) || OpenSslKeyUsageRefusal.ForbidsServerUse(chain.ChainElements[0].Certificate));
 
     // curl's Schannel build checks the chain's trust errors in this order. An untrusted root
     // is also what anything else, or no chain at all, is reported as.
@@ -896,15 +901,25 @@ internal static class TlsFailureMessages
             return SchannelChainIncomplete;
         }
 
-        // Any other chain status is named by its CERT_TRUST_* value, which .NET's flags share (BL-5032).
+        return SchannelChainErrorOfUntrustedOrUnknownStatus(status);
+    }
+
+    // An untrusted root is named before the raw trust-error mask (BL-5062); any other status
+    // is named by its CERT_TRUST_* value, which .NET's flags share (BL-5032).
+    private static string SchannelChainErrorOfUntrustedOrUnknownStatus(X509ChainStatusFlags status)
+    {
         var specific = status & ~SchannelStatusesThatAreNotNamedByValue;
+        if (status.HasFlag(X509ChainStatusFlags.UntrustedRoot))
+        {
+            return SchannelCaCertificateFileAnchorsNothing;
+        }
+
         if (specific != X509ChainStatusFlags.NoError)
         {
             return string.Create(CultureInfo.InvariantCulture, $"schannel: error 0x{(int)specific:x8}");
         }
 
-        var untrustedOrUnknown = status & (X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.RevocationStatusUnknown);
-        return untrustedOrUnknown == X509ChainStatusFlags.RevocationStatusUnknown
+        return status.HasFlag(X509ChainStatusFlags.RevocationStatusUnknown)
             ? SchannelRevocationStatusUnknown
             : SchannelCaCertificateFileAnchorsNothing;
     }
