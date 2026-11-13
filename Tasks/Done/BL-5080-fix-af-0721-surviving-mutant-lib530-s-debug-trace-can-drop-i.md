@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5080 — Fix AF-0721: Surviving mutant: lib530's debug trace can drop its hex dumps (noHex true)
 
@@ -52,3 +52,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Pinned lib530's hex-column, time-free debug trace in Lib530Tests
