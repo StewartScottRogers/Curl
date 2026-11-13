@@ -67,6 +67,7 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
     /// Tells, at each write of a <c>--trace -</c> dump on Windows, whether a transfer has switched
     /// standard output to binary mode, where its line feeds stay bare (<see cref="TextModeUntilBinaryStream" />).
     /// </param>
+    /// <param name="standardErrorIsStandardOutput">Whether <c>--stderr -</c> makes <paramref name="standardError" /> standard output, so <c>-v</c> lines follow its text or binary mode (BL-5040).</param>
     /// <returns>The output, which also writes each reported warning to <paramref name="standardError" /> unless <c>-s</c> is given (BL-3986); <see cref="None" /> with <c>-s</c> and no trace option.</returns>
     internal static async Task<TransferEventOutput> OpenAsync(
         CommandLineOptions options,
@@ -76,10 +77,11 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
         bool runsOnWindows,
         bool standardOutputIsTerminal,
         TimeProvider timeProvider,
-        Func<bool> standardOutputIsBinary)
+        Func<bool> standardOutputIsBinary,
+        bool standardErrorIsStandardOutput = false)
     {
         TransferEventOutput traceOutput = await OpenTraceOutputAsync(
-            options, fileSystem, standardOutput, standardError, runsOnWindows, standardOutputIsTerminal, timeProvider, standardOutputIsBinary)
+            options, fileSystem, standardOutput, standardError, runsOnWindows, standardOutputIsTerminal, timeProvider, standardOutputIsBinary, standardErrorIsStandardOutput)
             .ConfigureAwait(false);
         return options.Silent ? traceOutput : traceOutput.WritingWarningsTo(TextMode(standardError, runsOnWindows));
     }
@@ -95,6 +97,7 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
     /// <param name="standardOutputIsTerminal">Whether standard output is a terminal.</param>
     /// <param name="timeProvider">The clock a <c>--trace-time</c> stamp reads.</param>
     /// <param name="standardOutputIsBinary">Tells whether a transfer has switched standard output to binary mode.</param>
+    /// <param name="standardErrorIsStandardOutput">Whether <c>--stderr -</c> makes standard error standard output.</param>
     /// <returns>The output; <see cref="None" /> when no trace option is in effect.</returns>
     private static async Task<TransferEventOutput> OpenTraceOutputAsync(
         CommandLineOptions options,
@@ -104,7 +107,8 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
         bool runsOnWindows,
         bool standardOutputIsTerminal,
         TimeProvider timeProvider,
-        Func<bool> standardOutputIsBinary)
+        Func<bool> standardOutputIsBinary,
+        bool standardErrorIsStandardOutput)
     {
         if (options.Trace == TraceKind.None)
         {
@@ -116,7 +120,9 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
         {
             return new TransferEventOutput(
                 new VerboseTransferEventWriter(
-                    TextMode(standardError, runsOnWindows),
+                    runsOnWindows && standardErrorIsStandardOutput
+                        ? new TextModeUntilBinaryStream(standardError, standardOutputIsBinary)
+                        : TextMode(standardError, runsOnWindows),
                     !standardOutputIsTerminal,
                     options.TraceTime,
                     timeProvider,

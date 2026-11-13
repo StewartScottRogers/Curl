@@ -849,6 +849,9 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private HoldableStream? eventStandardError;
 
+    /// <summary>Whether the last <c>--stderr -</c> redirect makes standard error standard output (BL-5040).</summary>
+    private bool standardErrorIsStandardOutput;
+
     /// <summary>
     /// The run's diagnostic log (ADR-0222), which owns the <c>--log-file</c>; <see langword="null" />
     /// until an accepted command line opens it.
@@ -1136,6 +1139,7 @@ internal sealed class CurlCommandRunner(
     /// </remarks>
     private async Task RedirectStandardErrorAsync(StandardErrorRedirect redirect)
     {
+        standardErrorIsStandardOutput = redirect.File == StandardOutputStandardErrorFile;
         if (redirect.File == StandardOutputStandardErrorFile)
         {
             await CloseStandardErrorFileAsync().ConfigureAwait(false);
@@ -1802,7 +1806,7 @@ internal sealed class CurlCommandRunner(
 
         eventStandardError = new HoldableStream(standardError);
         transferEventOutput = await TransferEventOutput
-            .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider, () => standardOutputSwitchedToBinary)
+            .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider, () => standardOutputSwitchedToBinary, standardErrorIsStandardOutput)
             .ConfigureAwait(false);
     }
 

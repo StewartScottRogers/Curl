@@ -90,8 +90,8 @@ public sealed class CurlCommandRunnerStandardErrorFileTests
 
         Diagnostics.Assert("exit code", 7, exitCode);
         Assert.AreEqual(7, exitCode);
-        Diagnostics.Diff("stdout", Lf("*   Trying 127.0.0.1:1...\r\n" + FailureLine), Lf(StandardOutputText));
-        Assert.AreEqual("*   Trying 127.0.0.1:1...\r\n" + FailureLine, StandardOutputText);
+        Diagnostics.Diff("stdout", Lf("*   Trying 127.0.0.1:1...\n" + FailureLine), Lf(StandardOutputText));
+        Assert.AreEqual("*   Trying 127.0.0.1:1...\n" + FailureLine, StandardOutputText);
         Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
         Assert.AreEqual(string.Empty, StandardErrorText);
         Diagnostics.Assert("files written", 0, files.Written.Count);
