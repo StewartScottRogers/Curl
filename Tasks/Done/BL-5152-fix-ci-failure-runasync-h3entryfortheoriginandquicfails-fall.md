@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console.UnitTests, Curl.Console]
+touches: [Curl.Console.UnitTests, Curl.Console, Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5152 — Fix CI failure RunAsync_H3EntryForTheOriginAndQuicFails_FallsBackToTcpAndWritesTheRenewedEntry on Linux and macOS
 
@@ -26,11 +26,14 @@ Lanes test only on Windows, so reproduce with `gh run view 43523918778 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `RunAsync_H3EntryForTheOriginAndQuicFails_FallsBackToTcpAndWritesTheRenewedEntry` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `RunAsync_H3EntryForTheOriginAndQuicFails_FallsBackToTcpAndWritesTheRenewedEntry` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Root cause: BL-5099 made `AltSvcTransferCache` ignore h3 entries off Windows unless `actsAsQuicBuild`, but nothing passed the flag, so the QUIC-build runner tests (`parsesAsQuicBuild: true`, non-Windows only, never run on Windows) saw no h3 entry. Fix: `TransferPerformer.OpenAltSvcCacheAsync` takes `actsAsQuicBuild`; `CurlCommandRunner` passes `options.ActsAsQuicBuild`. Added `TransferPerformer.Setup.cs` to touches (no other Doing task holds it). The fix also covers BL-5153 to BL-5156 (same tests). Windows cannot run these OSCondition tests; Console and Engine fast tests green, quality run 0 failing.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 94bba3f1.
+- 2026-11-13: Doing -> Done. h3 alt-svc entries honoured again for a QUIC-build command line

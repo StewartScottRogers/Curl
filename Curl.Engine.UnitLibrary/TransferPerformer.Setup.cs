@@ -377,6 +377,7 @@ internal sealed partial class TransferPerformer
     /// <param name="fileSystem">Opens the file.</param>
     /// <param name="diagnosticLog">Where the cache logs.</param>
     /// <param name="usesOverHttp">Whether the cache also serves plain <c>http</c> origins (<c>CURL_ALTSVC_HTTP</c>).</param>
+    /// <param name="actsAsQuicBuild">Whether the command line is read as a QUIC build's, so <c>h3</c> entries are used with no version option (BL-5099).</param>
     /// <returns>A task that completes when the file is read.</returns>
     internal async Task OpenAltSvcCacheAsync(
         EngineTransferState state,
@@ -386,12 +387,13 @@ internal sealed partial class TransferPerformer
         string transferUrl,
         IFileSystem fileSystem,
         IDiagnosticLog diagnosticLog,
-        bool usesOverHttp)
+        bool usesOverHttp,
+        bool actsAsQuicBuild = false)
     {
         if (http.AltSvc is not null && IsHttpUrl(settings.AppendUrlQuery(transferUrl)))
         {
             state.AltSvc = await AltSvcTransferCache
-                .OpenAsync(http, network.ConnectTo, fileSystem, timeProvider, diagnosticLog, usesOverHttp)
+                .OpenAsync(http, network.ConnectTo, fileSystem, timeProvider, diagnosticLog, usesOverHttp, actsAsQuicBuild: actsAsQuicBuild)
                 .ConfigureAwait(false);
         }
     }
