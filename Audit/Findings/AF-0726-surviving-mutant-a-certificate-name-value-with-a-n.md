@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Output.UnitLibrary/OpenSslDistinguishedNameText.cs:AppendValue-or:surviving-mutant
 reproduction: mutation Curl.Output.UnitLibrary/OpenSslDistinguishedNameText.cs:163:||
-task: none
-tasks:
+task: BL-5085
+tasks: BL-5085
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md

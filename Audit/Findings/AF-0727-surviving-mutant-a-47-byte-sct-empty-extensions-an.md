@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Output.UnitLibrary/OpenSslPeerCertificateText.cs:FindSignatureStart-lt:surviving-mutant
 reproduction: mutation Curl.Output.UnitLibrary/OpenSslPeerCertificateText.cs:661:<
-task: none
-tasks:
+task: BL-5086
+tasks: BL-5086
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md

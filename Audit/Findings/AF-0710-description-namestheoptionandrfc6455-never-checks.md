@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Extension.WebSocketRepl.UnitTests/WebSocketReplExtensionTests.cs:Description_NamesTheOptionAndRfc6455:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-5069
+tasks: BL-5069
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md

@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:IsHashedCertificateFileName-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:698:>
-task: none
-tasks:
+task: BL-5078
+tasks: BL-5078
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md

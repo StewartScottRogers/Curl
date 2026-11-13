@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Extension.WebSocketRepl.UnitLibrary/Handshake/WebSocketOpeningHandshake.cs:PerformAsync-lt:surviving-mutant
 reproduction: mutation Curl.Extension.WebSocketRepl.UnitLibrary/Handshake/WebSocketOpeningHandshake.cs:35:<
-task: none
-tasks:
+task: BL-5083
+tasks: BL-5083
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md

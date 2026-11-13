@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.LibTest.UnitLibrary/LibProxyTunnelUpload.cs:Read-ge:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/LibProxyTunnelUpload.cs:131:>=
-task: none
-tasks:
+task: BL-5079
+tasks: BL-5079
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
