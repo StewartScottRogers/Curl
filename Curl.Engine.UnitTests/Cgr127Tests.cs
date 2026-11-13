@@ -94,6 +94,14 @@ public sealed class Cgr127Tests
         Assert.AreEqual(-1L, ManagedEasyTransfer.ContentLengthUploadOf(new EasyOptions(), null, "http://h/"));
     }
 
+    [TestMethod]
+    public void ContentLengthUploadOf_PostFieldsWithExplicitSizeZero_IsZeroNotTheFieldsLength()
+    {
+        EasyOptions options = new() { Http = new EasyHttpOptions { PostFields = Encoding.ASCII.GetBytes("abc"), PostFieldSize = 0 } };
+
+        Assert.AreEqual(0L, ManagedEasyTransfer.ContentLengthUploadOf(options));
+    }
+
     private static async Task<long> ContentLengthUploadAfterAsync(EasyHttpOptions http, params string[] responses)
     {
         ScriptedConnector connector = new([.. responses.Select(Encoding.ASCII.GetBytes)]);

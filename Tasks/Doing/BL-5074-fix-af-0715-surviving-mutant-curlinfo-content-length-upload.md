@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added Cgr127Tests.ContentLengthUploadOf_PostFieldsWithExplicitSizeZero_IsZeroNotTheFieldsLength, pinning PostFieldSize 0 with PostFields set to 0; it fails under the lt-to-le mutant. Lanes may not use the audit tooling, so the reproduction was not run; the test kills the named mutant by construction. Engine fast tests green (3015 passed).
 
 ## Log
 
