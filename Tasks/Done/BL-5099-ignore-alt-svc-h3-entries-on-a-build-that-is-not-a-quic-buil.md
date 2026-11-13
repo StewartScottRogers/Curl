@@ -44,10 +44,10 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - Mock servers in the review were Python; use PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python.
 - Review acceptance check, for a Linux hand check: step 3 exits 0 and prints the body, and `-v` shows no `Alt-svc connecting ... to [h3]` line.
 
-- Decision: ADR-1266. `actsAsQuicBuild` is a new defaulted parameter of `AltSvcTransferCache.OpenAsync` and `LookupOf`; nothing in production sets it. The repro is pinned at the cache level (an h3 entry yields no route and HTTP/1.1). Existing h3-race tests now pass `actsAsQuicBuild: true`. CI on Linux and macOS: tests are platform-neutral (onWindows pinned).
+- Decision: ADR-1268. `actsAsQuicBuild` is a new defaulted parameter of `AltSvcTransferCache.OpenAsync` and `LookupOf`; nothing in production sets it. The repro is pinned at the cache level (an h3 entry yields no route and HTTP/1.1). Existing h3-race tests now pass `actsAsQuicBuild: true`. CI on Linux and macOS: tests are platform-neutral (onWindows pinned).
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: a3ba72fb 578c7858 f157ec5c a0b49a29.
-- 2026-11-13: Doing -> Done. h3 alt-svc entries ignored without version option on a non-QUIC build (ADR-1266)
+- 2026-11-13: Doing -> Done. h3 alt-svc entries ignored without version option on a non-QUIC build (ADR-1268)

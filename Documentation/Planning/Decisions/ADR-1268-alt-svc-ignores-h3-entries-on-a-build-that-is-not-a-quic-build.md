@@ -1,4 +1,4 @@
-# ADR-1266: Alt-svc ignores h3 entries on a build that is not a QUIC build
+# ADR-1268: Alt-svc ignores h3 entries on a build that is not a QUIC build
 
 - Status: Accepted
 - Date: 2026-11-13
