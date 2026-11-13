@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5074 — Fix AF-0715: Surviving mutant: CURLINFO_CONTENT_LENGTH_UPLOAD can report the fields' length when POSTFIELDSIZE is 0
 
@@ -52,3 +52,4 @@ Added Cgr127Tests.ContentLengthUploadOf_PostFieldsWithExplicitSizeZero_IsZeroNot
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Added test pinning POSTFIELDSIZE 0 upload length; engine fast tests green
