@@ -27,12 +27,14 @@ The shift-end review of 2026-11-12 found this in the ADR-1248 change (type-desig
 
 ## Acceptance criteria
 
-- [ ] `RefuseUnsafeArguments` treats a program as a batch file when its name ends in `.cmd` or `.bat` (case-insensitive) after trailing `.` and space characters are removed.
-- [ ] Unit tests in `McpBatchArgumentRefusalTests` show that `srv.cmd `, `srv.bat.` and `srv.CMD. .` are refused when an argument holds `&`.
-- [ ] `srv.exe` with the same argument is still allowed.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `RefuseUnsafeArguments` treats a program as a batch file when its name ends in `.cmd` or `.bat` (case-insensitive) after trailing `.` and space characters are removed.
+- [x] Unit tests in `McpBatchArgumentRefusalTests` show that `srv.cmd `, `srv.bat.` and `srv.CMD. .` are refused when an argument holds `&`.
+- [x] `srv.exe` with the same argument is still allowed.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+TrimEnd of dots and spaces before the extension check; quality run: 0 failing members.
 
 ## Log
 
