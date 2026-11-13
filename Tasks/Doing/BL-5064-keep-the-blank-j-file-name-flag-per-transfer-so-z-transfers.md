@@ -42,3 +42,4 @@ The change adds a field to the runner, `private bool remoteHeaderNameWasBlank` (
 ## Log
 
 - 2026-11-12: Created.
+- 2026-11-12: Backlog -> Doing. Criteria at claim: e55419cd e530af4c 223c288a 3d836d5e.
