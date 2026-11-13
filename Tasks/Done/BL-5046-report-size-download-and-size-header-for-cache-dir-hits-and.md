@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.HttpCache.UnitLibrary/HttpCacheTransferHook.cs, Curl.Extension.HttpCache.UnitLibrary/StoredResponseOutput.cs, Curl.Extension.HttpCache.UnitTests/HttpCacheTransferHookTests.cs, Documentation/Planning/Decisions/ADR-1069-cache-dir-is-a-private-rfc-9111-cache-for-plain-http-get-in-a-transfer-hook.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5046 — Report size_download and size_header for --cache-dir hits and revalidations
 
@@ -30,13 +30,15 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extension.HttpCache.UnitTests/HttpCacheTransferHookTests.cs` has a test that a fresh hit returns a `TransferReport` with `DownloadSize` 25 and `HeaderSize` equal to the size of the stored head written (178 for the review's `/fresh` response), on the first hit and the second.
-- [ ] A test in the same class shows a revalidated 304 reports `DownloadSize` 11 and `HeaderSize` 175 (the stored response's head as written), not the 304's 133.
-- [ ] Regression: a cache miss that is stored still reports the origin's sizes (`200 25 178`), and the bodies written are unchanged byte for byte.
-- [ ] ADR-1069 (`Documentation/Planning/Decisions/ADR-1069-cache-dir-is-a-private-rfc-9111-cache-for-plain-http-get-in-a-transfer-hook.md`) states that `-w` size fields on a hit report the bytes written.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `Curl.Extension.HttpCache.UnitTests/HttpCacheTransferHookTests.cs` has a test that a fresh hit returns a `TransferReport` with `DownloadSize` 25 and `HeaderSize` equal to the size of the stored head written (178 for the review's `/fresh` response), on the first hit and the second.
+- [x] A test in the same class shows a revalidated 304 reports `DownloadSize` 11 and `HeaderSize` 175 (the stored response's head as written), not the 304's 133.
+- [x] Regression: a cache miss that is stored still reports the origin's sizes (`200 25 178`), and the bodies written are unchanged byte for byte.
+- [x] ADR-1069 (`Documentation/Planning/Decisions/ADR-1069-cache-dir-is-a-private-rfc-9111-cache-for-plain-http-get-in-a-transfer-hook.md`) states that `-w` size fields on a hit report the bytes written.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fast-test run of Curl.Extension.HttpCache.UnitTests green (99); Measure-CodeQuality for the library: 0 failing members. The hook now reads the written body and head lengths from StoredResponseOutput.WriteAsync. Platform-neutral.
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). The unit tests need no server: use a fake stored response. The 178 and 175 header sizes are the review's numbers for its server; in tests assert equality with the length of the head the hook writes, not a number tied to a real server's header set.
 
@@ -44,3 +46,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: cd5b7f63 eb9b5d13 d8cf5412 6b237200 a0b49a29.
+- 2026-11-12: Doing -> Done. --cache-dir hits and revalidations report size_download and size_header of the bytes written

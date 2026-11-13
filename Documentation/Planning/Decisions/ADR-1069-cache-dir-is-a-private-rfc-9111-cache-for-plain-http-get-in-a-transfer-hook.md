@@ -29,7 +29,7 @@ RFC 9111 core (storability, freshness, validation, the on-disk entry); BL-4204 g
   information or fragment (§2).
 - **Fresh** (§4.2): a stored response that is fresh, and a request without `Cache-Control: no-cache` (§5.2.1.4), is
   answered from the directory without contacting the origin; its status line and header fields go to `-i` and
-  `-D`, its body to the output, and `-w` sees its status code, header fields and content type.
+  `-D`, its body to the output, and `-w` sees its status code, header fields and content type, and its `size_download` and `size_header` report the bytes written (the body and the stored head), as `--replay` does.
 - **Stale** (§4.3): the request is sent with `If-None-Match` and `If-Modified-Since` from the stored validators
   (§4.3.1). A 304 that selects the stored response (§4.3.3) updates its header fields (§4.3.4), is stored again, and
   the stored response is written in the 304's place with its status code; a 304 that does not select it, and any

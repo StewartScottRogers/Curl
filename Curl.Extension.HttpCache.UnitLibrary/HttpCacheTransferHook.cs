@@ -39,13 +39,15 @@ internal sealed class HttpCacheTransferHook(CacheDirectory directory) : ITransfe
         !CacheControlDirectives.Parse(requestHeaders).Has("no-cache")
         && new FreshnessCalculator(timeProvider, isSharedCache: false).Evaluate(stored) == CacheEntryUsability.Fresh;
 
-    private static TransferResult Answered(StoredResponse stored, long bodyLength, ITransferContext context) =>
-        TransferResult.Success(bodyLength) with
+    private static TransferResult Answered(StoredResponse stored, (long BodyLength, long HeadLength) written, ITransferContext context) =>
+        TransferResult.Success(written.BodyLength) with
         {
             Report = new TransferReport
             {
                 ResponseCode = stored.StatusCode,
                 ResponseHeaders = stored.Headers,
+                DownloadSize = written.BodyLength,
+                HeaderSize = written.HeadLength,
                 Method = "GET",
                 EffectiveUrl = context.Url.OriginalString,
                 ContentType = HttpHeaderValues.FindFirst(stored.Headers, "Content-Type"),
@@ -95,8 +97,8 @@ internal sealed class HttpCacheTransferHook(CacheDirectory directory) : ITransfe
         var report = received.Result.Report!;
         var updated = CacheValidation.ApplyNotModified(lookup.Stored!, report.ResponseHeaders, received.RequestTime, received.ResponseTime);
         await TryStoreAsync(lookup.Key, updated, context.CancellationToken);
-        var bodyLength = await StoredResponseOutput.WriteAsync(updated, context);
-        return received.Result with { BytesTransferred = bodyLength, Report = report with { ResponseCode = updated.StatusCode, ResponseHeaders = updated.Headers } };
+        var written = await StoredResponseOutput.WriteAsync(updated, context);
+        return received.Result with { BytesTransferred = written.BodyLength, Report = report with { ResponseCode = updated.StatusCode, ResponseHeaders = updated.Headers, DownloadSize = written.BodyLength, HeaderSize = written.HeadLength } };
     }
 
     private async Task TryStoreAsync(string key, StoredResponse response, CancellationToken cancellationToken)
