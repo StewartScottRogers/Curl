@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitTests/TlsFailureMessagesTests.RevocationUnknown.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5103 — Print 'the revocation status is unknown' for Schannel chain errors curl reports that way
 
@@ -30,17 +30,20 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Networking.UnitTests/TlsFailureMessagesTests.RevocationUnknown.cs` prove that chain status flag combinations as produced by cases (a), (b) and (c) (NotSignatureValid with RevocationStatusUnknown, NotValidForUsage-style flags with RevocationStatusUnknown, and OfflineRevocation) print `schannel: the revocation status is unknown`.
-- [ ] Tests prove the precedence: Revoked, PartialChain, UntrustedRoot and NotTimeValid still win over the unknown status, and a status with a path-length/other error and no revocation flag still prints `error 0x00000400` as before.
-- [ ] Tests are platform-neutral (they feed `X509ChainStatusFlags` values to the message function).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Networking.UnitTests/TlsFailureMessagesTests.RevocationUnknown.cs` prove that chain status flag combinations as produced by cases (a), (b) and (c) (NotSignatureValid with RevocationStatusUnknown, NotValidForUsage-style flags with RevocationStatusUnknown, and OfflineRevocation) print `schannel: the revocation status is unknown`.
+- [x] Tests prove the precedence: Revoked, PartialChain, UntrustedRoot and NotTimeValid still win over the unknown status, and a status with a path-length/other error and no revocation flag still prints `error 0x00000400` as before.
+- [x] Tests are platform-neutral (they feed `X509ChainStatusFlags` values to the message function).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers in the review were Python; use PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python.
 - Review acceptance check, for a Windows hand check: the corrupted-signature case prints `the revocation status is unknown` and the pathlen case still prints `error 0x00000400`.
 
+- Decision: precedence is NotTimeValid, Revoked, PartialChain, UntrustedRoot, then unknown/offline revocation, then the raw mask. Removed a test row that pinned the old raw mask for NotSignatureValid with unknown revocation. Quality run: 0 failing members; tests are platform-neutral.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: a89e0105 08b69a0b 275452ca a0b49a29.
+- 2026-11-13: Doing -> Done. Unknown or offline revocation status prints curl's schannel line

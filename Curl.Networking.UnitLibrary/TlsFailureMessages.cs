@@ -921,13 +921,14 @@ internal static class TlsFailureMessages
             return SchannelCaCertificateFileAnchorsNothing;
         }
 
-        if (specific != X509ChainStatusFlags.NoError)
+        // curl checks the unknown or offline revocation status before the raw mask (BL-5103).
+        if ((status & (X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation)) != X509ChainStatusFlags.NoError)
         {
-            return string.Create(CultureInfo.InvariantCulture, $"schannel: error 0x{(int)specific:x8}");
+            return SchannelRevocationStatusUnknown;
         }
 
-        return status.HasFlag(X509ChainStatusFlags.RevocationStatusUnknown)
-            ? SchannelRevocationStatusUnknown
+        return specific != X509ChainStatusFlags.NoError
+            ? string.Create(CultureInfo.InvariantCulture, $"schannel: error 0x{(int)specific:x8}")
             : SchannelCaCertificateFileAnchorsNothing;
     }
 
