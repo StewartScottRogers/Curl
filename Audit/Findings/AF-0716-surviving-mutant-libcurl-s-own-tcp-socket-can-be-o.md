@@ -3,8 +3,8 @@ id: AF-0716
 title: Surviving mutant: libcurl's own TCP socket can be opened without TCP_NODELAY
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/SocketCallbackConnector.cs:Open-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/SocketCallbackConnector.cs:339:true
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
