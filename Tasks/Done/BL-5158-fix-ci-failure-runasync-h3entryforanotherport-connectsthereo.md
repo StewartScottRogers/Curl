@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests, Curl.Console]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5158 — Fix CI failure RunAsync_H3EntryForAnotherPort_ConnectsThereOverHttp3AloneWithAltUsed on Linux and macOS
 
@@ -36,3 +36,4 @@ Cause: BL-5154 changed the test to `--http3-only`, which looks entries up under 
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: d9c1ab0a.
+- 2026-11-13: Doing -> Done. Test used --http3-only so the h1 entry never matched; now uses --http3
