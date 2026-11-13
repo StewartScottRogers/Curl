@@ -3,8 +3,8 @@ id: AF-0715
 title: Surviving mutant: CURLINFO_CONTENT_LENGTH_UPLOAD can report the fields' length when POSTFIELDSIZE is 0
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs:ContentLengthUploadOf-lt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs:88:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
