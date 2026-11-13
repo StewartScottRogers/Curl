@@ -58,10 +58,12 @@ public sealed class CommandLineExtensionOptionTests
         CommandLineParseResult unknown = Parse(["--no-nothing", Url], Sse);
         CommandLineParseResult extensionsOff = Parse(["--no-sse", Url]);
 
-        Assert.IsNotNull(valueOption.Refusal);
-        Assert.IsNotNull(unknown.Refusal);
-        Assert.IsNotNull(extensionsOff.Refusal);
-        Assert.AreEqual(CurlExitCode.FailedInit, extensionsOff.Refusal.ExitCode);
+        Assert.AreEqual(CurlExitCode.FailedInit, valueOption.Refusal!.ExitCode);
+        Assert.AreEqual("curl: option --no-cache-dir: is unknown", valueOption.Refusal.StandardErrorLines[0]);
+        Assert.AreEqual(CurlExitCode.FailedInit, unknown.Refusal!.ExitCode);
+        Assert.AreEqual("curl: option --no-nothing: is unknown", unknown.Refusal.StandardErrorLines[0]);
+        Assert.AreEqual(CurlExitCode.FailedInit, extensionsOff.Refusal!.ExitCode);
+        Assert.AreEqual("curl: option --no-sse: is unknown", extensionsOff.Refusal.StandardErrorLines[0]);
     }
 
     [TestMethod]
