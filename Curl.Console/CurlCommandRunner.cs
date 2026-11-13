@@ -1208,7 +1208,14 @@ internal sealed class CurlCommandRunner(
 
         if (InformationLines(options) is { } informationLines)
         {
-            await WriteStandardOutputLinesAsync(informationLines).ConfigureAwait(false);
+            try
+            {
+                await WriteStandardOutputLinesAsync(informationLines).ConfigureAwait(false);
+            }
+            catch (IOException) when (options.ManualRequested)
+            {
+                // A pipe that closed early (curl --manual | head -1) ends the manual quietly with exit 0, as curl does (BL-5042).
+            }
 
             return (int)CurlExitCode.Ok;
         }

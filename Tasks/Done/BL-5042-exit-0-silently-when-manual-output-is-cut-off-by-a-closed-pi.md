@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/CurlCommandRunnerManualClosedPipeTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5042 — Exit 0 silently when --manual output is cut off by a closed pipe
 
@@ -27,15 +27,18 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A new test file `Curl.Console.UnitTests/CurlCommandRunnerManualClosedPipeTests.cs` runs `--manual` with a standard output whose write throws `IOException` and asserts exit 0 and empty stderr.
-- [ ] Regression: `--manual` with a working stdout still prints the whole manual and exits 0; an `IOException` from a different output (for example a transfer body write) is not swallowed by this change.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test file `Curl.Console.UnitTests/CurlCommandRunnerManualClosedPipeTests.cs` runs `--manual` with a standard output whose write throws `IOException` and asserts exit 0 and empty stderr.
+- [x] Regression: `--manual` with a working stdout still prints the whole manual and exits 0; an `IOException` from a different output (for example a transfer body write) is not swallowed by this change.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text. Check whether `--help`, `--ai-help` and `-V` closing early behave the same in REF before widening the catch; keep to `--manual` unless REF agrees.
 
+- Decision: caught only for `--manual` (`ManualRequested`); `--help`, `--ai-help`, `-V` not widened, REF not measured for them. Quality run for Curl.Console: 0 failing members. Ticked: fast tests green, platform-neutral.
+
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 0285f0cd f4061204 a0b49a29.
+- 2026-11-12: Doing -> Done. --manual into a closed pipe exits 0 quietly
