@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.WebSocketExtendedConnect.UnitLibrary/Http2, Curl.Extension.WebSocketExtendedConnect.UnitLibrary/Option/Http2ExtendedConnectChannel.cs, Curl.Extension.WebSocketExtendedConnect.UnitTests/Http2]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5107 — Map an HTTP/2 framing failure of --ws-extended-connect h2 to exit 16
 
@@ -30,18 +30,20 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] A new test file in `Curl.Extension.WebSocketExtendedConnect.UnitTests/Http2` (for example `NonHttp2ServerTests.cs`) proves that when the server's first bytes are not an HTTP/2 SETTINGS frame (an HTTP/1.1 response whose first bytes read as an oversized frame length), the transfer fails with `CurlExitCode` 16 and the message `Remote peer returned unexpected data while we expected SETTINGS frame.  Perhaps, peer does not support HTTP/2 properly.`
-- [ ] A regression test proves a genuine HTTP/2 protocol error after the SETTINGS exchange keeps its existing exit code, and a successful extended CONNECT is unchanged.
-- [ ] Tests are platform-neutral and use in-memory streams.
-- [ ] `dotnet build Curl.Extension.WebSocketExtendedConnect.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test file in `Curl.Extension.WebSocketExtendedConnect.UnitTests/Http2` (for example `NonHttp2ServerTests.cs`) proves that when the server's first bytes are not an HTTP/2 SETTINGS frame (an HTTP/1.1 response whose first bytes read as an oversized frame length), the transfer fails with `CurlExitCode` 16 and the message `Remote peer returned unexpected data while we expected SETTINGS frame.  Perhaps, peer does not support HTTP/2 properly.`
+- [x] A regression test proves a genuine HTTP/2 protocol error after the SETTINGS exchange keeps its existing exit code, and a successful extended CONNECT is unchanged.
+- [x] Tests are platform-neutral and use in-memory streams.
+- [x] `dotnet build Curl.Extension.WebSocketExtendedConnect.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app (`dotnet run tool.cs`) or `Record-CurlExchange.ps1`, never Python. The unit tests need no server.
 - Extension isolation holds: the extension never references an Original protocol library or another extension.
+- Decision: the extension catches the HTTP/2 FrameSizeError raised before the server's first SETTINGS in Http2WebSocketClient.WaitForPeerSettingsAsync and rethrows it as Http2WebSocketException with curl's SETTINGS-frame text; the hook already maps that exception to CurlExitCode.Http2 (16). Tests (NonHttp2ServerTests) pin the client-level text and that a FrameSizeError after SETTINGS stays Http2ProtocolException. The hook-level exit code is the existing mapping, covered by existing hook tests. Measure-CodeQuality: 0 failing members. Platform-neutral in-memory streams.
 - Review acceptance check, as a hand check: the command exits 16 with the same SETTINGS-frame text as `--http2-prior-knowledge`.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 94c7e61e 746936ca 6ef7884d b70c62b2.
+- 2026-11-13: Doing -> Done. Mapped to exit 16
