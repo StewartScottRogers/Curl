@@ -56,3 +56,4 @@ That is: the queried server's socket (127.0.0.1:29061) receives the query; a dif
 ## Log
 
 - 2026-11-13: Created.
+- 2026-11-13: Backlog -> Doing. Criteria at claim: 07b84187 b7de9068 8270dfc0 e3dd03fe 81f2b45f 024c2e36.
