@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Checksum.UnitLibrary/ChecksumTransferHook.cs, Curl.Extension.Checksum.UnitTests/ChecksumRedirectTests.cs, Documentation/Planning/Decisions/ADR-1096-checksum-verifies-the-response-body-against-a-fips-180-4-digest-and-fails-with-exit-61.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5122 — Check --checksum only against the body of the final response when -L follows redirects (EXT-049)
 
@@ -49,3 +49,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 66e25795 65e28992 c66235e9 b2f8bcd9 d6cd4299 fd8095de.
+- 2026-11-13: Doing -> Done. --checksum now skips followed redirect hops with -L; only the final body is checked
