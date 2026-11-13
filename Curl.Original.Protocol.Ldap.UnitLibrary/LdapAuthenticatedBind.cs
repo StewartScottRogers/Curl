@@ -15,13 +15,15 @@ namespace Curl.Original.Protocol.Ldap;
 /// The NTLM bind sends the negotiate message, answers the challenge in the reply with an NTLM
 /// response built from the <c>-u</c> credentials (tag <c>0x8b</c>), and fails with <c>Local Error</c>
 /// when the reply carries no decodable challenge; a server that refuses either step fails with
-/// its own result code.
+/// its own result code. When the challenge grants sealing, the bind exchanges a session key and
+/// every later message goes through the SASL security layer sealed with NTLM session security
+/// (BL-5142, ADR-1266).
 /// </remarks>
 internal static class LdapAuthenticatedBind
 {
     private const string NtlmSignature = "NTLMSSP\0";
 
-    private const int NegotiateFlags = unchecked((int)0xa208b207);
+    private const int NegotiateFlags = unchecked((int)0xe20882b7);
 
     private const int NegotiateMessageLength = 32;
 
@@ -67,11 +69,34 @@ internal static class LdapAuthenticatedBind
         }
 
         NtlmAuthenticateMessage answer = new NtlmChallengeAnswerer(TimeProvider.System, new SystemNtlmRandomSource())
-            .Answer(challenge, credentials.UserName, credentials.Password);
-        return answer.TryEncode(out byte[]? response)
-            ? await exchange.SicilyBindAsync(string.Empty, SicilyResponseChoice, response, cancellationToken).ConfigureAwait(false)
-            : new LdapBindReply(LdapBindReplyStatus.Answered, WinLdapResultText.LocalError);
+            .AnswerWithKeyExchange(challenge, credentials.UserName, credentials.Password, out byte[] exportedSessionKey);
+        try
+        {
+            if (!answer.TryEncode(out byte[]? response))
+            {
+                return new LdapBindReply(LdapBindReplyStatus.Answered, WinLdapResultText.LocalError);
+            }
+
+            LdapBindReply bound = await exchange.SicilyBindAsync(string.Empty, SicilyResponseChoice, response, cancellationToken).ConfigureAwait(false);
+            if (bound.IsSuccess && Seals(answer.Flags))
+            {
+                exchange.StartSecurityLayer(new NtlmLdapLogonAuthentication(NtlmSessionSecurity.CreateClient(answer.Flags, exportedSessionKey)), WinLdapResultText.Unavailable);
+            }
+
+            return bound;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(exportedSessionKey);
+        }
     }
+
+    /// <summary>
+    /// Gets a value indicating whether the server granted sealing with keys <see cref="NtlmSessionSecurity" />
+    /// can derive: SEAL, extended session security and 128-bit keys; otherwise the session stays unsealed.
+    /// </summary>
+    private static bool Seals(NtlmNegotiateFlags flags) =>
+        flags.HasFlag(NtlmNegotiateFlags.NegotiateSeal | NtlmNegotiateFlags.NegotiateExtendedSessionSecurity | NtlmNegotiateFlags.Negotiate128);
 
     /// <summary>Names DIGEST-MD5, then answers the challenge of the <c>saslBindInProgress</c> reply.</summary>
     private static async ValueTask<LdapBindReply> DigestAsync(LdapExchange exchange, NetworkCredential credentials, string host, CancellationToken cancellationToken)
