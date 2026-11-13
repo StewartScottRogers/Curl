@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/SchannelAlgorithmList.cs, Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Console/EasyOptionsFromCommandLine.cs, Curl.Networking.UnitTests/SchannelTls13CipherListRefusalTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5134 — Refuse --tlsv1.3 with a --ciphers list on Schannel with exit 35
 
@@ -46,3 +46,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 0aed72f3 9ea204d8 7fd76bd8 6d9d1948 a0b49a29.
 - 2026-11-13: Checked: no option added, so `--ai-help` and `--help` need no change. Refusal is in SchannelAlgorithmList.Refusal/OfferedSuites (new minimumVersion parameter), called by both providers' Schannel route with options.MinimumVersion; message in TlsFailureMessages. The console already passes MinimumVersion, so EasyOptionsFromCommandLine.cs needed no edit. Tests are platform-neutral (no connection is made, the refusal is a pure function). Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing. Linux/macOS CI: OpenSSL route unchanged.
+- 2026-11-13: Doing -> Done. TLS 1.3 minimum with a --ciphers list is exit 35 on the Schannel route
