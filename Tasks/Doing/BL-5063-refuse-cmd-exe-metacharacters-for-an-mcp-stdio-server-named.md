@@ -37,3 +37,4 @@ The shift-end review of 2026-11-12 found this in the ADR-1248 change (type-desig
 ## Log
 
 - 2026-11-12: Created.
+- 2026-11-12: Backlog -> Doing. Criteria at claim: 3fb92545 58fcdbec 58acf080 3d836d5e.
