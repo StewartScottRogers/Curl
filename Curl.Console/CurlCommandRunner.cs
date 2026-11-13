@@ -1609,7 +1609,23 @@ internal sealed class CurlCommandRunner(
     private IReadOnlyList<CommandLineExtensionOption> ParsedExtensionOptions =>
         EnvironmentVariables(ExtensionProtocolHandlers.SwitchVariable) == "0"
             ? []
-            : [.. (extensionOptions ?? ExtensionCommandLineOptions.For(EnvironmentVariables, IsCurlLongOption)).Select(ToCommandLineExtensionOption)];
+            : ToParserOptions(extensionOptions ?? ExtensionCommandLineOptions.For(EnvironmentVariables, IsCurlLongOption), ExpanderOptionNames);
+
+    /// <summary>Gives the parser's form of each extension option, those an expander consumes marked command-line only.</summary>
+    private static IReadOnlyList<CommandLineExtensionOption> ToParserOptions(IEnumerable<ExtensionOption> options, HashSet<string> commandLineOnlyNames)
+    {
+        List<CommandLineExtensionOption> parserOptions = [];
+        foreach (ExtensionOption option in options)
+        {
+            parserOptions.Add(ToParserOption(option, commandLineOnlyNames));
+        }
+
+        return parserOptions;
+    }
+
+    /// <summary>Gives the names of the options the argument expanders consume (their own and their companions), which a config file cannot carry (ADR-1040).</summary>
+    private HashSet<string> ExpanderOptionNames =>
+        [.. (argumentExpanders ?? ExtensionArgumentExpanderCatalogue.Entries).SelectMany(expander => expander is ITrailingArgumentExpander trailing ? trailing.CompanionOptions.Append(expander.Option) : [expander.Option]).Select(option => option.Name)];
 
     /// <summary>
     /// Reports whether a long name is one of curl's own options, created once with <see langword="new" /> so no
@@ -1617,17 +1633,12 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private static readonly Func<string, bool> IsCurlLongOption = new(CommandLineParser.IsCurlLongOption);
 
-    /// <summary>
-    /// Gives the parser's form of an extension's option (<see cref="ToParserOption" />), created once with
-    /// <see langword="new" /> so no use of it carries the compiler's method-group cache.
-    /// </summary>
-    private static readonly Func<ExtensionOption, CommandLineExtensionOption> ToCommandLineExtensionOption = new(ToParserOption);
-
     /// <summary>Gives the parser's form of an extension's option: its long name, and whether it takes a value.</summary>
     /// <param name="option">The extension's option.</param>
+    /// <param name="commandLineOnlyNames">The names of the options only the command line carries.</param>
     /// <returns>The option, taking a value when its argument is <see cref="ExtensionOptionArgument.Value" />.</returns>
-    private static CommandLineExtensionOption ToParserOption(ExtensionOption option) =>
-        new(option.Name, option.Argument == ExtensionOptionArgument.Value);
+    private static CommandLineExtensionOption ToParserOption(ExtensionOption option, HashSet<string> commandLineOnlyNames) =>
+        new(option.Name, option.Argument == ExtensionOptionArgument.Value, commandLineOnlyNames.Contains(option.Name));
 
     /// <summary>
     /// Transfers every URL of one option group in order, each command-line URL once for every URL

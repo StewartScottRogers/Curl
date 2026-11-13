@@ -8,4 +8,5 @@ namespace Curl.Cli;
 /// </summary>
 /// <param name="LongName">The long name without its leading <c>--</c>.</param>
 /// <param name="TakesValue">Whether a value follows, attached or as the next argument; otherwise a flag.</param>
-public sealed record CommandLineExtensionOption(string LongName, bool TakesValue);
+/// <param name="CommandLineOnly">Whether a <c>-K</c> config file refuses it (exit 2, "cannot be used in a config file"): an option an argument expander consumes before parsing, which never reaches the lines of a config file (ADR-1040).</param>
+public sealed record CommandLineExtensionOption(string LongName, bool TakesValue, bool CommandLineOnly = false);

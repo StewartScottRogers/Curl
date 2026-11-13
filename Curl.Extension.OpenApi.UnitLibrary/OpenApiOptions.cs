@@ -27,7 +27,7 @@ public static class OpenApiOptions
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "openapi",
-        "Builds a request from an OpenAPI 3 description: --openapi <spec> --operation <id> name=value... gives the method, server URL, path, query, header and cookie parameters by their style, and a JSON, form or multipart body.",
+        "Builds a request from an OpenAPI 3 description: --openapi <spec> --operation <id> name=value... gives the method, server URL, path, query, header and cookie parameters by their style, and a JSON, form or multipart body. Command line only: a -K config file refuses --openapi, --operation and --openapi-server.",
         [],
         [Specification, Operation, Server],
         new Uri("https://spec.openapis.org/oas/v3.1.1.html"));

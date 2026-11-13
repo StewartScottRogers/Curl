@@ -95,6 +95,20 @@ public sealed class CurlCommandRunnerTrailingArgumentExpansionTests
         Assert.IsEmpty(groups);
     }
 
+    [TestMethod]
+    public async Task RunAsync_ExpanderOptionInAConfigFile_IsRefusedAsCommandLineOnly()
+    {
+        string configFile = Path.Combine(Path.GetTempPath(), "bl5132-" + Guid.NewGuid().ToString("N") + ".cfg");
+        await File.WriteAllTextAsync(configFile, "x-spec = \"s\"\n");
+
+        int exitCode = await RunAsync(["-K", configFile, "http://h/"], _ => null);
+        File.Delete(configFile);
+
+        Assert.AreEqual(2, exitCode);
+        StringAssert.Contains(Encoding.UTF8.GetString(standardError.ToArray()), "curl: config file option 'x-spec' cannot be used in a config file" + Environment.NewLine + "curl: option -K: cannot be used in a config file" + Environment.NewLine);
+        Assert.IsEmpty(groups);
+    }
+
     private Task<int> RunAsync(IReadOnlyList<string> arguments, Func<string, string?> environment) =>
         new CurlCommandRunner(
                 CreateTransferDispatch,

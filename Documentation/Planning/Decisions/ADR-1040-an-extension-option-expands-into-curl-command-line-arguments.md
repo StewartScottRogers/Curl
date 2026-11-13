@@ -23,7 +23,10 @@ resolver, ADR-1016 certificate) act on a transfer that already exists, and a com
   flag taking no value. Nothing after a bare `--` is expanded (curl reads everything after it as a URL); an option
   with no value after it is left for the parser, which refuses it as curl refuses a missing parameter; an
   expansion's arguments are not expanded again, so no expander can recurse. Only the top-level arguments are
-  expanded, not lines of a `-K` config file, and a token that is the value of a preceding curl option (`-d
+  expanded, not lines of a `-K` config file (BL-5132: the parser refuses an expander option, and its companions,
+  there with exit 2 and `cannot be used in a config file`, rather than ignoring it; the host marks them
+  command-line only in the `CommandLineExtensionOption` it passes the parser, so Cli references no extension;
+  decided by Claude under Stewart's delegation, the minimum the finding asks for), and a token that is the value of a preceding curl option (`-d
   --http-file`) is still taken as the expander's option, since the pass runs before the parser knows which curl
   options take values; neither case is curl behaviour, as curl has no such option.
 - `Curl.Extension.Composition.UnitLibrary/ExtensionArgumentExpanderCatalogue.cs` lists the expanders one per line,

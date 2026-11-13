@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineParser.cs, Curl.Cli.UnitTests/ConfigFileArgumentExpanderOptionTests.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineParser.cs, Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Cli.UnitLibrary/CommandLineExtensionOption.cs, Curl.Cli.UnitTests/ConfigFileArgumentExpanderOptionTests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/CurlCommandRunnerTrailingArgumentExpansionTests.cs, Curl.Extension.HttpFile.UnitLibrary/HttpFileOptions.cs, Curl.Extension.OpenApi.UnitLibrary/OpenApiOptions.cs, Documentation/Planning/Decisions/ADR-1040-an-extension-option-expands-into-curl-command-line-arguments.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5132 — Refuse --http-file and --openapi in a -K config file with exit 2
 
@@ -33,12 +33,12 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] A new test file `Curl.Cli.UnitTests/ConfigFileArgumentExpanderOptionTests.cs` proves that `--http-file`, `--http-env`, `--openapi` and `--operation` read from a `-K` file (in `--name value` and `name = "value"` forms) are either expanded as on the command line or refused with `CurlExitCode` 2 and a message naming the option and saying it cannot be used in a config file; the message is asserted exactly.
-- [ ] A regression test proves other extension options (`checksum`, `--structured-fields`) are still honoured from `-K`, and that the same expander options on the command line still expand.
-- [ ] If the options are refused, `--extended-help` for the http-file and openapi extensions states they are command-line only; `--ai-help` is kept right where it mentions them.
-- [ ] ADR-1040 (or a new ADR marked "Decided by Claude under Stewart's delegation") states what happens to expander options in `-K`; the outdated line about extension options not being read from `-K` is corrected if it is in the same ADR.
-- [ ] Tests are platform-neutral (no Windows-only paths).
-- [ ] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test file `Curl.Cli.UnitTests/ConfigFileArgumentExpanderOptionTests.cs` proves that `--http-file`, `--http-env`, `--openapi` and `--operation` read from a `-K` file (in `--name value` and `name = "value"` forms) are either expanded as on the command line or refused with `CurlExitCode` 2 and a message naming the option and saying it cannot be used in a config file; the message is asserted exactly.
+- [x] A regression test proves other extension options (`checksum`, `--structured-fields`) are still honoured from `-K`, and that the same expander options on the command line still expand.
+- [x] If the options are refused, `--extended-help` for the http-file and openapi extensions states they are command-line only; `--ai-help` is kept right where it mentions them.
+- [x] ADR-1040 (or a new ADR marked "Decided by Claude under Stewart's delegation") states what happens to expander options in `-K`; the outdated line about extension options not being read from `-K` is corrected if it is in the same ADR.
+- [x] Tests are platform-neutral (no Windows-only paths).
+- [x] `dotnet build Curl.Cli.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -51,3 +51,5 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: df1ee63f 403425be 15e4eb64 a0218085 89b4d29a a1aaf16f.
+- 2026-11-13: Decision: refuse (the minimum), recorded in ADR-1040. `CommandLineExtensionOption` gained `CommandLineOnly`; `CurlCommandRunner` marks every expander option and companion (http-file, http-env, openapi, operation, openapi-server) so Cli references no extension; the parser refuses one read from a -K line with exit 2: `curl: option -K: cannot be used in a config file`, after the config-file line error. Extension descriptions (--extended-help) say command line only; --ai-help does not mention these options. Touches widened to the files above. Cli and Console quality runs: 0 failing members. Linux/macOS CI: tests are platform-neutral (temp file, no paths pinned).
+- 2026-11-13: Doing -> Done. A -K config file naming an expander option (--http-file, --http-env, --openapi, --operation, --openapi-server) is refused with exit 2; ADR-1040 updated
