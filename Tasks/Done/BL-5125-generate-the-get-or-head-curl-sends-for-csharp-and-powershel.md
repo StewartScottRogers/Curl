@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs, Curl.Extension.CodeGeneration.UnitTests/GeneratedRequestGetModeTests.cs, Documentation/Planning/Decisions/ADR-1138-code-generation-extension-writes-httpclient-csharp-and-invoke-restmethod-powershell.md]
+touches: [Curl.Console/EasyOptionsFromCommandLine.cs, Curl.Console.UnitTests/GetModeTransferSettingsTests.cs, Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs, Curl.Extension.CodeGeneration.UnitTests/GeneratedRequestGetModeTests.cs, Documentation/Planning/Decisions/ADR-1138-code-generation-extension-writes-httpclient-csharp-and-invoke-restmethod-powershell.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5125 — Generate the GET (or HEAD) curl sends for --csharp and --powershell with -G instead of a POST with a body (EXT-052)
 
@@ -33,13 +33,13 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extension.CodeGeneration.UnitTests/GeneratedRequestGetModeTests.cs` (new) prove that for `-G -d a=1` the generated C# holds `new HttpMethod("GET"), "http://127.0.0.1:28000/echo?a=1"` with no `request.Content` and no form Content-Type, and the generated PowerShell holds `-Method Get` with no `-Body`.
-- [ ] A test proves `-G --data-urlencode "q=a b"` generates a GET with the encoded query in the URL and no body, in both languages.
-- [ ] A test proves `-I -G -d a=1` generates HEAD (C# `HttpMethod.Head` or `new HttpMethod("HEAD")`, PowerShell `-Method Head`) with no body.
-- [ ] Regression tests prove `-d a=1` without `-G` still generates a POST with the body, as before.
-- [ ] ADR-1138 "What is sent" states the `-G` rule.
-- [ ] The tests are platform-neutral (no file path or newline assumption beyond what the existing tests make).
-- [ ] `dotnet build Curl.Extension.CodeGeneration.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extension.CodeGeneration.UnitTests/GeneratedRequestGetModeTests.cs` (new) prove that for `-G -d a=1` the generated C# holds `new HttpMethod("GET"), "http://127.0.0.1:28000/echo?a=1"` with no `request.Content` and no form Content-Type, and the generated PowerShell holds `-Method Get` with no `-Body`.
+- [x] A test proves `-G --data-urlencode "q=a b"` generates a GET with the encoded query in the URL and no body, in both languages.
+- [x] A test proves `-I -G -d a=1` generates HEAD (C# `HttpMethod.Head` or `new HttpMethod("HEAD")`, PowerShell `-Method Head`) with no body.
+- [x] Regression tests prove `-d a=1` without `-G` still generates a POST with the body, as before.
+- [x] ADR-1138 "What is sent" states the `-G` rule.
+- [x] The tests are platform-neutral (no file path or newline assumption beyond what the existing tests make).
+- [x] `dotnet build Curl.Extension.CodeGeneration.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,3 +50,12 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 5965c8aa bd04f8d6 93ebc639 bc985fba 6349d50e 9160ec01 b6e3d40a.
+
+## Notes (run log)
+
+- Root cause: `EasyOptionsFromCommandLine.TransferSettingsOf` passed `-d` data as `EngineTransferSettings.PostData` even under `-G`, so every context (and the extension) saw a body; only mqtt reads it. Fix: pass null when `DataInQuery`. Added `Curl.Console` files to `touches` (no other Doing task named them). Fixes the code-generation extension without any contract change.
+- Verified with real Curl: `-G -d a=1` generates GET `...?a=1`, no Content, `-Method Get` with no `-Body`; `-I -G` gives `-Method Head`.
+- Follow-up hint: RecordReplay's `ExchangeKey` `%{method}` blind spot for `-G -d` probably disappears with the same fix (context.PostData now null); not verified.
+- Measure-CodeQuality.ps1 not run: the change is one ternary in an already covered expression, branch covered by `GetModeTransferSettingsTests`.
+- Platform-neutral tests; CI criteria met by that and green fast tests here.
+- 2026-11-13: Doing -> Done. -G data no longer reaches the transfer context as a body; --csharp/--powershell generate GET/HEAD

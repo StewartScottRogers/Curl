@@ -33,7 +33,7 @@ transfer hook (ADR-1007) sees each transfer's request before running it unchange
   URL as sent (no fragment); `-A`, `-e`, the body's `Content-Type`, `--oauth2-bearer` as `Bearer` and credentials as
   `Basic` (RFC 7617), each unless `-H` gave that field; then every `-H` field (`Name;` sends it empty, `Name:` sends
   nothing, since the generated code adds no field it could remove). A body is written as UTF-8 text when it is valid
-  UTF-8, else as base64, so its bytes are exact.
+  UTF-8, else as base64, so its bytes are exact. With `-G` the data is in the URL's query and the request has no body: the code is the GET (or, with `-I`, the HEAD) curl sends, never a POST (BL-5125, EXT-052).
 
 ## Left out, and why
 
