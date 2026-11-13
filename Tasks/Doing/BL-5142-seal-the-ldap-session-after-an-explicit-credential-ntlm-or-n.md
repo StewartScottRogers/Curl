@@ -40,3 +40,4 @@ The remaining part of BL-5094 (finding STD-049, High: no integrity or confidenti
 ## Log
 
 - 2026-11-13: Created.
+- 2026-11-13: Backlog -> Doing. Criteria at claim: 21241d7b bbeb9bfe 2eb53dc5 97a37c4d a0b49a29.
