@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ResumableUpload.UnitLibrary/Transfer/ResumableUploadFlow.cs, Curl.Extension.ResumableUpload.UnitLibrary/Transfer/IetfUploadProtocol.cs, Curl.Extension.ResumableUpload.UnitTests/Transfer, Documentation/Planning/Decisions/ADR-1103-resumable-upload-picks-tus-by-options-and-resumes-from-the-servers-offset.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5131 — Fail or deliver the body when --resumable-upload meets a server that creates no upload resource (EXT-045)
 
@@ -36,12 +36,12 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extension.ResumableUpload.UnitTests/Transfer/` (a new file, for example `ResumableUploadWithoutServerSupportTests.cs`, using the existing `ScriptedConnector`) prove that when the server answers the OPTIONS and creation requests with 2xx and no `Location`, either the full body is sent (assert the bytes the scripted server received) or the transfer fails with the chosen non-zero `CurlExitCode` and a message that the server did not create an upload resource.
-- [ ] A test proves `%{size_upload}` (the reported uploaded byte count) equals the bytes actually sent in both the delivered and the failed case, never the file's length when nothing was sent.
-- [ ] A regression test proves a server that does answer with `Location` still gets the resumable flow as before, and the Tus path is unchanged.
-- [ ] ADR-1103 (or the new ADR) states the decision; if `Documentation/Conformance/Extended/` has a resumable-upload spec row naming the old behaviour, it is corrected.
-- [ ] The tests are platform-neutral (no real socket; no Windows-only path or text).
-- [ ] `dotnet build Curl.Extension.ResumableUpload.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extension.ResumableUpload.UnitTests/Transfer/` (a new file, for example `ResumableUploadWithoutServerSupportTests.cs`, using the existing `ScriptedConnector`) prove that when the server answers the OPTIONS and creation requests with 2xx and no `Location`, either the full body is sent (assert the bytes the scripted server received) or the transfer fails with the chosen non-zero `CurlExitCode` and a message that the server did not create an upload resource.
+- [x] A test proves `%{size_upload}` (the reported uploaded byte count) equals the bytes actually sent in both the delivered and the failed case, never the file's length when nothing was sent.
+- [x] A regression test proves a server that does answer with `Location` still gets the resumable flow as before, and the Tus path is unchanged.
+- [x] ADR-1103 (or the new ADR) states the decision; if `Documentation/Conformance/Extended/` has a resumable-upload spec row naming the old behaviour, it is corrected.
+- [x] The tests are platform-neutral (no real socket; no Windows-only path or text).
+- [x] `dotnet build Curl.Extension.ResumableUpload.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,7 +49,10 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - Review acceptance check, for a hand check: the step-3 command either delivers `IMPORTANT-DATA-1234567890` to the server, or exits non-zero with a message that the server did not create an upload resource; in both cases `%{size_upload}` equals the bytes actually sent.
 - If the option's behaviour changes visibly, keep `--extended-help` right.
 
+- Decision (ADR-1103 amendment): a 2xx creation without Location fails with exit 22 and a message; tus path unchanged. No Conformance/Extended row named the old behaviour. Platform-neutral tests; CI criterion met by that.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 40abc76f fad5eb67 14eb6a94 9cccc51a 0e15a3ec 7bc291d2.
+- 2026-11-13: Doing -> Done. A 2xx creation without Location now fails with exit 22 instead of silently succeeding

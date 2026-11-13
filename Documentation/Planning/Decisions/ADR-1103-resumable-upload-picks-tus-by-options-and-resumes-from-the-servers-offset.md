@@ -36,8 +36,7 @@ about the protocols.
 - **Seekable body.** A non-seekable upload, or one already read part way, is read whole into memory
   first: both protocols announce `Upload-Length` on creation, and a resumption sends again from any offset
   the server gives.
-- **Outcome.** The last response (the append's, or a creation or offset retrieval answered without 2xx or
-  without `Location`) is the transfer's: body to `Output`, head to `-i`'s and `-D`'s outputs, status and
+- **Outcome.** The last response (the append's, or a creation or offset retrieval answered without 2xx) is the transfer's: body to `Output`, head to `-i`'s and `-D`'s outputs, status and
   headers in the `TransferReport`. `-f` with a status of 400 or more ends with 22 and writes nothing;
   `--fail-with-body` writes it and ends with 22. Failures end with curl's code: the connector's (7 and the
   rest), 55 for sending, 56 for receiving, 8 for a malformed response or an offset outside the upload.
@@ -49,3 +48,7 @@ about the protocols.
 The upload needs no help from curl's HTTP handler and runs over any connection the connector gives,
 including TLS. Through an HTTP forward proxy the requests use origin-form targets, so only a tunnelling
 proxy works, as for the WebSocket REPL hook. Buffering a non-seekable upload holds it in memory.
+
+## Amendment 2026-11-13 (BL-5131, EXT-045)
+
+Decided by Claude under Stewart's delegation. A 2xx creation answered without `Location` created no upload resource, and the creation carried no body, so ending the transfer successfully reported bytes never sent. The flow now fails with exit 22 and a message that the server did not create an upload resource; no `%{size_upload}` is reported because the failure carries no report. Failing was chosen over an optimistic body in the creation because the draft's creation is announced with `Upload-Complete: ?0` and a server that ignores the protocol cannot be told apart from a lost body. The tus path is unchanged.

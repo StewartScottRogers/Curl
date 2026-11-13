@@ -19,9 +19,15 @@ internal sealed class ResumableUploadFlow(IResumableUploadProtocol protocol, Res
     public async Task<ResumableUploadExchange> UploadAsync(Uri target, Stream body)
     {
         var creation = await ResumeAsync(_ => session.SendAsync(protocol.CreationMethod, target, protocol.CreationHeaders(body.Length), Stream.Null));
-        if (!creation.IsSuccess || creation.FindHeader("Location") is not { } location)
+        if (!creation.IsSuccess)
         {
             return creation;
+        }
+
+        if (creation.FindHeader("Location") is not { } location)
+        {
+            throw new ResumableUploadTransferException(
+                CurlExitCode.HttpReturnedError, "The server did not create an upload resource: its creation response had no Location, so no upload bytes were sent.", canResume: false);
         }
 
         var upload = new Uri(target, location);
