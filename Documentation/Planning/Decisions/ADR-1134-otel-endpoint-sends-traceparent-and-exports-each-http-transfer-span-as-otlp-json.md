@@ -24,7 +24,8 @@ library only and never changing what curl does without its option. Upstream curl
   `traceparent` `-H` already gave is left to it; when it is valid (§3.2.2, §3.2.4) the span takes its trace-id and
   parent-id, so the exported span is the one the server sees as its parent, and when it is not the span gets fresh ids.
 - **The span.** Kind client, named by the method, timed on the transfer's `TimeProvider` around the whole transfer
-  (redirects and retries the handler follows included), with `http.request.method`, `url.full` (a user and password
+  (redirects and retries the handler follows included; with `-L` the hook runs once per hop, so every hop reuses the
+  first hop's trace-id and span-id and only the last hop exports, BL-5098), with `http.request.method`, `url.full` (a user and password
   replaced by `REDACTED:REDACTED`), `server.address`, `server.port` and any `http.response.status_code`. Its status is
   error, with `error.type`, when the transfer failed (the `CurlExitCode` name, and curl's error message as the status
   message) or the status is 400 or more (the status code); otherwise it is unset. The resource's `service.name` and the

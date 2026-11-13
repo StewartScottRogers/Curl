@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs, Curl.Extension.OpenTelemetry.UnitTests/OpenTelemetryRedirectTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5098 — Export one OpenTelemetry span per transfer with -L, in one trace
 
@@ -30,19 +30,21 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] A new test file `Curl.Extension.OpenTelemetry.UnitTests/OpenTelemetryRedirectTests.cs` proves that a transfer with a 302 followed by a 200 sends the same trace-id in `traceparent` on both hops and exports exactly one span, whose `http.response.status_code` is 200.
-- [ ] A test proves a transfer with no redirect still exports one span as before (regression), and a test covers a redirect chain of three hops.
-- [ ] The tests are platform-neutral and use no real network.
-- [ ] If ADR-1134 or the extension's conformance document needs a sentence about redirects, it is added, and `--extended-help` stays right.
-- [ ] `dotnet build Curl.Extension.OpenTelemetry.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test file `Curl.Extension.OpenTelemetry.UnitTests/OpenTelemetryRedirectTests.cs` proves that a transfer with a 302 followed by a 200 sends the same trace-id in `traceparent` on both hops and exports exactly one span, whose `http.response.status_code` is 200.
+- [x] A test proves a transfer with no redirect still exports one span as before (regression), and a test covers a redirect chain of three hops.
+- [x] The tests are platform-neutral and use no real network.
+- [x] If ADR-1134 or the extension's conformance document needs a sentence about redirects, it is added, and `--extended-help` stays right.
+- [x] `dotnet build Curl.Extension.OpenTelemetry.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app (`dotnet run tool.cs`) or `Record-CurlExchange.ps1`, never Python.
 - Extension isolation holds: the extension references only `Curl.Extension.Abstractions` and shared layers.
+- Done: the hook keeps the first hop's trace context in a field (one followed transfer at a time) and skips export on a hop whose response is a redirect -L will follow; ADR-1134 gained a sentence; --extended-help unchanged. Platform-neutral tests, no network.
 - Review acceptance check, as a hand check: exactly one `POST /otel` whose single span has `http.response.status_code` 200, and both hops carry the same trace-id.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 4d65d2ca 7f41521c 59a32e64 da4b13aa 9e85d1cf.
+- 2026-11-13: Doing -> Done. -L transfers export one OTel span with one trace-id across hops
