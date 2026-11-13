@@ -110,6 +110,67 @@ public sealed class CurlCommandRunnerRemoteNameExtractionFailureTests
         Assert.IsEmpty(fileSystem.Written);
     }
 
+    [TestMethod]
+    public async Task RunAsync_ParallelTransfersOneWithABlankRemoteHeaderName_RefusesOnlyThatTransfer()
+    {
+        HostKeyedConnector server = new(new Dictionary<string, byte[]>
+        {
+            ["blank.test"] = Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Disposition: attachment; filename=\" \"\r\nContent-Length: 5\r\n\r\nhello"),
+            ["good.test"] = Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Disposition: attachment; filename=\"kept.txt\"\r\nContent-Length: 5\r\n\r\nworld"),
+        });
+
+        int exitCode = await RunScriptedAsync(server, ["-Z", "-J", "-O", "http://good.test/v.txt", "-J", "-O", "http://blank.test/u.txt"]);
+
+        Assert.AreEqual(3, exitCode);
+        Assert.IsTrue(fileSystem.Written.ContainsKey("kept.txt"));
+        Assert.HasCount(1, fileSystem.Written);
+        Assert.Contains(ExtractionLine, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_BlankRemoteHeaderNameUnderRetryAllErrors_IsNotRetried()
+    {
+        HostKeyedConnector server = new(new Dictionary<string, byte[]>
+        {
+            ["blank.test"] = Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Disposition: attachment; filename=\" \"\r\nContent-Length: 5\r\n\r\nhello"),
+        });
+
+        int exitCode = await RunScriptedAsync(server, ["--retry", "2", "--retry-all-errors", "-J", "-O", "http://blank.test/u.txt"]);
+
+        Assert.AreEqual(3, exitCode);
+        Assert.DoesNotContain("retry", StandardErrorText, StringComparison.OrdinalIgnoreCase);
+        Assert.AreEqual(1, server.Connects);
+    }
+
+    private async Task<int> RunScriptedAsync(IConnector server, IReadOnlyList<string> arguments)
+    {
+        HttpProtocolHandler scripted = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+        CurlCommandRunner runner = new(
+            _ => new TransferDispatch(new ProtocolDispatcher([scripted])),
+            fileSystem,
+            fileSystem,
+            standardOutput,
+            standardError,
+            new MemoryStream(),
+            false,
+            outputPaths: fileSystem);
+
+        return await runner.RunAsync(arguments);
+    }
+
+    private sealed class HostKeyedConnector(Dictionary<string, byte[]> responses) : IConnector
+    {
+        private int connects;
+
+        public int Connects => Volatile.Read(ref connects);
+
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
+        {
+            _ = Interlocked.Increment(ref connects);
+            return new ScriptedConnector([responses[target.Host]]).ConnectAsync(target, cancellationToken);
+        }
+    }
+
     private async Task<int> RunAsync(IReadOnlyList<string> arguments)
     {
         CurlCommandRunner runner = new(

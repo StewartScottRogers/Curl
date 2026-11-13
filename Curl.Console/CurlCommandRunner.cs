@@ -621,7 +621,6 @@ internal sealed class CurlCommandRunner(
     /// Set when a <c>Content-Disposition</c> name was blank; <see cref="TransferIntoOutputFileAsync" /> reads
     /// and clears it once the transfer returns (BL-5016).
     /// </summary>
-    private bool remoteHeaderNameWasBlank;
 
     /// <summary>
     /// The line curl 8.21.0 prints when <c>-G</c> or <c>--url-query</c> asks for a query on an
@@ -5227,24 +5226,25 @@ internal sealed class CurlCommandRunner(
         OutputFileTarget target,
         DeferredOutputFileStream output) =>
         target.TakesContentDispositionName
-            ? chosen => new RemoteHeaderNameStream(output, chosen, name => RemoteHeaderNamePath(options, name), options.FollowRedirects)
+            ? chosen => new RemoteHeaderNameStream(output, chosen, name => RemoteHeaderNamePath(options, Running, name), options.FollowRedirects)
             : null;
 
     /// <summary>
     /// Names the file a <c>Content-Disposition</c> <c>filename=</c> value opens. A non-empty value with nothing but
     /// white space leaves curl no name to extract, so it is remembered in
-    /// <see cref="remoteHeaderNameWasBlank" /> for <see cref="TransferIntoOutputFileAsync" /> to end the run,
+    /// <see cref="RunningTransferState.RemoteHeaderNameWasBlank" /> for <see cref="TransferIntoOutputFileAsync" /> to end the run,
     /// and the transfer stops with an <see cref="IOException" /> before any file is opened (BL-5016).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer whose header named the file.</param>
     /// <param name="name">The header's file name.</param>
     /// <returns>The path to open.</returns>
     /// <exception cref="IOException">The name is blank.</exception>
-    private string RemoteHeaderNamePath(CommandLineOptions options, string name)
+    private string RemoteHeaderNamePath(CommandLineOptions options, RunningTransferState transfer, string name)
     {
         if (name.Length > 0 && string.IsNullOrWhiteSpace(name))
         {
-            remoteHeaderNameWasBlank = true;
+            transfer.RemoteHeaderNameWasBlank = true;
             throw new IOException("The Content-Disposition file name is blank.");
         }
 
@@ -5413,9 +5413,9 @@ internal sealed class CurlCommandRunner(
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
-            if (remoteHeaderNameWasBlank)
+            if (Running.RemoteHeaderNameWasBlank)
             {
-                remoteHeaderNameWasBlank = false;
+                Running.RemoteHeaderNameWasBlank = false;
                 return await RefuseRemoteNameExtractionAsync(options, RemoteNameUrlMalformedFailure).ConfigureAwait(false);
             }
 
@@ -5710,7 +5710,9 @@ internal sealed class CurlCommandRunner(
                 StartTransferProgress(options, attemptResumeFrom, toStandardOutput: outputFile is null);
             }
 
-            return await PerformThroughEasyAsync(easy, follower, attempt, attemptResumeFrom).ConfigureAwait(false);
+            TransferResult performed = await PerformThroughEasyAsync(easy, follower, attempt, attemptResumeFrom).ConfigureAwait(false);
+            // A blank -J name refuses the transfer whatever its attempt's result, so it is never retried (BL-5064).
+            return Running.RemoteHeaderNameWasBlank ? TransferResult.Success(0) : performed;
         });
 
         TransferResult result = await retrier
