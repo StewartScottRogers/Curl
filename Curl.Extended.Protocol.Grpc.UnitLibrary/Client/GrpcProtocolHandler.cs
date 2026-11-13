@@ -147,7 +147,7 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
         {
             return await CallOverStreamAsync(context, stream, target, method, request, body).ConfigureAwait(false);
         }
-        catch (IOException failure) when (failure is not EndOfStreamException)
+        catch (IOException failure) when (failure is not (EndOfStreamException or OutputWriteFailedException))
         {
             return TransferResult.Failure(
                 stream.WriteFailed ? CurlExitCode.SendError : CurlExitCode.RecvError,

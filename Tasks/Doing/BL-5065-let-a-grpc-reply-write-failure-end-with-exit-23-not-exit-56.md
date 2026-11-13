@@ -27,12 +27,14 @@ The shift-end review of 2026-11-12 found this in the BL-5028 change (silent-fail
 
 ## Acceptance criteria
 
-- [ ] An output write failure reaches the engine as it did before BL-5028. Either `CallOverAsync`'s filter excludes `OutputWriteFailedException`, or its try block covers only the connection's reads and writes.
-- [ ] A unit test in `GrpcProtocolHandlerTests`, with an output stream that throws `OutputWriteFailedException`, shows the transfer does not end with exit 56.
-- [ ] The existing tests that map a connection reset to exit 56 still pass.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] An output write failure reaches the engine as it did before BL-5028. Either `CallOverAsync`'s filter excludes `OutputWriteFailedException`, or its try block covers only the connection's reads and writes.
+- [x] A unit test in `GrpcProtocolHandlerTests`, with an output stream that throws `OutputWriteFailedException`, shows the transfer does not end with exit 56.
+- [x] The existing tests that map a connection reset to exit 56 still pass.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- CallOverAsync's catch filter now excludes OutputWriteFailedException, so it propagates to the engine as before BL-5028. Test: ExecuteAsync_OutputWriteFails_LetsTheWriteFailureReachTheEngineNotExit56. Quality run for the Grpc library: 0 failing members.
 
 ## Log
 
