@@ -56,21 +56,28 @@ public sealed class PhysicalOutputPathsDirectoryModeTests
     }
 
     [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [OSCondition(OperatingSystems.Linux)]
     [UnsupportedOSPlatform("windows")]
     public void TryCreateDirectory_RawByteName_GetsNoPermissionBeyondMode0750()
     {
         string made = Path.Combine(root, "r\uDC80x");
 
         bool created = new PhysicalOutputPaths().TryCreateDirectory(made, out int errorNumber);
-        string[] found = Directory.GetDirectories(root);
 
         Assert.IsTrue(created);
         Assert.AreEqual(0, errorNumber);
-        Assert.HasCount(1, found);
-        AssertWithinMode0750(found[0]);
+        // .NET cannot name the raw-byte directory again, so the shell's glob finds it and stat reads its mode.
+        var start = new System.Diagnostics.ProcessStartInfo("/bin/sh") { RedirectStandardOutput = true };
+        start.ArgumentList.Add("-c");
+        start.ArgumentList.Add("stat -c %a \"$1\"/*");
+        start.ArgumentList.Add("sh");
+        start.ArgumentList.Add(root);
+        using var process = System.Diagnostics.Process.Start(start)!;
+        string output = process.StandardOutput.ReadToEnd().Trim();
+        process.WaitForExit();
+        int mode = Convert.ToInt32(output, 8);
+        Assert.AreEqual(0, mode & ~Convert.ToInt32("750", 8), output);
     }
-
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     [UnsupportedOSPlatform("windows")]
