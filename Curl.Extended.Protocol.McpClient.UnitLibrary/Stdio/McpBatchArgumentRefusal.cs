@@ -11,8 +11,9 @@ internal static class McpBatchArgumentRefusal
     /// <exception cref="InvalidOperationException">The program is a batch file and an argument holds such a character.</exception>
     public static void RefuseUnsafeArguments(string program, IReadOnlyList<string> arguments)
     {
-        var isBatch = program.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
-            || program.EndsWith(".bat", StringComparison.OrdinalIgnoreCase);
+        var name = program.TrimEnd('.', ' ');
+        var isBatch = name.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".bat", StringComparison.OrdinalIgnoreCase);
         if (isBatch && arguments.Any(IsUnsafe))
         {
             throw new InvalidOperationException(

@@ -50,6 +50,12 @@ internal sealed class RunningTransferState(
     internal CancellationToken AbortToken { get; } = abortToken;
 
     /// <summary>
+    /// Gets or sets whether a <c>-J</c> <c>Content-Disposition</c> file name was blank, which ends the transfer with curl's
+    /// "Failed to extract a filename" refusal (BL-5016, BL-5064).
+    /// </summary>
+    internal bool RemoteHeaderNameWasBlank { get; set; }
+
+    /// <summary>
     /// Gets or sets the file the transfer saved its body to, under the name <c>-J</c> gave it if it
     /// gave one, printed by <c>%{filename_effective}</c>; <see langword="null" /> while the body goes
     /// to standard output.

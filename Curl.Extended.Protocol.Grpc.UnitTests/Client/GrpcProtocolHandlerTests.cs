@@ -399,6 +399,33 @@ public sealed class GrpcProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_OutputWriteFails_LetsTheWriteFailureReachTheEngineNotExit56()
+    {
+        byte[] reply = Reflection.ReflectionFixture.Server(
+            Reflection.ReflectionFixture.Headers(1, false, GrpcServerReply.OkHeaders),
+            Reflection.ReflectionFixture.Message(1, Reflection.ReflectionFixture.FilesResponse(Reflection.ReflectionFixture.HelloWorldFile)),
+            Reflection.ReflectionFixture.Trailers(1, 0),
+            Reflection.ReflectionFixture.Headers(3, false, GrpcServerReply.OkHeaders),
+            Reflection.ReflectionFixture.Message(3, ReplyHi),
+            Reflection.ReflectionFixture.Trailers(3, 0));
+        var context = new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new FailingOutput(), PostData = Encoding.UTF8.GetBytes("{\"name\":\"World\"}") };
+
+        await Assert.ThrowsExactlyAsync<OutputWriteFailedException>(async () =>
+            await new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(new ScriptedConnection(reply), null))).ExecuteAsync(context));
+    }
+
+    private sealed class FailingOutput : MemoryStream
+    {
+        public override void Write(byte[] buffer, int offset, int count) => throw new OutputWriteFailedException(0, "disk full");
+
+        public override void Write(ReadOnlySpan<byte> buffer) => throw new OutputWriteFailedException(0, "disk full");
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) => throw new OutputWriteFailedException(0, "disk full");
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => throw new OutputWriteFailedException(0, "disk full");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_WithoutGrpcProtoOnAServerWithoutReflection_FailsWithExit22NamingGrpcProto()
     {
         byte[] reply = GrpcServerReply.Of(GrpcServerReply.Headers(true, ":status", "200", "content-type", "application/grpc", "grpc-status", "12"));

@@ -20,6 +20,9 @@ public sealed class McpBatchArgumentRefusalTests
     [DataRow("srv.cmd", "a\"&echo.>pwn_mcp2.txt&\"")]
     [DataRow("srv.cmd", "%PATH%")]
     [DataRow("C:/t/mcpsrv/srv.cmd", "a&echo.>pwn_mcp3.txt")]
+    [DataRow("srv.cmd ", "a&b")]
+    [DataRow("srv.bat.", "a&b")]
+    [DataRow("srv.CMD. .", "a&b")]
     public void Start_UnsafeArgumentToBatchFile_ExitsSevenBeforeAnyProcessStarts(string program, string argument)
     {
         var starter = new ScriptedMcpServerProcessStarter(new InMemoryMcpServerProcess(string.Empty));

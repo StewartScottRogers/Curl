@@ -184,6 +184,25 @@ public sealed class ServerCertificateVerificationVerifyChainTests
     }
 
     [TestMethod]
+    public void Verify_UntrustedSelfSignedKeyCertSignCertificateServedAsLeafInTheOpenSslBuild_ReportsSelfSignedCertificate()
+    {
+        using var trusted = IssuedChain.Create();
+        using var servedKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var request = new CertificateRequest($"CN={Host}", servedKey, HashAlgorithmName.SHA256);
+        request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
+        request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign, true));
+        using var served = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(30));
+        var verification = new ServerCertificateVerification(trusted.TrustingOptions(), false, TimeProvider.System);
+        var anchors = verification.ReadTrustAnchors();
+        var verifier = new HandBuiltCertificateVerifier(verification, anchors.ChainPolicy, anchors.AnchorsBesideSystemStore, anchors.RevocationLists, Host);
+
+        var verdict = verifier.Verify(new ServerCertificateChain([served.RawData], Host, null));
+
+        Diagnostics.Act("rejection", verdict.Rejection);
+        Assert.AreEqual("SSL certificate OpenSSL verify result: self-signed certificate (18)", RejectionOf(verdict).Message);
+    }
+
+    [TestMethod]
     public void Verify_KeyCertSignOnlyLeafInTheOpenSslBuild_ReportsUnsuitableCertificatePurposeWithExit60()
     {
         using var issued = IssuedChain.Create(keyUsage: X509KeyUsageFlags.KeyCertSign);
@@ -210,6 +229,7 @@ public sealed class ServerCertificateVerificationVerifyChainTests
     [DataRow(null)]
     [DataRow(X509KeyUsageFlags.DigitalSignature)]
     [DataRow(X509KeyUsageFlags.KeyEncipherment)]
+    [DataRow(X509KeyUsageFlags.KeyAgreement)]
     public void Verify_LeafWithNoKeyUsageOrOneForServerUseInTheOpenSslBuild_IsAccepted(X509KeyUsageFlags? keyUsage)
     {
         using var issued = IssuedChain.Create(keyUsage: keyUsage);
