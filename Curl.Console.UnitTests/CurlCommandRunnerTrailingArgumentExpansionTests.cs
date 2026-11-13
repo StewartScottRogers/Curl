@@ -105,7 +105,8 @@ public sealed class CurlCommandRunnerTrailingArgumentExpansionTests
         File.Delete(configFile);
 
         Assert.AreEqual(2, exitCode);
-        StringAssert.Contains(Encoding.UTF8.GetString(standardError.ToArray()), "curl: config file option 'x-spec' cannot be used in a config file" + Environment.NewLine + "curl: option -K: cannot be used in a config file" + Environment.NewLine);
+        // The "file:line" prefix is wrapped at 79 columns, so a long temporary path changes it: assert only on the stable tail.
+        StringAssert.Contains(Encoding.UTF8.GetString(standardError.ToArray()), " config file option 'x-spec' cannot be used in a config file" + Environment.NewLine + "curl: option -K: cannot be used in a config file" + Environment.NewLine);
         Assert.IsEmpty(groups);
     }
 

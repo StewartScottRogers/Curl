@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests, Curl.Console]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5150 — Fix CI failure RunAsync_ExpanderOptionInAConfigFile_IsRefusedAsCommandLineOnly on macOS and Windows
 
@@ -26,11 +26,14 @@ Lanes test only on Windows, so reproduce with `gh run view 43521357508 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `RunAsync_ExpanderOptionInAConfigFile_IsRefusedAsCommandLineOnly` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `RunAsync_ExpanderOptionInAConfigFile_IsRefusedAsCommandLineOnly` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: the "file:line" prefix is wrapped at 79 columns, so the long CI temp path split it from "curl: config file option"; the test now asserts only the stable tail. Test-only change, platform-neutral; CI is watched by the shift.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: fbe34f51.
+- 2026-11-13: Doing -> Done. Expander-in-config-file test no longer depends on temp path length
