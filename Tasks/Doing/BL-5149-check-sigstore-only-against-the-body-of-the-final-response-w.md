@@ -22,9 +22,11 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
+
+- Task body was an empty template; mirrored BL-5122: SigstoreTransferHook now skips judging (and drops the held body of) a hop the follower will follow. Six new tests cover followed, tampered final, unfollowed, limit reached, no limit, no report. Platform-neutral, no sockets.
 
 ## Log
 

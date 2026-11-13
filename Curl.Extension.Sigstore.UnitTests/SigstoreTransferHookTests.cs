@@ -104,6 +104,78 @@ public sealed class SigstoreTransferHookTests
         StringAssert.Contains(empty.ErrorMessage, "--sigstore-root");
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_FollowingRedirects_VerifiesOnlyTheFinalBody()
+    {
+        var context = Context(new Curl.Protocol.Abstractions.HttpRequestOptions { FollowRedirects = true });
+        var hook = Hook(ValidBundle());
+
+        var first = await hook.ExecuteAsync(context, Hop(Encoding.ASCII.GetBytes("redirect page"), redirect: true));
+        var second = await hook.ExecuteAsync(context, Hop(Artifact, redirect: false));
+
+        Assert.IsTrue(first.IsSuccess);
+        Assert.IsTrue(second.IsSuccess);
+        CollectionAssert.AreEqual(Artifact, Bytes(context.Output));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FollowingRedirectsAndTheFinalBodyDiffers_FailsWith60()
+    {
+        var context = Context(new Curl.Protocol.Abstractions.HttpRequestOptions { FollowRedirects = true });
+        var hook = Hook(ValidBundle());
+
+        await hook.ExecuteAsync(context, Hop(Artifact, redirect: true));
+        var second = await hook.ExecuteAsync(context, Hop(Encoding.ASCII.GetBytes("tampered"), redirect: false));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, second.ExitCode);
+        Assert.AreEqual(0, context.Output.Length);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RedirectNotFollowed_VerifiesTheRedirectsBody()
+    {
+        var result = await Hook(ValidBundle()).ExecuteAsync(Context(new Curl.Protocol.Abstractions.HttpRequestOptions()), Hop(Encoding.ASCII.GetBytes("redirect page"), redirect: true));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RedirectLimitReached_VerifiesTheRedirectsBody()
+    {
+        var http = new Curl.Protocol.Abstractions.HttpRequestOptions { FollowRedirects = true, MaxRedirects = 1, RedirectsFollowed = 1 };
+
+        var result = await Hook(ValidBundle()).ExecuteAsync(Context(http), Hop(Encoding.ASCII.GetBytes("redirect page"), redirect: true));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_NoRedirectLimit_StillSkipsTheRedirect()
+    {
+        var http = new Curl.Protocol.Abstractions.HttpRequestOptions { FollowRedirects = true, MaxRedirects = -1, RedirectsFollowed = 100 };
+
+        var result = await Hook(ValidBundle()).ExecuteAsync(Context(http), Hop(Encoding.ASCII.GetBytes("redirect page"), redirect: true));
+
+        Assert.IsTrue(result.IsSuccess);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FollowingRedirectsButTheResponseHasNoReport_VerifiesTheBody()
+    {
+        var result = await Hook(ValidBundle()).ExecuteAsync(Context(new Curl.Protocol.Abstractions.HttpRequestOptions { FollowRedirects = true }), Serve(Encoding.ASCII.GetBytes("tampered")));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+    }
+
+    private static Func<ITransferContext, ValueTask<TransferResult>> Hop(byte[] body, bool redirect) => async context =>
+    {
+        await context.Output.WriteAsync(body);
+        var report = redirect
+            ? new TransferReport { ResponseCode = 302, RedirectUrl = "https://example.com/next" }
+            : new TransferReport { ResponseCode = 200 };
+        return TransferResult.Success(body.Length) with { Report = report };
+    };
+
     private string ValidBundle()
     {
         using var certificate = fulcio.Issue(signer);
@@ -133,8 +205,9 @@ public sealed class SigstoreTransferHookTests
 
     private static byte[] Bytes(Stream stream) => ((MemoryStream)stream).ToArray();
 
-    private static TransferContext Context() => new()
+    private static TransferContext Context(Curl.Protocol.Abstractions.HttpRequestOptions? http = null) => new()
     {
+        Http = http,
         Url = CurlUrl.Parse("https://example.com/release-1.0.tar.gz"),
         Output = new MemoryStream(),
         HeaderOutput = new MemoryStream(),
