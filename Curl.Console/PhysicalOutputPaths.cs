@@ -123,7 +123,20 @@ internal sealed class PhysicalOutputPaths(
         }
         else
         {
-            Directory.CreateDirectory(path, UnixDirectoryMode);
+            // .NET gives only the last directory the mode asked for and makes missing parents with
+            // 0777, so each missing parent is made on its own, outermost first (BL-5144).
+            var missing = new Stack<string>();
+            for (string? directory = Path.TrimEndingDirectorySeparator(path);
+                !string.IsNullOrEmpty(directory) && !Directory.Exists(directory);
+                directory = Path.GetDirectoryName(directory))
+            {
+                missing.Push(directory);
+            }
+
+            while (missing.Count > 0)
+            {
+                Directory.CreateDirectory(missing.Pop(), UnixDirectoryMode);
+            }
         }
     }
 
