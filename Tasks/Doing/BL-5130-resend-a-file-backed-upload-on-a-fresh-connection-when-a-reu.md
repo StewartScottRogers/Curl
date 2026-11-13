@@ -35,11 +35,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Http.UnitTests/HttpRewindableUploadResendTests.cs` prove that, on a reused connection closed by the server after the first response (no `Connection: close`), a seekable `StreamBody` upload is resent in full on a new connection and succeeds (200, one connect for the resent request), for a PUT body and a multipart body from a file.
-- [ ] A test proves the same with a 307 redirect (`-L`): the upload is followed and completes.
-- [ ] A test proves a non-seekable stream body is still not resent (same failure as today, exit 52), and `-d`/GET resend behaviour is unchanged.
-- [ ] Tests are platform-neutral (in-memory connection stand-ins).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Http.UnitTests/HttpRewindableUploadResendTests.cs` prove that, on a reused connection closed by the server after the first response (no `Connection: close`), a seekable `StreamBody` upload is resent in full on a new connection and succeeds (200, one connect for the resent request), for a PUT body and a multipart body from a file.
+- [x] A test proves the same with a 307 redirect (`-L`): the upload is followed and completes.
+- [x] A test proves a non-seekable stream body is still not resent (same failure as today, exit 52), and `-d`/GET resend behaviour is unchanged.
+- [x] Tests are platform-neutral (in-memory connection stand-ins).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,3 +50,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: e7a3fafb 6b4458c9 fb363b94 a8bf5a11 a0b49a29.
+- 2026-11-13: Done. `CanSendAgainOnFreshConnection` now allows a stream body that can seek or implements `IUploadRewinder` (`BodyCanBeSentAgain`); `FailedOutcome` rewinds it through `RewindStreamUploadFailure` before the resend. Non-seekable bodies still fail with exit 52. The `-L` case is the engine running the handler again with a rewound body, tested at that level (the handler does not follow redirects itself). Replaced the old test `ReusedConnectionDiedAfterAStreamBody_FailsWithoutSendingAgain` (it used a seekable stream); the non-seekable case is in the new tests. Quality run: 0 failing members. Linux/macOS: tests are in-memory and platform-neutral. Unrelated: Curl.Networking BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext failed once in the full run (port collision with other lanes), not touched.

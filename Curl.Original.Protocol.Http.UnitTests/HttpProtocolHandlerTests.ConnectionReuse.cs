@@ -456,22 +456,6 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ReusedConnectionDiedAfterAStreamBody_FailsWithoutSendingAgain()
-    {
-        HttpRequestOptions options = new() { Body = new StreamBody(new MemoryStream(new byte[3]), 3, "application/octet-stream") };
-        QueueConnector connector = new(ConnectResult.Connected(Connection(string.Empty, 65536), null, isReused: true));
-        Diagnostics.Arrange("url, stream body length", $"{ReuseUrl}, 3");
-
-        TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(new RecordingTransferEvents(), http: options));
-
-        WriteResult(result);
-        Diagnostics.Assert("exit code", CurlExitCode.GotNothing, result.ExitCode);
-        Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
-        Diagnostics.Assert("connect targets", 1, connector.Targets.Count);
-        Assert.AreEqual(1, connector.Targets.Count);
-    }
-
-    [TestMethod]
     public async Task ExecuteAsync_ReusedConnectionDiedAfterAnEmptyStreamBody_SendsTheRequestAgain()
     {
         HttpRequestOptions options = new() { Body = new StreamBody(new MemoryStream([], writable: false), 0, string.Empty) };

@@ -2357,6 +2357,20 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Tells whether a request body can go out again: it is not a stream, is an empty stream, or is
+    /// one <see cref="CanResend" /> says can be rewound (BL-5130).
+    /// </summary>
+    private static bool BodyCanBeSentAgain(HttpRequestBody? body) =>
+        body is not StreamBody { Length: not 0 } stream || CanResend(stream.Content);
+
+    /// <summary>
+    /// Rewinds a non-empty stream upload for a resend on a fresh connection, as
+    /// <see cref="RewindUploadFailure" /> does; an empty one has nothing to rewind (BL-5130).
+    /// </summary>
+    private static string? RewindStreamUploadFailure(HttpRequestBody? body, HttpRequestBodyWriter upload) =>
+        body is StreamBody { Length: not 0 } ? RewindUploadFailure(body, upload) : null;
+
+    /// <summary>
     /// Tells whether a stream body can be sent again from its start: it can seek, or it
     /// implements <see cref="IUploadRewinder" />.
     /// </summary>
@@ -2409,7 +2423,7 @@ public sealed class HttpProtocolHandler(
         }
 
         return DiedBeforeResponse(plan, reusedConnection, headReader, failure)
-            ? new HttpAttemptOutcome(failed, plan.OnFreshConnection(), KeepsAlive: false) { DiedBeforeResponse = true }
+            ? new HttpAttemptOutcome(failed, plan.OnFreshConnection().FailingUploadRewind(RewindStreamUploadFailure(plan.Framing.Body, upload)), KeepsAlive: false) { DiedBeforeResponse = true }
             : new HttpAttemptOutcome(failed, null, KeepsAlive: failure.LeavesConnectionIntact);
     }
 
@@ -2488,7 +2502,7 @@ public sealed class HttpProtocolHandler(
     private static bool CanSendAgainOnFreshConnection(HttpRequestPlan plan, bool reusedConnection) =>
         reusedConnection
             && !plan.SentOnFreshConnection
-            && plan.Framing.Body is not StreamBody { Length: not 0 };
+            && BodyCanBeSentAgain(plan.Framing.Body);
 
     /// <summary>
     /// Fails a request before any byte of it is sent, as curl 8.21.0 does once connected: a
