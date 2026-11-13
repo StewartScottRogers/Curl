@@ -51,6 +51,17 @@ public sealed class DerReaderTests
     }
 
     [TestMethod]
+    public void TryRead_LongLengthBytesFillTheInputExactly_ReadsTheEmptyElement()
+    {
+        byte[] der = [0x04, 0x81, 0x00];
+
+        var read = DerReader.TryRead(der, 0, der.Length, out var element);
+
+        Assert.IsTrue(read);
+        Assert.AreEqual((4, false, 3, 3, 3), Describe(element));
+    }
+
+    [TestMethod]
     public void TryRead_IndefiniteLengthOnConstructedElement_RunsToTheZeroByteAndSkipsOnlyIt()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
