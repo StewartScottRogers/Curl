@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Har.UnitLibrary/HarExchange.cs, Curl.Extension.Har.UnitLibrary/HarTransferHook.cs, Curl.Extension.Har.UnitTests/HarTransferHookTests.cs, Documentation/Planning/Decisions/ADR-1146-har-writes-each-option-groups-http-transfers-as-a-har-1-2-archive.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5049 — List the Cookie and default User-Agent request headers in --har entries
 
@@ -45,3 +45,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 97d216bb 8a590c81 c8d40aba 5217e918 a0b49a29.
 - 2026-11-12: Default UA is a `curl/8.22.0` constant in HarTransferHook (no shared version source exists; same literal as other libraries). Cookie listed after Referer unless a `-H Cookie` is given. Quality run: 0 failing members.
+- 2026-11-12: Doing -> Done. Cookie and default User-Agent listed in --har request headers; tests and ADR-1146 updated
