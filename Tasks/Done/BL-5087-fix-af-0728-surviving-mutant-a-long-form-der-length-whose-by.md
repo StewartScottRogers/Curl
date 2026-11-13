@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5087 — Fix AF-0728: Surviving mutant: a long-form DER length whose bytes exactly fill the input can be refused
 
@@ -52,3 +52,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Test pins the boundary mutant
