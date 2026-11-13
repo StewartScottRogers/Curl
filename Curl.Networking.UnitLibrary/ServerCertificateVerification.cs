@@ -505,7 +505,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
             : errors;
 
     // curl's Schannel build builds the --cacert chain with an exclusive-root engine holding
-    // the file's certificates, where a leaf the file lists is itself a trust anchor: a chain
+    // the file's certificates, where any certificate the file lists, the leaf or an intermediate, is itself a trust anchor (BL-5100): a chain
     // .NET finds partial or untrusted only for want of a root is accepted (measured with curl
     // 8.22.0, tls-wrong-ca, BL-3289, ADR-0797).
     //
@@ -519,13 +519,9 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         && HasOnlyMissingRootStatus(ReadChainStatus(chain))
         && ListsAnAnchorCandidate(chain);
 
-    private bool ListsAnAnchorCandidate(X509Chain chain)
-    {
-        var candidates = matchesSchannelBuild
-            ? chain.ChainElements.Cast<X509ChainElement>().Take(1)
-            : chain.ChainElements.Cast<X509ChainElement>();
-        return candidates.Any(element => ListsCertificate(chain.ChainPolicy.CustomTrustStore, element.Certificate));
-    }
+    private static bool ListsAnAnchorCandidate(X509Chain chain) =>
+        chain.ChainElements.Cast<X509ChainElement>()
+            .Any(element => ListsCertificate(chain.ChainPolicy.CustomTrustStore, element.Certificate));
 
     private static bool HasOnlyMissingRootStatus(X509ChainStatus[] chainStatus) =>
         chainStatus.All(status => (status.Status & ~(X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.UntrustedRoot)) == 0);

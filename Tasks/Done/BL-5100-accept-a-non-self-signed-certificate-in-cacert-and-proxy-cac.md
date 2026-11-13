@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.NonSelfSignedAnchor.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5100 — Accept a non-self-signed certificate in --cacert and --proxy-cacert as a trust anchor on Windows
 
@@ -35,11 +35,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.NonSelfSignedAnchor.cs` (certificates generated in the test) prove that a chain leaf -> `int` -> `ca` is accepted when the anchor file holds only `int`, on the default route and the `--ssl-no-revoke` route.
-- [ ] A test proves the leaf itself as the only anchor is accepted on the default route, and the proxy-certificate policy accepts an anchor that is a leaf or an intermediate.
-- [ ] A test proves a leaf signed by an unrelated CA, with an unrelated certificate as the only anchor, is still refused with exit 60, and that an expired or wrong-name certificate is still refused.
-- [ ] Tests are platform-neutral, or `[OSCondition(OperatingSystems.Windows)]` where they need the Windows chain engine; the Linux route is unchanged.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.NonSelfSignedAnchor.cs` (certificates generated in the test) prove that a chain leaf -> `int` -> `ca` is accepted when the anchor file holds only `int`, on the default route and the `--ssl-no-revoke` route.
+- [x] A test proves the leaf itself as the only anchor is accepted on the default route, and the proxy-certificate policy accepts an anchor that is a leaf or an intermediate.
+- [x] A test proves a leaf signed by an unrelated CA, with an unrelated certificate as the only anchor, is still refused with exit 60, and that an expired or wrong-name certificate is still refused.
+- [x] Tests are platform-neutral, or `[OSCondition(OperatingSystems.Windows)]` where they need the Windows chain engine; the Linux route is unchanged.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -51,3 +51,5 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 9473f6d9 4b0a611d d86c5b61 4b3018a4 a0b49a29.
+- 2026-11-13: Fix: `ListsAnAnchorCandidate` takes every chain element in the Schannel build (ADR-1266). Two older tests that pinned exit 60 for an intermediate-only file now pin acceptance; the LeafAnchor "another certificate" test got a distinct subject. Quality run for Curl.Networking.UnitLibrary clean. Windows hand check not done in the lane.
+- 2026-11-13: Doing -> Done. A listed intermediate or leaf now anchors the Schannel --cacert chain
