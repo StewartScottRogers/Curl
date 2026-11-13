@@ -23,7 +23,7 @@ public static class ObliviousHttpExtension
     public static ExtensionOption KeysOption { get; } = new(
         "ohttp-keys",
         ExtensionOptionArgument.Value,
-        "Read the gateway's application/ohttp-keys from <file>, or GET them from an http:// or https:// <url>");
+        "Read the gateway's application/ohttp-keys from <file>, or GET them from an http:// or https:// <url> (needs --ohttp-relay)");
 
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
@@ -35,10 +35,17 @@ public static class ObliviousHttpExtension
 
     /// <summary>Gives the extension's transfer hook when the option group gave <c>--ohttp-relay</c>.</summary>
     /// <param name="values">The option group's extension options.</param>
-    /// <returns>The hook for the named relay, or <see langword="null" /> when <c>--ohttp-relay</c> was not given.</returns>
+    /// <returns>The hook for the named relay, or <see langword="null" /> when neither option was given.</returns>
+    /// <exception cref="ArgumentException"><c>--ohttp-keys</c> was given without <c>--ohttp-relay</c>.</exception>
     public static ITransferHook? HookFor(ExtensionOptionValues values)
     {
         ArgumentNullException.ThrowIfNull(values);
-        return values.ValueOf(RelayOption) is { } relay ? new ObliviousHttpTransferHook(relay, values.ValueOf(KeysOption)) : null;
+        string? keys = values.ValueOf(KeysOption);
+        return (values.ValueOf(RelayOption), keys) switch
+        {
+            ({ } relay, _) => new ObliviousHttpTransferHook(relay, keys),
+            (null, null) => null,
+            _ => throw new ArgumentException("--ohttp-keys needs --ohttp-relay", nameof(values)),
+        };
     }
 }

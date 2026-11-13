@@ -15,10 +15,25 @@ public sealed class ObliviousHttpExtensionTests
     }
 
     [TestMethod]
+    public void HookFor_RelayAndKeysGiven_GivesTheHook()
+    {
+        var values = new ExtensionOptionValues(new Dictionary<string, string> { [ObliviousHttpExtension.RelayOption.Name] = "https://relay.example/r", [ObliviousHttpExtension.KeysOption.Name] = "keys.bin" });
+
+        Assert.IsInstanceOfType<ObliviousHttpTransferHook>(ObliviousHttpExtension.HookFor(values));
+    }
+
+    [TestMethod]
+    public void HookFor_KeysWithoutRelay_Throws()
+    {
+        var failure = Assert.ThrowsExactly<ArgumentException>(() => ObliviousHttpExtension.HookFor(Given(ObliviousHttpExtension.KeysOption)));
+
+        Assert.Contains("--ohttp-keys needs --ohttp-relay", failure.Message);
+    }
+
+    [TestMethod]
     public void HookFor_RelayNotGiven_GivesNone()
     {
         Assert.IsNull(ObliviousHttpExtension.HookFor(ExtensionOptionValues.None));
-        Assert.IsNull(ObliviousHttpExtension.HookFor(Given(ObliviousHttpExtension.KeysOption)));
         Assert.ThrowsExactly<ArgumentNullException>(() => ObliviousHttpExtension.HookFor(null!));
     }
 

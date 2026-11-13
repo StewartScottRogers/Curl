@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ObliviousHttp.UnitLibrary/ObliviousHttpExtension.cs, Curl.Extension.ObliviousHttp.UnitTests/ObliviousHttpExtensionTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5111 — Refuse --ohttp-keys without --ohttp-relay with exit 2
 
@@ -32,11 +32,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] Tests added to `Curl.Extension.ObliviousHttp.UnitTests/ObliviousHttpExtensionTests.cs` prove `--ohttp-keys <x>` without `--ohttp-relay` throws the `--ohttp-keys needs --ohttp-relay` failure that surfaces as `CurlExitCode` 2 with the exact message, with no hook returned and no connection made.
-- [ ] Regression tests prove both options together still produce the hook, no companion options still returns no hook, and the existing `--ohttp-relay` without `--ohttp-keys` behaviour is unchanged.
-- [ ] `--extended-help` for the extension says `--ohttp-keys` needs `--ohttp-relay`; `--ai-help` is kept right if it mentions it.
-- [ ] Tests are platform-neutral and use no network.
-- [ ] `dotnet build Curl.Extension.ObliviousHttp.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Tests added to `Curl.Extension.ObliviousHttp.UnitTests/ObliviousHttpExtensionTests.cs` prove `--ohttp-keys <x>` without `--ohttp-relay` throws the `--ohttp-keys needs --ohttp-relay` failure that surfaces as `CurlExitCode` 2 with the exact message, with no hook returned and no connection made.
+- [x] Regression tests prove both options together still produce the hook, no companion options still returns no hook, and the existing `--ohttp-relay` without `--ohttp-keys` behaviour is unchanged.
+- [x] `--extended-help` for the extension says `--ohttp-keys` needs `--ohttp-relay`; `--ai-help` is kept right if it mentions it.
+- [x] Tests are platform-neutral and use no network.
+- [x] `dotnet build Curl.Extension.ObliviousHttp.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -44,7 +44,10 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - Extension isolation holds: the extension references only `Curl.Extension.Abstractions` and shared layers.
 - Review acceptance check, as a hand check: step 1 exits 2 with `curl: --ohttp-keys needs --ohttp-relay`, and the server sees no request.
 
+- Done: `HookFor` throws `ArgumentException("--ohttp-keys needs --ohttp-relay")` when keys is given alone (same pattern as ObliviousDoh); relay alone unchanged; `--ohttp-keys` option text (shown in `--extended-help` and `--ai-help`) now says it needs `--ohttp-relay`. Platform-neutral, no network. Quality run: 0 failing members. Build and fast tests green.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b2278c4d 2e66514d 856228c7 c81ed873 2ed60793.
+- 2026-11-13: Doing -> Done. Refused --ohttp-keys without --ohttp-relay
