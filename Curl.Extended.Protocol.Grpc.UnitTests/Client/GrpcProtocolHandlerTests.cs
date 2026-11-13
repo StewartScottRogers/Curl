@@ -553,6 +553,170 @@ public sealed class GrpcProtocolHandlerTests
         return (headers, data.ToArray());
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_MaxTimeDuringReflection_ReportsOperationTimedOut()
+    {
+        var clock = new ManualClock();
+        using var watchdog = new Curl.Core.MaxTimeWatchdog(TimeSpan.FromSeconds(2), clock);
+        var connection = new HangingConnection(GrpcServerReply.Of());
+        var progress = new CountingProgress();
+        var context = new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream(), PostData = Encoding.UTF8.GetBytes("{}"), Progress = watchdog.WatchProgress(progress), CancellationToken = watchdog.Token };
+        Task<TransferResult> call = new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection, null))).ExecuteAsync(context).AsTask();
+
+        await connection.Hanging.Task;
+        clock.Fire(TimeSpan.FromSeconds(2));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => call);
+
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, watchdog.Failure.ExitCode);
+        Assert.AreEqual("Operation timed out after 2000 milliseconds with 0 bytes received", watchdog.Failure.ErrorMessage);
+        Assert.AreEqual(1, progress.TransferStarted);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MaxTimeWhileConnecting_ReportsConnectionTimedOut()
+    {
+        var clock = new ManualClock();
+        using var watchdog = new Curl.Core.MaxTimeWatchdog(TimeSpan.FromSeconds(2), clock);
+        var progress = new CountingProgress();
+        var connector = new HangingConnector();
+        var context = new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream(), PostData = Encoding.UTF8.GetBytes("{}"), Progress = watchdog.WatchProgress(progress), CancellationToken = watchdog.Token };
+        Task<TransferResult> call = new GrpcProtocolHandler(connector).ExecuteAsync(context).AsTask();
+
+        await connector.Hanging.Task;
+        clock.Fire(TimeSpan.FromSeconds(2));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => call);
+
+        Assert.AreEqual("Connection timed out after 2000 milliseconds", watchdog.Failure.ErrorMessage);
+        Assert.AreEqual(0, progress.TransferStarted);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WithGrpcProto_ReportsTransferStartedOnce()
+    {
+        using var proto = new ProtoFixture();
+        var progress = new CountingProgress();
+        var reply = GrpcServerReply.Of(GrpcServerReply.Headers(true, ":status", "200", "content-type", "application/grpc", "grpc-status", "0"));
+        var context = new GrpcProtoContext(new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream(), PostData = Encoding.UTF8.GetBytes("{}"), Progress = progress }, proto.GreeterPath);
+
+        await new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(new ScriptedConnection(reply), null))).ExecuteAsync(context);
+
+        Assert.AreEqual(1, progress.TransferStarted);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WithReflection_ReportsTransferStartedOnce()
+    {
+        byte[] reply = Reflection.ReflectionFixture.Server(
+            Reflection.ReflectionFixture.Headers(1, false, GrpcServerReply.OkHeaders),
+            Reflection.ReflectionFixture.Message(1, Reflection.ReflectionFixture.FilesResponse(Reflection.ReflectionFixture.HelloWorldFile)),
+            Reflection.ReflectionFixture.Trailers(1, 0),
+            Reflection.ReflectionFixture.Headers(3, false, GrpcServerReply.OkHeaders),
+            Reflection.ReflectionFixture.Message(3, ReplyHi),
+            Reflection.ReflectionFixture.Trailers(3, 0));
+        var progress = new CountingProgress();
+        var context = new TransferContext { Url = CurlUrl.Parse(GreeterUrl), Output = new MemoryStream(), PostData = Encoding.UTF8.GetBytes("{\"name\":\"World\"}"), Progress = progress };
+
+        await new GrpcProtocolHandler(new ScriptedConnector(ConnectResult.Connected(new ScriptedConnection(reply), null))).ExecuteAsync(context);
+
+        Assert.AreEqual(1, progress.TransferStarted);
+    }
+
+    private sealed class CountingProgress : ITransferProgress
+    {
+        public int TransferStarted { get; private set; }
+
+        public void ReportTransferStarted() => TransferStarted++;
+
+        public void ReportDownloaded(long bytesSoFar, long? expectedTotal)
+        {
+        }
+
+        public void ReportUploaded(long bytesSoFar, long? expectedTotal)
+        {
+        }
+    }
+
+    /// <summary>A clock whose one timer fires when the test says, after the test has moved time on.</summary>
+    private sealed class ManualClock : TimeProvider
+    {
+        private long ticks;
+        private TimerCallback? callback;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => ticks;
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            this.callback = callback;
+            return new NoTimer();
+        }
+
+        public void Fire(TimeSpan elapsed)
+        {
+            ticks += elapsed.Ticks;
+            callback!(null);
+        }
+
+        private sealed class NoTimer : ITimer
+        {
+            public bool Change(TimeSpan dueTime, TimeSpan period) => true;
+
+            public void Dispose()
+            {
+            }
+
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>A connection that gives its scripted bytes, then waits for cancellation on the next read.</summary>
+    private sealed class HangingConnection(byte[] reply) : IConnection
+    {
+        private readonly ScriptedConnection inner = new(reply);
+        private int served;
+
+        public TaskCompletionSource Hanging { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool IsSecure => false;
+
+        public System.Net.EndPoint? RemoteEndPoint => null;
+
+        public bool IsDisposed => inner.IsDisposed;
+
+        public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            int read = served < reply.Length ? await inner.ReadAsync(buffer, cancellationToken) : 0;
+            if (read > 0)
+            {
+                served += read;
+                return read;
+            }
+
+            Hanging.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return 0;
+        }
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => inner.WriteAsync(buffer, cancellationToken);
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
+
+    private sealed class HangingConnector : IConnector
+    {
+        public TaskCompletionSource Hanging { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
+        {
+            Hanging.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return default!;
+        }
+    }
+
     /// <summary>One call through the handler over a scripted connection.</summary>
     private sealed class Call(byte[] reply, string? applicationProtocol = null)
     {

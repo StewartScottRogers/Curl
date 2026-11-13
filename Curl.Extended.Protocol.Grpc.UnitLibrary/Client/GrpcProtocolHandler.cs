@@ -158,10 +158,10 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
     private static async Task<TransferResult> CallOverStreamAsync(ITransferContext context, ConnectionStream stream, GrpcRequestTarget target, GrpcProtoMethod? method, byte[]? request, ReadOnlyMemory<byte>? body)
     {
         GrpcHttp2Session session = await GrpcHttp2Session.OpenAsync(stream, context.CancellationToken).ConfigureAwait(false);
+        context.Progress.ReportTransferStarted();
         GrpcRequestHeaderValues headerValues = HeaderValuesOf(context);
         method ??= await ServerReflectionClient.DescribeAsync(session, target, headerValues, context.CancellationToken).ConfigureAwait(false);
         request ??= GrpcMessageJson.Encode(method.Input, body);
-        context.Progress.ReportTransferStarted();
         var headers = GrpcRequestHeaders.Build(target, headerValues);
         GrpcCallResult result = await GrpcHttp2Call.RunAsync(session, headers, request, context.CancellationToken).ConfigureAwait(false);
         return await WriteAsync(context, method.Output, result).ConfigureAwait(false);

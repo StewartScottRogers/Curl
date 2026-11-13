@@ -32,16 +32,18 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcProtocolHandlerTests.cs` scripts a connection that accepts, completes the HTTP/2 preface and never answers the reflection call, with a `-m` of 2 s on a fake `TimeProvider`, and asserts exit 28 with the message `Operation timed out after 2000 milliseconds with 0 bytes received`.
-- [ ] Regression: a timeout while still connecting (no connection established) still says `Connection timed out after N milliseconds`, and the `--grpc-proto` timeout text is unchanged.
-- [ ] `ReportTransferStarted` is called exactly once per call (a test with a recording `ITransferProgress` asserts it for both the reflection and the `--grpc-proto` paths).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A test in `Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcProtocolHandlerTests.cs` scripts a connection that accepts, completes the HTTP/2 preface and never answers the reflection call, with a `-m` of 2 s on a fake `TimeProvider`, and asserts exit 28 with the message `Operation timed out after 2000 milliseconds with 0 bytes received`.
+- [x] Regression: a timeout while still connecting (no connection established) still says `Connection timed out after N milliseconds`, and the `--grpc-proto` timeout text is unchanged.
+- [x] `ReportTransferStarted` is called exactly once per call (a test with a recording `ITransferProgress` asserts it for both the reflection and the `--grpc-proto` paths).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). The unit tests use the existing `ScriptedConnection` in `Curl.Extended.Protocol.Grpc.UnitTests/Client`.
 - BL-5018 and BL-5028 also change `GrpcProtocolHandler.cs`, so the board runs them one at a time; no dependency is needed.
 - Review acceptance check: the command prints the `Operation timed out after ... with 0 bytes received` text.
+
+- Done: ReportTransferStarted now runs once the HTTP/2 session is open, before reflection; 4 new tests; quality run 0 failing members. Platform-neutral.
 
 ## Log
 
