@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added Lib530Tests.RunAsync_SentHeader_TracesItWithoutTheTimeAndWithTheHexColumn, pinning the hex column and absent time stamp. The audit tool is refused to lanes (guard), so the mutant run was not repeated; with noHex true the hex line would be missing and the test fails. Fast tests green (1208).
 
 ## Log
 
