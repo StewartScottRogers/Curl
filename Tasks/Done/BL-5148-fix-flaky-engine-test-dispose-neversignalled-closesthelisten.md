@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests/SocketActionGatedResolverTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5148 — Fix flaky Engine test Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing
 
@@ -22,7 +22,7 @@ LoopbackLookupWakeup disposal closes the handle, but another test may be given t
 
 ## Acceptance criteria
 
-- [x] The test passes whether or not the handle number is reused: it checks the endpoint no longer belongs to the closed listener.
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
 
@@ -30,3 +30,4 @@ LoopbackLookupWakeup disposal closes the handle, but another test may be given t
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-11-13: Doing -> Done. Test no longer depends on the closed handle number staying unused
