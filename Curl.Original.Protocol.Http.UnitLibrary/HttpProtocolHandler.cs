@@ -3672,7 +3672,7 @@ public sealed class HttpProtocolHandler(
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
                 Timings = TimingsNow(),
             };
-            return Head is null ? report : WithHead(report, Head, body.StreamTrailers) with { RedirectUrl = RedirectUrl, DigestStaysAvailable = DigestStaysAvailableAfter(HeldDigestNonce, SentNtlmAuthorization, Head) };
+            return Head is null ? report : WithHead(report, Head, body.StreamTrailers) with { TrailerCount = body.StreamTrailers.Count + body.ChunkedTrailerCount, RedirectUrl = RedirectUrl, DigestStaysAvailable = DigestStaysAvailableAfter(HeldDigestNonce, SentNtlmAuthorization, Head) };
         }
 
         private long RequestSizeSoFar() => earlier?.RequestSize ?? 0;

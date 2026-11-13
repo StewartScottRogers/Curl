@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpChunkedDecoder.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.ChunkedTrailerNumHeaders.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5039 — Report the trailer count in num_headers for HTTP/1.1 chunked responses with trailers
 
@@ -27,11 +27,13 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] A new test file `Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.ChunkedTrailerNumHeaders.cs` (modelled on `Http2TrailerNumHeadersTests.cs`) runs the response above and asserts `TransferReport.TrailerCount` is 1 (so `%{num_headers}` renders `1`).
-- [ ] A chunked response with no trailers still reports its response header count (`2` for `X-A`, `X-B`), and an HTTP/2 trailer response is unchanged.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test file `Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.ChunkedTrailerNumHeaders.cs` (modelled on `Http2TrailerNumHeadersTests.cs`) runs the response above and asserts `TransferReport.TrailerCount` is 1 (so `%{num_headers}` renders `1`).
+- [x] A chunked response with no trailers still reports its response header count (`2` for `X-A`, `X-B`), and an HTTP/2 trailer response is unchanged.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Done: HttpResponseBodyReader.ChunkedTrailerCount feeds TransferReport.TrailerCount in HttpProtocolHandler.Report (no touches change needed). Quality run: 0 failing members. Test pins head header count 3 (incl. Transfer-Encoding).
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text.
 
@@ -39,3 +41,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 3885beaa 9167f6b6 a0b49a29.
+- 2026-11-12: Doing -> Done. Chunked trailers now reported in num_headers

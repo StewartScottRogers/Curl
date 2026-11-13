@@ -88,7 +88,13 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// Gets how many response headers the transfer has stored: <see cref="HeadersStoredBefore" />
     /// and the chunked body's trailers decoded so far.
     /// </summary>
-    internal int HeadersStored => HeadersStoredBefore + (decoder?.TrailerCount ?? 0);
+    internal int HeadersStored => HeadersStoredBefore + ChunkedTrailerCount;
+
+    /// <summary>
+    /// Gets how many trailers the chunked body's decoder has read so far (0 without chunked framing);
+    /// <c>%{num_headers}</c> prints it instead of the head's header count (BL-5039).
+    /// </summary>
+    internal int ChunkedTrailerCount => decoder?.TrailerCount ?? 0;
 
     /// <summary>
     /// Gets or sets a value indicating whether <c>--max-filesize</c> was given, so a
