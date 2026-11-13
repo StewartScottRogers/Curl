@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.WebSocketRepl.UnitTests]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5070 — Fix AF-0711: RunAsync_Cancelled_ThrowsAndStopsReadingLines never checks that line reading stops
 
@@ -52,3 +52,4 @@ Test now hands the reader one line and asserts ScriptedLineReader.LinesRead is 0
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Test asserts the reader is never read after cancellation
