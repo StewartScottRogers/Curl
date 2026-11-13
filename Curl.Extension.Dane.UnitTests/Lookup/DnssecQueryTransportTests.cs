@@ -59,6 +59,14 @@ public sealed class DnssecQueryTransportTests
         await Assert.ThrowsAsync<OperationCanceledException>(async () => await Transport(server).QueryAsync("example.test", DnssecRecordType.Tlsa, cancelled.Token));
     }
 
+    [TestMethod]
+    public async Task QueryAsync_ResolverRefusesTheDatagram_GivesNullInsteadOfThrowing()
+    {
+        FakeDnsServer server = new(new ManualTimeProvider()) { ReceiveThrowsSocketError = true };
+
+        Assert.IsNull(await Transport(server).QueryAsync("example.test", DnssecRecordType.Tlsa, CancellationToken.None));
+    }
+
     private static DnssecQueryTransport Transport(FakeDnsServer server) =>
         new(server, server, "resolver.test", 53, TimeProvider.System, TimeSpan.FromHours(1));
 }

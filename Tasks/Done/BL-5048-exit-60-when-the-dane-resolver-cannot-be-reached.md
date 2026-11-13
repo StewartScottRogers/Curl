@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Dane.UnitLibrary/DaneCheckHook.cs, Curl.Extension.Dane.UnitLibrary/Lookup/DnssecQueryTransport.cs, Curl.Extension.Dane.UnitTests/DaneCheckHookTests.cs, Curl.Extension.Dane.UnitTests/Lookup/DnssecQueryTransportTests.cs, Documentation/Planning/Decisions/ADR-1156-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5048 — Exit 60 when the --dane resolver cannot be reached
 
@@ -30,11 +30,11 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extension.Dane.UnitTests/Lookup/DnssecQueryTransportTests.cs` or `TlsaLookupTests.cs` has a test that a resolver whose connection is refused (a connector that throws a connect failure) gives `TlsaLookupStatus.Failed`, not an exception.
-- [ ] `Curl.Extension.Dane.UnitTests/DaneCheckHookTests.cs` has a test that an unreachable resolver makes `RefusalOfAsync` return a refusal naming the resolver (`127.0.0.1:48999`) and the TLSA name, so the transfer ends with exit 60 (the exit the hook's refusal already maps to), for both a trusted and a skipped-verification (`-k`) transfer.
-- [ ] Regression: timeout and error-RCODE resolver answers still exit 60, and a secure matching answer still passes.
-- [ ] ADR-1156 (`Documentation/Planning/Decisions/ADR-1156-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md`) matches the behaviour (unreachable resolver exits 60).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `Curl.Extension.Dane.UnitTests/Lookup/DnssecQueryTransportTests.cs` or `TlsaLookupTests.cs` has a test that a resolver whose connection is refused (a connector that throws a connect failure) gives `TlsaLookupStatus.Failed`, not an exception.
+- [x] `Curl.Extension.Dane.UnitTests/DaneCheckHookTests.cs` has a test that an unreachable resolver makes `RefusalOfAsync` return a refusal naming the resolver (`127.0.0.1:48999`) and the TLSA name, so the transfer ends with exit 60 (the exit the hook's refusal already maps to), for both a trusted and a skipped-verification (`-k`) transfer.
+- [x] Regression: timeout and error-RCODE resolver answers still exit 60, and a secure matching answer still passes.
+- [x] ADR-1156 (`Documentation/Planning/Decisions/ADR-1156-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md`) matches the behaviour (unreachable resolver exits 60).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -44,3 +44,8 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 967f782d 20432b50 de4e2cdd be060702 a0b49a29.
+
+### Notes (run)
+- Cause: the real UDP channel's `ReceiveAsync` throws `SocketException` (ICMP port unreachable on a refused resolver); it escaped `DnssecQueryTransport.QueryAsync` and took the connector's exit-7 path. Fixed by catching `SocketException` there, giving null, so `TlsaLookupStatus.Failed` and the hook's exit-60 refusal follow.
+- The hook's refusal does not depend on certificate verification, so `-k` and trusted transfers share the one hook test. Timeout/RCODE tests unchanged and green. ADR-1156 wording updated in place.
+- 2026-11-12: Doing -> Done. SocketException from the resolver's UDP channel now gives a Failed lookup, so exit 60

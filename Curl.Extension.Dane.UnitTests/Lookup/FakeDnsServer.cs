@@ -33,6 +33,9 @@ internal sealed class FakeDnsServer(ManualTimeProvider clock) : IDatagramConnect
 
     public bool ConnectFails { get; set; }
 
+    /// <summary>Gets or sets whether the UDP receive throws the socket error an ICMP port unreachable gives.</summary>
+    public bool ReceiveThrowsSocketError { get; set; }
+
     /// <summary>Gets or sets how many octets of a TCP reply are sent before the connection closes; null sends it all.</summary>
     public int? TcpReplyLength { get; set; }
 
@@ -96,6 +99,11 @@ internal sealed class FakeDnsServer(ManualTimeProvider clock) : IDatagramConnect
 
         public async ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
         {
+            if (server.ReceiveThrowsSocketError)
+            {
+                throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused);
+            }
+
             if (pending.TryDequeue(out (byte[] Datagram, EndPoint From) next))
             {
                 next.Datagram.CopyTo(buffer);

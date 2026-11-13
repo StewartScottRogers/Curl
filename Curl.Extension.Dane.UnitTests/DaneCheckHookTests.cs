@@ -149,6 +149,20 @@ public sealed class DaneCheckHookTests
         Assert.AreSame(DaneExtension.Option, hook.Option);
     }
 
+    [TestMethod]
+    public async Task RefusalOfAsync_ResolverUnreachable_RefusesNamingResolverAndTlsaName()
+    {
+        FakeDnsServer server = new(new ManualTimeProvider()) { ReceiveThrowsSocketError = true };
+        var hook = new DaneCheckHook("127.0.0.1:48999", _ => new TlsaLookup(
+            new DnssecQueryTransport(server, server, "127.0.0.1", 48999, TimeProvider.System, TimeSpan.FromHours(1)),
+            new RrsigVerifier(TimeProvider.System),
+            []));
+
+        string? refusal = await hook.RefusalOfAsync([Leaf], "localhost", 48443, CancellationToken.None);
+
+        Assert.AreEqual("DANE: the resolver 127.0.0.1:48999 gave no usable answer for _48443._tcp.localhost's TLSA records", refusal);
+    }
+
     private static Task<string?> RefusalAsync(SignedTree tree) =>
         new DaneCheckHook("192.0.2.53", _ => tree.Lookup()).RefusalOfAsync([Leaf], "example.test", 443, CancellationToken.None).AsTask();
 
