@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/SchannelAlgorithmList.cs, Curl.Console/EasyOptionsFromCommandLine.cs, Curl.Networking.UnitTests/SchannelTls13CipherListRefusalTests.cs]
+touches: [Curl.Networking.UnitLibrary/SchannelAlgorithmList.cs, Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Console/EasyOptionsFromCommandLine.cs, Curl.Networking.UnitTests/SchannelTls13CipherListRefusalTests.cs]
 requirement: none
 created: 2026-11-13
 completed:
@@ -30,11 +30,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Networking.UnitTests/SchannelTls13CipherListRefusalTests.cs` prove that minimum version TLS 1.3 plus a non-empty cipher list yields exit 35 with the exact message `schannel: TLS 1.3 is not supported with a cipher list; remove the cipher list or allow a lower TLS version`, before any connection is opened (a connection stand-in records zero opens).
-- [ ] Regression tests prove that a cipher list without `--tlsv1.3`, and `--tlsv1.3` without a cipher list, are not refused.
-- [ ] Tests are platform-neutral, or marked `[OSCondition(OperatingSystems.Windows)]` where they depend on the Schannel route.
-- [ ] No option is added, so `--ai-help` and `--help` need no change; the task's Log states this was checked.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Networking.UnitTests/SchannelTls13CipherListRefusalTests.cs` prove that minimum version TLS 1.3 plus a non-empty cipher list yields exit 35 with the exact message `schannel: TLS 1.3 is not supported with a cipher list; remove the cipher list or allow a lower TLS version`, before any connection is opened (a connection stand-in records zero opens).
+- [x] Regression tests prove that a cipher list without `--tlsv1.3`, and `--tlsv1.3` without a cipher list, are not refused.
+- [x] Tests are platform-neutral, or marked `[OSCondition(OperatingSystems.Windows)]` where they depend on the Schannel route.
+- [x] No option is added, so `--ai-help` and `--help` need no change; the task's Log states this was checked.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -45,3 +45,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 0aed72f3 9ea204d8 7fd76bd8 6d9d1948 a0b49a29.
+- 2026-11-13: Checked: no option added, so `--ai-help` and `--help` need no change. Refusal is in SchannelAlgorithmList.Refusal/OfferedSuites (new minimumVersion parameter), called by both providers' Schannel route with options.MinimumVersion; message in TlsFailureMessages. The console already passes MinimumVersion, so EasyOptionsFromCommandLine.cs needed no edit. Tests are platform-neutral (no connection is made, the refusal is a pure function). Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing. Linux/macOS CI: OpenSSL route unchanged.
