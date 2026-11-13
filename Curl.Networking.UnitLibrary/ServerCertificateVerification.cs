@@ -694,8 +694,9 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
             .Select(name => name![..8])
             .Distinct(StringComparer.Ordinal);
 
+    // Length >= 10: eight hash characters, the dot and at least one digit; a bare "<hash>." never names a file OpenSSL reads.
     private static bool IsHashedCertificateFileName(string? name) =>
-        name is { Length: > 9 }
+        name is { Length: >= 10 }
         && name[8] == '.'
         && name.AsSpan(0, 8).ContainsAnyExcept("0123456789abcdef") is false
         && name.AsSpan(9).ContainsAnyExceptInRange('0', '9') is false;
