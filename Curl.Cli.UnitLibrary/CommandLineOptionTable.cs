@@ -1097,13 +1097,23 @@ public static partial class CommandLineOptionTable
         CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, true, true, out byte[] contents);
         if (refusal is null)
         {
-            foreach (string line in HeaderFileText.Read(contents, options.ConfigFileWireTextEncoding).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
-            {
-                addHeader(line);
-            }
+            AddHeaderFileLines(HeaderFileText.Read(contents, options.ConfigFileWireTextEncoding), addHeader);
         }
 
         return refusal;
+    }
+
+    /// <summary>Adds each non-blank line of a header file, splitting on LF only and trimming one trailing CR per line, as curl does.</summary>
+    private static void AddHeaderFileLines(string text, Action<string> addHeader)
+    {
+        foreach (string line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string header = line.EndsWith('\r') ? line[..^1] : line;
+            if (header.Length > 0)
+            {
+                addHeader(header);
+            }
+        }
     }
 
     /// <summary>
