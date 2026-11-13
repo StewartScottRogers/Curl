@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+Added a Speed test row at exactly 1000000 microseconds with a huge size; it kills the >= to > mutant (the mutant would give long.MaxValue). The audit tool is off-limits to lanes, so the reproduction itself was not run. Test only, no production change.
+
 ## Log
 
 - 2026-11-13: Created.

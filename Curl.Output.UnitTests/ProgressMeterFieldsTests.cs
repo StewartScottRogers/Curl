@@ -222,6 +222,7 @@ public sealed class ProgressMeterFieldsTests
     [DataRow(10L, 40000L, 250L)]
     [DataRow(long.MaxValue / 1000000, 2000000L, long.MaxValue / 1000000 / 2)]
     [DataRow(long.MaxValue / 1000000, 999999L, long.MaxValue)]
+    [DataRow(long.MaxValue / 1000000, 1000000L, long.MaxValue / 1000000)]
     public void Speed_SizeAndMicroseconds_IsCurlsTrspeed(long size, long microseconds, long expected)
     {
         Diagnostics.Arrange("size", size);
