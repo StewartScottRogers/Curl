@@ -38,3 +38,4 @@ On the Schannel profile, a `--cacert` chain with a bad signature prints exactly 
 ## Log
 
 - 2026-11-12: Created.
+- 2026-11-12: Backlog -> Doing. Criteria at claim: 9252bd45 548292be cb91743c 456cca2d e4d345af.
