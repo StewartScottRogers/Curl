@@ -3,8 +3,8 @@ id: AF-0711
 title: RunAsync_Cancelled_ThrowsAndStopsReadingLines never checks that line reading stops
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Extension.WebSocketRepl.UnitTests/Session/WebSocketReplSessionTests.cs:RunAsync_Cancelled_ThrowsAndStopsReadingLines:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Extension.WebSocketRepl.UnitTests/Session/WebSocketRepl
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
