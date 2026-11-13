@@ -3,8 +3,8 @@ id: AF-0713
 title: Surviving mutant: --httpsig with no algorithm, or with ed25519, can crash or be refused
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/HttpSignatureSetup.cs:AlgorithmOf-or:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/HttpSignatureSetup.cs:62:||
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
