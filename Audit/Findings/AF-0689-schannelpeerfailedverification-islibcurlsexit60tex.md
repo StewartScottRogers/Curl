@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/TlsFailureMessagesTests.cs -Patter
 
 ## Re-audits
 
+- 2026-11-12 | 2026-11-12_2105.md | reproduces: no | Ran the Select-String with context: the test now asserts Assert.AreEqual(60, (int)CurlExitCode.PeerFailedVerification) (line 422) and Assert.AreEqual(LibcurlExit60Text, message) (line 423).
+
 ## Log
 
 - 2026-11-05: filed proposed.

@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/PortUnreachableReportingDatagramCh
 
 ## Re-audits
 
+- 2026-11-12 | 2026-11-12_2105.md | reproduces: no | Ran the Select-String: the test is now SendAsync_PortClosed_ThrowsCouldntConnectText (line 50) and asserts the exit-7 text it names (Assert.EndsWith(CouldntConnectWords, refused.Message), line 67).
+
 ## Log
 
 - 2026-11-05: filed proposed.

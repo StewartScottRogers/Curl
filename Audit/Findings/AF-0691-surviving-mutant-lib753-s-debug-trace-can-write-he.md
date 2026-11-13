@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-12 | 2026-11-12_2105.md | not re-audited | Ran the -Site command: outcome killed, but the operator 'true' resolved to the line's first occurrence, 'traceTime: true' -> 'traceTime: false', not the 'noHex: true' the finding names. The targeted run cannot reach the noHex occurrence, so it does not tell whether that mutant still survives. Not re-audited.
+
 ## Log
 
 - 2026-11-05: filed proposed.

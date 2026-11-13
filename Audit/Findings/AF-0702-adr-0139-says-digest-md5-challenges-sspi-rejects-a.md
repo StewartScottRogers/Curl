@@ -3,8 +3,8 @@ id: AF-0702
 title: ADR-0139 says DIGEST-MD5 challenges SSPI rejects are answered null (exit 67) because exit 94 cannot be expressed; SaslAuthenticator now raises exit 94 for them
 auditor: truthfulness
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-12_2105.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0139-sasl-cram-md5-and-digest-md5-answer-as-each-platforms-curl-with-sspi-on-windows.md:ADR-0139:stale-adr
 reproduction: none
 task: BL-4896
@@ -13,9 +13,9 @@ found: 2026-11-05
 found-at: 4eba3c63638befcc6a63aaa31ddf5419922fa939
 scorecard: 2026-11-05_2025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-12
+closed-how: reliable-reaudit
+closed-by: 2026-11-12_2105.md
 ---
 # AF-0702 - ADR-0139 says DIGEST-MD5 challenges SSPI rejects are answered null (exit 67) because exit 94 cannot be expressed; SaslAuthenticator now raises exit 94 for them
 
@@ -43,7 +43,9 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0139-sasl-cram-md5-and-
 ## Re-audits
 
 - 2026-11-11 | 2026-11-11_2002.md | reproduces: no | Ran the reproduction. ADR-0139 no longer says 'cannot yet be expressed'; lines 46-49 and the BL-781 amendment (lines 71-76) state that a DIGEST-MD5 challenge SSPI rejects fails with exit 94, and that only the OpenSSL path still answers null (exit 67). Curl.Authentication.UnitLibrary/SaslAuthenticator.cs:213 has '?? throw DigestMd5Failed()' and line 220 returns new SaslAuthenticationFailedException(CurlExitCode.AuthError, AuthErrorMessage). The ADR and the code agree.
+- 2026-11-12 | 2026-11-12_2105.md | reproduces: no | Ran the reproduction. Select-String on ADR-0139 for 'cannot yet be expressed|are answered `null`' found no match. ADR-0139 line 46 now reads 'A DIGEST-MD5 challenge SSPI rejects fails the transfer with exit 94 (CURLE_AUTH_ERROR...)', and lines 71-76 say the contract carries SSPI's exit 94. Select-String on SaslAuthenticator.cs matched line 213 '?? throw DigestMd5Failed()' and line 238 'return new SaslAuthenticationFailedException(CurlExitCode.AuthError, AuthErrorMessage);'. The ADR and the code agree on exit 94.
 
 ## Log
 
 - 2026-11-05: filed proposed.
+- 2026-11-12: accepted -> closed. Re-audit 2026-11-12_2105.md: the reproduction no longer reproduces.
