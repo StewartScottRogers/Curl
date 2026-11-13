@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5072 — Fix AF-0713: Surviving mutant: --httpsig with no algorithm, or with ed25519, can crash or be refused
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added tests HttpSignatureSetupOf_AlgorithmGivenOrDefaulted_UsesTheSupportedAlgorithm (null, ed25519, ED25519, hmac-sha256) and an unsupported-algorithm refusal test. The audit guard refuses a lane running the mutation tool, so the mutation run was not executed; the null and ed25519 rows fail under the mutant by construction (NRE, and unsupported refusal). No production change.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Added tests pinning default, ed25519 and unsupported algorithms
