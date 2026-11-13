@@ -37,13 +37,26 @@ public sealed class SystemHelperProcessStarter : IHelperProcessStarter
     /// <exception cref="IOException">The helper is a batch file and the URL holds such a character.</exception>
     internal static void RefuseUnsafeBatchArgument(string program, string url)
     {
-        bool isBatch = program.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
-            || program.EndsWith(".bat", StringComparison.OrdinalIgnoreCase);
-        if (isBatch && (url.AsSpan().IndexOfAny("&|<>^\"%") >= 0 || ContainsControlCharacter(url)))
+        if (IsBatchFile(program) && (url.AsSpan().IndexOfAny("&|<>^\"%") >= 0 || ContainsControlCharacter(url)))
         {
             throw new IOException("the URL holds a character cmd.exe would run as a command (& | < > ^ \" % or a control character), so it is not passed to a .cmd or .bat helper");
         }
     }
+
+    private static bool IsBatchFile(string program)
+    {
+        int end = program.Length;
+        while (end > 0 && IsTrailingNoise(program[end - 1]))
+        {
+            end--;
+        }
+
+        ReadOnlySpan<char> name = program.AsSpan(0, end);
+        return name.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".bat", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsTrailingNoise(char character) => character == '.' || char.IsWhiteSpace(character) || char.IsControl(character);
 
     private static bool ContainsControlCharacter(string url)
     {
