@@ -39,3 +39,4 @@ That breaks the drop-in promise.
 ## Log
 
 - 2026-11-12: Created.
+- 2026-11-12: Backlog -> Doing. Criteria at claim: fc682092 5db41aa6 31edfc9f 3d836d5e.
