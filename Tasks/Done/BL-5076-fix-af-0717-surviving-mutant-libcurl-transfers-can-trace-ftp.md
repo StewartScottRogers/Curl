@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5076 — Fix AF-0717: Surviving mutant: libcurl transfers can trace FTP lines by default
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added `CreateProtocolHandlers_FtpTransferWithoutTracesFtp_WritesNoFtpLines` in Curl.Engine.UnitTests/EngineCompositionFtpTraceTests.cs: a transfer through handlers built without `tracesFtp` writes no `[FTP]` lines. A lane cannot run the mutation script (the audit guard refuses), so I applied the mutant by hand (`tracesFtp = true` at line 141): the new test failed, so it is killed; reverted. Engine fast tests: 3017 passed. No production code changed, so no quality run.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Added a test that a libcurl-path FTP transfer writes no [FTP] trace lines; the tracesFtp=true mutant fails it.
