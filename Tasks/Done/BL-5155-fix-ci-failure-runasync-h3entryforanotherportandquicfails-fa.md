@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests, Curl.Console]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5155 — Fix CI failure RunAsync_H3EntryForAnotherPortAndQuicFails_FailsWithTheQuicErrorWithoutTryingTcp on Linux and macOS
 
@@ -36,3 +36,4 @@ Cause: BL-5099 added `actsAsQuicBuild` to `AltSvcTransferCache.OpenAsync` (defau
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 26d50871.
+- 2026-11-13: Doing -> Done. Passed the QUIC-build flag to the alt-svc cache so h3 entries are used on Linux and macOS
