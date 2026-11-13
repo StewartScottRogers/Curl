@@ -30,11 +30,11 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extension.Har.UnitTests/HarTransferHookTests.cs` has a test that a transfer with `-b "sid=abc"` produces an entry whose request headers include `Cookie: sid=abc`, and `cookies` stays `[]` as ADR-1146 states.
-- [ ] A test in the same file shows the default `User-Agent` (`curl/` plus the version the port reports, `curl/8.22.0` in the review) is listed when `-A` is not given, and the `-A` value is listed when it is.
-- [ ] Regression: `-H` headers, `Host` and the existing listed headers keep their order and content, and no header is listed twice.
-- [ ] ADR-1146 (`Documentation/Planning/Decisions/ADR-1146-har-writes-each-option-groups-http-transfers-as-a-har-1-2-archive.md`) states that the entry lists the `Cookie` header and the default `User-Agent`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `Curl.Extension.Har.UnitTests/HarTransferHookTests.cs` has a test that a transfer with `-b "sid=abc"` produces an entry whose request headers include `Cookie: sid=abc`, and `cookies` stays `[]` as ADR-1146 states.
+- [x] A test in the same file shows the default `User-Agent` (`curl/` plus the version the port reports, `curl/8.22.0` in the review) is listed when `-A` is not given, and the `-A` value is listed when it is.
+- [x] Regression: `-H` headers, `Host` and the existing listed headers keep their order and content, and no header is listed twice.
+- [x] ADR-1146 (`Documentation/Planning/Decisions/ADR-1146-har-writes-each-option-groups-http-transfers-as-a-har-1-2-archive.md`) states that the entry lists the `Cookie` header and the default `User-Agent`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -44,3 +44,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 97d216bb 8a590c81 c8d40aba 5217e918 a0b49a29.
+- 2026-11-12: Default UA is a `curl/8.22.0` constant in HarTransferHook (no shared version source exists; same literal as other libraries). Cookie listed after Referer unless a `-H Cookie` is given. Quality run: 0 failing members.

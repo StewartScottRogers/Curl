@@ -12,6 +12,9 @@ namespace Curl.Extension.Har;
 /// <param name="path">The file the archive is written to.</param>
 internal sealed class HarTransferHook(string path) : ITransferHook
 {
+    /// <summary>The <c>User-Agent</c> curl sends when <c>-A</c> is not given.</summary>
+    internal const string DefaultUserAgent = "curl/8.22.0";
+
     private readonly List<HarExchange> _exchanges = [];
 
     private readonly SemaphoreSlim _writing = new(1, 1);
@@ -53,8 +56,9 @@ internal sealed class HarTransferHook(string path) : ITransferHook
     {
         var given = http.Headers.Select(FieldOf).OfType<KeyValuePair<string, string>>().ToList();
         List<KeyValuePair<string, string>> headers = [];
-        AddUnlessGiven(headers, given, "User-Agent", http.UserAgent);
+        AddUnlessGiven(headers, given, "User-Agent", http.UserAgent ?? DefaultUserAgent);
         AddUnlessGiven(headers, given, "Referer", http.Referer);
+        AddUnlessGiven(headers, given, "Cookie", http.CookieStrings);
         headers.AddRange(given);
         return headers;
     }

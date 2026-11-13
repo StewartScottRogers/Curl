@@ -29,7 +29,7 @@ option.
   point when known. `connection` is left out: curl reports no connection identifier.
 - **Request (§request).** The method is the report's, else `-X`, else the one curl's options imply (`HEAD` for `-I`,
   `PUT` for `-T`, `POST` for a body, `GET`). The URL is the effective URL, else the URL typed. The headers are those
-  the hook can see: `User-Agent` and `Referer` from curl's options and every `-H` field, a `-H` field of the same
+  the hook can see: `User-Agent` (the default `curl/8.22.0` when `-A` is not given), `Referer` and the `Cookie` header for `-b` strings from curl's options and every `-H` field, a `-H` field of the same
   name winning and `Name:` or `Name;` (which remove or empty a field) left out; the fields curl's handler adds
   itself (`Host`, `Accept`, `Content-Length`) are not visible to a transfer hook and are not listed.
   `queryString` is the URL's query split on `&` and `=`, `+` read as a space and percent-decoded. A `-d` body is
