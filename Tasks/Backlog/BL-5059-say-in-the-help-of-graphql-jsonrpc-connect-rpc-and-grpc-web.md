@@ -1,5 +1,5 @@
 ---
-id: BL-5051
+id: BL-5059
 title: Say in the help of --graphql, --jsonrpc, --connect-rpc and --grpc-web that they cannot be combined
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-12
 completed:
 ---
-# BL-5051 — Say in the help of --graphql, --jsonrpc, --connect-rpc and --grpc-web that they cannot be combined
+# BL-5059 — Say in the help of --graphql, --jsonrpc, --connect-rpc and --grpc-web that they cannot be combined
 
 ## Goal
 
