@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5085 — Fix AF-0726: Surviving mutant: a certificate name value with a non-universal or constructed tag can print as text instead of #hex
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added two tests in Curl.Output.UnitTests/OpenSslDistinguishedNameTextTests.cs (context-specific primitive tag 19, constructed universal tag 19), each dumped as #hex; they fail under the mutant `&&` since it would print text. The audit script is refused to lanes by the guard, so the reproduction was not run; the re-audit confirms. Build clean, fast tests green (903 passed).
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Two tests pin context-specific and constructed string-tag values to #hex
