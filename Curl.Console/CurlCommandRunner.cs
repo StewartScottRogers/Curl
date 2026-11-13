@@ -4300,17 +4300,6 @@ internal sealed class CurlCommandRunner(
         EasyProxyOptions proxyOptions = EasyOptionsFromCommandLine.ProxyOf(options);
         EasyAuthenticationOptions authentication = EasyOptionsFromCommandLine.AuthenticationOf(options);
 
-        // The callback below selects the proxy and checks the URL credentials of each hop, so a redirect
-        // is judged afresh; the follower is built per transfer because the options are the group's.
-        RedirectFollower follower = new(
-            dispatch.Dispatcher,
-            (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
-                TransferProxySelection.TrySelect(dispatch.ProxySelector, proxyOptions, options.UnixSocketPath is not null, options.ProxyCredentials, hopUrl, out hopProxy, out hopFailure, diagnosticLog)
-                && TransferCredentialLookup.TryCheckUrlCredentials(authentication, hopUrl, out hopFailure),
-            hsts: Hsts,
-            selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
-            selectHopCredentials: CredentialLookup.ForRedirectHops(authentication));
-
         if (!TryParseQueriedUrl(url, options, transfer, out CurlUrl? transferUrl, out TransferResult? urlFailure))
         {
             return urlFailure;
@@ -4320,6 +4309,18 @@ internal sealed class CurlCommandRunner(
         {
             return refusal;
         }
+
+        // The callback below selects the proxy and checks the URL credentials of each hop, so a redirect
+        // is judged afresh; the follower is built per transfer because the options are the group's, and
+        // after the URL is parsed because a -u transfer's netrc lookup for a hop compares it (BL-5035).
+        RedirectFollower follower = new(
+            dispatch.Dispatcher,
+            (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
+                TransferProxySelection.TrySelect(dispatch.ProxySelector, proxyOptions, options.UnixSocketPath is not null, options.ProxyCredentials, hopUrl, out hopProxy, out hopFailure, diagnosticLog)
+                && TransferCredentialLookup.TryCheckUrlCredentials(authentication, hopUrl, out hopFailure),
+            hsts: Hsts,
+            selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
+            selectHopCredentials: CredentialLookup.ForRedirectHops(authentication, transferUrl));
 
         ByteRange? range = ParseRange(options.Range);
 

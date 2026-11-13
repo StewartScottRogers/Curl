@@ -116,7 +116,7 @@ internal sealed partial class ManagedEasyTransfer
         }
 
         TransferCredentialLookup lookup = new(Host.ReadFile, shared.ReadEnvironmentVariable, Host.RunsOnWindows, Host.DiagnosticLog);
-        hopCredentials = lookup.ForRedirectHops(options.Authentication);
+        hopCredentials = lookup.ForRedirectHops(options.Authentication, url);
         return lookup.TryLookUp(options.Authentication, url, out lookedUpCredentials, out failure);
     }
 
