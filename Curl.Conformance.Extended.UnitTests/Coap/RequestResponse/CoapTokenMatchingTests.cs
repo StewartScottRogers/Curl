@@ -72,6 +72,24 @@ public sealed class CoapTokenMatchingTests
             CoapEmptyMessage.AssertIs(server.Received[2], CoapReferenceMessageType.Acknowledgement, RightMessageId);
         });
 
+    [TestMethod]
+    [SpecRequirement("Coap:RFC7252-5.3.2-3")]
+    public Task ResponseFromAnotherEndpoint_IsIgnored() =>
+        CoapMessagingRun.CaseAsync(["Coap:RFC7252-5.3.2-3"], async () =>
+        {
+            CurlRunResult result = await RunAsync(
+                (request, _) =>
+                [
+                    CoapResponses.FromAnotherEndpoint(CoapResponses.Piggybacked(request, CoapResponses.Content, "spoofed"u8.ToArray())),
+                    CoapResponses.Piggybacked(request, CoapResponses.Content, "genuine"u8.ToArray()),
+                ],
+                out CoapReferenceServer server);
+
+            Assert.AreEqual(0, result.ExitCode, Encoding.UTF8.GetString(result.StandardError));
+            Assert.AreEqual("genuine", Encoding.UTF8.GetString(result.StandardOutput));
+            Assert.HasCount(1, server.Received);
+        });
+
     private static byte[] OtherToken(CoapReferenceMessage request) => [.. request.Token.Select(octet => (byte)(octet ^ 0xFF))];
 
     private async Task<byte[]> TokenOfARunAsync()
