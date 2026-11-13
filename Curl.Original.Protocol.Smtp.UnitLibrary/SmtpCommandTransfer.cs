@@ -106,7 +106,12 @@ internal sealed class SmtpCommandTransfer(
 
     private async ValueTask<TransferResult> SendCommandsAsync(MailRequestOptions mail)
     {
-        string? custom = string.IsNullOrEmpty(mail.CustomCommand) ? null : commandLineText.ToWire(mail.CustomCommand);
+        string? custom = string.IsNullOrEmpty(mail.CustomCommand) ? null : DecodeCustomCommand(commandLineText.ToWire(mail.CustomCommand));
+        if (custom is null && !string.IsNullOrEmpty(mail.CustomCommand))
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, SmtpSessionMessages.MalformedUrl);
+        }
+
         if (mail.Recipients.Count == 0)
         {
             return await ExchangeAsync(custom ?? "HELP", recipientCommand: false).ConfigureAwait(false)
@@ -114,6 +119,37 @@ internal sealed class SmtpCommandTransfer(
         }
 
         return await SendRecipientCommandsAsync(custom, mail.Recipients, mail.SendsMailboxHostAsWritten).ConfigureAwait(false);
+    }
+
+    /// <summary>Whether the <c>%</c> at <paramref name="index" /> is followed by two hexadecimal digits.</summary>
+    private static bool IsPercentEscapeAt(string text, int index) =>
+        index + 2 < text.Length && char.IsAsciiHexDigit(text[index + 1]) && char.IsAsciiHexDigit(text[index + 2]);
+
+    /// <summary>
+    /// Percent-decodes the <c>-X</c> command <paramref name="text" /> as curl does; <see langword="null" />
+    /// when it holds a control character (CR, LF, TAB and the like), so one <c>-X</c> never sends two commands.
+    /// </summary>
+    private static string? DecodeCustomCommand(string text)
+    {
+        var decoded = new System.Text.StringBuilder(text.Length);
+        for (int index = 0; index < text.Length; index++)
+        {
+            char next = text[index];
+            if (next == '%' && IsPercentEscapeAt(text, index))
+            {
+                next = (char)Convert.ToByte(text.Substring(index + 1, 2), 16);
+                index += 2;
+            }
+
+            if (next < ' ')
+            {
+                return null;
+            }
+
+            decoded.Append(next);
+        }
+
+        return decoded.ToString();
     }
 
     /// <summary>

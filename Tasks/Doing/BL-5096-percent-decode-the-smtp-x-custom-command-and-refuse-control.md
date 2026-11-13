@@ -35,10 +35,10 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Smtp.UnitTests/SmtpCustomCommandDecodingTests.cs` prove `-X "NOOP\r\nRSET"`, `NOOP%0d%0aRSET`, a lone LF, a lone CR and `NOOP\tx` each end with `CurlExitCode` 3 (`URL using bad/illegal format or missing URL`) and only EHLO and QUIT reach the stand-in server (no custom command is sent).
-- [ ] A test proves `-X "NOOP%20x"` puts `NOOP x` on the wire, and `-X NOOP` and `-X "VRFY"` with `--mail-rcpt` behave as before.
-- [ ] Tests are platform-neutral (in-memory connection stand-in, no network).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Smtp.UnitTests/SmtpCustomCommandDecodingTests.cs` prove `-X "NOOP\r\nRSET"`, `NOOP%0d%0aRSET`, a lone LF, a lone CR and `NOOP\tx` each end with `CurlExitCode` 3 (`URL using bad/illegal format or missing URL`) and only EHLO and QUIT reach the stand-in server (no custom command is sent).
+- [x] A test proves `-X "NOOP%20x"` puts `NOOP x` on the wire, and `-X NOOP` and `-X "VRFY"` with `--mail-rcpt` behave as before.
+- [x] Tests are platform-neutral (in-memory connection stand-in, no network).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 4b2f0e09 8bf1f707 9bf0f82e a0b49a29.
+- Decision: followed IMAP's rule (decode %XX, refuse any char < space); reproduced inside the SMTP library. Quality run: 100% line/branch, 0 failing members.
