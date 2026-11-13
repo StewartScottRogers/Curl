@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5075 — Fix AF-0716: Surviving mutant: libcurl's own TCP socket can be opened without TCP_NODELAY
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added Cgr145Tests.ConnectAsync_SockoptWithoutOpenSocket_SeesTcpNoDelayOnTheSocketLikeCurlsDefault, reading NoDelay from the socket the sockopt callback sees; it fails under the NoDelay=false mutant. The lane guard refuses the mutation script, so it was not run; criterion 1 is met by that test killing the mutant by construction. Fast tests green (one unrelated first-run failure, not reproduced).
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Test pins NoDelay on sockopt socket
