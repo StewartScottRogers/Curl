@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/OpenSslKeyUsageRefusal.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.VerifyChain.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5061 — Accept a keyAgreement-only server certificate on the OpenSSL profile as OpenSSL's KU_TLS does
 
@@ -29,14 +29,17 @@ That breaks the drop-in promise.
 
 ## Acceptance criteria
 
-- [ ] `OpenSslKeyUsageRefusal.ServerUse` includes `X509KeyUsageFlags.KeyAgreement`, and its summary and `<returns>` text name all three bits.
-- [ ] A unit test in `Curl.Networking.UnitTests` shows that `OpenSslKeyUsageRefusal.ForbidsServerUse` does not refuse a certificate whose keyUsage is `keyAgreement` only.
-- [ ] The existing test that refuses a certificate whose keyUsage is only `keyCertSign` still passes.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `OpenSslKeyUsageRefusal.ServerUse` includes `X509KeyUsageFlags.KeyAgreement`, and its summary and `<returns>` text name all three bits.
+- [x] A unit test in `Curl.Networking.UnitTests` shows that `OpenSslKeyUsageRefusal.ForbidsServerUse` does not refuse a certificate whose keyUsage is `keyAgreement` only.
+- [x] The existing test that refuses a certificate whose keyUsage is only `keyCertSign` still passes.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+KeyAgreement added to ServerUse (OpenSSL KU_TLS); a KeyAgreement DataRow joins the accepted-leaf test, the KeyCertSign refusal test still passes. Quality run: 0 failing members. Commit carries the code.
 
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: fc682092 5db41aa6 31edfc9f 3d836d5e.
+- 2026-11-12: Doing -> Done. KeyAgreement accepted

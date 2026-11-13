@@ -210,6 +210,7 @@ public sealed class ServerCertificateVerificationVerifyChainTests
     [DataRow(null)]
     [DataRow(X509KeyUsageFlags.DigitalSignature)]
     [DataRow(X509KeyUsageFlags.KeyEncipherment)]
+    [DataRow(X509KeyUsageFlags.KeyAgreement)]
     public void Verify_LeafWithNoKeyUsageOrOneForServerUseInTheOpenSslBuild_IsAccepted(X509KeyUsageFlags? keyUsage)
     {
         using var issued = IssuedChain.Create(keyUsage: keyUsage);
