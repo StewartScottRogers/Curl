@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitTests]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5071 — Fix AF-0712: TlsHandshake_SchannelWithoutAHashPin_PrintsOnlyTheAlpnLines checks only that two lines come back
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Test now asserts the two ALPN lines with CollectionAssert.AreEqual; Curl.Output.UnitTests green (901 passed).
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-13: Doing -> Done. Test asserts the two ALPN lines

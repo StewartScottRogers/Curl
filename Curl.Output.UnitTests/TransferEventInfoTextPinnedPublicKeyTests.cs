@@ -63,8 +63,14 @@ public sealed class TransferEventInfoTextPinnedPublicKeyTests
         var lines = TransferEventInfoText.TlsHandshake(Handshake(null, ["http/1.1"]), TlsBackend.Schannel);
         diagnostics.Act("lines", string.Join("\n", lines));
 
-        diagnostics.Assert("line count", 2, lines.Count);
-        Assert.HasCount(2, lines);
+        string[] expected = new[]
+            {
+                "ALPN: curl offers http/1.1",
+                "ALPN: server did not agree on a protocol. Uses default.",
+            };
+        string[] actual = lines.ToArray();
+        diagnostics.Diff("lines", string.Join("\n", expected), string.Join("\n", actual));
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
