@@ -7,7 +7,7 @@ namespace Curl.Extension.Composition;
 /// <summary>
 /// Refuses an option group that gives two extension options which each replace the request body (<c>--graphql</c>,
 /// <c>--jsonrpc</c>, <c>--connect-rpc</c>, <c>--grpc-web</c>): only one body can be sent, so the transfer fails with
-/// exit 2 naming both options and sends nothing, as curl refuses options it cannot use together (ADR-1261).
+/// exit 2 naming both options and sends nothing, as curl refuses options it cannot use together (ADR-1262).
 /// </summary>
 public static class BodyReplacingHookExclusivity
 {

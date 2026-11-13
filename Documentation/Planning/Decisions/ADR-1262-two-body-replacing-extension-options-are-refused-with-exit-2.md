@@ -1,4 +1,4 @@
-# ADR-1261 — Two body-replacing extension options are refused with exit 2
+# ADR-1262 — Two body-replacing extension options are refused with exit 2
 
 - Status: Accepted
 - Date: 2026-11-12

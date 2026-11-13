@@ -59,6 +59,6 @@ one value.
 prints the two replies in call order. The tests in `Curl.Extension.JsonRpc.UnitTests` check the
 request and reply bytes against the specification's sections, with no network.
 
-## Amendment (BL-5023, ADR-1261)
+## Amendment (BL-5023, ADR-1262)
 
 `--jsonrpc` cannot be combined with `--graphql`, `--connect-rpc` or `--grpc-web`: each replaces the request body, so the transfer exits 2 and sends nothing.
