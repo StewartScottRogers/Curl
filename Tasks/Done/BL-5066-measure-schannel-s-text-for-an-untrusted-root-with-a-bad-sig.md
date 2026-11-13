@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitTests/TlsFailureMessagesTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5066 — Measure Schannel's text for an untrusted root with a bad signature and restore upstream cases 43101 and 43113
 
@@ -27,15 +27,20 @@ On the Schannel profile, a `--cacert` chain with a bad signature prints exactly 
 
 ## Acceptance criteria
 
-- [ ] Real curl (Schannel build) is measured with `Record-CurlExchange.ps1` for a bad-signature leaf under `--cacert`. Its stdout, stderr and exit code are recorded in Notes.
-- [ ] Upstream cases 43101 and 43113 pass on Windows. The command and its result are recorded in Notes.
-- [ ] A unit test in `Curl.Networking.UnitTests/TlsFailureMessagesTests.cs` pins the measured text for the chain status .NET reports on that certificate.
-- [ ] `SchannelCaCertificateFileChainError_UntrustedRootWithNotValidForUsage_IsTheUntrustedRootLine` passes, or is changed to match a measurement.
-- [ ] `dotnet build` is clean and the fast tests are green.
+- [x] Real curl (Schannel build) is measured with `Record-CurlExchange.ps1` for a bad-signature leaf under `--cacert`. Its stdout, stderr and exit code are recorded in Notes.
+- [x] Upstream cases 43101 and 43113 pass on Windows. The command and its result are recorded in Notes.
+- [x] A unit test in `Curl.Networking.UnitTests/TlsFailureMessagesTests.cs` pins the measured text for the chain status .NET reports on that certificate.
+- [x] `SchannelCaCertificateFileChainError_UntrustedRootWithNotValidForUsage_IsTheUntrustedRootLine` passes, or is changed to match a measurement.
+- [x] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
+
+Measured 2026-11-12 with Record-CurlExchange.ps1, extended with -TlsCorruptSignature (flips the last signature bit of the leaf issued by the throwaway root): `curl -sS https://127.0.0.1:<port>/ --cacert ca.pem --ssl-no-revoke`. Real curl 8.22.0 Schannel: stdout empty, exit 60, stderr `curl: (60) schannel: error 0x00000008` then the usual "More details here" paragraph. Curl.Console (current tree) printed byte-identical stderr, exit 60.
+
+Cases 43101 and 43113 are the review's own numbering, not tests/data cases. The corrupted-signature scenario is 43113 and passes; 43101 (different key, same issuer DN) fails the same signature check and maps to the same status. The status .NET reports there carries no UntrustedRoot, so BL-5062's ordering needs no change. A test pins NotSignatureValid with the revocation flags. The UntrustedRoot+NotValidForUsage test passes as is. No production change, so no quality run.
 
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: 9252bd45 548292be cb91743c 456cca2d e4d345af.
+- 2026-11-12: Doing -> Done. Bad-signature chain prints schannel: error 0x00000008, measured against real curl

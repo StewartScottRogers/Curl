@@ -456,6 +456,10 @@
     names a revocation endpoint, so the Schannel build's revocation check of the leaf ends
     "status unknown", as ADR-0321 describes. The root's key is never written; the file is left for the caller to delete.
 
+.PARAMETER TlsCorruptSignature
+    With -TlsRootCertificateFile, flip the last bit of the served certificate's signature, so the
+    chain fails on its signature alone (BL-5066).
+
 .PARAMETER TlsEmptyCrlFile
     With -TlsRootCertificateFile, also write a PEM "X509 CRL" signed by the throwaway root
     that revokes nothing, so curl can be given --crlfile <path> (BL-609). It is a version 1
@@ -738,6 +742,7 @@ param(
     [switch] $Tls,
     [switch] $TlsCloseNotify,
     [string] $TlsRootCertificateFile,
+    [switch] $TlsCorruptSignature,
     [string] $TlsEmptyCrlFile,
     [string] $TlsRevokingCrlFile,
     [string] $TlsPublicKeyFile,
@@ -2091,6 +2096,7 @@ function New-IssuedByThrowawayRoot {
             [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($serial)
             $serial[0] = $serial[0] -band 0x7F
             $issued = $Request.Create($root, $NotBefore, $NotAfter, $serial)
+            if ($TlsCorruptSignature) { $raw = $issued.RawData; $raw[$raw.Length - 1] = $raw[$raw.Length - 1] -bxor 1; $issued = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(,$raw) }
             if ($TlsEmptyCrlFile) { Write-ThrowawayCrl -Path $TlsEmptyCrlFile -Root $root -RootKey $rootKey -RevokedSerial $null }
             if ($TlsRevokingCrlFile) { Write-ThrowawayCrl -Path $TlsRevokingCrlFile -Root $root -RootKey $rootKey -RevokedSerial $serial }
             try {
