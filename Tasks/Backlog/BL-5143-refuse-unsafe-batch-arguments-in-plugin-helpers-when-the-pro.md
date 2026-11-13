@@ -1,5 +1,5 @@
 ---
-id: BL-5141
+id: BL-5143
 title: Refuse unsafe batch arguments in Plugin helpers when the program name ends in dots, whitespace or a control character
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-13
 completed:
 ---
-# BL-5141 — Refuse unsafe batch arguments in Plugin helpers when the program name ends in dots, whitespace or a control character
+# BL-5143 — Refuse unsafe batch arguments in Plugin helpers when the program name ends in dots, whitespace or a control character
 
 ## Goal
 
