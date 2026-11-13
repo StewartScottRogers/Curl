@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs, Curl.Original.Protocol.File.UnitTests/FileTransferTimingsTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5101 — Report time_* and speed_* write-out variables for file:// transfers
 
@@ -34,17 +34,20 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.File.UnitTests/FileTransferTimingsTests.cs`, driven by a fake `TimeProvider` that advances between steps, prove that a file download and a file upload produce a `TransferReport` whose timings give non-zero total, pretransfer and start-transfer times and a non-zero connect/namelookup value consistent with curl's FILE output (all of them non-zero, as in the repro), and speeds equal size divided by total time.
-- [ ] A test proves a failed `file://` transfer still reports whatever timings curl would, and size reporting from BL-5025 is unchanged (existing tests green).
-- [ ] Tests are platform-neutral (drive-less URLs, temp files).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.File.UnitTests/FileTransferTimingsTests.cs`, driven by a fake `TimeProvider` that advances between steps, prove that a file download and a file upload produce a `TransferReport` whose timings give non-zero total, pretransfer and start-transfer times and a non-zero connect/namelookup value consistent with curl's FILE output (all of them non-zero, as in the repro), and speeds equal size divided by total time.
+- [x] A test proves a failed `file://` transfer still reports whatever timings curl would, and size reporting from BL-5025 is unchanged (existing tests green).
+- [x] Tests are platform-neutral (drive-less URLs, temp files).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers in the review were Python; this task needs none. Any hand-check helper is PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python.
 - Review acceptance check, for a hand check: both `file://` commands print non-zero `tt`, `tpt` and `tn`; the download prints non-zero `spd` and the upload non-zero `spu`.
 
+- Handler stamps TransferTimings in ExecuteAsync (start, resolved, end); failed transfers keep size via DownloadSize=BytesTransferred. Three PseudoHeader tests now assert empty headers rather than null Report. Quality run: 0 failing members. Platform-neutral tests.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: df4224e1 488eb91f 1feb8c58 a0b49a29.
+- 2026-11-13: Doing -> Done. file:// transfers report non-zero time_* and speed_* write-out variables
