@@ -3,12 +3,12 @@ id: AF-0714
 title: Surviving mutant: a handle's cookie jar can be dropped or taken from a non-HTTP transfer at cleanup
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs:CleanUpUnlessToolDoesAsync-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs:78:&&
-task: none
-tasks:
+task: BL-5073
+tasks: BL-5073
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.

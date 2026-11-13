@@ -3,12 +3,12 @@ id: AF-0712
 title: TlsHandshake_SchannelWithoutAHashPin_PrintsOnlyTheAlpnLines checks only that two lines come back
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Output.UnitTests/TransferEventInfoTextPinnedPublicKeyTests.cs:TlsHandshake_SchannelWithoutAHashPin_PrintsOnlyTheAlpnLines:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5071
+tasks: BL-5071
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Output.UnitTests/TransferEventInfoTextPinnedPublicKeyTe
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.

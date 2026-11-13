@@ -3,12 +3,12 @@ id: AF-0719
 title: Surviving mutant: --capath can take a file named 'xxxxxxxx.' (no digit) as a hashed certificate
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:IsHashedCertificateFileName-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:698:>
-task: none
-tasks:
+task: BL-5078
+tasks: BL-5078
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.

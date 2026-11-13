@@ -3,12 +3,12 @@ id: AF-0727
 title: Surviving mutant: a 47-byte SCT (empty extensions and signature) can be refused in the certificate text
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Output.UnitLibrary/OpenSslPeerCertificateText.cs:FindSignatureStart-lt:surviving-mutant
 reproduction: mutation Curl.Output.UnitLibrary/OpenSslPeerCertificateText.cs:661:<
-task: none
-tasks:
+task: BL-5086
+tasks: BL-5086
 found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Outpu
 ## Log
 
 - 2026-11-12: filed proposed.
+- 2026-11-13: proposed -> accepted.
