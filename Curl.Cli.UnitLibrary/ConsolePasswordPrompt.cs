@@ -27,7 +27,7 @@ public sealed class ConsolePasswordPrompt(TextWriter standardError, Func<Console
     }
 
     /// <summary>The prompt on this process's console: standard error, and keys read as <see cref="ForPlatform"/> chooses for this platform.</summary>
-    public static ConsolePasswordPrompt ForProcessConsole { get; } = ForPlatform(OperatingSystem.IsWindows(), Console.Error);
+    public static ConsolePasswordPrompt ForProcessConsole { get; } = ForPlatform(OperatingSystem.IsWindows(), ProcessStandardError.Open());
 
     /// <inheritdoc/>
     public string ReadPassword(string prompt)

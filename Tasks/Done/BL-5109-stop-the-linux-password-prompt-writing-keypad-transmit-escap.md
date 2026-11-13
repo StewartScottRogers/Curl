@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/PosixTerminalPasswordInput.cs, Curl.Cli.UnitTests/PosixTerminalPasswordInputBytesTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5109 — Stop the Linux password prompt writing keypad-transmit escapes
 
@@ -30,10 +30,10 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Cli.UnitTests/PosixTerminalPasswordInputBytesTests.cs` prove, with a recording terminal stand-in, that the bytes written before the password are exactly `Enter host password for user 'alice':` and the bytes after are exactly `\r\n`, with no `\x1b[?1h` or `\x1b=` sequence.
-- [ ] A test proves the terminal's echo setting is restored after a normal read and after a cancelled one.
-- [ ] Tests are platform-neutral (stand-in terminal) or marked `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Cli.UnitTests/PosixTerminalPasswordInputBytesTests.cs` prove, with a recording terminal stand-in, that the bytes written before the password are exactly `Enter host password for user 'alice':` and the bytes after are exactly `\r\n`, with no `\x1b[?1h` or `\x1b=` sequence.
+- [x] A test proves the terminal's echo setting is restored after a normal read and after a cancelled one.
+- [x] Tests are platform-neutral (stand-in terminal) or marked `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -44,3 +44,5 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: ca784fa4 35434768 ea4464e1 a0b49a29.
+- 2026-11-13: Cause: Console.Error's first use runs .NET terminfo setup (keypad_xmit). Fix: off Windows the prompt writes to fd 2 through ProcessStandardError (no Console.Error). Tests recorded in PosixTerminalPasswordInputBytesTests. Echo restore on cancel is by ReadKeysUntilEnter keeping input. Linux pty hand check not run (Windows lane); platform-neutral tests.
+- 2026-11-13: Doing -> Done. Prompt writes via fd 2, no keypad escapes; tests added
