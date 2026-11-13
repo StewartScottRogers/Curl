@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitTests/HttpRewindableUploadResendTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5130 — Resend a file-backed upload on a fresh connection when a reused connection was closed
 
@@ -51,3 +51,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: e7a3fafb 6b4458c9 fb363b94 a8bf5a11 a0b49a29.
 - 2026-11-13: Done. `CanSendAgainOnFreshConnection` now allows a stream body that can seek or implements `IUploadRewinder` (`BodyCanBeSentAgain`); `FailedOutcome` rewinds it through `RewindStreamUploadFailure` before the resend. Non-seekable bodies still fail with exit 52. The `-L` case is the engine running the handler again with a rewound body, tested at that level (the handler does not follow redirects itself). Replaced the old test `ReusedConnectionDiedAfterAStreamBody_FailsWithoutSendingAgain` (it used a seekable stream); the non-seekable case is in the new tests. Quality run: 0 failing members. Linux/macOS: tests are in-memory and platform-neutral. Unrelated: Curl.Networking BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext failed once in the full run (port collision with other lanes), not touched.
+- 2026-11-13: Doing -> Done. Rewindable stream uploads are resent on a fresh connection
