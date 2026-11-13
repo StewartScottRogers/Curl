@@ -40,6 +40,15 @@ public sealed class WebSocketHandshakeResponseValidatorTests
     }
 
     [TestMethod]
+    public void FindFailure_StatusLineWithNoReasonPhrase_IsNull()
+    {
+        string? failure = WebSocketHandshakeResponseValidator.FindFailure(
+            $"HTTP/1.1 101\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n{Accept}", Key);
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
     [DataRow("Upgrade websocket")]
     [DataRow(": websocket")]
     public void FindFailure_LineWithNoFieldName_Fails(string line)
