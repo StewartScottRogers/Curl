@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.ComponentModel;
+using System.Globalization;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -875,6 +876,9 @@ internal static class TlsFailureMessages
     private static string SchannelCaCertificateFileChainError(X509Chain? chain) =>
         SchannelCaCertificateFileChainError(ChainStatus(chain));
 
+    private const X509ChainStatusFlags SchannelStatusesThatAreNotNamedByValue =
+        X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation;
+
     internal static string SchannelCaCertificateFileChainError(X509ChainStatusFlags status)
     {
         if (status.HasFlag(X509ChainStatusFlags.NotTimeValid))
@@ -890,6 +894,13 @@ internal static class TlsFailureMessages
         if (status.HasFlag(X509ChainStatusFlags.PartialChain))
         {
             return SchannelChainIncomplete;
+        }
+
+        // Any other chain status is named by its CERT_TRUST_* value, which .NET's flags share (BL-5032).
+        var specific = status & ~SchannelStatusesThatAreNotNamedByValue;
+        if (specific != X509ChainStatusFlags.NoError)
+        {
+            return string.Create(CultureInfo.InvariantCulture, $"schannel: error 0x{(int)specific:x8}");
         }
 
         var untrustedOrUnknown = status & (X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.RevocationStatusUnknown);

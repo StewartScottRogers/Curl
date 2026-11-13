@@ -42,10 +42,10 @@ Where to start: `Curl.Networking.UnitLibrary/TlsFailureMessages.cs`, the mapping
 
 ## Acceptance criteria
 
-- [ ] Unit tests in `Curl.Networking.UnitTests/TlsFailureMessagesTests.cs` assert, for the Schannel profile with `--cacert`, that chain status `NotSignatureValid` yields `schannel: error 0x00000008`, `InvalidBasicConstraints` yields `schannel: error 0x00000400`, `NotValidForUsage` yields `schannel: error 0x00000010`, and `HasNotPermittedNameConstraint` yields `schannel: error 0x00004000`, each with exit 60.
-- [ ] A test shows an unmapped flag still prints `schannel: error 0x%08x` with its CERT_TRUST value.
-- [ ] Regression: an untrusted-root chain still prints `schannel: the certificate or certificate chain is based on an untrusted root`, and the existing expired, revoked and incomplete-chain messages are unchanged.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Unit tests in `Curl.Networking.UnitTests/TlsFailureMessagesTests.cs` assert, for the Schannel profile with `--cacert`, that chain status `NotSignatureValid` yields `schannel: error 0x00000008`, `InvalidBasicConstraints` yields `schannel: error 0x00000400`, `NotValidForUsage` yields `schannel: error 0x00000010`, and `HasNotPermittedNameConstraint` yields `schannel: error 0x00004000`, each with exit 60.
+- [x] A test shows an unmapped flag still prints `schannel: error 0x%08x` with its CERT_TRUST value.
+- [x] Regression: an untrusted-root chain still prints `schannel: the certificate or certificate chain is based on an untrusted root`, and the existing expired, revoked and incomplete-chain messages are unchanged.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -55,3 +55,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: c37c30b3 591cabf5 80a3b137 a0b49a29.
+- 2026-11-12: Chain statuses other than expired/revoked/incomplete/untrusted-root print `schannel: error 0x<CERT_TRUST_* value>` (.NET flag values equal CERT_TRUST_*). Fast tests (Networking) green, Measure-CodeQuality clean for Curl.Networking.UnitLibrary.
