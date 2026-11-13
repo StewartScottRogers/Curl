@@ -44,7 +44,10 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - Mock servers in the review were hand-rolled scripts; build the stand-in in the test project in C#, and any hand-check server in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python.
 - Review acceptance check, for a hand check against the mock: Type-1 flags include 0x10 and 0x20; after the 0x8b bind the next bytes are a 4-byte length plus a sealed blob; exit 39 like curl. A test server that unseals NTLM receives the SearchRequest.
 
+- 2026-11-13 (lane 4): Split for size before any edit. The seal needs Curl.Ntlm work outside this task's touches: the AUTHENTICATE message carries no EncryptedRandomSessionKey, the answerer drops the key exchange key, and nothing derives NTLM sign and seal keys. BL-5141 adds that to Curl.Ntlm; BL-5142 (depends on BL-5141) does the LDAP part and carries these acceptance criteria unchanged.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 21241d7b bbeb9bfe 2eb53dc5 97a37c4d a0b49a29.
+- 2026-11-13: Doing -> Deferred. Split into BL-5141, BL-5142
