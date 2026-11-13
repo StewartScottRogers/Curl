@@ -20,8 +20,18 @@ internal sealed class ChecksumTransferHook(ExpectedChecksum expected) : ITransfe
         await using var hashing = new HashingStream(context.Output, hash);
         var result = await next(context.WithOutputs(hashing, context.HeaderOutput, context.DumpHeaderOutput)).ConfigureAwait(false);
         var digest = hash.GetHashAndReset();
-        return !result.IsSuccess || CryptographicOperations.FixedTimeEquals(digest, Expected.Digest)
+        return !result.IsSuccess || IsFollowedRedirect(context, result) || CryptographicOperations.FixedTimeEquals(digest, Expected.Digest)
             ? result
             : result with { ExitCode = CurlExitCode.BadContentEncoding, ErrorMessage = $"checksum mismatch: expected {Expected.Format(Expected.Digest)}, got {Expected.Format(digest)}" };
     }
+
+    // With -L the redirect follower calls the hook once per hop; only the last response's body is the output (BL-5122).
+    private static bool IsFollowedRedirect(ITransferContext context, TransferResult result) =>
+        context.Http is { FollowRedirects: true } http && MayFollowAnother(http) && IsRedirect(result);
+
+    private static bool MayFollowAnother(HttpRequestOptions http) =>
+        http.MaxRedirects < 0 || http.RedirectsFollowed < http.MaxRedirects;
+
+    private static bool IsRedirect(TransferResult result) =>
+        result.Report is { ResponseCode: >= 300 and < 400, RedirectUrl: not null };
 }

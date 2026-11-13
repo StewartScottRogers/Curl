@@ -32,17 +32,18 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extension.Checksum.UnitTests/ChecksumRedirectTests.cs` (new) prove, with a scripted two-hop chain, that with `-L` and the digest of the final body the transfer succeeds (exit 0) and the final body is the output.
-- [ ] A test proves that with `-L` and the digest of the empty string (the first hop's body) the transfer fails with `CurlExitCode.BadContentEncoding` (61) and the message `checksum mismatch: expected sha256:e3b0c442..., got sha256:5891b5...` naming the final body's digest.
-- [ ] A test proves a 3xx response that is not followed (no `-L`) is still the checked body, and the existing `ChecksumTransferHookTests` stay green.
-- [ ] ADR-1096 states that only the final response's body is checked when redirects are followed.
-- [ ] The tests are platform-neutral (no real socket).
-- [ ] `dotnet build Curl.Extension.Checksum.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extension.Checksum.UnitTests/ChecksumRedirectTests.cs` (new) prove, with a scripted two-hop chain, that with `-L` and the digest of the final body the transfer succeeds (exit 0) and the final body is the output.
+- [x] A test proves that with `-L` and the digest of the empty string (the first hop's body) the transfer fails with `CurlExitCode.BadContentEncoding` (61) and the message `checksum mismatch: expected sha256:e3b0c442..., got sha256:5891b5...` naming the final body's digest.
+- [x] A test proves a 3xx response that is not followed (no `-L`) is still the checked body, and the existing `ChecksumTransferHookTests` stay green.
+- [x] ADR-1096 states that only the final response's body is checked when redirects are followed.
+- [x] The tests are platform-neutral (no real socket).
+- [x] `dotnet build Curl.Extension.Checksum.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Review acceptance check, for a hand check: step 1 exits 0 and `o.txt` contains `hello`; step 2 exits 61 with `got sha256:5891b5...`.
 - Keep `--ai-help` and `--extended-help` right if their `--checksum` text says anything about redirects.
+- Done: `ChecksumTransferHook` skips judging a hop the follower will follow (-L, max-redirs not reached, 3xx with Location). `--ai-help` says nothing about redirects. Sigstore hook has the same per-hop shape (`next` per hop, no redirect check): filed BL-5146. Quality run on Checksum library: 0 failing. CI criterion met by platform-neutral tests (no socket).
 
 ## Log
 
