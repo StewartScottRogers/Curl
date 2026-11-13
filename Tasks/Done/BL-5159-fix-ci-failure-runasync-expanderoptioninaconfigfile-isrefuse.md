@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests, Curl.Console]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5159 — Fix CI failure RunAsync_ExpanderOptionInAConfigFile_IsRefusedAsCommandLineOnly on Linux and macOS and Windows
 
@@ -26,11 +26,14 @@ Lanes test only on Windows, so reproduce with `gh run view 43527663292 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `RunAsync_ExpanderOptionInAConfigFile_IsRefusedAsCommandLineOnly` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `RunAsync_ExpanderOptionInAConfigFile_IsRefusedAsCommandLineOnly` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+The first message wraps at 79 columns at a point set by the temp path length (Linux, macOS). The test now undoes the wrap before asserting. Test-only change, no production code.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: fbe34f51.
+- 2026-11-13: Doing -> Done. Test undoes the 79-column wrap before asserting
