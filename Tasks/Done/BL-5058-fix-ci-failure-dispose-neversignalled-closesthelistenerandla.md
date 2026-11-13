@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests, Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5058 — Fix CI failure Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing on Windows
 
@@ -26,11 +26,14 @@ Lanes test only on Windows, so reproduce with `gh run view 43328655141 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: the test connected to the closed ephemeral port; a parallel test may own that port by then, so the connect succeeds. The test now checks the closed handle no longer names a socket. No production change.
 
 ## Log
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: acb33600.
+- 2026-11-12: Doing -> Done. Test no longer connects to a possibly reused port

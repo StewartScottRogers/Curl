@@ -109,14 +109,15 @@ public sealed class SocketActionGatedResolverTests
     public void Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing()
     {
         LoopbackLookupWakeup wakeup = LoopbackLookupWakeup.Open();
-        IPEndPoint listening = LocalEndPointOf(wakeup.Handle);
+        nint handle = wakeup.Handle;
+        Assert.IsNotNull(LocalEndPointOf(handle));
 
         wakeup.Dispose();
         wakeup.Signal();
 
-        using Socket probe = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        SocketException refused = Assert.ThrowsExactly<SocketException>(() => probe.Connect(listening));
-        Assert.AreEqual(SocketError.ConnectionRefused, refused.SocketErrorCode);
+        // Not a connect to the old port: a parallel test may have been given that ephemeral port since, so the
+        // connect would succeed against its listener (BL-5058). The closed handle no longer names a socket.
+        Assert.ThrowsExactly<SocketException>(() => LocalEndPointOf(handle));
     }
 
     private static IPEndPoint LocalEndPointOf(nint handle)
