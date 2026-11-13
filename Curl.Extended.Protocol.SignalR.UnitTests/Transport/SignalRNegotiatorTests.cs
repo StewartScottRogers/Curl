@@ -87,6 +87,25 @@ public sealed class SignalRNegotiatorTests
     }
 
     [TestMethod]
+    [DataRow("401 Unauthorized", 401)]
+    [DataRow("403 Forbidden", 403)]
+    public async Task NegotiateAsync_Status401Or403_FailsWithExit22NamingTheStatus(string status, int statusCode)
+    {
+        SignalRTransportException failure = await NegotiateFailureAsync(Answer(status, "not json"));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, failure.ExitCode);
+        StringAssert.Contains(failure.Message, $"HTTP status {statusCode}");
+    }
+
+    [TestMethod]
+    public async Task NegotiateAsync_Status500_KeepsExit8()
+    {
+        SignalRTransportException failure = await NegotiateFailureAsync(Answer("500 Internal Server Error", "x"));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, failure.ExitCode);
+    }
+
+    [TestMethod]
     public async Task NegotiateAsync_ErrorResponse_ThrowsWithTheServersError_TransportProtocolsNegotiate()
     {
         SignalRTransportException failure = await NegotiateFailureAsync(Answer("200 OK", "{\"error\":\"Hub is full\"}"));

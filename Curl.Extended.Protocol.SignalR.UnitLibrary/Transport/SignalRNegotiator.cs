@@ -46,6 +46,19 @@ internal sealed class SignalRNegotiator(
             ? new NegotiatedWebSocketEndpoint(SignalRUrls.WebSocketUrl(endpointUrl, response), accessToken)
             : throw new SignalRTransportException("The negotiate response offers no WebSockets transport.");
 
+    // A refused login (401, 403) exits 22 like the port's other WebSocket schemes; any other non-2xx status exits 8.
+    private static void ThrowUnlessSuccessful(int statusCode)
+    {
+        if (statusCode is >= 200 and <= 299)
+        {
+            return;
+        }
+
+        throw new SignalRTransportException(
+            $"The negotiate request failed with HTTP status {statusCode}.",
+            statusCode is 401 or 403 ? CurlExitCode.HttpReturnedError : CurlExitCode.WeirdServerReply);
+    }
+
     private async Task<NegotiateResponse> ExchangeAsync(Uri endpointUrl, string? accessToken, CancellationToken cancellationToken)
     {
         Uri negotiateUrl = SignalRUrls.NegotiateUrl(endpointUrl);
@@ -60,10 +73,7 @@ internal sealed class SignalRNegotiator(
         BufferedConnectionReader reader = new(connection);
         HttpResponseHead head = await HttpResponseReader.ReadHeadAsync(reader, cancellationToken);
         byte[] body = await HttpResponseReader.ReadBodyAsync(reader, head, cancellationToken);
-        if (head.StatusCode is < 200 or > 299)
-        {
-            throw new SignalRTransportException($"The negotiate request failed with HTTP status {head.StatusCode}.");
-        }
+        ThrowUnlessSuccessful(head.StatusCode);
 
         NegotiateResponse response = NegotiateResponseReader.Read(body);
         return response.Error is null

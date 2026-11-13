@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/SignalRNegotiator.cs, Curl.Extended.Protocol.SignalR.UnitTests/Transport/SignalRNegotiatorTests.cs, Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRProtocolHandlerTests.cs, Documentation/Conformance/Extended/SignalR.md]
+touches: [Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/SignalRNegotiator.cs, Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/SignalRTransportException.cs, Curl.Extended.Protocol.SignalR.UnitLibrary/Client/SignalRProtocolHandler.cs, Curl.Extended.Protocol.SignalR.UnitTests/Transport/SignalRNegotiatorTests.cs, Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRProtocolHandlerTests.cs, Documentation/Conformance/Extended/SignalR.md]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5043 — Map a refused SignalR negotiate status to the WebSocket schemes exit code
 
@@ -33,11 +33,11 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Extended.Protocol.SignalR.UnitTests/Transport/SignalRNegotiatorTests.cs` assert a negotiate answered 401, and one answered 403, fail with exit 22 (the exception carries the exit code the handler reports), with a message naming the status.
-- [ ] A test in `Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRProtocolHandlerTests.cs` asserts the transfer result for a 401 is exit 22.
-- [ ] Regression: negotiate answered 500 keeps its current exit code and message, and the TP-Negotiate-6/7 cases (`error` in the body, no WebSockets transport) still exit 8.
-- [ ] `Documentation/Conformance/Extended/SignalR.md` states the mapping (HTTP 401/403 on negotiate gives exit 22) in a new row, its "Covered by" naming the new tests.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Tests in `Curl.Extended.Protocol.SignalR.UnitTests/Transport/SignalRNegotiatorTests.cs` assert a negotiate answered 401, and one answered 403, fail with exit 22 (the exception carries the exit code the handler reports), with a message naming the status.
+- [x] A test in `Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRProtocolHandlerTests.cs` asserts the transfer result for a 401 is exit 22.
+- [x] Regression: negotiate answered 500 keeps its current exit code and message, and the TP-Negotiate-6/7 cases (`error` in the body, no WebSockets transport) still exit 8.
+- [x] `Documentation/Conformance/Extended/SignalR.md` states the mapping (HTTP 401/403 on negotiate gives exit 22) in a new row, its "Covered by" naming the new tests.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,5 @@ From the outside fitness review of 2026-11-12 (commit 2d2ad7f8b, `preview` curl-
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: ea04755d 3f55b778 8d6f8aec df6f5c4d a0b49a29.
+- 2026-11-12: Decided 22 for 401 and 403 (matches socketio); `SignalRTransportException` now carries an exit code and the handler reports it, so `touches` gained that file and `SignalRProtocolHandler.cs` (no other task held them). The SignalR.md row is `n/a:` because the matrix wants a `[SpecRequirement]` carrier and this is a port mapping, not a spec requirement; it names the unit tests. CI on Linux/macOS: change is platform-neutral.
+- 2026-11-12: Doing -> Done. 401/403 on negotiate now exit 22; tests, docs, quality gates green

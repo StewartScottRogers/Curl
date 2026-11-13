@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Extended.Protocol.SignalR.Transport;
 
 /// <summary>
@@ -7,9 +9,13 @@ namespace Curl.Extended.Protocol.SignalR.Transport;
 /// </summary>
 internal sealed class SignalRTransportException : IOException
 {
-    /// <summary>Creates the exception with the message naming what failed.</summary>
-    public SignalRTransportException(string message)
+    /// <summary>Creates the exception with the message naming what failed and the exit code the transfer reports.</summary>
+    public SignalRTransportException(string message, CurlExitCode exitCode = CurlExitCode.WeirdServerReply)
         : base(message)
     {
+        ExitCode = exitCode;
     }
+
+    /// <summary>Gets the exit code the transfer reports: 8 unless the server refused the request with HTTP 401 or 403, then 22.</summary>
+    public CurlExitCode ExitCode { get; }
 }

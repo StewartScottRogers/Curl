@@ -163,6 +163,17 @@ public sealed class SignalRProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task NegotiateRefusedWith401_FailsWithExit22()
+    {
+        ScriptedConnection negotiate = ScriptedConnection.FromText("HTTP/1.1 401 X\r\nContent-Length: 0\r\n\r\n");
+
+        TransferResult result = await Run(new ScriptedConnector(ConnectResult.Connected(negotiate)), "signalr://example.com/hub", new MemoryStream(), null);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("SignalR: The negotiate request failed with HTTP status 401.", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ConnectRefused_GivesTheConnectorsResult()
     {
         TransferResult result = await Run(new ScriptedConnector(ConnectResult.Refused("Failed to connect")), "signalrs://example.com/hub", new MemoryStream(), null);

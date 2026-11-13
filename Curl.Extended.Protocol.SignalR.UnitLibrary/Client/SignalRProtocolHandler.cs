@@ -36,7 +36,11 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
         {
             return TransferResult.Failure(failure.ExitCode, failure.Message);
         }
-        catch (Exception failure) when (failure is SignalRTransportException or SignalRWireFormatException)
+        catch (SignalRTransportException failure)
+        {
+            return TransferResult.Failure(failure.ExitCode, $"SignalR: {failure.Message}");
+        }
+        catch (SignalRWireFormatException failure)
         {
             return TransferResult.Failure(CurlExitCode.WeirdServerReply, $"SignalR: {failure.Message}");
         }
