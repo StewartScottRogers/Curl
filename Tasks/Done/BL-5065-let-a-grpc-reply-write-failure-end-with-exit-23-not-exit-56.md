@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Grpc.UnitLibrary/Client/GrpcProtocolHandler.cs, Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcProtocolHandlerTests.cs]
 requirement: none
 created: 2026-11-12
-completed:
+completed: 2026-11-12
 ---
 # BL-5065 — Let a gRPC reply write failure end with exit 23, not exit 56
 
@@ -40,3 +40,4 @@ The shift-end review of 2026-11-12 found this in the BL-5028 change (silent-fail
 
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Doing. Criteria at claim: fba1b063 1fd95b6f eeda0f41 3d836d5e.
+- 2026-11-12: Doing -> Done. Output write failure now propagates to the engine; unit test added
