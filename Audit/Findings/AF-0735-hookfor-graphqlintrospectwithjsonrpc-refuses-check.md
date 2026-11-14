@@ -3,8 +3,8 @@ id: AF-0735
 title: HookFor_GraphQlIntrospectWithJsonRpc_Refuses checks only that a hook exists, which a single-option hook also satisfies
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces.
 key: quality:Curl.Extension.Composition.UnitTests/BodyReplacingHookExclusivityTests.cs:HookFor_GraphQlIntrospectWithJsonRpc_Refuses:weak-assertion
 reproduction: none
 task: BL-5180
@@ -13,9 +13,9 @@ found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-14
+closed-how: reliable-reaudit
+closed-by: 2026-11-14_1335.md
 ---
 # AF-0735 - HookFor_GraphQlIntrospectWithJsonRpc_Refuses checks only that a hook exists, which a single-option hook also satisfies
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Extension.Composition.UnitTests/BodyReplacingHookExclus
 
 ## Re-audits
 
+- 2026-11-14 | 2026-11-14_1335.md | reproduces: no | Select-String plus the body: the test now runs the hook and asserts Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode) and the message '--graphql-introspect and --jsonrpc cannot be used together'.
+
 ## Log
 
 - 2026-11-13: filed proposed.
+- 2026-11-14: accepted -> closed. Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces.

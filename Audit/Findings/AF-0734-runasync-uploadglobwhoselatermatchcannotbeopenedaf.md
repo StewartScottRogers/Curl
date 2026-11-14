@@ -3,8 +3,8 @@ id: AF-0734
 title: RunAsync_UploadGlobWhoseLaterMatchCannotBeOpenedAfterASuccess_Exits26AndStopsTheRun asserts exit 25, not 26
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces.
 key: quality:Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs:RunAsync_UploadGlobWhoseLaterMatchCannotBeOpenedAfterASuccess_Exits26AndStopsTheRun:name-lies
 reproduction: none
 task: BL-5179
@@ -13,9 +13,9 @@ found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-14
+closed-how: reliable-reaudit
+closed-by: 2026-11-14_1335.md
 ---
 # AF-0734 - RunAsync_UploadGlobWhoseLaterMatchCannotBeOpenedAfterASuccess_Exits26AndStopsTheRun asserts exit 25, not 26
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs -Patt
 
 ## Re-audits
 
+- 2026-11-14 | 2026-11-14_1335.md | reproduces: no | Select-String: the test now asserts Assert.AreEqual((int)CurlExitCode.ReadError, exitCode); ReadError = 26.
+
 ## Log
 
 - 2026-11-13: filed proposed.
+- 2026-11-14: accepted -> closed. Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0740
 title: Surviving mutant: the DTLS 24-bit field limit can be raised past 24 bits; the tests derive their bound from the same constant
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Extended.Protocol.Coap.UnitLibrary/Dtls/Wire/DtlsHandshakeHeader.cs:MaximumUInt24-minus1:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Coap.UnitLibrary/Dtls/Wire/DtlsHandshakeHeader.cs:22:-1
 task: BL-5185
@@ -13,9 +13,9 @@ found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-14
+closed-how: mechanical
+closed-by: 2026-11-14_1335.md
 ---
 # AF-0740 - Surviving mutant: the DTLS 24-bit field limit can be raised past 24 bits; the tests derive their bound from the same constant
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 
 ## Re-audits
 
+- 2026-11-14 | 2026-11-14_1335.md | reproduces: no | Ran the -Site command: DtlsHandshakeHeader.cs:22 '-1' mutant outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-13: filed proposed.
+- 2026-11-14: accepted -> closed. Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
