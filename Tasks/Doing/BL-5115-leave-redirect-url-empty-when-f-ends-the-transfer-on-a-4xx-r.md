@@ -30,10 +30,10 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Http.UnitTests/FailedResponseRedirectUrlTests.cs` prove that with `--fail` a 404 with `Location: /redir-target` yields an empty redirect URL in the transfer result (so `%{redirect_url}` is empty and `%{json}` reports null) and exit 22.
-- [ ] Regression tests prove that without `--fail` the same 404 still reports the absolute Location URL, and a 302 with `-f` still reports it.
-- [ ] Tests are platform-neutral, using the in-memory connection stand-ins already in the HTTP unit tests.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Http.UnitTests/FailedResponseRedirectUrlTests.cs` prove that with `--fail` a 404 with `Location: /redir-target` yields an empty redirect URL in the transfer result (so `%{redirect_url}` is empty and `%{json}` reports null) and exit 22.
+- [x] Regression tests prove that without `--fail` the same 404 still reports the absolute Location URL, and a 302 with `-f` still reports it.
+- [x] Tests are platform-neutral, using the in-memory connection stand-ins already in the HTTP unit tests.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 

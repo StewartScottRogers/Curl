@@ -1518,6 +1518,11 @@ public sealed class HttpProtocolHandler(
         ReportReceiveFailure(plan.Context.Events, failure);
         ReportBodyFailure(plan.Context.Events, failure);
         exchangeLog.Failed(failure.ExitCode, failure);
+        if (failure.ExitCode == CurlExitCode.HttpReturnedError && plan.Options.Fail == HttpFailMode.Fail)
+        {
+            exchange.RedirectUrl = null;
+        }
+
         TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
             with
         {
