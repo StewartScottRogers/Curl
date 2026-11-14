@@ -40,3 +40,4 @@ The hook then exports a span (OpenTelemetry) or records a result whose exit code
 ## Log
 
 - 2026-11-14: Created.
+- 2026-11-14: Backlog -> Doing. Criteria at claim: da961aef 70d5e5a5 4856b334 5a7d9fbe d911a7e9.
