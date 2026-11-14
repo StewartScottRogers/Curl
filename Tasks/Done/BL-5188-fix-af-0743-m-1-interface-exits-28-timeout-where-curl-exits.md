@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console]
+touches: [Curl.Console, Curl.Networking.UnitLibrary/LocalBindingAddressChooser.cs, Curl.Networking.UnitTests/Cgr046Tests.cs]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5188 — Fix AF-0743: -m 1 --interface - exits 28 (timeout) where curl exits 45 (bind failed)
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause was in Curl.Networking (not Console): LocalBindingAddressChooser passed the -m-fired token to the --interface name lookup; curl's bind lookup blocks and ignores -m. Widened touches (no other Doing task holds it). Fixed with CancellationToken.None; ADR-1271; test in Cgr046Tests. Reproduction now exits 45 (measured with the Debug build). Networking fast tests green; Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing. Platform-neutral test.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-14: Doing -> Done. AF-0743 reproduction now exits 45; interface name lookup ignores -m (ADR-1271)

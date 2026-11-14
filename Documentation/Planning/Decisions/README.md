@@ -1312,3 +1312,4 @@ Each option and the specific reason it lost.
 | [1268](ADR-1268-alt-svc-ignores-h3-entries-on-a-build-that-is-not-a-quic-build.md) | Alt-svc ignores h3 entries on a build that is not a QUIC build when no version option is given (BL-5099) | Accepted | 2026-11-13 |
 | [1269](ADR-1269-openssl-chain-checks-after-trust-name-their-verify-result.md) | The OpenSSL build names a chain's CA, path-length, name-constraint and signature failures by their verify result (7, 25, 47, 79) in OpenSSL's order (BL-5104) | Accepted | 2026-11-13 |
 | [1270](ADR-1270-an-extension-connection-option-beside-unix-socket-is-a-command-line-error.md) | An extension connection option beside --unix-socket is a command-line error with exit 2 (BL-5133) | Accepted | 2026-11-13 |
+| [1271](ADR-1271-an-interface-name-lookup-ignores-max-time-as-curls-bind-lookup-does.md) | An --interface name lookup ignores -m, as curl's bind lookup does (BL-5188) | Accepted | 2026-11-14 |
