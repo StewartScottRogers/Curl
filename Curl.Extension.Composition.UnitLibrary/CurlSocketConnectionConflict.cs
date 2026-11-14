@@ -5,7 +5,7 @@ namespace Curl.Extension.Composition;
 
 /// <summary>
 /// Refuses an extension connection hook beside curl's own <c>--unix-socket</c> or <c>--abstract-unix-socket</c>
-/// (ADR-1269): each supplies the connection a transfer runs over, so, as with two extension connection options
+/// (ADR-1270): each supplies the connection a transfer runs over, so, as with two extension connection options
 /// (ADR-1014), only one may be given.
 /// </summary>
 public static class CurlSocketConnectionConflict

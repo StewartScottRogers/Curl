@@ -1,4 +1,4 @@
-# ADR-1269: An extension connection option beside --unix-socket is a command-line error with exit 2
+# ADR-1270: An extension connection option beside --unix-socket is a command-line error with exit 2
 
 - Status: Accepted
 - Date: 2026-11-13

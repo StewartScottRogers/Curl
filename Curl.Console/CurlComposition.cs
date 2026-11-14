@@ -880,7 +880,7 @@ internal static class CurlComposition
     internal static Func<IDnsResolver, IDnsResolver>? ExtensionResolverOf(ResolverHooks? hooks) =>
         hooks is { Hook: not null } ? hooks.ResolverOver : null;
 
-    // The curl socket option the group gave, by the name it was given under (ADR-1269), or null for none.
+    // The curl socket option the group gave, by the name it was given under (ADR-1270), or null for none.
     private static string? CurlSocketOptionOf(CommandLineOptions options) =>
         options.UnixSocketPath is null ? null : options.UnixSocketIsAbstract ? "abstract-unix-socket" : "unix-socket";
     // An extension option's bad value as curl's command-line error. ArgumentException.Message ends with

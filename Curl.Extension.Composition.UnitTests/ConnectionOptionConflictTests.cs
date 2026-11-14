@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Composition;
 
 /// <summary>
-/// Pins ADR-1269: <c>--npipe</c> or <c>--vm-socket</c> beside curl's <c>--unix-socket</c> or
+/// Pins ADR-1270: <c>--npipe</c> or <c>--vm-socket</c> beside curl's <c>--unix-socket</c> or
 /// <c>--abstract-unix-socket</c> is refused naming both options, before any connection is opened, while each
 /// alone, and <c>--npipe</c> with <c>--vm-socket</c>, keep their behaviour.
 /// </summary>
