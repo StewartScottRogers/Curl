@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5186 — Fix AF-0741: Surviving mutant: curl_multi_socket_action without a socket callback can answer CURLM_ABORTED_BY_CALLBACK
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs line 153`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs line 153`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `Cgr034Tests.SocketAction_NoSocketCallback_AnswersOkNotAbortedByCallback` (Curl.Engine.UnitTests/Cgr034KickSettleTests.cs): with line 153 returning false it fails, reverted it passes. Engine fast tests 3036 passed. Test-only change, no production edit.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: 999c072d 9742157d.
+- 2026-11-14: Doing -> Done. Mutant killed by new test
