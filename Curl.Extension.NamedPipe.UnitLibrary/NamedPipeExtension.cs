@@ -13,7 +13,7 @@ public static class NamedPipeExtension
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "npipe",
-        "Runs every transfer over a Windows named pipe, the Windows counterpart of --unix-socket.",
+        "Runs every transfer over a Windows named pipe, the Windows counterpart of --unix-socket; cannot be combined with --unix-socket or --abstract-unix-socket.",
         [],
         [Option],
         new Uri("https://learn.microsoft.com/windows/win32/ipc/pipe-names"));

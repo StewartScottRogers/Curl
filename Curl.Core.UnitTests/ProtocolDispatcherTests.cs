@@ -43,6 +43,32 @@ public sealed class ProtocolDispatcherTests
     }
 
     [TestMethod]
+    public async Task NotifyChainFinishedAsync_ServedScheme_TellsOnlyThatSchemesHandlerInAnyCase()
+    {
+        RecordingHandler file = new(TransferResult.Success(1), "file");
+        RecordingHandler dict = new(TransferResult.Success(2), "dict");
+        TransferContext context = CreateContext("DICT://x/d:a");
+        TransferResult result = TransferResult.Success(9);
+
+        await new ProtocolDispatcher([file, dict]).NotifyChainFinishedAsync(context, result);
+
+        Assert.IsEmpty(file.ChainsFinished);
+        Assert.HasCount(1, dict.ChainsFinished);
+        Assert.AreSame(context, dict.ChainsFinished[0].First);
+        Assert.AreSame(result, dict.ChainsFinished[0].Result);
+    }
+
+    [TestMethod]
+    public async Task NotifyChainFinishedAsync_SchemeNoHandlerServes_TellsNobody()
+    {
+        RecordingHandler file = new(TransferResult.Success(1), "file");
+
+        await new ProtocolDispatcher([file]).NotifyChainFinishedAsync(CreateContext("qttp://x/"), TransferResult.Success(9));
+
+        Assert.IsEmpty(file.ChainsFinished);
+    }
+
+    [TestMethod]
     [DataRow("dict", true)]
     [DataRow("DICT", true)]
     [DataRow("qttp", false)]
@@ -230,6 +256,14 @@ public sealed class ProtocolDispatcherTests
         : IProtocolHandler
     {
         public List<ITransferContext> ReceivedContexts { get; } = [];
+
+        public List<(ITransferContext First, TransferResult Result)> ChainsFinished { get; } = [];
+
+        public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result)
+        {
+            ChainsFinished.Add((first, result));
+            return ValueTask.CompletedTask;
+        }
 
         public IReadOnlyCollection<string> SupportedSchemes => schemes;
 

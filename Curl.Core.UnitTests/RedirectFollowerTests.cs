@@ -52,6 +52,44 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_ChainFollowedToItsEnd_TellsTheHandlerOnceWithTheFirstContextAndTheMergedResult()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next), TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 200 } });
+        TransferContext first = Context(Location());
+
+        TransferResult result = await Follow(handler, first, new RedirectPolicy { MaxRedirects = 3 });
+
+        Assert.HasCount(2, handler.Contexts);
+        Assert.HasCount(1, handler.ChainsFinished);
+        Assert.AreSame(first, handler.ChainsFinished[0].First);
+        Assert.AreSame(result, handler.ChainsFinished[0].Result);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_HopRefusedByMaxRedirs_StillTellsTheHandlerOnceWithTheRefusal()
+    {
+        ScriptedHandler handler = new(Redirect(302, Next));
+
+        TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { MaxRedirects = 0 });
+
+        Assert.HasCount(1, handler.Contexts);
+        Assert.HasCount(1, handler.ChainsFinished);
+        Assert.AreSame(result, handler.ChainsFinished[0].Result);
+        Assert.IsFalse(result.IsSuccess);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_WithoutLocation_TellsTheHandlerOnceWithTheDispatchersResult()
+    {
+        ScriptedHandler handler = new(TransferResult.Success(3));
+
+        TransferResult result = await Follow(handler, Context(new HttpRequestOptions()));
+
+        Assert.HasCount(1, handler.ChainsFinished);
+        Assert.AreSame(result, handler.ChainsFinished[0].Result);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_NullArguments_Throw()
     {
         RedirectFollower follower = new(new ProtocolDispatcher([]));
@@ -2077,6 +2115,14 @@ public sealed class RedirectFollowerTests
     private sealed class ScriptedHandler(params TransferResult[] script) : IProtocolHandler
     {
         public List<ITransferContext> Contexts { get; } = [];
+
+        public List<(ITransferContext First, TransferResult Result)> ChainsFinished { get; } = [];
+
+        public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result)
+        {
+            ChainsFinished.Add((first, result));
+            return ValueTask.CompletedTask;
+        }
 
         public IReadOnlyCollection<string> SupportedSchemes => ["http", "https", "ftp", "ftps", "file", "dict", "scp"];
 

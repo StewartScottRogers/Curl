@@ -13,7 +13,7 @@ public static class VirtualMachineSocketExtension
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "vm-socket",
-        "Runs every transfer over a vsock (CID:port) or Hyper-V socket (VM:service GUID), between a virtual machine and its host.",
+        "Runs every transfer over a vsock (CID:port) or Hyper-V socket (VM:service GUID), between a virtual machine and its host; cannot be combined with --unix-socket or --abstract-unix-socket.",
         [],
         [Option],
         new Uri("https://man7.org/linux/man-pages/man7/vsock.7.html"));

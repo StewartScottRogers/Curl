@@ -150,6 +150,90 @@ public sealed class OpenSslVerifyResultTests
         Assert.IsNull(code);
     }
 
+    [TestMethod]
+    [DataRow(X509ChainStatusFlags.NotSignatureValid, false, OpenSslVerifyResult.CertificateSignatureFailure, "certificate signature failure (7)")]
+    [DataRow(X509ChainStatusFlags.InvalidBasicConstraints, false, OpenSslVerifyResult.InvalidCaCertificate, "invalid CA certificate (79)")]
+    [DataRow(X509ChainStatusFlags.InvalidBasicConstraints, true, OpenSslVerifyResult.PathLengthExceeded, "path length constraint exceeded (25)")]
+    [DataRow(X509ChainStatusFlags.HasNotPermittedNameConstraint, false, OpenSslVerifyResult.PermittedSubtreeViolation, "permitted subtree violation (47)")]
+    public void OfChainStatus_ChainCheckAfterTrustFailed_ReturnsOpenSslsCodeAndText(X509ChainStatusFlags status, bool pathLengthExceeded, long expected, string expectedText)
+    {
+        ArrangeChainStatus(status, 2, false);
+        Diagnostics.Arrange("path length exceeded", pathLengthExceeded);
+        using var pathLengthChain = new DisposableCertificates(pathLengthExceeded ? CreatePathLengthChain(0) : []);
+
+        var code = OpenSslVerifyResult.OfChainStatus(status, 2, false, pathLengthExceeded);
+        var text = TlsFailureMessages.OpenSslExtensionOrSignatureError(status, pathLengthChain.Certificates);
+
+        WriteCode(expected, code);
+        Diagnostics.Assert("text", expectedText, text ?? "null");
+        Assert.AreEqual(expected, code);
+        Assert.AreEqual(expectedText, text);
+    }
+
+    [TestMethod]
+    [DataRow(X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.InvalidBasicConstraints | X509ChainStatusFlags.NotSignatureValid, OpenSslVerifyResult.SelfSignedCertificateInChain)]
+    [DataRow(X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.HasNotPermittedNameConstraint, OpenSslVerifyResult.UnableToGetIssuerCertificateLocally)]
+    [DataRow(X509ChainStatusFlags.InvalidBasicConstraints | X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.NotSignatureValid, OpenSslVerifyResult.InvalidCaCertificate)]
+    [DataRow(X509ChainStatusFlags.HasNotPermittedNameConstraint | X509ChainStatusFlags.NotSignatureValid | X509ChainStatusFlags.NotTimeValid, OpenSslVerifyResult.PermittedSubtreeViolation)]
+    [DataRow(X509ChainStatusFlags.NotSignatureValid | X509ChainStatusFlags.NotTimeValid, OpenSslVerifyResult.CertificateSignatureFailure)]
+    public void OfChainStatus_SeveralFlags_ReturnsWhatOpenSslReportsFirst(X509ChainStatusFlags status, long expected)
+    {
+        ArrangeChainStatus(status, 2, false);
+
+        var code = OpenSslVerifyResult.OfChainStatus(status, 2, false);
+
+        WriteCode(expected, code);
+        Assert.AreEqual(expected, code);
+    }
+
+    [TestMethod]
+    [DataRow(0, 3, true)]
+    [DataRow(0, 2, false)]
+    [DataRow(1, 3, false)]
+    [DataRow(-1, 3, false)]
+    public void ExceedsAPathLength_RootConstraintAndChainLength_TellsWhetherExceeded(int rootPathLength, int chainLength, bool expected)
+    {
+        Diagnostics.Arrange("root path length (-1: none)", rootPathLength);
+        Diagnostics.Arrange("chain length", chainLength);
+        using var certificates = new DisposableCertificates(CreatePathLengthChain(rootPathLength)[^chainLength..]);
+
+        var exceeded = OpenSslVerifyResult.ExceedsAPathLength(certificates.Certificates);
+
+        Diagnostics.Assert("exceeded", expected, exceeded);
+        Assert.AreEqual(expected, exceeded);
+    }
+
+    // Leaf, intermediate CA, intermediate CA, root (a CA whose path length is rootPathLength,
+    // none when negative). Only the extensions matter, so each is self-signed.
+    private static X509Certificate2[] CreatePathLengthChain(int rootPathLength) =>
+    [
+        CreateWithBasicConstraints("CN=Leaf", new X509BasicConstraintsExtension(false, false, 0, true)),
+        CreateWithBasicConstraints("CN=Lower", new X509BasicConstraintsExtension(true, false, 0, true)),
+        CreateWithBasicConstraints("CN=Upper", new X509BasicConstraintsExtension(true, false, 0, true)),
+        CreateWithBasicConstraints("CN=Root", new X509BasicConstraintsExtension(true, rootPathLength >= 0, Math.Max(rootPathLength, 0), true)),
+    ];
+
+    private static X509Certificate2 CreateWithBasicConstraints(string subject, X509BasicConstraintsExtension constraints)
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var request = new CertificateRequest(subject, key, HashAlgorithmName.SHA256);
+        request.CertificateExtensions.Add(constraints);
+        return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+    }
+
+    private sealed class DisposableCertificates(X509Certificate2[] certificates) : IDisposable
+    {
+        internal X509Certificate2[] Certificates { get; } = certificates;
+
+        public void Dispose()
+        {
+            foreach (var certificate in Certificates)
+            {
+                certificate.Dispose();
+            }
+        }
+    }
+
     private void ArrangeChainStatus(X509ChainStatusFlags status, int chainLength, bool anyNotYetValid)
     {
         Diagnostics.Arrange("chain status", status);

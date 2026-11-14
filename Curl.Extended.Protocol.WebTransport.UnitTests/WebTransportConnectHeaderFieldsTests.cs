@@ -58,4 +58,22 @@ public sealed class WebTransportConnectHeaderFieldsTests
         CollectionAssert.AreEqual(
             new HeaderField[] { new("user-agent", "curl/8.22.0") },
             WebTransportConnectHeaderFields.Build(null, null, null, null, [header]).ToArray());
+
+    [TestMethod]
+    public void Build_RepeatedCustomHeader_KeepsEveryOneInOrder() =>
+        CollectionAssert.AreEqual(
+            new HeaderField[] { new("user-agent", "curl/8.22.0"), new("x-trace", "a"), new("x-trace", "b") },
+            WebTransportConnectHeaderFields.Build(null, null, null, null, ["X-Trace: a", "X-Trace: b"]).ToArray());
+
+    [TestMethod]
+    public void Build_CustomHeaderReplacesFieldsCurlAdds_OnceOnly() =>
+        CollectionAssert.AreEqual(
+            new HeaderField[] { new("authorization", "Bearer 2"), new("user-agent", "u2"), new("user-agent", "u3") },
+            WebTransportConnectHeaderFields.Build("T", null, "a", "c=1", ["Authorization: Bearer 2", "User-Agent: u2", "Cookie:", "User-Agent: u3"]).ToArray());
+
+    [TestMethod]
+    public void Build_UserAgentSemicolon_SendsOneEmptyUserAgent() =>
+        CollectionAssert.AreEqual(
+            new HeaderField[] { new("user-agent", string.Empty) },
+            WebTransportConnectHeaderFields.Build(null, null, null, null, ["User-Agent;"]).ToArray());
 }

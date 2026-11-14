@@ -191,14 +191,16 @@ public sealed class RedirectFollower(
     /// the first hop's start, each phase the sum of its time on every hop, and
     /// <see cref="TransferTimings.RedirectDuration" /> the time until the last hop began.
     /// </returns>
-    public ValueTask<TransferResult> FollowAsync(ITransferContext context, RedirectPolicy policy)
+    public async ValueTask<TransferResult> FollowAsync(ITransferContext context, RedirectPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(policy);
 
-        return context.Http is { FollowRedirects: true } http
-            ? FollowChainAsync(context, http, policy)
-            : DispatchAsync(context, policy);
+        TransferResult result = context.Http is { FollowRedirects: true } http
+            ? await FollowChainAsync(context, http, policy).ConfigureAwait(false)
+            : await DispatchAsync(context, policy).ConfigureAwait(false);
+        await dispatcher.NotifyChainFinishedAsync(context, result).ConfigureAwait(false);
+        return result;
     }
 
     /// <summary>Performs one hop.</summary>

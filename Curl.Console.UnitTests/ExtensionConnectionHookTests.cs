@@ -56,6 +56,31 @@ public sealed class ExtensionConnectionHookTests
     }
 
     [TestMethod]
+    [DataRow("--unix-socket")]
+    [DataRow("--abstract-unix-socket")]
+    public async Task RunAsync_ConnectionHookOptionWithCurlSocketOption_ExitsTwoNamingBothOptions(string curlSocketOption)
+    {
+        int exitCode = await RunAsync("-sS", "--test-pipe", "p1", curlSocketOption, "/tmp/nosuch.sock", "http://127.0.0.1:20602/");
+
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(
+            $"curl: the options --test-pipe and {curlSocketOption} each supply the connection a transfer runs over; give only one of them\n"
+                + "curl: try 'curl --help' or 'curl --manual' for more information\n",
+            StandardErrorText.ReplaceLineEndings("\n"));
+        Assert.AreEqual(0, standardOutput.Length);
+        Assert.IsEmpty(curlServer.Written);
+        Assert.IsEmpty(hookServer.Written);
+    }
+
+    [TestMethod]
+    public void ExtensionConnectionHooksOf_CurlSocketOptionWithoutHook_ActivatesNoHook()
+    {
+        CommandLineOptions options = CommandLineParser.Parse(["--unix-socket", "/tmp/curl.sock", "http://127.0.0.1/"]).Options!;
+
+        Assert.IsNull(CurlComposition.ExtensionConnectionHooksOf(options, [ActivatedByPipe, ActivatedByTunnel]).Hook);
+    }
+
+    [TestMethod]
     public async Task RunAsync_NoExtensionOptionGiven_TransfersOverCurlsConnector()
     {
         int exitCode = await RunAsync("-sS", "http://127.0.0.1:20602/");

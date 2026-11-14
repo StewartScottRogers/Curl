@@ -821,12 +821,14 @@ internal static class CurlComposition
     /// <param name="options">The option group.</param>
     /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>
     /// <returns>The activated hook, or <see cref="ConnectionHooks.None" />.</returns>
-    /// <exception cref="ExtensionOptionConflictException">Two of the group's extension options each claim the connection; the message names both.</exception>
+    /// <exception cref="ExtensionOptionConflictException">Two of the group's extension options, or one and <c>--unix-socket</c> or <c>--abstract-unix-socket</c>, each claim the connection; the message names both.</exception>
     internal static ConnectionHooks ExtensionConnectionHooksOf(CommandLineOptions options, IEnumerable<Func<ExtensionOptionValues, IConnectionHook?>> activators)
     {
         try
         {
-            return ConnectionHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators);
+            ConnectionHooks hooks = ConnectionHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators);
+            CurlSocketConnectionConflict.RefuseBesideCurlSocket(hooks, CurlSocketOptionOf(options));
+            return hooks;
         }
         catch (ExtensionHookConflictException conflict)
         {
@@ -878,6 +880,9 @@ internal static class CurlComposition
     internal static Func<IDnsResolver, IDnsResolver>? ExtensionResolverOf(ResolverHooks? hooks) =>
         hooks is { Hook: not null } ? hooks.ResolverOver : null;
 
+    // The curl socket option the group gave, by the name it was given under (ADR-1270), or null for none.
+    private static string? CurlSocketOptionOf(CommandLineOptions options) =>
+        options.UnixSocketPath is null ? null : options.UnixSocketIsAbstract ? "abstract-unix-socket" : "unix-socket";
     // An extension option's bad value as curl's command-line error. ArgumentException.Message ends with
     // " (Parameter 'values')", which curl's line does not carry.
     private static ExtensionOptionConflictException OptionValueErrorOf(ArgumentException badValue) =>

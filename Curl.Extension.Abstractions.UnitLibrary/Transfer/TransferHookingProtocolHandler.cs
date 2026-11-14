@@ -36,6 +36,15 @@ internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, I
         return result;
     }
 
+    /// <inheritdoc />
+    public async ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result)
+    {
+        foreach (ITransferHook hook in hooks)
+        {
+            await hook.TransferChainFinishedAsync(first, result).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Runs the handler once with the hooks' request headers asked afresh, then lets each hook read the result.</summary>
     private async ValueTask<TransferResult> ExecuteOnceAsync(ITransferContext context, Stream output)
     {
