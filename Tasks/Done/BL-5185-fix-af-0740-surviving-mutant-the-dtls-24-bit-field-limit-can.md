@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Coap.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5185 — Fix AF-0740: Surviving mutant: the DTLS 24-bit field limit can be raised past 24 bits; the tests derive their bound from the same constant
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Coap.UnitLibrary/Dtls/Wire/DtlsHandshakeHeader.cs line 22`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Coap.UnitLibrary/Dtls/Wire/DtlsHandshakeHeader.cs line 22`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by DtlsHandshakeHeaderTests.Encode_Rfc6347Section4_2_2_RejectsFieldsOutOfRange rows "length of exactly 2^24" and "length of 2^24 plus one" (literals, not derived from the constant); verified by hand with the mutant applied, then reverted. Added Encode_Rfc6347Section4_2_2_AcceptsTheLargestTwentyFourBitLength pinning 16777215. Duplicate constant-derived rows replaced by literals.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: 3c5b1ece 9742157d.
+- 2026-11-14: Doing -> Done. Mutant killed by literal 2^24 rows

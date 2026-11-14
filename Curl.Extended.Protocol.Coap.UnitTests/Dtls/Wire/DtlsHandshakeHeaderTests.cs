@@ -27,17 +27,29 @@ public sealed class DtlsHandshakeHeaderTests
 
     [TestMethod]
     [DataRow(-1, 0, 0, DisplayName = "negative length")]
-    [DataRow(DtlsHandshakeHeader.MaximumUInt24 + 1, 0, 0, DisplayName = "length past 24 bits")]
     [DataRow(10, -1, 0, DisplayName = "negative offset")]
-    [DataRow(10, DtlsHandshakeHeader.MaximumUInt24 + 1, 0, DisplayName = "offset past 24 bits")]
     [DataRow(10, 0, -1, DisplayName = "negative fragment length")]
-    [DataRow(10, 0, DtlsHandshakeHeader.MaximumUInt24 + 1, DisplayName = "fragment length past 24 bits")]
+    [DataRow(16777216, 0, 0, DisplayName = "length of exactly 2^24")]
+    [DataRow(16777217, 0, 0, DisplayName = "length of 2^24 plus one")]
+    [DataRow(10, 16777216, 0, DisplayName = "offset of exactly 2^24")]
+    [DataRow(10, 0, 16777216, DisplayName = "fragment length of exactly 2^24")]
     [DataRow(10, 5, 6, DisplayName = "fragment past the message")]
     public void Encode_Rfc6347Section4_2_2_RejectsFieldsOutOfRange(int length, int offset, int fragmentLength)
     {
         DtlsHandshakeHeader header = new(HandshakeType.Finished, length, 0, offset, fragmentLength);
 
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => header.Encode());
+    }
+
+
+    [TestMethod]
+    public void Encode_Rfc6347Section4_2_2_AcceptsTheLargestTwentyFourBitLength()
+    {
+        DtlsHandshakeHeader header = new(HandshakeType.Finished, 16777215, 0, 0, 16777215);
+
+        byte[] encoded = header.Encode();
+
+        CollectionAssert.AreEqual(new byte[] { 0xFF, 0xFF, 0xFF }, encoded[1..4]);
     }
 
 
