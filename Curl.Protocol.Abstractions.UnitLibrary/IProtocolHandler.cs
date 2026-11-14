@@ -26,7 +26,9 @@ public interface IProtocolHandler
     /// <summary>
     /// Tells the handler that a transfer it served the first request of has ended, its whole redirect chain
     /// (or its single request) with the final merged result (BL-5164). Called once per transfer, after the
-    /// last hop, also when a hop was refused. Does nothing by default.
+    /// last hop, also when a hop was refused and when the <c>-m</c> or <c>-Y</c>/<c>-y</c> watchdog stopped the
+    /// transfer (BL-5165). Each <c>--retry</c> attempt is a transfer of its own and is told on its own. Does nothing
+    /// by default.
     /// </summary>
     /// <param name="first">The transfer as the follower was given it, before any redirect.</param>
     /// <param name="result">The final result, with the chain's merged report.</param>

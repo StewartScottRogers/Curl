@@ -90,6 +90,42 @@ public sealed partial class TransferPerformerTests
     }
 
     [TestMethod]
+    public async Task FollowWatchingSpeedAsync_StalledBelowSpeedLimit_TellsTheHandlerOnceWithTheExit28Result()
+    {
+        TransferPerformer performer = new(clock, EasyErrorText);
+        EngineTransferState state = NewState();
+        LowSpeedWatchdog? watchdog = performer.StartLowSpeedWatchdog(state, new EasyTransferOptions { LowSpeedLimit = 100, LowSpeedTime = TimeSpan.FromSeconds(2) }, NoDiagnosticLog.Instance);
+        StallingHandler handler = new();
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null, CancellationToken = watchdog!.Token };
+
+        Task<TransferResult> attempt = TransferPerformer.FollowWatchingSpeedAsync(state, Follower(handler), context, new RedirectPolicy());
+        await handler.Stalled;
+        clock.Advance(TimeSpan.FromSeconds(3));
+        await attempt;
+
+        Assert.HasCount(1, handler.Told);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, handler.Told[0].ExitCode);
+    }
+
+    [TestMethod]
+    public async Task FollowWatchingSpeedAsync_PastMaxTime_TellsTheHandlerOnceWithTheExit28Result()
+    {
+        TransferPerformer performer = new(clock, EasyErrorText);
+        EngineTransferState state = NewState();
+        MaxTimeWatchdog? watchdog = performer.StartMaxTimeWatchdog(state, new EasyTransferOptions { Timeout = TimeSpan.FromSeconds(1) }, NoDiagnosticLog.Instance);
+        StallingHandler handler = new();
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null, CancellationToken = watchdog!.Token };
+
+        Task<TransferResult> attempt = TransferPerformer.FollowWatchingSpeedAsync(state, Follower(handler), context, new RedirectPolicy());
+        await handler.Stalled;
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await attempt;
+
+        Assert.HasCount(1, handler.Told);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, handler.Told[0].ExitCode);
+    }
+
+    [TestMethod]
     public async Task FollowWatchingSpeedAsync_CancelledWithoutWatchdog_Throws()
     {
         using CancellationTokenSource cancelled = new();
@@ -276,6 +312,14 @@ public sealed partial class TransferPerformerTests
         private readonly TaskCompletionSource stalled = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task Stalled => stalled.Task;
+
+        public List<TransferResult> Told { get; } = [];
+
+        public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result)
+        {
+            Told.Add(result);
+            return ValueTask.CompletedTask;
+        }
 
         public IReadOnlyCollection<string> SupportedSchemes { get; } = ["http"];
 

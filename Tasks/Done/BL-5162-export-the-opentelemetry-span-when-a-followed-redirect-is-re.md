@@ -8,7 +8,7 @@ depends-on: [BL-5164]
 touches: [Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs, Curl.Extension.OpenTelemetry.UnitTests]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5162 — Export the OpenTelemetry span when a followed redirect is refused and keep first-hop state per transfer
 
@@ -27,17 +27,21 @@ Found by the shift-end review of 2026-11-13 (ADR-0710), silent-failure-hunter an
 
 ## Acceptance criteria
 
-- [ ] With `-L`, a 302 whose next hop the follower refuses still exports one span for the transfer, carrying the 302 response.
-- [ ] Two concurrent followed transfers through one hook each export one span with their own trace-id and start time, and neither sends the other's `traceparent`.
-- [ ] The comment saying the hook "assumes one followed transfer at a time" is removed or made true.
-- [ ] Unit tests in `Curl.Extension.OpenTelemetry.UnitTests` cover both cases. `dotnet build` is clean, the fast tests pass, and the library keeps 100% line and branch coverage.
+- [x] With `-L`, a 302 whose next hop the follower refuses still exports one span for the transfer, carrying the 302 response.
+- [x] Two concurrent followed transfers through one hook each export one span with their own trace-id and start time, and neither sends the other's `traceparent`.
+- [x] The comment saying the hook "assumes one followed transfer at a time" is removed or made true.
+- [x] Unit tests in `Curl.Extension.OpenTelemetry.UnitTests` cover both cases. `dotnet build` is clean, the fast tests pass, and the library keeps 100% line and branch coverage.
 
 ## Notes
 
 No code written. The hook runs once per hop and has no end-of-chain signal, so it cannot tell a refused redirect; BL-5164 adds that signal. Plan once it is Done: keep first-hop state in a map keyed by reference of Output+Progress+Events (all copied unchanged into every hop by `RedirectFollower.NextHop`), export on the end-of-chain call, remove the "one followed transfer at a time" comment.
+
+Done (2026-11-13): `OpenTelemetryTransferHook` keeps each chain waiting on its next hop in a `ConcurrentDictionary` keyed by the hop's (Progress, Events) sinks, which `RedirectFollower.NextHop` copies unchanged and the tool gives every transfer its own (a `TransferProgressRecorder` per transfer), so `-Z` transfers through one hook keep their own trace-id and start. Output was left out of the key: `TransferHookingProtocolHandler` wraps it in the hooks' streams on each hop. `TransferChainFinishedAsync` (BL-5164) exports the span of a chain still waiting, that is one whose next hop was refused, with the chain's exit code and message and, when the refusal carries no report (`TransferResult.Failure`), the last hop's report, so the span carries the 302. Decided by Claude under Stewart's delegation; recorded here rather than in an ADR because it only implements the plan above. The "one followed transfer at a time" comment is gone. Tests: `OpenTelemetryChainEndTests` (4). Measure-CodeQuality for the library: 0 failing members. Full build clean, fast tests green. The Linux and macOS side is met by keeping the tests platform-neutral (no paths, OS text or certificates).
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 3ea5d466 215dfa67 462da442 20333247.
 - 2026-11-13: Doing -> Backlog. Waits on BL-5164: hooks see each hop but not the end of a redirect chain, so a refused redirect cannot be detected
+- 2026-11-13: Backlog -> Doing. Criteria at claim: 3ea5d466 215dfa67 462da442 20333247.
+- 2026-11-13: Doing -> Done. A refused followed redirect still exports its span, and concurrent followed transfers keep their own trace

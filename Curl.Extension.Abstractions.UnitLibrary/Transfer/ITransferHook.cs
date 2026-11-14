@@ -74,8 +74,11 @@ public interface ITransferHook
     TimeSpan? RepeatAfter(TransferResult result) => null;
 
     /// <summary>
-    /// Tells the hook, once, that the transfer's whole redirect chain (or its single request) has ended
-    /// (BL-5164), however it ended, also when the follower refused a hop. <see cref="TransferFinished" /> and
+    /// Tells the hook, once per transfer, that the transfer's whole redirect chain (or its single request) has
+    /// ended (BL-5164), however it ended: also when the follower refused a hop, and when the <c>-m</c> or
+    /// <c>-Y</c>/<c>-y</c> watchdog stopped it, with its exit 28 result (BL-5165). Each <c>--retry</c> attempt is a
+    /// transfer of its own and is told on its own. An exception the hook throws here is swallowed: the hooks after it
+    /// are still told and the transfer keeps the result the chain produced. <see cref="TransferFinished" /> and
     /// <see cref="ExecuteAsync(ITransferContext, Func{ITransferContext, ValueTask{TransferResult}})" /> see each hop;
     /// this sees the end, with the final merged result, so a hook that exports one record per transfer can.
     /// </summary>

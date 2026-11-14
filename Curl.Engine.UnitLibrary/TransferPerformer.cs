@@ -185,12 +185,22 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
         }
         catch (OperationCanceledException) when (watchdog is { IsTooSlow: true })
         {
-            return watchdog.Failure;
+            return await FinishedByWatchdogAsync(follower, context, watchdog.Failure).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (maxTimeWatchdog is { HasTimedOut: true })
         {
-            return maxTimeWatchdog.Failure;
+            return await FinishedByWatchdogAsync(follower, context, maxTimeWatchdog.Failure).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Tells the transfer's handler that a watchdog's exit 28 ended it, which the follower could not, as the
+    /// cancellation left it before any result existed (BL-5165).
+    /// </summary>
+    private static async Task<TransferResult> FinishedByWatchdogAsync(RedirectFollower follower, TransferContext context, TransferResult failure)
+    {
+        await follower.NotifyChainFinishedAsync(context, failure).ConfigureAwait(false);
+        return failure;
     }
 
     /// <summary>
