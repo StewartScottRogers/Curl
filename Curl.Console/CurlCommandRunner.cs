@@ -2509,7 +2509,12 @@ internal sealed class CurlCommandRunner(
     {
         TransferResult skipped = TransferResult.Failure(firstFailure.ExitCode, CurlEasyErrorText.Of(firstFailure.ExitCode));
 
-        return ReportAsync(dispatch, options, transfer, state, skipped, transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol));
+        if (!TryResolveTransferUrl(options, transfer.Url, transfer.UploadFile, out string transferUrl))
+        {
+            transferUrl = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
+        }
+
+        return ReportAsync(dispatch, options, transfer, state, skipped, transfer.Url, transferUrl);
     }
 
     /// <summary>
