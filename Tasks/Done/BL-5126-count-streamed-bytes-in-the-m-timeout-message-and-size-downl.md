@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoSession.cs, Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoProtocolHandler.cs, Curl.Extended.Protocol.SocketIo.UnitTests/SocketIoSessionTests.cs, Curl.Extended.Protocol.SocketIo.UnitTests/SocketIoProtocolHandlerTests.cs, Documentation/Conformance/Extended/CurlSurface-Transfer-Realtime.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5126 — Count streamed bytes in the -m timeout message and size_download for socketio (EXT-036, socketio half)
 
@@ -46,3 +46,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 7d828870 820c3dd3 b7c3b215 f92474a6 d6cd4299 84a3704f.
+- 2026-11-13: Doing -> Done. socketio session reports streamed bytes to progress; tests and quality gate green
