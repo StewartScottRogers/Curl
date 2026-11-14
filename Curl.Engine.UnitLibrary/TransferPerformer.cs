@@ -191,8 +191,24 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
         {
             return await FinishedByWatchdogAsync(follower, context, maxTimeWatchdog.Failure).ConfigureAwait(false);
         }
+        catch (Exception exception)
+        {
+            return await FinishedByExceptionAsync(follower, context, exception).ConfigureAwait(false);
+        }
     }
 
+    /// <summary>
+    /// Tells the transfer's handler that the abort token or an exception from a hop ended it with no result (BL-5170):
+    /// an exit 42 failure for a cancellation, exit 2 for any other exception. Then it throws the same exception again.
+    /// </summary>
+    private static async Task<TransferResult> FinishedByExceptionAsync(RedirectFollower follower, TransferContext context, Exception exception)
+    {
+        TransferResult failure = TransferResult.Failure(
+            exception is OperationCanceledException ? CurlExitCode.AbortedByCallback : CurlExitCode.FailedInit,
+            exception.Message);
+        await follower.NotifyChainFinishedAsync(context, failure).ConfigureAwait(false);
+        throw exception;
+    }
     /// <summary>
     /// Tells the transfer's handler that a watchdog's exit 28 ended it, which the follower could not, as the
     /// cancellation left it before any result existed (BL-5165).

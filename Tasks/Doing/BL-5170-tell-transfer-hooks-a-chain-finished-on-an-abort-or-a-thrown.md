@@ -22,12 +22,14 @@ Found by the shift-end review of 7747c1d4d...8f429f2ab (type-design-analyzer; si
 
 ## Acceptance criteria
 
-- [ ] An aborted transfer (abort token cancelled, no watchdog fired) that had followed a 3xx leaves no entry in OpenTelemetryTransferHook's chain state, shown by a unit test.
-- [ ] The doc comments of ITransferHook.TransferChainFinishedAsync and IProtocolHandler.NotifyChainFinishedAsync state exactly which endings are told, and a test pins each told ending.
-- [ ] The aborted transfer's exception and exit code are unchanged.
-- [ ] dotnet build is clean and the fast tests pass; Curl.Engine.UnitLibrary and Curl.Core.UnitLibrary keep 100% line and branch coverage.
+- [x] An aborted transfer (abort token cancelled, no watchdog fired) that had followed a 3xx leaves no entry in OpenTelemetryTransferHook's chain state, shown by a unit test.
+- [x] The doc comments of ITransferHook.TransferChainFinishedAsync and IProtocolHandler.NotifyChainFinishedAsync state exactly which endings are told, and a test pins each told ending.
+- [x] The aborted transfer's exception and exit code are unchanged.
+- [x] dotnet build is clean and the fast tests pass; Curl.Engine.UnitLibrary and Curl.Core.UnitLibrary keep 100% line and branch coverage.
 
 ## Notes
+
+- FollowWatchingSpeedAsync now tells the handler on any other exception too: exit 42 for a cancellation, exit 2 otherwise, then rethrows the same exception (exception and exit code unchanged). Doc comments of ITransferHook and IProtocolHandler list the told endings (result, refused hop, watchdogs, abort token, hop exception). Tests pin the abort and the thrown hop in TransferPerformerTests; the hook drops its entry in TransferChainFinishedAsync, already covered by OpenTelemetryChainEndTests (test project outside touches). Engine library at 100% line and branch, 0 failing members. Platform-neutral.
 
 ## Log
 
