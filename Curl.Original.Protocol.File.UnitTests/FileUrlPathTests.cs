@@ -722,7 +722,7 @@ public sealed class FileUrlPathTests
 
     [TestMethod]
     [DataRow("file:///C:%2FWindows/win.ini", "C:%2FWindows/win.ini", "C:/Windows/win.ini")]
-    [DataRow("file://localhost/Q:dir/x", "Q:dir/x", "Q:dir/x")]
+    [DataRow("file://localhost/Q:dir/x", "/Q:dir/x", "Q:dir/x")]
     public void TryParse_DriveLettersOn_DropsTheLeadingSlash(
         string text,
         string urlPath,

@@ -251,12 +251,34 @@ public sealed record FileUrlPath
             ? StripDriveLetterSlash(url.AbsolutePath)
             : url.AbsolutePath;
 
+        string quoted = UppercaseEscapes(EncodeNonAscii(urlPath));
+
         path = new FileUrlPath(
-            UppercaseEscapes(EncodeNonAscii(urlPath)),
+            driveLetters && IsDriveRelative(urlPath) ? "/" + quoted : quoted,
             ToOperatingSystemPath(urlPath, readEscapedBytes));
 
         return true;
     }
+
+    /// <summary>
+    /// Tells whether a path whose drive slash was stripped names a drive-relative file such
+    /// as <c>C:name</c>, which curl quotes with the slash still on (<c>/C:name</c>).
+    /// </summary>
+    /// <param name="strippedPath">The path after <c>StripDriveLetterSlash</c>.</param>
+    /// <returns><see langword="true" /> for <c>X:</c> followed by a character other than a separator or escape.</returns>
+    private static bool IsDriveRelative(string strippedPath) =>
+        strippedPath.Length > 2
+        && char.IsAsciiLetter(strippedPath[0])
+        && strippedPath[1] == ':'
+        && !IsSeparatorOrEscape(strippedPath[2]);
+
+    /// <summary>
+    /// Tells whether a character is a path separator or starts an escape.
+    /// </summary>
+    /// <param name="character">The character after <c>X:</c>.</param>
+    /// <returns><see langword="true" /> for <c>/</c>, <c>\</c> or <c>%</c>.</returns>
+    private static bool IsSeparatorOrEscape(char character) =>
+        character is '/' or '\\' or '%';
 
     /// <summary>
     /// Drops the slash in front of a <c>/X:…</c> or <c>/X|…</c> drive specification.
