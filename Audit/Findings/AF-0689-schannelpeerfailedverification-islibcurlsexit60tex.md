@@ -3,8 +3,8 @@ id: AF-0689
 title: SchannelPeerFailedVerification_..._IsLibcurlsExit60Text never asserts exit 60
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces.
 key: quality:Curl.Networking.UnitTests/TlsFailureMessagesTests.cs:SchannelPeerFailedVerification_WithOnlyANameMismatchOnAnIpAddressAgainstAlternativeNames_IsLibcurlsExit60Text:name-lies
 reproduction: none
 task: BL-4883
@@ -13,9 +13,9 @@ found: 2026-11-05
 found-at: 4eba3c63638befcc6a63aaa31ddf5419922fa939
 scorecard: 2026-11-05_2025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-13
+closed-how: reliable-reaudit
+closed-by: 2026-11-13_2321.md
 ---
 # AF-0689 - SchannelPeerFailedVerification_..._IsLibcurlsExit60Text never asserts exit 60
 
@@ -43,7 +43,9 @@ Select-String -Path Curl.Networking.UnitTests/TlsFailureMessagesTests.cs -Patter
 ## Re-audits
 
 - 2026-11-12 | 2026-11-12_2105.md | reproduces: no | Ran the Select-String with context: the test now asserts Assert.AreEqual(60, (int)CurlExitCode.PeerFailedVerification) (line 422) and Assert.AreEqual(LibcurlExit60Text, message) (line 423).
+- 2026-11-13 | 2026-11-13_2321.md | reproduces: no | The context now shows Assert.AreEqual(60, (int)CurlExitCode.PeerFailedVerification); and Assert.AreEqual(LibcurlExit60Text, message); at lines 422-423.
 
 ## Log
 
 - 2026-11-05: filed proposed.
+- 2026-11-13: accepted -> closed. Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces.

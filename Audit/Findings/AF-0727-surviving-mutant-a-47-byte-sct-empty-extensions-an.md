@@ -3,8 +3,8 @@ id: AF-0727
 title: Surviving mutant: a 47-byte SCT (empty extensions and signature) can be refused in the certificate text
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Output.UnitLibrary/OpenSslPeerCertificateText.cs:FindSignatureStart-lt:surviving-mutant
 reproduction: mutation Curl.Output.UnitLibrary/OpenSslPeerCertificateText.cs:661:<
 task: BL-5086
@@ -13,9 +13,9 @@ found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-13
+closed-how: mechanical
+closed-by: 2026-11-13_2321.md
 ---
 # AF-0727 - Surviving mutant: a 47-byte SCT (empty extensions and signature) can be refused in the certificate text
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Outpu
 
 ## Re-audits
 
+- 2026-11-13 | 2026-11-13_2321.md | reproduces: no | Ran the -Site command: outcome killed (timestamp.Length < 47 -> <= 47). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-12: filed proposed.
 - 2026-11-13: proposed -> accepted.
+- 2026-11-13: accepted -> closed. Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

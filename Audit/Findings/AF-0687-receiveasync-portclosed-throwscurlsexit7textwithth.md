@@ -3,8 +3,8 @@ id: AF-0687
 title: ReceiveAsync_PortClosed_ThrowsCurlsExit7TextWithTheElapsedTime never asserts exit 7
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces.
 key: quality:Curl.Networking.UnitTests/PortUnreachableReportingDatagramChannelTests.cs:ReceiveAsync_PortClosed_ThrowsCurlsExit7TextWithTheElapsedTime:name-lies
 reproduction: none
 task: BL-4881
@@ -13,9 +13,9 @@ found: 2026-11-05
 found-at: 4eba3c63638befcc6a63aaa31ddf5419922fa939
 scorecard: 2026-11-05_2025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-13
+closed-how: reliable-reaudit
+closed-by: 2026-11-13_2321.md
 ---
 # AF-0687 - ReceiveAsync_PortClosed_ThrowsCurlsExit7TextWithTheElapsedTime never asserts exit 7
 
@@ -43,7 +43,9 @@ Select-String -Path Curl.Networking.UnitTests/PortUnreachableReportingDatagramCh
 ## Re-audits
 
 - 2026-11-12 | 2026-11-12_2105.md | reproduces: no | Ran the Select-String: the test is now ReceiveAsync_PortClosed_ThrowsCouldntConnectTextWithTheElapsedTime (line 26). It no longer names exit 7 and asserts the text it names (Assert.AreEqual("Failed to connect to localhost:1 after 5 ms: Could not connect to server", ...), Assert.EndsWith(CouldntConnectWords, ...)).
+- 2026-11-13 | 2026-11-13_2321.md | reproduces: no | Select-String now matches the renamed ReceiveAsync_PortClosed_ThrowsCouldntConnectTextWithTheElapsedTime (line 26) and Assert.EndsWith(CouldntConnectWords, refused.Message) (line 43); the name no longer promises exit 7, and the text it does promise is asserted exactly.
 
 ## Log
 
 - 2026-11-05: filed proposed.
+- 2026-11-13: accepted -> closed. Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces.

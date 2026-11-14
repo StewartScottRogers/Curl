@@ -3,8 +3,8 @@ id: AF-0712
 title: TlsHandshake_SchannelWithoutAHashPin_PrintsOnlyTheAlpnLines checks only that two lines come back
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces.
 key: quality:Curl.Output.UnitTests/TransferEventInfoTextPinnedPublicKeyTests.cs:TlsHandshake_SchannelWithoutAHashPin_PrintsOnlyTheAlpnLines:weak-assertion
 reproduction: none
 task: BL-5071
@@ -13,9 +13,9 @@ found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-13
+closed-how: reliable-reaudit
+closed-by: 2026-11-13_2321.md
 ---
 # AF-0712 - TlsHandshake_SchannelWithoutAHashPin_PrintsOnlyTheAlpnLines checks only that two lines come back
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Output.UnitTests/TransferEventInfoTextPinnedPublicKeyTe
 
 ## Re-audits
 
+- 2026-11-13 | 2026-11-13_2321.md | reproduces: no | The test now builds expected = [ALPN: curl offers http/1.1, ALPN: server did not agree on a protocol. Uses default.] and asserts CollectionAssert.AreEqual(expected, actual).
+
 ## Log
 
 - 2026-11-12: filed proposed.
 - 2026-11-13: proposed -> accepted.
+- 2026-11-13: accepted -> closed. Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces.

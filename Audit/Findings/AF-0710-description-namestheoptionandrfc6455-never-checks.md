@@ -3,8 +3,8 @@ id: AF-0710
 title: Description_NamesTheOptionAndRfc6455 never checks that the description names RFC 6455
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces.
 key: quality:Curl.Extension.WebSocketRepl.UnitTests/WebSocketReplExtensionTests.cs:Description_NamesTheOptionAndRfc6455:name-lies
 reproduction: none
 task: BL-5069
@@ -13,9 +13,9 @@ found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-13
+closed-how: reliable-reaudit
+closed-by: 2026-11-13_2321.md
 ---
 # AF-0710 - Description_NamesTheOptionAndRfc6455 never checks that the description names RFC 6455
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Extension.WebSocketRepl.UnitTests/WebSocketReplExtensio
 
 ## Re-audits
 
+- 2026-11-13 | 2026-11-13_2321.md | reproduces: no | The context shows Assert.AreEqual(new Uri(https://www.rfc-editor.org/rfc/rfc6455), WebSocketReplExtension.Description.Specification) at line 31.
+
 ## Log
 
 - 2026-11-12: filed proposed.
 - 2026-11-13: proposed -> accepted.
+- 2026-11-13: accepted -> closed. Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces.
