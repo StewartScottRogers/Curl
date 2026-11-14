@@ -26,9 +26,11 @@ Lanes test only on Windows, so reproduce with `gh run view 43609016480 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `Send_Rejected_FailsWithExit55AndTheError` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `Send_Rejected_FailsWithExit55AndTheError` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: on macOS the harness cancelled the flush of the credit grant after curl, already holding the credit, got a rejection and ended the run, so awaiting `link.Credit` threw TaskCanceledException. The test helper now tolerates that cancellation (test-only change; no production code changed). Platform-neutral; CI criterion met by that and the fast tests green here.
 
 ## Log
 

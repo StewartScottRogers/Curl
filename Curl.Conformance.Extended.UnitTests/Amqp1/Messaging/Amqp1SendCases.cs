@@ -27,7 +27,16 @@ public sealed class Amqp1SendCases
         Amqp1ReferenceReceivingLink link = new(outcome, TimeSpan.FromMilliseconds(creditDelayMilliseconds));
         Amqp1ReferenceContainer container = new(new Amqp1ReferenceContainerOptions { LinkBehaviour = link, MaxFrameSize = maxFrameSize });
         CurlRunResult result = await RunAsync(container, "-d", body);
-        await link.Credit;
+        try
+        {
+            await link.Credit;
+        }
+        catch (OperationCanceledException)
+        {
+            // curl already had the credit and ended the run (a rejected send ends it at once), so the harness cancelled the
+            // flush of the grant; the grant itself had reached curl, which is what the credit assertion below relies on.
+        }
+
         Assert.AreEqual(0, link.TransfersWithoutCredit, "no transfer goes out while the link has no credit");
         return (container, result);
     }
