@@ -203,21 +203,44 @@ public sealed class OpenSslVerifyResultTests
         Assert.AreEqual(expected, exceeded);
     }
 
+    [TestMethod]
+    public void ExceedsAPathLength_SelfIssuedIntermediateOnly_IsNotCounted()
+    {
+        Diagnostics.Arrange("chain", "leaf, self-issued CA, other CA, root with path length 1");
+        using var certificates = new DisposableCertificates(
+        [
+            CreateWithBasicConstraints("CN=Leaf", new X509BasicConstraintsExtension(false, false, 0, true), "CN=Issuer"),
+            CreateWithBasicConstraints("CN=Rollover", new X509BasicConstraintsExtension(true, false, 0, true)),
+            CreateWithBasicConstraints("CN=Upper", new X509BasicConstraintsExtension(true, false, 0, true), "CN=Issuer"),
+            CreateWithBasicConstraints("CN=Root", new X509BasicConstraintsExtension(true, true, 1, true)),
+        ]);
+
+        var exceeded = OpenSslVerifyResult.ExceedsAPathLength(certificates.Certificates);
+
+        Diagnostics.Assert("exceeded", false, exceeded);
+        Assert.IsFalse(exceeded);
+    }
+
     // Leaf, intermediate CA, intermediate CA, root (a CA whose path length is rootPathLength,
     // none when negative). Only the extensions matter, so each is self-signed.
     private static X509Certificate2[] CreatePathLengthChain(int rootPathLength) =>
     [
         CreateWithBasicConstraints("CN=Leaf", new X509BasicConstraintsExtension(false, false, 0, true)),
-        CreateWithBasicConstraints("CN=Lower", new X509BasicConstraintsExtension(true, false, 0, true)),
-        CreateWithBasicConstraints("CN=Upper", new X509BasicConstraintsExtension(true, false, 0, true)),
+        CreateWithBasicConstraints("CN=Lower", new X509BasicConstraintsExtension(true, false, 0, true), "CN=Issuer"),
+        CreateWithBasicConstraints("CN=Upper", new X509BasicConstraintsExtension(true, false, 0, true), "CN=Issuer"),
         CreateWithBasicConstraints("CN=Root", new X509BasicConstraintsExtension(true, rootPathLength >= 0, Math.Max(rootPathLength, 0), true)),
     ];
 
-    private static X509Certificate2 CreateWithBasicConstraints(string subject, X509BasicConstraintsExtension constraints)
+    private static X509Certificate2 CreateWithBasicConstraints(string subject, X509BasicConstraintsExtension constraints, string? issuer = null)
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var request = new CertificateRequest(subject, key, HashAlgorithmName.SHA256);
         request.CertificateExtensions.Add(constraints);
+        if (issuer is not null)
+        {
+            return request.Create(new X500DistinguishedName(issuer), X509SignatureGenerator.CreateForECDsa(key), DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1), new byte[] { 1 });
+        }
+
         return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
     }
 

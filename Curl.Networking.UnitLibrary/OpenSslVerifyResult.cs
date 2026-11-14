@@ -169,25 +169,39 @@ internal static class OpenSslVerifyResult
 
     /// <summary>
     /// Whether a CA in a chain has more intermediate certificates below it than its basic
-    /// constraints' path length allows, as OpenSSL's <c>check_chain_extensions</c> counts them
-    /// (self-issued intermediates counted too).
+    /// constraints' path length allows, as OpenSSL's <c>check_chain_extensions</c> counts them:
+    /// a self-issued intermediate (subject equal to issuer) is left out of the count.
     /// </summary>
     /// <param name="certificates">The chain's certificates, the server's own first.</param>
     /// <returns><see langword="true" /> when a path length is exceeded.</returns>
     internal static bool ExceedsAPathLength(IReadOnlyList<X509Certificate2> certificates)
     {
+        var intermediates = 0;
         for (var depth = 1; depth < certificates.Count; depth++)
         {
-            var constraints = certificates[depth].Extensions.OfType<X509BasicConstraintsExtension>().FirstOrDefault();
-            if (constraints is { CertificateAuthority: true, HasPathLengthConstraint: true }
-                && depth - 1 > constraints.PathLengthConstraint)
+            if (IsExceededBy(certificates[depth], intermediates))
             {
                 return true;
+            }
+
+            if (!IsSelfIssued(certificates[depth]))
+            {
+                intermediates++;
             }
         }
 
         return false;
     }
+
+    private static bool IsExceededBy(X509Certificate2 certificate, int intermediates)
+    {
+        var constraints = certificate.Extensions.OfType<X509BasicConstraintsExtension>().FirstOrDefault();
+        return constraints is { CertificateAuthority: true, HasPathLengthConstraint: true }
+            && intermediates > constraints.PathLengthConstraint;
+    }
+
+    private static bool IsSelfIssued(X509Certificate2 certificate) =>
+        certificate.SubjectName.RawData.AsSpan().SequenceEqual(certificate.IssuerName.RawData);
 
     /// <summary>The certificates of a built chain, the server's own first.</summary>
     /// <param name="chain">The chain.</param>

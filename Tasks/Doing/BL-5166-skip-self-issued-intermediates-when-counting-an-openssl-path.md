@@ -24,11 +24,13 @@ Found by the shift-end review of 2026-11-13 (ADR-0710) - code-reviewer, with typ
 
 ## Acceptance criteria
 
-- [ ] `ExceedsAPathLength` skips self-issued intermediates (subject equals issuer) when it counts the certificates below a CA; a unit test in `OpenSslVerifyResultTests.cs` builds a chain where only that self-issued intermediate would exceed the constraint and asserts `false`, and the existing exceeded case still asserts `true`.
-- [ ] The doc comment on `ExceedsAPathLength` and ADR-1269's paragraph on it describe the counting as the code now does it, with no claim that OpenSSL counts self-issued intermediates.
-- [ ] `dotnet build` clean, fast tests green, `Curl.Networking.UnitLibrary` at 100% line and branch coverage with no member over the complexity or CRAP gates.
+- [x] `ExceedsAPathLength` skips self-issued intermediates (subject equals issuer) when it counts the certificates below a CA; a unit test in `OpenSslVerifyResultTests.cs` builds a chain where only that self-issued intermediate would exceed the constraint and asserts `false`, and the existing exceeded case still asserts `true`.
+- [x] The doc comment on `ExceedsAPathLength` and ADR-1269's paragraph on it describe the counting as the code now does it, with no claim that OpenSSL counts self-issued intermediates.
+- [x] `dotnet build` clean, fast tests green, `Curl.Networking.UnitLibrary` at 100% line and branch coverage with no member over the complexity or CRAP gates.
 
 ## Notes
+
+- Self-issued = subject RawData equals issuer RawData. Quality run: 0 failing members for Curl.Networking.UnitLibrary. Existing test chain intermediates now get a distinct issuer so they still count.
 
 ## Log
 

@@ -26,8 +26,7 @@ other than a lone `NotTimeValid` was reported as a trust error. .NET folds both
   win, and the purpose refusal (26) keeps its place before these.
 - 25 is told from 79 by counting, as `check_chain_extensions` does: a CA at depth `d` whose
   basic constraints carry a path length below `d - 1` is exceeded
-  (`OpenSslVerifyResult.ExceedsAPathLength`). Self-issued intermediates are counted too, a
-  simplification for a case no measured chain holds.
+  (`OpenSslVerifyResult.ExceedsAPathLength`). Self-issued intermediates (subject equal to issuer) are left out of the\n  count, as OpenSSL leaves out a certificate with `EXFLAG_SI` and RFC 5280 6.1.4(l) requires.
 - `TlsFailureMessages.OpenSslExtensionOrSignatureError` gives the text, from OpenSSL's
   `X509_verify_cert_error_string`; `OfChainStatus` returns the same codes for `-w
   %{ssl_verify_result}` and the handshake event.
