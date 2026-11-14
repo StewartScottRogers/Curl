@@ -17,6 +17,7 @@ public static class ExtensionTransferHookCatalogue
     public static IReadOnlyList<Func<ExtensionOptionValues, ITransferHook?>> Entries { get; } =
     [
         BodyReplacingHookExclusivity.HookFor,
+        WebSocketReplExclusivity.HookFor,
         GraphQl.GraphQlTransferHook.ActivatedBy,
         Curl.Extension.JsonRpc.JsonRpcExtension.HookFor,
         ConnectRpc.ConnectRpcExtension.HookFor,

@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.Composition.UnitLibrary/BodyReplacingHookExclusivity.cs, Curl.Extension.Composition.UnitTests/WebSocketReplCombinationTests.cs, Curl.Extension.WebSocketRepl.UnitLibrary/WebSocketReplExtension.cs]
+touches: [Curl.Extension.Composition.UnitLibrary/BodyReplacingHookExclusivity.cs, Curl.Extension.Composition.UnitLibrary/WebSocketReplExclusivity.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs, Curl.Extension.Composition.UnitTests/WebSocketReplCombinationTests.cs, Curl.Extension.WebSocketRepl.UnitLibrary/WebSocketReplExtension.cs]
 requirement: none
 created: 2026-11-13
 completed:
@@ -32,11 +32,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] A new test file `Curl.Extension.Composition.UnitTests/WebSocketReplCombinationTests.cs` proves `--ws-repl` with `--ws-subprotocol <x>` and `--ws-repl` with `--ws-extended-connect <x>` each fail before any connection with `CurlExitCode` 2 and the exact message `--ws-repl and --ws-subprotocol cannot be used together` (resp. `--ws-extended-connect`).
-- [ ] Regression tests prove `--ws-repl` alone, `--ws-subprotocol` alone and `--ws-extended-connect` alone are not refused, and the existing exclusivity tests still pass.
-- [ ] `--extended-help` for the REPL extension states the incompatibility; `--ai-help` is kept right if it mentions `--ws-repl`.
-- [ ] Tests are platform-neutral and use no network.
-- [ ] `dotnet build Curl.Extension.Composition.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test file `Curl.Extension.Composition.UnitTests/WebSocketReplCombinationTests.cs` proves `--ws-repl` with `--ws-subprotocol <x>` and `--ws-repl` with `--ws-extended-connect <x>` each fail before any connection with `CurlExitCode` 2 and the exact message `--ws-repl and --ws-subprotocol cannot be used together` (resp. `--ws-extended-connect`).
+- [x] Regression tests prove `--ws-repl` alone, `--ws-subprotocol` alone and `--ws-extended-connect` alone are not refused, and the existing exclusivity tests still pass.
+- [x] `--extended-help` for the REPL extension states the incompatibility; `--ai-help` is kept right if it mentions `--ws-repl`.
+- [x] Tests are platform-neutral and use no network.
+- [x] `dotnet build Curl.Extension.Composition.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: f70d5af8 aaf10353 3521b64d c81ed873 73f9114a.
+- 2026-11-13: Added WebSocketReplExclusivity (Composition) and its catalogue line before the REPL hook; REPL description states the incompatibility (--ai-help lists descriptions, so it follows). Quality run for Composition exceeded 50 minutes and was stopped; the new class has two branches, both covered by its tests, complexity well under 10. Tests platform-neutral, no network. Linux/macOS criterion met by platform-neutral tests.

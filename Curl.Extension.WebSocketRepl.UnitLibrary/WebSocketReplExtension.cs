@@ -23,7 +23,7 @@ public static class WebSocketReplExtension
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "ws-repl",
-        "Holds an interactive WebSocket session: sends each typed line as text, binary or a ping, shows each reply, and answers pings and closes.",
+        "Holds an interactive WebSocket session: sends each typed line as text, binary or a ping, shows each reply, and answers pings and closes. Cannot be combined with --ws-subprotocol or --ws-extended-connect (exit 2).",
         [],
         [Option],
         new Uri("https://www.rfc-editor.org/rfc/rfc6455"));
