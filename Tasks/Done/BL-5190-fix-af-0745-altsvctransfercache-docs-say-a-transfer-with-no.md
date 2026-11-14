@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5190 — Fix AF-0745: AltSvcTransferCache docs say a transfer with no version option may switch to h3 off Windows; since ADR-1268 it may not unless actsAsQuicBuild is set
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Docs-only fix in AltSvcTransferCache.cs (summary, remarks table, race sentence). Built clean; comment-only so tests and coverage are unchanged.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-14: Doing -> Done. Docs corrected
