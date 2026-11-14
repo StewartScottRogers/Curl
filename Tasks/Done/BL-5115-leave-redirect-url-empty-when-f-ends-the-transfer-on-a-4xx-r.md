@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitTests/FailedResponseRedirectUrlTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5115 — Leave %{redirect_url} empty when -f ends the transfer on a 4xx response
 
@@ -44,3 +44,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 890da18b a2c2112a 8d854bd5 a0b49a29.
+- 2026-11-13: Doing -> Done. Failed -f response clears redirect URL; tests added, build and fast tests green, quality clean
