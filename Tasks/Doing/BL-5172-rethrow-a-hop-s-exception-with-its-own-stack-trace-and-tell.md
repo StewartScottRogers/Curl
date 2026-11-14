@@ -39,3 +39,4 @@ Fix: rethrow with `ExceptionDispatchInfo.Capture(exception).Throw()` (or a bare 
 ## Log
 
 - 2026-11-14: Created.
+- 2026-11-14: Backlog -> Doing. Criteria at claim: c83cc918 7a17321d 7f2ea65a 2cb2dc25 d911a7e9.
