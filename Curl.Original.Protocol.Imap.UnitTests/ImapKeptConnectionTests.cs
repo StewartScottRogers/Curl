@@ -238,6 +238,25 @@ public sealed class ImapKeptConnectionTests
         StringAssert.EndsWith(Encoding.Latin1.GetString(connection.Sent), "A004 LOGOUT\r\n", StringComparison.Ordinal);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ResumedTransferFails_SendsOneLogoutAndNoSecondAtShutDown()
+    {
+        var connection = new PoolingScriptedConnection(
+            Read(Greeting), Read(Capability), Read("A002 OK LOGIN completed\r\n"), Read("A003 OK [READ-WRITE] SELECT completed\r\n"),
+            Read("* 123 FETCH (BODY[1] {5}\r\nhello)\r\nA004 OK FETCH completed\r\n"),
+            Read("A005 NO no such message\r\n"), Read("* BYE\r\nA006 OK LOGOUT completed\r\n"),
+            Read("* BYE\r\nA007 OK LOGOUT completed\r\n"));
+        var handler = new ImapProtocolHandler(Reusing(connection), new QueuedTlsProvider());
+
+        await handler.ExecuteAsync(Context("imap://127.0.0.1/804/;MAILINDEX=123/;SECTION=1", new MemoryStream()));
+        TransferResult second = await handler.ExecuteAsync(Context("imap://127.0.0.1/804/;MAILINDEX=456/;SECTION=2.3", new MemoryStream()));
+        await connection.CloseAsync();
+
+        Assert.AreNotEqual(CurlExitCode.Ok, second.ExitCode);
+        string sent = Encoding.Latin1.GetString(connection.Sent);
+        Assert.AreEqual(1, sent.Split("LOGOUT", StringSplitOptions.None).Length - 1, sent);
+    }
+
     private static TransferContext AppendContext() =>
         new()
         {
