@@ -3,12 +3,12 @@ id: AF-0735
 title: HookFor_GraphQlIntrospectWithJsonRpc_Refuses checks only that a hook exists, which a single-option hook also satisfies
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.Composition.UnitTests/BodyReplacingHookExclusivityTests.cs:HookFor_GraphQlIntrospectWithJsonRpc_Refuses:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5180
+tasks: BL-5180
 found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md

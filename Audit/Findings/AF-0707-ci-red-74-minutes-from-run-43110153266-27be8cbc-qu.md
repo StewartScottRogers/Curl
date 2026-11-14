@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: process:logs:run-43110153266:ci-red
 reproduction: none
-task: BL-5004
-tasks: BL-5004
+task: BL-5176
+tasks: BL-5004, BL-5176
 found: 2026-11-11
 found-at: df2273e7663bedd3179f7d3166167d9ce99c6ca0
 scorecard: 2026-11-11_2002.md

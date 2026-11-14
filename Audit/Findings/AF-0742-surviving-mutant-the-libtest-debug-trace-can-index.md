@@ -3,12 +3,12 @@ id: AF-0742
 title: Surviving mutant: the libtest debug trace can index past data that ends in a carriage return
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/LibTestDebugTrace.cs:EndsRowAt-lt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/LibTestDebugTrace.cs:123:<
-task: none
-tasks:
+task: BL-5187
+tasks: BL-5187
 found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md

@@ -3,12 +3,12 @@ id: AF-0745
 title: AltSvcTransferCache docs say a transfer with no version option may switch to h3 off Windows; since ADR-1268 it may not unless actsAsQuicBuild is set
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Engine.UnitLibrary/AltSvcTransferCache.cs:NoVersionOptionDestinations:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-5190
+tasks: BL-5190
 found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md

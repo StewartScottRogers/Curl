@@ -3,12 +3,12 @@ id: AF-0736
 title: Surviving mutant: after an IMAP APPEND the keep-or-LOGOUT choice can be inverted
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Imap.UnitLibrary/ImapSession.cs:AppendAsync-eq:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Imap.UnitLibrary/ImapSession.cs:539:==
-task: none
-tasks:
+task: BL-5181
+tasks: BL-5181
 found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md
