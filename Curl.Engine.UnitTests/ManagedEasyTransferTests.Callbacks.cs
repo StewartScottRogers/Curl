@@ -241,6 +241,22 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_ReadCallbackThrowsANonIOException_ItLeavesAndIsNotAnAbort_BL5173()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes("220 hi\r\n250 ok\r\n250 ok\r\n250 ok\r\n354 go\r\n")]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "smtp://h/1507" },
+            Transfer = new EasyTransferOptions { Upload = true },
+            Protocols = new() { Smtp = new() { MailFrom = "<f@example.com>", MailRecipients = ["<r@example.com>"] } },
+            Callbacks = new() { Read = _ => throw new InvalidOperationException("callback broke") },
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await easy.PerformAsync(CancellationToken.None));
+    }
+
+    [TestMethod]
     public async Task PerformAsync_PostWithNoFieldsAndAReadCallbackThatAborts_ReturnsAbortedByCallbackWithLibcurlsText()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);

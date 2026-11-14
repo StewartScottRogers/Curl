@@ -168,47 +168,83 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
     /// <param name="follower">Performs the attempt, following redirects under <c>-L</c>.</param>
     /// <param name="context">The attempt's context.</param>
     /// <param name="redirectPolicy">The <c>-L</c> policy.</param>
+    /// <param name="endsAsAbortedByCallback">Tells whether the caller answers an exception from a hop as <c>CURLE_ABORTED_BY_CALLBACK</c>, as it does for a read callback's abort that surfaces as an <see cref="IOException" />; <see langword="null" /> for none (BL-5173).</param>
     /// <returns>The attempt's result, or a watchdog's failure.</returns>
     internal static async Task<TransferResult> FollowWatchingSpeedAsync(
         EngineTransferState state,
         RedirectFollower follower,
         TransferContext context,
-        RedirectPolicy redirectPolicy)
+        RedirectPolicy redirectPolicy,
+        Func<Exception, bool>? endsAsAbortedByCallback = null)
     {
         using LowSpeedWatchdog? watchdog = state.AttemptLowSpeedWatchdog;
         using MaxTimeWatchdog? maxTimeWatchdog = state.AttemptMaxTimeWatchdog;
         state.AttemptLowSpeedWatchdog = null;
         state.AttemptMaxTimeWatchdog = null;
+        TransferResult result = null!;
+        Exception? hopFailure = null;
         try
         {
-            return await follower.FollowAsync(context, redirectPolicy).ConfigureAwait(false);
+            result = await follower.FollowWithoutNotifyingAsync(context, redirectPolicy).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (watchdog is { IsTooSlow: true })
+        catch (OperationCanceledException) when (HasStoppedTheTransfer(watchdog))
         {
-            return await FinishedByWatchdogAsync(follower, context, watchdog.Failure).ConfigureAwait(false);
+            return await FinishedByWatchdogAsync(follower, context, watchdog!.Failure).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (maxTimeWatchdog is { HasTimedOut: true })
+        catch (OperationCanceledException) when (HasStoppedTheTransfer(maxTimeWatchdog))
         {
-            return await FinishedByWatchdogAsync(follower, context, maxTimeWatchdog.Failure).ConfigureAwait(false);
+            return await FinishedByWatchdogAsync(follower, context, maxTimeWatchdog!.Failure).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
-            return await FinishedByExceptionAsync(follower, context, exception).ConfigureAwait(false);
+            hopFailure = exception;
         }
+
+        if (hopFailure is not null)
+        {
+            await TellChainFinishedByExceptionAsync(follower, context, hopFailure, endsAsAbortedByCallback).ConfigureAwait(false);
+        }
+
+        // Awaiting a faulted task rethrows the hop's exception with its own stack trace kept.
+        result = await (hopFailure is null ? Task.FromResult(result) : Task.FromException<TransferResult>(hopFailure)).ConfigureAwait(false);
+        await follower.NotifyChainFinishedAsync(context, result).ConfigureAwait(false);
+        return result;
     }
+
+    private static bool HasStoppedTheTransfer(LowSpeedWatchdog? watchdog) => watchdog is { IsTooSlow: true };
+
+    private static bool HasStoppedTheTransfer(MaxTimeWatchdog? watchdog) => watchdog is { HasTimedOut: true };
 
     /// <summary>
     /// Tells the transfer's handler that the abort token or an exception from a hop ended it with no result (BL-5170):
-    /// an exit 42 failure for a cancellation, exit 2 for any other exception. Then it throws the same exception again.
+    /// the exit code the transfer then ends with (BL-5173): exit 42 (<c>AbortedByCallback</c>) when the transfer's own
+    /// token is cancelled (the abort token) or the caller says it answers the exception as an abort
+    /// (<paramref name="endsAsAbortedByCallback" />, a read callback's abort that escaped as an <see cref="IOException" />),
+    /// exit 2 (<c>FailedInit</c>) for any other exception, including an <see cref="OperationCanceledException" /> the
+    /// transfer's token did not cause (an internal timeout). The caller then rethrows the hop's exception with its own
+    /// stack trace; one the notification itself throws is dropped so the hop's is the one that leaves.
     /// </summary>
-    private static async Task<TransferResult> FinishedByExceptionAsync(RedirectFollower follower, TransferContext context, Exception exception)
+    private static async Task TellChainFinishedByExceptionAsync(
+        RedirectFollower follower,
+        TransferContext context,
+        Exception exception,
+        Func<Exception, bool>? endsAsAbortedByCallback)
     {
+        bool aborted = (exception is OperationCanceledException && context.CancellationToken.IsCancellationRequested)
+            || endsAsAbortedByCallback?.Invoke(exception) == true;
         TransferResult failure = TransferResult.Failure(
-            exception is OperationCanceledException ? CurlExitCode.AbortedByCallback : CurlExitCode.FailedInit,
+            aborted ? CurlExitCode.AbortedByCallback : CurlExitCode.FailedInit,
             exception.Message);
-        await follower.NotifyChainFinishedAsync(context, failure).ConfigureAwait(false);
-        throw exception;
+        try
+        {
+            await follower.NotifyChainFinishedAsync(context, failure).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // The hop's exception is the failure; the handler's own is secondary.
+        }
     }
+
     /// <summary>
     /// Tells the transfer's handler that a watchdog's exit 28 ended it, which the follower could not, as the
     /// cancellation left it before any result existed (BL-5165).
