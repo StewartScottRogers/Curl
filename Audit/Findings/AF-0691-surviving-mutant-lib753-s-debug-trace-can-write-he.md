@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Re-audits
 
 - 2026-11-12 | 2026-11-12_2105.md | not re-audited | Ran the -Site command: outcome killed, but the operator 'true' resolved to the line's first occurrence, 'traceTime: true' -> 'traceTime: false', not the 'noHex: true' the finding names. The targeted run cannot reach the noHex occurrence, so it does not tell whether that mutant still survives. Not re-audited.
+- 2026-11-13 | 2026-11-13_2321.md | not re-audited | Ran the -Site command: outcome killed, but line 41 now reads new LibTestDebugTrace(..., traceTime: true, noHex: true), and the tool mutated the first true on the line (traceTime: true -> false), not the noHex value the finding is about. The run says nothing about the noHex mutant: not re-audited.
 
 ## Log
 

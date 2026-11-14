@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-13 | 2026-11-13_2321.md | not re-audited | Ran the -Site command: outcome site-missing. IsHashedCertificateFileName now reads name is { Length: >= 10 } with a comment that a bare hash-dot name never names a file, so no > site remains in the member: not re-audited.
+
 ## Log
 
 - 2026-11-12: filed proposed.

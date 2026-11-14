@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-13 | 2026-11-13_2321.md | not re-audited | Ran the -Site command: outcome killed, but line 144 now reads new LibTestDebugTrace(..., traceTime: false, noHex: false), and the tool mutated the first false (traceTime), not the noHex value the finding is about. Not re-audited.
+
 ## Log
 
 - 2026-11-12: filed proposed.

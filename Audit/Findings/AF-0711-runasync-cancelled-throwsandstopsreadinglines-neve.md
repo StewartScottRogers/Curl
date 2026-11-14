@@ -42,6 +42,8 @@ Select-String -Path Curl.Extension.WebSocketRepl.UnitTests/Session/WebSocketRepl
 
 ## Re-audits
 
+- 2026-11-13 | 2026-11-13_2321.md | reproduces: yes | The body is still only await Assert.ThrowsAsync<OperationCanceledException>(...session.RunAsync(new ScriptedLineReader(false), ...)); ScriptedLineReader keeps no count of reads, so nothing checks that line reading stops.
+
 ## Log
 
 - 2026-11-12: filed proposed.

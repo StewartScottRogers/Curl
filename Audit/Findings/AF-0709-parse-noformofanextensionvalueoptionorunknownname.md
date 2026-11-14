@@ -3,8 +3,8 @@ id: AF-0709
 title: Parse_NoFormOfAnExtensionValueOptionOrUnknownName_IsAnUnknownOption checks two of its three refusals only for existence
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces.
 key: quality:Curl.Cli.UnitTests/CommandLineExtensionOptionTests.cs:Parse_NoFormOfAnExtensionValueOptionOrUnknownName_IsAnUnknownOption:weak-assertion
 reproduction: none
 task: BL-5068
@@ -13,9 +13,9 @@ found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-13
+closed-how: reliable-reaudit
+closed-by: 2026-11-13_2321.md
 ---
 # AF-0709 - Parse_NoFormOfAnExtensionValueOptionOrUnknownName_IsAnUnknownOption checks two of its three refusals only for existence
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Cli.UnitTests/CommandLineExtensionOptionTests.cs -Patte
 
 ## Re-audits
 
+- 2026-11-13 | 2026-11-13_2321.md | reproduces: no | Parse_NoFormOfAnExtensionValueOptionOrUnknownName_IsAnUnknownOption now asserts Assert.AreEqual(CurlExitCode.FailedInit, ...) and the exact is unknown line for valueOption, unknown and extensionsOff. The only remaining match (line 88) is Assert.IsNotNull(unknown.Refusal) in a different test, Parse_AnExtensionOptionWithExtensionsOff_RefusesItAsAnUnknownOption, where it is a guard before a CollectionAssert.
+
 ## Log
 
 - 2026-11-12: filed proposed.
 - 2026-11-13: proposed -> accepted.
+- 2026-11-13: accepted -> closed. Re-audit 2026-11-13_2321.md: the reproduction no longer reproduces.
