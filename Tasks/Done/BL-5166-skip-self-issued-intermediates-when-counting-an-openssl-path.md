@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/OpenSslVerifyResult.cs, Curl.Networking.UnitTests/OpenSslVerifyResultTests.cs, Documentation/Planning/Decisions/ADR-1269-openssl-chain-checks-after-trust-name-their-verify-result.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5166 — Skip self-issued intermediates when counting an OpenSSL path length
 
@@ -36,3 +36,4 @@ Found by the shift-end review of 2026-11-13 (ADR-0710) - code-reviewer, with typ
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 773f45ce f16d41d3 493c6829.
+- 2026-11-13: Doing -> Done. ExceedsAPathLength skips self-issued intermediates; doc and ADR-1269 corrected
