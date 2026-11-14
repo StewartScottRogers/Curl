@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ssh.UnitTests/SshProtocolHandlerTests.FailedSftpTeardown.cs]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5194 — Fix flaky SSH test ExecuteAsync_SftpListingOpenDirectoryFails_ClosesTheChannelBeforeDisconnecting
 
@@ -32,9 +32,13 @@ So the channel close write was cancelled during teardown, and the cancellation e
 - [x] `dotnet test Curl.Original.Protocol.Ssh.UnitTests --filter "FullyQualifiedName~ExecuteAsync_SftpListingOpenDirectoryFails_ClosesTheChannelBeforeDisconnecting"` passes 20 runs in a row.
 - [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
-## NotesnCause: test timing. The handler bounds teardown with a 5 s CancellationTokenSource on context.TimeProvider (real clock); a slow runner cancelled the channel-close write. Product is right (a cancelled teardown is a timeout). Fix: the test file gives its transfers a TimeProvider whose timers never fire, so no wall-clock decides the outcome. 20/20 focused runs, Ssh fast tests 953 pass.
+## Notes
+
+Cause: test timing. The handler bounds teardown with a 5 s CancellationTokenSource on context.TimeProvider (real clock); a slow runner cancelled the channel-close write. Product is right (a cancelled teardown is a timeout). Fix: the test file gives its transfers a TimeProvider whose timers never fire, so no wall-clock decides the outcome. 20/20 focused runs, Ssh fast tests 953 pass.
 
 ## Log
 
 - 2026-11-14: Created.
-- 2026-11-14: Backlog -> Doing. Criteria at claim: 28dc01b7 c93bfb91 cce0abcc a0b49a29.n
+- 2026-11-14: Backlog -> Doing. Criteria at claim: 28dc01b7 c93bfb91 cce0abcc a0b49a29.
+- 2026-11-14: Cause named (test timing); fixed in the test only.
+- 2026-11-14: Doing -> Done. Test timing: teardown timeout ran on the real clock; test now uses a never-firing TimeProvider. 20/20 runs, fast tests green.
