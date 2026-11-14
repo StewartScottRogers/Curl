@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/TransferPerformer.cs, Curl.Engine.UnitTests/TransferPerformerTests.cs, Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/ITransferHook.cs, Curl.Protocol.Abstractions.UnitLibrary/IProtocolHandler.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-14
 ---
 # BL-5170 — Tell transfer hooks a chain finished on an abort or a thrown hop too so OpenTelemetry chain state is not leaked
 
@@ -35,3 +35,4 @@ Found by the shift-end review of 7747c1d4d...8f429f2ab (type-design-analyzer; si
 
 - 2026-11-13: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: a04444ea 48cd604d e19db8f2 448f1e8f.
+- 2026-11-14: Doing -> Done. Abort token and hop exceptions now tell the handler the chain finished; docs and tests pin each ending
