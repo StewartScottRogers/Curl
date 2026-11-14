@@ -85,6 +85,22 @@ public sealed class ImapControlChannelTests
     }
 
     [TestMethod]
+    public async Task ReadResponseAsync_LiteralBeginningWithALineFeed_ReportsThatLineFeedAsALineOfItsOwn()
+    {
+        var events = new RecordingTransferEvents();
+        string script = "* 1 X {3}\r\n\nab)\r\nA001 OK done\r\n";
+        var channel = new ImapControlChannel(
+            new ScriptedConnection(Encoding.Latin1.GetBytes(script)), events, CancellationToken.None);
+        await channel.SendCommandAsync("X");
+
+        await channel.ReadResponseAsync(_ => true);
+
+        CollectionAssert.AreEqual(
+            (string[])["> A001 X\r\n", "< * 1 X {3}\r\n", "< \n", "< ab)\r\n", "< A001 OK done\r\n"],
+            events.Transcript);
+    }
+
+    [TestMethod]
     public async Task SendAsync_ConnectionReset_ReportsNothingSent()
     {
         var events = new RecordingTransferEvents();

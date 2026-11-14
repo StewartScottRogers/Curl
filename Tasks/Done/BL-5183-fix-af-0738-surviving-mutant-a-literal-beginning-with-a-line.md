@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Imap.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5183 — Fix AF-0738: Surviving mutant: a literal beginning with a line feed can be reported merged into the next -v line
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Imap.UnitLibrary/ImapControlChannel.cs line 537`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Imap.UnitLibrary/ImapControlChannel.cs line 537`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test `ReadResponseAsync_LiteralBeginningWithALineFeed_ReportsThatLineFeedAsALineOfItsOwn` in ImapControlChannelTests (mutant `> 0` failed it; reverted, all 543 pass). Test-only change.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: d4d7d4e6 9742157d.
+- 2026-11-14: Doing -> Done. Test pins a literal starting with LF; mutant at line 537 now fails it
