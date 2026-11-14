@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console/StandardOutputFailureDeferringStream.cs, Curl.Console.UnitTests/TraceToClosedStandardOutputExitCodeTests.cs]
+touches: [Curl.Console/StandardOutputFailureDeferringStream.cs, Curl.Console/TransferEventOutput.cs, Curl.Console.UnitTests/TraceToClosedStandardOutputExitCodeTests.cs]
 requirement: none
 created: 2026-11-13
 completed:
@@ -30,10 +30,10 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Console.UnitTests/TraceToClosedStandardOutputExitCodeTests.cs` prove that a trace write failing on a stdout stand-in whose reader has gone ends the transfer with `CurlExitCode` 23 (WriteError) and a message starting `Failure writing output to destination`.
-- [ ] A regression test proves a body write failing on the same stand-in still exits 23, and that a genuinely closed stdout at startup (not a broken pipe) keeps its present exit code.
-- [ ] Tests are platform-neutral (stand-in streams, no real pipe).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Console.UnitTests/TraceToClosedStandardOutputExitCodeTests.cs` prove that a trace write failing on a stdout stand-in whose reader has gone ends the transfer with `CurlExitCode` 23 (WriteError) and a message starting `Failure writing output to destination`.
+- [x] A regression test proves a body write failing on the same stand-in still exits 23, and that a genuinely closed stdout at startup (not a broken pipe) keeps its present exit code.
+- [x] Tests are platform-neutral (stand-in streams, no real pipe).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -44,3 +44,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: e4d6b6df a37055d2 04f2c6a6 a0b49a29.
+- 2026-11-13: Fixed in Curl.Console/TransferEventOutput.cs (added to touches): a `--trace`/`--trace-ascii -` dump to stdout is written through WriteFailureIgnoringStream, as curl ignores trace write failures, so the body write fails with exit 23. Cause was the trace write throwing OutputWriteFailedException out of the handler's event call. The startup-closed-stdout case is untouched (ClosedStandardOutputStreamTests still pass). Measure-CodeQuality for Curl.Console: 0 failing members. Linux/macOS: tests use stand-in streams, platform-neutral.
