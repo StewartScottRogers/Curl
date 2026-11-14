@@ -1,0 +1,115 @@
+{
+    "schema":  1,
+    "shift":  "20261114-080127",
+    "branch":  "work/dark-factory",
+    "state":  "running",
+    "publishedAt":  "2026-11-14T17:41:06Z",
+    "autoLanes":  {
+                      "lanes":  2,
+                      "target":  2,
+                      "binding":  "capacity",
+                      "reason":  "lanes 1 -\u003e 2 (2 lanes can be busy at once)",
+                      "changedAt":  "2026-11-14T15:41:56Z"
+                  },
+    "lanes":  [
+                  {
+                      "lane":  0,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "idle",
+                      "step":  "polling",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-14T17:41:06Z"
+                  },
+                  {
+                      "lane":  1,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-14T15:42:09Z"
+                  },
+                  {
+                      "lane":  2,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "retired",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-14T15:21:24Z"
+                  },
+                  {
+                      "lane":  3,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-14T15:38:11Z"
+                  },
+                  {
+                      "lane":  4,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-14T15:39:30Z"
+                  },
+                  {
+                      "lane":  5,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-14T15:45:59Z"
+                  },
+                  {
+                      "lane":  6,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-14T15:33:05Z"
+                  },
+                  {
+                      "lane":  7,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-14T15:36:07Z"
+                  },
+                  {
+                      "lane":  8,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-14T15:32:46Z"
+                  }
+              ]
+}
