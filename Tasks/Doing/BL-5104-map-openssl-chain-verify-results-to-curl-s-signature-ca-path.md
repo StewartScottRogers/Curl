@@ -49,3 +49,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13 (lane 11 notes): The exit-60 text is built in `TlsFailureMessages.OpenSslVerifyError`/`OpenSslTrustError` (line ~858-940), which BL-5103 (Windows half) holds in Doing. Plan: have `OpenSslVerifyError` call `OpenSslVerifyResult.OfChainStatus` extended with 7/25/47/79 (precedence after trust errors 18/19/20, OpenSSL order: signature 7, then CA 79 / pathlen 25, then name constraint 47, then dates) and add a text table for those codes. Added TlsFailureMessages.cs to touches and BL-5103 to depends-on; no code edited.
 - 2026-11-13: Doing -> Backlog. Needs TlsFailureMessages.cs, held by BL-5103 in Doing; depends-on BL-5103
+- 2026-11-13: Backlog -> Doing. Criteria at claim: e142f849 7e0dbfc6 6687648c a0b49a29.
