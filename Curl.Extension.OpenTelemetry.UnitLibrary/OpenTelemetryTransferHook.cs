@@ -19,6 +19,9 @@ internal sealed class OpenTelemetryTransferHook(string endpoint, Action<Span<byt
     /// <summary>The component the export warnings are logged under.</summary>
     internal const string LogComponent = "otel";
 
+    /// <summary>How long the export of a chain-end span may take.</summary>
+    private static readonly TimeSpan ChainEndExportTimeout = TimeSpan.FromSeconds(5);
+
     // With -L the redirect follower calls the hook once per hop; the hops share one trace and one span (BL-5098).
     // Each transfer's chain waiting on its next hop is kept under its progress and events sinks, which the follower
     // copies unchanged into every hop and the tool gives every transfer of its own, so -Z transfers run through one
@@ -61,15 +64,23 @@ internal sealed class OpenTelemetryTransferHook(string endpoint, Action<Span<byt
         if (_chains.TryRemove(KeyOf(first), out var chain))
         {
             var ended = result with { Report = result.Report ?? chain.LastResult.Report };
-            await ExportAsync(chain.TraceParent, chain.LastHop, ended, chain.Start, chain.Services);
+            // The chain may have ended because the -m or -Y/-y watchdog cancelled the transfer's token, so the export
+            // uses a token of its own, bounded by ChainEndExportTimeout (BL-5168).
+            using var own = new CancellationTokenSource(ChainEndExportTimeout, chain.LastHop.TimeProvider);
+            await ExportAsync(chain.TraceParent, chain.LastHop, ended, chain.Start, chain.Services, own.Token);
         }
     }
 
+    private ValueTask ExportAsync(
+        TraceParent traceParent, ITransferContext context, TransferResult result, DateTimeOffset start, TransferHookServices services) =>
+        ExportAsync(traceParent, context, result, start, services, context.CancellationToken);
+
     private async ValueTask ExportAsync(
-        TraceParent traceParent, ITransferContext context, TransferResult result, DateTimeOffset start, TransferHookServices services)
+        TraceParent traceParent, ITransferContext context, TransferResult result, DateTimeOffset start, TransferHookServices services,
+        CancellationToken cancellationToken)
     {
         var span = OtlpHttpClientSpan.For(traceParent, context, result, start, context.TimeProvider.GetUtcNow());
-        var failure = await new OtlpHttpExporter(services.Connector).ExportAsync(endpoint, OtlpJsonWriter.Write(span), context.CancellationToken);
+        var failure = await new OtlpHttpExporter(services.Connector).ExportAsync(endpoint, OtlpJsonWriter.Write(span), cancellationToken);
         if (failure is not null)
         {
             context.DiagnosticLog.Write(DiagnosticLogLevel.Warning, LogComponent, $"OTLP export to {endpoint} failed: {failure}");

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs, Curl.Extension.OpenTelemetry.UnitTests/OpenTelemetryChainEndTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-14
 ---
 # BL-5168 — Export the OpenTelemetry span of a watchdog-stopped chain with a token the watchdog has not cancelled
 
@@ -22,14 +22,17 @@ Found by the shift-end review of 7747c1d4d...8f429f2ab (silent-failure-hunter, t
 
 ## Acceptance criteria
 
-- [ ] OpenTelemetryTransferHook.TransferChainFinishedAsync exports with a token that the transfer's watchdog cannot have cancelled, and that export is still bounded in time.
-- [ ] A test in Curl.Extension.OpenTelemetry.UnitTests calls TransferChainFinishedAsync for a stored chain whose context's CancellationToken is already cancelled and asserts exactly one span reaches the exporter.
-- [ ] Curl's output bytes and exit code for the transfer are unchanged (still exit 28).
-- [ ] dotnet build is clean and the fast tests pass; Curl.Extension.OpenTelemetry.UnitLibrary keeps 100% line and branch coverage.
+- [x] OpenTelemetryTransferHook.TransferChainFinishedAsync exports with a token that the transfer's watchdog cannot have cancelled, and that export is still bounded in time.
+- [x] A test in Curl.Extension.OpenTelemetry.UnitTests calls TransferChainFinishedAsync for a stored chain whose context's CancellationToken is already cancelled and asserts exactly one span reaches the exporter.
+- [x] Curl's output bytes and exit code for the transfer are unchanged (still exit 28).
+- [x] dotnet build is clean and the fast tests pass; Curl.Extension.OpenTelemetry.UnitLibrary keeps 100% line and branch coverage.
 
 ## Notes
+
+- Chain-end export now uses its own CancellationTokenSource (5 s, on the context TimeProvider), not the watchdog-cancelled transfer token. Exit code and output bytes untouched. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 63e75727 130b4dd0 28d82c13 f6c15df8.
+- 2026-11-14: Doing -> Done. Chain-end OTel export uses its own 5 s bounded token; test added; build and fast tests green; quality clean.
