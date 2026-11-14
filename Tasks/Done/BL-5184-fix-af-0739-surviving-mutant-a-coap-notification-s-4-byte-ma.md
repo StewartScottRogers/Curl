@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Coap.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5184 — Fix AF-0739: Surviving mutant: a CoAP notification's 4-byte Max-Age can be ignored for the 60-second default
 
@@ -43,3 +43,4 @@ Killed by new test `MaxAgeOf_AFourByteValue_DecodesIt` (mutant `<` fails it; rev
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: afd26901 9742157d.
+- 2026-11-14: Doing -> Done. A 4-byte Max-Age is now pinned by a test that kills the mutant
