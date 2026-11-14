@@ -23,7 +23,7 @@ namespace Curl.Engine;
 /// </para>
 /// <list type="table">
 /// <listheader><term>Option</term><description>Looked up under; may switch to</description></listheader>
-/// <item><term>none</term><description><c>h2</c>, <c>h1</c>; <c>h1</c>, <c>h2</c>, <c>h3</c></description></item>
+/// <item><term>none</term><description><c>h2</c>, <c>h1</c>; <c>h1</c>, <c>h2</c> (and <c>h3</c> only when the build acts as a QUIC build, ADR-1268)</description></item>
 /// <item><term><c>--http1.1</c></term><description><c>h1</c>; <c>h1</c></description></item>
 /// <item><term><c>--http2</c></term><description><c>h2</c>, <c>h1</c>; <c>h1</c>, <c>h2</c></description></item>
 /// <item><term><c>--http3</c></term><description><c>h3</c>, <c>h2</c>, <c>h1</c>; <c>h1</c>, <c>h2</c>, <c>h3</c></description></item>
@@ -37,7 +37,7 @@ namespace Curl.Engine;
 /// offers that version alone through ALPN (<see cref="HttpVersionPreference.Http11" />, with the HTTP handler
 /// setting the offer, BL-948). An entry naming the origin itself is
 /// no route; one naming <c>h3</c> makes a transfer without a version option race HTTP/3 against TCP as
-/// <c>--http3</c> does, falling back to TCP when QUIC fails (measured), and one naming <c>h2</c> or <c>h1</c>
+/// <c>--http3</c> does (only when the build acts as a QUIC build, ADR-1268), falling back to TCP when QUIC fails (measured), and one naming <c>h2</c> or <c>h1</c>
 /// makes TCP the first attempt of <c>--http3</c>'s race (<see cref="HttpRequestOptions.TriesTcpBeforeQuic" />,
 /// BL-948). None is used for plain <c>http</c> or
 /// for an origin a <c>--connect-to</c> mapping matches, and no header received over plain <c>http</c>
@@ -284,7 +284,8 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
 
     /// <summary>
     /// The destination versions a transfer with no version option may switch to: <c>h1</c> alone on Windows,
-    /// as the Schannel build, and <c>h1</c>, <c>h2</c> and <c>h3</c> elsewhere, as the OpenSSL builds.
+    /// as the Schannel build, and <c>h1</c> and <c>h2</c> elsewhere, plus <c>h3</c> only when the build acts as a QUIC build
+    /// (<paramref name="actsAsQuicBuild" />, ADR-1268), as the OpenSSL builds.
     /// </summary>
     private static IReadOnlySet<AltSvcAlpn> NoVersionOptionDestinations(bool isWindows, bool actsAsQuicBuild) =>
         isWindows ? SchannelBuildAlpns : actsAsQuicBuild ? EveryAlpn : NoQuicBuildAlpns;

@@ -15,6 +15,19 @@ namespace Curl.Engine;
 public sealed partial class Cgr034Tests
 {
     [TestMethod]
+    public async Task SocketAction_NoSocketCallback_AnswersOkNotAbortedByCallback()
+    {
+        await using ManagedCurlEngine engine = EngineOver(new SocketDialer(Response));
+        await using IMultiTransfer multi = PatientMultiOf(engine);
+        multi.Options = new MultiOptions { Timer = _ => 0 };
+
+        (CurlMultiCode code, int running) = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+
+        Assert.AreEqual(CurlMultiCode.Ok, code);
+        Assert.AreEqual(0, running);
+    }
+
+    [TestMethod]
     public async Task SocketAction_ConnectCompletesAtOnceThenReadWaits_KickTellsTheSocketForReadingAndTheDeadline()
     {
         SocketDialer dialer = new(null);

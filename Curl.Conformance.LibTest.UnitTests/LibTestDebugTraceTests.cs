@@ -101,6 +101,16 @@ public sealed class LibTestDebugTraceTests
     }
 
     [TestMethod]
+    public void DebugDump_WithoutHexAndDataEndingInALoneCr_WritesTheCrAsADotWithoutReadingPastTheData()
+    {
+        var stream = new StringWriter();
+
+        LibTestDebugTrace.DebugDump(string.Empty, "<= Recv data", stream, "ab\r"u8, noHex: true);
+
+        Assert.AreEqual("<= Recv data, 3 bytes (0x3)\n0000: ab.\n", stream.ToString());
+    }
+
+    [TestMethod]
     public void DebugDump_WithoutHex_WritesSixtyFourBytesARow()
     {
         var stream = new StringWriter();

@@ -40,7 +40,7 @@ internal sealed class LocalBindingAddressChooser(
     /// </remarks>
     /// <param name="family">The family of the address dialled.</param>
     /// <param name="events">Where the <c>-v</c> lines go.</param>
-    /// <param name="cancellationToken">Cancels a host name's resolve.</param>
+    /// <param name="cancellationToken">Not used: curl's bind lookup blocks and ignores <c>-m</c>, so a host name's resolve is never cancelled (AF-0743).</param>
     /// <returns>The local address to bind.</returns>
     /// <exception cref="LocalBindException">No local address can be chosen, as its <see cref="LocalBindException.Failure" /> says.</exception>
     public async ValueTask<IPAddress> ChooseAsync(AddressFamily family, ITransferEvents events, CancellationToken cancellationToken)
@@ -58,7 +58,7 @@ internal sealed class LocalBindingAddressChooser(
 
         if (binding.HostName is { } hostName)
         {
-            return await ResolveHostAsync(hostName, family, events, cancellationToken).ConfigureAwait(false);
+            return await ResolveHostAsync(hostName, family, events).ConfigureAwait(false);
         }
 
         if (binding.InterfaceName is { } interfaceName)
@@ -113,9 +113,9 @@ internal sealed class LocalBindingAddressChooser(
     /// <see cref="LocalBindFailure.AddressFamilyMismatch" /> (measured: <c>host!localhost</c> and
     /// <c>::1</c> to <c>127.0.0.1</c> are exit 7). Either way curl's line for it goes to <paramref name="events" />.
     /// </summary>
-    private async ValueTask<IPAddress> ResolveHostAsync(string hostName, AddressFamily family, ITransferEvents events, CancellationToken cancellationToken)
+    private async ValueTask<IPAddress> ResolveHostAsync(string hostName, AddressFamily family, ITransferEvents events)
     {
-        var addresses = await LookUpAsync(hostName, cancellationToken).ConfigureAwait(false);
+        var addresses = await LookUpAsync(hostName).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
             events.ReportInfo(LocalBindLines.CouldNotResolveHost(hostName));
@@ -129,7 +129,7 @@ internal sealed class LocalBindingAddressChooser(
             : throw new LocalBindException(LocalBindFailure.AddressFamilyMismatch);
     }
 
-    private async ValueTask<IReadOnlyList<IPAddress>> LookUpAsync(string hostName, CancellationToken cancellationToken)
+    private async ValueTask<IReadOnlyList<IPAddress>> LookUpAsync(string hostName)
     {
         // An IPv4 address in shorthand goes to the resolver, which the Windows build's refuses (ADR-0908).
         if (!Ipv4ShorthandAddress.IsShorthand(hostName) && IPAddress.TryParse(hostName, out var address))
@@ -144,6 +144,6 @@ internal sealed class LocalBindingAddressChooser(
 
         return string.IsNullOrWhiteSpace(hostName)
             ? []
-            : await dnsResolver.ResolveAsync(hostName, cancellationToken).ConfigureAwait(false);
+            : await dnsResolver.ResolveAsync(hostName, CancellationToken.None).ConfigureAwait(false);
     }
 }

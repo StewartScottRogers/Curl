@@ -209,6 +209,64 @@ public sealed class ImapKeptConnectionTests
         Assert.IsEmpty(connection.Sent);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_AppendSucceeds_KeepsTheConnectionWithoutLogout()
+    {
+        var connection = new PoolingScriptedConnection(
+            Read(Greeting), Read(Capability), Read("A002 OK LOGIN completed\r\n"),
+            Read("+ Ready\r\n"), Read("A003 OK APPEND completed\r\n"));
+        var handler = new ImapProtocolHandler(Reusing(connection), new QueuedTlsProvider());
+
+        TransferResult result = await handler.ExecuteAsync(AppendContext());
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsFalse(Encoding.Latin1.GetString(connection.Sent).Contains("LOGOUT", StringComparison.Ordinal));
+        Assert.IsFalse(connection.IsClosed);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AppendRefused_SendsLogoutInsteadOfKeepingTheConnection()
+    {
+        var connection = new PoolingScriptedConnection(
+            Read(Greeting), Read(Capability), Read("A002 OK LOGIN completed\r\n"),
+            Read("+ Ready\r\n"), Read("A003 NO refused\r\n"), Read("* BYE\r\nA004 OK LOGOUT completed\r\n"));
+        var handler = new ImapProtocolHandler(Reusing(connection), new QueuedTlsProvider());
+
+        TransferResult result = await handler.ExecuteAsync(AppendContext());
+
+        Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
+        StringAssert.EndsWith(Encoding.Latin1.GetString(connection.Sent), "A004 LOGOUT\r\n", StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ResumedTransferFails_SendsOneLogoutAndNoSecondAtShutDown()
+    {
+        var connection = new PoolingScriptedConnection(
+            Read(Greeting), Read(Capability), Read("A002 OK LOGIN completed\r\n"), Read("A003 OK [READ-WRITE] SELECT completed\r\n"),
+            Read("* 123 FETCH (BODY[1] {5}\r\nhello)\r\nA004 OK FETCH completed\r\n"),
+            Read("A005 NO no such message\r\n"), Read("* BYE\r\nA006 OK LOGOUT completed\r\n"),
+            Read("* BYE\r\nA007 OK LOGOUT completed\r\n"));
+        var handler = new ImapProtocolHandler(Reusing(connection), new QueuedTlsProvider());
+
+        await handler.ExecuteAsync(Context("imap://127.0.0.1/804/;MAILINDEX=123/;SECTION=1", new MemoryStream()));
+        TransferResult second = await handler.ExecuteAsync(Context("imap://127.0.0.1/804/;MAILINDEX=456/;SECTION=2.3", new MemoryStream()));
+        await connection.CloseAsync();
+
+        Assert.AreNotEqual(CurlExitCode.Ok, second.ExitCode);
+        string sent = Encoding.Latin1.GetString(connection.Sent);
+        Assert.AreEqual(1, sent.Split("LOGOUT", StringSplitOptions.None).Length - 1, sent);
+    }
+
+    private static TransferContext AppendContext() =>
+        new()
+        {
+            Url = CurlUrl.Parse("imap://127.0.0.1/INBOX"),
+            Output = Stream.Null,
+            Upload = new MemoryStream(Encoding.Latin1.GetBytes("Subject: hi\r\n\r\nbody\r\n")),
+            Credentials = new NetworkCredential("user", "secret"),
+            Mail = new MailRequestOptions { UploadFlags = ["seen"] },
+        };
+
     private static byte[] Read(string text) => Encoding.Latin1.GetBytes(text);
 
     private static QueuedConnector Reusing(IConnection connection) =>

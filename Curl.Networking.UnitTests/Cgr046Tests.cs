@@ -104,6 +104,35 @@ public sealed class Cgr046Tests
     }
 
     [TestMethod]
+    public async Task ChooseAsync_WithACancelledToken_LooksTheNameUpUncancelledAsCurlsBindLookupIgnoresMaxTime()
+    {
+        var resolver = new TokenRecordingDnsResolver();
+        var chooser = new LocalBindingAddressChooser(new LocalBinding(null, "-", null, 0, 1), new SystemNetworkInterfaceLookup(onWindows: true, () => []), resolver);
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsExactlyAsync<LocalBindException>(
+            async () => await chooser.ChooseAsync(AddressFamily.InterNetwork, NoTransferEvents.Instance, cancelled.Token));
+
+        Assert.IsTrue(resolver.Called);
+        Assert.IsFalse(resolver.TokenCanBeCancelled);
+    }
+
+    private sealed class TokenRecordingDnsResolver : IDnsResolver
+    {
+        public bool Called { get; private set; }
+
+        public bool TokenCanBeCancelled { get; private set; }
+
+        public ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
+        {
+            Called = true;
+            TokenCanBeCancelled = cancellationToken.CanBeCanceled;
+            return ValueTask.FromResult<IReadOnlyList<IPAddress>>([]);
+        }
+    }
+
+    [TestMethod]
     public async Task ChooseAsync_WithADottedQuadHost_BindsItWithoutTheResolver()
     {
         var resolver = new FakeDnsResolver();

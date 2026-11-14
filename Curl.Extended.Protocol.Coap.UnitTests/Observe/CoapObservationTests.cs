@@ -240,6 +240,10 @@ public sealed class CoapObservationTests
     public void MaxAgeOf_AValueLongerThanFourBytes_GivesTheDefault() =>
         Assert.AreEqual(CoapObservation.DefaultMaxAge, CoapObservation.MaxAgeOf(new CoapMessage(CoapMessageType.NonConfirmable, CoapCode.Content, 1, Token, [new CoapOption(CoapOptionNumber.MaxAge, [0, 0, 0, 0, 1])], [])));
 
+    [TestMethod]
+    public void MaxAgeOf_AFourByteValue_DecodesIt() =>
+        Assert.AreEqual(TimeSpan.FromSeconds(0x01000000), CoapObservation.MaxAgeOf(new CoapMessage(CoapMessageType.NonConfirmable, CoapCode.Content, 1, Token, [new CoapOption(CoapOptionNumber.MaxAge, [1, 0, 0, 0])], [])));
+
     private static CoapOption[] MaxAgeOptions(uint? maxAge) =>
         maxAge is { } seconds ? [new CoapOption(CoapOptionNumber.MaxAge, CoapUnsignedInteger.Encode(seconds))] : [];
 
