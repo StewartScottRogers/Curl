@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.RecordReplay.UnitLibrary/ExchangeKey.cs, Curl.Extension.RecordReplay.UnitTests/ExchangeKeyGetFlagTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5139 — Record the GET method for a -G -d request under --record and --replay
 
@@ -33,11 +33,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] A new test file `Curl.Extension.RecordReplay.UnitTests/ExchangeKeyGetFlagTests.cs` proves a `-G -d a=1` request gets method GET, the recorded exchange line 2 reads `GET http://127.0.0.1:28000/echo?a=1`, and its key does not include the `-d` bytes as a body.
-- [ ] A test proves a replay of such a recording reports `%{method}` as GET, and that a recording made with `-d a=1` without `-G` is still POST (regression, key unchanged).
-- [ ] If an existing recording made before the fix no longer matches, the behaviour is stated in the extension's documentation or ADR-1135 note.
-- [ ] Tests are platform-neutral.
-- [ ] `dotnet build Curl.Extension.RecordReplay.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test file `Curl.Extension.RecordReplay.UnitTests/ExchangeKeyGetFlagTests.cs` proves a `-G -d a=1` request gets method GET, the recorded exchange line 2 reads `GET http://127.0.0.1:28000/echo?a=1`, and its key does not include the `-d` bytes as a body.
+- [x] A test proves a replay of such a recording reports `%{method}` as GET, and that a recording made with `-d a=1` without `-G` is still POST (regression, key unchanged).
+- [x] If an existing recording made before the fix no longer matches, the behaviour is stated in the extension's documentation or ADR-1135 note.
+- [x] Tests are platform-neutral.
+- [x] `dotnet build Curl.Extension.RecordReplay.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,5 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 4e51009f 5daa8112 ff26e4a2 c1cf21f9 c263594a.
+- 2026-11-13: Found already fixed in production by BL-5125 (-G data no longer reaches the context as a body); measured live record and replay: GET, line 2 `GET ...?a=1`. Added ExchangeKeyGetFlagTests and an ADR-1135 note on pre-fix recordings. No production code changed.
+- 2026-11-13: Doing -> Done. GET for -G -d already fixed by BL-5125; regression tests and ADR note added

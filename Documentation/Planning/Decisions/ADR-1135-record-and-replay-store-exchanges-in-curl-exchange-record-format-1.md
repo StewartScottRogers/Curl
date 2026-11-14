@@ -61,3 +61,10 @@ response, which is all record and replay need.
   back unchanged.
 - **Other protocols.** FTP, SMTP and the rest have no request/response pair a key can name as simply; they run as
   without the hook.
+
+## Note: `-G` (BL-5139)
+
+With `-G`, curl moves the `-d` data into the URL query and sends no body, so such a request is a GET: its method is
+`GET`, its exchange line 2 carries the URL with the query, and its key hashes no body bytes. A recording made before
+BL-5125 (which stopped passing `-G` data on as a post body) names such a request `POST` and hashes the data, so a
+replay of it under the same command line misses (exit 7); record it again.
