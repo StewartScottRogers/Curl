@@ -13,14 +13,20 @@ namespace Curl.Extended.Protocol.WebTransport;
 /// </summary>
 public sealed class WebTransportProtocolHandler : IProtocolHandler
 {
-    private readonly Func<WebTransportRequest, CancellationToken, ValueTask<IMultiplexedConnection>> dial;
+    private readonly Func<WebTransportRequest, ITransferEvents, CancellationToken, ValueTask<IMultiplexedConnection>> dial;
 
     /// <summary>Initializes a handler that dials through curl's datagram connector and judges certificates with curl's TLS.</summary>
     /// <param name="connector">Opens the UDP channel.</param>
     /// <param name="tlsProvider">Judges the server's certificate chain.</param>
     public WebTransportProtocolHandler(IDatagramConnector connector, ITlsProvider tlsProvider)
-        : this(new WebTransportQuicDialer(connector, CertificateVerifierFactory(tlsProvider), TimeProvider.System).DialAsync)
+        : this(DialerOf(connector, tlsProvider))
     {
+    }
+
+    private static Func<WebTransportRequest, ITransferEvents, CancellationToken, ValueTask<IMultiplexedConnection>> DialerOf(IDatagramConnector connector, ITlsProvider tlsProvider)
+    {
+        WebTransportQuicDialer dialer = new(connector, CertificateVerifierFactory(tlsProvider), TimeProvider.System);
+        return (request, events, cancellationToken) => dialer.DialAsync(request, events, cancellationToken);
     }
 
     /// <summary>Gives the factory that makes each host's certificate verifier over curl's TLS.</summary>
@@ -31,7 +37,14 @@ public sealed class WebTransportProtocolHandler : IProtocolHandler
 
     /// <summary>Initializes a handler that dials with <paramref name="dial" />, so a test runs it over an in-memory connection.</summary>
     /// <param name="dial">Gives the HTTP/3 connection for a request.</param>
-    internal WebTransportProtocolHandler(Func<WebTransportRequest, CancellationToken, ValueTask<IMultiplexedConnection>> dial) => this.dial = dial;
+    internal WebTransportProtocolHandler(Func<WebTransportRequest, CancellationToken, ValueTask<IMultiplexedConnection>> dial)
+        : this((request, _, cancellationToken) => dial(request, cancellationToken))
+    {
+    }
+
+    /// <summary>Initializes a handler that dials with <paramref name="dial" />, which also gets the transfer's events.</summary>
+    /// <param name="dial">Gives the HTTP/3 connection for a request, reporting the connection to the events.</param>
+    internal WebTransportProtocolHandler(Func<WebTransportRequest, ITransferEvents, CancellationToken, ValueTask<IMultiplexedConnection>> dial) => this.dial = dial;
 
     /// <inheritdoc />
     public IReadOnlyCollection<string> SupportedSchemes { get; } = ["webtransport"];
@@ -65,7 +78,7 @@ public sealed class WebTransportProtocolHandler : IProtocolHandler
         }
 
         WebTransportRequest request = WebTransportRequest.Of(context.Url, body);
-        await using IMultiplexedConnection connection = await dial(request, context.CancellationToken).ConfigureAwait(false);
+        await using IMultiplexedConnection connection = await dial(request, context.Events, context.CancellationToken).ConfigureAwait(false);
         context.Progress.ReportTransferStarted();
         long written = await new WebTransportSession(connection, context).RunAsync(request).ConfigureAwait(false);
         return TransferResult.Success(written);
