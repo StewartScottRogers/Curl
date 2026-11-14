@@ -76,7 +76,7 @@ public interface ITransferHook
     /// <summary>
     /// Tells the hook, once per transfer, that the transfer's whole redirect chain (or its single request) has
     /// ended (BL-5164), however it ended: also when the follower refused a hop, and when the <c>-m</c> or
-    /// <c>-Y</c>/<c>-y</c> watchdog stopped it, with its exit 28 result (BL-5165), and when the abort token or an exception from a hop left the chain, with an exit 42 or exit 2 failure and the exception rethrown unchanged (BL-5170). Each <c>--retry</c> attempt is a
+    /// <c>-Y</c>/<c>-y</c> watchdog stopped it, with its exit 28 result (BL-5165), and when the abort token or an exception from a hop left the chain, with the failure carrying the exit code the transfer then ends with (BL-5173): 42 when the abort token is cancelled or the exception is a read callback's abort, 2 for any other exception, an <see cref="OperationCanceledException" /> the transfer's token did not cause included, and the exception rethrown unchanged (BL-5170). Each <c>--retry</c> attempt is a
     /// transfer of its own and is told on its own. An exception the hook throws here is swallowed: the hooks after it
     /// are still told and the transfer keeps the result the chain produced. <see cref="TransferFinished" /> and
     /// <see cref="ExecuteAsync(ITransferContext, Func{ITransferContext, ValueTask{TransferResult}})" /> see each hop;

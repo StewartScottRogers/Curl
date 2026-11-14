@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-5172]
-touches: [Curl.Engine.UnitLibrary/TransferPerformer.cs, Curl.Engine.UnitTests/TransferPerformerTests.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs]
+touches: [Curl.Engine.UnitLibrary/TransferPerformer.cs, Curl.Engine.UnitTests/TransferPerformerTests.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Callbacks.cs, Curl.Protocol.Abstractions.UnitLibrary/IProtocolHandler.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/ITransferHook.cs]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5173 — Tell transfer hooks the exit code the transfer actually ends with when a hop throws or is cancelled
 
@@ -29,15 +29,18 @@ The hook then exports a span (OpenTelemetry) or records a result whose exit code
 
 ## Acceptance criteria
 
-- [ ] A unit test with a read-callback upload whose callback aborts and a handler that lets the read's `IOException` escape shows the handler is told exit 42, the code the perform answers.
-- [ ] A unit test with a hop that throws `OperationCanceledException` while the transfer's token is not cancelled shows the handler is not told exit 42.
-- [ ] The existing BL-5170 tests (`FollowWatchingSpeedAsync_AbortTokenCancelled_...`, `FollowWatchingSpeedAsync_HopThrows_...`) still pass or are updated to the new mapping with the reason in the test name.
-- [ ] The doc comments of `FinishedByExceptionAsync`, `ITransferHook.TransferChainFinishedAsync` and `IProtocolHandler.TransferChainFinishedAsync` say which exit code each ending is told with, and stay true of the code.
-- [ ] `dotnet build` is clean and the fast tests pass; `Curl.Engine.UnitLibrary` keeps 100% line and branch coverage.
+- [x] A unit test with a read-callback upload whose callback aborts and a handler that lets the read's `IOException` escape shows the handler is told exit 42, the code the perform answers.
+- [x] A unit test with a hop that throws `OperationCanceledException` while the transfer's token is not cancelled shows the handler is not told exit 42.
+- [x] The existing BL-5170 tests (`FollowWatchingSpeedAsync_AbortTokenCancelled_...`, `FollowWatchingSpeedAsync_HopThrows_...`) still pass or are updated to the new mapping with the reason in the test name.
+- [x] The doc comments of `FinishedByExceptionAsync`, `ITransferHook.TransferChainFinishedAsync` and `IProtocolHandler.TransferChainFinishedAsync` say which exit code each ending is told with, and stay true of the code.
+- [x] `dotnet build` is clean and the fast tests pass; `Curl.Engine.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+- Decided: FollowWatchingSpeedAsync takes an optional endsAsAbortedByCallback predicate; the told code is 42 when the transfer token is cancelled or the caller says it answers an abort (FollowUnlessAbortedAsync: IOException with a read aborted), else 2. Touches widened to the two doc-comment files and the callbacks test file (doc-only edits; no other Doing task held them). Engine library quality: 100% line and branch.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: da961aef 70d5e5a5 4856b334 5a7d9fbe d911a7e9.
+- 2026-11-14: Doing -> Done. Hooks are told the exit code the transfer ends with when a hop throws or is cancelled

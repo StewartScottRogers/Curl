@@ -166,6 +166,37 @@ public sealed partial class TransferPerformerTests
     }
 
     [TestMethod]
+    public async Task FollowWatchingSpeedAsync_ReadAbortEscapesAsIOExceptionAndCallerAnswersAbort_TellsTheHandlerExit42_BL5173()
+    {
+        StallingHandler handler = new() { Failure = new IOException("operation aborted by callback") };
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null };
+
+        await Assert.ThrowsAsync<IOException>(
+            async () => await TransferPerformer.FollowWatchingSpeedAsync(
+                NewState(),
+                Follower(handler),
+                context,
+                new RedirectPolicy(),
+                exception => exception is IOException));
+
+        Assert.HasCount(1, handler.Told);
+        Assert.AreEqual(CurlExitCode.AbortedByCallback, handler.Told[0].ExitCode);
+    }
+
+    [TestMethod]
+    public async Task FollowWatchingSpeedAsync_HopCancelledWhileTheTransfersTokenIsNot_IsNotToldExit42_BL5173()
+    {
+        StallingHandler handler = new() { Failure = new TaskCanceledException("internal timeout") };
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null };
+
+        await Assert.ThrowsAsync<TaskCanceledException>(
+            async () => await TransferPerformer.FollowWatchingSpeedAsync(NewState(), Follower(handler), context, new RedirectPolicy()));
+
+        Assert.HasCount(1, handler.Told);
+        Assert.AreEqual(CurlExitCode.FailedInit, handler.Told[0].ExitCode);
+    }
+
+    [TestMethod]
     public async Task FollowWatchingSpeedAsync_HopThrows_RethrownExceptionKeepsTheHopsFrame_BL5172()
     {
         StallingHandler handler = new() { Failure = new InvalidOperationException("hop broke") };

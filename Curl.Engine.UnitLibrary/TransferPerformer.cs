@@ -168,12 +168,14 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
     /// <param name="follower">Performs the attempt, following redirects under <c>-L</c>.</param>
     /// <param name="context">The attempt's context.</param>
     /// <param name="redirectPolicy">The <c>-L</c> policy.</param>
+    /// <param name="endsAsAbortedByCallback">Tells whether the caller answers an exception from a hop as <c>CURLE_ABORTED_BY_CALLBACK</c>, as it does for a read callback's abort that surfaces as an <see cref="IOException" />; <see langword="null" /> for none (BL-5173).</param>
     /// <returns>The attempt's result, or a watchdog's failure.</returns>
     internal static async Task<TransferResult> FollowWatchingSpeedAsync(
         EngineTransferState state,
         RedirectFollower follower,
         TransferContext context,
-        RedirectPolicy redirectPolicy)
+        RedirectPolicy redirectPolicy,
+        Func<Exception, bool>? endsAsAbortedByCallback = null)
     {
         using LowSpeedWatchdog? watchdog = state.AttemptLowSpeedWatchdog;
         using MaxTimeWatchdog? maxTimeWatchdog = state.AttemptMaxTimeWatchdog;
@@ -200,7 +202,7 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
 
         if (hopFailure is not null)
         {
-            await TellChainFinishedByExceptionAsync(follower, context, hopFailure).ConfigureAwait(false);
+            await TellChainFinishedByExceptionAsync(follower, context, hopFailure, endsAsAbortedByCallback).ConfigureAwait(false);
         }
 
         // Awaiting a faulted task rethrows the hop's exception with its own stack trace kept.
@@ -215,13 +217,23 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
 
     /// <summary>
     /// Tells the transfer's handler that the abort token or an exception from a hop ended it with no result (BL-5170):
-    /// an exit 42 failure for a cancellation, exit 2 for any other exception. The caller then rethrows the hop's
-    /// exception with its own stack trace; one the notification itself throws is dropped so the hop's is the one that leaves.
+    /// the exit code the transfer then ends with (BL-5173): exit 42 (<c>AbortedByCallback</c>) when the transfer's own
+    /// token is cancelled (the abort token) or the caller says it answers the exception as an abort
+    /// (<paramref name="endsAsAbortedByCallback" />, a read callback's abort that escaped as an <see cref="IOException" />),
+    /// exit 2 (<c>FailedInit</c>) for any other exception, including an <see cref="OperationCanceledException" /> the
+    /// transfer's token did not cause (an internal timeout). The caller then rethrows the hop's exception with its own
+    /// stack trace; one the notification itself throws is dropped so the hop's is the one that leaves.
     /// </summary>
-    private static async Task TellChainFinishedByExceptionAsync(RedirectFollower follower, TransferContext context, Exception exception)
+    private static async Task TellChainFinishedByExceptionAsync(
+        RedirectFollower follower,
+        TransferContext context,
+        Exception exception,
+        Func<Exception, bool>? endsAsAbortedByCallback)
     {
+        bool aborted = (exception is OperationCanceledException && context.CancellationToken.IsCancellationRequested)
+            || endsAsAbortedByCallback?.Invoke(exception) == true;
         TransferResult failure = TransferResult.Failure(
-            exception is OperationCanceledException ? CurlExitCode.AbortedByCallback : CurlExitCode.FailedInit,
+            aborted ? CurlExitCode.AbortedByCallback : CurlExitCode.FailedInit,
             exception.Message);
         try
         {

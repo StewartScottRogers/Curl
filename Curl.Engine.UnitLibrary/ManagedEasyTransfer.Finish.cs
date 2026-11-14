@@ -363,7 +363,12 @@ internal sealed partial class ManagedEasyTransfer
         TransferResult result;
         try
         {
-            result = await TransferPerformer.FollowWatchingSpeedAsync(state, follower, context, redirectPolicy).ConfigureAwait(false);
+            result = await TransferPerformer.FollowWatchingSpeedAsync(
+                state,
+                follower,
+                context,
+                redirectPolicy,
+                exception => exception is IOException && AnyReadAborted(reads)).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (progress is { Aborted: true })
         {
