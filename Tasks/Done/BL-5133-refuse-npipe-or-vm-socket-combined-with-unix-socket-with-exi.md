@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-5155]
-touches: [Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/ExtensionConnectionHookTests.cs, Curl.Extension.Composition.UnitLibrary/ExtensionConnectionHookCatalogue.cs, Curl.Extension.Composition.UnitTests/ConnectionOptionConflictTests.cs]
+touches: [Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/ExtensionConnectionHookTests.cs, Curl.Extension.Composition.UnitLibrary/ExtensionConnectionHookCatalogue.cs, Curl.Extension.Composition.UnitTests/ConnectionOptionConflictTests.cs, Curl.Extension.Composition.UnitLibrary/CurlSocketConnectionConflict.cs, Curl.Extension.NamedPipe.UnitLibrary/NamedPipeExtension.cs, Curl.Extension.VirtualMachineSocket.UnitLibrary/VirtualMachineSocketExtension.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5133 — Refuse --npipe or --vm-socket combined with --unix-socket with exit 2
 
@@ -33,11 +33,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] A new test file `Curl.Extension.Composition.UnitTests/ConnectionOptionConflictTests.cs` proves `--npipe` with `--unix-socket`, `--npipe` with `--abstract-unix-socket`, `--vm-socket` with `--unix-socket` and `--vm-socket` with `--abstract-unix-socket` each fail with an exception that surfaces as `CurlExitCode` 2 and a message naming both options (asserted exactly), before any connection opener is called.
-- [ ] Regression tests prove each of `--npipe`, `--vm-socket` and `--unix-socket` alone still works, and `--npipe` with `--vm-socket` keeps its existing refusal text.
-- [ ] Tests are platform-neutral (fake openers only; no real pipe, vsock or unix socket).
-- [ ] `--extended-help` and `--ai-help` stay right (the npipe and vm-socket text says they cannot be combined with `--unix-socket`), and ADR-1014 or a new ADR marked "Decided by Claude under Stewart's delegation" records the rule.
-- [ ] `dotnet build Curl.Extension.Composition.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test file `Curl.Extension.Composition.UnitTests/ConnectionOptionConflictTests.cs` proves `--npipe` with `--unix-socket`, `--npipe` with `--abstract-unix-socket`, `--vm-socket` with `--unix-socket` and `--vm-socket` with `--abstract-unix-socket` each fail with an exception that surfaces as `CurlExitCode` 2 and a message naming both options (asserted exactly), before any connection opener is called.
+- [x] Regression tests prove each of `--npipe`, `--vm-socket` and `--unix-socket` alone still works, and `--npipe` with `--vm-socket` keeps its existing refusal text.
+- [x] Tests are platform-neutral (fake openers only; no real pipe, vsock or unix socket).
+- [x] `--extended-help` and `--ai-help` stay right (the npipe and vm-socket text says they cannot be combined with `--unix-socket`), and ADR-1014 or a new ADR marked "Decided by Claude under Stewart's delegation" records the rule.
+- [x] `dotnet build Curl.Extension.Composition.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -56,3 +56,8 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - Requeued: BL-5155 (Doing) holds Curl.Console and Curl.Console.UnitTests. Remove nothing; the board offers this again once BL-5155 is Done.
 - 2026-11-13: Doing -> Backlog. Needs Curl.Console/CurlComposition.cs and its tests, held by BL-5155 (Doing); depends-on BL-5155. Plan in Notes.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: de7a2e61 f49c69db 45adc330 8d0ca22a 73f9114a.
+- Done (claim 2): the check lives in a new `Curl.Extension.Composition.UnitLibrary/CurlSocketConnectionConflict.cs` (`RefuseBesideCurlSocket`, given the curl option's name), called by `CurlComposition.ExtensionConnectionHooksOf` after `ConnectionHooks.ActivatedBy`, so the named Composition test file tests it with the real catalogue hooks and Composition never references the Cli options. `ExtensionConnectionHookCatalogue.cs` is unchanged: it is a merge=union shared list file, so no method goes there. Added the new file and the two extension description files to touches (no task in Doing on origin/work/dark-factory names them).
+- Decision (ADR-1269): the refusal covers every connection hook, not only --npipe and --vm-socket, since each replaces the connector the socket would use; the message names --abstract-unix-socket when that option set the socket. --extended-help and --ai-help read the extension descriptions, which now say --npipe and --vm-socket cannot be combined with --unix-socket or --abstract-unix-socket.
+- Console tests: `ExtensionConnectionHookTests` runs a connection option with --unix-socket and with --abstract-unix-socket end to end (exit 2, exact stderr, nothing written to either connector), and --unix-socket alone activates no hook. All tests use fakes and are platform-neutral, which meets the Linux and macOS CI criterion with the fast tests green here.
+- Measure-CodeQuality.ps1 for Composition, Console, NamedPipe and VirtualMachineSocket: 0 failing members. dotnet build clean; fast tests green.
+- 2026-11-13: Doing -> Done. npipe/vm-socket and other connection options beside --unix-socket or --abstract-unix-socket exit 2 naming both (ADR-1269)
