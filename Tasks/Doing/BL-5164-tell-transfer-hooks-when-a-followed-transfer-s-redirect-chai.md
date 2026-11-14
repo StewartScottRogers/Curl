@@ -30,3 +30,4 @@ Found by BL-5162. `RedirectFollower` runs the hook chain once per hop, so `ITran
 ## Log
 
 - 2026-11-13: Created.
+- 2026-11-13: Backlog -> Doing. Criteria at claim: 8248b0ba 3a0ed95e.
