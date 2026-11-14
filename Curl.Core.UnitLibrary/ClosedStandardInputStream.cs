@@ -24,7 +24,34 @@ public sealed class ClosedStandardInputStream : Stream
     {
         ArgumentNullException.ThrowIfNull(standardInput);
 
-        return ReferenceEquals(standardInput, Null) ? new ClosedStandardInputStream() : standardInput;
+        return ReferenceEquals(standardInput, Null) || ReadsWithBadDescriptor(standardInput)
+            ? new ClosedStandardInputStream()
+            : standardInput;
+    }
+
+    /// <summary>
+    /// Whether a zero-length read of <paramref name="standardInput"/> fails because the descriptor
+    /// is closed (EBADF, which Linux reports for a closed standard input instead of handing back
+    /// <see cref="Stream.Null"/>). Any other failure is not swallowed.
+    /// </summary>
+    private static bool ReadsWithBadDescriptor(Stream standardInput)
+    {
+        try
+        {
+            _ = standardInput.Read(Span<byte>.Empty);
+            return false;
+        }
+        catch (Exception exception) when (IsBadDescriptor(exception))
+        {
+            return true;
+        }
+    }
+
+    private static bool IsBadDescriptor(Exception exception)
+    {
+        const int badDescriptorErrno = 9;
+        return exception is IOException { HResult: badDescriptorErrno }
+            || exception.InnerException is IOException { HResult: badDescriptorErrno };
     }
 
     /// <inheritdoc/>
