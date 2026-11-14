@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Console.UnitTests/ContinueAtWithBodyWriteOutTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5119 — Write the -w output when -C offset is refused with -d, -F or --json
 
@@ -30,18 +30,21 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Console.UnitTests/ContinueAtWithBodyWriteOutTests.cs` prove that `-C 100 -d x -w "[W %{http_code} %{exitcode}]"` writes `[W 000 2]` to stdout, `curl: cannot mix --continue-at with --data` and `curl: (2) Failed initialization` to stderr, and exits 2; the same for `-F a=b` and `--json '{}'` (message names the respective option as today).
-- [ ] A test proves `%{onerror}` output is written for the same refusal.
-- [ ] A regression test proves the refusal still writes nothing to stdout when no `-w` is given, and that no network connection is opened.
-- [ ] Tests are platform-neutral.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Console.UnitTests/ContinueAtWithBodyWriteOutTests.cs` prove that `-C 100 -d x -w "[W %{http_code} %{exitcode}]"` writes `[W 000 2]` to stdout, `curl: cannot mix --continue-at with --data` and `curl: (2) Failed initialization` to stderr, and exits 2; the same for `-F a=b` and `--json '{}'` (message names the respective option as today).
+- [x] A test proves `%{onerror}` output is written for the same refusal.
+- [x] A regression test proves the refusal still writes nothing to stdout when no `-w` is given, and that no network connection is opened.
+- [x] Tests are platform-neutral.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check, as a hand check: the repro prints `[W 000 2]` on stdout and exits 2.
 
+- Done: `WriteOutOfContinueAtRefusalAsync` in CurlCommandRunner renders -w (failed init, exit 2) after the refusal lines. Platform-neutral tests; CI criterion met by that and fast tests green here.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 41b63e3f 489a7cf7 e9ffe7c1 c1cf21f9 a0b49a29.
+- 2026-11-13: Doing -> Done. -C offset refused with -d/-F/--json now writes the -w output

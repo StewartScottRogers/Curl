@@ -1045,6 +1045,27 @@ internal sealed class CurlCommandRunner(
         }
     }
 
+    /// <summary>
+    /// Renders the <c>-w</c> template for a <c>-C</c> offset refused beside a request body, as curl does for a
+    /// transfer that fails at setup: the first URL's transfer failed with exit 2 (BL-5119).
+    /// </summary>
+    /// <param name="refusal">The refusal.</param>
+    /// <param name="optionsRead">The options read before the refusal.</param>
+    /// <returns>A task that completes when the template, if any, is written.</returns>
+    private async Task WriteOutOfContinueAtRefusalAsync(CommandLineRefusal refusal, CommandLineOptions optionsRead)
+    {
+        if (!refusal.FoundAtTransferSetup || !ResumesBesideRequestBody(optionsRead) || optionsRead.WriteOut is null)
+        {
+            return;
+        }
+
+        UrlGlobMatch match = UrlGlob.Unglobbed(optionsRead.Urls[0]).Expand().First();
+        _ = UrlTransfer.TryCreate(optionsRead, 0, 0, transferPerformer.TakeTransferId(), match, null, runsOnWindows, out UrlTransfer? transfer, out _);
+        runningTransfer.Value = NewRunningTransferState(CancellationToken.None, deferringStandardOutput, GatedDeferringStandardOutput);
+        TransferResult result = TransferResult.Failure(refusal.ExitCode, CurlEasyErrorText.Of(refusal.ExitCode));
+        await WriteOutAsync(optionsRead, transfer!, match.Url, match.Url, result, false).ConfigureAwait(false);
+    }
+
     /// <summary>Whether <paramref name="options" /> has a <c>-C</c> offset past zero and a request body: a <c>-F</c> form or a <c>-d</c> body not moved into the query by <c>-G</c>.</summary>
     private static bool ResumesBesideRequestBody(CommandLineOptions options) =>
         options.ResumeFrom > 0
@@ -1072,6 +1093,7 @@ internal sealed class CurlCommandRunner(
         if (!parsed.IsAccepted)
         {
             await WriteRefusalAsync(parsed.Refusal, parsed.NotedDefaultConfigFile, parsed.OptionsReadBeforeRefusal).ConfigureAwait(false);
+            await WriteOutOfContinueAtRefusalAsync(parsed.Refusal, parsed.OptionsReadBeforeRefusal).ConfigureAwait(false);
             await CreateOutputFileOfContinueAtRefusalAsync(parsed.Refusal, parsed.OptionsReadBeforeRefusal).ConfigureAwait(false);
 
             return (int)parsed.Refusal.ExitCode;
