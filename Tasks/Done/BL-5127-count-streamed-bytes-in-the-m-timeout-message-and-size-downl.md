@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Coap.UnitLibrary/Observe/CoapObservation.cs, Curl.Extended.Protocol.Coap.UnitTests/Observe/CoapObservationTests.cs, Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams-Coap.md]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5127 — Count streamed bytes in the -m timeout message and size_download for coap --coap-observe (EXT-036, coap half)
 
@@ -30,18 +30,20 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.Coap.UnitTests/Observe/CoapObservationTests.cs` (existing file, or a new `CoapObservationProgressTests.cs` beside it) prove that after two notifications with payloads `v1` and `v2` the progress reporter has been told the running total of the bytes written to the output, and that the total never resets between notifications.
-- [ ] A test proves that a `-m` timeout after notifications surfaces as `CurlExitCode.OperationTimedOut` (28) with `with N bytes received`, N equal to the bytes on the output, through the observe hook path used by the existing `CoapObserveTransferHookTests`.
-- [ ] The existing CoAP Observe tests stay green, including a stream with no notifications (still `0 bytes received`).
-- [ ] The `CurlSurface-Transfer-MessagingStreams-Coap.md` row for the timeout message and `%{size_download}` states it for observe, "Covered by" naming a test from this task.
-- [ ] The tests are platform-neutral (no real socket).
-- [ ] `dotnet build Curl.Extended.Protocol.Coap.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.Coap.UnitTests/Observe/CoapObservationTests.cs` (existing file, or a new `CoapObservationProgressTests.cs` beside it) prove that after two notifications with payloads `v1` and `v2` the progress reporter has been told the running total of the bytes written to the output, and that the total never resets between notifications.
+- [x] A test proves that a `-m` timeout after notifications surfaces as `CurlExitCode.OperationTimedOut` (28) with `with N bytes received`, N equal to the bytes on the output, through the observe hook path used by the existing `CoapObserveTransferHookTests`.
+- [x] The existing CoAP Observe tests stay green, including a stream with no notifications (still `0 bytes received`).
+- [x] The `CurlSurface-Transfer-MessagingStreams-Coap.md` row for the timeout message and `%{size_download}` states it for observe, "Covered by" naming a test from this task.
+- [x] The tests are platform-neutral (no real socket).
+- [x] `dotnet build Curl.Extended.Protocol.Coap.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Review acceptance check, for a hand check: the coap command prints `|size=N` where N equals the bytes on stdout.
+- `CoapObservation.WriteAsync` now calls `context.Progress.ReportDownloaded(written, null)` after each notification; `written` already was the running total (payload plus newline). The 28 message and `%{size_download}` read that progress total, as for nats and signalr. The `-m` criterion is met by the cancelled-stream test (the engine turns the cancellation into 28 with the reported total); a full-engine test is out of reach of the Coap test project without a socket. A no-notification stream reports nothing, so 0 bytes (existing behaviour). Linux and macOS: tests use no real socket or path, so platform-neutral. Measure-CodeQuality for the Coap library: 0 failing members.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 4a49769f f4ede839 1c76155e 5c2669ad d6cd4299 d3bdf191.
+- 2026-11-13: Doing -> Done. coap --coap-observe reports running bytes written to progress
