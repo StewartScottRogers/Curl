@@ -32,11 +32,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Http.UnitTests/TransferEncodingPartialDecodeSizeDownloadTests.cs` prove that for a gzip-plus-trailing-junk transfer-coded body the failure is exit 23 and the reported downloaded size is 600, and for a two-member gzip body it is exit 23 with size 100.
-- [ ] The delivered output bytes in both cases are the decoded bytes before the error, unchanged from today.
-- [ ] A regression test proves a body that fails before any byte is decoded still reports size 0, and a successful `--tr-encoding` transfer's size is unchanged.
-- [ ] Tests are platform-neutral, using in-memory connection stand-ins.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Http.UnitTests/TransferEncodingPartialDecodeSizeDownloadTests.cs` prove that for a gzip-plus-trailing-junk transfer-coded body the failure is exit 23 and the reported downloaded size is 600, and for a two-member gzip body it is exit 23 with size 100.
+- [x] The delivered output bytes in both cases are the decoded bytes before the error, unchanged from today.
+- [x] A regression test proves a body that fails before any byte is decoded still reports size 0, and a successful `--tr-encoding` transfer's size is unchanged.
+- [x] Tests are platform-neutral, using in-memory connection stand-ins.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -47,3 +47,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 6cf3de41 0fe1459e 32eb45b3 71be241a a0b49a29.
+- 2026-11-13: Done. HttpResponseBodyReader.WriteWithinLimitAsync now adds the bytes the Transfer-Encoding decoder produced before a failure to BytesWritten (helpers CountsDecodedBytes, DownloadedBy keep complexity at the gate). Tests in TransferEncodingPartialDecodeSizeDownloadTests (600, 100, 0). Linux/macOS criterion met by platform-neutral in-memory tests. Follow-up not done: zstd `Transfer-Encoding` corrupt body wording ("Failed reading the chunked-encoded stream" upstream) is not a one-line mapping here; left as a possible follow-up.

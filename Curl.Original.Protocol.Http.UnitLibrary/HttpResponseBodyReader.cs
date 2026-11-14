@@ -717,6 +717,19 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         WriteAsync(output, bytes, WholeWrite, cancellationToken);
 
     /// <summary>
+    /// Whether a Transfer-Encoding coding is decoded, so downloads are counted after decoding.
+    /// </summary>
+    private bool CountsDecodedBytes => contentDecoder?.TransferCodingCount > 0;
+
+    /// <summary>
+    /// The bytes one write adds to <see cref="BytesWritten" />: what the Transfer-Encoding codings
+    /// decoded since <paramref name="deliveredBefore" />, or the <paramref name="received" /> bytes
+    /// when none is decoded.
+    /// </summary>
+    private long DownloadedBy(long deliveredBefore, int received) =>
+        CountsDecodedBytes ? contentDecoder!.TransferDecodedBytes - deliveredBefore : received;
+
+    /// <summary>
     /// Writes <paramref name="bytes" /> and reports the count downloaded after it, except for a
     /// write in pieces smaller than <see cref="WholeWrite" />, whose caller reports it piece by
     /// piece (<see cref="WriteReadAsync" />).
@@ -743,8 +756,14 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         {
             throw WriteFailed(bytes.Length, 0, pieceSize);
         }
+        catch (HttpTransferException) when (CountsDecodedBytes)
+        {
+            // The decoder failed partway: the bytes it decoded before the error still count, as in curl.
+            BytesWritten += DownloadedBy(deliveredBefore, bytes.Length);
+            throw;
+        }
 
-        BytesWritten += contentDecoder?.TransferCodingCount > 0 ? contentDecoder!.TransferDecodedBytes - deliveredBefore : bytes.Length;
+        BytesWritten += DownloadedBy(deliveredBefore, bytes.Length);
         if (pieceSize == WholeWrite)
         {
             Progress.ReportDownloaded(BytesWritten, ExpectedLength);
