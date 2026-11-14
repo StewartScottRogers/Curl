@@ -41,3 +41,4 @@ No code written. The hook runs once per hop and has no end-of-chain signal, so i
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 3ea5d466 215dfa67 462da442 20333247.
 - 2026-11-13: Doing -> Backlog. Waits on BL-5164: hooks see each hop but not the end of a redirect chain, so a refused redirect cannot be detected
+- 2026-11-13: Backlog -> Doing. Criteria at claim: 3ea5d466 215dfa67 462da442 20333247.
