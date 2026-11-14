@@ -37,3 +37,4 @@ So the channel close write was cancelled during teardown, and the cancellation e
 ## Log
 
 - 2026-11-14: Created.
+- 2026-11-14: Backlog -> Doing. Criteria at claim: 28dc01b7 c93bfb91 cce0abcc a0b49a29.
