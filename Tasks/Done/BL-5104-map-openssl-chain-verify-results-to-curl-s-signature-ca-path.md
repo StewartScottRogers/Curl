@@ -8,7 +8,7 @@ depends-on: [BL-5103]
 touches: [Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitTests/TlsFailureMessagesTests.OpenSslChainVerify.cs, Curl.Networking.UnitLibrary/OpenSslVerifyResult.cs, Curl.Networking.UnitTests/OpenSslVerifyResultTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5104 — Map OpenSSL chain-verify results to curl's signature, CA, path-length and name-constraint messages on Linux
 
@@ -32,15 +32,16 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New cases in `Curl.Networking.UnitTests/OpenSslVerifyResultTests.cs` prove each of `NotSignatureValid`, `InvalidBasicConstraints` (with and without a path-length violation), and `HasNotPermittedNameConstraint` yields the message text and code above (`certificate signature failure (7)`, `invalid CA certificate (79)`, `path length constraint exceeded (25)`, `permitted subtree violation (47)`).
-- [ ] A test proves the precedence when several flags are set matches what OpenSSL reports first, and the existing mapping tests stay green.
-- [ ] Tests are platform-neutral (they feed chain status flags to the mapping).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New cases in `Curl.Networking.UnitTests/OpenSslVerifyResultTests.cs` prove each of `NotSignatureValid`, `InvalidBasicConstraints` (with and without a path-length violation), and `HasNotPermittedNameConstraint` yields the message text and code above (`certificate signature failure (7)`, `invalid CA certificate (79)`, `path length constraint exceeded (25)`, `permitted subtree violation (47)`).
+- [x] A test proves the precedence when several flags are set matches what OpenSSL reports first, and the existing mapping tests stay green.
+- [x] Tests are platform-neutral (they feed chain status flags to the mapping).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers in the review were Python; use PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python.
 - Review acceptance check, for a Linux hand check: the pathlen case prints `path length constraint exceeded (25)`.
+- 2026-11-13 (lane 1): Done per ADR-1269. `OpenSslVerifyResult.OfExtensionsOrSignature` maps 79/25/47/7 after the trust errors and before the dates, in OpenSSL's order (check_chain_extensions, check_name_constraints, internal_verify); 25 is told from 79 by `ExceedsAPathLength` counting intermediates below each CA. `TlsFailureMessages.OpenSslExtensionOrSignatureError` gives the text. Flag-fed tests in `OpenSslVerifyResultTests` (platform-neutral); one real-chain pathlen test in `TlsFailureMessagesTests.OpenSslChainVerify.cs` runs on Windows and Linux only (macOS chain status not verified here). Quality run found `OfChainStatus` at complexity 12; fixed by extracting `OfValidity`. CI on Linux/macOS: change is platform-neutral and fast tests are green here. Not hand-checked against a Linux curl (Windows lane).
 
 ## Log
 
@@ -50,3 +51,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - 2026-11-13 (lane 11 notes): The exit-60 text is built in `TlsFailureMessages.OpenSslVerifyError`/`OpenSslTrustError` (line ~858-940), which BL-5103 (Windows half) holds in Doing. Plan: have `OpenSslVerifyError` call `OpenSslVerifyResult.OfChainStatus` extended with 7/25/47/79 (precedence after trust errors 18/19/20, OpenSSL order: signature 7, then CA 79 / pathlen 25, then name constraint 47, then dates) and add a text table for those codes. Added TlsFailureMessages.cs to touches and BL-5103 to depends-on; no code edited.
 - 2026-11-13: Doing -> Backlog. Needs TlsFailureMessages.cs, held by BL-5103 in Doing; depends-on BL-5103
 - 2026-11-13: Backlog -> Doing. Criteria at claim: e142f849 7e0dbfc6 6687648c a0b49a29.
+- 2026-11-13: Doing -> Done. OpenSSL build's exit 60 names invalid CA (79), path length (25), permitted subtree (47) and signature (7) verify results
