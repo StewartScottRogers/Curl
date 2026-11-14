@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/FilenameEffectiveOnUnsupportedSchemeTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5116 — Report the -o name as %{filename_effective} when the URL scheme is unsupported
 
@@ -46,3 +46,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: d5830f5d ff3382cc 949a0f54 a0b49a29.
+- 2026-11-13: Doing -> Done. -o name now reported as filename_effective on unsupported scheme; tests and quality run green
