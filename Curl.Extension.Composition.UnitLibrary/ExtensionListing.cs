@@ -84,11 +84,11 @@ public static class ExtensionListing
 
     private static string OptionText(ExtensionOption option) =>
         option.Argument == ExtensionOptionArgument.Value
-            ? $"`--{option.Name} <value>` ({option.Help})"
+            ? $"`--{option.Name} <{option.ValuePlaceholder}>` ({option.Help})"
             : $"`--{option.Name}` or `--no-{option.Name}` ({option.Help})";
 
     private static string LineOptionText(ExtensionOption option) =>
-        option.Argument == ExtensionOptionArgument.Value ? "--" + option.Name : $"--{option.Name}, --no-{option.Name}";
+        option.Argument == ExtensionOptionArgument.Value ? $"--{option.Name} <{option.ValuePlaceholder}>" : $"--{option.Name}, --no-{option.Name}";
 
     private static string ListOf<T>(IReadOnlyList<T> items, Func<T, string> format) =>
         items.Count == 0 ? "none" : string.Join(", ", items.Select(format));

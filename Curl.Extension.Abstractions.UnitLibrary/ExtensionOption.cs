@@ -9,4 +9,5 @@ namespace Curl.Extension.Abstractions;
 /// <param name="Name">The long name without its leading <c>--</c>, such as <c>cache-dir</c>.</param>
 /// <param name="Argument">What the option takes after its name.</param>
 /// <param name="Help">The option's one-line help.</param>
-public sealed record ExtensionOption(string Name, ExtensionOptionArgument Argument, string Help);
+/// <param name="ValuePlaceholder">What help calls the value of a <see cref="ExtensionOptionArgument.Value" /> option, shown as <c>&lt;placeholder&gt;</c>; <c>value</c> unless the extension names it.</param>
+public sealed record ExtensionOption(string Name, ExtensionOptionArgument Argument, string Help, string ValuePlaceholder = "value");

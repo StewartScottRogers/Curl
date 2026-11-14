@@ -151,7 +151,7 @@ public sealed class AltSvcTransferCacheTests
     {
         string header = $"{alpn}=\":443\"";
         Diagnostics.Arrange("alt-svc header", header);
-        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System, onWindows: false);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System, onWindows: false, actsAsQuicBuild: true);
         cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), header, System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
 
         HttpVersionPreference actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions()).Version;
@@ -194,7 +194,7 @@ public sealed class AltSvcTransferCacheTests
     {
         Diagnostics.Arrange("version and windows", $"{version} {isWindows}");
 
-        string actual = string.Join(",", AltSvcTransferCache.LookupOf(version, isWindows).Allowed.Order());
+        string actual = string.Join(",", AltSvcTransferCache.LookupOf(version, isWindows, actsAsQuicBuild: true).Allowed.Order());
         Diagnostics.Act("allowed", actual);
 
         Diagnostics.Assert("allowed", expected, actual);

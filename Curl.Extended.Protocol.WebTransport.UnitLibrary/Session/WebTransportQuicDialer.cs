@@ -1,3 +1,5 @@
+using System.Net;
+using System.Security.Authentication;
 using Curl.Protocol.Abstractions;
 using Curl.Quic;
 using Curl.Tls;
@@ -26,12 +28,25 @@ internal sealed class WebTransportQuicDialer(IDatagramConnector connector, Func<
         TransportParameters = QuicTransportParameters.CurlClientDefaults with { MaxDatagramFrameSize = MaxDatagramFrameSize },
     };
 
-    /// <summary>Opens the channel and runs the QUIC handshake.</summary>
+    /// <summary>Opens the channel and runs the QUIC handshake, reporting nothing.</summary>
     /// <param name="request">The host and port to dial.</param>
     /// <param name="cancellationToken">Cancels the dial.</param>
     /// <returns>The connection, past its handshake.</returns>
     /// <exception cref="WebTransportException">The channel did not open or the handshake failed, with curl's exit code for it.</exception>
-    public async ValueTask<IMultiplexedConnection> DialAsync(WebTransportRequest request, CancellationToken cancellationToken)
+    public ValueTask<IMultiplexedConnection> DialAsync(WebTransportRequest request, CancellationToken cancellationToken) =>
+        DialAsync(request, NoTransferEvents.Instance, cancellationToken);
+
+    /// <summary>
+    /// Opens the channel and runs the QUIC handshake, then reports the TLS handshake and the opened connection
+    /// to <paramref name="events" />, which <c>-v</c> writes as the TLS backend's lines and the
+    /// <c>Established connection</c> line (CurlSurface:verbose-webtransport-1).
+    /// </summary>
+    /// <param name="request">The host and port to dial.</param>
+    /// <param name="events">Where the TLS handshake and the opened connection are reported.</param>
+    /// <param name="cancellationToken">Cancels the dial.</param>
+    /// <returns>The connection, past its handshake.</returns>
+    /// <exception cref="WebTransportException">The channel did not open or the handshake failed, with curl's exit code for it.</exception>
+    public async ValueTask<IMultiplexedConnection> DialAsync(WebTransportRequest request, ITransferEvents events, CancellationToken cancellationToken)
     {
         DatagramOpenResult opened = await connector.OpenAsync(request.Host, request.Port, cancellationToken).ConfigureAwait(false);
         if (opened.Channel is not { } channel)
@@ -47,6 +62,23 @@ internal sealed class WebTransportQuicDialer(IDatagramConnector connector, Func<
             throw new WebTransportException(failure.ExitCode, failure.Message);
         }
 
+        events.ReportTlsHandshake(new TlsHandshakeEvent
+        {
+            ProtocolVersion = SslProtocols.Tls13,
+            CipherSuite = (System.Net.Security.TlsCipherSuite)state.Tls.CipherSuite!.Code,
+            NegotiatedApplicationProtocol = state.Tls.ApplicationProtocol,
+            OfferedApplicationProtocols = [],
+            ServerCertificate = null,
+            CertificateVerified = true,
+            IsQuic = true,
+        });
+        events.ReportConnectionOpened(new ConnectionOpenedEvent
+        {
+            HostName = request.Host,
+            RemoteEndPoint = channel.ServerEndPoint as IPEndPoint ?? new IPEndPoint(IPAddress.Any, request.Port),
+            LocalEndPoint = channel.LocalEndPoint as IPEndPoint ?? new IPEndPoint(IPAddress.Any, 0),
+            ConnectionNumber = 1,
+        });
         return new QuicConnection(state, channel, timeProvider);
     }
 }

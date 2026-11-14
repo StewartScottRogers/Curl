@@ -42,11 +42,17 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
 
     private static async Task<TransferResult> ReplayAsync(RecordedExchange exchange, ITransferContext context)
     {
-        await WriteIfGivenAsync(context.HeaderOutput, exchange.Head, context.CancellationToken);
+        var failMode = exchange.StatusCode >= 400 ? context.Http!.Fail : HttpFailMode.None;
+        var outcome = OutcomeOf(exchange, failMode);
+        if (failMode != HttpFailMode.Fail)
+        {
+            await WriteIfGivenAsync(context.HeaderOutput, exchange.Head, context.CancellationToken);
+            await context.Output.WriteAsync(exchange.Body, context.CancellationToken);
+        }
+
         await WriteIfGivenAsync(context.DumpHeaderOutput, exchange.Head, context.CancellationToken);
-        await context.Output.WriteAsync(exchange.Body, context.CancellationToken);
         var headers = RecordedHead.FieldsOfLastResponse(exchange.Head);
-        return TransferResult.Success(exchange.Body.Length) with
+        return outcome with
         {
             Report = new TransferReport
             {
@@ -61,6 +67,12 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
             },
         };
     }
+
+    /// <summary>The result <paramref name="failMode" /> makes of the recorded status: a failure for -f and --fail-with-body.</summary>
+    private static TransferResult OutcomeOf(RecordedExchange exchange, HttpFailMode failMode) =>
+        failMode == HttpFailMode.None
+            ? TransferResult.Success(exchange.Body.Length)
+            : TransferResult.Failure(CurlExitCode.HttpReturnedError, $"The requested URL returned error: {exchange.StatusCode}", failMode == HttpFailMode.FailWithBody ? exchange.Body.Length : 0);
 
     /// <summary>The recorded 3xx's <c>Location</c> resolved against the request URL, or <see langword="null" /> when there is none.</summary>
     private static string? RedirectTarget(RecordedExchange exchange, IReadOnlyList<KeyValuePair<string, string>> headers)

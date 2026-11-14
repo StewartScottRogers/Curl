@@ -128,7 +128,7 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
         Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.IsNull(result.Report);
+        Assert.IsEmpty(result.Report!.PseudoHeaders);
     }
 
     // A missing file exited 37 and printed [0].
@@ -146,7 +146,7 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
         Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
         Diagnostics.Assert("exit code", CurlExitCode.FileCouldntReadFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
-        Assert.IsNull(result.Report);
+        Assert.IsEmpty(result.Report!.PseudoHeaders);
     }
 
     // -T a.txt file:///C:/bl285tmp/b.txt printed [0].
@@ -210,7 +210,7 @@ public sealed class FileProtocolHandlerPseudoHeaderTests
         Diagnostics.Act("pseudo-headers", DescribePseudoHeaders(result));
         Diagnostics.Assert("exit code", CurlExitCode.WriteError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
-        Assert.IsNull(result.Report);
+        Assert.IsEmpty(result.Report!.PseudoHeaders);
     }
 
     private static string DescribePseudoHeaders(TransferResult result) =>

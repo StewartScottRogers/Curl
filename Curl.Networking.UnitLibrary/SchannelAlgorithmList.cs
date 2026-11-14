@@ -84,20 +84,25 @@ internal static class SchannelAlgorithmList
     /// connects, or <see langword="null" /> when the list is absent or Schannel takes it.
     /// </summary>
     /// <param name="ciphers">The <c>--ciphers</c> value, or <see langword="null" />.</param>
+    /// <param name="minimumVersion">The lowest TLS version offered; TLS 1.3 with a non-empty list is exit 35.</param>
     /// <returns>Exit 59 for an entry naming no algorithm, exit 35 for a list of algorithms
     /// Schannel accepts none of, otherwise <see langword="null" />.</returns>
-    internal static ConnectResult? Refusal(string? ciphers)
-    {
-        if (ciphers is null)
-        {
-            return null;
-        }
+    internal static ConnectResult? Refusal(string? ciphers, TlsVersion minimumVersion = TlsVersion.SystemDefault)
+        => ciphers is null ? null : Tls13WithCipherList(ciphers, minimumVersion) ?? ListRefusal(ciphers);
 
+    private static ConnectResult? ListRefusal(string ciphers)
+    {
         var algorithmIds = AlgorithmIdsOf(ciphers);
         return algorithmIds is null ? ConnectResult.Failed(CurlExitCode.SslCipher, TlsFailureMessages.SchannelCipherListRefused)
             : algorithmIds.Count == 0 || algorithmIds.Exists(AcceptedAlgorithmIds.Contains) ? null
             : ConnectResult.Failed(CurlExitCode.SslConnectError, TlsFailureMessages.SchannelAlgorithmMismatch);
     }
+
+    // curl's Schannel build refuses a TLS 1.3 minimum with a non-empty cipher list (BL-5134).
+    private static ConnectResult? Tls13WithCipherList(string ciphers, TlsVersion minimumVersion) =>
+        ciphers.Length > 0 && minimumVersion == TlsVersion.Tls13
+            ? ConnectResult.Failed(CurlExitCode.SslConnectError, TlsFailureMessages.SchannelTls13WithCipherList)
+            : null;
 
     /// <summary>
     /// Gets the cipher suites the Schannel build offers for a <c>--ciphers</c> list (ADR-1245):
@@ -109,14 +114,15 @@ internal static class SchannelAlgorithmList
     /// </summary>
     /// <param name="ciphers">The <c>--ciphers</c> value, or <see langword="null" />.</param>
     /// <param name="profileSuites">The suites the build offers with no list, in order.</param>
+    /// <param name="minimumVersion">The lowest TLS version offered, as <see cref="Refusal" /> reads it.</param>
     /// <returns>
     /// <see cref="Refusal" />'s failure; or <see langword="null" /> suites when no accepted
     /// algorithm is named, so the profile's are offered; or the suites left, and exit 35 for
     /// Schannel's algorithm mismatch when none is.
     /// </returns>
-    internal static (IReadOnlyList<ushort>? Suites, ConnectResult? Failure) OfferedSuites(string? ciphers, IReadOnlyList<ushort> profileSuites)
+    internal static (IReadOnlyList<ushort>? Suites, ConnectResult? Failure) OfferedSuites(string? ciphers, IReadOnlyList<ushort> profileSuites, TlsVersion minimumVersion = TlsVersion.SystemDefault)
     {
-        var refusal = Refusal(ciphers);
+        var refusal = Refusal(ciphers, minimumVersion);
         int[] named = refusal is null && ciphers is not null ? [.. AlgorithmIdsOf(ciphers)!.Where(AcceptedAlgorithmIds.Contains)] : [];
         if (named.Length == 0)
         {

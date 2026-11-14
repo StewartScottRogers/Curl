@@ -145,15 +145,15 @@ internal static partial class RawByteFileName
 
     /// <summary>
     /// Makes the directory named by the NUL-terminated raw bytes <paramref name="path" /> with the
-    /// runtime's <c>mkdir</c>, as curl's <c>--create-dirs</c> does (BL-3868), with the mode
-    /// <see cref="Directory.CreateDirectory(string)" /> gives every other name.
+    /// runtime's <c>mkdir</c>, as curl's <c>--create-dirs</c> does (BL-3868), with mode 0750
+    /// (BL-5097), the mode <see cref="PhysicalOutputPaths.UnixDirectoryMode" /> gives every other name.
     /// </summary>
     /// <param name="path">The name's raw bytes and a NUL.</param>
     /// <returns>0 when the directory was made, otherwise <c>mkdir</c>'s <c>errno</c>.</returns>
     [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0920: a thin adapter over a mkdir only Linux and macOS take raw bytes in.")]
     internal static int MakeDirectoryUnderRawBytes(byte[] path)
     {
-        const int AllPermissions = 0x1FF;
+        const int AllPermissions = 0x1E8; // 0750, as curl's mkdir call passes; the OS takes the umask off
         unsafe
         {
             fixed (byte* name = path)

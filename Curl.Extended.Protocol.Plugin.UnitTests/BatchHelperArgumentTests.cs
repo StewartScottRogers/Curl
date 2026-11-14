@@ -12,6 +12,12 @@ public sealed class BatchHelperArgumentTests
     [DataRow("/bin/curl-proto-demo.cmd", "demo://host/a<b")]
     [DataRow("/bin/curl-proto-demo.cmd", "demo://host/a^b")]
     [DataRow("/bin/curl-proto-demo.cmd", "demo://host/a\nb")]
+    [DataRow("srv.cmd ", "demo://host/a&b")]
+    [DataRow("srv.cmd.", "demo://host/a&b")]
+    [DataRow("srv.cmd\u0001", "demo://host/a&b")]
+    [DataRow("srv.bat\t", "demo://host/a&b")]
+    [DataRow("srv.bat\u000B", "demo://host/a&b")]
+    [DataRow("srv.bat  .", "demo://host/a&b")]
     public void RefuseUnsafeBatchArgument_BatchHelperAndMetacharacter_Refuses(string program, string url)
     {
         Assert.ThrowsExactly<IOException>(() => SystemHelperProcessStarter.RefuseUnsafeBatchArgument(program, url));
@@ -21,6 +27,14 @@ public sealed class BatchHelperArgumentTests
     public void RefuseUnsafeBatchArgument_BatchHelperAndCleanUrl_DoesNotRefuse()
     {
         SystemHelperProcessStarter.RefuseUnsafeBatchArgument("/bin/curl-proto-demo.cmd", "demo://host/path?a=1#frag");
+    }
+
+    [TestMethod]
+    [DataRow("")]
+    [DataRow(" \t.")]
+    public void RefuseUnsafeBatchArgument_NoProgramName_DoesNotRefuse(string program)
+    {
+        SystemHelperProcessStarter.RefuseUnsafeBatchArgument(program, "demo://host/a&b");
     }
 
     [TestMethod]

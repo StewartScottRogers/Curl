@@ -806,7 +806,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     {
         if (_matchesSchannelBuild)
         {
-            return (null, SchannelAlgorithmList.Refusal(_options.Ciphers));
+            return (null, SchannelAlgorithmList.Refusal(_options.Ciphers, _options.MinimumVersion));
         }
 
         var (suites, failureMessage) = OpenSslCipherSuites.Select(_options.Ciphers, _options.Tls13Ciphers);

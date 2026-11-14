@@ -102,6 +102,44 @@ internal sealed class PhysicalOutputPaths(
     private static int? OnWindows(int windowsValue) =>
         OperatingSystem.IsWindows() ? windowsValue : null;
 
+    /// <summary>
+    /// The mode every directory <c>--create-dirs</c> makes off Windows is asked for, 0750, as curl's
+    /// <c>mkdir</c> does; the OS takes the umask off (BL-5097).
+    /// </summary>
+    internal const UnixFileMode UnixDirectoryMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+        | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute;
+
+    /// <summary>
+    /// Makes <paramref name="path" /> and every missing parent, off Windows with
+    /// <see cref="UnixDirectoryMode" />, on Windows as <see cref="Directory.CreateDirectory(string)" /> does.
+    /// </summary>
+    /// <param name="path">The directory's name.</param>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: the platform picks the branch.")]
+    internal static void MakeDirectories(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Directory.CreateDirectory(path);
+        }
+        else
+        {
+            // .NET gives only the last directory the mode asked for and makes missing parents with
+            // 0777, so each missing parent is made on its own, outermost first (BL-5144).
+            var missing = new Stack<string>();
+            for (string? directory = Path.TrimEndingDirectorySeparator(path);
+                !string.IsNullOrEmpty(directory) && !Directory.Exists(directory);
+                directory = Path.GetDirectoryName(directory))
+            {
+                missing.Push(directory);
+            }
+
+            while (missing.Count > 0)
+            {
+                Directory.CreateDirectory(missing.Pop(), UnixDirectoryMode);
+            }
+        }
+    }
+
     /// <summary>Whether the full path of <paramref name="path" /> reaches the directory length limit.</summary>
     /// <param name="path">The directory's name.</param>
     /// <returns><see langword="true" /> when the directory would not be made for its length.</returns>
@@ -138,7 +176,7 @@ internal sealed class PhysicalOutputPaths(
                 return false;
             }
 
-            Directory.CreateDirectory(path);
+            MakeDirectories(path);
 
             return true;
         }

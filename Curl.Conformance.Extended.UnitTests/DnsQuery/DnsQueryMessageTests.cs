@@ -1,3 +1,4 @@
+using System.Net;
 using System.Globalization;
 using System.Text;
 using Curl.Conformance.Extended.DnsQuery.Reference;
@@ -135,6 +136,21 @@ public sealed class DnsQueryMessageTests
             AssertOutput(await RunAsync(server, Url), Text(server, mnemonic, "A", 0, string.Empty));
         });
 
+    [TestMethod]
+    [SpecRequirement("DnsQuery:RFC5452-9.1-3")]
+    public Task ReplyFromAnotherPort_IsIgnoredAndTheGenuineReplyAfterItTaken() =>
+        KnownFailures.RunCaseAsync(["DnsQuery:RFC5452-9.1-3"], async () =>
+        {
+            DnsReferenceServer spoofer = new((_, _) => [new DnsReferenceReply { Answers = [DnsReferenceRecord.A(Name, 60, "192.0.2.66")] }]);
+            DnsReferenceServer server = new((_, _) => [new DnsReferenceReply { Answers = [DnsReferenceRecord.A(Name, 60, "192.0.2.1")] }]);
+            OffPathThenGenuineServer both = new(spoofer, server);
+
+            CurlRunResult result = await ExtendedConformanceHarness.RunAsync(InProcessCurl.RunAsync, [ReferenceRoute.Udp(53, both)], ["-sS", Url]);
+
+            Assert.HasCount(1, server.Received);
+            AssertOutput(result, Text(server, "NOERROR", "A", 1, "example.com.\t60\tIN\tA\t192.0.2.1\n"));
+        });
+
     private static Task<CurlRunResult> RunAsync(DnsReferenceServer server, string url) =>
         DnsReferenceRun.RunAsync(InProcessCurl.RunAsync, server, ReferenceTransport.Udp, 53, url);
 
@@ -165,4 +181,21 @@ public sealed class DnsQueryMessageTests
             CultureInfo.InvariantCulture,
             $";; ->>HEADER<<- opcode: QUERY, status: {status}, id: {server.Received[0].Query.Id}\n;; flags: qr rd ra; QUERY: 1, ANSWER: {answerCount}, AUTHORITY: 0, ADDITIONAL: 0\n\n;; QUESTION SECTION:\n;{Name}\t\tIN\t{type}\n")
         + (answerCount == 0 ? string.Empty : "\n;; ANSWER SECTION:\n" + answers);
+
+    /// <summary>Answers each query first as an off-path sender on the next port would, then as the server queried.</summary>
+    private sealed class OffPathThenGenuineServer(DnsReferenceServer offPath, DnsReferenceServer genuine) : ISourcedDatagramReferenceServer
+    {
+        public IReadOnlyList<ReadOnlyMemory<byte>> Answer(ReadOnlyMemory<byte> datagram) => genuine.Answer(datagram);
+
+        public IReadOnlyList<SourcedDatagram> AnswerWithSources(ReadOnlyMemory<byte> datagram, EndPoint serverEndPoint)
+        {
+            var server = (IPEndPoint)serverEndPoint;
+            var offPathSource = new IPEndPoint(server.Address, server.Port + 1);
+            return
+            [
+                .. offPath.Answer(datagram).Select(reply => new SourcedDatagram(reply, offPathSource)),
+                .. genuine.Answer(datagram).Select(reply => new SourcedDatagram(reply, null)),
+            ];
+        }
+    }
 }

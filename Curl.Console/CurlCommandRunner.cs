@@ -1045,6 +1045,27 @@ internal sealed class CurlCommandRunner(
         }
     }
 
+    /// <summary>
+    /// Renders the <c>-w</c> template for a <c>-C</c> offset refused beside a request body, as curl does for a
+    /// transfer that fails at setup: the first URL's transfer failed with exit 2 (BL-5119).
+    /// </summary>
+    /// <param name="refusal">The refusal.</param>
+    /// <param name="optionsRead">The options read before the refusal.</param>
+    /// <returns>A task that completes when the template, if any, is written.</returns>
+    private async Task WriteOutOfContinueAtRefusalAsync(CommandLineRefusal refusal, CommandLineOptions optionsRead)
+    {
+        if (!refusal.FoundAtTransferSetup || !ResumesBesideRequestBody(optionsRead) || optionsRead.WriteOut is null)
+        {
+            return;
+        }
+
+        UrlGlobMatch match = UrlGlob.Unglobbed(optionsRead.Urls[0]).Expand().First();
+        _ = UrlTransfer.TryCreate(optionsRead, 0, 0, transferPerformer.TakeTransferId(), match, null, runsOnWindows, out UrlTransfer? transfer, out _);
+        runningTransfer.Value = NewRunningTransferState(CancellationToken.None, deferringStandardOutput, GatedDeferringStandardOutput);
+        TransferResult result = TransferResult.Failure(refusal.ExitCode, CurlEasyErrorText.Of(refusal.ExitCode));
+        await WriteOutAsync(optionsRead, transfer!, match.Url, match.Url, result, false).ConfigureAwait(false);
+    }
+
     /// <summary>Whether <paramref name="options" /> has a <c>-C</c> offset past zero and a request body: a <c>-F</c> form or a <c>-d</c> body not moved into the query by <c>-G</c>.</summary>
     private static bool ResumesBesideRequestBody(CommandLineOptions options) =>
         options.ResumeFrom > 0
@@ -1072,6 +1093,7 @@ internal sealed class CurlCommandRunner(
         if (!parsed.IsAccepted)
         {
             await WriteRefusalAsync(parsed.Refusal, parsed.NotedDefaultConfigFile, parsed.OptionsReadBeforeRefusal).ConfigureAwait(false);
+            await WriteOutOfContinueAtRefusalAsync(parsed.Refusal, parsed.OptionsReadBeforeRefusal).ConfigureAwait(false);
             await CreateOutputFileOfContinueAtRefusalAsync(parsed.Refusal, parsed.OptionsReadBeforeRefusal).ConfigureAwait(false);
 
             return (int)parsed.Refusal.ExitCode;
@@ -1609,7 +1631,23 @@ internal sealed class CurlCommandRunner(
     private IReadOnlyList<CommandLineExtensionOption> ParsedExtensionOptions =>
         EnvironmentVariables(ExtensionProtocolHandlers.SwitchVariable) == "0"
             ? []
-            : [.. (extensionOptions ?? ExtensionCommandLineOptions.For(EnvironmentVariables, IsCurlLongOption)).Select(ToCommandLineExtensionOption)];
+            : ToParserOptions(extensionOptions ?? ExtensionCommandLineOptions.For(EnvironmentVariables, IsCurlLongOption), ExpanderOptionNames);
+
+    /// <summary>Gives the parser's form of each extension option, those an expander consumes marked command-line only.</summary>
+    private static IReadOnlyList<CommandLineExtensionOption> ToParserOptions(IEnumerable<ExtensionOption> options, HashSet<string> commandLineOnlyNames)
+    {
+        List<CommandLineExtensionOption> parserOptions = [];
+        foreach (ExtensionOption option in options)
+        {
+            parserOptions.Add(ToParserOption(option, commandLineOnlyNames));
+        }
+
+        return parserOptions;
+    }
+
+    /// <summary>Gives the names of the options the argument expanders consume (their own and their companions), which a config file cannot carry (ADR-1040).</summary>
+    private HashSet<string> ExpanderOptionNames =>
+        [.. (argumentExpanders ?? ExtensionArgumentExpanderCatalogue.Entries).SelectMany(expander => expander is ITrailingArgumentExpander trailing ? trailing.CompanionOptions.Append(expander.Option) : [expander.Option]).Select(option => option.Name)];
 
     /// <summary>
     /// Reports whether a long name is one of curl's own options, created once with <see langword="new" /> so no
@@ -1617,17 +1655,12 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private static readonly Func<string, bool> IsCurlLongOption = new(CommandLineParser.IsCurlLongOption);
 
-    /// <summary>
-    /// Gives the parser's form of an extension's option (<see cref="ToParserOption" />), created once with
-    /// <see langword="new" /> so no use of it carries the compiler's method-group cache.
-    /// </summary>
-    private static readonly Func<ExtensionOption, CommandLineExtensionOption> ToCommandLineExtensionOption = new(ToParserOption);
-
     /// <summary>Gives the parser's form of an extension's option: its long name, and whether it takes a value.</summary>
     /// <param name="option">The extension's option.</param>
+    /// <param name="commandLineOnlyNames">The names of the options only the command line carries.</param>
     /// <returns>The option, taking a value when its argument is <see cref="ExtensionOptionArgument.Value" />.</returns>
-    private static CommandLineExtensionOption ToParserOption(ExtensionOption option) =>
-        new(option.Name, option.Argument == ExtensionOptionArgument.Value);
+    private static CommandLineExtensionOption ToParserOption(ExtensionOption option, HashSet<string> commandLineOnlyNames) =>
+        new(option.Name, option.Argument == ExtensionOptionArgument.Value, commandLineOnlyNames.Contains(option.Name));
 
     /// <summary>
     /// Transfers every URL of one option group in order, each command-line URL once for every URL
@@ -2498,7 +2531,12 @@ internal sealed class CurlCommandRunner(
     {
         TransferResult skipped = TransferResult.Failure(firstFailure.ExitCode, CurlEasyErrorText.Of(firstFailure.ExitCode));
 
-        return ReportAsync(dispatch, options, transfer, state, skipped, transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol));
+        if (!TryResolveTransferUrl(options, transfer.Url, transfer.UploadFile, out string transferUrl))
+        {
+            transferUrl = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
+        }
+
+        return ReportAsync(dispatch, options, transfer, state, skipped, transfer.Url, transferUrl);
     }
 
     /// <summary>
@@ -2816,7 +2854,7 @@ internal sealed class CurlCommandRunner(
         }
 
         EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
-        await transferPerformer.OpenAltSvcCacheAsync(Running, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp).ConfigureAwait(false);
+        await transferPerformer.OpenAltSvcCacheAsync(Running, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp, options.ActsAsQuicBuild).ConfigureAwait(false);
         transferUrl = await TransferPerformer.SwitchToHttpsForHstsAsync(Hsts, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, eventsBeforeConnecting).ConfigureAwait(false);
         Running.TransferId = transfer.TransferId;
         Running.RequestUrl = WriteOutRequestUrl(options, transferUrl, givenUrl);
@@ -4458,6 +4496,20 @@ internal sealed class CurlCommandRunner(
                 CancellationToken.None);
 
     /// <summary>
+    /// Names the <c>-o</c> file for <c>%{filename_effective}</c> when the transfer is refused for an unsupported
+    /// scheme: curl has named it by then, though nothing is opened (BL-5116).
+    /// </summary>
+    /// <param name="failure">The refusal.</param>
+    /// <param name="outputFile">The transfer's output file, or <see langword="null" /> for none.</param>
+    private void NameOutputFileOfRefusedScheme(TransferResult failure, string? outputFile)
+    {
+        if (failure.ExitCode == CurlExitCode.UnsupportedProtocol && outputFile is not null)
+        {
+            Running.OutputFileName = outputFile;
+        }
+    }
+
+    /// <summary>
     /// Performs one checked transfer, sending <paramref name="formBody" /> when given, to the file
     /// <see cref="ResolveOutputFile" /> names when it names one, nowhere under <c>--out-null</c>
     /// (<see cref="Stream.Null" />, with the progress meter drawn as for a file) and to standard
@@ -4504,6 +4556,7 @@ internal sealed class CurlCommandRunner(
         if (!TransferPerformer.TrySelectProxyAndCredentials(
                 dispatch, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), url, Running, EventsBeforeConnecting(transfer), diagnosticLog, CredentialLookup, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
+            NameOutputFileOfRefusedScheme(proxyFailure, outputFile);
             return proxyFailure;
         }
 

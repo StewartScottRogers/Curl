@@ -199,6 +199,13 @@ public sealed class CommandLineRefusal
     public static CommandLineRefusal TooLargeNumber(string spelledOption) =>
         Create(spelledOption, "too large number");
 
+    /// <summary>Refuses an extension option that only works on the command line (an argument expander's) when a config file line names it.</summary>
+    /// <param name="spelledOption">The option as written in the file.</param>
+    /// <returns>A refusal reading <c>cannot be used in a config file</c>, exit code 2.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal CommandLineOnlyOption(string spelledOption) =>
+        Create(spelledOption, "cannot be used in a config file");
+
     /// <summary>Refuses an option value curl reads but cannot use, such as a size in an unknown unit.</summary>
     /// <param name="spelledOption">The whole argument as typed.</param>
     /// <returns>A refusal reading <c>is badly used here</c>.</returns>

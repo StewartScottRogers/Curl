@@ -116,6 +116,12 @@ internal sealed class CoapObservation(IDatagramChannel channel, TimeProvider tim
             }
 
             DatagramReceived received = await receive.ConfigureAwait(false);
+            if (!CoapExchange.IsFromServer(channel.ServerEndPoint, received.RemoteEndPoint))
+            {
+                receive = channel.ReceiveAsync(buffer, context.CancellationToken).AsTask();
+                continue;
+            }
+
             if (await AnswerAsync(context, registration, buffer.AsSpan(0, received.Length).ToArray()).ConfigureAwait(false))
             {
                 return;
@@ -249,6 +255,7 @@ internal sealed class CoapObservation(IDatagramChannel channel, TimeProvider tim
         await context.Output.WriteAsync(NotificationEnd, context.CancellationToken).ConfigureAwait(false);
         await context.Output.FlushAsync(context.CancellationToken).ConfigureAwait(false);
         written += notification.Payload.Length + NotificationEnd.Length;
+        context.Progress.ReportDownloaded(written, null);
     }
 
     private static bool IsOfObservation(CoapMessage registration, CoapMessage message) =>

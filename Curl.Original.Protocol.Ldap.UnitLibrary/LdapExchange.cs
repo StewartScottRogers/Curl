@@ -22,6 +22,12 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer,
 
     private int nextMessageId = 1;
 
+    /// <summary>
+    /// Gets WinLDAP's result code for a search whose reply cannot be read (closed, or not
+    /// unsealed): <c>Server Down</c> unless <see cref="StartSecurityLayer" /> said otherwise.
+    /// </summary>
+    public int WinLdapLostResultCode { get; private set; } = WinLdapResultText.ServerDown;
+
     /// <summary>Whether a send failed with an I/O error, after which every read finds the server closed.</summary>
     private bool sendFailed;
 
@@ -30,8 +36,13 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer,
     /// keys of <paramref name="authentication" />, which the session now owns.
     /// </summary>
     /// <param name="authentication">The logon bind's complete authentication.</param>
-    public void StartSecurityLayer(ILdapLogonAuthentication authentication)
+    /// <param name="winLdapLostResultCode">
+    /// WinLDAP's result code for a search whose reply then cannot be read: <c>Server Down</c> after
+    /// the current-user bind, <c>Unavailable</c> after the explicit-credential one, as measured (ADR-1267).
+    /// </param>
+    public void StartSecurityLayer(ILdapLogonAuthentication authentication, int winLdapLostResultCode = WinLdapResultText.ServerDown)
     {
+        WinLdapLostResultCode = winLdapLostResultCode;
         securityLayer = new LdapSaslSecurityLayer(connection, authentication);
         connection = securityLayer;
         reader = new LdapMessageReader(securityLayer);

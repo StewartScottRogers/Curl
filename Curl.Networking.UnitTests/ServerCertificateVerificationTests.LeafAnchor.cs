@@ -78,7 +78,7 @@ public sealed class ServerCertificateVerificationLeafAnchorTests
     {
         using var authority = CreateAuthority();
         using var leaf = CreateLeaf(authority);
-        using var otherAuthority = CreateAuthority();
+        using var otherAuthority = CreateAuthority("CN=Another Test Root");
 
         var failure = VerifyAgainstCaFile(SchannelBuild, leaf, listed: otherAuthority, PartialChainStatus);
 
@@ -166,10 +166,10 @@ public sealed class ServerCertificateVerificationLeafAnchorTests
         return verification.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, Host, []);
     }
 
-    private static X509Certificate2 CreateAuthority()
+    private static X509Certificate2 CreateAuthority(string subject = "CN=Leaf Anchor Test Root")
     {
         using var key = RSA.Create(2048);
-        var request = new CertificateRequest("CN=Leaf Anchor Test Root", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var request = new CertificateRequest(subject, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign, true));
         request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));

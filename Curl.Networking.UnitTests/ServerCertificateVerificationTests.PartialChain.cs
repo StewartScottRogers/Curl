@@ -57,7 +57,7 @@ public sealed class ServerCertificateVerificationPartialChainTests
     }
 
     [TestMethod]
-    public void VerifyPeer_CaCertificateFileHoldingOnlyAnIntermediateInTheSchannelBuild_IsExit60()
+    public void VerifyPeer_CaCertificateFileHoldingOnlyAnIntermediateInTheSchannelBuild_Accepts()
     {
         using var root = CreateCa("CN=Partial Root", null);
         using var intermediate = CreateCa("CN=Partial Intermediate", root);
@@ -65,7 +65,7 @@ public sealed class ServerCertificateVerificationPartialChainTests
 
         var failure = Verify(matchesSchannelBuild: true, leaf, intermediate, listed: intermediate);
 
-        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.IsNull(failure);
     }
 
     // Judges the chain .NET builds for the leaf with the listed certificate as the only

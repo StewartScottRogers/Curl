@@ -11,6 +11,9 @@ namespace Curl.Extension.WebSocketExtendedConnect.Http2;
 /// </summary>
 internal static class Http2WebSocketClient
 {
+    private const string NotHttp2Message =
+        "Remote peer returned unexpected data while we expected SETTINGS frame.  Perhaps, peer does not support HTTP/2 properly.";
+
     /// <summary>Opens the WebSocket over a new HTTP/2 connection on <paramref name="transport" />.</summary>
     /// <param name="transport">The byte stream the HTTP/2 connection runs on, already past any TLS handshake; the caller owns it.</param>
     /// <param name="scheme">The <c>:scheme</c>: <c>https</c> for wss, <c>http</c> for ws.</param>
@@ -22,7 +25,7 @@ internal static class Http2WebSocketClient
     /// <returns>The open WebSocket.</returns>
     /// <exception cref="Http2WebSocketException">
     /// The server did not advertise the setting, answered other than 2xx, answered with DATA, reset the stream
-    /// or closed the connection before answering.
+    /// closed the connection before answering, or sent bytes that are not an HTTP/2 frame where its SETTINGS belong.
     /// </exception>
     internal static async Task<Http2WebSocket> OpenAsync(
         Stream transport,
@@ -62,7 +65,16 @@ internal static class Http2WebSocketClient
     {
         while (!connection.IsPeerSettingsReceived)
         {
-            _ = await connection.ReadFrameAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                _ = await connection.ReadFrameAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Http2ProtocolException error) when (error.ErrorCode == Http2ErrorCode.FrameSizeError)
+            {
+                // An HTTP/1.1 reply's first bytes read as a huge frame length; curl gives exit 16 with this text.
+                throw new Http2WebSocketException(NotHttp2Message, error);
+            }
+
             if (connection.IsClosedByPeer)
             {
                 throw new Http2WebSocketException("The server closed the HTTP/2 connection before sending its SETTINGS (RFC 8441 section 3).");

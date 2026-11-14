@@ -36,7 +36,7 @@ internal sealed class SigstoreTransferHook(SigstoreExpectation expectation) : IT
     {
         using MemoryStream body = new();
         var result = await next(context.WithOutputs(body, context.HeaderOutput, context.DumpHeaderOutput));
-        if (!result.IsSuccess)
+        if (!result.IsSuccess || IsFollowedRedirect(context, result))
         {
             return result;
         }
@@ -50,6 +50,16 @@ internal sealed class SigstoreTransferHook(SigstoreExpectation expectation) : IT
         await body.CopyToAsync(context.Output, context.CancellationToken);
         return result;
     }
+
+    // With -L the redirect follower calls the hook once per hop; only the last response's body is the output, so a followed hop's body is dropped unjudged (BL-5149).
+    private static bool IsFollowedRedirect(ITransferContext context, TransferResult result) =>
+        context.Http is { FollowRedirects: true } http && MayFollowAnother(http) && IsRedirect(result);
+
+    private static bool MayFollowAnother(Curl.Protocol.Abstractions.HttpRequestOptions http) =>
+        http.MaxRedirects < 0 || http.RedirectsFollowed < http.MaxRedirects;
+
+    private static bool IsRedirect(TransferResult result) =>
+        result.Report is { ResponseCode: >= 300 and < 400, RedirectUrl: not null };
 
     private async Task<SigstoreBundle?> ReadBundleAsync(CancellationToken cancellationToken)
     {

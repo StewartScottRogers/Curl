@@ -11,17 +11,19 @@ namespace Curl.Conformance.Extended.Harness;
 /// </summary>
 internal sealed class ReferenceDatagramChannel(IDatagramReferenceServer server, WireExchange exchange, EndPoint serverEndPoint) : IDatagramChannel
 {
-    private readonly Channel<byte[]> answers = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions { AllowSynchronousContinuations = true });
+    private static readonly IPEndPoint AnotherEndPoint = new(IPAddress.Parse("127.0.0.2"), 5683);
+
+    private readonly Channel<(byte[] Datagram, EndPoint Source)> answers = Channel.CreateUnbounded<(byte[] Datagram, EndPoint Source)>(new UnboundedChannelOptions { AllowSynchronousContinuations = true });
 
     public EndPoint ServerEndPoint => serverEndPoint;
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken)
     {
         exchange.RecordClient(datagram.Span);
-        foreach (ReadOnlyMemory<byte> answer in server.Answer(datagram))
+        foreach (SourcedDatagram answer in AnswersTo(datagram))
         {
-            exchange.RecordServer(answer.Span);
-            answers.Writer.TryWrite(answer.ToArray());
+            exchange.RecordServer(answer.Datagram.Span);
+            answers.Writer.TryWrite((answer.Datagram.ToArray(), answer.Source ?? (server.IsFromAnotherEndpoint(answer.Datagram) ? AnotherEndPoint : serverEndPoint)));
         }
 
         return ValueTask.CompletedTask;
@@ -29,11 +31,16 @@ internal sealed class ReferenceDatagramChannel(IDatagramReferenceServer server, 
 
     public async ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
-        byte[] answer = await answers.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+        (byte[] answer, EndPoint source) = await answers.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
         int length = Math.Min(answer.Length, buffer.Length);
         answer.AsSpan(0, length).CopyTo(buffer.Span);
-        return new DatagramReceived(length, serverEndPoint);
+        return new DatagramReceived(length, source);
     }
+
+    private IReadOnlyList<SourcedDatagram> AnswersTo(ReadOnlyMemory<byte> datagram) =>
+        server is ISourcedDatagramReferenceServer sourced
+            ? sourced.AnswerWithSources(datagram, serverEndPoint)
+            : [.. server.Answer(datagram).Select(answer => new SourcedDatagram(answer, null))];
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

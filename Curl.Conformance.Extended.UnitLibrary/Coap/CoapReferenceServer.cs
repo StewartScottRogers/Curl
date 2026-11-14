@@ -39,4 +39,15 @@ public sealed class CoapReferenceServer(CoapResponder respond, TimeProvider cloc
 
         return [.. respond(message, index).Select(answer => new ReadOnlyMemory<byte>(answer))];
     }
+
+    /// <inheritdoc />
+    public bool IsFromAnotherEndpoint(ReadOnlyMemory<byte> answer)
+    {
+        if (!System.Runtime.InteropServices.MemoryMarshal.TryGetArray(answer, out ArraySegment<byte> segment))
+        {
+            return false;
+        }
+
+        return CoapResponses.IsFromAnotherEndpoint(segment.Array!);
+    }
 }

@@ -9,6 +9,22 @@ public static class CoapResponses
     /// <summary>Gets a responder that never answers.</summary>
     public static CoapResponder Silence { get; } = static (_, _) => [];
 
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<byte[], object> FromAnotherEndpointMarks = [];
+
+    /// <summary>Marks a datagram so the server delivers it from an endpoint other than the one curl sent to.</summary>
+    /// <param name="datagram">The datagram to mark.</param>
+    /// <returns>The same datagram.</returns>
+    public static byte[] FromAnotherEndpoint(byte[] datagram)
+    {
+        FromAnotherEndpointMarks.AddOrUpdate(datagram, datagram);
+        return datagram;
+    }
+
+    /// <summary>Says whether <see cref="FromAnotherEndpoint" /> marked the datagram.</summary>
+    /// <param name="datagram">The datagram.</param>
+    /// <returns><see langword="true" /> when it was marked.</returns>
+    internal static bool IsFromAnotherEndpoint(byte[] datagram) => FromAnotherEndpointMarks.TryGetValue(datagram, out _);
+
     /// <summary>A piggybacked response (section 5.2.1): an Acknowledgement echoing the request's Message ID and token.</summary>
     /// <param name="request">The request it answers.</param>
     /// <param name="code">The response code.</param>

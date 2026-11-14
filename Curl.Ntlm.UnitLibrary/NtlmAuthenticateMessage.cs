@@ -21,13 +21,18 @@ namespace Curl.Ntlm;
 /// <param name="Domain">The domain, empty for none (see <see cref="NtlmUserName.SplitDomain" />).</param>
 /// <param name="User">The user.</param>
 /// <param name="Workstation">The workstation; curl always sends <see cref="CurlWorkstation" />.</param>
+/// <param name="EncryptedRandomSessionKey">
+/// The 16-byte <c>EncryptedRandomSessionKey</c> written after the workstation when key exchange
+/// is answered (MS-NLMP 2.2.1.3); <see langword="null" /> leaves the buffer empty, as curl does.
+/// </param>
 public sealed record NtlmAuthenticateMessage(
     NtlmNegotiateFlags Flags,
     byte[] LmChallengeResponse,
     byte[] NtChallengeResponse,
     string Domain,
     string User,
-    string Workstation)
+    string Workstation,
+    byte[]? EncryptedRandomSessionKey = null)
 {
     /// <summary>
     /// The workstation name curl sends in place of the real host name, copied from Firefox
@@ -76,7 +81,8 @@ public sealed record NtlmAuthenticateMessage(
         byte[] workstation = EncodeString(Workstation, unicode);
 
         int responsesEnd = HeaderLength + LmChallengeResponse.Length + NtChallengeResponse.Length;
-        int messageLength = responsesEnd + domain.Length + user.Length + workstation.Length;
+        byte[] sessionKey = EncryptedRandomSessionKey ?? [];
+        int messageLength = responsesEnd + domain.Length + user.Length + workstation.Length + sessionKey.Length;
         if (responsesEnd > CurlBufferSize)
         {
             failure = NtlmMessageFailure.ResponsesTooLarge;
@@ -98,7 +104,12 @@ public sealed record NtlmAuthenticateMessage(
         offset = WritePayload(written, 20, NtChallengeResponse, offset);
         offset = WritePayload(written, 28, domain, offset);
         offset = WritePayload(written, 36, user, offset);
-        WritePayload(written, 44, workstation, offset);
+        offset = WritePayload(written, 44, workstation, offset);
+        if (sessionKey.Length > 0)
+        {
+            WritePayload(written, 52, sessionKey, offset);
+        }
+
         BinaryPrimitives.WriteUInt32LittleEndian(written.AsSpan(60), (uint)Flags);
         message = written;
         return true;

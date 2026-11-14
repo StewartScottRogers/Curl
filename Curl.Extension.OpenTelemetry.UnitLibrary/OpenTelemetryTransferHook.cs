@@ -31,8 +31,15 @@ internal sealed class OpenTelemetryTransferHook(string endpoint, Action<Span<byt
 
         WarnWhenEndpointIsNotAnHttpUrl(context);
         var sent = WithTraceParent(context, out var traceParent);
-        var start = context.TimeProvider.GetUtcNow();
+        var start = context.Http.RedirectsFollowed > 0 && _firstHop is { } first ? first.Start : context.TimeProvider.GetUtcNow();
+        _firstHop = (traceParent, start);
         var result = await next(sent);
+        if (IsFollowedRedirect(context, result))
+        {
+            return result;
+        }
+
+        _firstHop = null;
         var span = OtlpHttpClientSpan.For(traceParent, context, result, start, context.TimeProvider.GetUtcNow());
         var failure = await new OtlpHttpExporter(services.Connector).ExportAsync(endpoint, OtlpJsonWriter.Write(span), context.CancellationToken);
         if (failure is not null)
@@ -51,11 +58,30 @@ internal sealed class OpenTelemetryTransferHook(string endpoint, Action<Span<byt
         }
     }
 
+    // With -L the redirect follower calls the hook once per hop; the hops share one trace and one span (BL-5098).
+    // The hook keeps the first hop's ids and start, so it assumes one followed transfer at a time.
+    private (TraceParent TraceParent, DateTimeOffset Start)? _firstHop;
+
+    private static bool IsFollowedRedirect(ITransferContext context, TransferResult result) =>
+        context.Http is { FollowRedirects: true } http && MayFollowAnother(http) && IsRedirect(result);
+
+    private static bool MayFollowAnother(HttpRequestOptions http) =>
+        http.MaxRedirects < 0 || http.RedirectsFollowed < http.MaxRedirects;
+
+    private static bool IsRedirect(TransferResult result) =>
+        result.Report is { ResponseCode: >= 300 and < 400, RedirectUrl: not null };
+
     private ITransferContext WithTraceParent(ITransferContext context, out TraceParent traceParent)
     {
         var given = GivenTraceParentValue(context.Http!.Headers);
         if (given is null)
         {
+            if (context.Http.RedirectsFollowed > 0 && _firstHop is { } first)
+            {
+                traceParent = first.TraceParent;
+                return context.WithRequestHeaders([TraceParent.FieldName + ": " + traceParent.ToString()]);
+            }
+
             traceParent = TraceParent.Fresh(fillRandom);
             return context.WithRequestHeaders([TraceParent.FieldName + ": " + traceParent.ToString()]);
         }

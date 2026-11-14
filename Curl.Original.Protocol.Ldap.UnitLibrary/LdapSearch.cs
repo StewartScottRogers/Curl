@@ -42,16 +42,13 @@ namespace Curl.Original.Protocol.Ldap;
 /// </remarks>
 internal static class LdapSearch
 {
-    /// <summary>WinLDAP's <c>LDAP_SERVER_DOWN</c>.</summary>
-    private const int WinLdapServerDown = 81;
-
     /// <summary>WinLDAP's <c>LDAP_FILTER_ERROR</c>.</summary>
     private const int WinLdapFilterError = 87;
 
     /// <summary>The SearchResultDone's <c>sizeLimitExceeded</c> result code (RFC 4511 section 4.1.9).</summary>
     private const int SizeLimitExceeded = 4;
 
-    private const string WinLdapRemotePrefix ="LDAP remote: ";
+    private const string WinLdapRemotePrefix = "LDAP remote: ";
 
     private const string OpenLdapSearchFailedPrefix = "LDAP remote: search failed ";
 
@@ -116,7 +113,7 @@ internal static class LdapSearch
         CancellationToken cancellationToken = context.CancellationToken;
         return reply.Kind switch
         {
-            LdapSearchReplyKind.Lost => Lost(dialect),
+            LdapSearchReplyKind.Lost => Lost(dialect, exchange.WinLdapLostResultCode),
             LdapSearchReplyKind.Entry => await AbandonAsync(exchange, messageId, TransferResult.Failure(CurlExitCode.RecvError, ReceiveFailed), cancellationToken).ConfigureAwait(false),
             LdapSearchReplyKind.OtherResponse => await AbandonAndUnbindAsync(exchange, messageId, TransferResult.Success(0), cancellationToken).ConfigureAwait(false),
             _ => await UnbindAndReturnAsync(exchange, await OutcomeAsync(dialect, reply, entries, context.Events).ConfigureAwait(false), cancellationToken).ConfigureAwait(false),
@@ -166,9 +163,9 @@ internal static class LdapSearch
             ? TransferResult.Failure(CurlExitCode.LdapSearchFailed, WinLdapRemotePrefix + WinLdapResultText.Of(WinLdapFilterError))
             : TransferResult.Failure(CurlExitCode.LdapSearchFailed, OpenLdapBadFilter);
 
-    private static TransferResult Lost(LdapDialect dialect) =>
+    private static TransferResult Lost(LdapDialect dialect, int winLdapResultCode) =>
         dialect == LdapDialect.WinLdap
-            ? TransferResult.Failure(CurlExitCode.LdapSearchFailed, WinLdapRemotePrefix + WinLdapResultText.Of(WinLdapServerDown))
+            ? TransferResult.Failure(CurlExitCode.LdapSearchFailed, WinLdapRemotePrefix + WinLdapResultText.Of(winLdapResultCode))
             : TransferResult.Failure(CurlExitCode.RecvError, OpenLdapCannotContactServer);
 
     /// <summary>

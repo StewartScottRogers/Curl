@@ -105,7 +105,7 @@ internal static class EasyOptionsFromCommandLine
             options.Passphrase,
             options.Engine,
             options.EchModeIsMalformed,
-            options.PostData,
+            options.DataInQuery ? null : options.PostData,
             options.ProxyCredentials,
             options.AllowedProtocols,
             options.AllowedRedirectProtocols,

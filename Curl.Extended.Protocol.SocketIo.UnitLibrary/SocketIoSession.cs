@@ -17,7 +17,8 @@ namespace Curl.Extended.Protocol.SocketIo;
 /// <param name="emit">The event's JSON array to emit, or <see langword="null" /> to only receive.</param>
 /// <param name="output">Where received events are written.</param>
 /// <param name="timeProvider">The transfer's clock, which times the heartbeat.</param>
-internal sealed class SocketIoSession(WebSocketMessageChannel channel, string namespaceName, string? emit, Stream output, TimeProvider timeProvider)
+/// <param name="progress">Told the bytes written so far after each event, so a <c>-m</c> timeout and <c>%{size_download}</c> count them.</param>
+internal sealed class SocketIoSession(WebSocketMessageChannel channel, string namespaceName, string? emit, Stream output, TimeProvider timeProvider, ITransferProgress progress)
 {
     private const char EngineIoOpen = '0';
 
@@ -182,6 +183,7 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
         byte[] line = Encoding.UTF8.GetBytes(packet.Data + "\n");
         await output.WriteAsync(line, cancellationToken).ConfigureAwait(false);
         written += line.Length;
+        progress.ReportDownloaded(written, null);
         if (packet.AckId is not null)
         {
             await SendPacketAsync(new SocketIoPacket(SocketIoPacketType.Ack, namespaceName, packet.AckId, "[]"), cancellationToken).ConfigureAwait(false);

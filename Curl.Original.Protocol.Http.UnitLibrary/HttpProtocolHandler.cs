@@ -827,9 +827,33 @@ public sealed class HttpProtocolHandler(
 
         ReportConnectionEnd(plan.Context, target, connect, outcome);
         return outcome.Retry is { } reconnect
-            ? await ConnectAndExchangeAsync(CountedOnIfResent(reconnect, outcome.DiedBeforeResponse), outcome.Result.Report, outcome.DiedBeforeResponse).ConfigureAwait(false)
+            ? await ConnectAndExchangeAsync(await CountedOnIfResentAsync(reconnect, outcome.DiedBeforeResponse).ConfigureAwait(false), outcome.Result.Report, outcome.DiedBeforeResponse).ConfigureAwait(false)
             : outcome.Result;
     }
+
+    /// <summary>
+    /// Gives a request resent on a fresh connection (<paramref name="resentAfterConnectionDied" />)
+    /// the plan it goes out with: one whose <c>Authorization</c> is a connection-bound answer, an NTLM
+    /// Type 3 message or a Negotiate token, starts its handshake again with the authenticator's first
+    /// answer (an NTLM Type 1), since the fresh connection knows nothing of the dead one's handshake
+    /// (BL-5121); otherwise <see cref="CountedOnIfResent" />'s.
+    /// </summary>
+    private async ValueTask<HttpRequestPlan> CountedOnIfResentAsync(HttpRequestPlan retry, bool resentAfterConnectionDied)
+    {
+        if (!resentAfterConnectionDied || !IsConnectionBoundAnswer(retry.Authorization))
+        {
+            return CountedOnIfResent(retry, resentAfterConnectionDied);
+        }
+
+        (string? first, HttpTransferException? failure) = await CreateFirstAuthorizationAsync(retry.AuthRequest, CancellationToken.None).ConfigureAwait(false);
+        return failure is null ? retry.WithHandshakeRestarted(first) : CountedOnIfResent(retry, resentAfterConnectionDied);
+    }
+
+    /// <summary>Decides whether an <c>Authorization</c> value is a later leg of NTLM (not Type 1) or Negotiate, which belongs to one connection.</summary>
+    private static bool IsConnectionBoundAnswer(string? authorization) =>
+        authorization is { } value
+        && ((value.StartsWith("NTLM ", StringComparison.Ordinal) && !IsNtlmType1(value))
+            || value.StartsWith("Negotiate ", StringComparison.Ordinal));
 
     /// <summary>
     /// Gives a request sent again on a fresh connection because its reused one died before the
@@ -1518,6 +1542,11 @@ public sealed class HttpProtocolHandler(
         ReportReceiveFailure(plan.Context.Events, failure);
         ReportBodyFailure(plan.Context.Events, failure);
         exchangeLog.Failed(failure.ExitCode, failure);
+        if (failure.ExitCode == CurlExitCode.HttpReturnedError && plan.Options.Fail == HttpFailMode.Fail)
+        {
+            exchange.RedirectUrl = null;
+        }
+
         TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
             with
         {
@@ -1605,7 +1634,7 @@ public sealed class HttpProtocolHandler(
                 HttpVersion = statusLine.Version,
                 HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
                 ResponseHeadersStored = Math.Max(report.ResponseHeadersStored, failure.HeadersStoredBeforeFailure),
-                ResponseHeaders = HeadersBeforeFailure(failure.HeadBytesBeforeFailure),
+                ResponseHeaders = failure.HeadBytesBeforeFailure.Length == 0 ? report.ResponseHeaders : HeadersBeforeFailure(failure.HeadBytesBeforeFailure),
                 ContentType = failure.ContentTypeBeforeFailure ?? report.ContentType,
             };
 
@@ -2357,6 +2386,20 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Tells whether a request body can go out again: it is not a stream, is an empty stream, or is
+    /// one <see cref="CanResend" /> says can be rewound (BL-5130).
+    /// </summary>
+    private static bool BodyCanBeSentAgain(HttpRequestBody? body) =>
+        body is not StreamBody { Length: not 0 } stream || CanResend(stream.Content);
+
+    /// <summary>
+    /// Rewinds a non-empty stream upload for a resend on a fresh connection, as
+    /// <see cref="RewindUploadFailure" /> does; an empty one has nothing to rewind (BL-5130).
+    /// </summary>
+    private static string? RewindStreamUploadFailure(HttpRequestBody? body, HttpRequestBodyWriter upload) =>
+        body is StreamBody { Length: not 0 } ? RewindUploadFailure(body, upload) : null;
+
+    /// <summary>
     /// Tells whether a stream body can be sent again from its start: it can seek, or it
     /// implements <see cref="IUploadRewinder" />.
     /// </summary>
@@ -2409,7 +2452,7 @@ public sealed class HttpProtocolHandler(
         }
 
         return DiedBeforeResponse(plan, reusedConnection, headReader, failure)
-            ? new HttpAttemptOutcome(failed, plan.OnFreshConnection(), KeepsAlive: false) { DiedBeforeResponse = true }
+            ? new HttpAttemptOutcome(failed, plan.OnFreshConnection().FailingUploadRewind(RewindStreamUploadFailure(plan.Framing.Body, upload)), KeepsAlive: false) { DiedBeforeResponse = true }
             : new HttpAttemptOutcome(failed, null, KeepsAlive: failure.LeavesConnectionIntact);
     }
 
@@ -2488,7 +2531,7 @@ public sealed class HttpProtocolHandler(
     private static bool CanSendAgainOnFreshConnection(HttpRequestPlan plan, bool reusedConnection) =>
         reusedConnection
             && !plan.SentOnFreshConnection
-            && plan.Framing.Body is not StreamBody { Length: not 0 };
+            && BodyCanBeSentAgain(plan.Framing.Body);
 
     /// <summary>
     /// Fails a request before any byte of it is sent, as curl 8.21.0 does once connected: a
@@ -3089,6 +3132,9 @@ public sealed class HttpProtocolHandler(
         }
         catch (HttpTransferException failure) when (!picksNegotiate)
         {
+            // curl keeps the response whose challenge it could not answer: its code and header count (BL-5118).
+            failure.StatusLineBeforeFailure = head.StatusLine;
+            failure.HeadersStoredBeforeFailure = head.Headers.Count + 1;
             return plan.WithAuthorizationFailure(failure, retryLines.Lines, RepeatProxyAuthorization(plan));
         }
 
@@ -4020,6 +4066,17 @@ public sealed class HttpProtocolHandler(
         /// <returns>The request's plan with that value.</returns>
         public HttpRequestPlan WithAuthorizationSentAgain(string? authorization) =>
             authorization == Authorization ? this : With(Framing, authorization).FailingUploadRewind(UploadRewindFailure);
+
+        /// <summary>
+        /// Makes the same request starting its connection-bound handshake again with
+        /// <paramref name="firstAuthorization" />, the answer sent before any challenge, for a fresh
+        /// connection that the earlier leg's answer does not belong to (BL-5121).
+        /// </summary>
+        /// <param name="firstAuthorization">The first leg's value, such as an NTLM Type 1 message; <see langword="null" /> for none.</param>
+        /// <returns>The restarted request's plan.</returns>
+        public HttpRequestPlan WithHandshakeRestarted(string? firstAuthorization) =>
+            WithAnswer(firstAuthorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: false, ProxyAuthorization, ProxyAuthorizationAnswersChallenge)
+                .FailingUploadRewind(UploadRewindFailure);
 
         /// <summary>
         /// Makes the same request, sent again over HTTP/1.1 on a new connection because the server

@@ -49,6 +49,9 @@ internal sealed class SocketCallbackConnection(IConnection inner, CurlSocketClos
     public ValueTask FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
 
     /// <inheritdoc />
+    public ValueTask ShutDownSendingAsync(CancellationToken cancellationToken) => inner.ShutDownSendingAsync(cancellationToken);
+
+    /// <inheritdoc />
     public void MarkReusable() => inner.MarkReusable();
 
     /// <inheritdoc />

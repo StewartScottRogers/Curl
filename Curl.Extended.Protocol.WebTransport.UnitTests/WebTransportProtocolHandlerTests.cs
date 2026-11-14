@@ -52,7 +52,7 @@ public sealed class WebTransportProtocolHandlerTests
         Assert.IsTrue(connect.IsWriteEnded, "the session stream is ended after WT_CLOSE_SESSION");
         List<HeaderFieldText> fields = DecodeRequest(connect.Written.ToArray());
         CollectionAssert.AreEqual(
-            new[] { new HeaderFieldText(":method", "CONNECT"), new(":protocol", "webtransport-h3"), new(":scheme", "https"), new(":authority", "example.com:4433"), new(":path", "/chat?room=1") },
+            new[] { new HeaderFieldText(":method", "CONNECT"), new(":protocol", "webtransport-h3"), new(":scheme", "https"), new(":authority", "example.com:4433"), new(":path", "/chat?room=1"), new("user-agent", "curl/8.22.0") },
             fields);
     }
 
@@ -441,7 +441,7 @@ public sealed class WebTransportProtocolHandlerTests
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) => throw new IOException("disk full");
     }
 
-    private static void Echo(ScriptedHttp3Connection server, InMemoryMultiplexedStream stream)
+    internal static void Echo(ScriptedHttp3Connection server, InMemoryMultiplexedStream stream)
     {
         byte[] written = stream.Written.ToArray();
         stream.Receive(written[3..]);
@@ -471,7 +471,7 @@ public sealed class WebTransportProtocolHandlerTests
         return [.. buffer];
     }
 
-    private static List<HeaderFieldText> DecodeRequest(byte[] written)
+    internal static List<HeaderFieldText> DecodeRequest(byte[] written)
     {
         int position = 0;
         HttpDatagramVariableLengthInteger.TryRead(written, out ulong type, out int consumed);
@@ -483,7 +483,7 @@ public sealed class WebTransportProtocolHandlerTests
         return [.. fields.Select(field => new HeaderFieldText(field.Name, field.Value))];
     }
 
-    private sealed record HeaderFieldText(string Name, string Value);
+    internal sealed record HeaderFieldText(string Name, string Value);
 
     // A connection that carries streams but no datagrams at all.
     private sealed class StreamsOnlyConnection(ScriptedHttp3Connection inner) : IMultiplexedConnection

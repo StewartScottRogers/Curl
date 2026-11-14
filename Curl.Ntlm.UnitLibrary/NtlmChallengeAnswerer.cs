@@ -25,7 +25,26 @@ public sealed class NtlmChallengeAnswerer(TimeProvider timeProvider, INtlmRandom
     /// <see cref="NtlmResponseComputation.ChallengeLength" /> bytes. A decoded challenge
     /// always has that many, so only one built by hand reaches this.
     /// </exception>
-    public NtlmAuthenticateMessage Answer(NtlmChallengeMessage challenge, string userName, string password)
+    public NtlmAuthenticateMessage Answer(NtlmChallengeMessage challenge, string userName, string password) =>
+        AnswerCore(challenge, userName, password, false, out _);
+
+    /// <summary>
+    /// Answers as <see cref="Answer" /> does and also exchanges a session key: when the
+    /// challenge negotiates <see cref="NtlmNegotiateFlags.NegotiateKeyExchange" />, draws a
+    /// 16-byte exported session key from the random source (after the client challenge) and
+    /// writes <c>RC4K(KeyExchangeKey, ExportedSessionKey)</c> as the message's
+    /// EncryptedRandomSessionKey; without that flag the key exchange key itself is the
+    /// exported session key.
+    /// </summary>
+    /// <param name="challenge">The CHALLENGE to answer.</param>
+    /// <param name="userName">curl's <c>-u</c> user name.</param>
+    /// <param name="password">The password.</param>
+    /// <param name="exportedSessionKey">The 16-byte key both ends derive sign and seal keys from.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="challenge" /> is null.</exception>
+    public NtlmAuthenticateMessage AnswerWithKeyExchange(NtlmChallengeMessage challenge, string userName, string password, out byte[] exportedSessionKey) =>
+        AnswerCore(challenge, userName, password, true, out exportedSessionKey);
+
+    private NtlmAuthenticateMessage AnswerCore(NtlmChallengeMessage challenge, string userName, string password, bool exchangeKey, out byte[] exportedSessionKey)
     {
         ArgumentNullException.ThrowIfNull(challenge);
         (string domain, string user) = NtlmUserName.SplitDomain(userName);
@@ -44,12 +63,22 @@ public sealed class NtlmChallengeAnswerer(TimeProvider timeProvider, INtlmRandom
             flags &= ~NtlmNegotiateFlags.NegotiateExtendedSessionSecurity;
         }
 
+        byte[]? encrypted = null;
+        exportedSessionKey = responses.KeyExchangeKey;
+        if (exchangeKey && flags.HasFlag(NtlmNegotiateFlags.NegotiateKeyExchange))
+        {
+            exportedSessionKey = new byte[NtlmResponseComputation.SessionKeyLength];
+            randomSource.Fill(exportedSessionKey);
+            encrypted = NtlmResponseComputation.EncryptSessionKey(responses.KeyExchangeKey, exportedSessionKey);
+        }
+
         return new NtlmAuthenticateMessage(
             flags,
             responses.LmChallengeResponse,
             responses.NtChallengeResponse,
             domain,
             user,
-            NtlmAuthenticateMessage.CurlWorkstation);
+            NtlmAuthenticateMessage.CurlWorkstation,
+            encrypted);
     }
 }

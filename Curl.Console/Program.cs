@@ -22,10 +22,14 @@ internal static class Program
         bool terminalRendersStyles = StandardOutputVirtualTerminal.RendersStyles(
             standardOutputIsTerminal, OperatingSystem.IsWindows(), virtualTerminal.Enable);
 
+        // The arguments are copied out of argv first, so blanking argv's secrets leaves the run its credentials (BL-5093).
+        IReadOnlyList<string> arguments = RawCommandLineArguments.ForCurrentPlatform(args);
+        NativeArgumentBlanking.BlankForCurrentPlatform(arguments);
+
         return await UnhandledExceptionGuard.RunAsync(
                 () => CurlComposition
                     .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal, terminalRendersStyles)
-                    .RunAsync(AnsiCodePageArguments.ForPlatform(RawCommandLineArguments.ForCurrentPlatform(args), OperatingSystem.IsWindows())),
+                    .RunAsync(AnsiCodePageArguments.ForPlatform(arguments, OperatingSystem.IsWindows())),
                 standardOutput,
                 standardError)
             .ConfigureAwait(false);

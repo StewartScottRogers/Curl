@@ -474,6 +474,14 @@ public static class CommandLineParser
     /// </summary>
     private static CommandLineRefusal? ApplyExtensionOption(CommandLineOptions options, CommandLineExtensionOption option, string argument, string? attachedValue, ArgumentReader reader)
     {
+        return option.CommandLineOnly && options.ReadingConfigFile
+            ? CommandLineRefusal.CommandLineOnlyOption(argument)
+            : RecordExtensionOption(options, option, argument, attachedValue, reader);
+    }
+
+    /// <summary>Records an extension option's value as <see cref="ApplyExtensionOption"/> describes.</summary>
+    private static CommandLineRefusal? RecordExtensionOption(CommandLineOptions options, CommandLineExtensionOption option, string argument, string? attachedValue, ArgumentReader reader)
+    {
         if (!option.TakesValue)
         {
             options.SetExtensionOptionValue(option.LongName, string.Empty);

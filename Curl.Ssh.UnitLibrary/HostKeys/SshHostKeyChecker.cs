@@ -55,7 +55,7 @@ internal static class SshHostKeyChecker
     /// Narrows the host-key list as the overload without events does, writing curl's
     /// <c>-v</c> lines on the way (ADR-0262): <c>SSH: failed to read known hosts from
     /// &lt;path&gt;</c> for a file libssh2 could not read to its end, then, unless
-    /// <c>--hostpubmd5</c> is given, <c>SSH: found host '&lt;host&gt;' in '&lt;path&gt;'</c>
+    /// <c>--hostpubmd5</c> or <c>--hostpubsha256</c> is given, <c>SSH: found host '&lt;host&gt;' in '&lt;path&gt;'</c>
     /// and <c>SSH: set '&lt;names&gt;' as hostkey type</c>, or <c>SSH: did not find host
     /// '&lt;host&gt;' in '&lt;path&gt;'</c>.
     /// </summary>
@@ -86,7 +86,7 @@ internal static class SshHostKeyChecker
             events.ReportInfo(SshInfoLines.KnownHostsReadFailed(path));
         }
 
-        if (options.HostPublicKeyMd5 is not null)
+        if (IsFingerprintGiven(options))
         {
             return preferences;
         }
@@ -102,6 +102,9 @@ internal static class SshHostKeyChecker
         events.ReportInfo(SshInfoLines.HostKeyTypeSet(SshAlgorithmPreferences.NarrowedHostKeyNames(keyType)));
         return preferences.NarrowHostKeysTo(keyType);
     }
+
+    private static bool IsFingerprintGiven(SshOptions options) =>
+        options.HostPublicKeyMd5 is not null || options.HostPublicKeySha256 is not null;
 
     /// <summary>
     /// Accepts or refuses the server's host key.

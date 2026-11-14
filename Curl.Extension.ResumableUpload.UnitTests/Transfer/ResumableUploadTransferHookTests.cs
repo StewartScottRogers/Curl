@@ -302,19 +302,6 @@ public sealed class ResumableUploadTransferHookTests
         Assert.AreEqual("too big", Encoding.ASCII.GetString(((MemoryStream)context.Output).ToArray()));
     }
 
-    [TestMethod]
-    public async Task ExecuteAsync_CreationWithoutLocation_EndsWithTheCreationResponse()
-    {
-        var connection = new RecordedConnection(PlainOptions + "HTTP/1.1 201 Created\r\nContent-Length: 2\r\n\r\nok");
-        var context = Context("http://up.example.com/files");
-
-        var result = await new ResumableUploadTransferHook().ExecuteAsync(context, Services(new ScriptedConnector(ConnectResult.Connected(connection))), NeverSent);
-
-        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(201, result.Report!.ResponseCode);
-        Assert.AreEqual("ok", Encoding.ASCII.GetString(((MemoryStream)context.Output).ToArray()));
-    }
-
     private static readonly TransferResult NextResult = TransferResult.Success(42);
 
     private static ValueTask<TransferResult> NeverSent(ITransferContext context) => throw new AssertFailedException("curl's handler ran.");

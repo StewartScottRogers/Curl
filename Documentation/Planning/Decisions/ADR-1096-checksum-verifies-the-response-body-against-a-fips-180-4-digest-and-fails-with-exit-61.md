@@ -29,7 +29,10 @@ hook's `ExecuteAsync` (ADR-1019) can see every body byte by running curl's handl
   contacting the server.
 - **What is hashed.** The response body as curl writes it to its output (after `--compressed` decoding, and after
   the other hooks' body streams), not the headers. Each transfer of the option group is hashed on its own, so the
-  option suits one URL per group.
+  option suits one URL per group. With `-L` only the final response's body is checked (BL-5122): the transfer hook
+  runs once per hop, so a hop the redirect follower will follow (success, a 3xx with a `Location`, `-L` set and
+  `--max-redirs` not reached) is passed through unjudged and its hash discarded; a 3xx that is not followed is the
+  output and is still checked.
 - **A mismatch** fails an otherwise successful transfer with exit 61 (`CURLE_BAD_CONTENT_ENCODING`, "the content
   received could not be accepted", the nearest of curl's codes to a body that is not what it should be) and the
   message `checksum mismatch: expected <alg>:<hex>, got <alg>:<hex>`, digests in lower case. The body has already

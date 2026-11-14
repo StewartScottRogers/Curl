@@ -505,7 +505,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
             : errors;
 
     // curl's Schannel build builds the --cacert chain with an exclusive-root engine holding
-    // the file's certificates, where a leaf the file lists is itself a trust anchor: a chain
+    // the file's certificates, where any certificate the file lists, the leaf or an intermediate, is itself a trust anchor (BL-5100): a chain
     // .NET finds partial or untrusted only for want of a root is accepted (measured with curl
     // 8.22.0, tls-wrong-ca, BL-3289, ADR-0797).
     //
@@ -519,13 +519,9 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         && HasOnlyMissingRootStatus(ReadChainStatus(chain))
         && ListsAnAnchorCandidate(chain);
 
-    private bool ListsAnAnchorCandidate(X509Chain chain)
-    {
-        var candidates = matchesSchannelBuild
-            ? chain.ChainElements.Cast<X509ChainElement>().Take(1)
-            : chain.ChainElements.Cast<X509ChainElement>();
-        return candidates.Any(element => ListsCertificate(chain.ChainPolicy.CustomTrustStore, element.Certificate));
-    }
+    private static bool ListsAnAnchorCandidate(X509Chain chain) =>
+        chain.ChainElements.Cast<X509ChainElement>()
+            .Any(element => ListsCertificate(chain.ChainPolicy.CustomTrustStore, element.Certificate));
 
     private static bool HasOnlyMissingRootStatus(X509ChainStatus[] chainStatus) =>
         chainStatus.All(status => (status.Status & ~(X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.UntrustedRoot)) == 0);
@@ -580,15 +576,45 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
             return errors;
         }
 
-        if (IsIpTargetWithoutAlternativeNames(chain, targetHost))
+        if (SchannelRefusesTheAlternativeNames(chain, targetHost))
         {
             return errors | SslPolicyErrors.RemoteCertificateNameMismatch;
         }
 
-        return errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
-            && SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
-                ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
-                : errors;
+        return WithoutNameMismatchTheCommonNameAnswers(errors, chain, targetHost);
+    }
+
+    private static SslPolicyErrors WithoutNameMismatchTheCommonNameAnswers(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
+        errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)
+        && SchannelCommonNameCheck.CommonNameMatches(chain!.ChainElements[0].Certificate, targetHost)
+            ? errors & ~SslPolicyErrors.RemoteCertificateNameMismatch
+            : errors;
+
+    private static bool SchannelRefusesTheAlternativeNames(X509Chain? chain, string targetHost) =>
+        IsIpTargetWithoutAlternativeNames(chain, targetHost)
+        || (chain is { ChainElements.Count: > 0 }
+            && !SchannelAlternativeNamesMatch(chain.ChainElements[0].Certificate, targetHost));
+
+    // Windows' own name check lets "f*.a.test" stand for "foo.a.test" and matches an IP host
+    // against a dNSName holding the same text; curl's Schannel build does neither (BL-5095).
+    // An IP host needs an iPAddress name; a DNS host needs a dNSName under
+    // SchannelCommonNameCheck.PatternMatchesHost. A certificate with no name of the kind
+    // asked for is left to the common name check.
+    private static bool SchannelAlternativeNamesMatch(X509Certificate2 leaf, string targetHost)
+    {
+        var names = leaf.Extensions.OfType<X509SubjectAlternativeNameExtension>().FirstOrDefault();
+        if (names is null)
+        {
+            return true;
+        }
+
+        if (System.Net.IPAddress.TryParse(targetHost, out var address))
+        {
+            return names.EnumerateIPAddresses().Any(candidate => candidate.Equals(address));
+        }
+
+        var dnsNames = names.EnumerateDnsNames().ToList();
+        return dnsNames.Count == 0 || dnsNames.Any(name => SchannelCommonNameCheck.PatternMatchesHost(name, targetHost));
     }
 
     private static bool IsIpTargetWithoutAlternativeNames(X509Chain? chain, string targetHost) =>

@@ -830,6 +830,13 @@ internal static class TlsFailureMessages
     public const string SchannelCipherListRefused = "schannel: Failed setting algorithm cipher list";
 
     /// <summary>
+    /// The Schannel build's message for exit 35 when <c>--tlsv1.3</c> is given with a
+    /// <c>--ciphers</c> list (BL-5134).
+    /// </summary>
+    public const string SchannelTls13WithCipherList =
+        "schannel: TLS 1.3 is not supported with a cipher list; remove the cipher list or allow a lower TLS version";
+
+    /// <summary>
     /// The Schannel build's message for exit 35 when AcquireCredentialsHandle accepts none of
     /// the <c>--ciphers</c> algorithms (ADR-0896, measured with curl 8.22.0).
     /// </summary>
@@ -914,13 +921,14 @@ internal static class TlsFailureMessages
             return SchannelCaCertificateFileAnchorsNothing;
         }
 
-        if (specific != X509ChainStatusFlags.NoError)
+        // curl checks the unknown or offline revocation status before the raw mask (BL-5103).
+        if ((status & (X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation)) != X509ChainStatusFlags.NoError)
         {
-            return string.Create(CultureInfo.InvariantCulture, $"schannel: error 0x{(int)specific:x8}");
+            return SchannelRevocationStatusUnknown;
         }
 
-        return status.HasFlag(X509ChainStatusFlags.RevocationStatusUnknown)
-            ? SchannelRevocationStatusUnknown
+        return specific != X509ChainStatusFlags.NoError
+            ? string.Create(CultureInfo.InvariantCulture, $"schannel: error 0x{(int)specific:x8}")
             : SchannelCaCertificateFileAnchorsNothing;
     }
 

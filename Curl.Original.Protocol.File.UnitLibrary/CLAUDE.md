@@ -33,7 +33,7 @@ a negative `ResumeFrom` as exit 36 for both before either starts.
 | `TimeCondition` | honoured: an unmet condition is success with nothing written (`DownloadFromAsync`) | ignored |
 | `HeaderOutput` | honoured: receives the pseudo-headers (`DownloadFromAsync`) | ignored |
 | `ConvertLineEndings` | ignored | honoured: `--crlf` conversion of each chunk (`UploadIntoAsync`) |
-| `TimeProvider` | read only to time the diagnostic log's transfer-end line (`ExecuteAsync`) | the same |
+| `TimeProvider` | read to stamp the report's timings (`%{time_*}`, `%{speed_*}`) and time the diagnostic log's transfer-end line (`ExecuteAsync`, BL-5101) | the same |
 | `DiagnosticLog` | honoured: the path opened and its size, a failed open, and the transfer's end (`FileTransferLog`) | honoured: the path opened and its mode, a failed open, and the transfer's end (`FileTransferLog`) |
 | `MaxFileSize` | honoured: exit 63 past the limit (`DownloadFromAsync`) | ignored |
 | `CreateFileMode` | ignored | honoured: the mode the destination is opened with (`UploadAsync`) |
@@ -52,7 +52,7 @@ every platform, as curl 8.22.0 does (BL-2166), when the `IFileSystem` is also an
 (only `Last-Modified`), `NoBody` and `MaxFileSize` as a file does, and honours `Range` and `ResumeFrom` against a size of zero (BL-4930), ignores
 `RangeText`. Otherwise a directory is exit 37.
 
-`TimeProvider` only times the diagnostic log's transfer-end line: nothing in a local file
+`TimeProvider` stamps the report's timings and times the diagnostic log's transfer-end line (BL-5101): nothing in a local file
 transfer is timed out or retried, and `-z`/`--time-cond` compares against the timestamp the open
 reported (`FileOpenResult.LastWriteTimeUtc`), not against now.
 

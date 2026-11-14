@@ -165,6 +165,14 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
         Stream textModeTarget = runsOnWindows && ReferenceEquals(target, standardOutput)
             ? new TextModeUntilBinaryStream(standardOutput, standardOutputIsBinary)
             : TextMode(target, runsOnWindows);
+
+        // curl ignores a failed write of its trace stream, standard output's included: the body write
+        // that follows then fails with exit 23 instead of the dump ending the transfer (BL-5108).
+        if (ReferenceEquals(target, standardOutput))
+        {
+            textModeTarget = new WriteFailureIgnoringStream(textModeTarget);
+        }
+
         return new TransferEventOutput(
             new TraceTransferEventWriter(textModeTarget, format, options.TraceTime, timeProvider, PlatformTlsBackend.ForProcess, traceIds),
             ownedFile,

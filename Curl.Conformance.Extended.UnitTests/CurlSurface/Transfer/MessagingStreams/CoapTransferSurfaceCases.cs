@@ -193,6 +193,18 @@ public sealed class CoapTransferSurfaceCases
                 AssertRun(result, requirement, "manual: -m, EXIT CODES 28; ADR-1222", 28, string.Empty, TimeoutMessage(scheme));
             });
 
+    [TestMethod]
+    [SpecRequirement("CurlSurface:Observe-Coap-1")]
+    public Task Observe_NoNotificationsBeforeMaxTime_Exits28WithZeroBytesReceived() =>
+        Known.RunCaseAsync(
+            ["CurlSurface:Observe-Coap-1"],
+            async () =>
+            {
+                CurlRunResult result = await RunPastMaxTimeAsync("coap", 5, TestContext.CancellationToken, "--coap-observe");
+
+                AssertRun(result, "CurlSurface:Observe-Coap-1", "manual: -m; ADR-1222", 28, string.Empty, TimeoutMessage("coap"));
+            });
+
     private static string Url(string scheme) => $"{scheme}://localhost/hello";
 
     private static int Port(string scheme) => scheme == "coaps" ? 5684 : 5683;
@@ -228,7 +240,7 @@ public sealed class CoapTransferSurfaceCases
     /// Runs curl with <c>-m <paramref name="seconds" /></c> against a server that reads every datagram and never answers,
     /// moving the clock from timer to timer once the first datagram arrives, until curl gives up.
     /// </summary>
-    private static async Task<CurlRunResult> RunPastMaxTimeAsync(string scheme, int seconds, CancellationToken cancellationToken)
+    private static async Task<CurlRunResult> RunPastMaxTimeAsync(string scheme, int seconds, CancellationToken cancellationToken, params string[] extraArguments)
     {
         TimerJumpingClock clock = new();
         SilentDatagramServer server = new();
@@ -236,7 +248,7 @@ public sealed class CoapTransferSurfaceCases
         Task<CurlRunResult> run = ExtendedConformanceHarness.RunAsync(
             InProcessCurl.RunAsync,
             [ReferenceRoute.Udp(Port(scheme), server)],
-            ["-sS", .. leading, "-m", seconds.ToString(CultureInfo.InvariantCulture), Url(scheme)],
+            ["-sS", .. leading, "-m", seconds.ToString(CultureInfo.InvariantCulture), .. extraArguments, Url(scheme)],
             timeProvider: clock);
         await server.FirstDatagramReceived.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         long deadline = Environment.TickCount64 + 30_000;

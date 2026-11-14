@@ -21,7 +21,7 @@ public static class HttpFileOptions
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "http-file",
-        "Runs the requests in a Visual Studio / VS Code REST Client .http file, with file variables, {{$processEnv}} and named environments from http-client.env.json.",
+        "Runs the requests in a Visual Studio / VS Code REST Client .http file, with file variables, {{$processEnv}} and named environments from http-client.env.json. Command line only: a -K config file refuses --http-file and --http-env.",
         [],
         [File, Environment],
         new Uri("https://learn.microsoft.com/aspnet/core/test/http-files"));

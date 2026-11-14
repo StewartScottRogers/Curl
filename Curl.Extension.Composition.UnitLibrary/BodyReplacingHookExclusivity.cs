@@ -22,12 +22,17 @@ public static class BodyReplacingHookExclusivity
 
     /// <summary>Gives a hook that refuses the transfer when an option group gave two body-replacing options.</summary>
     /// <param name="values">The extension options the option group gave.</param>
-    /// <returns>The refusing hook, or <see langword="null" /> when at most one body-replacing option was given.</returns>
+    /// <returns>The refusing hook for two options, a hook refusing <c>-T</c> and <c>-I</c> for one, or <see langword="null" /> for none.</returns>
     public static ITransferHook? HookFor(ExtensionOptionValues values)
     {
         ArgumentNullException.ThrowIfNull(values);
         List<string> given = [.. GivenNames(values)];
-        return given.Count < 2 ? null : new RefusingHook($"--{given[0]} and --{given[1]} cannot be used together");
+        return given.Count switch
+        {
+            0 => null,
+            1 => new UploadAndHeadRefusingHook(given[0]),
+            _ => new RefusingHook($"--{given[0]} and --{given[1]} cannot be used together"),
+        };
     }
 
     /// <summary>Gives the names of the body-replacing options given; <c>--graphql-introspect</c> counts as <c>--graphql</c>'s body.</summary>
@@ -45,6 +50,21 @@ public static class BodyReplacingHookExclusivity
         foreach (ExtensionOption option in Options.Skip(1).Where(values.IsGiven))
         {
             yield return option.Name;
+        }
+    }
+
+    private sealed class UploadAndHeadRefusingHook(string optionName) : ITransferHook
+    {
+        public ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
+        {
+            if (context.Upload is not null)
+            {
+                return ValueTask.FromResult(TransferResult.Failure(CurlExitCode.FailedInit, $"--{optionName} cannot be used with -T"));
+            }
+
+            return context.NoBody
+                ? ValueTask.FromResult(TransferResult.Failure(CurlExitCode.FailedInit, $"--{optionName} cannot be used with -I"))
+                : next(context);
         }
     }
 

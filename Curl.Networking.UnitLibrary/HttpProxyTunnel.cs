@@ -195,16 +195,22 @@ internal static class HttpProxyTunnel
                 }
             }
         }
-        catch (IOException failure) when (CurlSocketErrorText.ReceiveFailure(failure) is { } receiveFailure)
+        catch (IOException failure) when (header.Count == 0 && ReadFailureText(failure) is { } receiveFailure)
         {
-            if (header.Count == 0)
-            {
-                return HttpProxyTunnelReply.Failed(receiveFailure);
-            }
+            return HttpProxyTunnelReply.Failed(receiveFailure);
+        }
+        catch (IOException failure) when (ReadFailureText(failure) is not null)
+        {
+            // Part of the head arrived: curl words it as an aborted CONNECT.
         }
 
         return HttpProxyTunnelReply.Failed("Proxy CONNECT aborted");
     }
+
+    // The text curl reports for a failed read of the reply, or null when the failure is neither
+    // a socket error nor a TLS end without close_notify (BL-5092: that is exit 56, not 2).
+    private static string? ReadFailureText(IOException failure) =>
+        failure is MissingCloseNotifyException ? failure.Message : CurlSocketErrorText.ReceiveFailure(failure);
 
     // The reply once the byte just added ends it, or null while more is to be read; a line
     // holding nothing but an optional CR ends the block, as curl accepts bare LF line endings.
