@@ -4469,6 +4469,20 @@ internal sealed class CurlCommandRunner(
                 CancellationToken.None);
 
     /// <summary>
+    /// Names the <c>-o</c> file for <c>%{filename_effective}</c> when the transfer is refused for an unsupported
+    /// scheme: curl has named it by then, though nothing is opened (BL-5116).
+    /// </summary>
+    /// <param name="failure">The refusal.</param>
+    /// <param name="outputFile">The transfer's output file, or <see langword="null" /> for none.</param>
+    private void NameOutputFileOfRefusedScheme(TransferResult failure, string? outputFile)
+    {
+        if (failure.ExitCode == CurlExitCode.UnsupportedProtocol && outputFile is not null)
+        {
+            Running.OutputFileName = outputFile;
+        }
+    }
+
+    /// <summary>
     /// Performs one checked transfer, sending <paramref name="formBody" /> when given, to the file
     /// <see cref="ResolveOutputFile" /> names when it names one, nowhere under <c>--out-null</c>
     /// (<see cref="Stream.Null" />, with the progress meter drawn as for a file) and to standard
@@ -4515,6 +4529,7 @@ internal sealed class CurlCommandRunner(
         if (!TransferPerformer.TrySelectProxyAndCredentials(
                 dispatch, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), url, Running, EventsBeforeConnecting(transfer), diagnosticLog, CredentialLookup, out ProxyEndpoint? proxy, out TransferResult? proxyFailure))
         {
+            NameOutputFileOfRefusedScheme(proxyFailure, outputFile);
             return proxyFailure;
         }
 

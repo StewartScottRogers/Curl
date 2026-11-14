@@ -30,15 +30,17 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Console.UnitTests/FilenameEffectiveOnUnsupportedSchemeTests.cs` prove that `-o x.out -w "[%{filename_effective}]" nosuch://x` writes `[x.out]` and exits 1, and that `%{json}` for `-o NUL` carries `"filename_effective":"NUL"`.
-- [ ] Regression tests prove the exit 7 and exit 3 cases keep their present `filename_effective` output, and that no file `x.out` is created by the unsupported-scheme failure.
-- [ ] Tests are platform-neutral (no drive-letter paths).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Console.UnitTests/FilenameEffectiveOnUnsupportedSchemeTests.cs` prove that `-o x.out -w "[%{filename_effective}]" nosuch://x` writes `[x.out]` and exits 1, and that `%{json}` for `-o NUL` carries `"filename_effective":"NUL"`.
+- [x] Regression tests prove the exit 7 and exit 3 cases keep their present `filename_effective` output, and that no file `x.out` is created by the unsupported-scheme failure.
+- [x] Tests are platform-neutral (no drive-letter paths).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check, as a hand check: the first repro command prints `[x.out]` and exits 1.
+
+- Fix: `TransferWithBodyAsync` now names the -o file (`NameOutputFileOfRefusedScheme`) when the refusal is exit 1. Exit 3 keeps `[]`; a failed supported-scheme transfer (52 with an empty script) keeps its name. Tests are platform-neutral; CI on Linux and macOS is covered by that. Quality run for Curl.Console: 0 failing members.
 
 ## Log
 
