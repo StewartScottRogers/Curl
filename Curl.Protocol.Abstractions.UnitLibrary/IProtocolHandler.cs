@@ -27,7 +27,7 @@ public interface IProtocolHandler
     /// Tells the handler that a transfer it served the first request of has ended, its whole redirect chain
     /// (or its single request) with the final merged result (BL-5164). Called once per transfer, after the
     /// last hop, also when a hop was refused and when the <c>-m</c> or <c>-Y</c>/<c>-y</c> watchdog stopped the
-    /// transfer (BL-5165). Each <c>--retry</c> attempt is a transfer of its own and is told on its own. Does nothing
+    /// transfer (BL-5165), and when the abort token or an exception from a hop left the chain, with an exit 42 or exit 2 failure and the exception rethrown unchanged (BL-5170). Each <c>--retry</c> attempt is a transfer of its own and is told on its own. Does nothing
     /// by default.
     /// </summary>
     /// <param name="first">The transfer as the follower was given it, before any redirect.</param>

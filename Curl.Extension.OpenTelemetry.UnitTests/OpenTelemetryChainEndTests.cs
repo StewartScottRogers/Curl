@@ -24,6 +24,20 @@ public sealed class OpenTelemetryChainEndTests
     }
 
     [TestMethod]
+    public async Task TransferChainFinishedAsync_TheWatchdogCancelledTheTransferToken_StillExportsOneSpan_BL5168()
+    {
+        var (hook, connection, services) = Fixture();
+        using var cancelled = new CancellationTokenSource();
+        var first = Hop(0, new TransferProgress(), token: cancelled.Token);
+
+        await hook.ExecuteAsync(first, services, c => ValueTask.FromResult(Redirect()));
+        await cancelled.CancelAsync();
+        await hook.TransferChainFinishedAsync(first, TransferResult.Failure(CurlExitCode.OperationTimedOut, "timed out"));
+
+        Assert.AreEqual(1, Count(connection.Written, "POST "));
+    }
+
+    [TestMethod]
     public async Task TransferChainFinishedAsync_TheChainResultCarriesItsOwnReport_ExportsThatReport()
     {
         var (hook, connection, services) = Fixture();
@@ -86,13 +100,14 @@ public sealed class OpenTelemetryChainEndTests
         return (new OpenTelemetryTransferHook(Endpoint, bytes => bytes.Fill(0xab)), connection, new TransferHookServices(connector, connector));
     }
 
-    private static TransferContext Hop(int followed, ITransferProgress progress, TimeProvider? clock = null) => new()
+    private static TransferContext Hop(int followed, ITransferProgress progress, TimeProvider? clock = null, CancellationToken token = default) => new()
     {
         Url = CurlUrl.Parse("http://example.com/"),
         Output = Stream.Null,
         Progress = progress,
         Http = new HttpRequestOptions { FollowRedirects = true, RedirectsFollowed = followed, MaxRedirects = 50 },
         TimeProvider = clock ?? new SteppingTimeProvider(),
+        CancellationToken = token,
     };
 
     private static TransferResult Redirect() =>

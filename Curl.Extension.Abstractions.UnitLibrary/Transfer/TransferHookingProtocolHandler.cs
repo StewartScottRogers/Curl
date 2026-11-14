@@ -45,9 +45,11 @@ internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, I
             {
                 await hook.TransferChainFinishedAsync(first, result).ConfigureAwait(false);
             }
-            catch (Exception)
+            catch (Exception failure)
             {
-                // A hook that fails here neither hides the hooks after it nor replaces the finished result (BL-5165).
+                // A hook that fails here neither hides the hooks after it nor replaces the finished result (BL-5165);
+                // the Warning line, seen only under -v or --trace, tells its author why it did nothing (BL-5169).
+                first.DiagnosticLog.Write(DiagnosticLogLevel.Warning, "extension", $"{hook.GetType().Name}.TransferChainFinishedAsync failed: {failure.GetType().Name}: {failure.Message}");
             }
         }
     }

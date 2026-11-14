@@ -137,6 +137,34 @@ public sealed partial class TransferPerformerTests
     }
 
     [TestMethod]
+    public async Task FollowWatchingSpeedAsync_AbortTokenCancelled_TellsTheHandlerOnceWithTheAbortAndStillThrows_BL5170()
+    {
+        using CancellationTokenSource cancelled = new();
+        await cancelled.CancelAsync();
+        StallingHandler handler = new();
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null, CancellationToken = cancelled.Token };
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await TransferPerformer.FollowWatchingSpeedAsync(NewState(), Follower(handler), context, new RedirectPolicy()));
+
+        Assert.HasCount(1, handler.Told);
+        Assert.AreEqual(CurlExitCode.AbortedByCallback, handler.Told[0].ExitCode);
+    }
+
+    [TestMethod]
+    public async Task FollowWatchingSpeedAsync_HopThrows_TellsTheHandlerOnceAndRethrowsTheSameException_BL5170()
+    {
+        StallingHandler handler = new() { Failure = new InvalidOperationException("hop broke") };
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null };
+
+        InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await TransferPerformer.FollowWatchingSpeedAsync(NewState(), Follower(handler), context, new RedirectPolicy()));
+
+        Assert.AreEqual("hop broke", thrown.Message);
+        Assert.HasCount(1, handler.Told);
+        Assert.AreEqual(CurlExitCode.FailedInit, handler.Told[0].ExitCode);
+    }
+    [TestMethod]
     public void StartWatchdogs_NothingToWatch_KeepNone()
     {
         TransferPerformer performer = new(clock, EasyErrorText);
@@ -315,6 +343,8 @@ public sealed partial class TransferPerformerTests
 
         public List<TransferResult> Told { get; } = [];
 
+        public Exception? Failure { get; init; }
+
         public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result)
         {
             Told.Add(result);
@@ -326,6 +356,11 @@ public sealed partial class TransferPerformerTests
         public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
         {
             stalled.TrySetResult();
+            if (Failure is not null)
+            {
+                throw Failure;
+            }
+
             await Task.Delay(Timeout.Infinite, context.CancellationToken);
             return TransferResult.Success(0);
         }

@@ -170,6 +170,30 @@ public sealed partial class TransferHookingProtocolHandlerTests
         CollectionAssert.AreEqual(new[] { "a", "b" }, told);
     }
 
+    [TestMethod]
+    public async Task TransferChainFinishedAsync_OneHookThrows_WritesOneWarningNamingTheHookAndTheException()
+    {
+        List<string> told = [];
+        RecordingLog log = new();
+        IProtocolHandler hooked = new TransferHooks([new ThrowingChainEndHook(), new ChainEndHook("b", told)]).Around(new FailingHandler());
+        TransferContext first = new() { Url = CurlUrl.Parse("http://example.com/page"), Output = new MemoryStream(), DiagnosticLog = log };
+
+        await hooked.TransferChainFinishedAsync(first, TransferResult.Failure(CurlExitCode.TooManyRedirects, "stopped"));
+
+        Assert.HasCount(1, log.Lines);
+        Assert.AreEqual("Warning|extension|ThrowingChainEndHook.TransferChainFinishedAsync failed: InvalidOperationException: hook failed", log.Lines[0]);
+        CollectionAssert.AreEqual(new[] { "b" }, told);
+    }
+
+    private sealed class RecordingLog : IDiagnosticLog
+    {
+        public List<string> Lines { get; } = [];
+
+        public bool IsEnabled(DiagnosticLogLevel level) => true;
+
+        public void Write(DiagnosticLogLevel level, string component, string message) => Lines.Add($"{level}|{component}|{message}");
+    }
+
     private sealed class ThrowingChainEndHook : ITransferHook
     {
         public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result) =>
