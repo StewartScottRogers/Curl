@@ -191,6 +191,11 @@ public sealed class RedirectFollower(
     /// the first hop's start, each phase the sum of its time on every hop, and
     /// <see cref="TransferTimings.RedirectDuration" /> the time until the last hop began.
     /// </returns>
+    /// <remarks>
+    /// It tells the handler that the chain ended itself, when the chain returns. The engine does not call it: it calls
+    /// <see cref="FollowWithoutNotifyingAsync" /> and <see cref="NotifyChainFinishedAsync" />, so it can tell the handler on
+    /// every ending, an exception included.
+    /// </remarks>
     public async ValueTask<TransferResult> FollowAsync(ITransferContext context, RedirectPolicy policy)
     {
         TransferResult result = await FollowWithoutNotifyingAsync(context, policy).ConfigureAwait(false);
@@ -218,9 +223,11 @@ public sealed class RedirectFollower(
 
     /// <summary>
     /// Tells the handler of the first request's scheme that the transfer ended with
-    /// <paramref name="result" /> (BL-5164). <see cref="FollowAsync" /> does it when the chain ends; the caller does it
-    /// for a transfer a watchdog cancelled, which leaves <see cref="FollowAsync" /> by an exception before any result
-    /// exists (BL-5165).
+    /// <paramref name="result" /> (BL-5164). <see cref="FollowAsync" /> tells the handler itself when the chain ends. A
+    /// caller of <see cref="FollowWithoutNotifyingAsync" /> (the engine's
+    /// <c>TransferPerformer.FollowWatchingSpeedAsync</c>) tells it on every ending: success, a watchdog's exit 28
+    /// and an exception thrown by a hop, none of which leaves a result for <see cref="FollowAsync" /> to tell (BL-5165,
+    /// BL-5172, BL-5173).
     /// </summary>
     /// <param name="context">The transfer as <see cref="FollowAsync" /> was given it.</param>
     /// <param name="result">The transfer's final result.</param>
