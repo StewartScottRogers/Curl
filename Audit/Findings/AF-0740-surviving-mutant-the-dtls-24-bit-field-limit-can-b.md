@@ -3,8 +3,8 @@ id: AF-0740
 title: Surviving mutant: the DTLS 24-bit field limit can be raised past 24 bits; the tests derive their bound from the same constant
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Coap.UnitLibrary/Dtls/Wire/DtlsHandshakeHeader.cs:MaximumUInt24-minus1:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Coap.UnitLibrary/Dtls/Wire/DtlsHandshakeHeader.cs:22:-1
 task: none

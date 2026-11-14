@@ -3,8 +3,8 @@ id: AF-0741
 title: Surviving mutant: curl_multi_socket_action without a socket callback can answer CURLM_ABORTED_BY_CALLBACK
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs:UpdateSockets-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs:153:true
 task: none

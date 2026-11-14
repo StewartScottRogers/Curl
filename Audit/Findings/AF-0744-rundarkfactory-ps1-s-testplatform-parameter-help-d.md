@@ -3,8 +3,8 @@ id: AF-0744
 title: RunDarkFactory.ps1's -TestPlatform parameter help describes the audio-off self-test, and -TestAudioOff has none
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:RunDarkFactory.ps1:TestPlatform:false-help
 reproduction: none
 task: none

@@ -3,8 +3,8 @@ id: AF-0743
 title: -m 1 --interface - exits 28 (timeout) where curl exits 45 (bind failed)
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:--interface:max-time-during-bind:exit-code
 reproduction: none
 task: none

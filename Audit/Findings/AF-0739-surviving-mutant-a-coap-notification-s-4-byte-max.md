@@ -3,8 +3,8 @@ id: AF-0739
 title: Surviving mutant: a CoAP notification's 4-byte Max-Age can be ignored for the 60-second default
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Coap.UnitLibrary/Observe/CoapObservation.cs:MaxAgeOf-le:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Coap.UnitLibrary/Observe/CoapObservation.cs:101:<=
 task: none

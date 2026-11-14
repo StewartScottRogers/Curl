@@ -3,8 +3,8 @@ id: AF-0737
 title: Surviving mutant: a resumed IMAP connection can send a second LOGOUT at shutdown
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Imap.UnitLibrary/ImapSession.cs:OpenOrResumeAsync-false:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Imap.UnitLibrary/ImapSession.cs:345:false
 task: none

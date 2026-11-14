@@ -3,8 +3,8 @@ id: AF-0738
 title: Surviving mutant: a literal beginning with a line feed can be reported merged into the next -v line
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Imap.UnitLibrary/ImapControlChannel.cs:ReportLiteralAsync-ge:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Imap.UnitLibrary/ImapControlChannel.cs:537:>=
 task: none
