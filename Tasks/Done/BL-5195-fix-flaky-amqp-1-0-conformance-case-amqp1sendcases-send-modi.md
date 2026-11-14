@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests/Amqp1/Messaging/Amqp1SendCases.cs]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5195 — Fix flaky AMQP 1.0 conformance case Amqp1SendCases.Send_Modified_FailsWithExit55
 
@@ -27,14 +27,17 @@ So the reference broker tried to grant link credit after the connection's token 
 
 ## Acceptance criteria
 
-- [ ] The race is named in the Log.
-- [ ] The case no longer fails when Curl closes the connection before the reference broker's credit write, and it still asserts exit 55 for the `modified` outcome.
-- [ ] `dotnet test Curl.Conformance.Extended.UnitTests --filter "FullyQualifiedName~Amqp1SendCases"` passes 20 runs in a row.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The race is named in the Log.
+- [x] The case no longer fails when Curl closes the connection before the reference broker's credit write, and it still asserts exit 55 for the `modified` outcome.
+- [x] `dotnet test Curl.Conformance.Extended.UnitTests --filter "FullyQualifiedName~Amqp1SendCases"` passes 20 runs in a row.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Race: the reference broker grants link credit (GrantCreditAsync) while curl, having seen the settled outcome (exit 55), closes the connection, so the harness cancels the credit write and `await link.Credit` throws TaskCanceledException. Already fixed by b9f71fa0a3 (BL-5193): SendAsync catches OperationCanceledException from `link.Credit`, keeping every exit-code assertion. The failing CI run predated it (8a8b41ced). No code change here; 20 consecutive runs of Amqp1SendCases passed (6/6 each), build clean. No production or test code changed, so the fast suite is unaffected.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: 03aad249 0f1e48fe 4b203f19 a0b49a29.
+- 2026-11-14: Doing -> Done. Already fixed by BL-5193 (credit-flush cancellation tolerated); 20 runs of Amqp1SendCases pass
