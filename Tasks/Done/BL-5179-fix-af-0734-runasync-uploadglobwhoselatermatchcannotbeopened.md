@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5179 — Fix AF-0734: RunAsync_UploadGlobWhoseLaterMatchCannotBeOpenedAfterASuccess_Exits26AndStopsTheRun asserts exit 25, not 26
 
@@ -52,3 +52,4 @@ Stale finding: the test already asserts CurlExitCode.ReadError (26) at line 455 
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-14: Doing -> Done. Finding stale: test already asserts 26
