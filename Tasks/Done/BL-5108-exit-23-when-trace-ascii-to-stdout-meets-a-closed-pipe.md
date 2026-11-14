@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/StandardOutputFailureDeferringStream.cs, Curl.Console/TransferEventOutput.cs, Curl.Console.UnitTests/TraceToClosedStandardOutputExitCodeTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5108 — Exit 23 when --trace-ascii to stdout meets a closed pipe
 
@@ -45,3 +45,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: e4d6b6df a37055d2 04f2c6a6 a0b49a29.
 - 2026-11-13: Fixed in Curl.Console/TransferEventOutput.cs (added to touches): a `--trace`/`--trace-ascii -` dump to stdout is written through WriteFailureIgnoringStream, as curl ignores trace write failures, so the body write fails with exit 23. Cause was the trace write throwing OutputWriteFailedException out of the handler's event call. The startup-closed-stdout case is untouched (ClosedStandardOutputStreamTests still pass). Measure-CodeQuality for Curl.Console: 0 failing members. Linux/macOS: tests use stand-in streams, platform-neutral.
+- 2026-11-13: Doing -> Done. Trace dump to stdout ignores write failures, so a closed pipe exits 23
