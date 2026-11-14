@@ -32,3 +32,4 @@ The shift-end review (code-reviewer, 2026-11-14) of BL-5172/BL-5173 found that `
 ## Log
 
 - 2026-11-14: Created.
+- 2026-11-14: Backlog -> Doing. Criteria at claim: 1f74f5c6 05105088 f24b7820 125163ac.
