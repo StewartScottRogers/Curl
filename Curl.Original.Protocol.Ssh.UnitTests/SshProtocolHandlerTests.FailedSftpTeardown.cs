@@ -122,6 +122,7 @@ public sealed partial class SshProtocolHandlerTests
             Credentials = new NetworkCredential(User, Password),
             Upload = upload ? new MemoryStream(Hello) : null,
             QuoteCommands = quote is null ? [] : [quote],
+            TimeProvider = new NeverFiringTimerProvider(),
         };
         ArrangeTransfer(context);
 
@@ -145,4 +146,21 @@ public sealed partial class SshProtocolHandlerTests
         AssertTextDiagnostic("events after the subsystem", string.Join(" | ", [.. requests, .. ChannelClosedThenDisconnected]), string.Join(" | ", events[(subsystem + 1)..]));
         Assert.AreEqual(string.Join(" | ", [.. requests, .. ChannelClosedThenDisconnected]), string.Join(" | ", events[(subsystem + 1)..]));
     }
-}
+
+    // The handler bounds the teardown with a timeout on the context's clock; a clock whose timers
+    // never fire keeps a slow runner from cancelling the channel close mid-write.
+    private sealed class NeverFiringTimerProvider : TimeProvider
+    {
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period) => new IdleTimer();
+
+        private sealed class IdleTimer : ITimer
+        {
+            public bool Change(TimeSpan dueTime, TimeSpan period) => true;
+
+            public void Dispose()
+            {
+            }
+
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }}
