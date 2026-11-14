@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitTests, Curl.Conformance.Extended.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5193 — Fix CI failure Send_Rejected_FailsWithExit55AndTheError on macOS
 
@@ -36,3 +36,4 @@ Cause: on macOS the harness cancelled the flush of the credit grant after curl, 
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: 1eb73227.
+- 2026-11-14: Doing -> Done. Test helper tolerates cancelled credit flush; Amqp1SendCases pass
