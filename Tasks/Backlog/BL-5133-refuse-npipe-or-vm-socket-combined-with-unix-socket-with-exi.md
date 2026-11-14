@@ -4,8 +4,8 @@ title: Refuse --npipe or --vm-socket combined with --unix-socket with exit 2
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Extension.Composition.UnitLibrary/ExtensionConnectionHookCatalogue.cs, Curl.Extension.Composition.UnitTests/ConnectionOptionConflictTests.cs]
+depends-on: [BL-5155]
+touches: [Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/ExtensionConnectionHookTests.cs, Curl.Extension.Composition.UnitLibrary/ExtensionConnectionHookCatalogue.cs, Curl.Extension.Composition.UnitTests/ConnectionOptionConflictTests.cs]
 requirement: none
 created: 2026-11-13
 completed:
@@ -49,3 +49,9 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: de7a2e61 f49c69db 45adc330 8d0ca22a 73f9114a.
+
+## Notes
+
+- Finding (turn 8, no code edited): the ADR-1014 conflict is raised in `Curl.Console/CurlComposition.cs` `ExtensionConnectionHooksOf`, the only place that sees `CommandLineOptions.UnixSocketPath` (covers both `--unix-socket` and `--abstract-unix-socket`; `UnixSocketIsAbstract` tells which). Plan: after `ConnectionHooks.ActivatedBy`, when the hook is non-null and `UnixSocketPath` is set, throw `ExtensionOptionConflictException("the options --npipe and --unix-socket each supply the connection ...")` naming the hook's option and the actual curl option; no seam change in Abstractions. Tests go in `Curl.Console.UnitTests` (Composition.UnitTests cannot see CommandLineOptions); also update the npipe/vm-socket help text and ADR-1014.
+- Requeued: BL-5155 (Doing) holds Curl.Console and Curl.Console.UnitTests. Remove nothing; the board offers this again once BL-5155 is Done.
+- 2026-11-13: Doing -> Backlog. Needs Curl.Console/CurlComposition.cs and its tests, held by BL-5155 (Doing); depends-on BL-5155. Plan in Notes.
