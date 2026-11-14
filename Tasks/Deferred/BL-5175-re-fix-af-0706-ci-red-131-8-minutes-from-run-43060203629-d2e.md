@@ -54,3 +54,4 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Log
 
 - 2026-11-14: Created.
+- 2026-11-14: Backlog -> Deferred. Nothing left to fix in the factory: the finding's Expected line is the 'no spell over 30 minutes' rule Stewart replaced on 2026-11-12. Under the current rule every failed CI run from 2026-11-13 06:48 to 2026-11-14 12:00 Arizona was filed or covered within 10 minutes (11 runs), though two spells ran 67 and 110 minutes while fixes went through CI. PR #343 has the process re-audit apply the current rule, so the next audit can close the finding; look again only if that re-audit still says it reproduces.
