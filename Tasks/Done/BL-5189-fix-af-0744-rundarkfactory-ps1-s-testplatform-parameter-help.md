@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5189 — Fix AF-0744: RunDarkFactory.ps1's -TestPlatform parameter help describes the audio-off self-test, and -TestAudioOff has none
 
@@ -52,3 +52,4 @@ Moved the -TestPlatform help comment to describe the platform check (BL-3919); t
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-14: Doing -> Done. Help comments reattached; reproduction gives False.
