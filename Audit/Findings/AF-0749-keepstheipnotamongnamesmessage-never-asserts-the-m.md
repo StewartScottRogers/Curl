@@ -3,8 +3,8 @@ id: AF-0749
 title: ...KeepsTheIpNotAmongNamesMessage never asserts the message it names, only that it is not another one
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/ServerCertificateVerificationTests.VerifyChain.cs:VerifyServerCertificateChain_SchannelIpTargetAgainstCommonNameLocalhostWithDnsName_KeepsTheIpNotAmongNamesMessage:name-lies
 reproduction: none
 task: none

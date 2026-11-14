@@ -3,8 +3,8 @@ id: AF-0753
 title: Surviving mutant: an SFTP -Q command starting with a space can be refused as missing its parameter
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Ssh.UnitLibrary/Sftp/SftpQuoteCommand.cs:ParseWithArguments-ge:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Ssh.UnitLibrary/Sftp/SftpQuoteCommand.cs:99:>=
 task: none

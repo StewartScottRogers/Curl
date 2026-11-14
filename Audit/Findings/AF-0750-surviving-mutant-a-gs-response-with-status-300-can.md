@@ -3,8 +3,8 @@ id: AF-0750
 title: Surviving mutant: a gs:// response with status 300 can be taken as success
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Client/GcsClient.cs:ExchangeAsync-ge:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Client/GcsClient.cs:51:>=
 task: none

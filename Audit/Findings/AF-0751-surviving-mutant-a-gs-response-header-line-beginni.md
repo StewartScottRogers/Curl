@@ -3,8 +3,8 @@ id: AF-0751
 title: Surviving mutant: a gs:// response header line beginning with whitespace can be accepted
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Http/GcsHttpResponseHead.cs:ParseField-ge:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Http/GcsHttpResponseHead.cs:31:>=
 task: none

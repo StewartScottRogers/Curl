@@ -3,8 +3,8 @@ id: AF-0752
 title: Surviving mutant: the sftp/scp directory-listing test that picks the -v closing line can be inverted
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs:ListsDirectory-ne:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs:370:!=
 task: none

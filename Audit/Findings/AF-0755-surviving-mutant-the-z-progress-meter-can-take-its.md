@@ -3,8 +3,8 @@ id: AF-0755
 title: Surviving mutant: the -Z progress meter can take its speed window from an unset sample
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ParallelProgressMeter.cs:Speed-eq:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ParallelProgressMeter.cs:282:==
 task: none
