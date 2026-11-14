@@ -126,6 +126,50 @@ public sealed partial class TransferHookingProtocolHandlerTests
         }
     }
 
+    [TestMethod]
+    public async Task TransferChainFinishedAsync_WithTwoHooks_TellsEachOnceInOrderWithTheFirstContextAndTheFinalResult()
+    {
+        List<string> told = [];
+        TransferContext first = ContextWith(new MemoryStream(), null, null);
+        TransferResult final = TransferResult.Failure(CurlExitCode.TooManyRedirects, "stopped");
+        IProtocolHandler hooked = new TransferHooks([new ChainEndHook("a", told), new FinishedHook(), new ChainEndHook("b", told)]).Around(new FailingHandler());
+
+        await hooked.TransferChainFinishedAsync(first, final);
+
+        CollectionAssert.AreEqual(new[] { "a", "b" }, told);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_EachHop_DoesNotTellTheHookTheChainHasEnded()
+    {
+        List<string> told = [];
+        CountingHandler handler = new();
+        RecordingTimeProvider clock = new();
+        IProtocolHandler hooked = new TransferHooks([new ChainEndHook("a", told)]).Around(handler);
+        TransferContext first = ContextOn(clock, CancellationToken.None);
+
+        await hooked.ExecuteAsync(first);
+        await hooked.ExecuteAsync(first);
+
+        Assert.AreEqual(2, handler.Runs);
+        Assert.IsEmpty(told);
+    }
+
+    [TestMethod]
+    public async Task TransferChainFinishedAsync_HookWithoutTheMember_DoesNothing() =>
+        await new TransferHooks([new FinishedHook()]).Around(new FailingHandler()).TransferChainFinishedAsync(ContextWith(new MemoryStream(), null, null), TransferResult.Success(0));
+
+    private sealed class ChainEndHook(string name, List<string> told) : ITransferHook
+    {
+        public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result)
+        {
+            Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+            Assert.Contains("/page", first.Url.ToString());
+            told.Add(name);
+            return ValueTask.CompletedTask;
+        }
+    }
+
     private sealed class FinishedHook : ITransferHook
     {
         public TransferResult? Finished { get; private set; }

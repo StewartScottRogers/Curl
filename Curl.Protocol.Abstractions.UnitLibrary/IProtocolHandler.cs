@@ -22,4 +22,14 @@ public interface IProtocolHandler
     /// <param name="context">The transfer to perform.</param>
     /// <returns>The outcome, carrying the exit code the process should report.</returns>
     ValueTask<TransferResult> ExecuteAsync(ITransferContext context);
+
+    /// <summary>
+    /// Tells the handler that a transfer it served the first request of has ended, its whole redirect chain
+    /// (or its single request) with the final merged result (BL-5164). Called once per transfer, after the
+    /// last hop, also when a hop was refused. Does nothing by default.
+    /// </summary>
+    /// <param name="first">The transfer as the follower was given it, before any redirect.</param>
+    /// <param name="result">The final result, with the chain's merged report.</param>
+    /// <returns>A task that completes when the handler has been told.</returns>
+    ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result) => ValueTask.CompletedTask;
 }

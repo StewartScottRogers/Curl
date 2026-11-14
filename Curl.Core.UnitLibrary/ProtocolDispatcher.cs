@@ -80,6 +80,18 @@ public sealed class ProtocolDispatcher
     }
 
     /// <summary>
+    /// Tells the handler registered for the first request's scheme that the transfer's redirect chain has
+    /// ended (BL-5164); nothing happens when no handler serves the scheme.
+    /// </summary>
+    /// <param name="first">The transfer as it was before any redirect.</param>
+    /// <param name="result">The final result of the chain.</param>
+    /// <returns>A task that completes when the handler has been told.</returns>
+    public ValueTask NotifyChainFinishedAsync(ITransferContext first, TransferResult result) =>
+        handlersByScheme.TryGetValue(first.Url.Scheme.ToLowerInvariant(), out IProtocolHandler? handler)
+            ? handler.TransferChainFinishedAsync(first, result)
+            : ValueTask.CompletedTask;
+
+    /// <summary>
     /// Fails the transfer with exit 1 and <paramref name="message" />, which is also reported to
     /// the transfer's events as the info line curl 8.21.0's <c>-v</c> writes before its
     /// <c>curl: (1)</c> line (measured, BL-805 Notes).

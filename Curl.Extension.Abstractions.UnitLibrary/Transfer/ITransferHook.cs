@@ -72,4 +72,15 @@ public interface ITransferHook
     /// <param name="result">The result of the transfer that just ended.</param>
     /// <returns>How long to wait before repeating; <see langword="null" />, by default, not to repeat.</returns>
     TimeSpan? RepeatAfter(TransferResult result) => null;
+
+    /// <summary>
+    /// Tells the hook, once, that the transfer's whole redirect chain (or its single request) has ended
+    /// (BL-5164), however it ended, also when the follower refused a hop. <see cref="TransferFinished" /> and
+    /// <see cref="ExecuteAsync(ITransferContext, Func{ITransferContext, ValueTask{TransferResult}})" /> see each hop;
+    /// this sees the end, with the final merged result, so a hook that exports one record per transfer can.
+    /// </summary>
+    /// <param name="first">The transfer as the follower was given it, before any redirect.</param>
+    /// <param name="result">The final result, carrying the chain's merged report.</param>
+    /// <returns>A task that completes when the hook is done; nothing by default.</returns>
+    ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result) => ValueTask.CompletedTask;
 }

@@ -24,6 +24,10 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
     /// <summary>Gets the handler as given, a <see cref="LazyProtocolHandler" /> left unbuilt.</summary>
     internal IProtocolHandler GivenHandler => handler;
 
+    /// <inheritdoc />
+    public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result) =>
+        handler.TransferChainFinishedAsync(first, result);
+
     /// <summary>
     /// Clears the recorder, performs the transfer with <see cref="Handler" />, and puts the
     /// recorded end points on its report (<see cref="ConnectionEndPointRecorder.ReportOn" />).
