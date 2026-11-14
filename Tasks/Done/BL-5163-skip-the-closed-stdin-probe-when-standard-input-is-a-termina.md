@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/ClosedStandardInputStream.cs, Curl.Core.UnitTests]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5163 — Skip the closed-stdin probe when standard input is a terminal off Windows
 
@@ -39,3 +39,4 @@ Start by checking the effect on Linux: `script -q -c 'curl file:///etc/hostname'
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: c2f03300 fb741d7d 9c4d281d 65e07dd0.
+- 2026-11-13: Doing -> Done. Terminal stdin no longer probed
