@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitTests/NtlmRetryOnFreshConnectionTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5121 — Restart NTLM from Type-1 when a connection-bound request is resent on a fresh connection
 
@@ -32,11 +32,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Http.UnitTests/NtlmRetryOnFreshConnectionTests.cs` prove, with in-memory connection stand-ins, that when the connection dies after the Type-1/Type-2 exchange and before the Type-3 response begins, the first request on the fresh connection carries `Authorization: NTLM TlRMTVNTUAABAAAA` (a Type-1 message), not the earlier Type-3.
-- [ ] A test proves the same restart for a Negotiate (connection-bound) answer, or records in the task's Log why the Negotiate path cannot reach this retry.
-- [ ] A regression test proves a non-connection-bound request (for example Basic) is still resent unchanged on a fresh connection.
-- [ ] Tests are platform-neutral (stand-in authenticator, no SSPI).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Http.UnitTests/NtlmRetryOnFreshConnectionTests.cs` prove, with in-memory connection stand-ins, that when the connection dies after the Type-1/Type-2 exchange and before the Type-3 response begins, the first request on the fresh connection carries `Authorization: NTLM TlRMTVNTUAABAAAA` (a Type-1 message), not the earlier Type-3.
+- [x] A test proves the same restart for a Negotiate (connection-bound) answer, or records in the task's Log why the Negotiate path cannot reach this retry.
+- [x] A regression test proves a non-connection-bound request (for example Basic) is still resent unchanged on a fresh connection.
+- [x] Tests are platform-neutral (stand-in authenticator, no SSPI).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -47,3 +47,5 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 071aee68 280cf044 e5910ad0 5e6bf6ef a0b49a29.
+- 2026-11-13: Done. A fresh-connection resend whose Authorization is an NTLM Type 3 or a Negotiate token now asks the authenticator for its first answer again (`CountedOnIfResentAsync`, `WithHandshakeRestarted`), so Type 1 goes first. Negotiate reaches the same retry, so it is covered by a test. If the authenticator cannot make the first answer, the old value is sent as before. A Type-1 resend of a body request goes through the NTLM probe framing (`WithAnswer`). Hand check against a mock was not run; the in-memory tests pin the bytes. Quality run: 0 failing members.
+- 2026-11-13: Doing -> Done. NTLM and Negotiate restart from the first leg on a fresh connection

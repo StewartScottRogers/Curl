@@ -827,9 +827,33 @@ public sealed class HttpProtocolHandler(
 
         ReportConnectionEnd(plan.Context, target, connect, outcome);
         return outcome.Retry is { } reconnect
-            ? await ConnectAndExchangeAsync(CountedOnIfResent(reconnect, outcome.DiedBeforeResponse), outcome.Result.Report, outcome.DiedBeforeResponse).ConfigureAwait(false)
+            ? await ConnectAndExchangeAsync(await CountedOnIfResentAsync(reconnect, outcome.DiedBeforeResponse).ConfigureAwait(false), outcome.Result.Report, outcome.DiedBeforeResponse).ConfigureAwait(false)
             : outcome.Result;
     }
+
+    /// <summary>
+    /// Gives a request resent on a fresh connection (<paramref name="resentAfterConnectionDied" />)
+    /// the plan it goes out with: one whose <c>Authorization</c> is a connection-bound answer, an NTLM
+    /// Type 3 message or a Negotiate token, starts its handshake again with the authenticator's first
+    /// answer (an NTLM Type 1), since the fresh connection knows nothing of the dead one's handshake
+    /// (BL-5121); otherwise <see cref="CountedOnIfResent" />'s.
+    /// </summary>
+    private async ValueTask<HttpRequestPlan> CountedOnIfResentAsync(HttpRequestPlan retry, bool resentAfterConnectionDied)
+    {
+        if (!resentAfterConnectionDied || !IsConnectionBoundAnswer(retry.Authorization))
+        {
+            return CountedOnIfResent(retry, resentAfterConnectionDied);
+        }
+
+        (string? first, HttpTransferException? failure) = await CreateFirstAuthorizationAsync(retry.AuthRequest, CancellationToken.None).ConfigureAwait(false);
+        return failure is null ? retry.WithHandshakeRestarted(first) : CountedOnIfResent(retry, resentAfterConnectionDied);
+    }
+
+    /// <summary>Decides whether an <c>Authorization</c> value is a later leg of NTLM (not Type 1) or Negotiate, which belongs to one connection.</summary>
+    private static bool IsConnectionBoundAnswer(string? authorization) =>
+        authorization is { } value
+        && ((value.StartsWith("NTLM ", StringComparison.Ordinal) && !IsNtlmType1(value))
+            || value.StartsWith("Negotiate ", StringComparison.Ordinal));
 
     /// <summary>
     /// Gives a request sent again on a fresh connection because its reused one died before the
@@ -4042,6 +4066,17 @@ public sealed class HttpProtocolHandler(
         /// <returns>The request's plan with that value.</returns>
         public HttpRequestPlan WithAuthorizationSentAgain(string? authorization) =>
             authorization == Authorization ? this : With(Framing, authorization).FailingUploadRewind(UploadRewindFailure);
+
+        /// <summary>
+        /// Makes the same request starting its connection-bound handshake again with
+        /// <paramref name="firstAuthorization" />, the answer sent before any challenge, for a fresh
+        /// connection that the earlier leg's answer does not belong to (BL-5121).
+        /// </summary>
+        /// <param name="firstAuthorization">The first leg's value, such as an NTLM Type 1 message; <see langword="null" /> for none.</param>
+        /// <returns>The restarted request's plan.</returns>
+        public HttpRequestPlan WithHandshakeRestarted(string? firstAuthorization) =>
+            WithAnswer(firstAuthorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: false, ProxyAuthorization, ProxyAuthorizationAnswersChallenge)
+                .FailingUploadRewind(UploadRewindFailure);
 
         /// <summary>
         /// Makes the same request, sent again over HTTP/1.1 on a new connection because the server
