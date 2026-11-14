@@ -16,7 +16,8 @@ public static class CertificateTransparencyExtension
     public static ExtensionOption Option { get; } = new(
         "require-sct",
         ExtensionOptionArgument.Value,
-        "Require a valid Certificate Transparency SCT from a log in this v3 JSON log list on the server certificate");
+        "Require a valid Certificate Transparency SCT from a log in this v3 JSON log list on the server certificate",
+        "log-list");
 
     /// <summary>Gets what <c>curl --extended-help</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(

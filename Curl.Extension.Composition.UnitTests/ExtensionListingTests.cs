@@ -42,10 +42,32 @@ public sealed class ExtensionListingTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "cache: Keeps responses on disk. Schemes: cache, caches. Options: --cache-dir, --cache-off, --no-cache-off.",
+                "cache: Keeps responses on disk. Schemes: cache, caches. Options: --cache-dir <value>, --cache-off, --no-cache-off.",
                 "plain: Adds nothing. Schemes: none. Options: none.",
             },
             ExtensionListing.LinesOf([Cache, Plain]).ToArray());
+    }
+
+    [TestMethod]
+    public void LinesOf_NamedPlaceholder_ReplacesValueAndBooleanOptionIsUnchanged()
+    {
+        ExtensionDescription named = new("logs", "Checks logs.", [], [new("require-sct", ExtensionOptionArgument.Value, "Log list", "log-list"), new("strict", ExtensionOptionArgument.None, "Be strict")], new Uri("https://example.com/logs"));
+
+        StringAssert.EndsWith(ExtensionListing.LinesOf([named]).Single(), "Options: --require-sct <log-list>, --strict, --no-strict.");
+        StringAssert.Contains(ExtensionListing.MarkdownOf([named], off: false), "`--require-sct <log-list>` (Log list), `--strict` or `--no-strict` (Be strict)");
+    }
+
+    [TestMethod]
+    public void EveryRegisteredValueOption_ShowsItsPlaceholderInTheLineAndTheMarkdown()
+    {
+        string line = string.Join('\n', ExtensionListing.Lines(_ => null));
+        string markdown = ExtensionListing.Markdown(_ => null);
+
+        foreach (ExtensionOption option in ExtensionDescriptionCatalogue.Entries.SelectMany(description => description.Options).Where(option => option.Argument == ExtensionOptionArgument.Value))
+        {
+            StringAssert.Contains(line, $"--{option.Name} <{option.ValuePlaceholder}>");
+            StringAssert.Contains(markdown, $"`--{option.Name} <{option.ValuePlaceholder}>`");
+        }
     }
 
     [TestMethod]

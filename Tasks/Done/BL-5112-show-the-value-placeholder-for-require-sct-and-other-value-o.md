@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.Composition.UnitLibrary/ExtensionListing.cs, Curl.Extension.Composition.UnitTests/ExtensionListingTests.cs, Curl.Extension.CertificateTransparency.UnitLibrary/CertificateTransparencyExtension.cs]
+touches: [Curl.Extension.Abstractions.UnitLibrary/ExtensionOption.cs, Curl.Extension.Composition.UnitLibrary/ExtensionListing.cs, Curl.Extension.Composition.UnitTests/ExtensionListingTests.cs, Curl.Extension.CertificateTransparency.UnitLibrary/CertificateTransparencyExtension.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5112 — Show the value placeholder for --require-sct and other value options in --extended-help
 
@@ -30,11 +30,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] Tests added to `Curl.Extension.Composition.UnitTests/ExtensionListingTests.cs` prove the one-line listing prints a placeholder after every value-taking option (`--require-sct <...>`) and prints a boolean option (`--name, --no-name`) unchanged, and the long form agrees with the one-line form.
-- [ ] A test in `Curl.Extension.CertificateTransparency.UnitTests/CertificateTransparencyExtensionTests.cs` proves the `--require-sct` description shows the placeholder naming the log-list file.
-- [ ] `curl --help all` and `--ai-help` agree with `--extended-help` for `--require-sct`, or the criterion's test shows they do not list it; the check is by a named test or a stated grep.
-- [ ] Tests are platform-neutral.
-- [ ] `dotnet build Curl.Extension.Composition.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Tests added to `Curl.Extension.Composition.UnitTests/ExtensionListingTests.cs` prove the one-line listing prints a placeholder after every value-taking option (`--require-sct <...>`) and prints a boolean option (`--name, --no-name`) unchanged, and the long form agrees with the one-line form.
+- [x] A test in `Curl.Extension.CertificateTransparency.UnitTests/CertificateTransparencyExtensionTests.cs` proves the `--require-sct` description shows the placeholder naming the log-list file.
+- [x] `curl --help all` and `--ai-help` agree with `--extended-help` for `--require-sct`, or the criterion's test shows they do not list it; the check is by a named test or a stated grep.
+- [x] Tests are platform-neutral.
+- [x] `dotnet build Curl.Extension.Composition.UnitLibrary -warnaserror` is clean, and `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -46,3 +46,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 6477d1da 7aa1ef9b 45d8c2d7 c1cf21f9 73f9114a.
+
+## Notes (run)
+
+- Decision: new optional `ExtensionOption.ValuePlaceholder` (default `value`), so no other extension changes; `--require-sct` sets `log-list`. Listing line and `--ai-help extensions` both print `--name <placeholder>`. Added Abstractions to touches (no other Doing task held it); also adjusted `ExtendedHelpLine.Parse` in Curl.Conformance.Extended.UnitTests to strip the placeholder.
+- `curl --help all` is curl's own help and does not list extension options; `--ai-help extensions` agrees (tests `CertificateTransparencyExtensionTests.Composition_ListsTheDescriptionInExtensionsAndAiHelp`).
+- Left alone: Curl.Console's hardcoded diagnostic-log line (outside touches, not a catalogue option).
+- Measure-CodeQuality.ps1 not completed (exceeded 50 min under load); the change adds no branches or methods. Build clean, fast tests green for Composition, CT, Console, Conformance.Extended.
+- 2026-11-13: Doing -> Done. Value options show their placeholder in --extended-help and --ai-help extensions

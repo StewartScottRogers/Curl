@@ -58,6 +58,9 @@ public sealed class CertificateTransparencyExtensionTests
         Assert.IsTrue(ExtensionListing.Lines(_ => null).Any(line => line.Contains("certificate-transparency", StringComparison.Ordinal)));
         StringAssert.Contains(ExtensionListing.Markdown(_ => null), CertificateTransparencyExtension.Description.Summary);
         StringAssert.Contains(ExtensionListing.Markdown(_ => null), "--require-sct");
+        Assert.AreEqual("log-list", CertificateTransparencyExtension.Option.ValuePlaceholder);
+        StringAssert.Contains(ExtensionListing.Markdown(_ => null), "`--require-sct <log-list>`");
+        Assert.IsTrue(ExtensionListing.Lines(_ => null).Any(line => line.Contains("--require-sct <log-list>", StringComparison.Ordinal)));
     }
 
     private static ExtensionOptionValues Given(string logList) => new(new Dictionary<string, string> { [CertificateTransparencyExtension.Option.Name] = logList });

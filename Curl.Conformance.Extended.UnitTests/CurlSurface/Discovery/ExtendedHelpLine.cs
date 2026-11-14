@@ -20,7 +20,7 @@ internal sealed record ExtendedHelpLine(string Text, string Name, IReadOnlyList<
         int schemes = line.LastIndexOf(SchemesLabel, options, StringComparison.Ordinal);
         string schemeList = line[(schemes + SchemesLabel.Length)..options];
         string optionList = line[(options + OptionsLabel.Length)..].TrimEnd('.');
-        return new(line, line[..line.IndexOf(": ", StringComparison.Ordinal)], ListOf(schemeList), ListOf(optionList));
+        return new(line, line[..line.IndexOf(": ", StringComparison.Ordinal)], ListOf(schemeList), ListOf(optionList).Select(option => option.Split(' ')[0]).ToArray());
     }
 
     private static string[] ListOf(string list) => list == "none" ? [] : list.Split(", ");
