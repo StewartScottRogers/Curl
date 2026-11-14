@@ -120,6 +120,6 @@ public sealed class SocketIoProtocolHandler(IConnector connector, IWebSocketRand
         await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
         ReadOnlyMemory<byte> afterHead = await SocketIoUpgrade.ReadReplyAsync(connection, key, context.CancellationToken).ConfigureAwait(false);
         var channel = new WebSocketMessageChannel(connection, randomSource, afterHead);
-        return await new SocketIoSession(channel, NamespaceOf(context), emit, context.Output, context.TimeProvider).RunAsync(context.CancellationToken).ConfigureAwait(false);
+        return await new SocketIoSession(channel, NamespaceOf(context), emit, context.Output, context.TimeProvider, context.Progress).RunAsync(context.CancellationToken).ConfigureAwait(false);
     }
 }

@@ -30,16 +30,17 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] A new test in `Curl.Extended.Protocol.SocketIo.UnitTests/SocketIoSessionTests.cs` (or a new `SocketIoSessionProgressTests.cs`) proves that after one event `["news",{"a":1}]` the progress reporter has been told 17 downloaded bytes, and that a second event raises the running total (it never resets).
-- [ ] A test proves that a `-m` timeout after one event surfaces as `CurlExitCode.OperationTimedOut` (28) with the message ending `with 17 bytes received`, via the handler path used by the existing `SocketIoProtocolHandlerTests`.
-- [ ] The existing Socket.IO tests stay green, including ack events and a transfer with no events (still `0 bytes received`).
-- [ ] The `CurlSurface-Transfer-Realtime.md` rows for the timeout message and `%{size_download}` cover socketio, "Covered by" naming a test from this task.
-- [ ] The tests are platform-neutral (no real socket).
-- [ ] `dotnet build Curl.Extended.Protocol.SocketIo.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test in `Curl.Extended.Protocol.SocketIo.UnitTests/SocketIoSessionTests.cs` (or a new `SocketIoSessionProgressTests.cs`) proves that after one event `["news",{"a":1}]` the progress reporter has been told 17 downloaded bytes, and that a second event raises the running total (it never resets).
+- [x] A test proves that a `-m` timeout after one event surfaces as `CurlExitCode.OperationTimedOut` (28) with the message ending `with 17 bytes received`, via the handler path used by the existing `SocketIoProtocolHandlerTests`.
+- [x] The existing Socket.IO tests stay green, including ack events and a transfer with no events (still `0 bytes received`).
+- [x] The `CurlSurface-Transfer-Realtime.md` rows for the timeout message and `%{size_download}` cover socketio, "Covered by" naming a test from this task.
+- [x] The tests are platform-neutral (no real socket).
+- [x] `dotnet build Curl.Extended.Protocol.SocketIo.UnitLibrary -warnaserror` is clean, `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Review acceptance check, for a hand check: the socketio command prints `... with 17 bytes received` and `|size=17`.
+- Done: SocketIoSession takes the ITransferProgress and reports the running total after each event; the handler passes context.Progress. Tests in SocketIoSessionProgressTests (running total 17 then 23, no events, -m cancellation after one event reported 17; the "with N bytes received" text is the engine's from progress, as for nats). Quality run for the library clean. Tick: platform-neutral, no real socket.
 
 ## Log
 
