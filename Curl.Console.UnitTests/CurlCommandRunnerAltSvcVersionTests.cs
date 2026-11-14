@@ -405,6 +405,26 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
         Assert.AreEqual(18443, server.Targets.Single().Port);
     }
 
+    [TestMethod]
+    public async Task RunAsync_RedirectFromAnH3AlternativeToAnotherOrigin_ConnectsToItOverTcp()
+    {
+        CacheFileHolds(OtherPortH3Entry);
+        ScriptedMultiplexedStream stream = new(0, Http3Response(string.Empty, ("location", "https://other.example:18445/")));
+        ScriptedConnector tcp = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi")]);
+        FirstQuicOnlyConnector connector = new(MultiplexedConnectResult.Connected(new ScriptedMultiplexedConnection(stream), null), QuicRefused, tcp);
+
+        int exitCode = await RunAsync(connector, ["-sS", "-L", "--http3", "--alt-svc", CacheFile, Origin]);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hi", StandardOutputText);
+        Diagnostics.Assert("redirect host", "other.example", tcp.Targets.Single().Host);
+        Diagnostics.Assert("TCP alt-svc route", "<null>", RouteText(tcp.Targets.Single().AltSvcRoute));
+        Assert.AreEqual(0, exitCode, StandardErrorText);
+        Assert.AreEqual("hi", StandardOutputText);
+        Assert.AreEqual("other.example", tcp.Targets.Single().Host);
+        Assert.IsNull(tcp.Targets.Single().AltSvcRoute);
+    }
+
     /// <summary>The file the run reads, its lines ending in LF.</summary>
     private void CacheFileHolds(params string[] entries) =>
         files.ExistingContent[CacheFile] = Encoding.Latin1.GetBytes(string.Join("\n", [.. AltSvcCacheHeader(), .. entries]) + "\n");
@@ -525,5 +545,22 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     private sealed class FixedUtcClock(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    /// <summary>Hands the first QUIC request the given connection and every later one a refusal, so a redirect's own QUIC attempt falls back to TCP.</summary>
+    private sealed class FirstQuicOnlyConnector(MultiplexedConnectResult first, MultiplexedConnectResult later, IConnector tcp) : IConnector
+    {
+        private int quicRequests;
+
+        public List<ConnectTarget> QuicTargets { get; } = [];
+
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            tcp.ConnectAsync(target, cancellationToken);
+
+        public ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken)
+        {
+            QuicTargets.Add(target);
+            return ValueTask.FromResult(quicRequests++ == 0 ? first : later);
+        }
     }
 }
