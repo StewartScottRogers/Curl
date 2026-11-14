@@ -37,3 +37,4 @@ So the reference broker tried to grant link credit after the connection's token 
 ## Log
 
 - 2026-11-14: Created.
+- 2026-11-14: Backlog -> Doing. Criteria at claim: 03aad249 0f1e48fe 4b203f19 a0b49a29.
