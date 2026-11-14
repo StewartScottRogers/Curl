@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5187 — Fix AF-0742: Surviving mutant: the libtest debug trace can index past data that ends in a carriage return
 
@@ -43,3 +43,4 @@ Killed by new test DebugDump_WithoutHexAndDataEndingInALoneCr_WritesTheCrAsADotW
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: 550b24e3 9742157d.
+- 2026-11-14: Doing -> Done. Added the lone-CR no-hex trace test; it kills the AF-0742 mutant
