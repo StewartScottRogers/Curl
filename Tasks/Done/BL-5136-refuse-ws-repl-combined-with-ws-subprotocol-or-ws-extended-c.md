@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Composition.UnitLibrary/BodyReplacingHookExclusivity.cs, Curl.Extension.Composition.UnitLibrary/WebSocketReplExclusivity.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs, Curl.Extension.Composition.UnitTests/WebSocketReplCombinationTests.cs, Curl.Extension.WebSocketRepl.UnitLibrary/WebSocketReplExtension.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5136 — Refuse --ws-repl combined with --ws-subprotocol or --ws-extended-connect with exit 2
 
@@ -50,3 +50,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: f70d5af8 aaf10353 3521b64d c81ed873 73f9114a.
 - 2026-11-13: Added WebSocketReplExclusivity (Composition) and its catalogue line before the REPL hook; REPL description states the incompatibility (--ai-help lists descriptions, so it follows). Quality run for Composition exceeded 50 minutes and was stopped; the new class has two branches, both covered by its tests, complexity well under 10. Tests platform-neutral, no network. Linux/macOS criterion met by platform-neutral tests.
+- 2026-11-13: Doing -> Done. Added WebSocketReplExclusivity refusing --ws-repl with --ws-subprotocol/--ws-extended-connect (exit 2); tests green
