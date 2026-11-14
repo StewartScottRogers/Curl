@@ -4,7 +4,7 @@ title: Export the OpenTelemetry span when a followed redirect is refused and kee
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: []
+depends-on: [BL-5164]
 touches: [Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs, Curl.Extension.OpenTelemetry.UnitTests]
 requirement: none
 created: 2026-11-13
@@ -34,7 +34,10 @@ Found by the shift-end review of 2026-11-13 (ADR-0710), silent-failure-hunter an
 
 ## Notes
 
+No code written. The hook runs once per hop and has no end-of-chain signal, so it cannot tell a refused redirect; BL-5164 adds that signal. Plan once it is Done: keep first-hop state in a map keyed by reference of Output+Progress+Events (all copied unchanged into every hop by `RedirectFollower.NextHop`), export on the end-of-chain call, remove the "one followed transfer at a time" comment.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 3ea5d466 215dfa67 462da442 20333247.
+- 2026-11-13: Doing -> Backlog. Waits on BL-5164: hooks see each hop but not the end of a redirect chain, so a refused redirect cannot be detected
