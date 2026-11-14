@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Imap.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5182 — Fix AF-0737: Surviving mutant: a resumed IMAP connection can send a second LOGOUT at shutdown
 
@@ -43,3 +43,4 @@ Killed by `ExecuteAsync_ResumedTransferFails_SendsOneLogoutAndNoSecondAtShutDown
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: 9e97faca 9742157d.
+- 2026-11-14: Doing -> Done. Mutant killed by new test; fast tests green
