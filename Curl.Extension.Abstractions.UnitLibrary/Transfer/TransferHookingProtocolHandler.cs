@@ -41,7 +41,14 @@ internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, I
     {
         foreach (ITransferHook hook in hooks)
         {
-            await hook.TransferChainFinishedAsync(first, result).ConfigureAwait(false);
+            try
+            {
+                await hook.TransferChainFinishedAsync(first, result).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // A hook that fails here neither hides the hooks after it nor replaces the finished result (BL-5165).
+            }
         }
     }
 

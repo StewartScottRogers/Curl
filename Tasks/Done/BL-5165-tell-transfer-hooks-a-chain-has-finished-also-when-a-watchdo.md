@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Engine.UnitLibrary/TransferPerformer.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/TransferHookingProtocolHandler.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/ITransferHook.cs, Curl.Protocol.Abstractions.UnitLibrary/IProtocolHandler.cs, Curl.Core.UnitTests/RedirectFollowerTests.cs, Curl.Engine.UnitTests, Curl.Extension.Abstractions.UnitTests]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5165 — Tell transfer hooks a chain has finished also when a watchdog or a hook exception ends it
 
@@ -26,14 +26,17 @@ Found by the shift-end review of 2026-11-13 (ADR-0710) - silent-failure-hunter, 
 
 ## Acceptance criteria
 
-- [ ] A transfer stopped by the `-m` watchdog, and one stopped by the `-Y`/`-y` watchdog, each call `TransferChainFinishedAsync` exactly once with the exit 28 result; unit tests show both.
-- [ ] When one hook's `TransferChainFinishedAsync` throws, every other hook is still told and the transfer's exit code is the one the chain produced; a unit test in `Curl.Extension.Abstractions.UnitTests` shows it, and the `ITransferHook` doc comment states the contract.
-- [ ] The doc comments on `ITransferHook.TransferChainFinishedAsync` and `IProtocolHandler.TransferChainFinishedAsync` say exactly when it is called, including that each `--retry` attempt is told on its own.
-- [ ] `dotnet build` clean, fast tests green, the touched libraries at 100% line and branch coverage with no member over the complexity or CRAP gates.
+- [x] A transfer stopped by the `-m` watchdog, and one stopped by the `-Y`/`-y` watchdog, each call `TransferChainFinishedAsync` exactly once with the exit 28 result; unit tests show both.
+- [x] When one hook's `TransferChainFinishedAsync` throws, every other hook is still told and the transfer's exit code is the one the chain produced; a unit test in `Curl.Extension.Abstractions.UnitTests` shows it, and the `ITransferHook` doc comment states the contract.
+- [x] The doc comments on `ITransferHook.TransferChainFinishedAsync` and `IProtocolHandler.TransferChainFinishedAsync` say exactly when it is called, including that each `--retry` attempt is told on its own.
+- [x] `dotnet build` clean, fast tests green, the touched libraries at 100% line and branch coverage with no member over the complexity or CRAP gates.
 
 ## Notes
+
+- Watchdog exit 28: `TransferPerformer.FollowWatchingSpeedAsync` now tells the handler through the new public `RedirectFollower.NotifyChainFinishedAsync`. A hook exception in `TransferHookingProtocolHandler.TransferChainFinishedAsync` is swallowed per hook. Docs state per-attempt under `--retry`. CI on Linux and macOS: change is platform-neutral. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: af42ca3b 638c5cf6 2ee82dc8 225a7ab7.
+- 2026-11-13: Doing -> Done. done

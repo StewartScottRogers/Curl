@@ -159,6 +159,23 @@ public sealed partial class TransferHookingProtocolHandlerTests
     public async Task TransferChainFinishedAsync_HookWithoutTheMember_DoesNothing() =>
         await new TransferHooks([new FinishedHook()]).Around(new FailingHandler()).TransferChainFinishedAsync(ContextWith(new MemoryStream(), null, null), TransferResult.Success(0));
 
+    [TestMethod]
+    public async Task TransferChainFinishedAsync_OneHookThrows_StillTellsTheOthersAndDoesNotThrow()
+    {
+        List<string> told = [];
+        IProtocolHandler hooked = new TransferHooks([new ChainEndHook("a", told), new ThrowingChainEndHook(), new ChainEndHook("b", told)]).Around(new FailingHandler());
+
+        await hooked.TransferChainFinishedAsync(ContextWith(new MemoryStream(), null, null), TransferResult.Failure(CurlExitCode.TooManyRedirects, "stopped"));
+
+        CollectionAssert.AreEqual(new[] { "a", "b" }, told);
+    }
+
+    private sealed class ThrowingChainEndHook : ITransferHook
+    {
+        public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result) =>
+            throw new InvalidOperationException("hook failed");
+    }
+
     private sealed class ChainEndHook(string name, List<string> told) : ITransferHook
     {
         public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result)

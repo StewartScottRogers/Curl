@@ -199,9 +199,21 @@ public sealed class RedirectFollower(
         TransferResult result = context.Http is { FollowRedirects: true } http
             ? await FollowChainAsync(context, http, policy).ConfigureAwait(false)
             : await DispatchAsync(context, policy).ConfigureAwait(false);
-        await dispatcher.NotifyChainFinishedAsync(context, result).ConfigureAwait(false);
+        await NotifyChainFinishedAsync(context, result).ConfigureAwait(false);
         return result;
     }
+
+    /// <summary>
+    /// Tells the handler of the first request's scheme that the transfer ended with
+    /// <paramref name="result" /> (BL-5164). <see cref="FollowAsync" /> does it when the chain ends; the caller does it
+    /// for a transfer a watchdog cancelled, which leaves <see cref="FollowAsync" /> by an exception before any result
+    /// exists (BL-5165).
+    /// </summary>
+    /// <param name="context">The transfer as <see cref="FollowAsync" /> was given it.</param>
+    /// <param name="result">The transfer's final result.</param>
+    /// <returns>A task that completes when the handler has been told.</returns>
+    public ValueTask NotifyChainFinishedAsync(ITransferContext context, TransferResult result) =>
+        dispatcher.NotifyChainFinishedAsync(context, result);
 
     /// <summary>Performs one hop.</summary>
     private ValueTask<TransferResult> DispatchAsync(ITransferContext hop, RedirectPolicy policy) =>
