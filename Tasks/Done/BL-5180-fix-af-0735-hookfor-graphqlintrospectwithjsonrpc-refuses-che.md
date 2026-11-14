@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Composition.UnitTests]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5180 — Fix AF-0735: HookFor_GraphQlIntrospectWithJsonRpc_Refuses checks only that a hook exists, which a single-option hook also satisfies
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The test now runs the hook and asserts exit 2 and the real message. The message names --graphql-introspect (the option given), not --graphql as the finding guessed; pinned as the code behaves.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-14: Doing -> Done. Test now asserts exit 2 and refusal message

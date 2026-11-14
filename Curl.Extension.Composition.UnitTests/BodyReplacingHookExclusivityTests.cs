@@ -30,9 +30,14 @@ public sealed class BodyReplacingHookExclusivityTests
     }
 
     [TestMethod]
-    public void HookFor_GraphQlIntrospectWithJsonRpc_Refuses()
+    public async Task HookFor_GraphQlIntrospectWithJsonRpc_Refuses()
     {
-        Assert.IsNotNull(BodyReplacingHookExclusivity.HookFor(Given("graphql-introspect", "jsonrpc")));
+        var hook = BodyReplacingHookExclusivity.HookFor(Given("graphql-introspect", "jsonrpc"))!;
+
+        var result = await hook.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("http://example.com/"), Output = Stream.Null }, _ => throw new AssertFailedException("A request was sent."));
+
+        Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
+        Assert.AreEqual("--graphql-introspect and --jsonrpc cannot be used together", result.ErrorMessage);
     }
 
     [TestMethod]
