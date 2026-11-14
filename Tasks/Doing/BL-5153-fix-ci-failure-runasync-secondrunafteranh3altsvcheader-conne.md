@@ -38,3 +38,4 @@ Lanes test only on Windows, so reproduce with `gh run view 43523918778 --log-fai
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: b55f9dd5.
 - 2026-11-13: Doing -> Backlog. Waits on BL-5152, which holds CurlCommandRunnerAltSvcVersionTests.cs for the same BL-5099 cause
+- 2026-11-13: Backlog -> Doing. Criteria at claim: b55f9dd5.
