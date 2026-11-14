@@ -33,11 +33,23 @@ internal static class WebTransportConnectHeaderFields
     /// <param name="credentials">The <c>-u</c> user and password, or <see langword="null"/>.</param>
     /// <param name="userAgent">The <c>-A</c> value: <see langword="null"/> sends curl's own, empty sends none.</param>
     /// <param name="cookies">The <c>-b</c> cookie text, or <see langword="null"/>.</param>
-    /// <param name="customHeaders">Each <c>-H</c> value: <c>Name: value</c> replaces a field of that name,
-    /// <c>Name:</c> removes it, <c>Name;</c> sends it empty.</param>
+    /// <param name="customHeaders">Each <c>-H</c> value: <c>Name: value</c> replaces the field curl adds of that name,
+    /// <c>Name:</c> removes it, <c>Name;</c> replaces it with an empty one; a repeated name is sent as often as given.</param>
     /// <returns>The fields in the order they are sent.</returns>
     public static IReadOnlyList<HeaderField> Build(
         string? bearerToken, NetworkCredential? credentials, string? userAgent, string? cookies, IReadOnlyList<string> customHeaders)
+    {
+        List<HeaderField> fields = CurlAddedFields(bearerToken, credentials, userAgent, cookies);
+        HashSet<string> ownFields = [.. fields.Select(field => field.Name)];
+        foreach (string header in customHeaders)
+        {
+            ApplyCustomHeader(fields, ownFields, FirstLine(header));
+        }
+
+        return fields;
+    }
+
+    private static List<HeaderField> CurlAddedFields(string? bearerToken, NetworkCredential? credentials, string? userAgent, string? cookies)
     {
         List<HeaderField> fields = [];
         if (AuthorizationOf(bearerToken, credentials) is { } authorization)
@@ -54,11 +66,6 @@ internal static class WebTransportConnectHeaderFields
         if (!string.IsNullOrEmpty(cookies))
         {
             fields.Add(new("cookie", cookies));
-        }
-
-        foreach (string header in customHeaders)
-        {
-            ApplyCustomHeader(fields, FirstLine(header));
         }
 
         return fields;
@@ -82,25 +89,35 @@ internal static class WebTransportConnectHeaderFields
         return end < 0 ? header : header[..end];
     }
 
-    private static void ApplyCustomHeader(List<HeaderField> fields, string header)
+    private static void ApplyCustomHeader(List<HeaderField> fields, HashSet<string> ownFields, string header)
     {
         int colon = header.IndexOf(':', StringComparison.Ordinal);
         if (colon > 0)
         {
-            ReplaceOrRemove(fields, header[..colon].ToLowerInvariant(), header[(colon + 1)..].Trim(' ', '\t'));
+            ReplaceOrRemove(fields, ownFields, header[..colon].ToLowerInvariant(), header[(colon + 1)..].Trim(' ', '\t'));
         }
         else if (header.EndsWith(';') && header.Length > 1)
         {
-            AddIfSendable(fields, new(header[..^1].ToLowerInvariant(), string.Empty));
+            string name = header[..^1].ToLowerInvariant();
+            DropOwnField(fields, ownFields, name);
+            AddIfSendable(fields, new(name, string.Empty));
         }
     }
 
-    private static void ReplaceOrRemove(List<HeaderField> fields, string name, string value)
+    private static void ReplaceOrRemove(List<HeaderField> fields, HashSet<string> ownFields, string name, string value)
     {
-        fields.RemoveAll(field => field.Name == name);
+        DropOwnField(fields, ownFields, name);
         if (value.Length > 0)
         {
             AddIfSendable(fields, new(name, value));
+        }
+    }
+
+    private static void DropOwnField(List<HeaderField> fields, HashSet<string> ownFields, string name)
+    {
+        if (ownFields.Remove(name))
+        {
+            fields.RemoveAll(field => field.Name == name);
         }
     }
 
