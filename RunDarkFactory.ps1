@@ -569,9 +569,10 @@ param(
     [switch]$TestModelChoice,
     # Prove the audit cadence: the shift-end audit check and the start refusal (BL-1022), and exit.
     [switch]$TestAuditCadence,
+    # Prove the PowerShell executable and data folder the factory picks for this OS (BL-3919), and exit.
+    [switch]$TestPlatform,
     # Prove the audio-off file silences the alarm, chimes and spoken notices, and that they
     # sound as before without it, playing nothing (BL-1456), and exit.
-    [switch]$TestPlatform,
     [switch]$TestAudioOff,
     # Prove the CURL_DARK_FACTORY_LANE marker's value for a lane, a coordinator and a
     # launcher, and that a claude -p run inherits it, and exit.
