@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, Curl.Original.Protocol.Http.UnitTests/TransferEncodingPartialDecodeSizeDownloadTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5120 — Count bytes decoded before the error in %{size_download} with --tr-encoding
 
@@ -48,3 +48,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 6cf3de41 0fe1459e 32eb45b3 71be241a a0b49a29.
 - 2026-11-13: Done. HttpResponseBodyReader.WriteWithinLimitAsync now adds the bytes the Transfer-Encoding decoder produced before a failure to BytesWritten (helpers CountsDecodedBytes, DownloadedBy keep complexity at the gate). Tests in TransferEncodingPartialDecodeSizeDownloadTests (600, 100, 0). Linux/macOS criterion met by platform-neutral in-memory tests. Follow-up not done: zstd `Transfer-Encoding` corrupt body wording ("Failed reading the chunked-encoded stream" upstream) is not a one-line mapping here; left as a possible follow-up.
+- 2026-11-13: Doing -> Done. size_download counts bytes decoded before a transfer-decoding error; tests added
