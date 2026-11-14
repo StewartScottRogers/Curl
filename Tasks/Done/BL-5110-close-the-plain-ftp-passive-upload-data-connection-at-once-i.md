@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Networking.UnitLibrary/PooledConnection.cs, Curl.Engine.UnitLibrary/SocketCallbackConnection.cs, Curl.Original.Protocol.Ftp.UnitTests/FtpPassiveUploadDataShutdownTests.cs, Curl.Networking.UnitTests/PooledConnectionShutDownSendingForwardingTests.cs, Curl.Engine.UnitTests/SocketCallbackConnectionShutDownSendingTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5110 — Close the plain-FTP passive upload data connection at once instead of after 2 seconds
 
@@ -34,18 +34,21 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Ftp.UnitTests/FtpPassiveUploadDataShutdownTests.cs` prove that after the last upload byte the session calls `ShutDownSendingAsync` on the data connection and finishes without waiting for `DataShutdownTimeout` (a fake `TimeProvider` is never advanced and the upload completes).
-- [ ] Tests in `Curl.Networking.UnitTests/PooledConnectionShutDownSendingForwardingTests.cs` prove `PooledConnection` forwards `ShutDownSendingAsync` to the wrapped connection; a similar test covers `SocketCallbackConnection` in `Curl.Engine.UnitTests/SocketCallbackConnectionShutDownSendingTests.cs`.
-- [ ] A regression test proves a data connection whose shutdown is a no-op still ends after `DataShutdownTimeout`, as before.
-- [ ] Tests are platform-neutral and need no network.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Ftp.UnitTests/FtpPassiveUploadDataShutdownTests.cs` prove that after the last upload byte the session calls `ShutDownSendingAsync` on the data connection and finishes without waiting for `DataShutdownTimeout` (a fake `TimeProvider` is never advanced and the upload completes).
+- [x] Tests in `Curl.Networking.UnitTests/PooledConnectionShutDownSendingForwardingTests.cs` prove `PooledConnection` forwards `ShutDownSendingAsync` to the wrapped connection; a similar test covers `SocketCallbackConnection` in `Curl.Engine.UnitTests/SocketCallbackConnectionShutDownSendingTests.cs`.
+- [x] A regression test proves a data connection whose shutdown is a no-op still ends after `DataShutdownTimeout`, as before.
+- [x] Tests are platform-neutral and need no network.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check, as a hand check: step 3 prints `0`, and the server log shows the STOR completing with no 2-second wait.
 
+- Fix: forwarded ShutDownSendingAsync in PooledConnection and SocketCallbackConnection (FtpSession already called it; the wrappers hit the no-op default). Criteria on CI platforms met by platform-neutral tests. Quality run clean for Networking and Engine.
+
 ## Log
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 441489aa ceeaf412 1127c890 ba2e74dc a0b49a29.
+- 2026-11-13: Doing -> Done. Plain passive FTP upload data connection now gets its FIN at once: pooled and socket-callback wrappers forward ShutDownSendingAsync

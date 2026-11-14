@@ -93,6 +93,10 @@ public sealed class PooledConnection : IConnection
         _underlying.Connection.FlushAsync(cancellationToken);
 
     /// <inheritdoc />
+    public ValueTask ShutDownSendingAsync(CancellationToken cancellationToken) =>
+        _underlying.Connection.ShutDownSendingAsync(cancellationToken);
+
+    /// <inheritdoc />
     /// <remarks>
     /// A connection whose target had no <see cref="ConnectTarget.PoolScheme" /> ignores the
     /// mark and closes on dispose.
