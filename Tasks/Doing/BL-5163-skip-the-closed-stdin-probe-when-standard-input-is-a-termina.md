@@ -36,3 +36,4 @@ Start by checking the effect on Linux: `script -q -c 'curl file:///etc/hostname'
 ## Log
 
 - 2026-11-13: Created.
+- 2026-11-13: Backlog -> Doing. Criteria at claim: c2f03300 fb741d7d 9c4d281d 65e07dd0.
