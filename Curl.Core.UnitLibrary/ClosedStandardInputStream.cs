@@ -8,7 +8,7 @@ namespace Curl.Core;
 /// <remarks>
 /// .NET hands back <see cref="Stream.Null"/> for a closed standard input, which reads as an empty
 /// one, so <c>-d @-</c> would send an empty body where curl stops with exit 26.
-/// <see cref="InPlaceOfNull"/> swaps this stream in for it.
+/// <see cref="InPlaceOfNull(Stream)"/> swaps this stream in for it.
 /// </remarks>
 public sealed class ClosedStandardInputStream : Stream
 {
@@ -20,11 +20,22 @@ public sealed class ClosedStandardInputStream : Stream
     /// <param name="standardInput">The stream <see cref="Console.OpenStandardInput()"/> returned.</param>
     /// <returns>The stream to read standard input from.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="standardInput"/> is <see langword="null"/>.</exception>
-    public static Stream InPlaceOfNull(Stream standardInput)
+    public static Stream InPlaceOfNull(Stream standardInput) => InPlaceOfNull(standardInput, Console.IsInputRedirected);
+
+    /// <summary>
+    /// As <see cref="InPlaceOfNull(Stream)"/>, with whether standard input is redirected given. A
+    /// terminal standard input is never probed: off Windows the probe read would run .NET's terminal
+    /// setup, which writes to the terminal, and a closed descriptor always reports as redirected.
+    /// </summary>
+    /// <param name="standardInput">The stream <see cref="Console.OpenStandardInput()"/> returned.</param>
+    /// <param name="isInputRedirected">Whether standard input is not a terminal.</param>
+    /// <returns>The stream to read standard input from.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="standardInput"/> is <see langword="null"/>.</exception>
+    public static Stream InPlaceOfNull(Stream standardInput, bool isInputRedirected)
     {
         ArgumentNullException.ThrowIfNull(standardInput);
 
-        return ReferenceEquals(standardInput, Null) || ReadsWithBadDescriptor(standardInput)
+        return ReferenceEquals(standardInput, Null) || (isInputRedirected && ReadsWithBadDescriptor(standardInput))
             ? new ClosedStandardInputStream()
             : standardInput;
     }

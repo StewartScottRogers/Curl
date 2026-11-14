@@ -10,7 +10,7 @@ public sealed class ClosedStandardInputStreamBadDescriptorTests
     [TestMethod]
     public void InPlaceOfNull_ReadsThrowIoExceptionBadDescriptor_IsClosedStandardInput()
     {
-        using Stream result = ClosedStandardInputStream.InPlaceOfNull(new ThrowingStream(new IOException("Bad file descriptor") { HResult = BadDescriptorErrno }));
+        using Stream result = ClosedStandardInputStream.InPlaceOfNull(new ThrowingStream(new IOException("Bad file descriptor") { HResult = BadDescriptorErrno }), true);
 
         Assert.IsInstanceOfType<ClosedStandardInputStream>(result);
         Assert.AreEqual(0, result.Read(new byte[4], 0, 4));
@@ -21,7 +21,7 @@ public sealed class ClosedStandardInputStreamBadDescriptorTests
     {
         var wrapped = new UnauthorizedAccessException("Access to the path is denied.", new IOException("Bad file descriptor") { HResult = BadDescriptorErrno });
 
-        using Stream result = ClosedStandardInputStream.InPlaceOfNull(new ThrowingStream(wrapped));
+        using Stream result = ClosedStandardInputStream.InPlaceOfNull(new ThrowingStream(wrapped), true);
 
         Assert.IsInstanceOfType<ClosedStandardInputStream>(result);
     }
@@ -31,7 +31,7 @@ public sealed class ClosedStandardInputStreamBadDescriptorTests
     {
         using var stream = new ThrowingStream(new IOException("Input/output error") { HResult = 5 });
 
-        Assert.ThrowsExactly<IOException>(() => ClosedStandardInputStream.InPlaceOfNull(stream));
+        Assert.ThrowsExactly<IOException>(() => ClosedStandardInputStream.InPlaceOfNull(stream, true));
     }
 
     [TestMethod]
@@ -39,7 +39,7 @@ public sealed class ClosedStandardInputStreamBadDescriptorTests
     {
         using var stream = new ThrowingStream(new InvalidOperationException("boom", new IOException("x") { HResult = 5 }));
 
-        Assert.ThrowsExactly<InvalidOperationException>(() => ClosedStandardInputStream.InPlaceOfNull(stream));
+        Assert.ThrowsExactly<InvalidOperationException>(() => ClosedStandardInputStream.InPlaceOfNull(stream, true));
     }
 
     [TestMethod]
@@ -47,7 +47,22 @@ public sealed class ClosedStandardInputStreamBadDescriptorTests
     {
         using var stream = new MemoryStream([1, 2, 3]);
 
+        Assert.AreSame(stream, ClosedStandardInputStream.InPlaceOfNull(stream, true));
         Assert.AreSame(stream, ClosedStandardInputStream.InPlaceOfNull(stream));
+    }
+
+    [TestMethod]
+    public void InPlaceOfNull_TerminalStandardInput_IsNotProbed()
+    {
+        using var stream = new ThrowingStream(new IOException("must not be read") { HResult = BadDescriptorErrno });
+
+        Assert.AreSame(stream, ClosedStandardInputStream.InPlaceOfNull(stream, false));
+    }
+
+    [TestMethod]
+    public void InPlaceOfNull_TerminalStandardInputThatIsStreamNull_IsAClosedStandardInput()
+    {
+        Assert.IsInstanceOfType<ClosedStandardInputStream>(ClosedStandardInputStream.InPlaceOfNull(Stream.Null, false));
     }
 
     private sealed class ThrowingStream(Exception toThrow) : Stream

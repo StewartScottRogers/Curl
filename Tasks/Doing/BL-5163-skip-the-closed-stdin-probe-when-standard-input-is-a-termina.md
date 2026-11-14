@@ -26,12 +26,14 @@ Start by checking the effect on Linux: `script -q -c 'curl file:///etc/hostname'
 
 ## Acceptance criteria
 
-- [ ] When standard input is a terminal, `InPlaceOfNull` does not read from the console stream.
-- [ ] A closed standard input (EBADF) is still replaced with `ClosedStandardInputStream`, so `-d @-` with stdin closed still exits 26.
-- [ ] A unit test in `Curl.Core.UnitTests` pins that a terminal standard input is not probed, using an injected "is redirected" seam or something similar.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Curl.Core.UnitLibrary` keeps 100% line and branch coverage.
+- [x] When standard input is a terminal, `InPlaceOfNull` does not read from the console stream.
+- [x] A closed standard input (EBADF) is still replaced with `ClosedStandardInputStream`, so `-d @-` with stdin closed still exits 26.
+- [x] A unit test in `Curl.Core.UnitTests` pins that a terminal standard input is not probed, using an injected "is redirected" seam or something similar.
+- [x] `dotnet build` is clean, the fast tests pass, and `Curl.Core.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+- Added `InPlaceOfNull(Stream, bool isInputRedirected)`; the one-argument form passes `Console.IsInputRedirected`. A terminal stdin is never probed; `Stream.Null` is still replaced; a closed descriptor reports as redirected, so EBADF detection is kept. Tests in `ClosedStandardInputStreamBadDescriptorTests`. Quality run for Curl.Core.UnitLibrary: 0 failing members. Linux/macOS terminal check not run (Windows lane).
 
 ## Log
 
