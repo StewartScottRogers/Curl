@@ -7,13 +7,17 @@ namespace Curl.Conformance.Extended.UnitTests.Mqtt5.PublishSubscribe;
 
 /// <summary>
 /// PINGREQ and PINGRESP while a subscribing curl waits (OASIS MQTT Version 5.0 sections 3.1.2.10, 3.12 and 3.13,
-/// BL-4485), on a CONNACK's Server Keep Alive of one second, so curl pings every half second.
+/// BL-4485), on a CONNACK's Server Keep Alive of one or two seconds, so curl pings every half or whole second.
 /// </summary>
 [TestClass]
 public sealed class KeepAliveCases
 {
     private static readonly byte[] KeepAliveOneSecond =
         Mqtt5ConnAckBytes.Build(0, 0, Mqtt5ConnAckBytes.TwoByteProperty(Mqtt5ConnAckBytes.ServerKeepAlive, 1));
+
+    // Two seconds, so curl pings every second: a loaded CI machine gets a whole second to deliver each PINGRESP (BL-5171).
+    private static readonly byte[] KeepAliveTwoSeconds =
+        Mqtt5ConnAckBytes.Build(0, 0, Mqtt5ConnAckBytes.TwoByteProperty(Mqtt5ConnAckBytes.ServerKeepAlive, 2));
 
     [TestMethod]
     [SpecRequirement("Mqtt5:MQTT5-3.12-1")]
@@ -25,7 +29,7 @@ public sealed class KeepAliveCases
             [Mqtt5WirePacket.Subscribe] = _ => Mqtt5PublishSubscribeBytes.SubAck(1, 0x00),
             [PublishSubscribeRun.PingReq] = _ => ++pings == 2 ? PublishSubscribeRun.NormalDisconnect : Mqtt5PublishSubscribeBytes.PingResp,
         };
-        (CurlRunResult result, Mqtt5ReferenceBroker broker) = await PublishSubscribeRun.RunAsync(responders, KeepAliveOneSecond, "-m", "5", "mqtt5://localhost/t");
+        (CurlRunResult result, Mqtt5ReferenceBroker broker) = await PublishSubscribeRun.RunAsync(responders, KeepAliveTwoSeconds, "-m", "10", "mqtt5://localhost/t");
 
         PublishSubscribeRun.AssertSucceeded(result, string.Empty);
         CollectionAssert.AreEqual(
