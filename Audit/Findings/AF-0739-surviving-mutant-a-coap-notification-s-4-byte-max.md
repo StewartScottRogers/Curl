@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Coap.UnitLibrary/Observe/CoapObservation.cs:MaxAgeOf-le:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Coap.UnitLibrary/Observe/CoapObservation.cs:101:<=
-task: none
-tasks:
+task: BL-5184
+tasks: BL-5184
 found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md
