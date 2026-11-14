@@ -136,6 +136,8 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
         CollectionAssert.AreEquivalent(new[] { "http://h/1 1", "http://h/2 1", "http://h/3 1" }, Lines(standardOutput.Text));
     }
 
+    private static readonly TimeSpan WaitLimit = TimeSpan.FromSeconds(60);
+
     private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static string[] Lines(string text) =>
@@ -143,9 +145,11 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
 
     private static async Task WhenOpenedAsync(Http2ServerConnector server, string host, int count)
     {
+        DateTime deadline = DateTime.UtcNow + WaitLimit;
         while (server.To(host).Length < count)
         {
-            await Task.Yield();
+            Assert.IsLessThan(deadline, DateTime.UtcNow, "the server was not opened to in time");
+            await Task.Delay(1);
         }
     }
 
@@ -176,7 +180,7 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
         int exitCode;
         using (Diagnostics.Phase("run"))
         {
-            exitCode = await runner.RunAsync(arguments);
+            exitCode = await runner.RunAsync(arguments).WaitAsync(WaitLimit);
         }
 
         Diagnostics.Act("exit code", exitCode);

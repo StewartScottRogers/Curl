@@ -134,7 +134,7 @@ internal sealed class Http2ServerConnection : IConnection
             TaskCompletionSource reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
             waiters.Add((count, reached));
             Signal(waiters, current());
-            return reached.Task;
+            return reached.Task.WaitAsync(TimeSpan.FromSeconds(60));
         }
     }
 
