@@ -58,10 +58,8 @@ public sealed class FileDriveRelativeOpenFailureMessageTests
 
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
-    public async Task ExecuteAsync_FullDrivePathOffWindows_QuotesThePathAsWritten()
+    public void TryParse_FullDrivePathOffWindows_IsRefusedAsTheOpenSslBuildRefusesIt()
     {
-        var result = await DownloadAsync("file:///C:/nofile.txt");
-
-        Assert.AreEqual("Could not open file /C:/nofile.txt", result.ErrorMessage);
+        Assert.IsFalse(CurlUrl.TryParse("file:///C:/nofile.txt", false, out _));
     }
 }
