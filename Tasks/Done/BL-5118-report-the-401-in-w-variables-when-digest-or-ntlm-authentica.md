@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitTests/AuthenticationFailureWriteOutTests.cs]
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-13
 ---
 # BL-5118 — Report the 401 in -w variables when Digest or NTLM authentication fails with exit 94
 
@@ -50,3 +50,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13: Created.
 - 2026-11-13: Backlog -> Doing. Criteria at claim: 0ccd5924 db75c56b f8e81336 f07e896c a0b49a29.
+- 2026-11-13: Doing -> Done. 401 status and header count carried into the exit 94 report; tests added
