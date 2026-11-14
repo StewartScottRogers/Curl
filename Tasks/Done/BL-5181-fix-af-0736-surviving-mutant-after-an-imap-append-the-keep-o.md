@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Imap.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5181 — Fix AF-0736: Surviving mutant: after an IMAP APPEND the keep-or-LOGOUT choice can be inverted
 
@@ -43,3 +43,4 @@ Killed by `ExecuteAsync_AppendSucceeds_KeepsTheConnectionWithoutLogout` and `Exe
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: 6e36a605 9742157d.
+- 2026-11-14: Doing -> Done. Added two tests killing the inverted keep-or-LOGOUT mutant
