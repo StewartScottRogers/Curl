@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/TransferPerformer.cs, Curl.Engine.UnitTests/TransferPerformerTests.cs]
+touches: [Curl.Engine.UnitLibrary/TransferPerformer.cs, Curl.Engine.UnitTests/TransferPerformerTests.cs, Curl.Core.UnitLibrary/RedirectFollower.cs]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5172 — Rethrow a hop's exception with its own stack trace and tell the chain end at most once
 
@@ -28,15 +28,18 @@ Fix: rethrow with `ExceptionDispatchInfo.Capture(exception).Throw()` (or a bare 
 
 ## Acceptance criteria
 
-- [ ] A unit test shows that the exception rethrown after a hop throws carries the hop's frame in its `StackTrace` (the throwing handler's method name appears in it).
-- [ ] A unit test with a handler whose `TransferChainFinishedAsync` throws after a successful chain shows the handler is told exactly once.
-- [ ] A unit test with a handler whose `TransferChainFinishedAsync` throws while a hop's exception is being reported shows the hop's exception, not the notification's, leaves `FollowWatchingSpeedAsync`.
-- [ ] The doc comments of `ITransferHook.TransferChainFinishedAsync` and `IProtocolHandler.TransferChainFinishedAsync` stay true of the code.
-- [ ] `dotnet build` is clean and the fast tests pass; `Curl.Engine.UnitLibrary` keeps 100% line and branch coverage.
+- [x] A unit test shows that the exception rethrown after a hop throws carries the hop's frame in its `StackTrace` (the throwing handler's method name appears in it).
+- [x] A unit test with a handler whose `TransferChainFinishedAsync` throws after a successful chain shows the handler is told exactly once.
+- [x] A unit test with a handler whose `TransferChainFinishedAsync` throws while a hop's exception is being reported shows the hop's exception, not the notification's, leaves `FollowWatchingSpeedAsync`.
+- [x] The doc comments of `ITransferHook.TransferChainFinishedAsync` and `IProtocolHandler.TransferChainFinishedAsync` stay true of the code.
+- [x] `dotnet build` is clean and the fast tests pass; `Curl.Engine.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+- Added RedirectFollower.FollowWithoutNotifyingAsync (Curl.Core, no other Doing task touches it; added to touches): the performer now notifies after the chain result itself, so a throwing notification after a result is never followed by a second, made-up one. A hop's exception is told (the notification's own failure is swallowed so the hop's survives) and then rethrown by awaiting a faulted task, which keeps its stack trace; this shape was the one that reached 100% line and branch under the coverage tool. Quality run for Curl.Engine.UnitLibrary: 0 failing members, 100/100. Fast tests of Engine and Core green.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: c83cc918 7a17321d 7f2ea65a 2cb2dc25 d911a7e9.
+- 2026-11-14: Doing -> Done. Rethrow keeps the hop's stack trace; handler told once

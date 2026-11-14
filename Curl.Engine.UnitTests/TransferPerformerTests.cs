@@ -164,6 +164,50 @@ public sealed partial class TransferPerformerTests
         Assert.HasCount(1, handler.Told);
         Assert.AreEqual(CurlExitCode.FailedInit, handler.Told[0].ExitCode);
     }
+
+    [TestMethod]
+    public async Task FollowWatchingSpeedAsync_HopThrows_RethrownExceptionKeepsTheHopsFrame_BL5172()
+    {
+        StallingHandler handler = new() { Failure = new InvalidOperationException("hop broke") };
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null };
+
+        InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await TransferPerformer.FollowWatchingSpeedAsync(NewState(), Follower(handler), context, new RedirectPolicy()));
+
+        Assert.IsNotNull(thrown.StackTrace);
+        Assert.Contains(nameof(StallingHandler.ExecuteAsync), thrown.StackTrace);
+    }
+
+    [TestMethod]
+    public async Task FollowWatchingSpeedAsync_NotificationThrowsAfterASuccessfulChain_HandlerToldOnce_BL5172()
+    {
+        StallingHandler handler = new() { Succeeds = true, NotificationFailure = new InvalidOperationException("told badly") };
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null };
+
+        InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await TransferPerformer.FollowWatchingSpeedAsync(NewState(), Follower(handler), context, new RedirectPolicy()));
+
+        Assert.AreEqual("told badly", thrown.Message);
+        Assert.HasCount(1, handler.Told);
+    }
+
+    [TestMethod]
+    public async Task FollowWatchingSpeedAsync_NotificationThrowsWhileReportingAHopsException_TheHopsExceptionLeaves_BL5172()
+    {
+        StallingHandler handler = new()
+        {
+            Failure = new InvalidOperationException("hop broke"),
+            NotificationFailure = new ArgumentException("told badly"),
+        };
+        TransferContext context = new() { Url = CurlUrl.Parse(First), Output = Stream.Null };
+
+        InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await TransferPerformer.FollowWatchingSpeedAsync(NewState(), Follower(handler), context, new RedirectPolicy()));
+
+        Assert.AreEqual("hop broke", thrown.Message);
+        Assert.HasCount(1, handler.Told);
+    }
+
     [TestMethod]
     public void StartWatchdogs_NothingToWatch_KeepNone()
     {
@@ -345,10 +389,14 @@ public sealed partial class TransferPerformerTests
 
         public Exception? Failure { get; init; }
 
+        public Exception? NotificationFailure { get; init; }
+
+        public bool Succeeds { get; init; }
+
         public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result)
         {
             Told.Add(result);
-            return ValueTask.CompletedTask;
+            return NotificationFailure is null ? ValueTask.CompletedTask : throw NotificationFailure;
         }
 
         public IReadOnlyCollection<string> SupportedSchemes { get; } = ["http"];
@@ -359,6 +407,11 @@ public sealed partial class TransferPerformerTests
             if (Failure is not null)
             {
                 throw Failure;
+            }
+
+            if (Succeeds)
+            {
+                return TransferResult.Success(0);
             }
 
             await Task.Delay(Timeout.Infinite, context.CancellationToken);

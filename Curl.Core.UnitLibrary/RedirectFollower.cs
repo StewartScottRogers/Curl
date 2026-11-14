@@ -193,14 +193,27 @@ public sealed class RedirectFollower(
     /// </returns>
     public async ValueTask<TransferResult> FollowAsync(ITransferContext context, RedirectPolicy policy)
     {
+        TransferResult result = await FollowWithoutNotifyingAsync(context, policy).ConfigureAwait(false);
+        await NotifyChainFinishedAsync(context, result).ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>
+    /// Performs the transfer as <see cref="FollowAsync" /> does but leaves telling the handler to the caller (BL-5172), so
+    /// a caller that catches an exception from a hop can tell an exception that left before a result from one the
+    /// notification threw after it, and tell the handler exactly once.
+    /// </summary>
+    /// <param name="context">The transfer as given on the command line.</param>
+    /// <param name="policy">The redirect options.</param>
+    /// <returns>The result <see cref="FollowAsync" /> would have told the handler.</returns>
+    public async ValueTask<TransferResult> FollowWithoutNotifyingAsync(ITransferContext context, RedirectPolicy policy)
+    {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(policy);
 
-        TransferResult result = context.Http is { FollowRedirects: true } http
+        return context.Http is { FollowRedirects: true } http
             ? await FollowChainAsync(context, http, policy).ConfigureAwait(false)
             : await DispatchAsync(context, policy).ConfigureAwait(false);
-        await NotifyChainFinishedAsync(context, result).ConfigureAwait(false);
-        return result;
     }
 
     /// <summary>
