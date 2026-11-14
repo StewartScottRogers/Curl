@@ -44,6 +44,18 @@ internal static class OpenSslVerifyResult
     /// <summary><c>X509_V_ERR_CERT_HAS_EXPIRED</c>.</summary>
     internal const long CertificateHasExpired = 10;
 
+    /// <summary><c>X509_V_ERR_CERT_SIGNATURE_FAILURE</c>.</summary>
+    internal const long CertificateSignatureFailure = 7;
+
+    /// <summary><c>X509_V_ERR_PATH_LENGTH_EXCEEDED</c>.</summary>
+    internal const long PathLengthExceeded = 25;
+
+    /// <summary><c>X509_V_ERR_PERMITTED_VIOLATION</c>.</summary>
+    internal const long PermittedSubtreeViolation = 47;
+
+    /// <summary><c>X509_V_ERR_INVALID_CA</c>.</summary>
+    internal const long InvalidCaCertificate = 79;
+
     /// <summary><c>X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT</c>.</summary>
     internal const long DepthZeroSelfSignedCertificate = 18;
 
@@ -91,7 +103,7 @@ internal static class OpenSslVerifyResult
             status |= chainStatus.Status;
         }
 
-        return OfChainStatus(status, chain.ChainElements.Count, IsAnyNotYetValid(chain, now));
+        return OfChainStatus(status, chain.ChainElements.Count, IsAnyNotYetValid(chain, now), ExceedsAPathLength(CertificatesOf(chain)));
     }
 
     /// <summary>
@@ -104,8 +116,12 @@ internal static class OpenSslVerifyResult
     /// <param name="status">Every status flag of the chain, combined.</param>
     /// <param name="chainLength">How many certificates the chain holds.</param>
     /// <param name="anyNotYetValid">Whether a certificate in it is not valid yet.</param>
+    /// <param name="pathLengthExceeded">
+    /// Whether a CA in it has more intermediates below it than its path length constraint allows
+    /// (<see cref="ExceedsAPathLength" />).
+    /// </param>
     /// <returns>The code, or <see langword="null" /> when the status has no known code.</returns>
-    internal static long? OfChainStatus(X509ChainStatusFlags status, int chainLength, bool anyNotYetValid)
+    internal static long? OfChainStatus(X509ChainStatusFlags status, int chainLength, bool anyNotYetValid, bool pathLengthExceeded = false)
     {
         if ((status & X509ChainStatusFlags.UntrustedRoot) != 0)
         {
@@ -117,10 +133,67 @@ internal static class OpenSslVerifyResult
             return UnableToGetIssuerCertificateLocally;
         }
 
-        return (status & X509ChainStatusFlags.NotTimeValid) != 0
+        return OfExtensionsOrSignature(status, pathLengthExceeded) ?? OfValidity(status, anyNotYetValid);
+    }
+
+    private static long? OfValidity(X509ChainStatusFlags status, bool anyNotYetValid) =>
+        (status & X509ChainStatusFlags.NotTimeValid) != 0
             ? anyNotYetValid ? CertificateNotYetValid : CertificateHasExpired
             : null;
+
+    /// <summary>
+    /// Returns the code for what OpenSSL finds wrong with a chain it could build to a trusted
+    /// root, before it checks validity dates: its <c>check_chain_extensions</c> finds an issuer
+    /// that may not act as a CA (79) or whose path length is exceeded (25), then
+    /// <c>check_name_constraints</c> a name outside a permitted subtree (47), and last
+    /// <c>internal_verify</c> a signature that does not verify (7) before it checks dates
+    /// (BL-5104). .NET reports both 79 and 25 as <see cref="X509ChainStatusFlags.InvalidBasicConstraints" />.
+    /// </summary>
+    /// <param name="status">Every status flag of the chain, combined.</param>
+    /// <param name="pathLengthExceeded">Whether a CA in the chain has its path length exceeded.</param>
+    /// <returns>The code, or <see langword="null" /> when none of those flags is set.</returns>
+    internal static long? OfExtensionsOrSignature(X509ChainStatusFlags status, bool pathLengthExceeded)
+    {
+        if ((status & X509ChainStatusFlags.InvalidBasicConstraints) != 0)
+        {
+            return pathLengthExceeded ? PathLengthExceeded : InvalidCaCertificate;
+        }
+
+        if ((status & X509ChainStatusFlags.HasNotPermittedNameConstraint) != 0)
+        {
+            return PermittedSubtreeViolation;
+        }
+
+        return (status & X509ChainStatusFlags.NotSignatureValid) != 0 ? CertificateSignatureFailure : null;
     }
+
+    /// <summary>
+    /// Whether a CA in a chain has more intermediate certificates below it than its basic
+    /// constraints' path length allows, as OpenSSL's <c>check_chain_extensions</c> counts them
+    /// (self-issued intermediates counted too).
+    /// </summary>
+    /// <param name="certificates">The chain's certificates, the server's own first.</param>
+    /// <returns><see langword="true" /> when a path length is exceeded.</returns>
+    internal static bool ExceedsAPathLength(IReadOnlyList<X509Certificate2> certificates)
+    {
+        for (var depth = 1; depth < certificates.Count; depth++)
+        {
+            var constraints = certificates[depth].Extensions.OfType<X509BasicConstraintsExtension>().FirstOrDefault();
+            if (constraints is { CertificateAuthority: true, HasPathLengthConstraint: true }
+                && depth - 1 > constraints.PathLengthConstraint)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>The certificates of a built chain, the server's own first.</summary>
+    /// <param name="chain">The chain.</param>
+    /// <returns>Its certificates.</returns>
+    internal static X509Certificate2[] CertificatesOf(X509Chain chain) =>
+        [.. chain.ChainElements.Select(element => element.Certificate)];
 
     private static bool IsAnyNotYetValid(X509Chain chain, DateTimeOffset now)
     {

@@ -199,6 +199,15 @@ internal static class TlsFailureMessages
         [OpenSslVerifyResult.KeyUsageDoesNotIncludeCrlSigning] = "key usage does not include CRL signing",
     }.ToFrozenDictionary();
 
+    // OpenSSL's X509_verify_cert_error_string for each chain check after trust (BL-5104).
+    private static readonly FrozenDictionary<long, string> OpenSslChainCheckErrorTexts = new Dictionary<long, string>
+    {
+        [OpenSslVerifyResult.CertificateSignatureFailure] = "certificate signature failure",
+        [OpenSslVerifyResult.PathLengthExceeded] = "path length constraint exceeded",
+        [OpenSslVerifyResult.PermittedSubtreeViolation] = "permitted subtree violation",
+        [OpenSslVerifyResult.InvalidCaCertificate] = "invalid CA certificate",
+    }.ToFrozenDictionary();
+
     private const int SecEIllegalMessage = unchecked((int)0x80090326);
 
     // How SslStream names a received protocol_version alert in its AuthenticationException.
@@ -875,7 +884,28 @@ internal static class TlsFailureMessages
             return "unsuitable certificate purpose (26)";
         }
 
-        return status == X509ChainStatusFlags.NotTimeValid ? OpenSslValidityError(chain) : OpenSslTrustError(chain);
+        return OpenSslExtensionOrSignatureError(status, OpenSslVerifyResult.CertificatesOf(chain))
+            ?? (status == X509ChainStatusFlags.NotTimeValid ? OpenSslValidityError(chain) : OpenSslTrustError(chain));
+    }
+
+    /// <summary>
+    /// The OpenSSL build's verify result for a chain it could build to a trusted root but whose
+    /// issuer may not act as a CA, whose path length is exceeded, which names a host outside a
+    /// permitted subtree or whose signature does not verify (BL-5104).
+    /// </summary>
+    /// <param name="status">Every status flag of the chain, combined.</param>
+    /// <param name="certificates">The chain's certificates, the server's own first.</param>
+    /// <returns>The verify result as <c>text (code)</c>, or <see langword="null" /> when none applies.</returns>
+    internal static string? OpenSslExtensionOrSignatureError(X509ChainStatusFlags status, IReadOnlyList<X509Certificate2> certificates)
+    {
+        if ((status & (X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.PartialChain)) != X509ChainStatusFlags.NoError)
+        {
+            return null;
+        }
+
+        return OpenSslVerifyResult.OfExtensionsOrSignature(status, OpenSslVerifyResult.ExceedsAPathLength(certificates)) is { } code
+            ? string.Create(CultureInfo.InvariantCulture, $"{OpenSslChainCheckErrorTexts[code]} ({code})")
+            : null;
     }
 
     // OpenSSL checks trust (errors 18, 19, 20) before purpose, so only a chain it trusts is refused for purpose (BL-5062).
