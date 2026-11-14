@@ -109,6 +109,16 @@ came back "not re-audited" and could never close):
   `Measure-FactoryProcess.ps1` command, and look for the same cause the finding names (for
   example a task requeued because its lane failed to integrate after a rebase, or a run
   ending seconds after its claim with no result).
+- This audit's window starts at the first line of the earliest `DarkFactory-<stamp>.log` in your
+  log copy, not at the finding's own `-Since` date: pass `-Since` that day, and leave out every
+  CI run that ended before that first line, because no copied log could hold its trace. A CI run
+  older than the copied logs is never evidence of a missing trace (AF-0746 and AF-0747 were filed
+  that way, for two runs the coordinator had filed within 30 minutes, in a log the copy did not
+  hold; BL-5191, BL-5192).
+- A `ci-red` finding is re-audited under the CI red rule above (filed, covered or green within
+  30 minutes of the run ending), even when its `Expected` line states the older "no spell over
+  30 minutes": that rule was replaced on 2026-11-12, and a spell over 30 minutes whose runs were
+  all filed in time does not reproduce the finding (AF-0706 to AF-0708; BL-5175 to BL-5177).
 - `"reproduces": true` when the window shows that cause crossing the rule again; name the
   new task, lane and time as evidence.
 - `"reproduces": false` when the window holds at least one shift that finished a task and
