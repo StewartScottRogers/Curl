@@ -32,3 +32,4 @@ Found by the shift-end review of 7747c1d4d...8f429f2ab (type-design-analyzer; si
 ## Log
 
 - 2026-11-13: Created.
+- 2026-11-14: Backlog -> Doing. Criteria at claim: a04444ea 48cd604d e19db8f2 448f1e8f.
