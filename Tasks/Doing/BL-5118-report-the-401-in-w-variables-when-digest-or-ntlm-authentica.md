@@ -33,16 +33,18 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Http.UnitTests/AuthenticationFailureWriteOutTests.cs` prove that a Digest challenge the client cannot answer (algorithm unsupported) gives exit 94 and a transfer result with response code 401 and the received header count, so `%{http_code}`, `%{response_code}` and `%{num_headers}` read `401 401 4` for a four-header response.
-- [ ] A second test proves the NTLM invalid-Type-2 case reports response code 401.
-- [ ] A regression test proves a failure before any response arrives still reports `000`.
-- [ ] Tests are platform-neutral (in-memory connection stand-ins; no SSPI needed: use a stand-in authenticator that throws `HttpAuthenticationFailedException`).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Http.UnitTests/AuthenticationFailureWriteOutTests.cs` prove that a Digest challenge the client cannot answer (algorithm unsupported) gives exit 94 and a transfer result with response code 401 and the received header count, so `%{http_code}`, `%{response_code}` and `%{num_headers}` read `401 401 4` for a four-header response.
+- [x] A second test proves the NTLM invalid-Type-2 case reports response code 401.
+- [x] A regression test proves a failure before any response arrives still reports `000`.
+- [x] Tests are platform-neutral (in-memory connection stand-ins; no SSPI needed: use a stand-in authenticator that throws `HttpAuthenticationFailedException`).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check, as a hand check: step 2 prints `[401 401 4]` and exits 94; step 3 prints `[401]`.
+
+- Fix: RetryWithAuthorizationAsync stamps the 401 status line and header count (headers + status line) on the HttpTransferException; WithHeadBeforeFailure keeps the report's headers when the failure carries no head bytes. Tests in AuthenticationFailureWriteOutTests. Quality run: library 100/100, 0 failing. Not hand-checked against a live server (stand-in tests only).
 
 ## Log
 

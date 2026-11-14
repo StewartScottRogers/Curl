@@ -1610,7 +1610,7 @@ public sealed class HttpProtocolHandler(
                 HttpVersion = statusLine.Version,
                 HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
                 ResponseHeadersStored = Math.Max(report.ResponseHeadersStored, failure.HeadersStoredBeforeFailure),
-                ResponseHeaders = HeadersBeforeFailure(failure.HeadBytesBeforeFailure),
+                ResponseHeaders = failure.HeadBytesBeforeFailure.Length == 0 ? report.ResponseHeaders : HeadersBeforeFailure(failure.HeadBytesBeforeFailure),
                 ContentType = failure.ContentTypeBeforeFailure ?? report.ContentType,
             };
 
@@ -3108,6 +3108,9 @@ public sealed class HttpProtocolHandler(
         }
         catch (HttpTransferException failure) when (!picksNegotiate)
         {
+            // curl keeps the response whose challenge it could not answer: its code and header count (BL-5118).
+            failure.StatusLineBeforeFailure = head.StatusLine;
+            failure.HeadersStoredBeforeFailure = head.Headers.Count + 1;
             return plan.WithAuthorizationFailure(failure, retryLines.Lines, RepeatProxyAuthorization(plan));
         }
 
