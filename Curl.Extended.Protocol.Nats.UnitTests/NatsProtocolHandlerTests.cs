@@ -199,6 +199,7 @@ public sealed class NatsProtocolHandlerTests
     [DataRow("nats://example.com/a", 4222, false)]
     [DataRow("NATSS://example.com/a", 4222, true)]
     [DataRow("natss://example.com:4443/a", 4443, true)]
+    [DataRow("nats://example.com:0/a", 0, false)]
     public async Task ExecuteAsync_TheScheme_ChoosesTheDefaultPortAndTls(string url, int port, bool useTls)
     {
         ScriptedConnector connector = new(ConnectResult.Refused("x"));
