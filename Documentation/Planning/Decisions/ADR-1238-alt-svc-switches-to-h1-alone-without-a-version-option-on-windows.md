@@ -1,6 +1,6 @@
 # ADR-1238 — Without a version option, alt-svc switches to h1 alone on Windows
 
-- Status: Accepted
+- Status: Accepted, amended by ADR-1268 (off Windows, h3 is allowed only on a QUIC build)
 - Date: 2026-11-11
 - Task: BL-4912
 - Decided by Claude under Stewart's delegation.
@@ -20,7 +20,7 @@ served over HTTP/2 on Windows.
 ## Decision
 
 `AltSvcTransferCache.LookupOf` allows only `h1` as the destination when the transfer has no
-version option and the system is Windows; elsewhere it still allows `h1`, `h2` and `h3`, as the
+version option and the system is Windows; elsewhere it allowed `h1`, `h2` and `h3` (ADR-1268 later took `h3` out unless the build is a QUIC build), as the
 OpenSSL builds with nghttp2 and ngtcp2 do. A version option (`--http2`, `--http3`,
 `--http3-only`) keeps the destinations it allowed before on every platform: Curl accepts those
 options everywhere (ADR-0141, ADR-0144), and the reference build has no answer to match, since it

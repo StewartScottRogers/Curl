@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5224 — Fix AF-0775: ADR-1238 (Accepted) still decides that alt-svc allows h1, h2 and h3 off Windows with no version option; since ADR-1268 the code allows h3 only on a QUIC build, which the executable never is
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Docs-only: ADR-1238 status and Decision now say ADR-1268 amended the off-Windows h3 rule; README row updated. No code changed.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-14: Doing -> Done. ADR-1238 marked amended by ADR-1268; docs only, Engine builds clean
