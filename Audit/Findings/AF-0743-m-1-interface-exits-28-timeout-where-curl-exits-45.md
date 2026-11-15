@@ -3,8 +3,8 @@ id: AF-0743
 title: -m 1 --interface - exits 28 (timeout) where curl exits 45 (bind failed)
 auditor: conformance
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces.
 key: conformance:--interface:max-time-during-bind:exit-code
 reproduction: none
 task: BL-5188
@@ -13,9 +13,9 @@ found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-14
+closed-how: reliable-reaudit
+closed-by: 2026-11-14_1335.md
 ---
 # AF-0743 - -m 1 --interface - exits 28 (timeout) where curl exits 45 (bind failed)
 
@@ -42,6 +42,9 @@ dotnet build Curl.Console -c Release; & ./Record-CurlExchange.ps1 -Port 62811 -C
 
 ## Re-audits
 
+- 2026-11-14 | 2026-11-14_1335.md | reproduces: no | Ran the reproduction (port 62811, Release build at b6c9545, reference curl 8.22.0 Schannel): exitcode.txt curl 45, Curl 45. Both stderr: 'curl: (45) Failed to connect to 127.0.0.1:62811 after ~2.9 s: Failed binding local connection end'. The expected result is given; Curl no longer exits 28.
+
 ## Log
 
 - 2026-11-13: filed proposed.
+- 2026-11-14: accepted -> closed. Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces.

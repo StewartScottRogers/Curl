@@ -3,8 +3,8 @@ id: AF-0691
 title: Surviving mutant: lib753's debug trace can write hex dumps (noHex false)
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib753.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib753.cs:41:true
 task: BL-4885
@@ -13,9 +13,9 @@ found: 2026-11-05
 found-at: 4eba3c63638befcc6a63aaa31ddf5419922fa939
 scorecard: 2026-11-05_2025.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-14
+closed-how: mechanical
+closed-by: 2026-11-14_1335.md
 ---
 # AF-0691 - Surviving mutant: lib753's debug trace can write hex dumps (noHex false)
 
@@ -44,7 +44,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 - 2026-11-12 | 2026-11-12_2105.md | not re-audited | Ran the -Site command: outcome killed, but the operator 'true' resolved to the line's first occurrence, 'traceTime: true' -> 'traceTime: false', not the 'noHex: true' the finding names. The targeted run cannot reach the noHex occurrence, so it does not tell whether that mutant still survives. Not re-audited.
 - 2026-11-13 | 2026-11-13_2321.md | not re-audited | Ran the -Site command: outcome killed, but line 41 now reads new LibTestDebugTrace(..., traceTime: true, noHex: true), and the tool mutated the first true on the line (traceTime: true -> false), not the noHex value the finding is about. The run says nothing about the noHex mutant: not re-audited.
+- 2026-11-14 | 2026-11-14_1335.md | reproduces: no | Ran the -Site command: Lib753.cs:41 'true' mutant (traceTime true->false) outcome killed, resolvedLine 41. Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-11-05: filed proposed.
+- 2026-11-14: accepted -> closed. Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
