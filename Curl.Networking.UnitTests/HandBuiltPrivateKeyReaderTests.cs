@@ -309,7 +309,12 @@ public sealed class HandBuiltPrivateKeyReaderTests
         ActLoad(loaded, failure);
         Diagnostics.Assert("failure is null", true, failure is null);
         Assert.IsNull(failure);
-        loaded?.Dispose();
+        using (loaded)
+        {
+            Diagnostics.Assert("signs with Ed25519", true, (loaded as HandBuiltKeyCertificate)?.SigningKey.CanSign(TlsSignatureScheme.Ed25519));
+            Assert.IsInstanceOfType<HandBuiltKeyCertificate>(loaded);
+            Assert.IsTrue(((HandBuiltKeyCertificate)loaded!).SigningKey.CanSign((ushort)TlsSignatureScheme.Ed25519));
+        }
     }
 
     private string WriteEncryptedKey(byte[] privateKeyInfo)
