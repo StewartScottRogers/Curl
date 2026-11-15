@@ -297,7 +297,7 @@ public sealed class ServerCertificateVerificationVerifyChainTests
 
         Diagnostics.Act("message", verdict.ErrorMessage);
         Assert.IsFalse(verdict.IsAccepted);
-        Assert.AreNotEqual("schannel: CertFindExtension() returned no extension.", verdict.ErrorMessage);
+        Assert.AreEqual("SSL peer certificate or SSH remote key was not OK", verdict.ErrorMessage);
     }
 
     private static (CurlExitCode ExitCode, string Message) RejectionOf(ServerCertificateVerdict verdict) =>
