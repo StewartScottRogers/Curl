@@ -84,6 +84,19 @@ public sealed partial class TransferPerformerTests
     }
 
     [TestMethod]
+    public void TrySelectProxyAndCredentials_ProxySelectionRefused_ReturnsFalseWithTheRefusal()
+    {
+        CommandLineOptions options = Parse("--preproxy", "http://pre.example:8080", "-x", "http://proxy.example:3128", First);
+
+        bool selected = TransferPerformer.TrySelectProxyAndCredentials(
+            HttpDispatch(), EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), CurlUrl.Parse(First), NewState(), new InfoRecordingEvents(), NoDiagnosticLog.Instance, CredentialLookup(),
+            out _, out TransferResult? failure);
+
+        Assert.IsFalse(selected);
+        Assert.AreEqual(CurlExitCode.CouldntResolveProxy, failure!.ExitCode);
+    }
+
+    [TestMethod]
     public void TrySelectProxyAndCredentials_SchemeNoHandlerServes_Exits1AndReportsIt()
     {
         CommandLineOptions options = Parse("gopher://example.com/");

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-15
 ---
 # BL-5221 — Fix AF-0772: Surviving mutant: a failed proxy selection can be reported as success and the transfer go on
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs line 239`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs line 239`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `TransferPerformerTests.TrySelectProxyAndCredentials_ProxySelectionRefused_ReturnsFalseWithTheRefusal` (an HTTP-kind `--preproxy` is refused with exit 5): with line 239 changed to `return true;` it failed at `Assert.IsFalse(selected)`; reverted, all 3042 fast Engine tests pass. Test-only change, no production edit.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: a5b5508a 9742157d.
+- 2026-11-15: Doing -> Done. Mutant killed by new test
