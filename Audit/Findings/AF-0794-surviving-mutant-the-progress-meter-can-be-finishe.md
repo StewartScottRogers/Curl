@@ -3,12 +3,12 @@ id: AF-0794
 title: Surviving mutant: the progress meter can be finished with the transfer's success inverted
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.Parsed.cs:FollowFinishingMeterAsync-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.Parsed.cs:117:true
-task: none
-tasks:
+task: BL-5245
+tasks: BL-5245
 found: 2026-11-15
 found-at: 065474f7431e6647cda727e7f0fd5a25c9859a90
 scorecard: 2026-11-15_1159.md

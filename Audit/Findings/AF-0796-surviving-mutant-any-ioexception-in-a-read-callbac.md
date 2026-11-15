@@ -3,12 +3,12 @@ id: AF-0796
 title: Surviving mutant: any IOException in a read-callback upload can be reported as an aborted-by-callback exit 42
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs:FollowUnlessAbortedAsync-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs:371:&&
-task: none
-tasks:
+task: BL-5247
+tasks: BL-5247
 found: 2026-11-15
 found-at: 065474f7431e6647cda727e7f0fd5a25c9859a90
 scorecard: 2026-11-15_1159.md
