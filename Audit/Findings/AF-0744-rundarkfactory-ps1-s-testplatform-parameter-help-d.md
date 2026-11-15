@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-11-14 | 2026-11-14_1335.md | reproduces: no | Ran (Get-Help ./RunDarkFactory.ps1 -Parameter TestPlatform | Out-String) -match 'audio-off': False. -TestPlatform's help now reads 'Prove the PowerShell executable and data folder the factory picks for this OS (BL-3919), and exit.', and -TestAudioOff has its own help ('Prove the audio-off file silences the alarm, chimes and spoken notices ... (BL-1456), and exit.').
+
 ## Log
 
 - 2026-11-13: filed proposed.

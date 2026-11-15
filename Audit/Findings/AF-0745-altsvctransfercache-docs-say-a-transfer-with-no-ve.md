@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.UnitLibrary/AltSvcTransferCache.cs -Pattern 'and
 
 ## Re-audits
 
+- 2026-11-14 | 2026-11-14_1335.md | reproduces: no | Ran the Select-String. 'and <c>h1</c>, <c>h2</c> and <c>h3</c> elsewhere' has no match. The code patterns match AltSvcTransferCache.cs:73 (NoQuicBuildAlpns = { H1, H2 }) and :291 (isWindows ? SchannelBuildAlpns : actsAsQuicBuild ? EveryAlpn : NoQuicBuildAlpns). The type's remarks (line 26) now say no version option switches to h1, h2 'and h3 only when the build acts as a QUIC build, ADR-1268'. NoVersionOptionDestinations' doc (lines 287-288) says the same.
+
 ## Log
 
 - 2026-11-13: filed proposed.

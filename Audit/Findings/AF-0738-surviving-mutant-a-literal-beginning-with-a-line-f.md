@@ -3,8 +3,8 @@ id: AF-0738
 title: Surviving mutant: a literal beginning with a line feed can be reported merged into the next -v line
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Original.Protocol.Imap.UnitLibrary/ImapControlChannel.cs:ReportLiteralAsync-ge:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Imap.UnitLibrary/ImapControlChannel.cs:537:>=
 task: BL-5183
@@ -13,9 +13,9 @@ found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-14
+closed-how: mechanical
+closed-by: 2026-11-14_1335.md
 ---
 # AF-0738 - Surviving mutant: a literal beginning with a line feed can be reported merged into the next -v line
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Origi
 
 ## Re-audits
 
+- 2026-11-14 | 2026-11-14_1335.md | reproduces: no | Ran the -Site command: ImapControlChannel.cs:537 '>=' mutant outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-13: filed proposed.
+- 2026-11-14: accepted -> closed. Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

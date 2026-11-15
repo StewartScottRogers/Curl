@@ -3,8 +3,8 @@ id: AF-0736
 title: Surviving mutant: after an IMAP APPEND the keep-or-LOGOUT choice can be inverted
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Original.Protocol.Imap.UnitLibrary/ImapSession.cs:AppendAsync-eq:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Imap.UnitLibrary/ImapSession.cs:539:==
 task: BL-5181
@@ -13,9 +13,9 @@ found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-14
+closed-how: mechanical
+closed-by: 2026-11-14_1335.md
 ---
 # AF-0736 - Surviving mutant: after an IMAP APPEND the keep-or-LOGOUT choice can be inverted
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Origi
 
 ## Re-audits
 
+- 2026-11-14 | 2026-11-14_1335.md | reproduces: no | Ran the -Site command: ImapSession.cs:539 '==' mutant outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-13: filed proposed.
+- 2026-11-14: accepted -> closed. Re-audit 2026-11-14_1335.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
