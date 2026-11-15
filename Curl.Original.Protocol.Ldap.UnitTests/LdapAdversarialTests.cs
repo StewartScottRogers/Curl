@@ -394,7 +394,10 @@ public sealed class LdapAdversarialTests
         Assert.IsNull(encoder.Encode(NestedAnd(LdapFilterEncoder.MaximumSetDepth + 1)));
         byte[]? reused = encoder.Encode(NestedAnd(LdapFilterEncoder.MaximumSetDepth));
 
+        byte[]? fresh = Encoder(LdapDialect.OpenLdap).Encode(NestedAnd(LdapFilterEncoder.MaximumSetDepth));
         Assert.IsNotNull(reused);
+        Assert.IsNotNull(fresh);
+        CollectionAssert.AreEqual(fresh, reused);
     }
 
     private static string NestedAnd(int depth) =>

@@ -176,8 +176,11 @@ public sealed class WebSocketReplSessionTests
         await cancellation.CancelAsync();
         using WebSocketReplSession session = new(new ScriptedConnection((1, ServerClose1000)), new FixedRandomSource());
 
+        ScriptedLineReader reader = new(false, "never read", "/ping");
+
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            await session.RunAsync(new ScriptedLineReader(false), Stream.Null, ReadOnlyMemory<byte>.Empty, cancellation.Token));
+            await session.RunAsync(reader, Stream.Null, ReadOnlyMemory<byte>.Empty, cancellation.Token));
+        Assert.IsLessThanOrEqualTo(1, reader.LinesRead);
     }
 
     [TestMethod]

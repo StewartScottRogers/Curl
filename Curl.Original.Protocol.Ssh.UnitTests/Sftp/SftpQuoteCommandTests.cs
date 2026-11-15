@@ -124,6 +124,7 @@ public sealed class SftpQuoteCommandTests
     [DataRow("rm \"/f\"x", "Suspicious data after the command line", DisplayName = "text after the quote, as measured")]
     [DataRow("rm /~/b c", "Suspicious data after the command line", DisplayName = "home path with a space, as measured")]
     [DataRow("ln /a /b /c", "Suspicious data after the command line", DisplayName = "a third argument")]
+    [DataRow(" rm x", "Unknown SFTP command", DisplayName = "a leading space reads its arguments, so the name is unknown, not a missing parameter")]
     public void Parse_Malformed_FailsWithExit21AndCurlsMessage(string value, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);

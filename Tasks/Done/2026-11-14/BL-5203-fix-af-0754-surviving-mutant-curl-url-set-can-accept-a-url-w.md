@@ -1,0 +1,46 @@
+---
+id: BL-5203
+title: Fix AF-0754: Surviving mutant: curl_url_set can accept a URL whose first character is a control byte
+priority: High
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Engine.UnitLibrary]
+requirement: none
+created: 2026-11-14
+completed: 2026-11-14
+---
+# BL-5203 — Fix AF-0754: Surviving mutant: curl_url_set can accept a URL whose first character is a control byte
+
+## Goal
+
+The defect the audit office reported as AF-0754 is fixed: its reproduction no longer reproduces, so a re-audit can close the finding.
+
+## Context
+
+Filed from audit finding AF-0754 (High, quality auditor), which Stewart accepted. The finding's file is on the audit office's paths, which a dark factory lane may not read or run; everything this task needs is below.
+
+Location: `Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs:322`
+
+Location: `Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs:322`
+
+Mutant 'value.AsSpan().IndexOfAnyInRange('\u0000', '\u001F') >= 0' -> '> 0' survived. A control byte at index 0 would no longer be MalformedInput (curl's junkscan) and the URL would parse, so a CURLUcode a libcurl caller sees changes. The tests reject control bytes only after the first character.
+
+Reproduction: the audit office's mutation test changed `Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs line 322` as the evidence above describes (the mutant operator is `>=`), and every test still passed. Check it by hand, not with the audit tools: make that one change, run the library's `.UnitTests` project, see a test fail, and revert the change. The audit office reruns its mutation test on the re-audit.
+
+The finding closes only when a later re-audit by the quality auditor confirms the fix, never because this task reaches Done.
+
+## Acceptance criteria
+
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs line 322`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+Added DataRow "0001http://host/file" to SetUrl_ControlByteAnywhere_IsMalformedInputBeforeTheScheme (Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.Set.cs). With the `> 0` mutant applied it fails (BadScheme); reverted, all 3037 Engine fast tests pass. Test-only change, no production code changed. CI platform-neutral.
+
+## Log
+
+- 2026-11-14: Created.
+- 2026-11-14: Backlog -> Doing. Criteria at claim: d5215963 9742157d.
+- 2026-11-14: Doing -> Done. Added control-byte-first DataRow that kills the > 0 mutant
