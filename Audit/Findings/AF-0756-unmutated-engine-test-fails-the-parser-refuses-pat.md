@@ -42,6 +42,8 @@ dotnet test Curl.Engine.UnitTests/Curl.Engine.UnitTests.csproj -c Release --filt
 
 ## Re-audits
 
+- 2026-11-14 | 2026-11-14_1801.md | reproduces: no | Ran the dotnet test reproduction: 'Passed! - Failed: 0, Passed: 1, Skipped: 0, Total: 1' for Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine. Two other Engine tests (AwsSigV4HttpAuthenticatorTests) do fail unmutated; they are filed as a new finding.
+
 ## Log
 
 - 2026-11-14: filed proposed.

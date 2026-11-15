@@ -42,6 +42,8 @@ Select-String -Path Curl.Original.Protocol.Ldap.UnitTests/LdapAdversarialTests.c
 
 ## Re-audits
 
+- 2026-11-14 | 2026-11-14_1801.md | reproduces: no | Ran the Select-String. Encode_ReusedAfterADepthRefusal_EncodesTheMaximumDepthAgain now encodes the maximum depth with a fresh encoder too and asserts CollectionAssert.AreEqual(fresh, reused): the encoding itself is compared, not just that some bytes came back.
+
 ## Log
 
 - 2026-11-14: filed proposed.

@@ -3,8 +3,8 @@ id: AF-0684
 title: -F upload under --limit-rate 1 puts one more body byte on the wire than curl before the server's reset
 auditor: conformance
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-14_1801.md: the reproduction no longer reproduces.
 key: conformance:Curl.Console/RateLimitedUploadStream.cs:--limit-rate:request
 reproduction: none
 task: BL-4875
@@ -13,9 +13,9 @@ found: 2026-11-05
 found-at: aea9f0110c59ad5209aafb9f0f985886a2cb9439
 scorecard: 2026-11-05_0819.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-14
+closed-how: reliable-reaudit
+closed-by: 2026-11-14_1801.md
 ---
 # AF-0684 - -F upload under --limit-rate 1 puts one more body byte on the wire than curl before the server's reset
 
@@ -47,7 +47,9 @@ dotnet build Curl.Console -c Release; & ./Record-CurlExchange.ps1 -Port 63871 -C
 - 2026-11-12 | 2026-11-12_2105.md | not re-audited | Ran the reproduction three times against curl 8.22.0 (x86_64-w64-mingw32, Schannel). request.bin lengths, curl / Curl: 197/195, 195/196, 195/194. Both exit 56 each time. The reference's own byte count varies by 2 between runs. Curl sent one more byte than curl in run 2 only (the finding's symptom) and fewer in runs 1 and 3, so the reproduction cannot tell a defect from timing.
 - 2026-11-13 | 2026-11-13_2321.md | not re-audited | Ran the reproduction six times against curl 8.22.0 (Schannel, ucrt64) and the Release Curl.Console. request.bin lengths (curl/Curl): 196/197, 195/194, 195/195, 194/194, 194/194, 195/194; both exit 56 each time. curl's own byte count varies by up to 2 between runs, and Curl was one byte longer only on the first run. The reproduction's result depends on timing, so it cannot tell whether the defect remains.
 - 2026-11-14 | 2026-11-14_1335.md | not re-audited | Ran the reproduction 5 times against the Release build at b6c9545 (port 63871; reference curl 8.22.0 Schannel). request.bin lengths, curl/Curl: 196/197, 196/195, 194/194, 194/195, 194/195. Both exit 56. The reference curl's own count drifts 194-196 between runs, so the byte count before the reset depends on timing; Curl is +1 in 3 runs, equal in 1 and -1 in 1. The reproduction does not tell reliably.
+- 2026-11-14 | 2026-11-14_1801.md | reproduces: no | Ran the reproduction as given (--form a=b --limit-rate 1, port 63871, Release build) 4 times. request.bin lengths, curl/Curl: 195/194, 196/194, 196/195, 194/194; both exited 56 every time. Curl never sent more bytes than curl. Curl's own count varies by up to 2 bytes between runs, so the comparison depends on timing.
 
 ## Log
 
 - 2026-11-05: filed proposed.
+- 2026-11-14: accepted -> closed. Re-audit 2026-11-14_1801.md: the reproduction no longer reproduces.
