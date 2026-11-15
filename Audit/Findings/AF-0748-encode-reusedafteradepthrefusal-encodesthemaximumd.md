@@ -3,12 +3,12 @@ id: AF-0748
 title: Encode_ReusedAfterADepthRefusal_EncodesTheMaximumDepthAgain checks only that some bytes came back, not the encoding
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Ldap.UnitTests/LdapAdversarialTests.cs:Encode_ReusedAfterADepthRefusal_EncodesTheMaximumDepthAgain:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5197
+tasks: BL-5197
 found: 2026-11-14
 found-at: fc4d1268bd4c1bce123dba90334b07e141be698a
 scorecard: 2026-11-14_1335.md
