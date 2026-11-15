@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5235 — Fix AF-0784: Lib552 RunAsync_SetsTheIoctlCallbackAndPerforms never checks the ioctl callback is set
 
@@ -52,3 +52,4 @@ Added Assert.IsTrue(ioctlSet) via Performing capturing o.Callbacks.Ioctl; test-o
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. Lib552 test asserts the ioctl callback is set
