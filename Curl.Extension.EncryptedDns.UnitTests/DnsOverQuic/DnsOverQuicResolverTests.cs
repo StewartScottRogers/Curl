@@ -94,10 +94,34 @@ public sealed class DnsOverQuicResolverTests
     {
         RefusingChannel channel = new();
 
-        IReadOnlyList<IPAddress> addresses = await Resolver(new FakeDatagramConnector(channel)).ResolveAsync("example.com", CancellationToken.None);
+        DnsOverQuicResolver resolver = Resolver(new FakeDatagramConnector(channel));
+
+        IReadOnlyList<IPAddress> addresses = await resolver.ResolveAsync("example.com", CancellationToken.None);
+        ConnectResult result = await new Curl.Networking.TcpConnector(resolver, new NeverDialingTcpDialer(), new UnusedTlsProvider(), TimeProvider.System)
+            .ConnectAsync(new ConnectTarget("example.com", 80, UseTls: false), CancellationToken.None);
 
         Assert.IsEmpty(addresses);
         Assert.IsTrue(channel.Refused);
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreNotEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+    }
+
+    private sealed class NeverDialingTcpDialer : Curl.Networking.ITcpDialer
+    {
+        public ValueTask<Curl.Networking.DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("No address was resolved, so nothing may be dialled.");
+
+        public ValueTask<Curl.Networking.DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("No address was resolved, so nothing may be dialled.");
+
+        public ValueTask<IConnection> DialUnixSocketAsync(Curl.Networking.UnixSocketAddress address, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("No address was resolved, so nothing may be dialled.");
+    }
+
+    private sealed class UnusedTlsProvider : ITlsProvider
+    {
+        public ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("No TLS is used for a plain connection.");
     }
 
     private sealed class RefusingChannel : IDatagramChannel
