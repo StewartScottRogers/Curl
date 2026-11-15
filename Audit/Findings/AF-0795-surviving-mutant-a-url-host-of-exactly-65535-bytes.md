@@ -3,8 +3,8 @@ id: AF-0795
 title: Surviving mutant: a URL host of exactly 65535 bytes can be refused with exit 3
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:ParsedUrlRefusal-gt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:171:>
 task: none

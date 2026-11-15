@@ -3,8 +3,8 @@ id: AF-0790
 title: Surviving mutant: lib1560's UntilError can stop after the first passing row and skip every later check
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1560Checks.cs:UntilError-gt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1560Checks.cs:177:>
 task: none

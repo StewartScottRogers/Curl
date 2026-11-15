@@ -3,8 +3,8 @@ id: AF-0788
 title: ArgumentsForValue_WithoutCompanions_AsksForTheOperation never checks the message that asks for the operation
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OpenApi.UnitTests/OpenApiArgumentExpanderTests.cs:ArgumentsForValue_WithoutCompanions_AsksForTheOperation:name-lies
 reproduction: none
 task: none

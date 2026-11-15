@@ -3,8 +3,8 @@ id: AF-0793
 title: Surviving mutant: an unusable -x behind --preproxy can be ignored instead of failing the transfer
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/TransferProxySelection.cs:TrySelectProxyBehindPreProxy-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferProxySelection.cs:181:false
 task: none

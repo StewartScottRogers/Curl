@@ -3,8 +3,8 @@ id: AF-0789
 title: SegmentedDownload's not-a-plain-GET test records only the last request, so a split POST/PUT/upload goes unseen
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.SegmentedDownload.UnitTests/SegmentedDownloadTransferHookTests.cs:ExecuteAsync_ATransferThatIsNotAPlainGetOfTheWholeResource_RunsAsCurlRunsIt:weak-assertion
 reproduction: none
 task: none
