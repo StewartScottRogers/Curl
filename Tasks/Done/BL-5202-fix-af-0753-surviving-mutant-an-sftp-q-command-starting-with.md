@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ssh.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5202 — Fix AF-0753: Surviving mutant: an SFTP -Q command starting with a space can be refused as missing its parameter
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Ssh.UnitLibrary/Sftp/SftpQuoteCommand.cs line 99`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Ssh.UnitLibrary/Sftp/SftpQuoteCommand.cs line 99`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by the new Parse_Malformed DataRow " rm x" in SftpQuoteCommandTests: with the mutant `space > 0` it fails with "missing parameter" instead of "Unknown SFTP command". Reverted; all 955 fast tests pass in the Ssh unit tests.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: a25f48f5 9742157d.
+- 2026-11-14: Doing -> Done. Test pins the leading-space -Q case, kills the mutant
