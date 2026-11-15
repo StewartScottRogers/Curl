@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.WebTransport.UnitTests]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5211 — Fix AF-0762: DialAsync_VerboseOff_RaisesNothing asserts on an event recorder that is never passed to the dial, so it can never fail
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Renamed the test to DialAsync_VerboseOff_DialsWithTheSilentSinkAndStillConnects: NoTransferEvents.Instance is a stateless global sink nothing can observe, so the test now asserts the handler hands the dial that sink by default and that the no-events overload still connects. Fast tests of the WebTransport test project: 87 passed. Platform-neutral.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-14: Doing -> Done. Test now asserts the dial's default silent sink

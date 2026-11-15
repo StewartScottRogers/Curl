@@ -45,14 +45,24 @@ public sealed class WebTransportVerboseTests
 
     [TestMethod]
     [Timeout(HangTimeoutMilliseconds, CooperativeCancellation = true)]
-    public async Task DialAsync_VerboseOff_RaisesNothing()
+    public async Task DialAsync_VerboseOff_DialsWithTheSilentSinkAndStillConnects()
     {
         using QuicTestServer server = new();
-        RecordingEvents unattached = new();
+        ITransferEvents? received = null;
+        WebTransportQuicDialer dialer = Dialer(new FakeDatagramConnector(new QuicTestChannel(server)));
+        IMultiplexedConnection? connection = null;
+        WebTransportProtocolHandler handler = new(async (request, passed, token) =>
+        {
+            received = passed;
+            connection = await dialer.DialAsync(request, token);
+            throw new WebTransportException(CurlExitCode.CouldntConnect, "stop");
+        });
 
-        await using IMultiplexedConnection connection = await Dialer(new FakeDatagramConnector(new QuicTestChannel(server))).DialAsync(Request, CancellationToken.None);
+        await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("webtransport://wt.example/"), Output = new MemoryStream() });
 
-        Assert.IsEmpty(unattached.Order);
+        Assert.AreSame(NoTransferEvents.Instance, received);
+        Assert.IsNotNull(connection);
+        await connection.DisposeAsync();
     }
 
     [TestMethod]
