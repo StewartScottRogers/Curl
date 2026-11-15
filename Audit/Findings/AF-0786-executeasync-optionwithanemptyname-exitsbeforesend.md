@@ -3,8 +3,8 @@ id: AF-0786
 title: ExecuteAsync_OptionWithAnEmptyName_ExitsBeforeSendingAByte checks only that the exit code is not Ok
 auditor: quality
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_1159.md: the reproduction no longer reproduces.
 key: quality:Curl.Original.Protocol.Telnet.UnitTests/TelnetProtocolHandlerAdversarialTests.cs:ExecuteAsync_OptionWithAnEmptyName_ExitsBeforeSendingAByte:weak-assertion
 reproduction: none
 task: BL-5237
@@ -13,9 +13,9 @@ found: 2026-11-15
 found-at: d04b275ae7a1546a4d0feed894da1ba520945cf5
 scorecard: 2026-11-15_0222.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: reliable-reaudit
+closed-by: 2026-11-15_1159.md
 ---
 # AF-0786 - ExecuteAsync_OptionWithAnEmptyName_ExitsBeforeSendingAByte checks only that the exit code is not Ok
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Original.Protocol.Telnet.UnitTests/TelnetProtocolHandle
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_1159.md | reproduces: no | Ran the Select-String: no match for Assert.AreNotEqual(CurlExitCode.Ok, exchange.Result.ExitCode). ExecuteAsync_OptionWithAnEmptyName_ExitsBeforeSendingAByte now asserts Assert.AreEqual(expectedExitCode, exchange.Result.ExitCode) from its DataRow, and that nothing was sent or output.
+
 ## Log
 
 - 2026-11-15: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_1159.md: the reproduction no longer reproduces.
