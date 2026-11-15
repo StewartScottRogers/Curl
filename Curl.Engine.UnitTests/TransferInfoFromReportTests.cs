@@ -446,6 +446,17 @@ public sealed class TransferInfoFromReportTests
     }
 
     [TestMethod]
+    public void CertInfoRecordsOf_TextStartingWithItsPemBlock_GivesOnlyTheCertString()
+    {
+        const string text = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n";
+
+        IReadOnlyList<string> records = TransferInfoFromReport.CertInfoRecordsOf(text, TlsBackend.Schannel);
+
+        Assert.HasCount(1, records);
+        Assert.AreEqual("Cert:" + text, records[0]);
+    }
+
+    [TestMethod]
     public void CertInfoRecordsOf_UnreadableCertificate_GivesNoStrings() =>
         Assert.IsEmpty(TransferInfoFromReport.CertInfoRecordsOf(PeerCertificateText.Format(new byte[] { 1, 2, 3 }), TlsBackend.Schannel));
 

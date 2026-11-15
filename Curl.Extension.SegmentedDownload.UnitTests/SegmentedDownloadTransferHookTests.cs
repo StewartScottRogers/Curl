@@ -189,15 +189,16 @@ public sealed class SegmentedDownloadTransferHookTests
 
         foreach (var context in contexts)
         {
-            ITransferContext? sent = null;
+            List<ITransferContext> sent = [];
 
             await new SegmentedDownloadTransferHook(4).ExecuteAsync(context, request =>
             {
-                sent = request;
+                sent.Add(request);
                 return ValueTask.FromResult(TransferResult.Success(0));
             });
 
-            Assert.AreSame(context, sent);
+            Assert.AreEqual(1, sent.Count);
+            Assert.AreSame(context, sent[0]);
         }
     }
 

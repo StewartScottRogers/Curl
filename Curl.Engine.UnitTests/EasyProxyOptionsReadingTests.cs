@@ -143,6 +143,20 @@ public sealed class EasyProxyOptionsReadingTests
     }
 
     [TestMethod]
+    public void TrySelect_SocksPreProxyAndAnUnusableProxyText_FailsWithTheSelectorsFailure()
+    {
+        EasyProxyOptions options = new() { PreProxy = "socks5://127.0.0.1:1080", Proxy = "foo://proxy.example:1111" };
+
+        bool selected = TransferProxySelection.TrySelect(new ProxySelector(_ => null), options, false, null, Url, out ProxyEndpoint? proxy, out TransferResult? failure);
+        Diagnostics.Act("selected / exit code", $"{selected} / {failure?.ExitCode}");
+
+        Diagnostics.Assert("selected / exit code", "False / CouldntConnect", $"{selected} / {failure?.ExitCode}");
+        Assert.IsFalse(selected);
+        Assert.IsNull(proxy);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, failure!.ExitCode);
+    }
+
+    [TestMethod]
     public void PreProxyOf_RecordWithASocksPreProxy_IsThatProxy()
     {
         ProxyEndpoint? preProxy = EngineComposition.PreProxyOf(new EasyProxyOptions { PreProxy = "127.0.0.1:1080" });
