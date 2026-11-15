@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5200 — Fix AF-0751: Surviving mutant: a gs:// response header line beginning with whitespace can be accepted
 
@@ -47,3 +47,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - Killing test: `GcsHttpResponseHeadTests.ParseField_WhitespaceInTheName_FailsMalformedHeaderField` (rows " x: v" and "\tx: v"). With `>= 0` changed to `> 0` it failed 2 rows; reverted, all 147 fast tests pass.
 - Why the connection-level test could not kill it: `ReadHeadLineAsync` already rejects a leading space or tab before `ParseField`, so the check at line 31 is reached with leading whitespace only by a direct `ParseField` call. Tested there; no production change.
 - Build clean; CI-on-Linux/macOS criterion met by platform-neutral tests.
+- 2026-11-14: Doing -> Done. Added GcsHttpResponseHeadTests.ParseField_WhitespaceInTheName_FailsMalformedHeaderField, which kills the >= 0 mutant; build clean, 147 fast tests pass.
