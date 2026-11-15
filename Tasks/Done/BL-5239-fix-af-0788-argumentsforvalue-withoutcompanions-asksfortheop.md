@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.OpenApi.UnitTests]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5239 — Fix AF-0788: ArgumentsForValue_WithoutCompanions_AsksForTheOperation never checks the message that asks for the operation
 
@@ -52,3 +52,4 @@ Test now asserts exit code 2 and the message "openapi: --operation <id> names th
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. Test asserts exit code and message; fast tests green.
