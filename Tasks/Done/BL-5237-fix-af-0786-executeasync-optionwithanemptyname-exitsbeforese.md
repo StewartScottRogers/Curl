@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Telnet.UnitTests]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5237 — Fix AF-0786: ExecuteAsync_OptionWithAnEmptyName_ExitsBeforeSendingAByte checks only that the exit code is not Ok
 
@@ -52,3 +52,4 @@ The three `-t` rows now pin their exit codes: "" gives 49 (no equals sign, Setop
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. Exact exit codes pinned in the three rows; fast tests green.
