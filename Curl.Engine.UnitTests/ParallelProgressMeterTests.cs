@@ -209,6 +209,28 @@ public sealed class ParallelProgressMeterTests
     }
 
     [TestMethod]
+    public void DrawIfDue_FewerThanTenSamplesAfterALateStart_MeasuresTheSpeedSinceTheRunStarted()
+    {
+        Diagnostics.Arrange("transfer", "clock at 10 s when the meter starts; 4000 bytes of unknown size after 1 s");
+        clock.Advance(10000);
+        using ParallelProgressMeter meter = NewMeter();
+        ParallelTransferProgress transfer = meter.AddTransfer();
+        transfer.MarkLive();
+        meter.DrawIfDue();
+        clock.Advance(1000);
+
+        transfer.ReportDownloaded(4000, null);
+        clock.Advance(1000);
+        string output = written.ToString();
+        string lastLine = Neutral(output[output.LastIndexOf('\r')..]);
+        Diagnostics.Act("last meter line", lastLine);
+
+        // 4000 bytes over the 2 s since the start, not over the 12 s since an unset sample's time 0.
+        Diagnostics.Assert("last meter line ends with", "  2000      ", lastLine);
+        StringAssert.EndsWith(lastLine, "  2000      ");
+    }
+
+    [TestMethod]
     public void DrawFinal_NoTransfer_WritesTheHeaderAndAFinalZeroLine()
     {
         Diagnostics.Arrange("transfers", "none");
