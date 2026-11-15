@@ -3,8 +3,8 @@ id: AF-0711
 title: RunAsync_Cancelled_ThrowsAndStopsReadingLines never checks that line reading stops
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces.
 key: quality:Curl.Extension.WebSocketRepl.UnitTests/Session/WebSocketReplSessionTests.cs:RunAsync_Cancelled_ThrowsAndStopsReadingLines:name-lies
 reproduction: none
 task: BL-5196
@@ -13,9 +13,9 @@ found: 2026-11-12
 found-at: acc2af773fb64825b3b57d9470bb6f96176fb127
 scorecard: 2026-11-12_2105.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: reliable-reaudit
+closed-by: 2026-11-15_0222.md
 ---
 # AF-0711 - RunAsync_Cancelled_ThrowsAndStopsReadingLines never checks that line reading stops
 
@@ -45,8 +45,10 @@ Select-String -Path Curl.Extension.WebSocketRepl.UnitTests/Session/WebSocketRepl
 - 2026-11-13 | 2026-11-13_2321.md | reproduces: yes | The body is still only await Assert.ThrowsAsync<OperationCanceledException>(...session.RunAsync(new ScriptedLineReader(false), ...)); ScriptedLineReader keeps no count of reads, so nothing checks that line reading stops.
 - 2026-11-14 | 2026-11-14_1335.md | reproduces: yes | Select-String shows the test still only does Assert.ThrowsAsync<OperationCanceledException>(... session.RunAsync(new ScriptedLineReader(false), ...)); nothing checks that line reading stopped (no read count or reader state asserted).
 - 2026-11-14 | 2026-11-14_1801.md | reproduces: no | Ran the Select-String. RunAsync_Cancelled_ThrowsAndStopsReadingLines now ends with Assert.IsLessThanOrEqualTo(1, reader.LinesRead) after the ThrowsAsync<OperationCanceledException>. The reader is scripted with two lines ('never read', '/ping') and does not end after them, so reading past the first line fails the test: line reading is checked.
+- 2026-11-15 | 2026-11-15_0222.md | reproduces: no | Ran the Select-String. The test now ends Assert.IsLessThanOrEqualTo(1, reader.LinesRead) over a reader holding two lines, so a session that went on to read '/ping' fails it.
 
 ## Log
 
 - 2026-11-12: filed proposed.
 - 2026-11-13: proposed -> accepted.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces.

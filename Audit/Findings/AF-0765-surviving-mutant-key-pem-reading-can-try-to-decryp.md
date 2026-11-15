@@ -3,8 +3,8 @@ id: AF-0765
 title: Surviving mutant: --key PEM reading can try to decrypt a non-key block (or decrypt without a passphrase)
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/ClientCertificateLoader.cs:PemPrivateKeyInfo-and:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ClientCertificateLoader.cs:444:&&
 task: BL-5214
@@ -13,9 +13,9 @@ found: 2026-11-14
 found-at: 92f6fc980babe08d1ebff5f02d7e076e42c67fd7
 scorecard: 2026-11-14_1801.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: mechanical
+closed-by: 2026-11-15_0222.md
 ---
 # AF-0765 - Surviving mutant: --key PEM reading can try to decrypt a non-key block (or decrypt without a passphrase)
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_0222.md | reproduces: no | Ran the -Site command: resolvedLine 444, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-14: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

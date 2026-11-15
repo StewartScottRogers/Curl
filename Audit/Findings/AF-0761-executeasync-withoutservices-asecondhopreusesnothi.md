@@ -42,6 +42,8 @@ Select-String -Path Curl.Extension.OpenTelemetry.UnitTests/OpenTelemetryRedirect
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_0222.md | reproduces: yes | Ran the Select-String. The test now checks each traceparent's format by regex and that it appears once per request, but it never compares the two hops' traceparents, so the 'ReusesNothing' the name states is still unchecked. A hook reusing the first hop's trace ID would pass.
+
 ## Log
 
 - 2026-11-14: filed proposed.

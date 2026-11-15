@@ -3,8 +3,8 @@ id: AF-0762
 title: DialAsync_VerboseOff_RaisesNothing asserts on an event recorder that is never passed to the dial, so it can never fail
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces.
 key: quality:Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportVerboseTests.cs:DialAsync_VerboseOff_RaisesNothing:weak-assertion
 reproduction: none
 task: BL-5211
@@ -13,9 +13,9 @@ found: 2026-11-14
 found-at: 92f6fc980babe08d1ebff5f02d7e076e42c67fd7
 scorecard: 2026-11-14_1801.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: reliable-reaudit
+closed-by: 2026-11-15_0222.md
 ---
 # AF-0762 - DialAsync_VerboseOff_RaisesNothing asserts on an event recorder that is never passed to the dial, so it can never fail
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportVe
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_0222.md | reproduces: no | Ran the Select-String: no match. The test is now DialAsync_VerboseOff_DialsWithTheSilentSinkAndStillConnects and asserts Assert.AreSame(NoTransferEvents.Instance, received) on the events actually passed to the dial.
+
 ## Log
 
 - 2026-11-14: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces.

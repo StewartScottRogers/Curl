@@ -3,8 +3,8 @@ id: AF-0749
 title: ...KeepsTheIpNotAmongNamesMessage never asserts the message it names, only that it is not another one
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces.
 key: quality:Curl.Networking.UnitTests/ServerCertificateVerificationTests.VerifyChain.cs:VerifyServerCertificateChain_SchannelIpTargetAgainstCommonNameLocalhostWithDnsName_KeepsTheIpNotAmongNamesMessage:name-lies
 reproduction: none
 task: BL-5198
@@ -13,9 +13,9 @@ found: 2026-11-14
 found-at: fc4d1268bd4c1bce123dba90334b07e141be698a
 scorecard: 2026-11-14_1335.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: reliable-reaudit
+closed-by: 2026-11-15_0222.md
 ---
 # AF-0749 - ...KeepsTheIpNotAmongNamesMessage never asserts the message it names, only that it is not another one
 
@@ -43,7 +43,9 @@ Select-String -Path Curl.Networking.UnitTests/ServerCertificateVerificationTests
 ## Re-audits
 
 - 2026-11-14 | 2026-11-14_1801.md | reproduces: no | Ran the Select-String. ...KeepsTheIpNotAmongNamesMessage now asserts Assert.AreEqual("SSL peer certificate or SSH remote key was not OK", verdict.ErrorMessage), the exact text of TlsFailureMessages.SchannelIpAddressNotAmongAlternativeNames (TlsFailureMessages.cs:56).
+- 2026-11-15 | 2026-11-15_0222.md | reproduces: no | Ran the Select-String. Line 300 asserts Assert.AreEqual("SSL peer certificate or SSH remote key was not OK", verdict.ErrorMessage), which is TlsFailureMessages.SchannelIpAddressNotAmongAlternativeNames.
 
 ## Log
 
 - 2026-11-14: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces.

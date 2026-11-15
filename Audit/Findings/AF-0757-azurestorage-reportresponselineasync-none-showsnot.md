@@ -3,8 +3,8 @@ id: AF-0757
 title: AzureStorage ReportResponseLineAsync_None_ShowsNothing asserts only that a never-null instance is not null
 auditor: quality
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces.
 key: quality:Curl.Extended.Protocol.AzureStorage.UnitTests/Http/AzureStorageHttpHeadReporterTests.cs:ReportResponseLineAsync_None_ShowsNothing:weak-assertion
 reproduction: none
 task: BL-5206
@@ -13,9 +13,9 @@ found: 2026-11-14
 found-at: 92f6fc980babe08d1ebff5f02d7e076e42c67fd7
 scorecard: 2026-11-14_1801.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: reliable-reaudit
+closed-by: 2026-11-15_0222.md
 ---
 # AF-0757 - AzureStorage ReportResponseLineAsync_None_ShowsNothing asserts only that a never-null instance is not null
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Extended.Protocol.AzureStorage.UnitTests/Http/AzureStor
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_0222.md | reproduces: no | Ran the Select-String. The test now asserts Assert.IsNull(reporter.Report) instead of IsNotNull on a never-null instance.
+
 ## Log
 
 - 2026-11-14: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces.
