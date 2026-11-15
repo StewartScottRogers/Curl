@@ -352,7 +352,7 @@ internal sealed partial class ManagedEasyTransfer
     /// <param name="progress">The progress callback's sink, or <see langword="null" /> for none.</param>
     /// <param name="reads">The read callbacks' streams the transfer reads: the upload's and the <c>curl_mime_data_cb</c> parts'.</param>
     /// <returns>The attempt's result, or <see langword="null" /> when a callback aborted it.</returns>
-    private static async Task<TransferResult?> FollowUnlessAbortedAsync(
+    internal static async Task<TransferResult?> FollowUnlessAbortedAsync(
         RedirectFollower follower,
         EngineTransferState state,
         TransferContext context,

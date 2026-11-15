@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5247 — Fix AF-0796: Surviving mutant: any IOException in a read-callback upload can be reported as an aborted-by-callback exit 42
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs line 371`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs line 371`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killed by `ManagedEasyTransferFollowUnlessAbortedTests` (`IOExceptionAndNoReadAborted` and `NonIOExceptionAfterAReadAborted`), checked by hand with `&&` -> `||`; both fail with the mutant, all 3048 fast Engine tests pass reverted. `FollowUnlessAbortedAsync` became internal to be tested directly. Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: aeacaa28 9742157d.
+- 2026-11-15: Doing -> Done. Mutant killed by new FollowUnlessAborted tests
