@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/ServerCertificateVerificationTests
 
 ## Re-audits
 
+- 2026-11-14 | 2026-11-14_1801.md | reproduces: no | Ran the Select-String. ...KeepsTheIpNotAmongNamesMessage now asserts Assert.AreEqual("SSL peer certificate or SSH remote key was not OK", verdict.ErrorMessage), the exact text of TlsFailureMessages.SchannelIpAddressNotAmongAlternativeNames (TlsFailureMessages.cs:56).
+
 ## Log
 
 - 2026-11-14: filed proposed.

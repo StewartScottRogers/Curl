@@ -44,6 +44,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 - 2026-11-13 | 2026-11-13_2321.md | not re-audited | Ran the -Site command: outcome site-missing. IsHashedCertificateFileName now reads name is { Length: >= 10 } with a comment that a bare hash-dot name never names a file, so no > site remains in the member: not re-audited.
 - 2026-11-14 | 2026-11-14_1335.md | not re-audited | Ran the -Site command: outcome site-missing (resolvedLine null). IsHashedCertificateFileName moved to line 724 and now reads 'name is { Length: >= 10 }'. For information, the same operator at the new site (ServerCertificateVerification.cs:724:>=) was killed. Recorded as not re-audited.
+- 2026-11-14 | 2026-11-14_1801.md | not re-audited | Ran the -Site command: outcome site-missing, resolvedLine null, no mutant run. IsHashedCertificateFileName now reads 'name is { Length: >= 10 } && name[8] == '.' && ...' (ServerCertificateVerification.cs:724-728), so the member holds no ' > ' site. Not re-audited.
 
 ## Log
 
