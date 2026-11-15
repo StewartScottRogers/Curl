@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.GoogleCloudStorage.UnitTests]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-15
 ---
 # BL-5207 — Fix AF-0758: Gcs ReportResponseLineAsync_None_ShowsNothing asserts only that a never-null instance is not null
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test now takes one instance of `GcsHttpHeadReporter.None`, reports a request head and a response line, and asserts only the reporter's own -w memory changed (HeaderSize 17); None has no header output and no-op events, so nothing is shown. Fast tests: 147 pass. Test-only change, no production code.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. Test asserts None shows nothing

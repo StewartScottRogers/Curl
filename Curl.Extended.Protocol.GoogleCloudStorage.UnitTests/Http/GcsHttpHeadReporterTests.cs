@@ -105,10 +105,17 @@ public sealed class GcsHttpHeadReporterTests
     [TestMethod]
     public async Task ReportResponseLineAsync_None_ShowsNothing()
     {
-        GcsHttpHeadReporter.None.ReportRequestHead("x"u8);
-        await GcsHttpHeadReporter.None.ReportResponseLineAsync("x", CancellationToken.None);
+        GcsHttpHeadReporter none = GcsHttpHeadReporter.None;
+        Assert.IsNull(none.Report);
 
-        Assert.IsNotNull(GcsHttpHeadReporter.None);
+        none.ReportRequestHead("x"u8);
+        await none.ReportResponseLineAsync("HTTP/1.1 200 OK", CancellationToken.None);
+
+        // Nothing is shown: the events are the no-op ones and there is no header output, so only the
+        // reporter's own -w memory of the response head changes.
+        TransferReport report = none.Report!;
+        Assert.AreEqual(17, report.HeaderSize);
+        Assert.AreNotSame(GcsHttpHeadReporter.None, none);
     }
 
     [TestMethod]
