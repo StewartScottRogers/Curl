@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5203 — Fix AF-0754: Surviving mutant: curl_url_set can accept a URL whose first character is a control byte
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs line 322`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs line 322`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added DataRow "0001http://host/file" to SetUrl_ControlByteAnywhere_IsMalformedInputBeforeTheScheme (Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.Set.cs). With the `> 0` mutant applied it fails (BadScheme); reverted, all 3037 Engine fast tests pass. Test-only change, no production code changed. CI platform-neutral.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: d5215963 9742157d.
+- 2026-11-14: Doing -> Done. Added control-byte-first DataRow that kills the > 0 mutant

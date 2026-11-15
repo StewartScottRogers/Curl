@@ -683,6 +683,7 @@ public sealed partial class ManagedCurlUrlHandleTests
     [DataRow("htt\u0002://host/file", CurlUrlFlags.NonSupportScheme)]
     [DataRow("http\u001F://host/path/", CurlUrlFlags.UrlEncode)]
     [DataRow("http://host/pa\u007Fth", CurlUrlFlags.None)]
+    [DataRow("\u0001http://host/file", CurlUrlFlags.None)]
     [DataRow(" http://host/file", CurlUrlFlags.None)]
     [DataRow(" ", CurlUrlFlags.None)]
     [DataRow("http://host/a b", CurlUrlFlags.None)]
