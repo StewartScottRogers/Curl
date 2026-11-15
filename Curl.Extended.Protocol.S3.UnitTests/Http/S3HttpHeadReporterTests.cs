@@ -105,10 +105,14 @@ public sealed class S3HttpHeadReporterTests
     [TestMethod]
     public async Task ReportResponseLineAsync_None_ShowsNothing()
     {
-        S3HttpHeadReporter.None.ReportRequestHead("x"u8);
-        await S3HttpHeadReporter.None.ReportResponseLineAsync("x", CancellationToken.None);
+        S3HttpHeadReporter none = S3HttpHeadReporter.None;
 
-        Assert.IsNotNull(S3HttpHeadReporter.None);
+        none.ReportRequestHead("x"u8);
+        await none.ReportResponseLineAsync("x", CancellationToken.None);
+
+        // A line that is not a status line records no response, and a later None starts with nothing remembered.
+        Assert.IsNull(none.Report);
+        Assert.IsNull(S3HttpHeadReporter.None.Report);
     }
 
     [TestMethod]
