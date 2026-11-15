@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.OciRegistry.UnitTests]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-15
 ---
 # BL-5208 — Fix AF-0759: Oci ReportResponseLineAsync_None_ShowsNothing asserts only that a never-null instance is not null
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Replaced the IsNotNull assertion with one that the None reporter's response-line task completes successfully (a null-output, no-events reporter shows nothing); test made synchronous. Fast tests green (189 in the Oci project).
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. Assertion strengthened; tests green

@@ -103,12 +103,12 @@ public sealed class OciHttpHeadReporterTests
     }
 
     [TestMethod]
-    public async Task ReportResponseLineAsync_None_ShowsNothing()
+    public void ReportResponseLineAsync_None_ShowsNothing()
     {
         OciHttpHeadReporter.None.ReportRequestHead("x"u8);
-        await OciHttpHeadReporter.None.ReportResponseLineAsync("x", CancellationToken.None);
+        var response = OciHttpHeadReporter.None.ReportResponseLineAsync("x", CancellationToken.None);
 
-        Assert.IsNotNull(OciHttpHeadReporter.None);
+        Assert.IsTrue(response.IsCompletedSuccessfully);
     }
 
     [TestMethod]
