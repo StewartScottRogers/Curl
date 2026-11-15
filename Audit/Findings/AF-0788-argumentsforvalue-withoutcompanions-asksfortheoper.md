@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OpenApi.UnitTests/OpenApiArgumentExpanderTests.cs:ArgumentsForValue_WithoutCompanions_AsksForTheOperation:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-5239
+tasks: BL-5239
 found: 2026-11-15
 found-at: 065474f7431e6647cda727e7f0fd5a25c9859a90
 scorecard: 2026-11-15_1159.md
