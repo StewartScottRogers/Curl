@@ -105,10 +105,11 @@ public sealed class AzureStorageHttpHeadReporterTests
     [TestMethod]
     public async Task ReportResponseLineAsync_None_ShowsNothing()
     {
-        AzureStorageHttpHeadReporter.None.ReportRequestHead("x"u8);
-        await AzureStorageHttpHeadReporter.None.ReportResponseLineAsync("x", CancellationToken.None);
+        var reporter = AzureStorageHttpHeadReporter.None;
+        reporter.ReportRequestHead("x"u8);
+        await reporter.ReportResponseLineAsync("x", CancellationToken.None);
 
-        Assert.IsNotNull(AzureStorageHttpHeadReporter.None);
+        Assert.IsNull(reporter.Report);
     }
 
     [TestMethod]
