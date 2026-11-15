@@ -107,6 +107,14 @@ public sealed class WebTransportRequestTests
     }
 
     [TestMethod]
+    public void Of_ExplicitPortZero_DialsPortZeroAndSendsItInTheAuthority()
+    {
+        WebTransportRequest request = WebTransportRequest.Of(CurlUrl.Parse("webtransport://example.com:0/echo"), null);
+
+        Assert.AreEqual(("example.com", 0, "example.com:0"), (request.Host, request.Port, request.Authority));
+    }
+
+    [TestMethod]
     [DataRow("webtransport://h:8443/p?wt=uni", "/p", (int)WebTransportMode.Unidirectional)]
     [DataRow("webtransport://h:8443/p?a=1&wt=datagram&b=2", "/p?a=1&b=2", (int)WebTransportMode.Datagram)]
     [DataRow("webtransport://h:8443/p?", "/p", (int)WebTransportMode.Bidirectional)]
