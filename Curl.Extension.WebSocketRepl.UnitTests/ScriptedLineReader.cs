@@ -7,6 +7,9 @@ internal sealed class ScriptedLineReader(bool endsAfterLines, params string[] li
 {
     private int next;
 
+    /// <summary>How many lines have been handed out so far.</summary>
+    public int LinesRead => next;
+
     public override async ValueTask<string?> ReadLineAsync(CancellationToken cancellationToken)
     {
         if (next < lines.Length)
