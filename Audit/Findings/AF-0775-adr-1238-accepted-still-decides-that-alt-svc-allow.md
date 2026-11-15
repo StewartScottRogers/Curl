@@ -3,8 +3,8 @@ id: AF-0775
 title: ADR-1238 (Accepted) still decides that alt-svc allows h1, h2 and h3 off Windows with no version option; since ADR-1268 the code allows h3 only on a QUIC build, which the executable never is
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1238-alt-svc-switches-to-h1-alone-without-a-version-option-on-windows.md:ADR-1238:stale-adr
 reproduction: none
 task: BL-5224
@@ -13,9 +13,9 @@ found: 2026-11-14
 found-at: 92f6fc980babe08d1ebff5f02d7e076e42c67fd7
 scorecard: 2026-11-14_1801.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: reliable-reaudit
+closed-by: 2026-11-15_0222.md
 ---
 # AF-0775 - ADR-1238 (Accepted) still decides that alt-svc allows h1, h2 and h3 off Windows with no version option; since ADR-1268 the code allows h3 only on a QUIC build, which the executable never is
 
@@ -42,6 +42,9 @@ Select-String -Path Documentation/Planning/Decisions/ADR-1238-alt-svc-switches-t
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_0222.md | reproduces: no | Ran the reproduction. Select-String for 'elsewhere it still allows' in ADR-1238 finds no match. Its Decision now reads "elsewhere it allowed `h1`, `h2` and `h3` (ADR-1268 later took `h3` out unless the build is a QUIC build)", and its Status is "Accepted, amended by ADR-1268 (off Windows, h3 is allowed only on a QUIC build)". The code half still matches at Curl.Engine.UnitLibrary/AltSvcTransferCache.cs:291 (`isWindows ? SchannelBuildAlpns : actsAsQuicBuild ? EveryAlpn : NoQuicBuildAlpns`), and the ADR now agrees with it.
+
 ## Log
 
 - 2026-11-14: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces.

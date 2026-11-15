@@ -3,8 +3,8 @@ id: AF-0766
 title: Surviving mutant: the DNS-over-TCP stream can be made not to own its socket, leaving it open
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/DnsSocketOpener.cs:ConnectStreamAsync-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DnsSocketOpener.cs:35:true
 task: BL-5215
@@ -13,9 +13,9 @@ found: 2026-11-14
 found-at: 92f6fc980babe08d1ebff5f02d7e076e42c67fd7
 scorecard: 2026-11-14_1801.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: mechanical
+closed-by: 2026-11-15_0222.md
 ---
 # AF-0766 - Surviving mutant: the DNS-over-TCP stream can be made not to own its socket, leaving it open
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_0222.md | reproduces: no | Ran the -Site command: resolvedLine 35, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-14: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_0222.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
