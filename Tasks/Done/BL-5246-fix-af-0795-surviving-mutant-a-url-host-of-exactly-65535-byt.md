@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5246 — Fix AF-0795: Surviving mutant: a URL host of exactly 65535 bytes can be refused with exit 3
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs line 171`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs line 171`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test `ParsedUrlRefusal_HostOfExactlyTheMaximum_IsNotRefused` (Curl.Engine.UnitTests/TransferPerformerTests.Setup.cs): fails with `>=` applied by hand, passes reverted. Test-only change; the engine library suite passed the two ParsedUrlRefusal tests.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: 771ae913 9742157d.
+- 2026-11-15: Doing -> Done. Boundary test kills the >= mutant

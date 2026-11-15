@@ -68,6 +68,14 @@ public sealed partial class TransferPerformerTests
     }
 
     [TestMethod]
+    public void ParsedUrlRefusal_HostOfExactlyTheMaximum_IsNotRefused()
+    {
+        CurlUrl url = CurlUrl.Parse("http://" + new string('a', TransferPerformer.MaximumHostLength) + "/");
+
+        Assert.IsNull(TransferPerformer.ParsedUrlRefusal(url));
+    }
+
+    [TestMethod]
     public void TrySelectProxyAndCredentials_ProxyOption_ChoosesThatProxy()
     {
         CommandLineOptions options = Parse("-x", "http://proxy.example:3128", First);
