@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5248 — Fix AF-0797: Surviving mutant: CURLINFO_CERTINFO can be empty for certificate text that starts with its PEM block
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferInfoFromReport.CertInfo.cs line 34`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferInfoFromReport.CertInfo.cs line 34`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `CertInfoRecordsOf_TextStartingWithItsPemBlock_GivesOnlyTheCertString` (PEM at offset 0). Test-only change; build clean, 3050 fast tests green in Curl.Engine.UnitTests.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b882b1a9 9742157d.
+- 2026-11-15: Doing -> Done. Mutant killed by new PEM-at-offset-0 test
