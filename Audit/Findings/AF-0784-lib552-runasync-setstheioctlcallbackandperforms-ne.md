@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib539To553Tests.cs:RunAsync_SetsTheIoctlCallbackAndPerforms:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-5235
+tasks: BL-5235
 found: 2026-11-15
 found-at: d04b275ae7a1546a4d0feed894da1ba520945cf5
 scorecard: 2026-11-15_0222.md

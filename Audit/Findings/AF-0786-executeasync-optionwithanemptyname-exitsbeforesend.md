@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Telnet.UnitTests/TelnetProtocolHandlerAdversarialTests.cs:ExecuteAsync_OptionWithAnEmptyName_ExitsBeforeSendingAByte:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5237
+tasks: BL-5237
 found: 2026-11-15
 found-at: d04b275ae7a1546a4d0feed894da1ba520945cf5
 scorecard: 2026-11-15_0222.md
