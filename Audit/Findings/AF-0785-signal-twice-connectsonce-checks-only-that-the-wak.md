@@ -3,8 +3,8 @@ id: AF-0785
 title: Signal_Twice_ConnectsOnce checks only that the wakeup is readable, not that it connected once
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitTests/SocketActionGatedResolverTests.cs:Signal_Twice_ConnectsOnce:name-lies
 reproduction: none
 task: none

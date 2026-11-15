@@ -3,8 +3,8 @@ id: AF-0778
 title: Surviving mutant: --dns-over-tls/--dns-over-quic can refuse a name of exactly 255 octets
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.EncryptedDns.UnitLibrary/Wire/DnsQueryEncoder.cs:EncodeName-gt:surviving-mutant
 reproduction: mutation Curl.Extension.EncryptedDns.UnitLibrary/Wire/DnsQueryEncoder.cs:62:>
 task: none

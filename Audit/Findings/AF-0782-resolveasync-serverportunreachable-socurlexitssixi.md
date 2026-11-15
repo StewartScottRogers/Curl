@@ -3,8 +3,8 @@ id: AF-0782
 title: ResolveAsync_ServerPortUnreachable_...SoCurlExitsSixInsteadOfSeven never asserts an exit code
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.EncryptedDns.UnitTests/DnsOverQuic/DnsOverQuicResolverTests.cs:ResolveAsync_ServerPortUnreachable_FindsNoAddressesSoCurlExitsSixInsteadOfSeven:name-lies
 reproduction: none
 task: none

@@ -3,8 +3,8 @@ id: AF-0779
 title: Surviving mutant: a TLS session valid until the current second can be dropped as expired
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/TlsSessionCache.cs:RemoveExpired-lt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TlsSessionCache.cs:337:<
 task: none

@@ -3,8 +3,8 @@ id: AF-0781
 title: Surviving mutant: a header write starting with its line feed can lose that line from the recorded headers
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/HeaderRecordingStream.cs:Record-ge:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/HeaderRecordingStream.cs:84:>=
 task: none

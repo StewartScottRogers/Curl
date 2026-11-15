@@ -3,8 +3,8 @@ id: AF-0776
 title: Surviving mutant: stomp://host:0/ can be dialled on the default port 61613 instead of port 0
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompProtocolHandler.cs:TargetOf-ge:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompProtocolHandler.cs:44:>=
 task: none

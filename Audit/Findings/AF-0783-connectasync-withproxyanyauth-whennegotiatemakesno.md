@@ -3,8 +3,8 @@ id: AF-0783
 title: ConnectAsync_WithProxyAnyAuth_WhenNegotiateMakesNoToken_FailsWithThe407 never checks the 407
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs:ConnectAsync_WithProxyAnyAuth_WhenNegotiateMakesNoToken_FailsWithThe407:name-lies
 reproduction: none
 task: none

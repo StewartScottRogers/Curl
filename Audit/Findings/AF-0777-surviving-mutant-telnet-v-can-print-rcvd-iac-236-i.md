@@ -3,8 +3,8 @@ id: AF-0777
 title: Surviving mutant: telnet -v can print 'RCVD IAC 236' instead of 'RCVD IAC EOF'
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Telnet.UnitLibrary/TelnetTraceReporter.cs:CommandReceived-ge:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Telnet.UnitLibrary/TelnetTraceReporter.cs:87:>=
 task: none
