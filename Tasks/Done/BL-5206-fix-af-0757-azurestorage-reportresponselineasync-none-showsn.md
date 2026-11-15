@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.AzureStorage.UnitTests]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-15
 ---
 # BL-5206 — Fix AF-0757: AzureStorage ReportResponseLineAsync_None_ShowsNothing asserts only that a never-null instance is not null
 
@@ -52,3 +52,4 @@ None now asserts `Report` stays null after a request head and a non-status line 
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. None test now asserts Report stays null
