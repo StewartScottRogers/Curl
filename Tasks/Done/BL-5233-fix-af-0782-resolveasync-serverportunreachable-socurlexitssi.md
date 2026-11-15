@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.EncryptedDns.UnitTests]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5233 — Fix AF-0782: ResolveAsync_ServerPortUnreachable_...SoCurlExitsSixInsteadOfSeven never asserts an exit code
 
@@ -52,3 +52,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. Test now asserts exit 6 via TcpConnector over the refused DoQ resolver
