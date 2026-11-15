@@ -38,6 +38,21 @@ public sealed class Lib500Tests
     }
 
     [TestMethod]
+    public async Task RunAsync_EqualTimes_WritesOnlyTheIpLine()
+    {
+        string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var info = new TransferInfo { PrimaryIp = "127.0.0.1" };
+        var engine = new FakeCurlEngine { Info = info };
+        var run = new PortRun(engine, 585, "ftp://x/", path, "activeftp");
+
+        await new Lib500(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+
+        string times = await File.ReadAllTextAsync(path);
+        File.Delete(path);
+        Assert.AreEqual("IP 127.0.0.1\n", times);
+    }
+
+    [TestMethod]
     public async Task RunAsync_PlainCaseWithoutAFile_SetsNoSocketCallbacksAndWritesNothing()
     {
         var engine = new FakeCurlEngine { Performing = options => options.Callbacks.OpenSocket is null ? CurlCode.Ok : CurlCode.Obsolete44 };
