@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Composition.UnitLibrary]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5238 — Fix AF-0787: BodyReplacingHookExclusivity's summaries say it refuses only two body-replacing options, but it also refuses one given with -T or -I
 
@@ -52,3 +52,4 @@ Summaries of the class and HookFor now also describe the single-option refusal u
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. Class and HookFor summaries now describe the single-option -T/-I refusal; build and fast tests green
