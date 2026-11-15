@@ -3,12 +3,12 @@ id: AF-0787
 title: BodyReplacingHookExclusivity's summaries say it refuses only two body-replacing options, but it also refuses one given with -T or -I
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Extension.Composition.UnitLibrary/BodyReplacingHookExclusivity.cs:BodyReplacingHookExclusivity:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-5238
+tasks: BL-5238
 found: 2026-11-15
 found-at: d04b275ae7a1546a4d0feed894da1ba520945cf5
 scorecard: 2026-11-15_0222.md
