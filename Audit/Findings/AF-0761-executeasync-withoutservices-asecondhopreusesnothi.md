@@ -3,12 +3,12 @@ id: AF-0761
 title: ExecuteAsync_WithoutServices_ASecondHopReusesNothingAndStillSendsATraceParent checks only that some traceparent exists
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OpenTelemetry.UnitTests/OpenTelemetryRedirectTests.cs:ExecuteAsync_WithoutServices_ASecondHopReusesNothingAndStillSendsATraceParent:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5210
+tasks: BL-5210
 found: 2026-11-14
 found-at: 92f6fc980babe08d1ebff5f02d7e076e42c67fd7
 scorecard: 2026-11-14_1801.md
