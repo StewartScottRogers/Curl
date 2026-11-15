@@ -7,7 +7,9 @@ namespace Curl.Extension.Composition;
 /// <summary>
 /// Refuses an option group that gives two extension options which each replace the request body (<c>--graphql</c>,
 /// <c>--jsonrpc</c>, <c>--connect-rpc</c>, <c>--grpc-web</c>): only one body can be sent, so the transfer fails with
-/// exit 2 naming both options and sends nothing, as curl refuses options it cannot use together (ADR-1262).
+/// exit 2 naming both options and sends nothing, as curl refuses options it cannot use together (ADR-1262). A single
+/// body-replacing option is refused too when it is given with <c>-T</c> or <c>-I</c>: it fails the transfer with
+/// <c>--&lt;option&gt; cannot be used with -T</c> or <c>-I</c>.
 /// </summary>
 public static class BodyReplacingHookExclusivity
 {
@@ -20,7 +22,7 @@ public static class BodyReplacingHookExclusivity
         Curl.Extension.GrpcWeb.GrpcWebExtension.Option,
     ];
 
-    /// <summary>Gives a hook that refuses the transfer when an option group gave two body-replacing options.</summary>
+    /// <summary>Gives a hook that refuses the transfer when an option group gave two body-replacing options, or one given with <c>-T</c> or <c>-I</c>.</summary>
     /// <param name="values">The extension options the option group gave.</param>
     /// <returns>The refusing hook for two options, a hook refusing <c>-T</c> and <c>-I</c> for one, or <see langword="null" /> for none.</returns>
     public static ITransferHook? HookFor(ExtensionOptionValues values)

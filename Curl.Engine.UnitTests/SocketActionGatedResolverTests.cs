@@ -103,6 +103,9 @@ public sealed class SocketActionGatedResolverTests
         wakeup.Signal();
 
         Assert.IsTrue(IsReadable(wakeup.Handle, TimeSpan.FromSeconds(5)));
+        using Socket listener = new(new SafeSocketHandle(wakeup.Handle, ownsHandle: false));
+        using Socket accepted = listener.Accept();
+        Assert.IsFalse(IsReadable(wakeup.Handle, TimeSpan.FromMilliseconds(200)), "a second connection reached the listener");
     }
 
     [TestMethod]

@@ -52,6 +52,24 @@ public sealed class DnsWireTests
     }
 
     [TestMethod]
+    public void Encode_Rfc1035Section2_3_4_NameOfExactly255Octets_IsEncoded()
+    {
+        string label = new('a', 63);
+
+        byte[] query = DnsQueryEncoder.Encode(1, $"{label}.{label}.{label}.{new string('a', 61)}", DnsRecordType.A);
+
+        Assert.AreEqual(12 + 255 + 4, query.Length);
+    }
+
+    [TestMethod]
+    public void Encode_Rfc1035Section2_3_4_NameOf256Octets_IsRefused()
+    {
+        string label = new('a', 63);
+
+        Assert.ThrowsExactly<ArgumentException>(() => DnsQueryEncoder.Encode(1, $"{label}.{label}.{label}.{new string('a', 62)}", DnsRecordType.A));
+    }
+
+    [TestMethod]
     public void Decode_Rfc1035Section4_1_4_AnswerNamedByACompressionPointer_GivesItsAddress()
     {
         byte[] answer =

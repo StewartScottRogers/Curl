@@ -178,15 +178,15 @@ public sealed class TelnetProtocolHandlerAdversarialTests
     }
 
     [TestMethod]
-    [DataRow("", DisplayName = "empty option")]
-    [DataRow("=", DisplayName = "only an equals sign")]
-    [DataRow("==", DisplayName = "two equals signs")]
-    public async Task ExecuteAsync_OptionWithAnEmptyName_ExitsBeforeSendingAByte(string option)
+    [DataRow("", CurlExitCode.SetoptOptionSyntax, DisplayName = "empty option")]
+    [DataRow("=", CurlExitCode.UnknownOption, DisplayName = "only an equals sign")]
+    [DataRow("==", CurlExitCode.UnknownOption, DisplayName = "two equals signs")]
+    public async Task ExecuteAsync_OptionWithAnEmptyName_ExitsBeforeSendingAByte(string option, CurlExitCode expectedExitCode)
     {
         Exchange exchange = await RunAsync([option], Read("68 69"));
 
         Diagnostics.Arrange("option", option);
-        Assert.AreNotEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
+        Assert.AreEqual(expectedExitCode, exchange.Result.ExitCode);
         Assert.AreEqual(string.Empty, exchange.Sent);
         Assert.AreEqual(string.Empty, exchange.Output);
     }

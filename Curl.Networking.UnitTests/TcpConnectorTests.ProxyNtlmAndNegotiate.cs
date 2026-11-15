@@ -195,6 +195,7 @@ public sealed partial class TcpConnectorTests
 
         Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(407, result.ProxyConnectResponseCode);
         Assert.AreEqual(UnauthenticatedConnect, Encoding.Latin1.GetString([.. connection.Written]));
         Assert.HasCount(1, dialer.DialedEndPoints);
         Assert.AreEqual(1, tokens.ContextsMade);

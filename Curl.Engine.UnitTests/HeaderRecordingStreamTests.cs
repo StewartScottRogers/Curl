@@ -33,6 +33,18 @@ public sealed class HeaderRecordingStreamTests
     }
 
     [TestMethod]
+    public void Write_WriteStartingWithItsLineFeed_EndsThePendingLineAtOnce()
+    {
+        TransferHeaderStore store = new();
+        using HeaderRecordingStream stream = new(store, null);
+
+        stream.Write(Head, 0, Head.Length - 4);
+        stream.Write("\n"u8);
+
+        Assert.AreEqual("s\xe9", ServerOf(store));
+    }
+
+    [TestMethod]
     public async Task WriteAsync_WithAnInnerStream_RecordsTheLinesAndPassesTheBytesOn()
     {
         TransferHeaderStore store = new();
