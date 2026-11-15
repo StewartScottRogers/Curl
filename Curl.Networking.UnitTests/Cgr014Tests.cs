@@ -118,7 +118,7 @@ public sealed class Cgr014Tests
             SslPolicyErrors.RemoteCertificateNotAvailable, null, "localhost", [], null, [], Staple(pki, OcspStapleStatus.Revoked));
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
-        Assert.AreNotEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+        Assert.AreEqual(TlsFailureMessages.SchannelCaCertificateFileChainError(X509ChainStatusFlags.NoError), failure?.Message);
     }
 
     [TestMethod]

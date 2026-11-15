@@ -292,6 +292,26 @@ public sealed class HandBuiltPrivateKeyReaderTests
         Assert.AreEqual($"unable to set private key file: '{keyFile}' type PEM", failure.ErrorMessage);
     }
 
+    // AF-0765: with a passphrase, a block that is not an ENCRYPTED PRIVATE KEY (here the
+    // CERTIFICATE ahead of it) is skipped, never decrypted.
+    [TestMethod]
+    public void LoadAsOpenSslBuild_WithAnEncryptedPemKeyAfterACertificateBlock_SkipsTheCertificateAndDecryptsTheKey()
+    {
+        var (publicKey, privateKeyInfo) = KeyPair(HandBuiltPrivateKeyReader.Ed25519Oid);
+        using var certificate = CertificateFor(HandBuiltPrivateKeyReader.Ed25519Oid, publicKey);
+        var encryptedKeyPem = File.ReadAllText(WriteEncryptedKey(privateKeyInfo));
+        var keyFile = WriteFile("combined.pem", certificate.ExportCertificatePem() + "\n" + encryptedKeyPem);
+        Diagnostics.Arrange("key file", "a CERTIFICATE block, then an ENCRYPTED PRIVATE KEY block");
+        Diagnostics.Arrange("passphrase", "the right one");
+
+        var (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(WriteFile("cert.pem", certificate.ExportCertificatePem()), "pass phrase", keyFile, null, null);
+
+        ActLoad(loaded, failure);
+        Diagnostics.Assert("failure is null", true, failure is null);
+        Assert.IsNull(failure);
+        loaded?.Dispose();
+    }
+
     private string WriteEncryptedKey(byte[] privateKeyInfo)
     {
         var encrypted = EncryptedPrivateKeyInfoDecryptionTests.Encrypt(

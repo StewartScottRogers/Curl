@@ -47,6 +47,14 @@ public sealed class WebTransportConnectHeaderFieldsTests
             WebTransportConnectHeaderFields.Build(null, null, null, null, ["User-Agent:", "X-Empty;", "no-colon", ";", "X-Inj: a\r\nEvil: b"]).ToArray());
 
     [TestMethod]
+    [DataRow("\r\nX-Evil: b")]
+    [DataRow("\nX-Evil: b")]
+    public void Build_CustomHeaderStartingWithLineBreak_IsIgnoredWhole(string header) =>
+        CollectionAssert.AreEqual(
+            new HeaderField[] { new("user-agent", "curl/8.22.0") },
+            WebTransportConnectHeaderFields.Build(null, null, null, null, [header]).ToArray());
+
+    [TestMethod]
     [DataRow(":path: /x")]
     [DataRow(":method: GET")]
     [DataRow("Host: evil.example")]

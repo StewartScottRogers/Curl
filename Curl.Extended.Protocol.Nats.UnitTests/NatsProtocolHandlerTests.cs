@@ -104,6 +104,17 @@ public sealed class NatsProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DataOfExactlyMaxPayload_PublishesIt()
+    {
+        ScriptedConnection connection = ScriptedConnection.Of(Info, "PONG\r\n");
+
+        TransferResult result = await ExecuteAsync(connection, "nats://example.com/a", new MemoryStream(), "12345678");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(Connect + "PUB a 8\r\n12345678\r\nPING\r\n", connection.Sent);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_DataOverMaxPayload_FailsWithExit63BeforePublishing()
     {
         ScriptedConnection connection = ScriptedConnection.Of(Info);
@@ -188,6 +199,7 @@ public sealed class NatsProtocolHandlerTests
     [DataRow("nats://example.com/a", 4222, false)]
     [DataRow("NATSS://example.com/a", 4222, true)]
     [DataRow("natss://example.com:4443/a", 4443, true)]
+    [DataRow("nats://example.com:0/a", 0, false)]
     public async Task ExecuteAsync_TheScheme_ChoosesTheDefaultPortAndTls(string url, int port, bool useTls)
     {
         ScriptedConnector connector = new(ConnectResult.Refused("x"));

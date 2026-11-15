@@ -294,6 +294,31 @@ public sealed partial class ManagedEasyTransferTests
         CollectionAssert.AreEqual(new[] { CurlCode.BadFunctionArgument, CurlCode.SendError, CurlCode.Ok, CurlCode.SendError }, answers);
     }
 
+    [TestMethod]
+    public async Task PerformAsync_ReadCallbackStartsAZeroLengthFrame_IsAccepted()
+    {
+        CurlCode answer = CurlCode.SendError;
+        bool first = true;
+        IEasyTransfer? self = null;
+        (IEasyTransfer easy, _) = CreateWebSocketUploadEasy(
+            _ =>
+            {
+                if (first)
+                {
+                    first = false;
+                    answer = self!.WebSocket.StartFrameAsync(CurlWebSocketFlags.Text, 0, CancellationToken.None).AsTask().GetAwaiter().GetResult();
+                }
+
+                return 0;
+            });
+        self = easy;
+        await using IEasyTransfer handle = easy;
+
+        await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, answer);
+    }
+
     private static (IEasyTransfer Easy, ScriptedConnector Connector) CreateWebSocketUploadEasy(ReadCallback read)
     {
         ScriptedConnector connector = new([[.. Ascii(SwitchingProtocolsHead), .. ManagedEasyWebSocketTests.ServerFrame(WsOpcode.Text, true, "hi")]]);

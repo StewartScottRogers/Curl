@@ -4,8 +4,8 @@ using Curl.Testing;
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins <see cref="DnsSocketOpener" />'s UDP side, which opens a loopback socket and sends nothing;
-/// its TCP connect is an ADR-0083 adapter measured by the Integration run.
+/// Pins <see cref="DnsSocketOpener" />'s UDP side, which opens a loopback socket and sends nothing, and
+/// that its TCP stream owns its socket (a loopback connect that sends nothing, so a unit test).
 /// </summary>
 [TestClass]
 public sealed class DnsSocketOpenerTests
@@ -34,4 +34,31 @@ public sealed class DnsSocketOpenerTests
         }
     }
 
+    [TestMethod]
+    public async Task ConnectStreamAsync_StreamDisposed_ClosesTheSocketSoTheServerSeesEndOfStream()
+    {
+        var listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            var server = (IPEndPoint)listener.LocalEndpoint;
+            Diagnostics.Arrange("server", server);
+
+            var stream = await new DnsSocketOpener().ConnectStreamAsync(server, IPAddress.Loopback, CancellationToken.None);
+            using var accepted = await listener.AcceptTcpClientAsync(TestContext.CancellationToken);
+            await stream.DisposeAsync();
+
+            var buffer = new byte[1];
+            using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CancellationToken);
+            readTimeout.CancelAfter(TimeSpan.FromSeconds(10));
+            var read = await accepted.GetStream().ReadAsync(buffer, readTimeout.Token);
+            Diagnostics.Act("bytes read after the client disposed its stream", read);
+            Diagnostics.Assert("bytes read (0 = FIN received)", 0, read);
+            Assert.AreEqual(0, read);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
 }

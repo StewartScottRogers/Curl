@@ -145,6 +145,22 @@ public sealed class NatsWireTests
         await AssertLineTooLongAsync(new string('x', 16384), new string('x', 16384), new string('x', 16384), new string('x', 16384), "x\r\n");
 
     [TestMethod]
+    public async Task ReadLineAsync_ALineOfExactlyTheLimitBufferedBeforeItsEnd_IsReturned()
+    {
+        NatsWireReader reader = new(ScriptedConnection.Of(new string('x', 16384), new string('x', 16384), new string('x', 16384), new string('x', 16384), "\n"));
+
+        Assert.AreEqual(NatsWireReader.MaxLineLength, (await reader.ReadLineAsync(CancellationToken.None))!.Length);
+    }
+
+    [TestMethod]
+    public async Task ReadLineAsync_ALineOfExactlyTheLimitEndedInTheLastRead_IsReturned()
+    {
+        NatsWireReader reader = new(ScriptedConnection.Of(new string('x', 16384), new string('x', 16384), new string('x', 16384), new string('x', 16383), "\r\n"));
+
+        Assert.AreEqual(NatsWireReader.MaxLineLength - 1, (await reader.ReadLineAsync(CancellationToken.None))!.Length);
+    }
+
+    [TestMethod]
     public async Task ReadPayloadAsync_SplitAcrossReads_GivesThePayload()
     {
         NatsWireReader reader = new(ScriptedConnection.Of("ab", "cd\r", "\n"));
