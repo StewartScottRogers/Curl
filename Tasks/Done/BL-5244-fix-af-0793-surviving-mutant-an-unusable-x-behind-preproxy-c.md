@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5244 — Fix AF-0793: Surviving mutant: an unusable -x behind --preproxy can be ignored instead of failing the transfer
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferProxySelection.cs line 181`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferProxySelection.cs line 181`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `TrySelect_SocksPreProxyAndAnUnusableProxyText_FailsWithTheSelectorsFailure` in `Curl.Engine.UnitTests/EasyProxyOptionsReadingTests.cs`: with line 181 changed to `return true;` it fails (selected True); reverted, all 3044 engine fast tests pass. No production change, so no quality run.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b04afdf8 9742157d.
+- 2026-11-15: Doing -> Done. Test kills the mutant
