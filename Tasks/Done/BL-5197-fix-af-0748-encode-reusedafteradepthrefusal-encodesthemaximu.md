@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5197 — Fix AF-0748: Encode_ReusedAfterADepthRefusal_EncodesTheMaximumDepthAgain checks only that some bytes came back, not the encoding
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Test now compares the reused encoder bytes with a fresh encoder via CollectionAssert.AreEqual. Ldap unit tests: 725 passed. Only a test changed; no production code.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-14: Doing -> Done. Reused-encoder test compares exact bytes with a fresh encoding
