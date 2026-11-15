@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-15
 ---
 # BL-5215 — Fix AF-0766: Surviving mutant: the DNS-over-TCP stream can be made not to own its socket, leaving it open
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/DnsSocketOpener.cs line 35`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/DnsSocketOpener.cs line 35`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `DnsSocketOpenerTests.ConnectStreamAsync_StreamDisposed_ClosesTheSocketSoTheServerSeesEndOfStream`: with `ownsSocket: false` the server read times out (no FIN); reverted, all 4157 fast tests pass. Library code unchanged.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: 28998873 9742157d.
+- 2026-11-15: Doing -> Done. Mutant killed by new DnsSocketOpenerTests test
