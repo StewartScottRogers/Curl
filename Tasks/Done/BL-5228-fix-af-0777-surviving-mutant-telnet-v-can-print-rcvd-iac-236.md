@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Telnet.UnitLibrary]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5228 — Fix AF-0777: Surviving mutant: telnet -v can print 'RCVD IAC 236' instead of 'RCVD IAC EOF'
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Telnet.UnitLibrary/TelnetTraceReporter.cs line 87`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Telnet.UnitLibrary/TelnetTraceReporter.cs line 87`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test `ExecuteAsync_ServerSendsFirstNamedCommand_ReportsItsNameNotItsNumber` (IAC 236 prints `EOF`): fails with the mutant `>`, passes with `>=`. Fast tests green (276 passed). Test-only change.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: c2251094 9742157d.
+- 2026-11-15: Doing -> Done. Test added that kills the mutant

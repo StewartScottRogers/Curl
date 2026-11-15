@@ -112,6 +112,19 @@ public sealed class TelnetProtocolHandlerTransferEventsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ServerSendsFirstNamedCommand_ReportsItsNameNotItsNumber()
+    {
+        // IAC 236 is EOF, the first of curl's named commands; the trace prints the name.
+        Session session = await RunAsync([], null, Hex("FF EC"), Latin1("hi\r\n"));
+
+        string[] expected = new[] { "* RCVD IAC EOF" }
+            .Concat(["<= hi\r\n", "* shutting down connection #0"])
+            .ToArray();
+        Diagnostics.AssertLines("transcript", expected, session.Transcript);
+        CollectionAssert.AreEqual(expected, session.Transcript);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_UserAndEnvironmentVariables_ReportsTheEnvironmentByteByByte()
     {
         // Measured with -u bob:x -t NEW_ENV=AB,CD -t NEW_ENV=E; the TTYPE IS at the end,
