@@ -3,8 +3,8 @@ id: AF-0770
 title: Surviving mutant: curl_ws_start_frame for a zero-length upload frame can answer SendError
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyWebSocket.cs:StartUploadFrame-lt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyWebSocket.cs:229:<
 task: none

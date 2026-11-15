@@ -3,8 +3,8 @@ id: AF-0763
 title: DialAsync_HandshakeFails_ThrowsItsExitCodeAndDisposesTheChannel checks only that the exit code is not Ok
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportOtherTests.cs:DialAsync_HandshakeFails_ThrowsItsExitCodeAndDisposesTheChannel:weak-assertion
 reproduction: none
 task: none

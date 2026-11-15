@@ -3,8 +3,8 @@ id: AF-0760
 title: S3 ReportResponseLineAsync_None_ShowsNothing asserts only that a never-null instance is not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.S3.UnitTests/Http/S3HttpHeadReporterTests.cs:ReportResponseLineAsync_None_ShowsNothing:weak-assertion
 reproduction: none
 task: none

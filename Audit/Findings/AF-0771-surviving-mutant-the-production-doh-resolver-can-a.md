@@ -3,8 +3,8 @@ id: AF-0771
 title: Surviving mutant: the production DoH resolver can accept a plain http:// --doh-url that curl's release build refuses
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/EngineComposition.Dns.cs:CreateDnsResolver-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EngineComposition.Dns.cs:37:false
 task: none

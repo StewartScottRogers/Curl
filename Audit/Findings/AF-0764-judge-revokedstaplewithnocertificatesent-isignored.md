@@ -3,8 +3,8 @@ id: AF-0764
 title: Judge_RevokedStapleWithNoCertificateSent_IsIgnored never asserts the message, only that it is not the revoked one
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/Cgr014Tests.cs:Judge_RevokedStapleWithNoCertificateSent_IsIgnored:weak-assertion
 reproduction: none
 task: none

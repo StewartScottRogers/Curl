@@ -3,8 +3,8 @@ id: AF-0767
 title: Surviving mutant: a NATS line of exactly 65536 bytes can be refused with exit 8
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Nats.UnitLibrary/NatsWireReader.cs:CheckLength-gt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Nats.UnitLibrary/NatsWireReader.cs:82:>
 task: none

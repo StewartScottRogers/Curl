@@ -3,8 +3,8 @@ id: AF-0765
 title: Surviving mutant: --key PEM reading can try to decrypt a non-key block (or decrypt without a passphrase)
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/ClientCertificateLoader.cs:PemPrivateKeyInfo-and:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ClientCertificateLoader.cs:444:&&
 task: none

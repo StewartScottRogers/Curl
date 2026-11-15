@@ -3,8 +3,8 @@ id: AF-0758
 title: Gcs ReportResponseLineAsync_None_ShowsNothing asserts only that a never-null instance is not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.GoogleCloudStorage.UnitTests/Http/GcsHttpHeadReporterTests.cs:ReportResponseLineAsync_None_ShowsNothing:weak-assertion
 reproduction: none
 task: none

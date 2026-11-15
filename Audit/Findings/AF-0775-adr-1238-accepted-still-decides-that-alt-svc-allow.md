@@ -3,8 +3,8 @@ id: AF-0775
 title: ADR-1238 (Accepted) still decides that alt-svc allows h1, h2 and h3 off Windows with no version option; since ADR-1268 the code allows h3 only on a QUIC build, which the executable never is
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1238-alt-svc-switches-to-h1-alone-without-a-version-option-on-windows.md:ADR-1238:stale-adr
 reproduction: none
 task: none

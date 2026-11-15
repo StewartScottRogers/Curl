@@ -3,8 +3,8 @@ id: AF-0772
 title: Surviving mutant: a failed proxy selection can be reported as success and the transfer go on
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:TrySelectProxyAndCredentials-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:239:false
 task: none

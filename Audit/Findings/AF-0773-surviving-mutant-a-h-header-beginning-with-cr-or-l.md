@@ -3,8 +3,8 @@ id: AF-0773
 title: Surviving mutant: a -H header beginning with CR or LF can be sent whole instead of cut to its empty first line
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.WebTransport.UnitLibrary/Session/WebTransportConnectHeaderFields.cs:FirstLine-lt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.WebTransport.UnitLibrary/Session/WebTransportConnectHeaderFields.cs:89:<
 task: none

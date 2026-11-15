@@ -3,8 +3,8 @@ id: AF-0762
 title: DialAsync_VerboseOff_RaisesNothing asserts on an event recorder that is never passed to the dial, so it can never fail
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportVerboseTests.cs:DialAsync_VerboseOff_RaisesNothing:weak-assertion
 reproduction: none
 task: none

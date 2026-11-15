@@ -3,8 +3,8 @@ id: AF-0766
 title: Surviving mutant: the DNS-over-TCP stream can be made not to own its socket, leaving it open
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/DnsSocketOpener.cs:ConnectStreamAsync-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DnsSocketOpener.cs:35:true
 task: none

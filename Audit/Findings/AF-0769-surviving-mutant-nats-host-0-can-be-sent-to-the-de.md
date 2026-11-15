@@ -3,8 +3,8 @@ id: AF-0769
 title: Surviving mutant: nats://host:0/ can be sent to the default port 4222
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Nats.UnitLibrary/NatsProtocolHandler.cs:TransferAsync-ge:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Nats.UnitLibrary/NatsProtocolHandler.cs:57:>=
 task: none

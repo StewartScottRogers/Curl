@@ -3,8 +3,8 @@ id: AF-0768
 title: Surviving mutant: a NATS publish of exactly max_payload bytes can be refused with exit 63
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Nats.UnitLibrary/NatsSession.cs:PublishLines-le:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Nats.UnitLibrary/NatsSession.cs:83:<=
 task: none
