@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5214 — Fix AF-0765: Surviving mutant: --key PEM reading can try to decrypt a non-key block (or decrypt without a passphrase)
 
@@ -32,12 +32,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/ClientCertificateLoader.cs line 444`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/ClientCertificateLoader.cs line 444`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killing test: `HandBuiltPrivateKeyReaderTests.LoadAsOpenSslBuild_WithAnEncryptedPemKeyAfterACertificateBlock_SkipsTheCertificateAndDecryptsTheKey`. With the `||` mutant applied by hand (plus `passphrase!` so it compiles) it fails; reverted, all fast tests pass. PemPrivateKeyInfo only runs for Ed25519, Ed448 and ML-DSA certificates, so the test uses an Ed25519 one.
+- The no-passphrase half of the mutant is not observable: Decrypt throws and the transfer ends with the same exit code and message as "no PEM PRIVATE KEY", so no test can tell them apart. Production code unchanged.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: ca9a6720 9742157d.
+- 2026-11-14: Doing -> Done. Test added that kills the AF-0765 mutant
