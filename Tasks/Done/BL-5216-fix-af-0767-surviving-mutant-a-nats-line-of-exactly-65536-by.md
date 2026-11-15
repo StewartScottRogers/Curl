@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Nats.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5216 — Fix AF-0767: Surviving mutant: a NATS line of exactly 65536 bytes can be refused with exit 8
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Nats.UnitLibrary/NatsWireReader.cs line 82`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Nats.UnitLibrary/NatsWireReader.cs line 82`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `NatsWireTests.ReadLineAsync_ALineOfExactlyTheLimitBufferedBeforeItsEnd_IsReturned` and `ReadLineAsync_ALineOfExactlyTheLimitEndedInTheLastRead_IsReturned` (new): with `>=` both fail, with `>` all 84 pass. Test-only change; no production code changed.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: bbec8eec 9742157d.
+- 2026-11-14: Doing -> Done. Boundary tests added; mutant killed
