@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Http/GcsHttpResponseHead.cs:ParseField-ge:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Http/GcsHttpResponseHead.cs:31:>=
-task: none
-tasks:
+task: BL-5200
+tasks: BL-5200
 found: 2026-11-14
 found-at: fc4d1268bd4c1bce123dba90334b07e141be698a
 scorecard: 2026-11-14_1335.md

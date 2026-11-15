@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:path-as-is:failing-test
 reproduction: none
-task: none
-tasks:
+task: BL-5205
+tasks: BL-5205
 found: 2026-11-14
 found-at: fc4d1268bd4c1bce123dba90334b07e141be698a
 scorecard: 2026-11-14_1335.md
