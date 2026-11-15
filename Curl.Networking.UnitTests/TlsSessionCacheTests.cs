@@ -367,6 +367,21 @@ public sealed class TlsSessionCacheTests
         Assert.AreEqual(16384u, listed.MaxEarlyData);
     }
 
+    [TestMethod]
+    public void ListSessions_SessionValidUntilTheCurrentSecond_StillListsIt()
+    {
+        var cache = new TlsSessionCache(new FixedClock(Received), () => Salt);
+        var atBoundary = TlsSessionPacking.Pack(new PackedTlsSession([1], 0x0304, Received.ToUnixTimeSeconds(), null, 0, null));
+        cache.ImportSession(PeerKey, null, atBoundary);
+        Diagnostics.Arrange("held", "one imported session valid until exactly the current second");
+
+        var held = cache.ListSessions();
+
+        Diagnostics.Act("listed", held.Count);
+        Diagnostics.Assert("listed", 1, held.Count);
+        Assert.HasCount(1, held);
+    }
+
     private static TlsSessionRecord Session(uint maxEarlyData = 0, byte ticket = 7, uint lifetime = 7200) =>
         new(0x0304, 0x1301, new byte[32], new byte[32], [ticket, 1, 2], lifetime, 5, maxEarlyData, Received)
         {
