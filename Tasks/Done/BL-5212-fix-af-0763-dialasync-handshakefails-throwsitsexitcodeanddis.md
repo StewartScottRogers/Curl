@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.WebTransport.UnitTests]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-15
 ---
 # BL-5212 — Fix AF-0763: DialAsync_HandshakeFails_ThrowsItsExitCodeAndDisposesTheChannel checks only that the exit code is not Ok
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Test now asserts CouldntConnect (7): the server closing a handshake with a non-CONNECTION_REFUSED code maps to 7 (QuicHandshakeFailures.FromServerClose). Test-only change; no production code.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. Test pins CouldntConnect (7) for a refused QUIC handshake

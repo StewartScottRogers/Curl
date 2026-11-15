@@ -163,7 +163,7 @@ public sealed class WebTransportQuicDialerTests
 
         WebTransportException failure = await Assert.ThrowsExactlyAsync<WebTransportException>(async () => await Dialer(new FakeDatagramConnector(channel)).DialAsync(Request, CancellationToken.None));
 
-        Assert.AreNotEqual(CurlExitCode.Ok, failure.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, failure.ExitCode);
         Assert.IsTrue(channel.IsDisposed);
     }
 
