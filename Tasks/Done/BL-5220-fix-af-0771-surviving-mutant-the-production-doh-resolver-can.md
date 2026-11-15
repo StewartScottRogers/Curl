@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-15
 ---
 # BL-5220 — Fix AF-0771: Surviving mutant: the production DoH resolver can accept a plain http:// --doh-url that curl's release build refuses
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EngineComposition.Dns.cs line 37`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EngineComposition.Dns.cs line 37`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `EngineCompositionPlainHttpDohUrlTests.CreateDnsResolver_PlainHttpDohUrlByDefault_IsTheUnusableDohUrlResolver` and `CreateTransports_PlainHttpDohUrl_ResolvesThroughTheUnusableDohUrlResolver`: both fail with the mutant applied by hand, and all 3041 fast Engine tests pass reverted. Test-only change; no production code touched.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: eb592d47 9742157d.
+- 2026-11-15: Doing -> Done. Added tests that kill the AF-0771 mutant
