@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5243 — Fix AF-0792: Surviving mutant: an SslStream connection can send a second close_notify after ShutDownSendingAsync
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/SslStreamConnection.cs line 196`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/SslStreamConnection.cs line 196`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killed by `CloseNotifyOnDisposeTests.DisposeAsync_OfAnSslStreamConnectionAfterSendingWasShutDown_TriesNoSecondCloseNotify` (mutant applied by hand: it failed; reverted: 4158 fast tests pass). Test-only change; no production code changed.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: 1117eb11 9742157d.
+- 2026-11-15: Doing -> Done. SslStreamConnection ShutDownSendingAsync _tlsEnded mutant now killed by a test

@@ -104,6 +104,31 @@ public sealed class CloseNotifyOnDisposeTests
         Assert.AreEqual(0, clock.TimersCreated, "Disposing after ShutDownSendingAsync tried to send close_notify again.");
     }
 
+    // ShutDownSendingAsync sends close_notify itself, so disposing after it must not try again (AF-0792).
+    [TestMethod]
+    public async Task DisposeAsync_OfAnSslStreamConnectionAfterSendingWasShutDown_TriesNoSecondCloseNotify()
+    {
+        using var certificate = CreateServerCertificate();
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var sslStream = new SslStream(client, false, (_, _, _, _) => true);
+        await using var serverStream = new SslStream(server);
+        var serverTask = serverStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions { ServerCertificate = certificate });
+        await sslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions { TargetHost = "localhost" });
+        await serverTask;
+        var plaintext = new StallingConnection();
+        var clock = new TimerCountingTimeProvider();
+        var connection = new SslStreamConnection(sslStream, new ConnectionStream(plaintext), plaintext, null, string.Empty, matchesOpenSslBuild: false)
+        {
+            CloseNotifyTimeout = s_bound,
+            TimeProvider = clock,
+        };
+
+        await connection.ShutDownSendingAsync(CancellationToken.None);
+        await connection.DisposeAsync().AsTask().WaitAsync(s_generousWait);
+
+        Assert.AreEqual(0, clock.TimersCreated, "Disposing after ShutDownSendingAsync tried to send close_notify again.");
+    }
+
     [TestMethod]
     public async Task DisposeAsync_OfAnSslStreamConnectionWhoseStreamDisposalThrows_StillDisposesTheTransport()
     {
