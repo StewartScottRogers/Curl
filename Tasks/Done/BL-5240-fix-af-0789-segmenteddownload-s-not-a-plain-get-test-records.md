@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.SegmentedDownload.UnitTests]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5240 — Fix AF-0789: SegmentedDownload's not-a-plain-GET test records only the last request, so a split POST/PUT/upload goes unseen
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Test now collects every request the hook sends and asserts exactly one, the context itself; fast tests of the project pass (43). Build of the project clean.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. SegmentedDownload not-a-plain-GET test now asserts every request sent (exactly one, the context)
