@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.EncryptedDns.UnitLibrary]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5229 — Fix AF-0778: Surviving mutant: --dns-over-tls/--dns-over-quic can refuse a name of exactly 255 octets
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.EncryptedDns.UnitLibrary/Wire/DnsQueryEncoder.cs line 62`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.EncryptedDns.UnitLibrary/Wire/DnsQueryEncoder.cs line 62`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by Encode_Rfc1035Section2_3_4_NameOfExactly255Octets_IsEncoded (fails with `>=`, passes with `>`); Encode_Rfc1035Section2_3_4_NameOf256Octets_IsRefused pins the other side. Only a test was added; production code is unchanged.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: e52d72c8 9742157d.
+- 2026-11-15: Doing -> Done. Boundary tests added; mutant killed
