@@ -3,8 +3,8 @@ id: AF-0782
 title: ResolveAsync_ServerPortUnreachable_...SoCurlExitsSixInsteadOfSeven never asserts an exit code
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_1159.md: the reproduction no longer reproduces.
 key: quality:Curl.Extension.EncryptedDns.UnitTests/DnsOverQuic/DnsOverQuicResolverTests.cs:ResolveAsync_ServerPortUnreachable_FindsNoAddressesSoCurlExitsSixInsteadOfSeven:name-lies
 reproduction: none
 task: BL-5233
@@ -13,9 +13,9 @@ found: 2026-11-15
 found-at: d04b275ae7a1546a4d0feed894da1ba520945cf5
 scorecard: 2026-11-15_0222.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: reliable-reaudit
+closed-by: 2026-11-15_1159.md
 ---
 # AF-0782 - ResolveAsync_ServerPortUnreachable_...SoCurlExitsSixInsteadOfSeven never asserts an exit code
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Extension.EncryptedDns.UnitTests/DnsOverQuic/DnsOverQui
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_1159.md | reproduces: no | Ran the Select-String: the test now asserts Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode) and Assert.AreNotEqual(CurlExitCode.CouldntConnect, result.ExitCode) after connecting through TcpConnector.
+
 ## Log
 
 - 2026-11-15: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_1159.md: the reproduction no longer reproduces.
