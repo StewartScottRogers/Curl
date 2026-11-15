@@ -120,8 +120,13 @@ public sealed class OpenApiArgumentExpanderTests
     }
 
     [TestMethod]
-    public void ArgumentsForValue_WithoutCompanions_AsksForTheOperation() =>
-        Assert.ThrowsExactly<ArgumentExpansionException>(() => ((IArgumentExpander)new OpenApiArgumentExpander()).ArgumentsFor("pets.json", ContextOf(("pets.json", PetStore))));
+    public void ArgumentsForValue_WithoutCompanions_AsksForTheOperation()
+    {
+        ArgumentExpansionException failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => ((IArgumentExpander)new OpenApiArgumentExpander()).ArgumentsFor("pets.json", ContextOf(("pets.json", PetStore))));
+
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+        Assert.AreEqual("openapi: --operation <id> names the operation to call", failure.Message);
+    }
 
     [TestMethod]
     [DataRow("petId=5", true)]
