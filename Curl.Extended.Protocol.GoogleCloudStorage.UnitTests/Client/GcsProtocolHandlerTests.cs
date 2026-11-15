@@ -134,6 +134,17 @@ public sealed class GcsProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_MultipleChoicesStatus300_IsAnErrorNotTheObject()
+    {
+        QueuedGcsConnector connector = new("HTTP/1.1 300 Multiple Choices\r\nContent-Length: 0\r\n\r\n");
+
+        TransferResult result = await Handler(connector, Emulator).ExecuteAsync(Context("gs://bucket/k", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("Cloud Storage returned error 300", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ConnectionRefused_KeepsTheConnectorsFailure()
     {
         TransferResult result = await Handler(new QueuedGcsConnector(QueuedGcsConnector.Refuse), Emulator).ExecuteAsync(Context("gs://bucket/k", new MemoryStream()));

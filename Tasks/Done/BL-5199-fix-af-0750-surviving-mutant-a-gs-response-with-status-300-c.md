@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5199 — Fix AF-0750: Surviving mutant: a gs:// response with status 300 can be taken as success
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Client/GcsClient.cs line 51`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Client/GcsClient.cs line 51`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test `GcsProtocolHandlerTests.ExecuteAsync_MultipleChoicesStatus300_IsAnErrorNotTheObject`: with line 51 mutated to `> 300` it failed (1 of 143); reverted, all 143 pass. Build clean. Test-only change; no production code changed.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: 8372f4b0 9742157d.
+- 2026-11-14: Doing -> Done. Test pins status 300 as an error; mutant killed
