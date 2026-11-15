@@ -153,6 +153,41 @@ public sealed class Lib526Tests
     }
 
     [TestMethod]
+    public async Task TestAsync_ASelectThatFails_EndsTheLoopWithoutAdvancing()
+    {
+        var engine = new FakeCurlEngine();
+        var clock = new LibTestClock(new ManualTimeProvider(DateTimeOffset.UnixEpoch));
+        clock.StartTestTiming();
+        engine.Multi.PerformResults.Enqueue((CurlMultiCode.Ok, 1));
+        engine.Multi.WaitResult = (CurlMultiCode.BadHandle, 0);
+        var run = new PortRun(engine, 526, "http://x/526");
+        CurlLibrary library = CurlGlobal.Init(engine);
+
+        await Lib526.TestAsync(run.Context, run.Steps, library, clock, CancellationToken.None);
+
+        Assert.AreEqual(LibTestErrorCodes.Select, run.Steps.Result);
+        Assert.DoesNotContain("Advancing", run.Error.ToString());
+    }
+
+    [TestMethod]
+    public async Task TestAsync_ATestClockThatExpiresDuringTheSelect_EndsTheLoopWithoutAdvancing()
+    {
+        var time = new ManualTimeProvider(DateTimeOffset.UnixEpoch);
+        var clock = new LibTestClock(time);
+        clock.StartTestTiming();
+        var engine = new FakeCurlEngine();
+        engine.Multi.PerformResults.Enqueue((CurlMultiCode.Ok, 1));
+        engine.Multi.Waiting = () => time.Advance(TimeSpan.FromMilliseconds(60001));
+        var run = new PortRun(engine, 526, "http://x/526");
+        CurlLibrary library = CurlGlobal.Init(engine);
+
+        await Lib526.TestAsync(run.Context, run.Steps, library, clock, CancellationToken.None);
+
+        Assert.AreEqual(LibTestErrorCodes.RunsForever, run.Steps.Result);
+        Assert.DoesNotContain("Advancing", run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task TestAsync_ALibraryCleanedUpAtTheSecondHandle_FailsEasyInit()
     {
         var holder = new PortRun.LibraryHolder();
