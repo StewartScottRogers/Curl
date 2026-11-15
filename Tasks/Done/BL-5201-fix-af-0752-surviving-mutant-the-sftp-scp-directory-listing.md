@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ssh.UnitLibrary]
 requirement: none
 created: 2026-11-14
-completed:
+completed: 2026-11-14
 ---
 # BL-5201 — Fix AF-0752: Surviving mutant: the sftp/scp directory-listing test that picks the -v closing line can be inverted
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs line 370`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs line 370`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `ExecuteAsync_SftpListingResetAtReadDirectory_LeavesTheConnectionIntact` (new, `SshProtocolHandlerTests.FailedListingClosingLine.cs`): with `!=` flipped to `==` at line 370 it failed; reverted, all 954 fast tests pass. Test-only change, production code untouched.
 
 ## Log
 
 - 2026-11-14: Created.
 - 2026-11-14: Backlog -> Doing. Criteria at claim: 57d5291a 9742157d.
+- 2026-11-14: Doing -> Done. Test kills the mutant at SshProtocolHandler.cs:370
