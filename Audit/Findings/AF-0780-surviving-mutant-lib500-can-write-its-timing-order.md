@@ -3,8 +3,8 @@ id: AF-0780
 title: Surviving mutant: lib500 can write its timing-order complaint lines when two times are equal
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_1159.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib500.cs:WriteIfLater-gt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib500.cs:118:>
 task: BL-5231
@@ -13,9 +13,9 @@ found: 2026-11-15
 found-at: d04b275ae7a1546a4d0feed894da1ba520945cf5
 scorecard: 2026-11-15_0222.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: mechanical
+closed-by: 2026-11-15_1159.md
 ---
 # AF-0780 - Surviving mutant: lib500 can write its timing-order complaint lines when two times are equal
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_1159.md | reproduces: no | Ran the -Site reproduction: Lib500.cs:118 > resolved at line 118, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-15: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_1159.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

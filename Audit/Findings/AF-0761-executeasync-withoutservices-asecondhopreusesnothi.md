@@ -3,8 +3,8 @@ id: AF-0761
 title: ExecuteAsync_WithoutServices_ASecondHopReusesNothingAndStillSendsATraceParent checks only that some traceparent exists
 auditor: quality
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_1159.md: the reproduction no longer reproduces.
 key: quality:Curl.Extension.OpenTelemetry.UnitTests/OpenTelemetryRedirectTests.cs:ExecuteAsync_WithoutServices_ASecondHopReusesNothingAndStillSendsATraceParent:weak-assertion
 reproduction: none
 task: BL-5210
@@ -13,9 +13,9 @@ found: 2026-11-14
 found-at: 92f6fc980babe08d1ebff5f02d7e076e42c67fd7
 scorecard: 2026-11-14_1801.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: reliable-reaudit
+closed-by: 2026-11-15_1159.md
 ---
 # AF-0761 - ExecuteAsync_WithoutServices_ASecondHopReusesNothingAndStillSendsATraceParent checks only that some traceparent exists
 
@@ -43,7 +43,9 @@ Select-String -Path Curl.Extension.OpenTelemetry.UnitTests/OpenTelemetryRedirect
 ## Re-audits
 
 - 2026-11-15 | 2026-11-15_0222.md | reproduces: yes | Ran the Select-String. The test now checks each traceparent's format by regex and that it appears once per request, but it never compares the two hops' traceparents, so the 'ReusesNothing' the name states is still unchecked. A hook reusing the first hop's trace ID would pass.
+- 2026-11-15 | 2026-11-15_1159.md | reproduces: no | Ran the Select-String: the test now asserts Assert.HasCount(2, sent) and, for each hop, a traceparent matching ^traceparent: 00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$ and exactly one traceparent header, not only that one exists.
 
 ## Log
 
 - 2026-11-14: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_1159.md: the reproduction no longer reproduces.

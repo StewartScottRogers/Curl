@@ -42,6 +42,8 @@ Select-String -Path Curl.Extension.Composition.UnitLibrary/BodyReplacingHookExcl
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_1159.md | reproduces: no | Ran Select-String -Path Curl.Extension.Composition.UnitLibrary/BodyReplacingHookExclusivity.cs -Pattern 'Refuses an option group that gives two|refuses the transfer when an option group gave two|cannot be used with -T'. The class summary (lines 8-12) now continues 'A single body-replacing option is refused too when it is given with -T or -I: it fails the transfer with --<option> cannot be used with -T or -I', and HookFor's summary (line 25) reads 'refuses the transfer when an option group gave two body-replacing options, or one given with -T or -I'; its returns tag says 'a hook refusing -T and -I for one'. This matches the code: HookFor returns UploadAndHeadRefusingHook for one option (line 35), which fails with FailedInit and 'cannot be used with -T' / '-I' (lines 62-68). The summaries no longer hide the single-option refusal.
+
 ## Log
 
 - 2026-11-15: filed proposed.

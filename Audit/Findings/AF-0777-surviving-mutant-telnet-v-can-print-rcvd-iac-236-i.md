@@ -3,8 +3,8 @@ id: AF-0777
 title: Surviving mutant: telnet -v can print 'RCVD IAC 236' instead of 'RCVD IAC EOF'
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_1159.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Original.Protocol.Telnet.UnitLibrary/TelnetTraceReporter.cs:CommandReceived-ge:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Telnet.UnitLibrary/TelnetTraceReporter.cs:87:>=
 task: BL-5228
@@ -13,9 +13,9 @@ found: 2026-11-15
 found-at: d04b275ae7a1546a4d0feed894da1ba520945cf5
 scorecard: 2026-11-15_0222.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: mechanical
+closed-by: 2026-11-15_1159.md
 ---
 # AF-0777 - Surviving mutant: telnet -v can print 'RCVD IAC 236' instead of 'RCVD IAC EOF'
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Origi
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_1159.md | reproduces: no | Ran the -Site reproduction: TelnetTraceReporter.cs:87 >= resolved at line 87, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-15: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_1159.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
