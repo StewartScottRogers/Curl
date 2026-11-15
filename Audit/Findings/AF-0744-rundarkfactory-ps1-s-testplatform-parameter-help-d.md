@@ -3,8 +3,8 @@ id: AF-0744
 title: RunDarkFactory.ps1's -TestPlatform parameter help describes the audio-off self-test, and -TestAudioOff has none
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-14_1801.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-14_1335.md, 2026-11-14_1801.md).
 key: truthfulness:RunDarkFactory.ps1:TestPlatform:false-help
 reproduction: none
 task: BL-5189
@@ -13,9 +13,9 @@ found: 2026-11-13
 found-at: 01e399058f0175f566ebf05c3a643be509c45063
 scorecard: 2026-11-13_2321.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-14
+closed-how: consecutive
+closed-by: 2026-11-14_1335.md, 2026-11-14_1801.md
 ---
 # AF-0744 - RunDarkFactory.ps1's -TestPlatform parameter help describes the audio-off self-test, and -TestAudioOff has none
 
@@ -43,7 +43,9 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-11-14 | 2026-11-14_1335.md | reproduces: no | Ran (Get-Help ./RunDarkFactory.ps1 -Parameter TestPlatform | Out-String) -match 'audio-off': False. -TestPlatform's help now reads 'Prove the PowerShell executable and data folder the factory picks for this OS (BL-3919), and exit.', and -TestAudioOff has its own help ('Prove the audio-off file silences the alarm, chimes and spoken notices ... (BL-1456), and exit.').
+- 2026-11-14 | 2026-11-14_1801.md | reproduces: no | (Get-Help ./RunDarkFactory.ps1 -Parameter TestPlatform | Out-String) -match 'audio-off' returned False. -TestPlatform's help is now 'Prove the PowerShell executable and data folder the factory picks for this OS (BL-3919), and exit.', and -TestAudioOff has its own help: 'Prove the audio-off file silences the alarm, chimes and spoken notices, and that they sound as before without it, playing nothing (BL-1456), and exit.'
 
 ## Log
 
 - 2026-11-13: filed proposed.
+- 2026-11-14: accepted -> closed. Re-audit 2026-11-14_1801.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-11-14_1335.md, 2026-11-14_1801.md).
