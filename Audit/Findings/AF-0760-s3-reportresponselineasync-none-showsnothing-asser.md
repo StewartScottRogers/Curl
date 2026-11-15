@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.S3.UnitTests/Http/S3HttpHeadReporterTests.cs:ReportResponseLineAsync_None_ShowsNothing:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5209
+tasks: BL-5209
 found: 2026-11-14
 found-at: 92f6fc980babe08d1ebff5f02d7e076e42c67fd7
 scorecard: 2026-11-14_1801.md
