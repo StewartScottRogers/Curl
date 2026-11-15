@@ -28,6 +28,21 @@ public sealed class Lib1560ChecksTests
     }
 
     [TestMethod]
+    public void GetParts_PassingRowThenFailingRow_StillChecksTheLaterRow()
+    {
+        var run = new Run();
+
+        int errors = run.Checks.GetParts(
+        [
+            new("http://h/p?q#f", PlainParts, CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),
+            new("http://h/p?q#f", "x", CurlUrlFlags.None, CurlUrlFlags.None, CurlUrlCode.Ok),
+        ]);
+
+        Assert.AreEqual(1, errors);
+        Assert.AreEqual($"in: http://h/p?q#f\nwanted: x\ngot:    {PlainParts}\n", run.Error.ToString());
+    }
+
+    [TestMethod]
     public void GetParts_PartsDiffer_WritesWantedAndGot()
     {
         var run = new Run();
