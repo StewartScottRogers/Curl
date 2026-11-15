@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Stomp.UnitLibrary]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5227 — Fix AF-0776: Surviving mutant: stomp://host:0/ can be dialled on the default port 61613 instead of port 0
 
@@ -43,3 +43,4 @@ Killed by ExecuteAsync_Url_ConnectsToItsPortWithTlsForStomps, new rows stomp://b
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: 89e87e40 9742157d.
+- 2026-11-15: Doing -> Done. Port-0 rows added to ExecuteAsync_Url_ConnectsToItsPortWithTlsForStomps kill the > 0 mutant.
