@@ -419,11 +419,13 @@ public sealed class Lib552Tests
     [TestMethod]
     public async Task RunAsync_SetsTheIoctlCallbackAndPerforms()
     {
-        var run = new PortRun(new FakeCurlEngine(), 552, "http://x/552", "http://proxy");
+        bool ioctlSet = false;
+        var run = new PortRun(new FakeCurlEngine { Performing = o => { ioctlSet = o.Callbacks.Ioctl is not null; return CurlCode.Ok; } }, 552, "http://x/552", "http://proxy");
 
         LibTestResult result = await new Lib552(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual((int)CurlCode.Ok, result.ExitCode);
+        Assert.IsTrue(ioctlSet);
         Assert.AreEqual("lib552", new Lib552(TimeProvider.System).ProgramName);
     }
 
