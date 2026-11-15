@@ -3,12 +3,12 @@ id: AF-0754
 title: Surviving mutant: curl_url_set can accept a URL whose first character is a control byte
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs:HoldsControlByte-ge:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs:322:>=
-task: none
-tasks:
+task: BL-5203
+tasks: BL-5203
 found: 2026-11-14
 found-at: fc4d1268bd4c1bce123dba90334b07e141be698a
 scorecard: 2026-11-14_1335.md
