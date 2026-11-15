@@ -3,12 +3,12 @@ id: AF-0791
 title: Surviving mutant: lib526/527/532 can keep looping after a select failure or a test timeout
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib526.cs:TransferEachAsync-or:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib526.cs:88:||
-task: none
-tasks:
+task: BL-5242
+tasks: BL-5242
 found: 2026-11-15
 found-at: 065474f7431e6647cda727e7f0fd5a25c9859a90
 scorecard: 2026-11-15_1159.md
