@@ -102,7 +102,18 @@ public sealed class OpenTelemetryRedirectTests
 
         await hook.ExecuteAsync(Hop(1), c => Respond(c, sent, Final()));
 
-        Assert.IsNotNull(TraceParentOf(sent[0]));
+        await hook.ExecuteAsync(Hop(2), c => Respond(c, sent, Final()));
+
+        Assert.HasCount(2, sent);
+        foreach (var context in sent)
+        {
+            var traceParent = TraceParentOf(context);
+            Assert.IsNotNull(traceParent);
+            Assert.IsTrue(
+                System.Text.RegularExpressions.Regex.IsMatch(traceParent, "^traceparent: 00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$", System.Text.RegularExpressions.RegexOptions.IgnoreCase),
+                traceParent);
+            Assert.AreEqual(1, context.Http!.Headers.Count(h => h.StartsWith("traceparent:", StringComparison.OrdinalIgnoreCase)));
+        }
     }
 
     private static (OpenTelemetryTransferHook Hook, RecordedConnection Connection, RecordedConnector Connector) Fixture()
