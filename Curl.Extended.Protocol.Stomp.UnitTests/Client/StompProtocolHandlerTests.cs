@@ -94,6 +94,8 @@ public sealed class StompProtocolHandlerTests
     [DataRow("stomp://broker/q", 61613, false)]
     [DataRow("stomps://broker/q", 61614, true)]
     [DataRow("STOMPS://broker:7000/q", 7000, true)]
+    [DataRow("stomp://broker:0/q", 0, false)]
+    [DataRow("stomps://broker:0/q", 0, true)]
     public async Task ExecuteAsync_Url_ConnectsToItsPortWithTlsForStomps(string url, int port, bool useTls)
     {
         ScriptedStompConnector connector = new(ConnectResult.Refused("refused"));
