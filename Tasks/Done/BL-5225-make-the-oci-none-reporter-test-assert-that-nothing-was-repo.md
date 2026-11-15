@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.OciRegistry.UnitTests/Http/OciHttpHeadReporterTests.cs]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5225 — Make the Oci None reporter test assert that nothing was reported (AF-0759 fix falls short)
 
@@ -27,13 +27,16 @@ The shift-end review of 2026-11-15 (ADR-0710) found this with the silent-failure
 
 ## Acceptance criteria
 
-- [ ] `ReportResponseLineAsync_None_ShowsNothing` in `OciHttpHeadReporterTests.cs` asserts on the reporter's recorded state, for example `Assert.IsNull(none.Report)` after a non-status line. It does not rely only on `IsCompletedSuccessfully`.
-- [ ] The test holds one `OciHttpHeadReporter.None` instance in a local and calls both report methods on it, since `None` is a property that returns a new instance each time.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `ReportResponseLineAsync_None_ShowsNothing` in `OciHttpHeadReporterTests.cs` asserts on the reporter's recorded state, for example `Assert.IsNull(none.Report)` after a non-status line. It does not rely only on `IsCompletedSuccessfully`.
+- [x] The test holds one `OciHttpHeadReporter.None` instance in a local and calls both report methods on it, since `None` is a property that returns a new instance each time.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test now holds one `None` instance, awaits both report calls and asserts `Assert.IsNull(none.Report)`. Built; OciRegistry.UnitTests 189 passed (only a test file changed, so no library quality run).
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: 91151eb4 a7fa7596 9742157d.
+- 2026-11-15: Doing -> Done. None reporter test asserts Report is null on one shared instance
