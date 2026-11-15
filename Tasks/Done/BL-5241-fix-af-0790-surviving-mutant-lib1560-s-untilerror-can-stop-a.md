@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5241 — Fix AF-0790: Surviving mutant: lib1560's UntilError can stop after the first passing row and skip every later check
 
@@ -43,3 +43,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: 50bca548 9742157d.
+- 2026-11-15: Doing -> Done. Added a passing-then-failing row test that kills the mutant
