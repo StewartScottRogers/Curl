@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests/HandBuiltPrivateKeyReaderTests.cs]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5226 — Assert the key is loaded in the encrypted-PEM-after-certificate test (AF-0765)
 
@@ -27,13 +27,16 @@ The shift-end review of 2026-11-15 (ADR-0710) found this with the silent-failure
 
 ## Acceptance criteria
 
-- [ ] The test asserts that `loaded` is a `HandBuiltKeyCertificate` whose `SigningKey` is the Ed25519 signing key, or that the key can sign with `TlsSignatureScheme.Ed25519`.
-- [ ] `loaded` is disposed through `using`, not `loaded?.Dispose()`, so a failed assertion does not leak it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The test asserts that `loaded` is a `HandBuiltKeyCertificate` whose `SigningKey` is the Ed25519 signing key, or that the key can sign with `TlsSignatureScheme.Ed25519`.
+- [x] `loaded` is disposed through `using`, not `loaded?.Dispose()`, so a failed assertion does not leak it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Asserted CanSign(Ed25519) on the HandBuiltKeyCertificate signing key inside using; Networking tests for the class pass (39).
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: 228843cb 42653e78 9742157d.
+- 2026-11-15: Doing -> Done. Test now asserts the decrypted Ed25519 key is loaded
