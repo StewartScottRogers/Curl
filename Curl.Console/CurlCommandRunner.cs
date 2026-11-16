@@ -3741,14 +3741,25 @@ internal sealed class CurlCommandRunner(
         ITransferEvents recorded = options.WriteOut is null
             ? events
             : new ResponseCodeRecordingTransferEvents(new TlsResultRecordingTransferEvents(events, state), state);
-        ITransferEvents withFileFailure = options.Trace != TraceKind.None
-            ? new OutputFileOpenFailureTransferEvents(recorded, state, options.Silent ? null : eventStandardError)
-            : recorded;
+        ITransferEvents withFileFailure = WithOutputFileFailureEvents(options, recorded, state);
         state.Events = options.WriteOut is null && !options.TraceIds && state.ParallelProgress is null
             ? withFileFailure
             : new ConnectionIdRecordingTransferEvents(withFileFailure, state, connectionIdsByPoolNumber, takeConnectionId);
         return EventsBeforeConnecting(transfer);
     }
+
+    /// <summary>
+    /// Wraps <paramref name="recorded" /> in the events that report a trace file that cannot be opened, under a
+    /// <c>--trace</c> option; otherwise gives it as it is.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="recorded">The events to wrap.</param>
+    /// <param name="state">The running transfer.</param>
+    /// <returns>The wrapping events, or <paramref name="recorded" /> without a trace.</returns>
+    private ITransferEvents WithOutputFileFailureEvents(CommandLineOptions options, ITransferEvents recorded, RunningTransferState state) =>
+        options.Trace != TraceKind.None
+            ? new OutputFileOpenFailureTransferEvents(recorded, state, options.Silent ? null : eventStandardError)
+            : recorded;
 
     /// <summary>
     /// The sink for what <paramref name="transfer" /> reports before it connects, whose lines under
