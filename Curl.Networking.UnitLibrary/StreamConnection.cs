@@ -53,8 +53,9 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     internal bool ReportsAbortedReadAsReset { get; init; } = OperatingSystem.IsWindows();
 
     /// <summary>
-    /// Gets the check run before each write: whether the peer had already sent bytes, or its FIN,
-    /// that the stream has not read yet. Production asks the socket under a
+    /// Gets the check run before a write once the connection has read a byte: whether the peer had
+    /// already sent bytes, or its FIN, that the stream has not read yet. Before the first byte is read
+    /// <see cref="HasUnreadBytesBeforeFirstRead" /> runs instead. Production asks the socket under a
     /// <see cref="NetworkStream" />; tests set it (ADR-0708, BL-2821, BL-3304).
     /// </summary>
     internal Func<Stream, bool> HasUnreadBytesOrEndBeforeWrite { get; init; } = HasSocketUnderUnreadBytesOrEnd;
@@ -113,9 +114,11 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     /// request, or right after accepting (ADR-0419). A peer whose bytes were still unread at the
     /// write, as a proxy leaving bytes after its CONNECT reply and closing the tunnel (upstream
     /// test1802), keeps the abort, as curl's Schannel build prints it (ADR-0708); so does a peer
-    /// whose FIN was unread at the write on a connection that had already read a byte, as a server that closed a kept connection curl then reuses
-    /// (BL-3304, ADR-0878; a fresh connection never read from ignores the FIN, as Windows shows a peer's RST that way, BL-5259): Windows answers the reset of a connection it had a FIN on with
-    /// WSAECONNABORTED however soon the receive runs.
+    /// whose FIN was unread at the write on a connection that had already read a byte, as a server
+    /// that closed a kept connection curl then reuses (BL-3304, ADR-0878): Windows answers the reset
+    /// of a connection it had a FIN on with WSAECONNABORTED however soon the receive runs.
+    /// An unread FIN is not counted until the connection has read a byte, as Windows shows a peer's
+    /// RST on a fresh connection that way (BL-5259).
     /// </remarks>
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {

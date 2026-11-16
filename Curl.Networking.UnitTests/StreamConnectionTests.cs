@@ -295,7 +295,7 @@ public sealed class StreamConnectionTests
         Assert.AreSame(other, failure);
     }
 
-    /// <summary>A stream whose every read fails with the given exception.</summary>
+    /// <summary>A stream whose first read returns one byte and every later read fails with the given exception.</summary>
     private sealed class ReadOnceThenFailingStream(IOException failure) : MemoryStream
     {
         private bool _served;
@@ -313,6 +313,7 @@ public sealed class StreamConnectionTests
         }
     }
 
+    /// <summary>A stream whose every read fails with the given exception.</summary>
     private sealed class ReadFailingStream(IOException failure) : MemoryStream
     {
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>

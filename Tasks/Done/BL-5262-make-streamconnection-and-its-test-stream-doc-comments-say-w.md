@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/StreamConnection.cs, Curl.Networking.UnitTests/StreamConnectionTests.cs]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5262 — Make StreamConnection and its test stream doc comments say what the code does after BL-5259
 
@@ -28,11 +28,11 @@ CLAUDE.md's "say what it does, do what it says" rule treats a misaligned doc as 
 
 ## Acceptance criteria
 
-- [ ] `ReadFailingStream` carries the summary "A stream whose every read fails with the given exception." (or an equivalent that is true of it).
-- [ ] `ReadOnceThenFailingStream` has its own summary saying its first read returns one byte and every later read fails with the given exception.
-- [ ] The `HasUnreadBytesOrEndBeforeWrite` summary says it runs before a write only once the connection has read a byte.
-- [ ] The `ReadAsync` remarks are wrapped like the rest of the file, and they state the first-write rule ("an unread FIN is not counted until the connection has read a byte") in a sentence of its own.
-- [ ] `dotnet build` is clean, and the fast tests of `Curl.Networking.UnitTests` pass.
+- [x] `ReadFailingStream` carries the summary "A stream whose every read fails with the given exception." (or an equivalent that is true of it).
+- [x] `ReadOnceThenFailingStream` has its own summary saying its first read returns one byte and every later read fails with the given exception.
+- [x] The `HasUnreadBytesOrEndBeforeWrite` summary says it runs before a write only once the connection has read a byte.
+- [x] The `ReadAsync` remarks are wrapped like the rest of the file, and they state the first-write rule ("an unread FIN is not counted until the connection has read a byte") in a sentence of its own.
+- [x] `dotnet build` is clean, and the fast tests of `Curl.Networking.UnitTests` pass.
 
 ## Notes
 
@@ -42,3 +42,4 @@ Doc-only. No behaviour change.
 
 - 2026-11-15: Created by the shift-end review (ADR-0710).
 - 2026-11-15: Backlog -> Doing. Criteria at claim: 33bca73c de0425ad 55101ad7 a487ed1b e3d1342b.
+- 2026-11-15: Doing -> Done. Doc comments realigned; Networking fast tests green
