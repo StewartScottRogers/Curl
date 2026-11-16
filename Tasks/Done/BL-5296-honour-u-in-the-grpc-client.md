@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Grpc.UnitLibrary/Client/GrpcProtocolHandler.cs, Curl.Extended.Protocol.Grpc.UnitTests/Client/GrpcBasicCredentialsTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5296 — Honour -u in the grpc client
 
@@ -27,11 +27,14 @@ Filed from Surl's Phase 7 measurement of the port's extended clients (Stewart ap
 
 ## Acceptance criteria
 
-- [ ] A port test where the server demands Basic credentials passes with `-u user:password`, and the request carries `authorization: Basic <base64 of user:password>`.
+- [x] A port test where the server demands Basic credentials passes with `-u user:password`, and the request carries `authorization: Basic <base64 of user:password>`.
 
 ## Notes
+
+- `GrpcProtocolHandler` now prepends `Authorization: Basic base64(user:password)` from `-u` to the `-H` values; an explicit `-H Authorization` wins (no duplicate). Three tests in `GrpcBasicCredentialsTests`; Grpc fast tests 240 green; quality run 0 failing members.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: e4c5469c.
+- 2026-11-16: Doing -> Done. -u user:password is sent by the grpc client as authorization: Basic
