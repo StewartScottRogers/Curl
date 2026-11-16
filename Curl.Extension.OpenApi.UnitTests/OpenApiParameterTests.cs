@@ -32,8 +32,13 @@ public sealed class OpenApiParameterTests
     [DataRow("""{"in":"query"}""", "openapi: a parameter has no name")]
     [DataRow("""{"name":"a","in":5}""", "openapi: parameter a has no in")]
     [DataRow("[]", "openapi: a parameter has no name")]
-    public void From_WithoutNameOrIn_FailsWithExit2(string json, string message) =>
-        Assert.AreEqual(message, Assert.ThrowsExactly<ArgumentExpansionException>(() => OpenApiParameter.From(Parse(json))).Message);
+    public void From_WithoutNameOrIn_FailsWithExit2(string json, string message)
+    {
+        ArgumentExpansionException failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => OpenApiParameter.From(Parse(json)));
+
+        Assert.AreEqual(message, failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+    }
 
     [TestMethod]
     [DataRow("header", "accept", true)]
