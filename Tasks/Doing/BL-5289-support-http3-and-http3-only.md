@@ -41,3 +41,4 @@ The refusal follows the reference builds on purpose (ADR-0540). Doing this task 
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: 84bf8554 a12090e0 622005d5.
