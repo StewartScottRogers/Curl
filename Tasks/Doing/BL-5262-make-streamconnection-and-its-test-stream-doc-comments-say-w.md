@@ -41,3 +41,4 @@ Doc-only. No behaviour change.
 ## Log
 
 - 2026-11-15: Created by the shift-end review (ADR-0710).
+- 2026-11-15: Backlog -> Doing. Criteria at claim: 33bca73c de0425ad 55101ad7 a487ed1b e3d1342b.
