@@ -42,3 +42,4 @@ Shares `SaslAuthenticator.cs` with BL-5281, so the two run one after the other.
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: e7bd11d6 5df6465a 668b5e4d.
