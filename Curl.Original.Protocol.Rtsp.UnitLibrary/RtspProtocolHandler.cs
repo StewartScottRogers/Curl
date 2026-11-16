@@ -371,19 +371,9 @@ public sealed class RtspProtocolHandler(
         log.RequestSent(plan.MethodName, sequenceNumber);
         RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken, log, context.MaxFileSize, Frames(session)).ConfigureAwait(false);
         log.ReplyRead(head, session.SessionId);
-        TransferReport report = new()
-        {
-            ResponseCode = head.StatusCode,
-            HttpVersion = System.Net.HttpVersion.Version11,
-            PseudoHeaders = head.HeaderLines,
-            Method = plan.MethodName,
-            HeaderSize = head.Length,
-            RequestSize = requestSize,
-            RtspSessionId = session.SessionId,
-            RtspClientSequenceNumber = session.NextSequenceNumber,
-            RtspSequenceNumberReceived = head.SequenceNumber,
-        };
-        if (StatusFailure(head, options, context.MaxFileSize, events) is { } statusFailure)
+        TransferReport report = ReportOf(head, session, requestSize);
+        (string? answerToChallenge, HttpRequestOptions statusOptions) = ChallengeAnswer(context, options, head, authorization);
+        if (StatusFailure(head, statusOptions, context.MaxFileSize, events) is { } statusFailure)
         {
             return new(statusFailure with { Report = report }, null);
         }
@@ -395,8 +385,33 @@ public sealed class RtspProtocolHandler(
             ? TransferResult.Success(bodyRead)
             : Fail(events, CurlExitCode.RtspCseqError, SequenceMismatch(sequenceNumber, head.SequenceNumber), bodyRead);
         result = result with { Report = report with { DownloadSize = plan.WritesReplyBody ? bodyRead : 0, ContentType = ContentTypeOf(head) } };
-        return new(result, result.IsSuccess && authorization is null ? AnswerChallenges(context, options, head) : null);
+        return new(result, result.IsSuccess ? answerToChallenge : null);
     }
+
+    /// <summary>
+    /// The answer to a <c>401</c> that the request is sent again with, and the options its status is checked
+    /// with: <c>-f</c> does not fail a <c>401</c> that is answered (BL-5287), as curl's HTTP does not.
+    /// </summary>
+    private (string? Answer, HttpRequestOptions StatusOptions) ChallengeAnswer(ITransferContext context, HttpRequestOptions options, RtspReplyHead head, string? authorization)
+    {
+        string? answer = authorization is null ? AnswerChallenges(context, options, head) : null;
+        return (answer, answer is null ? options : options with { Fail = HttpFailMode.None });
+    }
+
+    /// <summary>The report of a reply head: its status, headers and sizes, and the session's <c>CSeq</c> and ID.</summary>
+    private TransferReport ReportOf(RtspReplyHead head, RtspSessionState session, int requestSize) =>
+        new()
+        {
+            ResponseCode = head.StatusCode,
+            HttpVersion = System.Net.HttpVersion.Version11,
+            PseudoHeaders = head.HeaderLines,
+            Method = plan.MethodName,
+            HeaderSize = head.Length,
+            RequestSize = requestSize,
+            RtspSessionId = session.SessionId,
+            RtspClientSequenceNumber = session.NextSequenceNumber,
+            RtspSequenceNumberReceived = head.SequenceNumber,
+        };
 
     /// <summary>The value of the reply's last <c>Content-Type</c> header, or <see langword="null" /> when it has none (BL-4934).</summary>
     private static string? ContentTypeOf(RtspReplyHead head) =>

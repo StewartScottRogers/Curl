@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Rtsp.UnitLibrary/RtspProtocolHandler.cs, Curl.Original.Protocol.Rtsp.UnitTests/RtspDigestChallengeTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5287 — Answer an RTSP Digest challenge on the same connection
 
@@ -33,12 +33,15 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] `--digest -u tester:secret` on `rtsp://` against a server that challenges with Digest exits 0 on one connection (`-w %{num_connects}` writes `1`), shown by a port test.
-- [ ] `--anyauth` picks Digest from the challenge and succeeds, and a wrong password exits 22 after the second request, shown by port tests.
+- [x] `--digest -u tester:secret` on `rtsp://` against a server that challenges with Digest exits 0 on one connection (`-w %{num_connects}` writes `1`), shown by a port test.
+- [x] `--anyauth` picks Digest from the challenge and succeeds, and a wrong password exits 22 after the second request, shown by port tests.
 
 ## Notes
+
+The retry on 401 already existed (BL-2818); the defect was `-f` failing the first 401 with 22 before it could be answered. A 401 that will be answered is now not failed by `-f`; the second 401 is. Tests: RtspDigestChallengeTests (fake authenticator, one connection). Linux/macOS: change is platform-neutral. Quality run clean.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: a2ae5627 2476711f.
+- 2026-11-16: Doing -> Done. RTSP 401 answered under -f; tests added
