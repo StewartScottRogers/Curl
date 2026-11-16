@@ -47,11 +47,16 @@ public sealed class ManagedCurlVersionTests
     }
 
     [TestMethod]
-    [DataRow("HTTP2")]
     [DataRow("HTTPSRR")]
     public void For_Windows_DoesNotListWhatTheSchannelBuildDoesNot(string feature)
     {
         CollectionAssert.DoesNotContain(ManagedCurlVersion.For(isWindows: true, isMacOS: false).Features.ToArray(), feature);
+    }
+
+    [TestMethod]
+    public void For_Windows_ListsHttp2_BecauseHttpsOffersH2ByDefault()
+    {
+        CollectionAssert.Contains(ManagedCurlVersion.For(isWindows: true, isMacOS: false).Features.ToArray(), "HTTP2");
     }
 
     [TestMethod]

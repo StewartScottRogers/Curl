@@ -164,8 +164,8 @@ public sealed class CurlVersionTests
 
         Assert.AreEqual(expectedBits, info.Features);
         Assert.AreNotEqual(CurlVersionFeatures.None, info.Features & CurlVersionFeatures.Ssl);
-        // The Schannel reference build does not list HTTP2 (ADR-0808); the OpenSSL one does.
-        Assert.AreEqual(!OperatingSystem.IsWindows(), (info.Features & CurlVersionFeatures.Http2) != CurlVersionFeatures.None);
+        // Every platform lists HTTP2: https offers h2 by ALPN by default (ADR-1273).
+        Assert.IsTrue((info.Features & CurlVersionFeatures.Http2) != CurlVersionFeatures.None);
     }
 
     [TestMethod]

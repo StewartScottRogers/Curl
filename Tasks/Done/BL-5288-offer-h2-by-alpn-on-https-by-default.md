@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/HttpVersionMapping.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Engine.UnitTests/HttpVersionMappingDefaultOfferTests.cs]
+touches: [Curl.Engine.UnitLibrary/HttpVersionMapping.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, Curl.Engine.UnitTests/ManagedCurlVersionTests.cs, Curl.Console.UnitTests/HttpVersionMappingTests.cs, Curl.Cli.UnitTests/CurlVersionTextTests.cs, Libcurl.UnitTests/Misc/Version/CurlVersionTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5288 — Offer h2 by ALPN on https by default
 
@@ -30,14 +30,15 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] `curl -k -w %{http_version} https://<h2 server>/` writes `2`, and `-v` shows `* ALPN: curl offers h2,http/1.1`, shown by port tests.
-- [ ] `--http1.1` still offers only `http/1.1`, and `curl -V` lists `HTTP2` in `Features:`.
+- [x] `curl -k -w %{http_version} https://<h2 server>/` writes `2`, and `-v` shows `* ALPN: curl offers h2,http/1.1`, shown by port tests.
+- [x] `--http1.1` still offers only `http/1.1`, and `curl -V` lists `HTTP2` in `Features:`.
 
 ## Notes
 
-The Windows default follows the Schannel reference build on purpose (ADR-0141, measured). Doing this task means an ADR amending ADR-0141 for Windows, decided under Stewart's delegation.
+ADR-1273 amends ADR-0141: no version option offers `h2,http/1.1` on every platform, and the Windows `-V` Features line (and ManagedCurlVersion) lists `HTTP2`. The ALPN criteria are shown by `HttpVersionMappingTests` (data rows and `CreateTcpConnector_NoVersionOption_OffersH2ThenHttp11`); `--http1.1` rows still pin `http/1.1`. The Engine-side `HttpVersionMappingDefaultOfferTests` was not added: Engine.UnitTests has no InternalsVisibleTo access, so the Console test project covers it. Touches widened to the test and version files the change pins. Platform-neutral. Quality run on Curl.Engine.UnitLibrary: 0 failing.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 0e62be3f 7a2a3b56.
+- 2026-11-16: Doing -> Done. https offers h2,http/1.1 by default on every platform; Windows -V lists HTTP2

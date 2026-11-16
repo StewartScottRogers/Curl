@@ -30,10 +30,10 @@ public static class CurlVersionText
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
     /// ignoring case): the line for Linux and macOS, the OpenSSL reference build. <see cref="WindowsFeaturesLine"/>
-    /// is the Windows line, which drops <c>GSS-API</c>, <c>HTTP2</c> and <c>SSLS-EXPORT</c>
+    /// is the Windows line, which drops <c>GSS-API</c> and <c>SSLS-EXPORT</c>
     /// and adds <c>SSPI</c>. ADR-0021's four, plus <c>brotli</c> and <c>libz</c> now that the registered
-    /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> off Windows
-    /// now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c> off Windows, and
+    /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c>
+    /// now that curl offers h2 by ALPN by default (ADR-1273), and <c>GSS-API</c> off Windows, and
     /// <c>Kerberos</c> and <c>SPNEGO</c> on every platform, now that <c>--negotiate</c> is answered
     /// (ADR-0142, ADR-0176), <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181).
     /// No <c>HTTP3</c>: the OpenSSL reference build has no QUIC library, so it lists no <c>HTTP3</c> and refuses <c>--http3</c> and <c>--http3-only</c>, as Curl does unless the parse reads as a QUIC build (ADR-0144, ADR-0451, ADR-0521, ADR-0540, BL-2330, BL-2332).
@@ -55,12 +55,11 @@ public static class CurlVersionText
     /// Windows (ADR-0142) and the features must say so (ADR-0439, BL-1796), and without <c>ECH</c>, which
     /// the Schannel reference build does not list, refusing <c>--ech</c> as it does (ADR-0448, ADR-0918), and
     /// without <c>GSS-API</c>, which the Schannel reference build does not list because Negotiate and
-    /// Kerberos answer through SSPI there (ADR-0449, BL-1823), without <c>HTTP2</c>, which the
-    /// Schannel reference build does not list, though Curl's own HTTP/2 still works there (ADR-0808, BL-3359), and without
+    /// Kerberos answer through SSPI there (ADR-0449, BL-1823), with <c>HTTP2</c>, as the port speaks HTTP/2 by ALPN by default (ADR-1273), and without
     /// <c>HTTP3</c>, which the Schannel reference build does not list, though <c>--http3</c> still works
     /// (ADR-0451, BL-1825).
     /// </summary>
-    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli HSTS HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd";
+    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd";
 
     /// <summary>Returns the four lines for the platform described, without line terminators.</summary>
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>
