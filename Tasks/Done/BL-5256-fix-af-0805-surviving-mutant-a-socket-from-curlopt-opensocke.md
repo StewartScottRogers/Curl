@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/SocketCallbackConnector.cs]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5256 — Fix AF-0805: Surviving mutant: a socket from CURLOPT_OPENSOCKETFUNCTION can be treated as the connection's own, changing when the close-socket callback runs
 
@@ -43,3 +43,4 @@ Mutant (line 249 false -> true) applied by hand: the new test ConnectAsync_OpenS
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: d56c40e9 9742157d.
+- 2026-11-15: Doing -> Done. Test pins close-socket order for open-socket-supplied sockets, killing the AF-0805 mutant
