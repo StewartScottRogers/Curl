@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/TransferHeaderStore.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5268 — Fix AF-0814: Surviving mutant: a response header line starting with ':' can be dropped from curl_easy_header's store
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferHeaderStore.cs line 277`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferHeaderStore.cs line 277`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `TransferHeaderStoreTests.Next_LineStartingWithColon_IsStoredAsHeaderWithEmptyName` (mutant `colon > 0` fails it, 33 others pass; reverted, production code unchanged). Engine fast tests: 3053 passed. No production change, so no quality run.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 64dab6e2 9742157d.
+- 2026-11-16: Doing -> Done. Added a test that kills the mutant.

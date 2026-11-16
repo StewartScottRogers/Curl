@@ -64,6 +64,16 @@ public sealed class TransferHeaderStoreTests
     }
 
     [TestMethod]
+    public void Next_LineStartingWithColon_IsStoredAsHeaderWithEmptyName()
+    {
+        TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", ":x", string.Empty);
+
+        CurlHeader? header = store.Next(CurlHeaderOrigin.Header, Last, null);
+
+        Assert.AreEqual(new CurlHeader(string.Empty, "x", 1, 0, CurlHeaderOrigin.Header), header);
+    }
+
+    [TestMethod]
     public void Find_NothingRecorded_AnswersNoHeaders()
     {
         Assert.AreEqual(CurlHeaderCode.NoHeaders, new TransferHeaderStore().Find("Server", 0, CurlHeaderOrigin.Header, Last, out _));
