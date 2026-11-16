@@ -8,7 +8,7 @@ depends-on: []
 touches: [README.md]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5306 — Fix AF-0832: README says smb and smbs are disabled in every build and absent from curl -V, but Curl serves and lists them
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+README.md protocol paragraph now lists smb and smbs as served and listed by -V, citing ADR-1281 (supersedes ADR-0835, ADR-1263). Docs-only change; build and fast tests unaffected by a README edit.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-16: Doing -> Done. README fixed
