@@ -36,10 +36,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib573.cs line 31`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib573.cs line 31`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test `Lib573_DebugTrace_StartsEachLineWithTheLocalTime` (Lib567To576Tests.cs): the mutant at line 31 (traceTime: true -> false) fails it; reverted, all 1217 fast tests pass. The existing `Lib573_DebugTrace_DumpsDataWithoutHexColumn` covers noHex.
 
 ## Log
 

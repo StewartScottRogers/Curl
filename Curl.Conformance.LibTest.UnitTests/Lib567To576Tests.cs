@@ -391,6 +391,21 @@ public sealed class Lib573To576Tests
     }
 
     [TestMethod]
+    public async Task Lib573_DebugTrace_StartsEachLineWithTheLocalTime()
+    {
+        var engine = new FakeCurlEngine();
+        var run = new PortRun(engine, 573, "http://x/573");
+        await new Lib573(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+        run.Error.GetStringBuilder().Clear();
+
+        _ = engine.Multi.Added!.Options.Callbacks.Debug!(CurlInfoType.DataIn, "AB"u8);
+
+        Assert.IsTrue(
+            System.Text.RegularExpressions.Regex.IsMatch(run.Error.ToString(), @"^\d\d:\d\d:\d\d\.\d{6} "),
+            run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task Lib573_ConnectTimeOrFailingLoop_AnswersWithoutTheCheck()
     {
         var timed = new PortRun(new FakeCurlEngine { Info = new TransferInfo { ConnectTime = TimeSpan.FromMilliseconds(1) } }, 573, "http://x/573");
