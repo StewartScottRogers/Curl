@@ -3,8 +3,8 @@ id: AF-0809
 title: EndPointRecordingConnector.ConnectAsync's summary says it records the connection or a failed connect's socket error; on success it records both
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs:ConnectAsync:false-doc-comment
 reproduction: none
 task: none

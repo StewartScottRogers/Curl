@@ -3,8 +3,8 @@ id: AF-0803
 title: Surviving mutant: lib564 can write its debug trace without the time stamps upstream's trace has
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib564.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib564.cs:66:true
 task: none

@@ -3,8 +3,8 @@ id: AF-0800
 title: Surviving mutant: lib757's read callback can send nothing when the buffer is exactly the part's length
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib757.cs:Read-lt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib757.cs:29:<
 task: none

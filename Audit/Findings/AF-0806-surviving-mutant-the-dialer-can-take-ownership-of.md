@@ -3,8 +3,8 @@ id: AF-0806
 title: Surviving mutant: the dialer can take ownership of an application-supplied socket and close it itself
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/TcpDialer.cs:DialSuppliedSocketAsync-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpDialer.cs:346:false
 task: none

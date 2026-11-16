@@ -3,8 +3,8 @@ id: AF-0808
 title: When the server resets the connection right after accepting it, Curl prints 'Recv failure: Connection was aborted' where curl prints 'Connection was reset'
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:reset-after-accept:Recv-failure-wording:stderr
 reproduction: none
 task: none

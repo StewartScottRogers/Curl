@@ -3,8 +3,8 @@ id: AF-0810
 title: Lanes waited 43 of 198.38 lane minutes (21.7%) because every ready task overlapped one in Doing
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: process:logs:overlap-wait:overlap-wait
 reproduction: none
 task: none

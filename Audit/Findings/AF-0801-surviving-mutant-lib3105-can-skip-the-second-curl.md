@@ -3,8 +3,8 @@ id: AF-0801
 title: Surviving mutant: lib3105 can skip the second curl_multi_remove_handle it exists to check
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib3105.cs:RemoveTwice-eq:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib3105.cs:65:==
 task: none

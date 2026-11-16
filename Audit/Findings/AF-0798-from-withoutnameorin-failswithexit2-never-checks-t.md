@@ -3,8 +3,8 @@ id: AF-0798
 title: From_WithoutNameOrIn_FailsWithExit2 never checks the exit code 2 its name promises
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OpenApi.UnitTests/OpenApiParameterTests.cs:From_WithoutNameOrIn_FailsWithExit2:name-lies
 reproduction: none
 task: none
