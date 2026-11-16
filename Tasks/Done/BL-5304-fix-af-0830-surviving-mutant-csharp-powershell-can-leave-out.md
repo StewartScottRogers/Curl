@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5304 — Fix AF-0830: Surviving mutant: --csharp/--powershell can leave out a -F form body of exactly the 1 MiB read-ahead limit
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs line 87`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs line 87`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killed by `From_AFormOfExactlyTheReadAheadLimit_IsStillRead` (CodeGenerationTextFormTests.cs); verified by applying `<` by hand, test failed, reverted, all 47 pass. Test-only change, no production edit.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: da75c15a 9742157d.
+- 2026-11-16: Doing -> Done. A form body of exactly the 1 MiB read-ahead limit is pinned by a new test that kills the mutant
