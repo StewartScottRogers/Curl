@@ -30,12 +30,21 @@ public sealed class CurlCommandRunnerMalformedResolveTests
     }
 
     [TestMethod]
-    public async Task RunAsync_MalformedResolveWithRejectedQueryUrl_Exits49()
+    public async Task RunAsync_MalformedResolveWithRejectedQueryUrl_Exits3AsCurlsToolFailsTheQueryFirst()
     {
         (int exitCode, string error) = await RunAsync("-sS", "-G", "--url-query", "a=b", "--resolve", "x:", "http://a b/");
 
+        Assert.AreEqual(3, exitCode);
+        Assert.AreEqual("curl: (3) Could not parse the URL, failed to set query", error.TrimEnd());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseMalformedResolveAfterGoodEntry_PrintsAddedLineAndEntryInfoThenExits49()
+    {
+        (int exitCode, string error) = await RunAsync("-v", "--resolve", "good:80:127.0.0.1", "--resolve", "x:", "/");
+
         Assert.AreEqual(49, exitCode);
-        Assert.AreEqual(Expected, error.TrimEnd());
+        Assert.AreEqual("* [DNS] added good:80:127.0.0.1 to cache\n* Could not parse CURLOPT_RESOLVE entry 'x:'\n" + Expected, error.Replace("\r\n", "\n").TrimEnd());
     }
 
     [TestMethod]
@@ -53,7 +62,7 @@ public sealed class CurlCommandRunnerMalformedResolveTests
         ScriptedConnector server = new([]);
         HttpProtocolHandler http = new(server, new Curl.Authentication.BasicAndBearerAuthenticator(Curl.Authentication.CredentialEncoding.ForPlatform(isWindows: false)));
         int exitCode = await new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                _ => new TransferDispatch(new ProtocolDispatcher([http]), [], loadResolveEntries: events => events.ReportInfo("[DNS] added good:80:127.0.0.1 to cache")),
                 files,
                 files,
                 new MemoryStream(),
