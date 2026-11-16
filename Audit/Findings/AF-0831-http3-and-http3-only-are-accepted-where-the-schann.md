@@ -3,8 +3,8 @@ id: AF-0831
 title: --http3 and --http3-only are accepted where the Schannel reference curl refuses them with exit 2
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:--http3:refused-option
 reproduction: none
 task: none

@@ -3,8 +3,8 @@ id: AF-0826
 title: Surviving mutant: a plain CONNECT reply can be read as a CONNECT-UDP one, so a 101 skips its Content-Length
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:ReadReplyAsync-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:163:false
 task: none

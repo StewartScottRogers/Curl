@@ -3,8 +3,8 @@ id: AF-0833
 title: Protocols.md's SMB row says disabled in every build, exit 1, not in curl -V; the code serves smb/smbs and lists them
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Protocols.md:SMB:false-statement
 reproduction: none
 task: none

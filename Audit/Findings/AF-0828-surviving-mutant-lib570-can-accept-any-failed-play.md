@@ -3,8 +3,8 @@ id: AF-0828
 title: Surviving mutant: lib570 can accept any failed PLAY as the expected session-ID mismatch
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib570.cs:PlayAsync-and:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib570.cs:94:&&
 task: none

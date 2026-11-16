@@ -3,8 +3,8 @@ id: AF-0825
 title: PerformAsync_GzipBodyUnderAcceptEncoding_DeliversTheDecodedBytes checks only how many bytes were delivered, never which
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitTests/Cgr126Tests.cs:PerformAsync_GzipBodyUnderAcceptEncoding_DeliversTheDecodedBytes:name-lies
 reproduction: none
 task: none

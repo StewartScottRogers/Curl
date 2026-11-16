@@ -3,8 +3,8 @@ id: AF-0834
 title: Requirements.md says SMB is registered only as disabled, failing with exit 1; the engine serves smb/smbs
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Product/Requirements.md:SMB:false-statement
 reproduction: none
 task: none
