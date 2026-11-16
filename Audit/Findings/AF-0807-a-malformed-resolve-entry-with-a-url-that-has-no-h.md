@@ -3,8 +3,8 @@ id: AF-0807
 title: A malformed --resolve entry with a URL that has no host exits 3 (URL rejected) where curl exits 49
 auditor: conformance
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-16_0514.md: the reproduction no longer reproduces.
 key: conformance:--resolve:host-less-url-checked-first:exit-code
 reproduction: none
 task: BL-5258
@@ -13,9 +13,9 @@ found: 2026-11-15
 found-at: 2a5b0f025b7c8fef02cb85fb555414235eb4e132
 scorecard: 2026-11-15_1610.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-16
+closed-how: reliable-reaudit
+closed-by: 2026-11-16_0514.md
 ---
 # AF-0807 - A malformed --resolve entry with a URL that has no host exits 3 (URL rejected) where curl exits 49
 
@@ -42,6 +42,9 @@ dotnet build Curl.Console -c Release -v q | Out-Null; & 'C:\Program Files\Git\uc
 
 ## Re-audits
 
+- 2026-11-16 | 2026-11-16_0514.md | reproduces: no | Ran the reproduction against the Release build of this tree (from the scratch folder). curl: `curl: (49) Could not parse CURLOPT_RESOLVE entry 'x:'`, exit 49. Curl: `curl: (49) Could not parse CURLOPT_RESOLVE entry 'x:'`, exit 49. Same exit code and same text.
+
 ## Log
 
 - 2026-11-15: filed proposed.
+- 2026-11-16: accepted -> closed. Re-audit 2026-11-16_0514.md: the reproduction no longer reproduces.
