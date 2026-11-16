@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.JsonRpc.UnitLibrary/JsonRpcReplyPairing.cs]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5250 — Fix AF-0799: Surviving mutant: --jsonrpc can write a batch's responses out of call order when the first one received answers an early call
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.JsonRpc.UnitLibrary/JsonRpcReplyPairing.cs line 49`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.JsonRpc.UnitLibrary/JsonRpcReplyPairing.cs line 49`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by test `Pair_TheFirstResponseReceivedAnswersTheFirstCall_IsWrittenInThatCallsPlace_Section6` (mutant checked by hand, reverted; 32 tests pass). Build clean via test run.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: 5c70baa3 9742157d.
+- 2026-11-15: Doing -> Done. Added test killing the index>0 mutant
