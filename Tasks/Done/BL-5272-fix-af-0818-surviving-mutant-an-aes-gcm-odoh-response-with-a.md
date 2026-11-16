@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ObliviousDoh.UnitLibrary/Encryption/ResponseAead.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5272 — Fix AF-0818: Surviving mutant: an AES-GCM ODoH response with a bad tag can be reported as opened
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.ObliviousDoh.UnitLibrary/Encryption/ResponseAead.cs line 46`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.ObliviousDoh.UnitLibrary/Encryption/ResponseAead.cs line 46`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `ResponseAeadTests.TryOpen_AesGcmWithATamperedTag_RefusesToOpen` (new; calls TryOpen directly). Verified by hand: mutant fails it, reverted passes (98 fast tests green). Production code unchanged.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 4ad30d39 9742157d.
+- 2026-11-16: Doing -> Done. Added ResponseAeadTests killing the TryOpen mutant.
