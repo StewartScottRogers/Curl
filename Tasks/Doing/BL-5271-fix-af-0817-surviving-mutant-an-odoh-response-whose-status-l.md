@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.ObliviousDoh.UnitLibrary/Http/ObliviousDohHttpResponseParser.cs line 32`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.ObliviousDoh.UnitLibrary/Http/ObliviousDohHttpResponseParser.cs line 32`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `ObliviousDohHttpTests.Parse_FramesTheBodyAsRfc9112Section6_3` with the new row `HTTP/1.1 200` (no reason phrase); with the mutant it failed, reverted it passes (97 of 97). Production code unchanged. Fast tests of the library pass; the full-solution run is left to the shift (test-only change).
 
 ## Log
 
