@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Mcp.IntegrationTests, Curl.Mcp.UnitLibrary, Curl.Mcp]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5298 — Fix CI failure Conversation_AnswersAsRecorded on Linux and Windows
 
@@ -28,11 +28,14 @@ Lanes test only on Windows, so reproduce with `gh run view 43936333856 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `Conversation_AnswersAsRecorded` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `Conversation_AnswersAsRecorded` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Golden `tools-call-version.json` lacked `smb` and `smbs` in `protocols` (SMB was added to the version tool); added them. Platform-neutral data change; 28 of 28 golden conversations pass. No production code changed.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: e70e753a.
+- 2026-11-16: Doing -> Done. Golden tools-call-version now lists smb and smbs; 28 of 28 conversations pass

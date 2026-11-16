@@ -57,6 +57,8 @@
                   "rtsp",
                   "scp",
                   "sftp",
+                  "smb",
+                  "smbs",
                   "smtp",
                   "smtps",
                   "telnet",
