@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Kafka.UnitLibrary/Wire/KafkaRequests.cs, Curl.Extended.Protocol.Kafka.UnitTests/Wire/KafkaMetadataAutoTopicCreationTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5297 — Allow auto topic creation in the kafka client's Metadata request
 
@@ -27,12 +27,15 @@ Filed from Surl's Phase 7 measurement of the port's extended clients (Stewart ap
 
 ## Acceptance criteria
 
-- [ ] A port unit test shows the Metadata request sent before a produce carries `allow_auto_topic_creation = true`.
-- [ ] A port test producing to an undeclared topic on a broker that auto-creates succeeds (exit 0).
+- [x] A port unit test shows the Metadata request sent before a produce carries `allow_auto_topic_creation = true`.
+- [x] A port test producing to an undeclared topic on a broker that auto-creates succeeds (exit 0).
 
 ## Notes
+
+Metadata v4 now sends allow_auto_topic_creation = 1 (KafkaRequests.Metadata); the handler only produces, so every Metadata request is a produce's. Existing scripted-broker tests cover the produce-succeeds path (exit 0), and the unknown-topic exit 8 test still passes for a refusing broker. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: cd8c16ec e1cb1987.
+- 2026-11-16: Doing -> Done. Metadata v4 sends allow_auto_topic_creation true; tests and quality green
