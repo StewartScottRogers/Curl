@@ -3580,7 +3580,7 @@ internal sealed class CurlCommandRunner(
         if (QueryRejected(url, queriedUrl))
         {
             transferUrl = null;
-            failure = MalformedResolveFailure(options) ?? TransferResult.Failure(CurlExitCode.UrlMalformat, "Could not parse the URL, failed to set query");
+            failure = TransferResult.Failure(CurlExitCode.UrlMalformat, "Could not parse the URL, failed to set query");
             return false;
         }
 
@@ -3589,18 +3589,24 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
-        failure = MalformedResolveFailure(options) ?? TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
+        failure = MalformedResolveFailure(options, EventsBeforeConnecting(transfer)) ?? TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
         return false;
     }
 
     /// <summary>
     /// The exit 49 failure for a malformed <c>--resolve</c> entry, or <see langword="null" /> when every entry parses: curl loads
-    /// <c>CURLOPT_RESOLVE</c> before it parses the URL, so the entry is reported ahead of a URL rejection (AF-0807).
+    /// <c>CURLOPT_RESOLVE</c> before it parses the URL, so the entry is reported ahead of a URL rejection (AF-0807), as an info line first (BL-5263). A <c>-G</c> query rejection comes before it: the tool fails that one itself (exit 3).
     /// </summary>
-    private static TransferResult? MalformedResolveFailure(CommandLineOptions options) =>
-        ResolveOverrides.Parse(EasyOptionsFromCommandLine.NetworkOf(options).Resolve).ParseError is { } parseError
-            ? TransferResult.Failure(CurlExitCode.SetoptOptionSyntax, parseError)
-            : null;
+    private static TransferResult? MalformedResolveFailure(CommandLineOptions options, ITransferEvents events)
+    {
+        if (ResolveOverrides.Parse(EasyOptionsFromCommandLine.NetworkOf(options).Resolve).ParseError is not { } parseError)
+        {
+            return null;
+        }
+
+        events.ReportInfo(parseError);
+        return TransferResult.Failure(CurlExitCode.SetoptOptionSyntax, parseError);
+    }
 
     /// <summary>
     /// Whether curl refuses the URL it was given when <c>-G</c> / <c>--url-query</c> has a query to append: its tool parses the URL
