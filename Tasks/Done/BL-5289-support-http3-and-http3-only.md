@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineOption.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CurlAiHelpText.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, Curl.Cli.UnitTests/Http3OptionsAcceptedTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5289 — Support --http3 and --http3-only
 
@@ -42,3 +42,4 @@ ADR-1282 supersedes ADR-0540: the table rows are plain flags, RefusedWithoutQuic
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 84bf8554 a12090e0 622005d5.
+- 2026-11-16: Doing -> Done. --http3 and --http3-only accepted, -V lists HTTP3 (ADR-1282)
