@@ -9,6 +9,9 @@ public sealed class UrlPartTextTests
     [TestMethod]
     [DataRow("a%aab%aAc%Aa", "a%AAb%AAc%AA")]
     [DataRow("w%wf%xf%f", "w%wf%xf%f")]
+    [DataRow("%aF", "%AF")]
+    [DataRow("9%aF", "9%AF")]
+    [DataRow("A%aF", "A%AF")]
     public void UrlEncodeString_PercentEscapes_UpperCasesOnlyValidLowerCaseOnes(string text, string expected)
     {
         string encoded = UrlPartText.UrlEncodeString(text, relative: true, UrlEncodeQuery.No);

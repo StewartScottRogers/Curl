@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/UrlPartText.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5266 — Fix AF-0812: Surviving mutant: URL encoding can leave a lower-case %xx escape un-upper-cased, or index before the string
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/UrlPartText.cs line 218`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/UrlPartText.cs line 218`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Mutant (`bytes[index - 1]`) killed by `UrlPartTextTests.UrlEncodeString_PercentEscapes_UpperCasesOnlyValidLowerCaseOnes` rows `%aF`, `9%aF`, `A%aF` (3 failed with mutant, all pass reverted). Test-only change; fast tests 3055 pass.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 000aa3d9 9742157d.
+- 2026-11-16: Doing -> Done. Added escape rows that kill the index-1 mutant
