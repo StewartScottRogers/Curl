@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/SocketCallbackConnector.cs:OpenSocketAsync-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/SocketCallbackConnector.cs:249:false
-task: none
-tasks:
+task: BL-5256
+tasks: BL-5256
 found: 2026-11-15
 found-at: 2a5b0f025b7c8fef02cb85fb555414235eb4e132
 scorecard: 2026-11-15_1610.md

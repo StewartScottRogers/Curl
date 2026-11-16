@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs:ConnectAsync:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-5260
+tasks: BL-5260
 found: 2026-11-15
 found-at: 2a5b0f025b7c8fef02cb85fb555414235eb4e132
 scorecard: 2026-11-15_1610.md
