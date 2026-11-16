@@ -90,8 +90,7 @@ internal sealed class AwsSigV4HttpAuthenticator(IHttpAuthenticator otherSchemes,
     /// <exception cref="HttpAuthenticationFailedException">curl refuses to sign the request.</exception>
     private string? Sign(HttpAuthRequest request, AwsSigV4Inputs inputs, IReadOnlyList<string> challenges)
     {
-        // libcurl also signs with an empty key ID when only --oauth2-bearer is set (AF-0823).
-        NetworkCredential? credential = request.Credential ?? (request.BearerToken is null ? null : new NetworkCredential(string.Empty, string.Empty));
+        NetworkCredential? credential = CredentialToSignWith(request);
         if (challenges.Count != 0 || credential is null)
         {
             return null;
@@ -103,6 +102,21 @@ internal sealed class AwsSigV4HttpAuthenticator(IHttpAuthenticator otherSchemes,
             throw new HttpAuthenticationFailedException(result.ExitCode, message);
         }
 
+        string? value = ReportSigning(request, result);
+        request.Events.ReportInfo($"Server auth using AWS_SIGV4 with user '{credential.UserName}'");
+        return value;
+    }
+
+    /// <summary>
+    /// The request's credential; libcurl also signs with an empty key ID when only
+    /// --oauth2-bearer is set (AF-0823). <see langword="null" /> when there is neither.
+    /// </summary>
+    private static NetworkCredential? CredentialToSignWith(HttpAuthRequest request) =>
+        request.Credential ?? (request.BearerToken is null ? null : new NetworkCredential(string.Empty, string.Empty));
+
+    /// <summary>Reports the picked-from-host, string-to-sign and signature lines and gives the header value to send, if any.</summary>
+    private static string? ReportSigning(HttpAuthRequest request, AwsSigV4SigningResult result)
+    {
         foreach (string line in result.PickedFromHostLines)
         {
             request.Events.ReportInfo(line);
@@ -117,7 +131,6 @@ internal sealed class AwsSigV4HttpAuthenticator(IHttpAuthenticator otherSchemes,
             value = string.Join("\r\n", result.HeaderLines)[AuthorizationLinePrefix.Length..];
         }
 
-        request.Events.ReportInfo($"Server auth using AWS_SIGV4 with user '{credential.UserName}'");
         return value;
     }
 
