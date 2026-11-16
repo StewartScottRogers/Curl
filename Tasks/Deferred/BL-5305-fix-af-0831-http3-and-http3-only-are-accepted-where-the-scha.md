@@ -46,8 +46,9 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
-Stewart decided 2026-11-16 ("Put the 10 in"): match the platform curl - on Windows, where the Schannel reference curl 8.22.0 has no HTTP3 feature, --http3 and --http3-only are refused with exit 2 and the reference curl's exact stderr ("curl: option --http3-only: the installed libcurl version does not support this" plus the try -h line), and curl -V lists no HTTP3; Linux and macOS keep ADR-1282's behaviour. Record this as an amendment to ADR-1282 (decided by Stewart). Pin each platform's answer in its own test (OSCondition), and keep --ai-help right.
+Stewart decided 2026-11-16 (option 1, keep HTTP/3 on): --http3 and --http3-only stay accepted on every platform (ADR-1282), as HTTP/2 does on Windows (ADR-0871, ADR-0929); AF-0831 is closed at his word. Not to be worked unless Stewart reverses ADR-1282.
 
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Backlog -> Deferred. Stewart 2026-11-16 chose to keep HTTP/3 on (ADR-1282), as HTTP/2 on Windows (ADR-0871); AF-0831 closed at his word
