@@ -34,3 +34,4 @@ Filed from Surl's Phase 7 measurement of the port's extended clients (Stewart ap
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: e4c5469c.
