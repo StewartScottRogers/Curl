@@ -77,6 +77,29 @@ public sealed partial class ManagedEasyTransferTests
         Assert.HasCount(1, connector.Targets);
     }
 
+    [TestMethod]
+    public async Task PerformAsync_HandleInAMultiHandle_LeavesItsConnectionsUnownedInTheMultisCache()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response), Encoding.ASCII.GetBytes(Response)]);
+        await using ManagedCurlEngine engine = CreatePoolingEngine(connector);
+        EasyOptions options = new() { Network = new EasyNetworkOptions { Url = "http://h/x" } };
+        IEasyTransfer first = engine.CreateEasy();
+        first.Options = options;
+        await using IMultiTransfer multi = engine.CreateMulti();
+        multi.Add(first);
+        await PerformInMultiAsync(multi);
+        Assert.IsTrue(engine.Shared.MultiCaches.TryGetValue((ManagedMultiTransfer)multi, out ManagedEngineSharedState? caches));
+
+        await caches.Connections.CloseIdleOwnedByAsync(first);
+        await using IEasyTransfer second = engine.CreateEasy();
+        second.Options = options;
+        multi.Add(second);
+        CurlCode code = await PerformInMultiAsync(multi);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.HasCount(1, connector.Targets);
+    }
+
     // Drives the multi handle until its one transfer is done, as curl_easy_perform of a handle in a multi handle is refused (CGR-147).
     private static async Task<CurlCode> PerformInMultiAsync(IMultiTransfer multi)
     {

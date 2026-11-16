@@ -32,10 +32,13 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs line 337`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs line 337`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The mutant survived because `OwnTheConnectionsOpened` set `OpeningOwner` on the handle's own cache (`shared.Connections`), but a tool transfer runs over the engine-wide cache and a multi-owned one over the multi's cache, so the `ToolSettings`/multi guard had no observable effect. The fix sets the owner on the cache the perform will use (`EngineWide`, the multi's, else `shared`), with the same condition; behaviour is unchanged.
+- Killing tests with the `||` mutant applied: `DisposeAsync_ToolSettingsSet_LeavesThePooledConnectionForTheNextHandle` (existing, now kills) and the new `PerformAsync_HandleInAMultiHandle_LeavesItsConnectionsUnownedInTheMultisCache`. With the mutant reverted all 3060 Curl.Engine fast tests pass; Measure-CodeQuality for Curl.Engine.UnitLibrary reports 0 failing members.
 
 ## Log
 

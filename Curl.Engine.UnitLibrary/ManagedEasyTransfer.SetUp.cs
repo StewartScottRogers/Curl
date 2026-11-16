@@ -334,7 +334,8 @@ internal sealed partial class ManagedEasyTransfer
     /// set) own none, as its run's connections outlive each transfer's handle.
     /// </summary>
     private void OwnTheConnectionsOpened() =>
-        shared.Connections.OpeningOwner = ToolSettings is null && !shared.MultiOwners.ContainsKey(this) ? this : null;
+        (ToolSettings is not null ? shared.EngineWide : MultiCachesOf() ?? shared).Connections.OpeningOwner =
+            ToolSettings is null && !shared.MultiOwners.ContainsKey(this) ? this : null;
 
     /// <summary>
     /// Wraps <paramref name="events" /> in the decorators the curl tool's runner adds under the same
