@@ -1,4 +1,4 @@
-# ADR-1273 — --negotiate follows the Windows reference build: no NTLM inside SPNEGO
+# ADR-1276 — --negotiate follows the Windows reference build: no NTLM inside SPNEGO
 
 Status: Accepted. Decided by Claude under Stewart's delegation. Confirms ADR-0176.
 

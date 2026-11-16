@@ -34,10 +34,10 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Notes
 
-Decision: the port follows the Windows reference build's `!ntlm` change (ADR-1273, confirming ADR-0176); the criterion's ADR alternative is met. No code change.
+Decision: the port follows the Windows reference build's `!ntlm` change (ADR-1276, confirming ADR-0176); the criterion's ADR alternative is met. No code change.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 132e44e6.
-- 2026-11-16: Doing -> Done. ADR-1273 records that the port follows the Windows reference build's !ntlm change
+- 2026-11-16: Doing -> Done. ADR-1276 records that the port follows the Windows reference build's !ntlm change
