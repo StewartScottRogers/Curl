@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Product/Requirements.md]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5308 — Fix AF-0834: Requirements.md says SMB is registered only as disabled, failing with exit 1; the engine serves smb/smbs
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Reworded the Coverage note in Requirements.md to say smb/smbs are served (ADR-1281). Markdown only; no code changed, so build and fast tests are unaffected.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-16: Doing -> Done. Requirements.md now says smb/smbs are served
