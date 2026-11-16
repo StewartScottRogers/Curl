@@ -30,9 +30,11 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] On `ldap://` the port opens curl's own connection, sends nothing on it, and runs the LDAP exchange on a second connection, shown by a port test counting connections; or a port ADR records that the port keeps one connection.
+- [x] On `ldap://` the port opens curl's own connection, sends nothing on it, and runs the LDAP exchange on a second connection, shown by a port test counting connections; or a port ADR records that the port keeps one connection.
 
 ## Notes
+
+- Decision in ADR-1280. Also edited Curl.Console.UnitTests/CurlCompositionLdapTests.cs (target count 2) and LdapProtocolHandlerTests.Search.cs; both are test-only. Ldap quality gate: 100/100, 0 failing. Platform-neutral tests. Ldaps with -u left at one connection (BL-5285).
 
 ## Log
 

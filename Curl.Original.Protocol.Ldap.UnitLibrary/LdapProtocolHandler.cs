@@ -175,8 +175,8 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// dialect's bind as the logged-on user, on a second connection WinLDAP opens beside it.
     /// </summary>
     private ValueTask<TransferResult> SearchAsync(IConnection connection, ConnectTarget target, ITransferContext context) =>
-        dialect == LdapDialect.WinLdap && context.Credentials is null
-            ? SearchBesideEmptyConnectionAsync(connection, target, context)
+        dialect == LdapDialect.WinLdap && (context.Credentials is null || !target.UseTls)
+            ?SearchBesideEmptyConnectionAsync(connection, target, context)
             : SearchOnAsync(connection, context);
 
     /// <summary>The failure a connect that opened no connection ends the transfer with.</summary>
@@ -216,7 +216,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// target is unchanged.
     /// </summary>
     private static ConnectTarget WinLdapTargetOf(ConnectTarget target) =>
-        target.UseTls ? target with { TlsServerName = Environment.MachineName, TrustsSystemStoreOnly = true } : target;
+        (target.UseTls ? target with { TlsServerName = Environment.MachineName, TrustsSystemStoreOnly = true } : target) with { Events = NoTransferEvents.Instance };
     /// <summary>Reads the URL, then binds and searches on <paramref name="connection" />, which it disposes.</summary>
     /// <remarks>The WinLDAP dialect first names the library and the URL, and once the URL is read, the kind of connection.</remarks>
     private async ValueTask<TransferResult> SearchOnAsync(IConnection connection, ITransferContext context)
