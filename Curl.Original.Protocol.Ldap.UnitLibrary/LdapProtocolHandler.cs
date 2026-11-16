@@ -148,16 +148,26 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         }
 
         ConnectTarget target = TargetOf(context);
-        ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        (ConnectResult connect, TransferResult? connectFailure) = await ConnectAsync(target, context).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return ConnectFailure(connect);
+            return connectFailure!;
         }
 
         context.Progress.ReportTransferStarted();
         TransferResult result = await SearchAsync(connection, target, context).ConfigureAwait(false);
         ReportConnectionEnd(context.Events, result, target, connect.ConnectionNumber);
         return result;
+    }
+
+    // Over ldaps with -u WinLDAP checks the certificate against the Windows store itself, so -k
+    // does not help and a handshake it refuses is the bind's Server Down (BL-5285).
+    private async ValueTask<(ConnectResult Connect, TransferResult? Failure)> ConnectAsync(ConnectTarget target, ITransferContext context)
+    {
+        bool winLdapChecksCertificate = dialect == LdapDialect.WinLdap && target.UseTls && context.Credentials is not null;
+        ConnectResult connect = await connector.ConnectAsync(winLdapChecksCertificate ? target with { TrustsSystemStoreOnly = true } : target, context.CancellationToken).ConfigureAwait(false);
+        TransferResult? failure = connect.Connection is not null ? null : winLdapChecksCertificate ? WinLdapConnectFailure(connect, target) : ConnectFailure(connect);
+        return (connect, failure);
     }
 
     /// <summary>

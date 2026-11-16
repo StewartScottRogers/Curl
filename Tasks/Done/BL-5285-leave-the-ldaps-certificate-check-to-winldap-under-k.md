@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapsInsecureWinLdapTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5285 — Leave the ldaps certificate check to WinLDAP under -k
 
@@ -30,13 +30,16 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] On Windows, `-k` with `ldaps://` to a self-signed server exits 38 with `curl: (38) LDAP local: bind via ldap_win_bind Server Down` and writes nothing, shown by a port test.
+- [x] On Windows, `-k` with `ldaps://` to a self-signed server exits 38 with `curl: (38) LDAP local: bind via ldap_win_bind Server Down` and writes nothing, shown by a port test.
 
 ## Notes
 
 Shares `LdapProtocolHandler.cs` with BL-5284, so the two run one after the other.
 
+Decision: -k is not visible to the handler, so over WinLDAP ldaps with -u the connect trusts the system store only and any refused handshake is `Server Down` (exit 38), as WinLDAP does with or without -k. Tests in LdapsInsecureWinLdapTests; the Ldap library passes Measure-CodeQuality.
+
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: cf183cd6.
+- 2026-11-16: Doing -> Done. WinLDAP ldaps with -u trusts the system store only; refused handshake is Server Down
