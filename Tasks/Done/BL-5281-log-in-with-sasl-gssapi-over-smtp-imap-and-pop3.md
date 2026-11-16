@@ -9,7 +9,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary/SaslAuthenticator.cs, Curl.Authentication.UnitTests/SaslGssapiLoginTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5281 — Log in with SASL GSSAPI over SMTP, IMAP and POP3
 
@@ -34,15 +34,24 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] The port completes a SASL `GSSAPI` login over SMTP, IMAP and POP3, with and without `--sasl-ir`, shown by port tests of each exchange.
-- [ ] `--login-options AUTH=GSSAPI` with a valid Kerberos principal no longer exits 67 (`CURLE_LOGIN_DENIED`) where the server accepts the ticket.
+- [x] The port completes a SASL `GSSAPI` login over SMTP, IMAP and POP3, with and without `--sasl-ir`, shown by port tests of each exchange.
+- [x] `--login-options AUTH=GSSAPI` with a valid Kerberos principal no longer exits 67 (`CURLE_LOGIN_DENIED`) where the server accepts the ticket.
 
 ## Notes
 
 Interactive only: the code path is already complete and unit-pinned (BL-538): SaslMechanismRanking picks GSSAPI for u@REALM, SaslAuthenticator.Begin builds a Kerberos SecurityContextSaslExchange, EngineComposition wires it for smtp, imap and pop3, and the Windows route is SystemSecurityContextFactory over NegotiateAuthentication("Kerberos"). Exit 67 (not 94) means the mechanism was chosen and the Surl server then refused the AP-REQ (or none was chosen), which no unit test can show without a Kerberos KDC and Surl server. Nothing was edited. Remove `lane: no` once a test KDC (Surl --auth gssapi, KDC on 127.0.0.1:88) is available to the session; then run the port with -v and read the AUTH GSSAPI exchange for what the server answers (compare SPN smtp/mail.surl.test, explicit credential tester@SURL.TEST passed as user with no domain, to upstream SSPI).
+
+
+**Root cause (2026-11-16, interactive session with Surl's test KDC):** the AP-REQ was fine (SPN `smtp/mail.surl.test`, `tester@SURL.TEST` as the user with no domain, both identical to upstream). The server refused the last step: `-v` showed upstream answering the wrapped security-layer offer with `BQQA/wAMAAwAAAAAXQVJ+...` (RFC 4121 wrap token, SND_SEQ = the authenticator's sequence number, which the acceptor echoed in its offer) while the port answered `BQQA/wAMAAwAAAAAAAAAAE1y...` (SND_SEQ 0), and Surl replied `535 5.7.8 Authentication credentials invalid`. `SaslAuthenticator` asked GSSAPI's context for `ProtectionLevel.Sign`; `NegotiateAuthentication` turns that into `ISC_REQ_INTEGRITY`, and with it SSPI's Kerberos wraps with sequence number 0. Curl 8.21.0's SSPI build asks `InitializeSecurityContext` for no flags.
+
+**Fix:** `Curl.Authentication.UnitLibrary/SaslAuthenticator.cs` asks `ProtectionLevel.None` for GSSAPI (the context still wraps and unwraps). Pinned by `Curl.Authentication.UnitTests/SaslGssapiLoginTests.cs` (the request and the `NegotiateAuthentication` options for smtp, imap and pop: Kerberos package, `service/mail.surl.test`, the explicit credential, no required protection); `SaslAuthenticatorSecurityContextTests` and `Curl.Console.UnitTests/CurlCompositionSaslDelegationTests` now expect `None`. ADR-0184 amended.
+
+**Surl evidence:** a local clone of Surl at `ffef7667f1cd5844de2f04bbcf17afbf21a3a62b` (Z:\repos\Surl untouched), its `CurlPortBuilds.json` pin pointed at the worktree's Debug `curl.exe`, `-v` added to the mail arguments, then `dotnet test Conformance/Surl.Conformance.UnitTests --filter "FullyQualifiedName~CurlPortBesideUpstreamCurlOverHttpTests.GssapiOver"`. Before the fix: all six Account cases a listed port defect (port exit 67, upstream 0). After: all six report the port now agrees with upstream curl (exit 0, message stored or fetched identically); they fail only on Surl's rule that `Documentation/Conformance/CurlPort/Http.md` still lists finding 3, which Surl must now remove. The three NoAccount cases still agree (exit 67).
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 86fd6769 d1597e80.
 - 2026-11-16: Doing -> Backlog. Interactive only: needs a Kerberos KDC and Surl server to reproduce the refused GSSAPI exchange; code path already complete.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: 86fd6769 d1597e80.
+- 2026-11-16: Doing -> Done. GSSAPI asks no required message protection, as curl's SSPI build does; Surl's six GSSAPI cases now agree with upstream curl.
