@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.ObliviousDoh.UnitLibrary/Wire/ObliviousDohConfig.cs line 30`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.ObliviousDoh.UnitLibrary/Wire/ObliviousDohConfig.cs line 30`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killing test: Config_SelectFrom_UsableListWithBytesAfterTheVector_GivesNull (new). With && changed to || it fails; reverted, all 97 pass. Production code unchanged.
 
 ## Log
 
