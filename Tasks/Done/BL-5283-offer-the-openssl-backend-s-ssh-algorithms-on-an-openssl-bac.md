@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Ssh.UnitLibrary/Negotiation/SshAlgorithmPreferences.cs, Curl.Ssh.UnitLibrary/PacketProtection/SshPacketProtections.cs, Curl.Ssh.UnitTests/Negotiation/SshAlgorithmPreferencesOpenSslTests.cs]
+touches: [Documentation/Planning/Decisions, Curl.Ssh.UnitLibrary/Negotiation/SshAlgorithmPreferences.cs, Curl.Ssh.UnitLibrary/PacketProtection/SshPacketProtections.cs, Curl.Ssh.UnitTests/Negotiation/SshAlgorithmPreferencesOpenSslTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5283 — Offer the OpenSSL backend's SSH algorithms on an OpenSSL-backed build
 
@@ -30,14 +30,17 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] The port's `KEXINIT` on the build it pairs with upstream's OpenSSL build lists the OpenSSL backend's name-lists in libssh2 1.11.1's order, shown by a port test; or a port ADR records that the port keeps the WinCNG lists.
-- [ ] Against a server offering only `blowfish-cbc`, `cast128-cbc`, `hmac-ripemd160` or `hmac-ripemd160@openssh.com`, the port completes the SFTP download (exit 0), shown by port tests.
+- [x] The port's `KEXINIT` on the build it pairs with upstream's OpenSSL build lists the OpenSSL backend's name-lists in libssh2 1.11.1's order, shown by a port test; or a port ADR records that the port keeps the WinCNG lists.
+- [x] Against a server offering only `blowfish-cbc`, `cast128-cbc`, `hmac-ripemd160` or `hmac-ripemd160@openssh.com`, the port completes the SFTP download (exit 0), shown by port tests.
 
 ## Notes
 
 The port follows the Windows Schannel/WinCNG reference build on Windows on purpose (its CLAUDE.md "Decisions"); whether it follows the OpenSSL build here is its maintainer's call, recorded in an ADR under Stewart's delegation. Shares `SshAlgorithmPreferences.cs` with BL-5279, so the two run one after the other.
 
+Decision: ADR-1274 (OpenSSL preset already carries the lists; Windows keeps WinCNG). Both criteria met by tests and the ADR.
+
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 3b1ce6e2 37344a61.
+- 2026-11-16: Doing -> Done. OpenSSL preset pinned by tests; ADR-1274
