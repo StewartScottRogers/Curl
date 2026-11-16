@@ -37,10 +37,10 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 The port follows the Windows Schannel/WinCNG reference build on Windows on purpose (its CLAUDE.md "Decisions"); whether it follows the OpenSSL build here is its maintainer's call, recorded in an ADR under Stewart's delegation. Shares `SshAlgorithmPreferences.cs` with BL-5279, so the two run one after the other.
 
-Decision: ADR-1274 (OpenSSL preset already carries the lists; Windows keeps WinCNG). Both criteria met by tests and the ADR.
+Decision: ADR-1278 (OpenSSL preset already carries the lists; Windows keeps WinCNG). Both criteria met by tests and the ADR.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 3b1ce6e2 37344a61.
-- 2026-11-16: Doing -> Done. OpenSSL preset pinned by tests; ADR-1274
+- 2026-11-16: Doing -> Done. OpenSSL preset pinned by tests; ADR-1278

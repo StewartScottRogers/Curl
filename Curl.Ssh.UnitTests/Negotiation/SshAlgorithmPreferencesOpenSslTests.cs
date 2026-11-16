@@ -6,7 +6,7 @@ namespace Curl.Ssh.Negotiation;
 /// <summary>
 /// Pins that the OpenSSL preset offers libssh2 1.11.1's OpenSSL lists in its order, and that
 /// every weak algorithm it offers (Blowfish, CAST-128, RIPEMD-160) is one the packet layer
-/// implements, so a server offering only one of them agrees it (BL-5283, ADR-1274).
+/// implements, so a server offering only one of them agrees it (BL-5283, ADR-1278).
 /// </summary>
 [TestClass]
 public sealed class SshAlgorithmPreferencesOpenSslTests

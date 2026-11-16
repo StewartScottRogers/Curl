@@ -1,4 +1,4 @@
-# ADR-1274: The OpenSSL preset carries the OpenSSL SSH algorithm lists; Windows keeps the WinCNG preset
+# ADR-1278: The OpenSSL preset carries the OpenSSL SSH algorithm lists; Windows keeps the WinCNG preset
 
 - Status: Accepted
 - Date: 2026-11-16
