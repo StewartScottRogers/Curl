@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/SocketCallbackConnector.cs line 249`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/SocketCallbackConnector.cs line 249`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Mutant (line 249 false -> true) applied by hand: the new test ConnectAsync_OpenSocketCallbackSuppliesTheSocket_ClosesTheSocketAfterTheInnerConnectionIsDisposed failed; reverted, all fast tests pass. Added FakeConnection.OnDispose in Curl.Engine.UnitTests/SocketCallbackConnectorTests.cs (touches widened to that test file).
 
 ## Log
 

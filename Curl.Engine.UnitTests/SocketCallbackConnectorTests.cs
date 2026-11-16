@@ -437,6 +437,27 @@ public sealed class SocketCallbackConnectorTests
         Assert.IsNull(await connection.ClearTlsAsync(sendCloseNotifyFirst: false, CancellationToken.None));
     }
 
+    [TestMethod]
+    public async Task ConnectAsync_OpenSocketCallbackSuppliesTheSocket_ClosesTheSocketAfterTheInnerConnectionIsDisposed()
+    {
+        List<string> calls = [];
+        FakeConnection inner = new() { SocketHandle = 77, OnDispose = () => calls.Add("inner disposed") };
+        SocketCallbackConnector connector = Create(new FakeConnector(inner), new EasyCallbackOptions
+        {
+            OpenSocket = (_, _) => new CurlSocket(9),
+            CloseSocket = socket =>
+            {
+                calls.Add($"close {socket.Handle}");
+                return 0;
+            },
+        });
+
+        ConnectResult connect = await connector.ConnectAsync(Target, CancellationToken.None);
+        await connect.Connection!.DisposeAsync();
+
+        CollectionAssert.AreEqual(new[] { "inner disposed", "close 9" }, calls);
+    }
+
     private static SocketCallbackConnector Create(IConnector inner, EasyCallbackOptions callbacks) =>
         new(inner, callbacks, new CurlSocketHandles(), new FrozenTimeProvider());
 
@@ -483,6 +504,8 @@ public sealed class SocketCallbackConnectorTests
 
         public bool Disposed { get; private set; }
 
+        public Action? OnDispose { get; init; }
+
         public int Writes { get; private set; }
 
         public int Flushes { get; private set; }
@@ -510,6 +533,7 @@ public sealed class SocketCallbackConnectorTests
         public ValueTask DisposeAsync()
         {
             Disposed = true;
+            OnDispose?.Invoke();
             return ValueTask.CompletedTask;
         }
     }
