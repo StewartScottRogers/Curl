@@ -41,3 +41,10 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: ad4d9a77 82a66894 4701464d.
+
+## Notes
+
+- Not a defect of the port: the port targets curl 8.22.0 (vendored `CurlTestCases/Original/` and the installed curl are 8.22.0). Measured real curl 8.22.0 on case 798's command line and response with Record-CurlExchange.ps1: jar line `#HttpOnly_localhost	FALSE	/p4	TRUE	0	flavor	tasty`, no leading dot, flag FALSE. The vendored 798 and 1136 `<file>` sections say the same, and the port passes them. Surl compared against 8.21.0, whose jar lines differ.
+- Ratchet puzzle answered: the runner checks 8.22.0's `<file>`, which the port writes correctly; Surl's copy of the cases holds 8.21.0's. The runner is not wrong.
+- Decision recorded in ADR-1273. No code changed; acceptance criteria 1 and 2 would contradict 8.22.0 and are not met, so the task goes to Deferred.
+- 2026-11-16: Doing -> Deferred. Not a defect: curl 8.22.0 writes Domain=host as a host cookie (FALSE, no dot); see ADR-1273
