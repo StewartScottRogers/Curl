@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-16 | 2026-11-16_0514.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: Lib573.cs:31 resolved to the line's first `true` (traceTime: true -> false), and it survived. The same mutant also survived in the sampled LibTest run with seed 213433. Runner's targeted mutation rerun on the clean audited commit: survived.
+
 ## Log
 
 - 2026-11-15: filed proposed.
