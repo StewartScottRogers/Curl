@@ -3,8 +3,8 @@ id: AF-0789
 title: SegmentedDownload's not-a-plain-GET test records only the last request, so a split POST/PUT/upload goes unseen
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_1610.md: the reproduction no longer reproduces.
 key: quality:Curl.Extension.SegmentedDownload.UnitTests/SegmentedDownloadTransferHookTests.cs:ExecuteAsync_ATransferThatIsNotAPlainGetOfTheWholeResource_RunsAsCurlRunsIt:weak-assertion
 reproduction: none
 task: BL-5240
@@ -13,9 +13,9 @@ found: 2026-11-15
 found-at: 065474f7431e6647cda727e7f0fd5a25c9859a90
 scorecard: 2026-11-15_1159.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: reliable-reaudit
+closed-by: 2026-11-15_1610.md
 ---
 # AF-0789 - SegmentedDownload's not-a-plain-GET test records only the last request, so a split POST/PUT/upload goes unseen
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Extension.SegmentedDownload.UnitTests/SegmentedDownload
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_1610.md | reproduces: no | Ran the Select-String reproduction: no match for 'sent = request;' or 'Assert.AreSame(context, sent)'. ExecuteAsync_ATransferThatIsNotAPlainGetOfTheWholeResource_RunsAsCurlRunsIt now records every request (line 192 List<ITransferContext> sent = []; line 196 sent.Add(request)) and asserts Assert.AreEqual(1, sent.Count) and Assert.AreSame(context, sent[0]) (lines 200-201).
+
 ## Log
 
 - 2026-11-15: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_1610.md: the reproduction no longer reproduces.

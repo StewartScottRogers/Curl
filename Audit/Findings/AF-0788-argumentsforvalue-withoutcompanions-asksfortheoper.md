@@ -3,8 +3,8 @@ id: AF-0788
 title: ArgumentsForValue_WithoutCompanions_AsksForTheOperation never checks the message that asks for the operation
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_1610.md: the reproduction no longer reproduces.
 key: quality:Curl.Extension.OpenApi.UnitTests/OpenApiArgumentExpanderTests.cs:ArgumentsForValue_WithoutCompanions_AsksForTheOperation:name-lies
 reproduction: none
 task: BL-5239
@@ -13,9 +13,9 @@ found: 2026-11-15
 found-at: 065474f7431e6647cda727e7f0fd5a25c9859a90
 scorecard: 2026-11-15_1159.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: reliable-reaudit
+closed-by: 2026-11-15_1610.md
 ---
 # AF-0788 - ArgumentsForValue_WithoutCompanions_AsksForTheOperation never checks the message that asks for the operation
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Extension.OpenApi.UnitTests/OpenApiArgumentExpanderTest
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_1610.md | reproduces: no | Ran the Select-String reproduction: it shows the test at OpenApiArgumentExpanderTests.cs:123-125, and lines 126-127 now assert Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode) and Assert.AreEqual("openapi: --operation <id> names the operation to call", failure.Message), the exact message that asks for the operation.
+
 ## Log
 
 - 2026-11-15: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_1610.md: the reproduction no longer reproduces.
