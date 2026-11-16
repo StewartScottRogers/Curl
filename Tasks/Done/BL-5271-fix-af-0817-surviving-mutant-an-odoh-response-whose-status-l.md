@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ObliviousDoh.UnitLibrary/Http/ObliviousDohHttpResponseParser.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5271 — Fix AF-0817: Surviving mutant: an ODoH response whose status line has no reason phrase can be refused, failing the resolve
 
@@ -43,3 +43,4 @@ Killed by `ObliviousDohHttpTests.Parse_FramesTheBodyAsRfc9112Section6_3` with th
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 5bda924b 9742157d.
+- 2026-11-16: Doing -> Done. Added no-reason-phrase status line test; kills the >= mutant
