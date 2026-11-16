@@ -43,3 +43,10 @@ Shares `SaslAuthenticator.cs` with BL-5281, so the two run one after the other.
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: e7bd11d6 5df6465a 668b5e4d.
+
+## Notes
+
+- Decided not to change the code (ADR-1274, decided by Claude under Stewart's delegation). The platform's curl here is 8.22.0 (`curl --version`), and ADR-0928 measured it sending an empty line for LOGIN's empty answer; 8.22.0 changed test838/884/943 the same way (GF-0038). The port's `Encode*DeferredInitialResponse` and its tests pin the empty line on purpose.
+- Why the runner listed 838, 884, 943 as passing: its upstream test data is 8.22.0's, whose expected `<protocol>` is the empty line. Surl's oracle plays 8.21.0's data, which expects `=`. The runner is not wrong; the oracle versions differ.
+- Acceptance criteria 1 and 2 ask for `=`, contradicting the measured platform curl, so they are not met by design. Surl should move its oracle to curl 8.22.0 for these cases.
+- 2026-11-16: Doing -> Deferred. Decided against: platform curl 8.22.0 sends the empty line, ADR-1274; Surl's 8.21.0 oracle differs
