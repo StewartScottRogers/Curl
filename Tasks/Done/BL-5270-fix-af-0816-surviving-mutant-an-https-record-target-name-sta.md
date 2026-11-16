@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServiceBindingRecordDecoder.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5270 — Fix AF-0816: Surviving mutant: an HTTPS-record target name starting with NUL can be junk-scanned past its C-string end
 
@@ -43,3 +43,4 @@ Killed by `Decode_TargetStartingWithANulThenASpace_IsAcceptedAsCurlsCStringIsEmp
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 0f135e1b 9742157d.
+- 2026-11-16: Doing -> Done. Added test killing the NUL-start mutant; fast tests green
