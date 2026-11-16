@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5277 — Fix AF-0823: --aws-sigv4 with --oauth2-bearer and no -u sends no Authorization header where curl sends a SigV4-signed one
 
@@ -52,3 +52,4 @@ Sign now uses an empty credential when only BearerToken is set. Reproduction ver
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-16: Doing -> Done. AF-0823 fixed; reproduction now signs
