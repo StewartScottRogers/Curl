@@ -164,7 +164,7 @@ public sealed class CurlVersionTests
 
         Assert.AreEqual(expectedBits, info.Features);
         Assert.AreNotEqual(CurlVersionFeatures.None, info.Features & CurlVersionFeatures.Ssl);
-        // Every platform lists HTTP2: https offers h2 by ALPN by default (ADR-1273).
+        // Every platform lists HTTP2: https offers h2 by ALPN by default (ADR-1274).
         Assert.IsTrue((info.Features & CurlVersionFeatures.Http2) != CurlVersionFeatures.None);
     }
 

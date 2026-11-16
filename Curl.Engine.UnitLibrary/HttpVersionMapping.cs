@@ -40,7 +40,7 @@ internal static class HttpVersionMapping
     /// <see cref="HttpVersion.Http2Tls" />), under <c>--http3</c> and <c>--http3-only</c> for the TCP connection they
     /// fall back to or take through a proxy (measured, ADR-0144), and with no version option
     /// (<see cref="HttpVersion.None" />) on every platform, because curl negotiates HTTP/2 in the TLS handshake by
-    /// default (ADR-1273, which amends ADR-0141 for Windows), and <c>h2</c> alone under <c>--http2-prior-knowledge</c>.
+    /// default (ADR-1274, which amends ADR-0141 for Windows), and <c>h2</c> alone under <c>--http2-prior-knowledge</c>.
     /// </summary>
     /// <param name="version">The option group's HTTP version.</param>
     /// <returns>One of <see cref="HttpApplicationProtocols" />' lists.</returns>

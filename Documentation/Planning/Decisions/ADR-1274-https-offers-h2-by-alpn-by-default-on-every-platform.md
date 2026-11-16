@@ -1,4 +1,4 @@
-# ADR-1273: https offers h2 by ALPN by default on every platform
+# ADR-1274: https offers h2 by ALPN by default on every platform
 
 Decided by Claude under Stewart's delegation (BL-5288).
 

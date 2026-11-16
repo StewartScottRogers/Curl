@@ -35,7 +35,7 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Notes
 
-ADR-1273 amends ADR-0141: no version option offers `h2,http/1.1` on every platform, and the Windows `-V` Features line (and ManagedCurlVersion) lists `HTTP2`. The ALPN criteria are shown by `HttpVersionMappingTests` (data rows and `CreateTcpConnector_NoVersionOption_OffersH2ThenHttp11`); `--http1.1` rows still pin `http/1.1`. The Engine-side `HttpVersionMappingDefaultOfferTests` was not added: Engine.UnitTests has no InternalsVisibleTo access, so the Console test project covers it. Touches widened to the test and version files the change pins. Platform-neutral. Quality run on Curl.Engine.UnitLibrary: 0 failing.
+ADR-1274 amends ADR-0141: no version option offers `h2,http/1.1` on every platform, and the Windows `-V` Features line (and ManagedCurlVersion) lists `HTTP2`. The ALPN criteria are shown by `HttpVersionMappingTests` (data rows and `CreateTcpConnector_NoVersionOption_OffersH2ThenHttp11`); `--http1.1` rows still pin `http/1.1`. The Engine-side `HttpVersionMappingDefaultOfferTests` was not added: Engine.UnitTests has no InternalsVisibleTo access, so the Console test project covers it. Touches widened to the test and version files the change pins. Platform-neutral. Quality run on Curl.Engine.UnitLibrary: 0 failing.
 
 ## Log
 
