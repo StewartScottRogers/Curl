@@ -4,6 +4,7 @@ title: Log in with SASL GSSAPI over SMTP, IMAP and POP3
 priority: Normal
 assignee: Claude
 pipeline: feature
+lane: no
 depends-on: []
 touches: [Curl.Authentication.UnitLibrary/SaslAuthenticator.cs, Curl.Authentication.UnitTests/SaslGssapiLoginTests.cs]
 requirement: none
@@ -38,7 +39,10 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Notes
 
+Interactive only: the code path is already complete and unit-pinned (BL-538): SaslMechanismRanking picks GSSAPI for u@REALM, SaslAuthenticator.Begin builds a Kerberos SecurityContextSaslExchange, EngineComposition wires it for smtp, imap and pop3, and the Windows route is SystemSecurityContextFactory over NegotiateAuthentication("Kerberos"). Exit 67 (not 94) means the mechanism was chosen and the Surl server then refused the AP-REQ (or none was chosen), which no unit test can show without a Kerberos KDC and Surl server. Nothing was edited. Remove `lane: no` once a test KDC (Surl --auth gssapi, KDC on 127.0.0.1:88) is available to the session; then run the port with -v and read the AUTH GSSAPI exchange for what the server answers (compare SPN smtp/mail.surl.test, explicit credential tester@SURL.TEST passed as user with no domain, to upstream SSPI).
+
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 86fd6769 d1597e80.
+- 2026-11-16: Doing -> Backlog. Interactive only: needs a Kerberos KDC and Surl server to reproduce the refused GSSAPI exchange; code path already complete.
