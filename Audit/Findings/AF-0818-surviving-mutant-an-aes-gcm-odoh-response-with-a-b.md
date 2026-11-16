@@ -3,8 +3,8 @@ id: AF-0818
 title: Surviving mutant: an AES-GCM ODoH response with a bad tag can be reported as opened
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.ObliviousDoh.UnitLibrary/Encryption/ResponseAead.cs:TryOpen-false:surviving-mutant
 reproduction: mutation Curl.Extension.ObliviousDoh.UnitLibrary/Encryption/ResponseAead.cs:46:false
 task: none

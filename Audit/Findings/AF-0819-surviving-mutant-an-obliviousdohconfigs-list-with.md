@@ -3,8 +3,8 @@ id: AF-0819
 title: Surviving mutant: an ObliviousDoHConfigs list with bytes after its vector can be accepted
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.ObliviousDoh.UnitLibrary/Wire/ObliviousDohConfig.cs:SelectFrom-and:surviving-mutant
 reproduction: mutation Curl.Extension.ObliviousDoh.UnitLibrary/Wire/ObliviousDohConfig.cs:30:&&
 task: none

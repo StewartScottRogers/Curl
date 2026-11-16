@@ -3,8 +3,8 @@ id: AF-0817
 title: Surviving mutant: an ODoH response whose status line has no reason phrase can be refused, failing the resolve
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.ObliviousDoh.UnitLibrary/Http/ObliviousDohHttpResponseParser.cs:StatusCodeOf-ge:surviving-mutant
 reproduction: mutation Curl.Extension.ObliviousDoh.UnitLibrary/Http/ObliviousDohHttpResponseParser.cs:32:>=
 task: none

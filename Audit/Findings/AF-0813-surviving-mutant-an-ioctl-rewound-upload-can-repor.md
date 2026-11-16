@@ -3,8 +3,8 @@ id: AF-0813
 title: Surviving mutant: an ioctl-rewound upload can report it was read before any byte was read
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/IoctlRewoundCallbackReadStream.cs:HasBeenRead-gt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/IoctlRewoundCallbackReadStream.cs:25:>
 task: none

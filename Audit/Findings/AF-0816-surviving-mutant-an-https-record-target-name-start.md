@@ -3,8 +3,8 @@ id: AF-0816
 title: Surviving mutant: an HTTPS-record target name starting with NUL can be junk-scanned past its C-string end
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/ServiceBindingRecordDecoder.cs:HasControlCharacter-ge:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ServiceBindingRecordDecoder.cs:94:>=
 task: none

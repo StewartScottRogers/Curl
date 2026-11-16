@@ -3,8 +3,8 @@ id: AF-0822
 title: Surviving mutant: libtest's default verbose trace can write text starting with LF as one prefixed line
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/LibTestDefaultVerboseTrace.cs:WriteLines-lt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/LibTestDefaultVerboseTrace.cs:43:<
 task: none

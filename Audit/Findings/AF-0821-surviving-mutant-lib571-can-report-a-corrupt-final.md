@@ -3,8 +3,8 @@ id: AF-0821
 title: Surviving mutant: lib571 can report a corrupt final full-size RTP chunk with the wrong message
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib571.cs:CheckPayload-gt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib571.cs:148:>
 task: none

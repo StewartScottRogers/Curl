@@ -3,8 +3,8 @@ id: AF-0820
 title: Surviving mutant: lib1576's read callback can send an unfilled buffer when it is exactly the body's length
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1576.cs:Read-ge:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1576.cs:79:>=
 task: none

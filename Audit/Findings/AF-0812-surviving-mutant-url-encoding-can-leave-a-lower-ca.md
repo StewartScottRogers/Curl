@@ -3,8 +3,8 @@ id: AF-0812
 title: Surviving mutant: URL encoding can leave a lower-case %xx escape un-upper-cased, or index before the string
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/UrlPartText.cs:IsLowerCaseEscape-plus1:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartText.cs:218:+1
 task: none

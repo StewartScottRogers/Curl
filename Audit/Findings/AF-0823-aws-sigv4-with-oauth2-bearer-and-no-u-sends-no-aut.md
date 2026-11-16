@@ -3,8 +3,8 @@ id: AF-0823
 title: --aws-sigv4 with --oauth2-bearer and no -u sends no Authorization header where curl sends a SigV4-signed one
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs:--aws-sigv4:request
 reproduction: none
 task: none
