@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/HttpProxyTunnel.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5300 — Fix AF-0826: Surviving mutant: a plain CONNECT reply can be read as a CONNECT-UDP one, so a 101 skips its Content-Length
 
@@ -43,3 +43,4 @@ Killed by `HttpProxyTunnelTests.ReadReplyAsync_PlainConnectOverload_ReadsA101AsA
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 7eb2d710 9742157d.
+- 2026-11-16: Doing -> Done. Mutant killed by new test
