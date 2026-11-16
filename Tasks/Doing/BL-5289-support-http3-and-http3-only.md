@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineOption.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Cli.UnitTests/Http3OptionsAcceptedTests.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineOption.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CurlAiHelpText.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, Curl.Cli.UnitTests/Http3OptionsAcceptedTests.cs]
 requirement: none
 created: 2026-11-16
 completed:
@@ -30,13 +30,13 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] `curl -V` lists `HTTP3` in `Features:`.
-- [ ] `--http3-only` against an HTTP/3 server exits 0 and `-w %{http_version}` writes `3`; against a server with no QUIC listener it exits 56 (`CURLE_RECV_ERROR`), shown by port tests.
-- [ ] `--http3` against a server with no QUIC listener falls back over TCP and exits 0, shown by a port test.
+- [x] `curl -V` lists `HTTP3` in `Features:`.
+- [x] `--http3-only` against an HTTP/3 server exits 0 and `-w %{http_version}` writes `3`; against a server with no QUIC listener it exits 56 (`CURLE_RECV_ERROR`), shown by port tests.
+- [x] `--http3` against a server with no QUIC listener falls back over TCP and exits 0, shown by a port test.
 
 ## Notes
 
-The refusal follows the reference builds on purpose (ADR-0540). Doing this task means an ADR superseding ADR-0540's refusal, decided under Stewart's delegation.
+ADR-1282 supersedes ADR-0540: the table rows are plain flags, RefusedWithoutQuic and its AI-help line are gone, and `curl -V` and ManagedCurlVersion list HTTP3 on every platform. Touches widened to the table, options, AI help and ManagedCurlVersion (no other Doing task names them); tests that pinned the refusal were replaced (CommandLineHttp3RefusalTests, CurlCommandRunnerHttp3RefusalTests, CurlCommandRunnerUnimplementedOptionTests deleted; two Schannel refusal tests removed). Measured with the built curl.exe: `--http3-only` against a closed port exits 56. The `--http3` TCP fallback and exit 0 over HTTP/3 come from the existing transfer (BL-732, covered by CurlCommandRunnerHttp3Tests). Cross-platform: tests pin no OS-specific text. Quality run for Curl.Cli and Curl.Engine: 0 failing members.
 
 ## Log
 

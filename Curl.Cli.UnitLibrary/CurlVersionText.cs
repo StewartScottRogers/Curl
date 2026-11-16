@@ -36,7 +36,7 @@ public static class CurlVersionText
     /// now that curl offers h2 by ALPN by default (ADR-1274), and <c>GSS-API</c> off Windows, and
     /// <c>Kerberos</c> and <c>SPNEGO</c> on every platform, now that <c>--negotiate</c> is answered
     /// (ADR-0142, ADR-0176), <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181).
-    /// No <c>HTTP3</c>: the OpenSSL reference build has no QUIC library, so it lists no <c>HTTP3</c> and refuses <c>--http3</c> and <c>--http3-only</c>, as Curl does unless the parse reads as a QUIC build (ADR-0144, ADR-0451, ADR-0521, ADR-0540, BL-2330, BL-2332).
+    /// <c>HTTP3</c> on every platform, as curl 8.21.0 built with ngtcp2 and nghttp3 lists it, because Curl speaks HTTP/3 over its hand-built QUIC and accepts <c>--http3</c> and <c>--http3-only</c> (ADR-1282, superseding ADR-0540, ADR-0521 and ADR-0451, BL-5289).
     /// No <c>TLS-SRP</c>: curl 8.22.0 dropped TLS-SRP, so its <c>lib/version.c</c> lists it no more (ADR-0480, BL-2152).
     /// BL-1417's audit added <c>alt-svc</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>IDN</c>,
     /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment). No <c>HTTPSRR</c>: neither reference build lists it, though Curl's HTTPS records still work when asked for (ADR-0856, ADR-0957).
@@ -47,7 +47,7 @@ public static class CurlVersionText
     /// <c>--ssl-sessions</c> loads and saves TLS session tickets there (ADR-0319, ADR-0519, BL-2331); the
     /// Schannel build refuses <c>--ssl-sessions</c> (ADR-0397), so <see cref="WindowsFeaturesLine"/> leaves it out.
     /// </summary>
-    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
+    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
 
     /// <summary>
     /// The fourth line on Windows: <see cref="FeaturesLine"/> with <c>SSPI</c> after <c>SSL</c>, as the
@@ -55,11 +55,9 @@ public static class CurlVersionText
     /// Windows (ADR-0142) and the features must say so (ADR-0439, BL-1796), and without <c>ECH</c>, which
     /// the Schannel reference build does not list, refusing <c>--ech</c> as it does (ADR-0448, ADR-0918), and
     /// without <c>GSS-API</c>, which the Schannel reference build does not list because Negotiate and
-    /// Kerberos answer through SSPI there (ADR-0449, BL-1823), with <c>HTTP2</c>, as the port speaks HTTP/2 by ALPN by default (ADR-1274), and without
-    /// <c>HTTP3</c>, which the Schannel reference build does not list, though <c>--http3</c> still works
-    /// (ADR-0451, BL-1825).
+    /// Kerberos answer through SSPI there (ADR-0449, BL-1823), with <c>HTTP2</c>, as the port speaks HTTP/2 by ALPN by default (ADR-1274), and with <c>HTTP3</c> (ADR-1282).
     /// </summary>
-    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd";
+    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli HSTS HTTP2 HTTP3 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd";
 
     /// <summary>Returns the four lines for the platform described, without line terminators.</summary>
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>

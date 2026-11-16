@@ -68,7 +68,7 @@ public sealed class Http2OnWindowsTests
     }
 
     [TestMethod]
-    public void Lines_Windows_ListsHttp2AndHttpsProxyRightAfterHsts()
+    public void Lines_Windows_ListsHttp2Http3AndHttpsProxyRightAfterHsts()
     {
         string[] features = CurlVersionText.Lines(isWindows: true, isMacOS: false)[3].Split(' ');
         Diagnostics.Act("features", string.Join(' ', features));
@@ -76,7 +76,8 @@ public sealed class Http2OnWindowsTests
         int hsts = Array.IndexOf(features, "HSTS");
         Assert.IsGreaterThanOrEqualTo(0, hsts);
         Assert.AreEqual("HTTP2", features[hsts + 1]);
-        Assert.AreEqual("HTTPS-proxy", features[hsts + 2]);
+        Assert.AreEqual("HTTP3", features[hsts + 2]);
+        Assert.AreEqual("HTTPS-proxy", features[hsts + 3]);
     }
 
     private CommandLineParseResult ParseOnWindows(IReadOnlyList<string> arguments)
