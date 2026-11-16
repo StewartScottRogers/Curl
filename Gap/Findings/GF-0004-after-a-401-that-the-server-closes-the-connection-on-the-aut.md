@@ -56,6 +56,7 @@ In Curl.Protocol.Http.UnitLibrary's HttpProtocolHandler, treat a connection that
 - 2026-11-02_0859: 0 of 15 items are gaps.
 - 2026-11-03_1616: 0 of 15 items are gaps.
 - 2026-11-14_0201: 0 of 15 items are gaps.
+- 2026-11-15_1929: 0 of 15 items are gaps.
 
 ## Log
 
