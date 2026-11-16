@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ObliviousDoh.UnitLibrary/Wire/ObliviousDohConfig.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5273 — Fix AF-0819: Surviving mutant: an ObliviousDoHConfigs list with bytes after its vector can be accepted
 
@@ -43,3 +43,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: e80da4b9 9742157d.
+- 2026-11-16: Doing -> Done. Mutant killed by new test
