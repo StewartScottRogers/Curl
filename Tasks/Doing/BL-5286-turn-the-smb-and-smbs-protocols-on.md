@@ -41,3 +41,4 @@ The port disabled SMB on purpose to match the reference builds, which lack it: B
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: 720ff3dd 0a85c8cf b598bc23.
