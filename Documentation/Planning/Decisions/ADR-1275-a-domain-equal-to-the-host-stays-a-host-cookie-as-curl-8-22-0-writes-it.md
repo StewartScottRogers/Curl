@@ -1,4 +1,4 @@
-# ADR-1273: A cookie whose Domain equals the host stays a host cookie in the jar, as curl 8.22.0 writes it
+# ADR-1275: A cookie whose Domain equals the host stays a host cookie in the jar, as curl 8.22.0 writes it
 
 - Status: Accepted
 - Date: 2026-11-16
