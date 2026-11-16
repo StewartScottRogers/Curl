@@ -3,8 +3,8 @@ id: AF-0787
 title: BodyReplacingHookExclusivity's summaries say it refuses only two body-replacing options, but it also refuses one given with -T or -I
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_1610.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Extension.Composition.UnitLibrary/BodyReplacingHookExclusivity.cs:BodyReplacingHookExclusivity:false-doc-comment
 reproduction: none
 task: BL-5238
@@ -13,9 +13,9 @@ found: 2026-11-15
 found-at: d04b275ae7a1546a4d0feed894da1ba520945cf5
 scorecard: 2026-11-15_0222.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: reliable-reaudit
+closed-by: 2026-11-15_1610.md
 ---
 # AF-0787 - BodyReplacingHookExclusivity's summaries say it refuses only two body-replacing options, but it also refuses one given with -T or -I
 
@@ -43,7 +43,9 @@ Select-String -Path Curl.Extension.Composition.UnitLibrary/BodyReplacingHookExcl
 ## Re-audits
 
 - 2026-11-15 | 2026-11-15_1159.md | reproduces: no | Ran Select-String -Path Curl.Extension.Composition.UnitLibrary/BodyReplacingHookExclusivity.cs -Pattern 'Refuses an option group that gives two|refuses the transfer when an option group gave two|cannot be used with -T'. The class summary (lines 8-12) now continues 'A single body-replacing option is refused too when it is given with -T or -I: it fails the transfer with --<option> cannot be used with -T or -I', and HookFor's summary (line 25) reads 'refuses the transfer when an option group gave two body-replacing options, or one given with -T or -I'; its returns tag says 'a hook refusing -T and -I for one'. This matches the code: HookFor returns UploadAndHeadRefusingHook for one option (line 35), which fails with FailedInit and 'cannot be used with -T' / '-I' (lines 62-68). The summaries no longer hide the single-option refusal.
+- 2026-11-15 | 2026-11-15_1610.md | reproduces: no | Ran the reproduction Select-String. Line 8's type summary now continues (lines 10-12): 'A single body-replacing option is refused too when it is given with -T or -I: it fails the transfer with --<option> cannot be used with -T or -I.' Line 25's HookFor summary now reads 'refuses the transfer when an option group gave two body-replacing options, or one given with -T or -I'. Line 64 still refuses with '--{optionName} cannot be used with -T', and UploadAndHeadRefusingHook also refuses -I (NoBody). The summaries now match the code.
 
 ## Log
 
 - 2026-11-15: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_1610.md: the reproduction no longer reproduces.

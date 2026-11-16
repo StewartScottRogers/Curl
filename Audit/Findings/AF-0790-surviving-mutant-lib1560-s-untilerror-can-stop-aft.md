@@ -3,8 +3,8 @@ id: AF-0790
 title: Surviving mutant: lib1560's UntilError can stop after the first passing row and skip every later check
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-15_1610.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1560Checks.cs:UntilError-gt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1560Checks.cs:177:>
 task: BL-5241
@@ -13,9 +13,9 @@ found: 2026-11-15
 found-at: 065474f7431e6647cda727e7f0fd5a25c9859a90
 scorecard: 2026-11-15_1159.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-15
+closed-how: mechanical
+closed-by: 2026-11-15_1610.md
 ---
 # AF-0790 - Surviving mutant: lib1560's UntilError can stop after the first passing row and skip every later check
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-15 | 2026-11-15_1610.md | reproduces: no | Ran the -Site command: site Curl.Conformance.LibTest.UnitLibrary/Lib1560Checks.cs:177:>, resolvedLine 177, outcome killed (killed 1, survived 0). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-15: filed proposed.
+- 2026-11-15: accepted -> closed. Re-audit 2026-11-15_1610.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
