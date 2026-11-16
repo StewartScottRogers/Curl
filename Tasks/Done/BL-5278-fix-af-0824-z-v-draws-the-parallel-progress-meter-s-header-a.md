@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ParallelProgressMeter.cs, Curl.Engine.UnitLibrary/ParallelTransferProgress.cs, Curl.Console/ConnectionIdRecordingTransferEvents.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/ConnectionIdRecordingTransferEventsTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5278 — Fix AF-0824: -Z -v draws the parallel progress meter's header and first line only after the response head, where curl draws them right after 'Trying'
 
@@ -52,3 +52,4 @@ Fix: a `-Z` transfer draws the meter when its connect attempt reports `  Trying 
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-16: Doing -> Done. Meter now draws right after the Trying line; AF-0824 repro gives Trying, DL% header, > GET
