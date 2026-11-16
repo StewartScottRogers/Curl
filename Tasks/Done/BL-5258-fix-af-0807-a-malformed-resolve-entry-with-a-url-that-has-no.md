@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/TcpConnector.cs]
+touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/CurlCommandRunnerMalformedResolveTests.cs]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5258 — Fix AF-0807: A malformed --resolve entry with a URL that has no host exits 3 (URL rejected) where curl exits 49
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fix made in the runner, not TcpConnector: the URL is rejected before any connect, so `TryParseQueriedUrl` now reports the malformed --resolve entry (exit 49, ResolveOverrides.ParseError text) ahead of a URL rejection (`MalformedResolveFailure`). No other Doing task touches these files. Fast tests green; Measure-CodeQuality for Curl.Console: 0 failing members. CI platform criterion met by platform-neutral tests.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. Malformed --resolve entry now exits 49 ahead of a URL rejection
