@@ -35,7 +35,7 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Notes
 
-- Causes found: RECEIVE closed its connection (and a successful RECEIVE with bytes was not left intact), its result carried no report (so session ID and CSeq counters read none), and a library handle never started the -m watchdog, so CURLOPT_TIMEOUT could not end a waiting RECEIVE. Fixed in RtspProtocolHandler, RtspSessionState (LastReceivedSequenceNumber) and ManagedEasyTransfer.ProgressStartingWatchdogsOf; ADR-1280.
+- Causes found: RECEIVE closed its connection (and a successful RECEIVE with bytes was not left intact), its result carried no report (so session ID and CSeq counters read none), and a library handle never started the -m watchdog, so CURLOPT_TIMEOUT could not end a waiting RECEIVE. Fixed in RtspProtocolHandler, RtspSessionState (LastReceivedSequenceNumber) and ManagedEasyTransfer.ProgressStartingWatchdogsOf; ADR-1283.
 - Tests are in Curl.Engine.UnitTests (ManagedEasyTransferTests.RtspReceive.cs, over a paced fake server: one connection, session and CSeq kept, 28 on timeout) instead of Libcurl.UnitTests, since the engine fakes live there; touches widened accordingly, no other Doing task holds these files. Two old tests pinning the dropped connection and no-watchdog behaviour were updated.
 - Not changed: a RECEIVE still hands over what one read gives, so frames arriving together arrive in one call (upstream's one-frame-per-call came from the server pacing them). Measured no real libcurl here.
 - Quality run: Rtsp and Engine libraries 100/100, no failing member. Fast tests green for Rtsp, Engine, Console, Api, Libcurl, Conformance. Linux/macOS: tests are platform-neutral. Commit carries code and task.

@@ -1,4 +1,4 @@
-# ADR-1280 — A libcurl RTSP RECEIVE keeps its connection, and CURLOPT_TIMEOUT bounds every library perform
+# ADR-1283 — A libcurl RTSP RECEIVE keeps its connection, and CURLOPT_TIMEOUT bounds every library perform
 
 - Status: Accepted
 - Date: 2026-11-16
