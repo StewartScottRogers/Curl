@@ -376,6 +376,21 @@ public sealed class Lib573To576Tests
     }
 
     [TestMethod]
+    public async Task Lib573_DebugTrace_DumpsDataWithoutHexColumn()
+    {
+        var engine = new FakeCurlEngine();
+        var run = new PortRun(engine, 573, "http://x/573");
+        await new Lib573(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+        run.Error.GetStringBuilder().Clear();
+
+        _ = engine.Multi.Added!.Options.Callbacks.Debug!(CurlInfoType.DataIn, "AB"u8);
+
+        string trace = run.Error.ToString();
+        StringAssert.Contains(trace, "AB");
+        Assert.DoesNotContain("41 42", trace);
+    }
+
+    [TestMethod]
     public async Task Lib573_ConnectTimeOrFailingLoop_AnswersWithoutTheCheck()
     {
         var timed = new PortRun(new FakeCurlEngine { Info = new TransferInfo { ConnectTime = TimeSpan.FromMilliseconds(1) } }, 573, "http://x/573");
