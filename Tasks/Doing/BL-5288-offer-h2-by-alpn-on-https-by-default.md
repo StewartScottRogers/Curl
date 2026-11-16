@@ -40,3 +40,4 @@ The Windows default follows the Schannel reference build on purpose (ADR-0141, m
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: 0e62be3f 7a2a3b56.
