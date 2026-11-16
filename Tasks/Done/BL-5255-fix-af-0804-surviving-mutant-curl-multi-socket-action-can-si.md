@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.Perform.cs]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5255 — Fix AF-0804: Surviving mutant: curl_multi_socket_action can signal the wrong events to a waiting transfer
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedMultiTransfer.Perform.cs line 60`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedMultiTransfer.Perform.cs line 60`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `SocketActionAsync_NoEventsOnTheSocketOfAReadWait_WakesTheWaitingRead` (ManagedMultiTransferTests.SocketAction.cs): with the mutant it fails, reverted all 3051 Engine fast tests pass. CI platform-neutral (no OS-specific code).
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: 796777ef 9742157d.
+- 2026-11-15: Doing -> Done. Added test killing the socket_action events mutant
