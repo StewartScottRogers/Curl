@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5265 — Fix AF-0811: Surviving mutant: the curl tool's and multi handles' transfers can take ownership of their connections and close them at handle cleanup
 
@@ -44,3 +44,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: a7407462 9742157d.
+- 2026-11-16: Doing -> Done. Mutant killed by the tool-settings and new multi tests
