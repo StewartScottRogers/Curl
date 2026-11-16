@@ -45,8 +45,8 @@ The port disabled SMB on purpose to match the reference builds, which lack it: B
 
 ## Notes (run)
 
-- ADR-1275 supersedes ADR-0835. `EngineComposition` registers `SmbProtocolHandler`; `DisabledProtocolHandler` and its tests, the Cgr043 disabled-answer tests and conformance case ext11001 are removed; `-V`, `--proto*`, `--libcurl` and `ManagedCurlVersion` now list smb and smbs on every platform. `SmbEnabledTests` shows `smb://` and `smbs://` reach the connector.
+- ADR-1281 supersedes ADR-0835. `EngineComposition` registers `SmbProtocolHandler`; `DisabledProtocolHandler` and its tests, the Cgr043 disabled-answer tests and conformance case ext11001 are removed; `-V`, `--proto*`, `--libcurl` and `ManagedCurlVersion` now list smb and smbs on every platform. `SmbEnabledTests` shows `smb://` and `smbs://` reach the connector.
 - The 67/78/upload behaviour is the existing `Curl.Original.Protocol.Smb.UnitLibrary` client, covered by its own tests (not changed here).
 - Measure-CodeQuality.ps1 not run: the change only removes code and a registration, adds no branch; CI's quality job will report.
 - `touches` widened to the test files and docs that pinned the old answer; no other Doing task named them.
-- 2026-11-16: Doing -> Done. smb and smbs served by the Smb library; -V lists them (ADR-1275)
+- 2026-11-16: Doing -> Done. smb and smbs served by the Smb library; -V lists them (ADR-1281)

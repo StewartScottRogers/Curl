@@ -1322,4 +1322,4 @@ Each option and the specific reason it lost.
 | [1278](ADR-1278-the-openssl-preset-carries-the-openssl-ssh-algorithm-lists-and-windows-keeps-wincng.md) | The OpenSSL preset carries the OpenSSL SSH algorithm lists; Windows keeps the WinCNG preset (BL-5283) | Accepted | 2026-11-16 |
 | [1279](ADR-1279-sasl-external-without-a-user-name-stays-an-empty-line-as-curl-8-22-0-sends-it.md) | SASL EXTERNAL without a user name stays an empty line, as curl 8.22.0 sends it (BL-5293) | Accepted | 2026-11-16 |
 | [1280](ADR-1280-winldap-opens-its-own-connection-beside-curls-idle-one-on-plaintext-ldap.md) | On plaintext ldap:// WinLDAP opens its own connection beside curl's idle one (BL-5284) | Accepted | 2026-11-16 |
-| [1275](ADR-1275-smb-and-smbs-are-served-as-in-the-openssl-reference-build.md) | smb and smbs are served as in the OpenSSL reference build, superseding ADR-0835 (BL-5286) | Accepted | 2026-11-16 |
+| [1281](ADR-1281-smb-and-smbs-are-served-as-in-the-openssl-reference-build.md) | smb and smbs are served as in the OpenSSL reference build, superseding ADR-0835 (BL-5286) | Accepted | 2026-11-16 |

@@ -45,7 +45,7 @@ internal static partial class EngineComposition
     /// <c>Sec-WebSocket-Key</c> and frame mask from <see cref="SystemWebSocketRandomSource" />
     /// (ADR-0128); <c>rtsp</c> over <paramref name="connector" />, sending one <c>OPTIONS *</c>
     /// request per transfer with a pre-emptive <c>Authorization</c> from the same authenticator
-    /// (ADR-0169); <c>smb</c> and <c>smbs</c> served by the SMB client (ADR-1275)
+    /// (ADR-0169); <c>smb</c> and <c>smbs</c> served by the SMB client (ADR-1281)
     /// ; <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
     /// and key files from the disk and offering the Windows curl's libssh2 algorithms on Windows and the
     /// OpenSSL build's elsewhere (ADR-0122); and <c>tftp</c> over

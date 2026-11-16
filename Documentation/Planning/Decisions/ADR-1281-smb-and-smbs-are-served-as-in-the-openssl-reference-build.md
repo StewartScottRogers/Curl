@@ -1,4 +1,4 @@
-# ADR-1275: smb and smbs are served as in the OpenSSL reference build
+# ADR-1281: smb and smbs are served as in the OpenSSL reference build
 
 Decided by Claude under Stewart's delegation (BL-5286). Supersedes ADR-0835.
 

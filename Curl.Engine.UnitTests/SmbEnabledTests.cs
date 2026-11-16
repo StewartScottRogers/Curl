@@ -6,7 +6,7 @@ using Curl.Testing;
 namespace Curl.Engine;
 
 /// <summary>
-/// Pins BL-5286 (ADR-1275) through the composed handlers: <c>smb://</c> and <c>smbs://</c> reach the SMB client,
+/// Pins BL-5286 (ADR-1281) through the composed handlers: <c>smb://</c> and <c>smbs://</c> reach the SMB client,
 /// which connects, instead of failing as disabled.
 /// </summary>
 [TestClass]

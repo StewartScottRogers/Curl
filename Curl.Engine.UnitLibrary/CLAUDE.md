@@ -533,7 +533,7 @@ Before each perform it starts, `ManagedMultiTransfer` gives a `ManagedEasyTransf
 
 ## smb and smbs served (BL-5286)
 
-`CreateProtocolHandlers` serves `smb` and `smbs` with `Curl.Original.Protocol.Smb.UnitLibrary`'s `SmbProtocolHandler`, as the OpenSSL reference build does (ADR-1275, superseding ADR-0835). Its tests are `EngineCompositionTests` and `Curl.Original.Protocol.Smb.UnitTests`.
+`CreateProtocolHandlers` serves `smb` and `smbs` with `Curl.Original.Protocol.Smb.UnitLibrary`'s `SmbProtocolHandler`, as the OpenSSL reference build does (ADR-1281, superseding ADR-0835). Its tests are `EngineCompositionTests` and `Curl.Original.Protocol.Smb.UnitTests`.
 
 ## CURLINFO_SIZE_DELIVERED (BL-3655)
 

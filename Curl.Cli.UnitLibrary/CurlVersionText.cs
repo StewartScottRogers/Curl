@@ -23,7 +23,7 @@ public static class CurlVersionText
     /// and <c>ipfs</c>/<c>ipns</c>, which the tool serves by rewriting to a gateway as curl does and which
     /// every curl 8.21.0 build lists (ADR-0021 amendment, BL-1417). The same line on every platform.
     /// <c>smb</c> and <c>smbs</c> are served by <c>Curl.Original.Protocol.Smb.UnitLibrary</c>, as the OpenSSL reference build lists them,
-    /// on every platform (ADR-1275, superseding ADR-0835).
+    /// on every platform (ADR-1281, superseding ADR-0835).
     /// </summary>
     public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss";
 
