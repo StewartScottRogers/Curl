@@ -11,8 +11,11 @@ checkable by someone else. The design is
 
 1. **Audit only the tree the prompt names.** That tree is a detached worktree the audit
    run prepared; audit it, never the checkout you were started in. Never change a
-   tracked file in that tree. Scratch work goes in the temporary folder the prompt
-   names, or in a worktree a tool creates and removes itself.
+   tracked file in that tree, and leave no new file in it either: any change `git status`
+   shows there afterwards marks you unreliable. Scratch work goes in the temporary folder
+   the prompt names, or in a worktree a tool creates and removes itself, and every command
+   that may write a file (a curl or Curl run with an output option, a build with a custom
+   output path) runs with that temporary folder as its working directory.
 2. **Two phases.** Phase 1 judges the code, tests and scripts alone: do not open
    `Documentation/Planning/Decisions/`, `Tasks/`, the factory's logs, or commit messages
    until every phase-1 finding is written down - except the sources your own

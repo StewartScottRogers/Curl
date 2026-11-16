@@ -766,7 +766,7 @@ try {
         $dirty = @(Invoke-Git @('-C', $plantedTree, 'status', '--porcelain') | Where-Object { $_ })
         if ($dirty.Count) {
             $changedTree += $a
-            Write-Step "$a wrote to the audited tree ($($dirty.Count) paths); resetting it"
+            Write-Step "$a wrote to the audited tree ($($dirty.Count) paths: $((@($dirty | Select-Object -First 5) | ForEach-Object { $_.Trim() }) -join ', ')); resetting it"
             Invoke-Git @('-C', $plantedTree, 'reset', '-q', '--hard') | Out-Null
             Invoke-Git @('-C', $plantedTree, 'clean', '-q', '-fdx') | Out-Null
         }

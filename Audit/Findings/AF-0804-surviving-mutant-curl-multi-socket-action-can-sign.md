@@ -3,12 +3,12 @@ id: AF-0804
 title: Surviving mutant: curl_multi_socket_action can signal the wrong events to a waiting transfer
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedMultiTransfer.Perform.cs:--eq:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedMultiTransfer.Perform.cs:60:==
-task: none
-tasks:
+task: BL-5255
+tasks: BL-5255
 found: 2026-11-15
 found-at: 2a5b0f025b7c8fef02cb85fb555414235eb4e132
 scorecard: 2026-11-15_1610.md

@@ -3,12 +3,12 @@ id: AF-0799
 title: Surviving mutant: --jsonrpc can write a batch's responses out of call order when the first one received answers an early call
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.JsonRpc.UnitLibrary/JsonRpcReplyPairing.cs:Paired-ge:surviving-mutant
 reproduction: mutation Curl.Extension.JsonRpc.UnitLibrary/JsonRpcReplyPairing.cs:49:>=
-task: none
-tasks:
+task: BL-5250
+tasks: BL-5250
 found: 2026-11-15
 found-at: 2a5b0f025b7c8fef02cb85fb555414235eb4e132
 scorecard: 2026-11-15_1610.md
