@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapIdleCurlConnectionTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5284 — Open and leave idle curl's own connection before WinLDAP's on ldap://
 
@@ -40,3 +40,4 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: c377b6dc.
+- 2026-11-16: Doing -> Done. WinLDAP's own connection opens beside curl's idle one on plaintext ldap://; ADR-1280
