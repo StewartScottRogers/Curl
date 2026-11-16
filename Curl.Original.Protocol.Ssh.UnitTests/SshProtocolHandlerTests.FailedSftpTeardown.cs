@@ -13,7 +13,7 @@ namespace Curl.Original.Protocol.Ssh;
 /// </summary>
 public sealed partial class SshProtocolHandlerTests
 {
-    private static readonly string[] ChannelClosedThenDisconnected = ["channel eof", "channel close", "disconnect 11 Shutdown"];
+    private static readonly string[] DisconnectedWithoutChannelClose = ["disconnect 11 Shutdown"];
 
     [TestMethod]
     public async Task ExecuteAsync_SftpDownloadOpenFails_ClosesTheChannelBeforeDisconnecting()
@@ -143,8 +143,8 @@ public sealed partial class SshProtocolHandlerTests
         Assert.AreEqual(message, result.ErrorMessage);
         string[] events = [.. server.Events];
         int subsystem = Array.IndexOf(events, "subsystem sftp");
-        AssertTextDiagnostic("events after the subsystem", string.Join(" | ", [.. requests, .. ChannelClosedThenDisconnected]), string.Join(" | ", events[(subsystem + 1)..]));
-        Assert.AreEqual(string.Join(" | ", [.. requests, .. ChannelClosedThenDisconnected]), string.Join(" | ", events[(subsystem + 1)..]));
+        AssertTextDiagnostic("events after the subsystem", string.Join(" | ", [.. requests, .. DisconnectedWithoutChannelClose]), string.Join(" | ", events[(subsystem + 1)..]));
+        Assert.AreEqual(string.Join(" | ", [.. requests, .. DisconnectedWithoutChannelClose]), string.Join(" | ", events[(subsystem + 1)..]));
     }
 
     // The handler bounds the teardown with a timeout on the context's clock; a clock whose timers

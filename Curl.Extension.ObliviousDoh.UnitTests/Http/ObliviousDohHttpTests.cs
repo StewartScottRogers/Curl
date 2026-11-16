@@ -67,6 +67,7 @@ public sealed class ObliviousDohHttpTests
     [TestMethod]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nabXX", "ab")]
     [DataRow("HTTP/1.1 200 OK\r\nX-Note\r\n\r\nto close", "to close")]
+    [DataRow("HTTP/1.1 200\r\nContent-Length: 2\r\n\r\nab", "ab")]
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2;ext=1\r\nab\r\n1\r\nc\r\n0\r\n\r\n", "abc")]
     public void Parse_FramesTheBodyAsRfc9112Section6_3(string response, string body) =>
         Assert.AreEqual(body, Encoding.ASCII.GetString(ObliviousDohHttpResponseParser.Parse(Encoding.ASCII.GetBytes(response))!.Body));

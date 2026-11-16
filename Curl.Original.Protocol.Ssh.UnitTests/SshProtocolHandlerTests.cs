@@ -64,7 +64,7 @@ public sealed partial class SshProtocolHandlerTests
             server,
             "service ssh-userauth", $"auth none {User} refused", $"auth password {User} ok", "channel open session", "subsystem sftp",
             "sftp 16 .", "sftp 3 /data/hello.txt", "sftp 17 /data/hello.txt", "sftp 5 /data/hello.txt",
-            "sftp 4 /data/hello.txt", "channel eof", "channel close", "disconnect 11 Shutdown");
+            "sftp 4 /data/hello.txt", "disconnect 11 Shutdown");
     }
 
     [TestMethod]
@@ -85,7 +85,7 @@ public sealed partial class SshProtocolHandlerTests
         AssertEvents(
             server,
             "service ssh-userauth", $"auth none {User} refused", $"auth password {User} ok", "channel open session", "subsystem sftp",
-            "sftp 16 .", "sftp 11 /data/", "sftp 12 /data/", "sftp 12 /data/", "sftp 4 /data/", "channel eof", "channel close", "disconnect 11 Shutdown");
+            "sftp 16 .", "sftp 11 /data/", "sftp 12 /data/", "sftp 12 /data/", "sftp 4 /data/", "disconnect 11 Shutdown");
     }
 
     [TestMethod]
@@ -529,7 +529,7 @@ public sealed partial class SshProtocolHandlerTests
             server,
             "service ssh-userauth", $"auth none {User} refused", $"auth password {User} ok", "channel open session", "subsystem sftp",
             "sftp 16 .", "sftp 13 /data/old", "sftp 3 /data/hello.txt", "sftp 17 /data/hello.txt", "sftp 5 /data/hello.txt",
-            "sftp 4 /data/hello.txt", "sftp 15 /data/d", "channel eof", "channel close", "disconnect 11 Shutdown");
+            "sftp 4 /data/hello.txt", "sftp 15 /data/d", "disconnect 11 Shutdown");
     }
 
     [TestMethod]
@@ -593,7 +593,7 @@ public sealed partial class SshProtocolHandlerTests
         AssertEvents(
             server,
             "service ssh-userauth", $"auth none {User} refused", $"auth password {User} ok", "channel open session", "subsystem sftp",
-            "sftp 16 .", "sftp 3 /data/up.txt", "sftp 6 /data/up.txt", "sftp 4 /data/up.txt", "channel eof", "channel close", "disconnect 11 Shutdown");
+            "sftp 16 .", "sftp 3 /data/up.txt", "sftp 6 /data/up.txt", "sftp 4 /data/up.txt", "disconnect 11 Shutdown");
     }
 
     [TestMethod]

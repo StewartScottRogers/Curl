@@ -235,9 +235,8 @@ internal sealed partial class ManagedEasyTransfer
     /// The progress the context reports to, after starting the attempt's <c>-Y</c>/<c>-y</c> watchdog on
     /// <paramref name="state" /> for every handle, so a library handle's <c>CURLOPT_LOW_SPEED_LIMIT</c> and
     /// <c>CURLOPT_LOW_SPEED_TIME</c> end a too-slow transfer with <c>CURLE_OPERATION_TIMEDOUT</c> as libcurl 8.22.0
-    /// does (BL-3196): the runner's <paramref name="toolProgress" />, after starting the <c>-m</c> watchdog too as the
-    /// runner does when it creates each attempt's context, so every perform, a <c>--retry</c> attempt's too, gets
-    /// fresh ones; else <paramref name="callbackProgress" /> (ADR-0567).
+    /// does (BL-3196), and the <c>-m</c> watchdog too (<c>CURLOPT_TIMEOUT</c>, BL-5291), so every perform, a <c>--retry</c>
+    /// attempt's too, gets fresh ones: the runner's <paramref name="toolProgress" />, else <paramref name="callbackProgress" /> (ADR-0567).
     /// </summary>
     /// <param name="toolProgress">The runner's progress, or <see langword="null" /> for a handle's own.</param>
     /// <param name="callbackProgress">The progress callback's sink, or <see langword="null" />.</param>
@@ -251,12 +250,7 @@ internal sealed partial class ManagedEasyTransfer
         EngineTransferState state)
     {
         shared.Performer.StartLowSpeedWatchdog(state, options.Transfer, Host.DiagnosticLog);
-        if (toolProgress is null)
-        {
-            return callbackProgress;
-        }
-
         shared.Performer.StartMaxTimeWatchdog(state, options.Transfer, Host.DiagnosticLog);
-        return toolProgress.Progress;
+        return toolProgress is null ? callbackProgress : toolProgress.Progress;
     }
 }

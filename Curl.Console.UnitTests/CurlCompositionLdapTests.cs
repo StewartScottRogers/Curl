@@ -73,7 +73,10 @@ public sealed class CurlCompositionLdapTests
                 "* shutting down connection #0"),
             standardError);
         Assert.AreEqual(WinLdapSent, Hex(connector.Written));
-        Assert.AreEqual(("127.0.0.1", 18389, false), connector.Targets.Select(target => (target.Host, target.Port, target.UseTls)).Single());
+        // curl's own idle connection, then the one WinLDAP opens for the exchange (BL-5284).
+        CollectionAssert.AreEqual(
+            new[] { ("127.0.0.1", 18389, false), ("127.0.0.1", 18389, false) },
+            connector.Targets.Select(target => (target.Host, target.Port, target.UseTls)).ToArray());
     }
 
     [TestMethod]

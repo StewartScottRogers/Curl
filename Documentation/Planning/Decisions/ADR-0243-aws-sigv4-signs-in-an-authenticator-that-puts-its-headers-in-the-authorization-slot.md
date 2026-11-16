@@ -55,7 +55,7 @@ was measured with `Record-CurlExchange.ps1` (BL-628 and BL-629 Notes):
 
 - WebSocket and RTSP keep the ranked authenticator; `--aws-sigv4` signs HTTP(S) only.
 - With `--oauth2-bearer` and no `-u`, nothing is signed; libcurl would sign with an empty
-  key ID. That edge is left for a follow-up if it is ever measured to matter.
+  key ID. That edge was measured (AF-0823) and fixed by BL-5277: a bearer token alone now signs with an empty key ID.
 
 ## Alternatives considered
 

@@ -42,7 +42,7 @@ public sealed partial class SshProtocolHandlerTests
         CollectionAssert.Contains(events.Transcript, "* Exceeded the maximum allowed file size (3) with 3 bytes");
         string[] serverEvents = [.. server.Events];
         int subsystem = Array.IndexOf(serverEvents, "subsystem sftp");
-        string[] expected = ["sftp 16 .", "sftp 3 /data/hello.txt", "sftp 17 /data/hello.txt", "sftp 5 /data/hello.txt", "sftp 4 /data/hello.txt", .. ChannelClosedThenDisconnected];
+        string[] expected = ["sftp 16 .", "sftp 3 /data/hello.txt", "sftp 17 /data/hello.txt", "sftp 5 /data/hello.txt", "sftp 4 /data/hello.txt", .. DisconnectedWithoutChannelClose];
         Assert.AreEqual(string.Join(" | ", expected), string.Join(" | ", serverEvents[(subsystem + 1)..]));
     }
 
@@ -79,7 +79,7 @@ public sealed partial class SshProtocolHandlerTests
         CollectionAssert.Contains(events.Transcript, "* Exceeded the maximum allowed file size (10) with 10 bytes");
         string[] serverEvents = [.. server.Events];
         int subsystem = Array.IndexOf(serverEvents, "subsystem sftp");
-        string[] expectedEvents = ["sftp 16 .", "sftp 11 /data/", "sftp 12 /data/", "sftp 4 /data/", .. ChannelClosedThenDisconnected];
+        string[] expectedEvents = ["sftp 16 .", "sftp 11 /data/", "sftp 12 /data/", "sftp 4 /data/", .. DisconnectedWithoutChannelClose];
         Assert.AreEqual(string.Join(" | ", expectedEvents), string.Join(" | ", serverEvents[(subsystem + 1)..]));
     }
 

@@ -11,9 +11,8 @@ namespace Curl.Original.Protocol.Ssh.Sftp;
 /// </summary>
 /// <remarks>
 /// A slot that keeps the session for the connection leaves its channel open at each
-/// transfer's end (<see cref="SftpSession.DefersChannelClose" />), and
-/// <see cref="CloseIgnoringFailureAsync" /> closes it before the connection's
-/// <c>DISCONNECT</c>; any other slot lets each transfer close it as before.
+/// transfer's end (<see cref="SftpSession.DefersChannelClose" />) and sends no close at all:
+/// the connection's <c>DISCONNECT</c> ends it, as libssh2 does (BL-5280); any other slot lets each transfer close it as before.
 /// </remarks>
 /// <param name="keepsSession">Whether the session outlives the transfer that started it.</param>
 internal sealed class SftpSessionSlot(bool keepsSession)
@@ -48,7 +47,6 @@ internal sealed class SftpSessionSlot(bool keepsSession)
         trace.Enter("SSH_SFTP_INIT");
         session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
         session.DefersChannelClose = keepsSession;
-        session.HasDeferredChannelClose = keepsSession;
         return session;
     }
 
@@ -72,29 +70,5 @@ internal sealed class SftpSessionSlot(bool keepsSession)
         homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
             () => started.RealPathAsync(HomeDirectoryPath, cancellationToken)).ConfigureAwait(false);
         return homeDirectory;
-    }
-
-    /// <summary>
-    /// Closes the channel the last transfer left open (<see cref="SftpSession.HasDeferredChannelClose" />),
-    /// as curl shuts the SFTP session down before its <c>DISCONNECT</c>; a broken connection is
-    /// left as it is.
-    /// </summary>
-    /// <param name="cancellationToken">Cancels the close.</param>
-    /// <returns>A task that completes once the channel is closed, or when there was none to close.</returns>
-    internal async ValueTask CloseIgnoringFailureAsync(CancellationToken cancellationToken)
-    {
-        if (session is not { HasDeferredChannelClose: true } open)
-        {
-            return;
-        }
-
-        open.HasDeferredChannelClose = false;
-        try
-        {
-            await open.ShutdownAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (SshConnectionFailure.Is(exception))
-        {
-        }
     }
 }

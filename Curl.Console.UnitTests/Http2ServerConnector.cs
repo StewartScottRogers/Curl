@@ -25,10 +25,16 @@ internal sealed class Http2ServerConnector(uint? maxConcurrentStreams = null, in
     /// <summary>Gets a value indicating whether each response waits for <see cref="Http2ServerConnection.ReleaseResponses" />.</summary>
     public bool HoldsResponses { get; init; }
 
+    /// <summary>Gets the application protocol the connections report as negotiated by ALPN, or <see langword="null" /> for none.</summary>
+    public string? ApplicationProtocol { get; init; }
+
+    /// <summary>Gets the header fields every response carries after <c>:status</c>.</summary>
+    public IReadOnlyList<(string Name, string Value)> ResponseHeaders { get; init; } = [];
+
     /// <inheritdoc />
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
-        Http2ServerConnection connection = new(target.Host, maxConcurrentStreams, HoldsResponses);
+        Http2ServerConnection connection = new(target.Host, maxConcurrentStreams, HoldsResponses) { ResponseHeaders = ResponseHeaders };
         lock (gate)
         {
             Opened.Add(connection);
@@ -39,7 +45,7 @@ internal sealed class Http2ServerConnector(uint? maxConcurrentStreams = null, in
         }
 
         await connectsAsked.Task.WaitAsync(cancellationToken);
-        return ConnectResult.Connected(connection, new ConnectTimings(1, 1, 2, null), new IPEndPoint(IPAddress.Loopback, 50000));
+        return ConnectResult.Connected(connection, new ConnectTimings(1, 1, 2, null), new IPEndPoint(IPAddress.Loopback, 50000), applicationProtocol: ApplicationProtocol);
     }
 
     /// <summary>Gets the connections opened to <paramref name="host" />.</summary>

@@ -56,6 +56,12 @@ internal sealed class ParallelTransferProgress(ParallelProgressMeter meter, obje
         }
     }
 
+    /// <summary>
+    /// Draws a line when due, as curl's first <c>curl_multi_perform</c> does once it has started the
+    /// connect and written <c>Trying</c> (AF-0824), before the connection is established.
+    /// </summary>
+    internal void ReportConnectAttemptStarted() => meter.DrawIfDue();
+
     /// <summary>Ends the transfer on the meter (<see cref="ParallelProgressMeter.EndTransfer" />).</summary>
     internal void End() => meter.EndTransfer(this);
 

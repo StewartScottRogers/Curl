@@ -120,6 +120,17 @@ public sealed class AwsSigV4HttpAuthenticatorTests
     }
 
     [TestMethod]
+    public void CreateAuthorization_AwsSigV4WithOnlyABearerToken_SignsWithAnEmptyKeyId()
+    {
+        Diagnostics.Arrange("bearer", "x");
+        string? value = Authenticator().CreateAuthorization(SignedRequest() with { Credential = null, BearerToken = "x" }, []);
+        Diagnostics.Act("authorization", value ?? "(null)");
+        Diagnostics.Assert("starts with", "AWS4-HMAC-SHA256 Credential=/", value ?? "(null)");
+        Assert.IsNotNull(value);
+        StringAssert.StartsWith(value, "AWS4-HMAC-SHA256 Credential=/", StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     public void CreateAuthorization_AwsSigV4TheSignerRefuses_FailsWithItsExitCodeAndMessage()
     {
         HttpAuthRequest request = SignedRequest() with { Url = CurlUrl.Parse("http://localhost:18631/x") };

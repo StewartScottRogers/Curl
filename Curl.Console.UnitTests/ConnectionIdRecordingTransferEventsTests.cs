@@ -136,6 +136,34 @@ public sealed class ConnectionIdRecordingTransferEventsTests
         ConnectionNumber = connectionNumber,
     };
 
+    [TestMethod]
+    public void ReportInfo_TryingLineOfAParallelTransfer_DrawsTheMetersHeaderAndFirstLine()
+    {
+        List<string> drawn = [];
+        using Curl.Engine.ParallelProgressMeter meter = new(TimeProvider.System, new Curl.Engine.WriteGate(), drawn.Add);
+        RunningTransferState state = NewState();
+        state.ParallelProgress = meter.AddTransfer();
+        state.ParallelProgress.MarkLive();
+        ITransferEvents events = new ConnectionIdRecordingTransferEvents(NoTransferEvents.Instance, state, new ConcurrentDictionary<long, long>(), () => 0);
+
+        events.ReportInfo("  Trying 127.0.0.1:80...");
+        events.ReportInfo("Established connection");
+
+        Assert.HasCount(1, drawn);
+        StringAssert.StartsWith(drawn[0], "DL%");
+    }
+
+    [TestMethod]
+    public void ReportInfo_TryingLineOfASerialTransfer_PassesItOn()
+    {
+        CallRecordingEvents inner = new();
+        ITransferEvents events = new ConnectionIdRecordingTransferEvents(inner, NewState(), new ConcurrentDictionary<long, long>(), () => 0);
+
+        events.ReportInfo("  Trying 127.0.0.1:80...");
+
+        CollectionAssert.AreEqual(new[] { "Info   Trying 127.0.0.1:80..." }, inner.Calls);
+    }
+
     private static RunningTransferState NewState()
     {
         StandardOutputFailureDeferringStream standardOutput = new(new MemoryStream());

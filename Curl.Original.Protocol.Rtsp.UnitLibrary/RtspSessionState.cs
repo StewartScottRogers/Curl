@@ -44,6 +44,12 @@ public sealed class RtspSessionState
     /// </summary>
     internal byte[] CarriedBytes { get; set; } = [];
 
+    /// <summary>
+    /// Gets or sets the <c>CSeq</c> of the last reply read, which a <c>RECEIVE</c> (it reads no reply) reports as
+    /// <c>CURLINFO_RTSP_CSEQ_RECV</c> as libcurl's handle-wide counter does (BL-5291).
+    /// </summary>
+    internal long LastReceivedSequenceNumber { get; set; }
+
     /// <summary>Gets the <c>CSeq</c> the next request is sent with.</summary>
     internal long NextSequenceNumber { get; private set; }
 

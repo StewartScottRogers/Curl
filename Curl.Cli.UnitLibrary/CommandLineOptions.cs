@@ -304,11 +304,7 @@ public sealed class CommandLineOptions
     /// <summary>
     /// <see langword="true"/> when the command line is read as a curl built with a QUIC library reads it, as
     /// curl.se's ngtcp2 build does: <c>--http3</c> and <c>--http3-only</c> are accepted and run over Curl's
-    /// hand-built HTTP/3 (ADR-0144). <see langword="false"/> as every reference build reads it - Schannel on
-    /// Windows, OpenSSL without a QUIC library on Linux and macOS - which refuses both with
-    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedWithoutQuic"/>,
-    /// ADR-0540). The executable never sets it; tests and the conformance harness ask
-    /// <see cref="CommandLineParser"/> for it to reach the HTTP/3 stack.
+    /// hand-built HTTP/3 (ADR-0144). Only the alt-svc cache reads it now: <c>--http3</c> and <c>--http3-only</c> are accepted on every platform (ADR-1282, superseding ADR-0540).
     /// </summary>
     public bool ActsAsQuicBuild { get => globals.ActsAsQuicBuild; internal set => globals.ActsAsQuicBuild = value; }
 
