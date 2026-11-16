@@ -50,7 +50,11 @@ like the random ones. Report `sweepCases` (`summary.json`'s `sweepCount`) and
 
 For each differing case, find the smallest command line that still differs: drop one option
 (with its value) at a time and rerun the case's two `Record-CurlExchange.ps1` commands from its
-`repro.ps1`; keep a drop when the difference persists. The finding names that smallest command
+`repro.ps1`; keep a drop when the difference persists. Run every rerun with the temporary folder
+the prompt names as the working directory (`Push-Location <temp folder>\reduce`), never the
+audited tree: a generated case's `-o`, `-O`, `-D`, `-c` or `--output-dir` writes relative to it,
+and a file left in the audited tree marks you unreliable (audit 20261115-161015 left `o1`, `o2`
+and `nodir/x/out.bin` there). The finding names that smallest command
 line, and its reproduction is the reduced pair of commands, with curl's output as the expected
 result and Curl's as the actual.
 
