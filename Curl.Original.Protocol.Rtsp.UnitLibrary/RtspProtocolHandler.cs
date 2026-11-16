@@ -169,7 +169,7 @@ public sealed class RtspProtocolHandler(
             session.StartTransfer(requestSettings, connect.IsReused);
             plan = await plan.WithUploadAsync(context.Upload, context.CancellationToken).ConfigureAwait(false);
             TransferResult result = await RequestAsync(connection, context, session).ConfigureAwait(false);
-            ReportConnectionEnd(context.Events, target, connect, result, session.ClosesConnection);
+            ReportConnectionEnd(context.Events, target, connect, result, session.ClosesConnection, ReceivedSuccessfully(result));
             return result;
         }
     }
@@ -178,9 +178,9 @@ public sealed class RtspProtocolHandler(
     /// Hands the connection back to the pool and reports it left intact when curl 8.21.0 keeps
     /// it; otherwise reports it shut down or closed, as measured (BL-593, BL-1403).
     /// </summary>
-    private static void ReportConnectionEnd(ITransferEvents events, ConnectTarget target, ConnectResult connect, TransferResult result, bool closesConnection)
+    private static void ReportConnectionEnd(ITransferEvents events, ConnectTarget target, ConnectResult connect, TransferResult result, bool closesConnection, bool receivedOnKeptConnection)
     {
-        if (!closesConnection && RtspVerboseLines.LeavesIntact(result))
+        if (!closesConnection && (receivedOnKeptConnection || RtspVerboseLines.LeavesIntact(result)))
         {
             connect.Connection!.MarkReusable();
             events.ReportInfo(RtspVerboseLines.LeftIntact(connect.ConnectionNumber, target.Host, target.Port));
@@ -190,9 +190,12 @@ public sealed class RtspProtocolHandler(
         events.ReportInfo(RtspVerboseLines.Dropped(result, connect.ConnectionNumber));
     }
 
+    /// <summary>Tells whether the perform was a <c>RECEIVE</c> that read without failing, whose connection the next request reads on (BL-5291).</summary>
+    private bool ReceivedSuccessfully(TransferResult result) => plan.Kind == RtspRequestKind.Receive && result.IsSuccess;
+
     /// <summary>
-    /// Makes the perform's request: a <c>RECEIVE</c>, after which the connection the server closed
-    /// is not kept, or any other kind's request and reply.
+    /// Makes the perform's request: a <c>RECEIVE</c>, which keeps its connection for the next request (BL-5291),
+    /// or any other kind's request and reply.
     /// </summary>
     private async Task<TransferResult> RequestAsync(IConnection connection, ITransferContext context, RtspSessionState session)
     {
@@ -201,7 +204,6 @@ public sealed class RtspProtocolHandler(
             return await ExchangeAsync(connection, context, session).ConfigureAwait(false);
         }
 
-        session.CloseConnection();
         return await ReceiveAsync(connection, context, session).ConfigureAwait(false);
     }
 
@@ -259,7 +261,15 @@ public sealed class RtspProtocolHandler(
             byte[] carried = session.CarriedBytes;
             session.CarriedBytes = [];
             await RtspReplyReader.ReceiveFramesAsync(connection, frames, carried, context.CancellationToken).ConfigureAwait(false);
-            return TransferResult.Success(frames.BytesHanded);
+            return TransferResult.Success(frames.BytesHanded) with
+            {
+                Report = new TransferReport
+                {
+                    RtspSessionId = session.SessionId,
+                    RtspClientSequenceNumber = session.NextSequenceNumber,
+                    RtspSequenceNumberReceived = session.LastReceivedSequenceNumber,
+                },
+            };
         }
         catch (RtspTransferException failure)
         {
@@ -371,6 +381,7 @@ public sealed class RtspProtocolHandler(
         log.RequestSent(plan.MethodName, sequenceNumber);
         RtspReplyHead head = await RtspReplyReader.ReadHeadAsync(connection, session, context.HeaderOutput, events, context.CancellationToken, log, context.MaxFileSize, Frames(session)).ConfigureAwait(false);
         log.ReplyRead(head, session.SessionId);
+        session.LastReceivedSequenceNumber = head.SequenceNumber;
         TransferReport report = ReportOf(head, session, requestSize);
         (string? answerToChallenge, HttpRequestOptions statusOptions) = ChallengeAnswer(context, options, head, authorization);
         if (StatusFailure(head, statusOptions, context.MaxFileSize, events) is { } statusFailure)

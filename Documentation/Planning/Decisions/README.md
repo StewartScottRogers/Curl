@@ -1324,3 +1324,4 @@ Each option and the specific reason it lost.
 | [1280](ADR-1280-winldap-opens-its-own-connection-beside-curls-idle-one-on-plaintext-ldap.md) | On plaintext ldap:// WinLDAP opens its own connection beside curl's idle one (BL-5284) | Accepted | 2026-11-16 |
 | [1281](ADR-1281-smb-and-smbs-are-served-as-in-the-openssl-reference-build.md) | smb and smbs are served as in the OpenSSL reference build, superseding ADR-0835 (BL-5286) | Accepted | 2026-11-16 |
 | [1282](ADR-1282-http3-and-http3-only-are-accepted-and-curl-v-lists-http3.md) | --http3 and --http3-only are accepted and curl -V lists HTTP3, superseding ADR-0540 (BL-5289) | Accepted | 2026-11-16 |
+| [1280](ADR-1280-a-libcurl-rtsp-receive-keeps-its-connection-and-curlopt-timeout-bounds-every-library-perform.md) | A libcurl RTSP RECEIVE keeps its connection, and CURLOPT_TIMEOUT bounds every library perform (BL-5291) | Accepted | 2026-11-16 |

@@ -209,7 +209,7 @@ public sealed class RtspProtocolHandlerLibcurlRequestTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_Receive_SendsNothingHandsTheFramesToTheSinkAndDropsTheConnection()
+    public async Task ExecuteAsync_Receive_SendsNothingHandsTheFramesToTheSinkAndKeepsTheConnection()
     {
         var sink = new RecordingInterleaveSink();
         var server = new ScriptedConnection(Bytes("$\0\0\u0002ab"));
@@ -221,7 +221,7 @@ public sealed class RtspProtocolHandlerLibcurlRequestTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsEmpty(server.Sent);
         Assert.HasCount(1, sink.Frames);
-        Assert.IsFalse(server.IsMarkedReusable);
+        Assert.IsTrue(server.IsMarkedReusable);
     }
 
     [TestMethod]

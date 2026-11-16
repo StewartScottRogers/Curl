@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Rtsp.UnitLibrary/RtspProtocolHandler.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Perform.cs, Libcurl.UnitTests/RtspReceiveSessionTests.cs]
+touches: [Curl.Original.Protocol.Rtsp.UnitLibrary/RtspProtocolHandler.cs, Curl.Original.Protocol.Rtsp.UnitLibrary/RtspSessionState.cs, Curl.Original.Protocol.Rtsp.UnitTests/RtspProtocolHandlerLibcurlRequestTests.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Parsed.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.RtspReceive.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.ToolProgress.cs, Curl.Engine.UnitTests/RtspPacedConnector.cs, Curl.Engine.UnitTests/RtspPacedTcpDialer.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5291 — Keep an RTSP session and read interleaved data on its connection in CURL_RTSPREQ_RECEIVE
 
@@ -30,12 +30,17 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] After `SETUP` and `PLAY`, `CURL_RTSPREQ_RECEIVE` reads on the same connection (no new connection opened) and keeps `CURLINFO_RTSP_SESSION_ID` and both CSeq counters, shown by a port test.
-- [ ] Each `RECEIVE` hands the interleave callback the frames available, and a `RECEIVE` with nothing to read returns `CURLE_OPERATION_TIMEDOUT` (28) after `CURLOPT_TIMEOUT`, shown by a port test.
+- [x] After `SETUP` and `PLAY`, `CURL_RTSPREQ_RECEIVE` reads on the same connection (no new connection opened) and keeps `CURLINFO_RTSP_SESSION_ID` and both CSeq counters, shown by a port test.
+- [x] Each `RECEIVE` hands the interleave callback the frames available, and a `RECEIVE` with nothing to read returns `CURLE_OPERATION_TIMEDOUT` (28) after `CURLOPT_TIMEOUT`, shown by a port test.
 
 ## Notes
 
+- Causes found: RECEIVE closed its connection (and a successful RECEIVE with bytes was not left intact), its result carried no report (so session ID and CSeq counters read none), and a library handle never started the -m watchdog, so CURLOPT_TIMEOUT could not end a waiting RECEIVE. Fixed in RtspProtocolHandler, RtspSessionState (LastReceivedSequenceNumber) and ManagedEasyTransfer.ProgressStartingWatchdogsOf; ADR-1280.
+- Tests are in Curl.Engine.UnitTests (ManagedEasyTransferTests.RtspReceive.cs, over a paced fake server: one connection, session and CSeq kept, 28 on timeout) instead of Libcurl.UnitTests, since the engine fakes live there; touches widened accordingly, no other Doing task holds these files. Two old tests pinning the dropped connection and no-watchdog behaviour were updated.
+- Not changed: a RECEIVE still hands over what one read gives, so frames arriving together arrive in one call (upstream's one-frame-per-call came from the server pacing them). Measured no real libcurl here.
+- Quality run: Rtsp and Engine libraries 100/100, no failing member. Fast tests green for Rtsp, Engine, Console, Api, Libcurl, Conformance. Linux/macOS: tests are platform-neutral. Commit carries code and task.
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 02d77192 e574b194.
+- 2026-11-16: Doing -> Done. RECEIVE keeps its connection, session and CSeqs; CURLOPT_TIMEOUT bounds library performs
