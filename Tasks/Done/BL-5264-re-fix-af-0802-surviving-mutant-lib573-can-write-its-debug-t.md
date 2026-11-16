@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib573.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5264 — Re-fix AF-0802: Surviving mutant: lib573 can write its debug trace with hex dumps, unlike upstream's nohex trace
 
@@ -47,3 +47,4 @@ Killed by new test `Lib573_DebugTrace_StartsEachLineWithTheLocalTime` (Lib567To5
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: ce743b0b 9742157d.
+- 2026-11-16: Doing -> Done. Mutant killed by Lib573_DebugTrace_StartsEachLineWithTheLocalTime; build and fast tests green
