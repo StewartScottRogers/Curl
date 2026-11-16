@@ -40,3 +40,4 @@ If the measurement shows curl prints no `Added` line here, record that in the lo
 ## Log
 
 - 2026-11-15: Created by the shift-end review (ADR-0710).
+- 2026-11-15: Backlog -> Doing. Criteria at claim: 79a3ef5a 9bfda06c ebfb1d10 1c8244dd.
