@@ -28,8 +28,10 @@ public sealed class Cgr126Tests
         byte[] compressed = Gzip("hello");
         byte[] response = [.. Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: {compressed.Length}\r\n\r\n"), .. compressed];
 
-        IEasyTransfer easy = await PerformAsync(response, new EasyHttpOptions { AcceptEncoding = "" }, new EasyBehaviourOptions());
+        MemoryStream delivered = new();
+        IEasyTransfer easy = await PerformAsync(response, new EasyHttpOptions { AcceptEncoding = "" }, new EasyBehaviourOptions(), delivered);
 
+        Assert.AreEqual("hello", Encoding.ASCII.GetString(delivered.ToArray()));
         Assert.AreEqual(compressed.Length, easy.Info.SizeDownload);
         Assert.AreEqual(5L, easy.Info.SizeDelivered);
         await easy.DisposeAsync();
@@ -58,7 +60,7 @@ public sealed class Cgr126Tests
         await easy.DisposeAsync();
     }
 
-    private static async Task<IEasyTransfer> PerformAsync(byte[] response, EasyHttpOptions http, EasyBehaviourOptions behaviour)
+    private static async Task<IEasyTransfer> PerformAsync(byte[] response, EasyHttpOptions http, EasyBehaviourOptions behaviour, MemoryStream? delivered = null)
     {
         ScriptedConnector connector = new([response]);
         IEasyTransfer easy = EngineOver(connector).CreateEasy();
@@ -67,7 +69,14 @@ public sealed class Cgr126Tests
             Network = new EasyNetworkOptions { Url = "http://h/x" },
             Http = http,
             Behaviour = behaviour,
-            Callbacks = new EasyCallbackOptions { Write = bytes => bytes.Length },
+            Callbacks = new EasyCallbackOptions
+            {
+                Write = data =>
+                {
+                    delivered?.Write(data);
+                    return data.Length;
+                },
+            },
         };
 
         Assert.AreEqual(CurlCode.Ok, await easy.PerformAsync(CancellationToken.None));
