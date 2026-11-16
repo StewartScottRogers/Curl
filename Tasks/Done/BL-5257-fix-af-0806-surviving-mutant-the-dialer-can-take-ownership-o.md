@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/TcpDialer.cs]
+touches: [Curl.Networking.UnitLibrary/TcpDialer.cs, Curl.Networking.UnitTests/SocketOpenerTcpDialerTests.cs]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5257 — Fix AF-0806: Surviving mutant: the dialer can take ownership of an application-supplied socket and close it itself
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/TcpDialer.cs line 346`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/TcpDialer.cs line 346`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killed by new test `SocketOpenerTcpDialerTests.DialAsync_WithASuppliedSocket_LeavesTheHandleOpenAfterTheConnectionIsDisposed` (checked by hand: ownsHandle true fails it, false passes all 10 in the class; Networking fast tests 4159 pass). No production change. touches widened to the test file.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: ffdac368 9742157d.
+- 2026-11-15: Doing -> Done. Test now kills the ownsHandle mutant in DialSuppliedSocketAsync
