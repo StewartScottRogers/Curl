@@ -42,7 +42,7 @@ public sealed class Cgr130Tests
         Assert.AreEqual(1, server.Events.Count(line => line == "subsystem sftp"));
         Assert.AreEqual(1, server.Events.Count(line => line == "sftp 16 ."));
         CollectionAssert.AreEqual(
-            new[] { "channel eof", "channel close", "disconnect 11 Shutdown" },
+            new[] { "disconnect 11 Shutdown" },
             server.Events.SkipWhile(line => line != "sftp 4 /data/digits.txt").Skip(1).Where(line => line != "closed").ToArray());
     }
 

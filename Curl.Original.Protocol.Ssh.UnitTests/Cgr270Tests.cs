@@ -31,7 +31,6 @@ public sealed class Cgr270Tests
         }));
         await server.WhenSessionsEndAsync();
 
-        CollectionAssert.Contains(server.Events.ToList(), "channel close");
         CollectionAssert.Contains(server.Events.ToList(), "disconnect 11 Shutdown");
     }
 

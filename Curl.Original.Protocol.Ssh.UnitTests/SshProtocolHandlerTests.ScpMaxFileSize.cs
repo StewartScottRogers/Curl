@@ -40,7 +40,7 @@ public sealed partial class SshProtocolHandlerTests
         CollectionAssert.Contains(events.Transcript, "* Exceeded the maximum allowed file size (3) with 3 bytes");
         string[] serverEvents = [.. server.Events];
         int exec = Array.IndexOf(serverEvents, "exec scp -pf '/data/hello.txt'");
-        Assert.AreEqual(string.Join(" | ", ChannelClosedThenDisconnected), string.Join(" | ", serverEvents[(exec + 1)..]));
+        Assert.AreEqual("channel eof | channel close | disconnect 11 Shutdown", string.Join(" | ", serverEvents[(exec + 1)..]));
     }
 
     [TestMethod]

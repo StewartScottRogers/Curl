@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ssh.UnitLibrary/SshKeptSession.cs, Curl.Original.Protocol.Ssh.UnitTests/SftpDisconnectOrderTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5280 — Disconnect an SFTP session before closing its channel, as libssh2 does
 
@@ -30,11 +30,14 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] After an SFTP download the port sends `SSH_MSG_DISCONNECT` before any `SSH_MSG_CHANNEL_CLOSE` for the SFTP channel, shown by a port test of the message order; or a port ADR records why it keeps its order.
+- [x] After an SFTP download the port sends `SSH_MSG_DISCONNECT` before any `SSH_MSG_CHANNEL_CLOSE` for the SFTP channel, shown by a port test of the message order; or a port ADR records why it keeps its order.
 
 ## Notes
+
+Decision: `SshKeptSession.ShutDownAsync` now sends DISCONNECT first and sends no channel EOF/close at all, libssh2's wire order (a close after DISCONNECT made the real-server conformance cases wait for a channel-close reply that never came). Removed `SftpSessionSlot.CloseIgnoringFailureAsync` and `SftpSession.HasDeferredChannelClose`. SFTP expectations in the Ssh unit tests lost their channel eof/close; SCP unchanged. Port test: `SftpDisconnectOrderTests`. Quality run for the Ssh library: 0 failing members.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 3e370155.
+- 2026-11-16: Doing -> Done. SFTP DISCONNECT now precedes any channel close; test and quality green
