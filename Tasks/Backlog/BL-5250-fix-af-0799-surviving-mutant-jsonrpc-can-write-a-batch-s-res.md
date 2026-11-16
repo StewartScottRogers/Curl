@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.JsonRpc.UnitLibrary]
+touches: [Curl.Extension.JsonRpc.UnitLibrary/JsonRpcReplyPairing.cs]
 requirement: none
 created: 2026-11-15
 completed:

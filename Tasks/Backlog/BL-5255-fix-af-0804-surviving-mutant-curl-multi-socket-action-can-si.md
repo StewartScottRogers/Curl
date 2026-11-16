@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.Perform.cs]
 requirement: none
 created: 2026-11-15
 completed:

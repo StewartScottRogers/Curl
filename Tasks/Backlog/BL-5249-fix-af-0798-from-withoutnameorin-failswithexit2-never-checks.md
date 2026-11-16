@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.OpenApi.UnitTests]
+touches: [Curl.Extension.OpenApi.UnitTests/OpenApiParameterTests.cs]
 requirement: none
 created: 2026-11-15
 completed:
