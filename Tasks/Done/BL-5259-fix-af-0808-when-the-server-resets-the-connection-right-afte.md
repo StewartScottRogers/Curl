@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/StreamConnection.cs]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5259 — Fix AF-0808: When the server resets the connection right after accepting it, Curl prints 'Recv failure: Connection was aborted' where curl prints 'Connection was reset'
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause (measured): at the first write the socket was readable, Available 0, and both peek and receive returned 0, so the BL-3304 FIN check counted a FIN and kept the abort. Fix: the FIN part applies only after the connection has read a byte (ADR-1272). Touches widened to Curl.Networking.UnitTests/StreamConnectionTests.cs and the ADR. Reproduction now prints 'Connection was reset'. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. Fixed: first-write FIN ignored on a fresh connection (ADR-1272)
