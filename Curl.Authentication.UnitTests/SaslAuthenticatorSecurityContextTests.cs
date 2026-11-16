@@ -373,7 +373,7 @@ public sealed class SaslAuthenticatorSecurityContextTests
         Assert.IsTrue(context.IsDisposed);
         Assert.IsNull(await exchange.RespondAsync(WrappedOffer(0x01, 0, 0, 0), CancellationToken.None));
         Assert.AreEqual(
-            new SecurityContextRequest(SecurityMechanism.Kerberos, "smtp", Host) { UserName = "alice", Password = "pw", Domain = "EXAMPLE", MessageProtection = ProtectionLevel.Sign },
+            new SecurityContextRequest(SecurityMechanism.Kerberos, "smtp", Host) { UserName = "alice", Password = "pw", Domain = "EXAMPLE", MessageProtection = ProtectionLevel.None },
             factory.Requests.Single());
     }
 

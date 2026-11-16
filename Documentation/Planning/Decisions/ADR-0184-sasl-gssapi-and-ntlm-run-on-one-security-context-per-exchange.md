@@ -30,7 +30,7 @@ cannot be measured on the loopback recorder.
 2. **NTLM:** the initial response is the context's first token (Type 1); the one answer is the
    next step's token for the Type 2 challenge (Type 3); any further challenge is not answered.
 3. **GSSAPI** runs on `SecurityMechanism.Kerberos`, the raw RFC 4121 mechanism, not SPNEGO
-   (RFC 4752), asking `ProtectionLevel.Sign` so SSPI negotiates the keys `Wrap` needs. The
+   (RFC 4752), asking no required message protection (see the second amendment). The
    initial response is the first token; while the context is not established each challenge is
    stepped and its token answered (empty after an AP-REP); once it is established the next
    challenge is the wrapped security-layer offer. It must unwrap to four bytes with the "no
@@ -61,3 +61,13 @@ cannot be measured on the loopback recorder.
   `null` and cancels with exit 67 (BL-856).
 - Consequences: the engine now passes the router's security contexts to the SASL authenticator for
   IMAP, POP3 and SMTP (BL-852), so GSSAPI and NTLM are offered there.
+
+## Amendment (2026-11-16, BL-5281)
+
+- Decision item 3: GSSAPI no longer asks `ProtectionLevel.Sign`; it asks `ProtectionLevel.None`, as
+  curl 8.21.0's SSPI build asks `InitializeSecurityContext` for no flags. With `Sign`,
+  `NegotiateAuthentication` adds `ISC_REQ_INTEGRITY`, and SSPI's Kerberos then wraps the
+  security-layer answer with sequence number 0 instead of the authenticator's, so an RFC 4121
+  acceptor (Surl with a test KDC on `127.0.0.1:88`) answered `535` and the port exited 67 where
+  upstream exits 0. The context still wraps and unwraps without the flag, measured against Surl over
+  SMTP, IMAP and POP3, with and without `--sasl-ir`.
