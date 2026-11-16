@@ -68,15 +68,15 @@ public sealed class Http2OnWindowsTests
     }
 
     [TestMethod]
-    public void Lines_Windows_ListsHttpsProxyRightAfterHstsWithNoHttp2()
+    public void Lines_Windows_ListsHttp2AndHttpsProxyRightAfterHsts()
     {
         string[] features = CurlVersionText.Lines(isWindows: true, isMacOS: false)[3].Split(' ');
         Diagnostics.Act("features", string.Join(' ', features));
 
         int hsts = Array.IndexOf(features, "HSTS");
         Assert.IsGreaterThanOrEqualTo(0, hsts);
-        Assert.AreEqual("HTTPS-proxy", features[hsts + 1]);
-        CollectionAssert.DoesNotContain(features, "HTTP2");
+        Assert.AreEqual("HTTP2", features[hsts + 1]);
+        Assert.AreEqual("HTTPS-proxy", features[hsts + 2]);
     }
 
     private CommandLineParseResult ParseOnWindows(IReadOnlyList<string> arguments)
