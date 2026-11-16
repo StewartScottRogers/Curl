@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/LibTestDefaultVerboseTrace.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5276 — Fix AF-0822: Surviving mutant: libtest's default verbose trace can write text starting with LF as one prefixed line
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/LibTestDefaultVerboseTrace.cs line 43`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/LibTestDefaultVerboseTrace.cs line 43`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by Trace_TextStartingWithLineFeed_PrefixesTheEmptyFirstLineAndTheRest (mutant applied by hand, test failed, reverted, 1217 pass). Test-only change; build clean.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 04a16ee1 9742157d.
+- 2026-11-16: Doing -> Done. Added LF-first test killing the AF-0822 mutant
