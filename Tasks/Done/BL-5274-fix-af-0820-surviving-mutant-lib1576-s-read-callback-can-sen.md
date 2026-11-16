@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib1576.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5274 — Fix AF-0820: Surviving mutant: lib1576's read callback can send an unfilled buffer when it is exactly the body's length
 
@@ -43,3 +43,4 @@ Killed by new test `Lib1576_Read_CopiesTheBodyIntoABufferExactlyItsLength` (veri
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: e6b2ca00 9742157d.
+- 2026-11-16: Doing -> Done. Added boundary test that kills the mutant
