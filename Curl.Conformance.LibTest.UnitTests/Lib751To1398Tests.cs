@@ -235,6 +235,17 @@ public sealed class Lib751To1398Tests
     }
 
     [TestMethod]
+    public void Lib757Read_BufferExactlyTheDataLength_GivesTheWholeData()
+    {
+        byte[] buffer = new byte[24];
+
+        long read = Lib757.Read(buffer);
+
+        Assert.AreEqual(24L, read);
+        Assert.AreEqual("<title>fun-times</title>", Encoding.ASCII.GetString(buffer));
+    }
+
+    [TestMethod]
     public void Lib757ReadAndSeek_GiveTheWholeDataWhenItFits()
     {
         byte[] buffer = new byte[64];

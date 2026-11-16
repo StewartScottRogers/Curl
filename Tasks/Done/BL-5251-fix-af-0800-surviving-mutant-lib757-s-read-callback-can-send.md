@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib757.cs]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5251 — Fix AF-0800: Surviving mutant: lib757's read callback can send nothing when the buffer is exactly the part's length
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib757.cs line 29`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib757.cs line 29`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test `Lib757Read_BufferExactlyTheDataLength_GivesTheWholeData` (Lib751To1398Tests.cs): with `<=` applied by hand it failed, reverted it passes. Build clean, 1214 fast tests in Curl.Conformance.LibTest.UnitTests green.
 
 ## Log
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: 96c84f46 9742157d.
+- 2026-11-15: Doing -> Done. Added boundary test for Lib757.Read; mutant killed
