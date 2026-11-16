@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-5288]
-touches: [Curl.Engine.UnitTests/HttpsH2WithAltSvcH3Tests.cs]
+touches: [Curl.Engine.UnitTests/HttpsH2WithAltSvcH3Tests.cs, Curl.Console.UnitTests/CurlCommandRunnerHttpsH2WithAltSvcH3Tests.cs, Curl.Console.UnitTests/Http2ServerConnector.cs, Curl.Console.UnitTests/Http2ServerConnection.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5290 — Negotiate HTTP/2 over https when the server also advertises h3
 
@@ -29,11 +29,14 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] `curl -k -I https://<server with h2 and h3>/` writes `HTTP/2 200 ` as its first line, with the `alt-svc` field in lower case, shown by a port test.
+- [x] `curl -k -I https://<server with h2 and h3>/` writes `HTTP/2 200 ` as its first line, with the `alt-svc` field in lower case, shown by a port test.
 
 ## Notes
+
+BL-5288 already fixed this; the test pins it. Placed in Curl.Console.UnitTests (Engine.UnitTests has no h2 server stand-in); touches widened to it and to Http2ServerConnector/Connection, which gained optional ApplicationProtocol and ResponseHeaders. No Doing task held them. Test-only, platform-neutral.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: a120f932.
+- 2026-11-16: Doing -> Done. https negotiates h2 with alt-svc h3, pinned
