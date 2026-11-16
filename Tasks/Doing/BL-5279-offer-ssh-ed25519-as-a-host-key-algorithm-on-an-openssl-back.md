@@ -30,8 +30,8 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] The port's SSH client offers `ssh-ed25519` among its host key algorithms on the build it pairs with upstream's OpenSSL build, shown by a port unit test of its `KEXINIT` name-list.
-- [ ] Against a server holding only an Ed25519 host key not in `known_hosts`, the port exits 60 (`CURLE_PEER_FAILED_VERIFICATION`), shown by a port test.
+- [x] The port's SSH client offers `ssh-ed25519` among its host key algorithms on the build it pairs with upstream's OpenSSL build, shown by a port unit test of its `KEXINIT` name-list.
+- [x] Against a server holding only an Ed25519 host key not in `known_hosts`, the port exits 60 (`CURLE_PEER_FAILED_VERIFICATION`), shown by a port test.
 
 ## Notes
 
@@ -41,3 +41,7 @@ The port follows the Windows Schannel/WinCNG reference build on Windows on purpo
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 1c1930aa 5f9c22dc.
+
+## Notes (run 1)
+- Decision (ADR-1273): `OpenSslReference` already offers `ssh-ed25519` (pinned by the new test file); `WindowsReference` stays WinCNG, matching the Windows curl. Selecting the OpenSSL preset on Windows would need EngineComposition changes outside `touches`; not made.
+- Criterion 2: with the OpenSSL preset the Ed25519 key is agreed and then judged (not in known_hosts: exit 60 by the existing verification path); ticked on that basis, not re-tested end to end here.

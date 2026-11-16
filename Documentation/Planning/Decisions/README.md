@@ -1314,3 +1314,4 @@ Each option and the specific reason it lost.
 | [1270](ADR-1270-an-extension-connection-option-beside-unix-socket-is-a-command-line-error.md) | An extension connection option beside --unix-socket is a command-line error with exit 2 (BL-5133) | Accepted | 2026-11-13 |
 | [1271](ADR-1271-an-interface-name-lookup-ignores-max-time-as-curls-bind-lookup-does.md) | An --interface name lookup ignores -m, as curl's bind lookup does (BL-5188) | Accepted | 2026-11-14 |
 | [1272](ADR-1272-a-fresh-connection-ignores-an-unread-fin-at-its-first-write.md) | A connection that has read no byte ignores an unread peer FIN at its first write, so a peer that resets right after accepting reads as `Connection was reset`; amends ADR-0878 (BL-5259) | Accepted | 2026-11-15 |
+| [1273](ADR-1273-ssh-ed25519-is-offered-by-the-openssl-preset-and-not-the-wincng-preset.md) | ssh-ed25519 is offered by the OpenSSL preset and not the WinCNG preset (BL-5279) | Accepted | 2026-11-16 |
