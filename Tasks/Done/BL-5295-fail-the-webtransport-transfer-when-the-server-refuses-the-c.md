@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.WebTransport.UnitLibrary/WebTransportProtocolHandler.cs, Curl.Extended.Protocol.WebTransport.UnitLibrary/Session/WebTransportSession.cs, Curl.Extended.Protocol.WebTransport.UnitTests/WebTransportRefusedConnectTests.cs, Documentation/Conformance/Extended/WebTransport.md]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5295 — Fail the webtransport transfer when the server refuses the CONNECT
 
@@ -30,13 +30,16 @@ Filed from Surl's Phase 7 measurement of the port's extended clients (Stewart ap
 
 ## Acceptance criteria
 
-- [ ] A port test where the server answers the webtransport CONNECT `401` asserts a non-zero exit code and a stderr message naming the refusal.
-- [ ] A port test where the server answers the CONNECT `200` still exits 0 and echoes as before.
-- [ ] The chosen exit code is recorded in `Documentation/Conformance/Extended/WebTransport.md`.
+- [x] A port test where the server answers the webtransport CONNECT `401` asserts a non-zero exit code and a stderr message naming the refusal.
+- [x] A port test where the server answers the CONNECT `200` still exits 0 and echoes as before.
+- [x] The chosen exit code is recorded in `Documentation/Conformance/Extended/WebTransport.md`.
 
 ## Notes
+
+- The handler already failed a non-2xx CONNECT with exit 22 (the BL-4608 case pins 404); the 401-then-FIN shape of the Surl finding was unpinned. Added WebTransportRefusedConnectTests (401 plus FIN, and 200), which pass with no production change, so the finding was against an older port build. No production code changed, so no quality run. Exit code 22 recorded in WebTransport.md.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: c0436890 3313b567 3ee6c9dc.
+- 2026-11-16: Doing -> Done. Pinned 401+FIN and 200 with tests; exit 22 documented
