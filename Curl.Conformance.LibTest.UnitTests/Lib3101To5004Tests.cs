@@ -205,12 +205,14 @@ public sealed class Lib3101To5004Tests
     [TestMethod]
     public async Task Lib3105_WhenBothRemovalsSucceed_EndsOk()
     {
-        var run = new PortRun(new FakeCurlEngine(), 3105, "-");
+        var engine = new FakeCurlEngine();
+        var run = new PortRun(engine, 3105, "-");
 
         LibTestResult result = await new Lib3105().RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual(0, result.ExitCode);
         Assert.AreEqual(string.Empty, run.Error.ToString());
+        Assert.AreEqual(2, engine.Multi.Removals);
     }
 
     [TestMethod]

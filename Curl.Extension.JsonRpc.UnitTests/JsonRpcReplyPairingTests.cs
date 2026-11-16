@@ -30,6 +30,16 @@ public sealed class JsonRpcReplyPairingTests
     }
 
     [TestMethod]
+    public void Pair_TheFirstResponseReceivedAnswersTheFirstCall_IsWrittenInThatCallsPlace_Section6()
+    {
+        string body = "[{\"id\":1},{\"id\":3},{\"id\":2}]";
+
+        Assert.AreEqual(
+            "{\"id\":1}\n{\"id\":2}\n{\"id\":3}\n",
+            Paired(body, [new("a", null, 1), new("b", null, 2), new("c", null, 3)]));
+    }
+
+    [TestMethod]
     public void Pair_OneResponseObject_IsWrittenOnItsOwnLine_Section5()
     {
         Assert.AreEqual("{\"jsonrpc\": \"2.0\", \"result\": 19, \"id\": 1}\n", Paired("{\"jsonrpc\": \"2.0\", \"result\": 19, \"id\": 1}", [new("subtract", "[42,23]", 1)]));

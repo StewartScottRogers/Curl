@@ -286,6 +286,26 @@ public sealed class Lib560And564Tests
     }
 
     [TestMethod]
+    public async Task RunAsync_Lib564TracesVerboseText_PrefixesEachLineWithTheTime()
+    {
+        var engine = new FakeCurlEngine();
+        engine.Multi.PerformResults.Enqueue((Curl.Api.Codes.CurlMultiCode.Ok, 1));
+        engine.Multi.Performing = () => engine.Multi.Added!.Options.Callbacks.Debug!(CurlInfoType.Text, "hi\n"u8);
+        var run = new PortRun(engine, 564, "http://x/564", "127.0.0.1:1080");
+
+        await new Lib564(new FixedLocalTimeProvider(new DateTimeOffset(2026, 1, 2, 12, 34, 56, TimeSpan.Zero))).RunAsync(run.Context, CancellationToken.None);
+
+        StringAssert.Contains(run.Error.ToString(), "12:34:56.000000 == Info: hi\n", StringComparison.Ordinal);
+    }
+
+    private sealed class FixedLocalTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    [TestMethod]
     public async Task RunAsync_Lib564AddHandleFails_SaysNothing()
     {
         var engine = new FakeCurlEngine();

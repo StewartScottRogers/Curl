@@ -63,6 +63,21 @@ public sealed class SocketOpenerTcpDialerTests
     }
 
     [TestMethod]
+    public async Task DialAsync_WithASuppliedSocket_LeavesTheHandleOpenAfterTheConnectionIsDisposed()
+    {
+        using var listener = Listen();
+        using var supplied = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        var opener = new RecordingSocketOpener(_ => TcpSocketOpenDecision.Supplied(supplied.Handle, alreadyConnected: false));
+        var dialer = new SocketOpenerTcpDialer(new FakeTcpDialer(), opener);
+        var dialed = await dialer.DialAsync((IPEndPoint)listener.LocalEndPoint!, CancellationToken.None);
+        using var accepted = await listener.AcceptAsync();
+
+        await dialed.Connection.DisposeAsync();
+
+        Assert.AreEqual((int)SocketType.Stream, (int)supplied.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Type)!, "the application's handle is still open: the operating system still answers for it");
+    }
+
+    [TestMethod]
     public async Task DialAsync_WithASuppliedSocketNotYetConnected_ConnectsItToTheAddress()
     {
         using var listener = Listen();
