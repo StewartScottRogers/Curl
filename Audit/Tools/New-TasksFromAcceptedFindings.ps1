@@ -11,8 +11,8 @@
       -Title     "Fix AF-NNNN: (the finding's title)"
       -Priority  High for a Critical or High finding, Normal for Medium, Low for Low
       -Pipeline  docs for a truthfulness finding, direct for a process finding, feature otherwise
-      -Touches   the repository folders (or, for a file at the root, the file) the finding's
-                 location names - never an audit path;
+      -Touches   the files the finding's location names (the folder, when a file is gone) -
+                 never a whole project it only adds to, and never an audit path;
                  RunDarkFactory.ps1 for a process finding located in the logs; none
                  otherwise when it names no folder, so the task runs alone
 
@@ -172,15 +172,17 @@ function Get-TaskPipeline([string]$Auditor) {
 }
 
 function Get-TaskTouches([string]$Location, [string]$Root) {
-    # The repository folders the location names: its first path segment, when that folder exists
-    # and is not an audit path. A location is "path:line" or several joined by ", ".
+    # The files the location names, when they exist and are not audit paths; else the folder a
+    # missing file's first path segment names. A whole project as touches keeps every other task in
+    # that project waiting (AF-0810), so a file wins over its folder. A location is "path:line" or
+    # several joined by ", ".
     $touches = @()
     foreach ($part in ($Location -split ',\s*')) {
         $path = ($part -replace '\\', '/' -replace ':\d+(-\d+)?$', '').Trim()
         $first = ($path -split '/')[0]
         if (-not $first -or $first -eq 'Audit' -or $path -like '.claude/agents/audit-*') { continue }
-        if (Test-Path -LiteralPath (Join-Path $Root $first) -PathType Container) { $touches += $first }
-        elseif (Test-Path -LiteralPath (Join-Path $Root $path) -PathType Leaf) { $touches += $path }
+        if (Test-Path -LiteralPath (Join-Path $Root $path) -PathType Leaf) { $touches += $path }
+        elseif (Test-Path -LiteralPath (Join-Path $Root $first) -PathType Container) { $touches += $first }
     }
     return @($touches | Select-Object -Unique)
 }
@@ -341,6 +343,7 @@ if ($SelfTest) {
     $work = Join-Path ([IO.Path]::GetTempPath()) ('triage-selftest-' + [guid]::NewGuid().ToString('N'))
     foreach ($s in 'Backlog', 'Doing', 'Blocked', 'Deferred', 'Done') { New-Item -ItemType Directory -Force (Join-Path $work "Tasks\$s") | Out-Null }
     New-Item -ItemType Directory -Force (Join-Path $work 'Curl.Cli.UnitTests'), (Join-Path $work 'findings') | Out-Null
+    [IO.File]::WriteAllText((Join-Path $work 'Curl.Cli.UnitTests\ParserTests.cs'), '')
     $failed = 0
     function Check([string]$Name, [bool]$Ok, [string]$Detail) { if (-not $Ok) { $script:failed++ }; Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Detail" }
     $finding = { param($Id, $Status, $Task, $Severity, $Auditor, $Key, $Command, $Kind)
@@ -451,7 +454,8 @@ if ($SelfTest) {
             $id = ($tasks[0].Name -split '-')[0..1] -join '-'
             Check 'priority High for a High finding, pipeline feature for quality' ($t -match '(?m)^priority: High?$' -and $t -match '(?m)^pipeline: feature?$') 'High, feature'
             $touchesLine = if ($t -match '(?m)^touches:[^\r\n]*') { $Matches[0] } else { '(none)' }
-            Check 'touches the folder the location names' ($touchesLine -eq 'touches: [Curl.Cli.UnitTests]') $touchesLine
+            Check 'touches the file the location names, not its whole project' ($touchesLine -eq 'touches: [Curl.Cli.UnitTests/ParserTests.cs]') $touchesLine
+            Check 'touches the folder when the named file is missing' ((@(Get-TaskTouches 'Curl.Cli.UnitTests/Gone.cs:3' $work) -join ',') -eq 'Curl.Cli.UnitTests') 'folder fallback'
             Check 'no template comment left' ($t -notmatch '<!--') 'none'
             Check 'the finding names the task' ([IO.File]::ReadAllText((Join-Path $work 'findings\AF-0001-x.md')) -match "(?m)^task: $id\r?$") $id
         }
