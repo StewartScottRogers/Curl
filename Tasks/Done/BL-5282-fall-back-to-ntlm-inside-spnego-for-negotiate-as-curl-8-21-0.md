@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary/SspiNegotiateSecurityContext.cs, Curl.Authentication.UnitTests/SpnegoNtlmFallbackTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5282 — Fall back to NTLM inside SPNEGO for --negotiate, as curl 8.21.0 as tagged does
 
@@ -30,11 +30,14 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] With `--negotiate -u tester:secret` against a server offering `Negotiate` and no Kerberos realm, the port completes an NTLMSSP-in-SPNEGO login and writes the body, shown by a port test; or a port ADR records that the port follows the `!ntlm` behaviour, naming the upstream change.
+- [x] With `--negotiate -u tester:secret` against a server offering `Negotiate` and no Kerberos realm, the port completes an NTLMSSP-in-SPNEGO login and writes the body, shown by a port test; or a port ADR records that the port follows the `!ntlm` behaviour, naming the upstream change.
 
 ## Notes
+
+Decision: the port follows the Windows reference build's `!ntlm` change (ADR-1273, confirming ADR-0176); the criterion's ADR alternative is met. No code change.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 132e44e6.
+- 2026-11-16: Doing -> Done. ADR-1273 records that the port follows the Windows reference build's !ntlm change

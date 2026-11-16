@@ -1317,3 +1317,4 @@ Each option and the specific reason it lost.
 | [1273](ADR-1273-ssh-ed25519-is-offered-by-the-openssl-preset-and-not-the-wincng-preset.md) | ssh-ed25519 is offered by the OpenSSL preset and not the WinCNG preset (BL-5279) | Accepted | 2026-11-16 |
 | [1274](ADR-1274-https-offers-h2-by-alpn-by-default-on-every-platform.md) | https offers h2 by ALPN by default on every platform, amending ADR-0141 for Windows (BL-5288) | Accepted | 2026-11-16 |
 | [1275](ADR-1275-a-domain-equal-to-the-host-stays-a-host-cookie-as-curl-8-22-0-writes-it.md) | A cookie whose Domain equals the host stays a host cookie in the jar, as curl 8.22.0 writes it; BL-5292 closed without a change | Accepted | 2026-11-16 |
+| [1273](ADR-1273-negotiate-follows-the-windows-reference-builds-no-ntlm-in-spnego.md) | --negotiate follows the Windows reference build's `!ntlm` change: no NTLM inside SPNEGO; confirms ADR-0176 (BL-5282) | Accepted | 2026-11-16 |
