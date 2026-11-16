@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EndPointRecordingConnector.cs]
 requirement: none
 created: 2026-11-15
-completed:
+completed: 2026-11-15
 ---
 # BL-5260 — Fix AF-0809: EndPointRecordingConnector.ConnectAsync's summary says it records the connection or a failed connect's socket error; on success it records both
 
@@ -52,3 +52,4 @@ Summary reworded to say a success after an earlier failed address also records t
 
 - 2026-11-15: Created.
 - 2026-11-15: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-15: Doing -> Done. Summary now names the success-path socket error record; build clean.
