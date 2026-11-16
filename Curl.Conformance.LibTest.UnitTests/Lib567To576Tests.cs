@@ -293,6 +293,19 @@ public sealed class Lib567To572Tests
     }
 
     [TestMethod]
+    public void Lib571_RtpWriter_CorruptFinalFullSizeChunk_ReportsEndCorrupted()
+    {
+        var output = new MemoryStream();
+        var rtp = new Lib571.RtpWriter(output, new StringWriter());
+
+        Assert.AreEqual(16, rtp.Write(Packet("X_1234\n\0Rsdf"u8.ToArray())));
+
+        Assert.AreEqual(
+            "RTP: message size 12, channel 0\nRTP PAYLOAD END CORRUPTED (12), [X_1234\n]\n",
+            Encoding.Latin1.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
     public void Lib571_RtpWriter_ChecksSizeAndPayload()
     {
         var output = new MemoryStream();
