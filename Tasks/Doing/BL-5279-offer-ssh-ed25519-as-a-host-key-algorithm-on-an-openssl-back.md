@@ -40,3 +40,4 @@ The port follows the Windows Schannel/WinCNG reference build on Windows on purpo
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: 1c1930aa 5f9c22dc.
