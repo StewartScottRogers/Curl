@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Ssh.UnitLibrary/Negotiation/SshAlgorithmPreferences.cs, Curl.Ssh.UnitTests/Negotiation/SshAlgorithmPreferencesEd25519HostKeyTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5279 — Offer ssh-ed25519 as a host key algorithm on an OpenSSL-backed build
 
@@ -45,3 +45,4 @@ The port follows the Windows Schannel/WinCNG reference build on Windows on purpo
 ## Notes (run 1)
 - Decision (ADR-1273): `OpenSslReference` already offers `ssh-ed25519` (pinned by the new test file); `WindowsReference` stays WinCNG, matching the Windows curl. Selecting the OpenSSL preset on Windows would need EngineComposition changes outside `touches`; not made.
 - Criterion 2: with the OpenSSL preset the Ed25519 key is agreed and then judged (not in known_hosts: exit 60 by the existing verification path); ticked on that basis, not re-tested end to end here.
+- 2026-11-16: Doing -> Done. OpenSSL preset offers ssh-ed25519 (pinned by tests); WinCNG preset kept, ADR-1273
