@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/IoctlRewoundCallbackReadStream.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5267 — Fix AF-0813: Surviving mutant: an ioctl-rewound upload can report it was read before any byte was read
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/IoctlRewoundCallbackReadStream.cs line 25`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/IoctlRewoundCallbackReadStream.cs line 25`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added `IoctlRewoundCallbackReadStreamTests`; `HasBeenRead_NothingReadYet_IsFalse` kills the `>= 0` mutant (it would return true with nothing read). Only a test was added; build clean, the 3 new tests pass.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: b615ab1a 9742157d.
+- 2026-11-16: Doing -> Done. Added test killing the mutant
