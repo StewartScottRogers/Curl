@@ -3,8 +3,8 @@ id: AF-0808
 title: When the server resets the connection right after accepting it, Curl prints 'Recv failure: Connection was aborted' where curl prints 'Connection was reset'
 auditor: conformance
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-16_0514.md: the reproduction no longer reproduces.
 key: conformance:reset-after-accept:Recv-failure-wording:stderr
 reproduction: none
 task: BL-5259
@@ -13,9 +13,9 @@ found: 2026-11-15
 found-at: 2a5b0f025b7c8fef02cb85fb555414235eb4e132
 scorecard: 2026-11-15_1610.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-16
+closed-how: reliable-reaudit
+closed-by: 2026-11-16_0514.md
 ---
 # AF-0808 - When the server resets the connection right after accepting it, Curl prints 'Recv failure: Connection was aborted' where curl prints 'Connection was reset'
 
@@ -42,6 +42,9 @@ dotnet build Curl.Console -c Release -v q | Out-Null; ./Record-CurlExchange.ps1 
 
 ## Re-audits
 
+- 2026-11-16 | 2026-11-16_0514.md | reproduces: no | Ran the reproduction with Record-CurlExchange.ps1 -Reset on port 53133 (output folders in the scratch folder instead of $env:TEMP). curl stderr `curl: (56) Recv failure: Connection was reset`, exit 56. Curl stderr `curl: (56) Recv failure: Connection was reset`, exit 56. Ran Curl three more times: the same 'Connection was reset' line each time, never 'Connection was aborted'.
+
 ## Log
 
 - 2026-11-15: filed proposed.
+- 2026-11-16: accepted -> closed. Re-audit 2026-11-16_0514.md: the reproduction no longer reproduces.

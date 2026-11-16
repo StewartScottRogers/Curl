@@ -3,8 +3,8 @@ id: AF-0806
 title: Surviving mutant: the dialer can take ownership of an application-supplied socket and close it itself
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-16_0514.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/TcpDialer.cs:DialSuppliedSocketAsync-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpDialer.cs:346:false
 task: BL-5257
@@ -13,9 +13,9 @@ found: 2026-11-15
 found-at: 2a5b0f025b7c8fef02cb85fb555414235eb4e132
 scorecard: 2026-11-15_1610.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-16
+closed-how: mechanical
+closed-by: 2026-11-16_0514.md
 ---
 # AF-0806 - Surviving mutant: the dialer can take ownership of an application-supplied socket and close it itself
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-16 | 2026-11-16_0514.md | reproduces: no | Ran the -Site command: TcpDialer.cs:346 `ownsHandle: false` -> `ownsHandle: true` was killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-15: filed proposed.
+- 2026-11-16: accepted -> closed. Re-audit 2026-11-16_0514.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
