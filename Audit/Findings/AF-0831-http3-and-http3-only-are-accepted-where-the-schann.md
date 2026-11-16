@@ -3,19 +3,19 @@ id: AF-0831
 title: --http3 and --http3-only are accepted where the Schannel reference curl refuses them with exit 2
 auditor: conformance
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Stewart closed it on 2026-11-16: he keeps --http3 and --http3-only accepted on every platform (ADR-1282), as he kept HTTP/2 on Windows (ADR-0871, ADR-0929); a decided difference from the Schannel reference curl, not a defect. Task BL-5305 deferred.
 key: conformance:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:--http3:refused-option
 reproduction: none
-task: none
-tasks:
+task: BL-5305
+tasks: BL-5305
 found: 2026-11-16
 found-at: f28eba04920fb5d8dd2a1c70283f268a1891b7e5
 scorecard: 2026-11-16_1333.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-16
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0831 - --http3 and --http3-only are accepted where the Schannel reference curl refuses them with exit 2
 
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release -v q | Out-Null; ./Record-CurlExchange.ps1 
 ## Log
 
 - 2026-11-16: filed proposed.
+- 2026-11-16: accepted -> closed. Stewart closed it on 2026-11-16: he keeps --http3 and --http3-only accepted on every platform (ADR-1282), as he kept HTTP/2 on Windows (ADR-0871, ADR-0929); a decided difference from the Schannel reference curl, not a defect. Task BL-5305 deferred.

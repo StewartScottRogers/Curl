@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:ReadReplyAsync-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:163:false
-task: none
-tasks:
+task: BL-5300
+tasks: BL-5300
 found: 2026-11-16
 found-at: f28eba04920fb5d8dd2a1c70283f268a1891b7e5
 scorecard: 2026-11-16_1333.md
