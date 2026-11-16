@@ -1,4 +1,4 @@
-# ADR-1273 — --libcurl setopt order follows the vendored 8.22.0 cases, not 8.21.0 (BL-5294)
+# ADR-1277 — --libcurl setopt order follows the vendored 8.22.0 cases, not 8.21.0 (BL-5294)
 
 Status: Accepted. Date: 2026-11-16. Decided by Claude under Stewart's delegation.
 

@@ -45,5 +45,5 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 - Not a defect. The port already writes curl 8.22.0's setopt order (19908ab502, 2026-10-21, before Surl's 2026-11-06 measurement). The vendored cases (`LIBCURL_VERSION "8.22.0-DEV"`) expect that order (e.g. data1402.c has USERAGENT before POSTFIELDS, data1407.c has USERPWD before DIRLISTONLY); I ran `-v ... --libcurl` for 1402 and 1407 and the setopt order matches them. Surl's oracle is 8.21.0, whose order differs.
 - Why the runner listed the six as passing: it compares against the vendored 8.22.0 `<file>` data, which the port matches. No runner defect, no follow-up.
-- Decision in ADR-1273: keep 8.22.0's order. Making the six pass against 8.21.0 would break them against the repository's own data.
-- 2026-11-16: Doing -> Deferred. Not a defect: port already writes 8.22.0 setopt order matching vendored cases; 8.21.0 oracle differs (ADR-1273)
+- Decision in ADR-1277: keep 8.22.0's order. Making the six pass against 8.21.0 would break them against the repository's own data.
+- 2026-11-16: Doing -> Deferred. Not a defect: port already writes 8.22.0 setopt order matching vendored cases; 8.21.0 oracle differs (ADR-1277)
