@@ -3,12 +3,12 @@ id: AF-0811
 title: Surviving mutant: the curl tool's and multi handles' transfers can take ownership of their connections and close them at handle cleanup
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs:OwnTheConnectionsOpened-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs:337:&&
-task: none
-tasks:
+task: BL-5265
+tasks: BL-5265
 found: 2026-11-16
 found-at: 74f3f45c47e86300b2b262dc1dacd43b508b09aa
 scorecard: 2026-11-16_0514.md

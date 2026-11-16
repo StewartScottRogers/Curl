@@ -3,12 +3,12 @@ id: AF-0815
 title: Surviving mutant: a chunked DoH response larger than curl's buffer can be read on instead of refused
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/DohResponseReader.cs:ReadChunkAsync-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DohResponseReader.cs:158:false
-task: none
-tasks:
+task: BL-5269
+tasks: BL-5269
 found: 2026-11-16
 found-at: 74f3f45c47e86300b2b262dc1dacd43b508b09aa
 scorecard: 2026-11-16_0514.md

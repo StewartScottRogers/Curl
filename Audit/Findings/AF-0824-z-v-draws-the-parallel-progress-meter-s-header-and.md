@@ -3,12 +3,12 @@ id: AF-0824
 title: -Z -v draws the parallel progress meter's header and first line only after the response head, where curl draws them right after 'Trying'
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:Curl.Engine.UnitLibrary/ParallelProgressMeter.cs:--parallel:stderr
 reproduction: none
-task: none
-tasks:
+task: BL-5278
+tasks: BL-5278
 found: 2026-11-16
 found-at: 74f3f45c47e86300b2b262dc1dacd43b508b09aa
 scorecard: 2026-11-16_0514.md
