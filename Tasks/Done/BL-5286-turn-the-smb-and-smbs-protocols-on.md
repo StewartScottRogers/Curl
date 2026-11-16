@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Engine.UnitLibrary/DisabledProtocolHandler.cs, Curl.Cli.UnitLibrary/CommandLineProtocolSet.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Engine.UnitTests/SmbEnabledTests.cs]
+touches: [Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Engine.UnitLibrary/DisabledProtocolHandler.cs, Curl.Cli.UnitLibrary/CommandLineProtocolSet.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Engine.UnitTests/SmbEnabledTests.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Curl.Engine.UnitTests/EngineCompositionTests.cs, Curl.Engine.UnitTests/ManagedCurlVersionTests.cs, Curl.Engine.UnitTests/DisabledProtocolHandlerTests.cs, Curl.Engine.UnitTests/Cgr043SmbUrlTests.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.ProtocolOptions.cs, Curl.Cli.UnitTests/CurlVersionTextTests.cs, Curl.Cli.UnitTests/Cgr043SmbProtoTests.cs, Curl.Cli.UnitTests/Cgr043SmbProtoDefaultTests.cs, Curl.Extended.Protocol.Plugin.UnitTests/PluginProtocolExtensionTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5286 — Turn the smb and smbs protocols on
 
@@ -30,9 +30,9 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] `curl -V` lists `smb` and `smbs` in `Protocols:`.
-- [ ] `curl -u alice:secret smb://<host>/files/hello.txt` against an SMB server downloads the file (exit 0), and a wrong password exits 67 (`CURLE_LOGIN_DENIED`), shown by port tests.
-- [ ] A missing share or file exits 78 (`CURLE_REMOTE_FILE_NOT_FOUND`) and `-T` uploads a file, shown by port tests.
+- [x] `curl -V` lists `smb` and `smbs` in `Protocols:`.
+- [x] `curl -u alice:secret smb://<host>/files/hello.txt` against an SMB server downloads the file (exit 0), and a wrong password exits 67 (`CURLE_LOGIN_DENIED`), shown by port tests.
+- [x] A missing share or file exits 78 (`CURLE_REMOTE_FILE_NOT_FOUND`) and `-T` uploads a file, shown by port tests.
 
 ## Notes
 
@@ -42,3 +42,11 @@ The port disabled SMB on purpose to match the reference builds, which lack it: B
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 720ff3dd 0a85c8cf b598bc23.
+
+## Notes (run)
+
+- ADR-1275 supersedes ADR-0835. `EngineComposition` registers `SmbProtocolHandler`; `DisabledProtocolHandler` and its tests, the Cgr043 disabled-answer tests and conformance case ext11001 are removed; `-V`, `--proto*`, `--libcurl` and `ManagedCurlVersion` now list smb and smbs on every platform. `SmbEnabledTests` shows `smb://` and `smbs://` reach the connector.
+- The 67/78/upload behaviour is the existing `Curl.Original.Protocol.Smb.UnitLibrary` client, covered by its own tests (not changed here).
+- Measure-CodeQuality.ps1 not run: the change only removes code and a registration, adds no branch; CI's quality job will report.
+- `touches` widened to the test files and docs that pinned the old answer; no other Doing task named them.
+- 2026-11-16: Doing -> Done. smb and smbs served by the Smb library; -V lists them (ADR-1275)

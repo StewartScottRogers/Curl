@@ -13,7 +13,7 @@ public sealed class CurlVersionTextTests
 {
     private const string ReleaseDate = "Release-Date: 2026-09-02";
 
-    private const string Protocols = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss";
+    private const string Protocols = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss";
 
     private const string Features = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
 
@@ -62,13 +62,13 @@ public sealed class CurlVersionTextTests
     [DataRow(true, false)]
     [DataRow(false, false)]
     [DataRow(false, true)]
-    public void Lines_AnyPlatform_ProtocolsLineListsNeitherSmbNorSmbs(bool isWindows, bool isMacOS)
+    public void Lines_AnyPlatform_ProtocolsLineListsSmbAndSmbs(bool isWindows, bool isMacOS)
     {
         string[] schemes = Lines(isWindows, isMacOS)[2].Split(' ');
 
-        Diagnostics.Assert("smb and smbs listed", "False False", $"{schemes.Contains("smb")} {schemes.Contains("smbs")}");
-        CollectionAssert.DoesNotContain(schemes, "smb");
-        CollectionAssert.DoesNotContain(schemes, "smbs");
+        Diagnostics.Assert("smb and smbs listed", "True True", $"{schemes.Contains("smb")} {schemes.Contains("smbs")}");
+        CollectionAssert.Contains(schemes, "smb");
+        CollectionAssert.Contains(schemes, "smbs");
     }
 
     [TestMethod]
@@ -80,13 +80,13 @@ public sealed class CurlVersionTextTests
         string expected =
             "curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel\r\n"
             + "Release-Date: 2026-09-02\r\n"
-            + "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss\r\n"
+            + "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss\r\n"
             + "Features: alt-svc AsynchDNS brotli HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd\r\n";
         Diagnostics.Diff("text", expected, text);
         Assert.AreEqual(
             "curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel\r\n"
             + "Release-Date: 2026-09-02\r\n"
-            + "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss\r\n"
+            + "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss\r\n"
             + "Features: alt-svc AsynchDNS brotli HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd\r\n",
             text);
     }

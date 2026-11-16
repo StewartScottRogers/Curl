@@ -26,12 +26,12 @@ public sealed class ManagedCurlVersionTests
     }
 
     [TestMethod]
-    public void For_AnyPlatform_ListsNeitherSmbNorSmbs()
+    public void For_AnyPlatform_ListsSmbAndSmbs()
     {
         CurlVersionInfo info = ManagedCurlVersion.For(isWindows: true, isMacOS: false);
 
-        CollectionAssert.DoesNotContain(info.Protocols.ToArray(), "smb");
-        CollectionAssert.DoesNotContain(info.Protocols.ToArray(), "smbs");
+        CollectionAssert.Contains(info.Protocols.ToArray(), "smb");
+        CollectionAssert.Contains(info.Protocols.ToArray(), "smbs");
     }
 
     [TestMethod]

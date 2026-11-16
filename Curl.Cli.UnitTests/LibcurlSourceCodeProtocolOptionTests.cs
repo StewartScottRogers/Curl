@@ -72,7 +72,7 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     [DataRow("--proto|=http", "  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, \"http\");\n")]
     [DataRow("--proto|=HTTP", "  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, \"http\");\n")]
     [DataRow("--proto|=https,http,ftp", "  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, \"ftp,http,https\");\n")]
-    [DataRow("--proto|all", "  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, \"dict,file,ftp,ftps,gopher,gophers,http,https,imap,imaps,ldap,ldaps,mqtt,mqtts,pop3,pop3s,rtsp,scp,sftp,smtp,smtps,telnet,tftp,ws,wss\");\n")]
+    [DataRow("--proto|all", "  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, \"dict,file,ftp,ftps,gopher,gophers,http,https,imap,imaps,ldap,ldaps,mqtt,mqtts,pop3,pop3s,rtsp,scp,sftp,smb,smbs,smtp,smtps,telnet,tftp,ws,wss\");\n")]
     [DataRow("--proto-redir|=http", "  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, \"http\");\n")]
     [DataRow("--mail-auth|a@b", "  curl_easy_setopt(curl, CURLOPT_MAIL_AUTH, \"a@b\");\n" + "  curl_easy_setopt(curl, CURLOPT_MAIL_AUTH, \"a@b\");\n")]
     [DataRow("--proto-default|FtP", "  curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, \"FtP\");\n")]

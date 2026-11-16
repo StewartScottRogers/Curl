@@ -13,6 +13,7 @@ using Curl.Original.Protocol.Ldap;
 using Curl.Original.Protocol.Mqtt;
 using Curl.Original.Protocol.Pop3;
 using Curl.Original.Protocol.Rtsp;
+using Curl.Original.Protocol.Smb;
 using Curl.Original.Protocol.Smtp;
 using Curl.Original.Protocol.Ssh;
 using Curl.Original.Protocol.Telnet;
@@ -44,8 +45,8 @@ internal static partial class EngineComposition
     /// <c>Sec-WebSocket-Key</c> and frame mask from <see cref="SystemWebSocketRandomSource" />
     /// (ADR-0128); <c>rtsp</c> over <paramref name="connector" />, sending one <c>OPTIONS *</c>
     /// request per transfer with a pre-emptive <c>Authorization</c> from the same authenticator
-    /// (ADR-0169); <c>smb</c> and <c>smbs</c> refused as disabled, as curl 8.22.0's reference builds leave them out
-    /// (ADR-0835); <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
+    /// (ADR-0169); <c>smb</c> and <c>smbs</c> served by the SMB client (ADR-1275)
+    /// ; <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
     /// and key files from the disk and offering the Windows curl's libssh2 algorithms on Windows and the
     /// OpenSSL build's elsewhere (ADR-0122); and <c>tftp</c> over
     /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS
@@ -193,7 +194,7 @@ internal static partial class EngineComposition
             new LazyProtocolHandler(["ldap", "ldaps"], () => new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows()), new NegotiateLogonTokenSource(), tlsProvider)),
             new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, webSocketRandomSource ?? new SystemWebSocketRandomSource()) { TracesFrames = tracesWs, RawMode = webSocketRawMode, PerformConnection = webSocketPerformConnection }),
             new LazyProtocolHandler(["rtsp"], () => new RtspProtocolHandler(recordingConnector, httpAuthenticator.Value, rtspInterleaveSink, rtspSettingsOf(), rtspSessionState)),
-            new LazyProtocolHandler(["smb", "smbs"], () => new DisabledProtocolHandler(["smb", "smbs"])),
+            new LazyProtocolHandler(["smb", "smbs"], () => new SmbProtocolHandler(recordingConnector)),
             new LazyProtocolHandler(["scp", "sftp"], () => new SshProtocolHandler(
                 recordingConnector,
                 new PhysicalFileSystem(),

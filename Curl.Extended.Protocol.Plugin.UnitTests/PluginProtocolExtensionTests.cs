@@ -73,7 +73,7 @@ public sealed class PluginProtocolExtensionTests
     [TestMethod]
     public void CurlSchemes_HoldEverySchemeCurlLists()
     {
-        string[] versionProtocols = "dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss".Split(' ');
+        string[] versionProtocols = "dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss".Split(' ');
 
         CollectionAssert.IsSubsetOf(versionProtocols, PluginProtocolExtension.CurlSchemes.ToArray());
     }
