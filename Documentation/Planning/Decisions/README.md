@@ -1320,4 +1320,4 @@ Each option and the specific reason it lost.
 | [1276](ADR-1276-negotiate-follows-the-windows-reference-builds-no-ntlm-in-spnego.md) | --negotiate follows the Windows reference build's `!ntlm` change: no NTLM inside SPNEGO; confirms ADR-0176 (BL-5282) | Accepted | 2026-11-16 |
 | [1277](ADR-1277-libcurl-setopt-order-follows-the-vendored-8-22-0-cases-not-8-21-0.md) | --libcurl setopt order follows the vendored 8.22.0 cases, not 8.21.0 (BL-5294) | Accepted | 2026-11-16 |
 | [1278](ADR-1278-the-openssl-preset-carries-the-openssl-ssh-algorithm-lists-and-windows-keeps-wincng.md) | The OpenSSL preset carries the OpenSSL SSH algorithm lists; Windows keeps the WinCNG preset (BL-5283) | Accepted | 2026-11-16 |
-| [1274](ADR-1274-sasl-external-without-a-user-name-stays-an-empty-line-as-curl-8-22-0-sends-it.md) | SASL EXTERNAL without a user name stays an empty line, as curl 8.22.0 sends it (BL-5293) | Accepted | 2026-11-16 |
+| [1279](ADR-1279-sasl-external-without-a-user-name-stays-an-empty-line-as-curl-8-22-0-sends-it.md) | SASL EXTERNAL without a user name stays an empty line, as curl 8.22.0 sends it (BL-5293) | Accepted | 2026-11-16 |

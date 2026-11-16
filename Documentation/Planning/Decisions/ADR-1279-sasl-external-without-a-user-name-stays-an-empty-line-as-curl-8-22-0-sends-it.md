@@ -1,4 +1,4 @@
-# ADR-1274 — SASL EXTERNAL without a user name stays an empty line, as curl 8.22.0 sends it
+# ADR-1279 — SASL EXTERNAL without a user name stays an empty line, as curl 8.22.0 sends it
 
 - Status: Accepted
 - Date: 2026-11-16
