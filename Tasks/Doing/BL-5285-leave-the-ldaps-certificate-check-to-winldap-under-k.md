@@ -39,3 +39,4 @@ Shares `LdapProtocolHandler.cs` with BL-5284, so the two run one after the other
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: cf183cd6.
