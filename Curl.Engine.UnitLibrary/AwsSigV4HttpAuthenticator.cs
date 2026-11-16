@@ -90,7 +90,9 @@ internal sealed class AwsSigV4HttpAuthenticator(IHttpAuthenticator otherSchemes,
     /// <exception cref="HttpAuthenticationFailedException">curl refuses to sign the request.</exception>
     private string? Sign(HttpAuthRequest request, AwsSigV4Inputs inputs, IReadOnlyList<string> challenges)
     {
-        if (challenges.Count != 0 || request.Credential is not { } credential)
+        // libcurl also signs with an empty key ID when only --oauth2-bearer is set (AF-0823).
+        NetworkCredential? credential = request.Credential ?? (request.BearerToken is null ? null : new NetworkCredential(string.Empty, string.Empty));
+        if (challenges.Count != 0 || credential is null)
         {
             return null;
         }
