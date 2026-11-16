@@ -13,8 +13,9 @@ namespace Curl.Engine;
 internal sealed class EndPointRecordingConnector(IConnector connector, ConnectionEndPointRecorder recorder) : IConnector
 {
     /// <summary>
-    /// Connects as the wrapped connector does and records the connection it opened, or a failed
-    /// connect's last socket error (BL-2374).
+    /// Connects as the wrapped connector does and records the connection it opened; a connect that
+    /// succeeds after an earlier address failed also records that address's last socket error, and
+    /// a failed connect records its last socket error and proxy error (BL-2374, BL-3328).
     /// </summary>
     /// <param name="target">Where to connect.</param>
     /// <param name="cancellationToken">Cancels the connect.</param>
