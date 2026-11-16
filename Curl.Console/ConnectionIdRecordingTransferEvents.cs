@@ -29,6 +29,9 @@ internal sealed class ConnectionIdRecordingTransferEvents(
     ConcurrentDictionary<long, long> connectionIds,
     Func<long> takeConnectionId) : ITransferEvents
 {
+    /// <summary>The start of the info line a connect attempt reports, <c>  Trying 127.0.0.1:80...</c>.</summary>
+    private const string ConnectAttemptPrefix = "  Trying ";
+
     /// <inheritdoc />
     public void ReportConnectionOpened(ConnectionOpenedEvent opened)
     {
@@ -60,6 +63,10 @@ internal sealed class ConnectionIdRecordingTransferEvents(
         if (text.StartsWith(RedirectFollower.IssueAnotherRequestMessagePrefix, StringComparison.Ordinal))
         {
             state.ConnectionId = null;
+        }
+        else if (text.StartsWith(ConnectAttemptPrefix, StringComparison.Ordinal))
+        {
+            state.ParallelProgress?.ReportConnectAttemptStarted();
         }
     }
 

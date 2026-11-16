@@ -3744,7 +3744,7 @@ internal sealed class CurlCommandRunner(
         ITransferEvents withFileFailure = options.Trace != TraceKind.None
             ? new OutputFileOpenFailureTransferEvents(recorded, state, options.Silent ? null : eventStandardError)
             : recorded;
-        state.Events = options.WriteOut is null && !options.TraceIds
+        state.Events = options.WriteOut is null && !options.TraceIds && state.ParallelProgress is null
             ? withFileFailure
             : new ConnectionIdRecordingTransferEvents(withFileFailure, state, connectionIdsByPoolNumber, takeConnectionId);
         return EventsBeforeConnecting(transfer);

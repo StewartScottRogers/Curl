@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ParallelProgressMeter.cs]
+touches: [Curl.Engine.UnitLibrary/ParallelProgressMeter.cs, Curl.Engine.UnitLibrary/ParallelTransferProgress.cs, Curl.Console/ConnectionIdRecordingTransferEvents.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/ConnectionIdRecordingTransferEventsTests.cs]
 requirement: none
 created: 2026-11-16
 completed:
@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fix: a `-Z` transfer draws the meter when its connect attempt reports `  Trying ...` (`ConnectionIdRecordingTransferEvents` -> `ParallelTransferProgress.ReportConnectAttemptStarted`), as curl does after its first multi_perform. The recorder wraps events for any parallel transfer. Repro now gives Trying, DL% header, then > GET. Widened touches (no other Doing task holds these files). Engine quality report: 0 failing. Platform-neutral.
 
 ## Log
 
