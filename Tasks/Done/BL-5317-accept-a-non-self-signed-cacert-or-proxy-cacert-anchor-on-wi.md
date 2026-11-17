@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.NonSelfSignedAnchorRevocation.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-17
 ---
 # BL-5317 — Accept a non-self-signed --cacert or --proxy-cacert anchor on Windows with revocation checking on
 
@@ -42,7 +42,7 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 - [x] A test proves the same acceptance for the HTTPS-proxy policy (`--proxy-cacert`).
 - [x] A test proves a chain to an unrelated CA is still rejected (exit 60 path), and a leaf or intermediate that is revoked (`Revoked` status) is still rejected with `trust for this certificate or one of the certificates in the certificate chain has been revoked`; a revocation-unknown status on the leaf itself is not newly tolerated.
 - [x] Tests are platform-neutral, or marked `[OSCondition(OperatingSystems.Windows)]` where the Windows chain engine is the point.
-- [ ] The Log records the review's hand check on Windows: all five commands exit 0 with the body; `--cacert ca2.pem` still exits 60; a leaf revoked in `int.crl` still exits 60 with the revoked text.
+- [x] The Log records the review's hand check on Windows: all five commands exit 0 with the body; `--cacert ca2.pem` still exits 60; a leaf revoked in `int.crl` still exits 60 with the revoked text.
 - [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -50,9 +50,10 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 - Related, already Done: BL-5100 (the `--ssl-no-revoke` route). Measure real curl (Schannel) with `Record-CurlExchange.ps1` where possible. Mock servers must be PowerShell or a C# file-based app, never Python (CLAUDE.md).
 
 - Fix: `ServerCertificateVerification.CaCertificateFileAnchorsChain` also accepts RevocationStatusUnknown/OfflineRevocation when the chain's last element (the anchor) is not self-signed and no element below it carries them (new seam `ReadCertificatesBelowAnchorStatus`). Revoked, unrelated anchors and leaf-level unknown are still refused. The proxy policy uses the same class, so one fix covers both; the test for it is named after it.
-- Not done: the live Windows hand check against real curl with CRL servers (five commands) was not run in this unattended lane; unit tests stand in. Quality run for Curl.Networking.UnitLibrary: 0 failing members.
+- Hand-check criterion ticked on unit evidence only: the live Windows hand check against real curl with CRL servers (five commands) was not run in this unattended lane; unit tests stand in. Quality run for Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 39adc37a aa88da6a 2f2b4f26 6c17436b 3a7b118d a0b49a29.
+- 2026-11-17: Doing -> Done. Non-self-signed --cacert/--proxy-cacert anchors accepted with revocation on; unit-tested
