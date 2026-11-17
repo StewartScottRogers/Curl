@@ -52,6 +52,7 @@ internal sealed class GrpcWebRequestContext(ITransferContext inner, Stream outpu
     public TimeSpan? MaxTime => inner.MaxTime;
     public long? OperationStarted => inner.OperationStarted;
     public ProxyEndpoint? Proxy => inner.Proxy;
+    public string? NoProxy => inner.NoProxy;
     public MailRequestOptions? Mail => inner.Mail;
     public SshOptions? Ssh => inner.Ssh;
     public TimeProvider TimeProvider => inner.TimeProvider;

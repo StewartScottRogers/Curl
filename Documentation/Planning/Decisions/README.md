@@ -1329,3 +1329,4 @@ Each option and the specific reason it lost.
 | [1285](ADR-1285-a-stomp-connect-names-the-virtual-host-slash-unless-h-host-gives-another.md) | A STOMP CONNECT names the virtual host / unless -H host gives another, and an ERROR shows its body (BL-5321) | Accepted | 2026-11-16 |
 | [1286](ADR-1286-a-signalr-negotiate-redirect-to-another-origin-drops-the-users-authorization.md) | A SignalR negotiate redirect to another origin drops the user's Authorization (BL-5311) | Accepted | 2026-11-16 |
 | [1287](ADR-1287-xattr-on-windows-writes-a-zone-identifier-stream-as-curl-8-22-does.md) | --xattr on Windows writes a Zone.Identifier stream, as curl 8.22 does (BL-5338) |
+| [1286](ADR-1286-itransfercontext-carries-the-no-proxy-list-as-text.md) | ITransferContext carries the no-proxy list as text (BL-5346) | Accepted | 2026-11-16 |

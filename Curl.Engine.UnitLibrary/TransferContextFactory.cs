@@ -55,6 +55,13 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// </summary>
     internal bool ReadsTelnetStandardInputInTextMode { get; init; } = OperatingSystem.IsWindows();
 
+    /// <summary>
+    /// Gets how the factory reads the <c>no_proxy</c> and <c>NO_PROXY</c> variables for
+    /// <see cref="TransferContext.NoProxy" />; the process environment by default, settable so tests
+    /// touch no real variable.
+    /// </summary>
+    internal Func<string, string?> ReadEnvironmentVariable { get; init; } = Environment.GetEnvironmentVariable;
+
     /// <summary>Standard input as a <c>telnet</c> transfer reads it, built on its first use (<see cref="UploadOf" />).</summary>
     private Stream? telnetStandardInput;
 
@@ -280,6 +287,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             TimeCondition = TimeConditionOf(transfer),
             RemoteTime = transfer.FileTime,
             Proxy = proxy,
+            NoProxy = proxyOptions.NoProxy ?? ReadEnvironmentVariable("no_proxy") ?? ReadEnvironmentVariable("NO_PROXY"),
             Http = HttpOptionsWithAltSvc(
                 url,
                 HttpRequestOptionsMapping.Of(settings, http, behaviour, transfer, authentication, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with

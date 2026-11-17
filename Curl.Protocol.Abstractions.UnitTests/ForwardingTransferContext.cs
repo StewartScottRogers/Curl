@@ -52,6 +52,7 @@ internal sealed class ForwardingTransferContext(ITransferContext inner) : ITrans
     public TimeSpan? MaxTime => inner.MaxTime;
     public long? OperationStarted => inner.OperationStarted;
     public ProxyEndpoint? Proxy => inner.Proxy;
+    public string? NoProxy => inner.NoProxy;
     public HttpRequestOptions? Http => inner.Http;
     public MailRequestOptions? Mail => inner.Mail;
     public SshOptions? Ssh => inner.Ssh;

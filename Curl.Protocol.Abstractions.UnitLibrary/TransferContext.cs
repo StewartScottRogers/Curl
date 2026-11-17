@@ -159,6 +159,9 @@ public sealed class TransferContext : ITransferContext
     public ProxyEndpoint? Proxy { get; init; }
 
     /// <inheritdoc />
+    public string? NoProxy { get; init; }
+
+    /// <inheritdoc />
     public HttpRequestOptions? Http { get; init; }
 
     /// <inheritdoc />

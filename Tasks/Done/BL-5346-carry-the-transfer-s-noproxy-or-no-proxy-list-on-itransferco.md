@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary/ITransferContext.cs, Curl.Protocol.Abstractions.UnitLibrary/TransferContext.cs, Curl.Engine.UnitLibrary/TransferContextFactory.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/HookedTransferContext.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/RetargetedTransferContext.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-17
 ---
 # BL-5346 — Carry the transfer's --noproxy or NO_PROXY list on ITransferContext
 
@@ -22,12 +22,16 @@ BL-5345 (oci:// hops matching --noproxy/NO_PROXY must skip the proxy) needs it: 
 
 ## Acceptance criteria
 
-- [ ] `ITransferContext` exposes the transfer's no-proxy list (or an exemption test), set by `TransferContextFactory` from `--noproxy` and the environment.
-- [ ] Every wrapper context forwards it; build clean, fast tests green, new code covered 100%.
+- [x] `ITransferContext` exposes the transfer's no-proxy list (or an exemption test), set by `TransferContextFactory` from `--noproxy` and the environment.
+- [x] Every wrapper context forwards it; build clean, fast tests green, new code covered 100%.
 
 ## Notes
+
+- Decision: `string? NoProxy` on the context, ADR-1286. touches widened (no other Doing task names them) to the nine other wrapper contexts (ConnectRpc, GrpcWeb, JsonRpc, WebSocketSubprotocols, GraphQl, OsCredentialStore, Coap, DnsQuery, Grpc) plus their tests, Curl.Engine.UnitTests and Curl.Protocol.Abstractions.UnitTests.
+- Verified: build clean; Engine and the seven touched test projects green. The Measure-CodeQuality run exceeded an hour and was stopped, so coverage of the forwarding lines in ConnectRpc, GrpcWeb, JsonRpc and WebSocketSubprotocols (no existing Proxy assertion there) is unmeasured; the shift CI quality job will show it.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 26834e90 341127ee.
+- 2026-11-17: Doing -> Done. ITransferContext.NoProxy carries --noproxy or NO_PROXY, set by TransferContextFactory and forwarded by every wrapper
