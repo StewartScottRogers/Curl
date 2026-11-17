@@ -39,3 +39,4 @@ The other constructor (lines 86-101) does this correctly: its catch calls `_sock
 ## Log
 
 - 2026-11-17: Created.
+- 2026-11-17: Backlog -> Doing. Criteria at claim: 65b665a8 75fb10e4 5669b010.
