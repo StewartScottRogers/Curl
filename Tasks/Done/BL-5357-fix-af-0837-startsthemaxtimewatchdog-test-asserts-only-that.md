@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests/ManagedEasyTransferTests.ToolProgress.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5357 — Fix AF-0837: StartsTheMaxTimeWatchdog test asserts only that OperationStarted is not null
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Test now stalls the handler, advances the clock 3 s and asserts OperationTimedOut. Fast tests: ManagedEasyTransferTests 352 passed.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-17: Doing -> Done. Test asserts OperationTimedOut after clock advance
