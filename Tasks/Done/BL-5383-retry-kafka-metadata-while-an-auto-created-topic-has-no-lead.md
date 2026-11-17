@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Kafka.UnitLibrary/Client, Curl.Extended.Protocol.Kafka.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5383 — Retry Kafka Metadata while an auto-created topic has no leader yet
 
@@ -52,3 +52,4 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Retry in `KafkaClientFlow.FindLeaderAsync`: errors 3 and 5 are retried up to 10 attempts, 250 ms apart via `Task.Delay(..., TimeProvider, ct)` (`-m` cancels through the token). Tests in `Client/KafkaLeaderRetryTests.cs`; the existing unknown-topic handler test now uses error 29 (non-retried), since error 3 now retries.
 - Hand check against a live broker not run: no Docker broker available in this lane; the criterion is met by the scripted-broker tests (no refusing-broker case beyond "never gets a leader", which a refusing broker answers identically). Choice of 10 x 250 ms recorded here; no ADR needed for a bound this small.
+- 2026-11-17: Doing -> Done. Metadata retried up to 10 times on errors 3 and 5; scripted-broker tests added, live hand check not run
