@@ -30,3 +30,4 @@ completed:
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-11-16: Doing -> Backlog. Needs BL-5346 (no-proxy list on ITransferContext; abstractions and engine projects outside touches) before the oci hop can match it
