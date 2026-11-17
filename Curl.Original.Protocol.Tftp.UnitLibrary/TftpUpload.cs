@@ -89,7 +89,7 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
     internal async ValueTask<TransferResult> RunAsync(TftpRequestFile file)
     {
         TftpTransferTimings timings = new(context.TimeProvider, startTimestamp);
-        return timings.Stamp(await RunUnstampedAsync(file).ConfigureAwait(false));
+        return timings.Stamp(await RunUnstampedAsync(file).ConfigureAwait(false), isUpload: true);
     }
 
     private async ValueTask<TransferResult> RunUnstampedAsync(TftpRequestFile file)
