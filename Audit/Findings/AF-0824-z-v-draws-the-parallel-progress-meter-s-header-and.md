@@ -3,8 +3,8 @@ id: AF-0824
 title: -Z -v draws the parallel progress meter's header and first line only after the response head, where curl draws them right after 'Trying'
 auditor: conformance
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-16_1333.md: the reproduction no longer reproduces.
 key: conformance:Curl.Engine.UnitLibrary/ParallelProgressMeter.cs:--parallel:stderr
 reproduction: none
 task: BL-5278
@@ -13,9 +13,9 @@ found: 2026-11-16
 found-at: 74f3f45c47e86300b2b262dc1dacd43b508b09aa
 scorecard: 2026-11-16_0514.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-16
+closed-how: reliable-reaudit
+closed-by: 2026-11-16_1333.md
 ---
 # AF-0824 - -Z -v draws the parallel progress meter's header and first line only after the response head, where curl draws them right after 'Trying'
 
@@ -42,6 +42,9 @@ dotnet build Curl.Console -c Release -v q | Out-Null; ./Record-CurlExchange.ps1 
 
 ## Re-audits
 
+- 2026-11-16 | 2026-11-16_1333.md | reproduces: no | Ran the reproduction: curl gives line numbers 4 (DL%) and 10 (> GET); Curl gives 2 and 6. In both the meter header and its first line come right after '*   Trying 127.0.0.1:62211...' and before '> GET'. The line offset is only the reference debug build's two WARNING lines and its two Curl_xfer_send lines.
+
 ## Log
 
 - 2026-11-16: filed proposed.
+- 2026-11-16: accepted -> closed. Re-audit 2026-11-16_1333.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0823
 title: --aws-sigv4 with --oauth2-bearer and no -u sends no Authorization header where curl sends a SigV4-signed one
 auditor: conformance
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-16_1333.md: the reproduction no longer reproduces.
 key: conformance:Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs:--aws-sigv4:request
 reproduction: none
 task: BL-5277
@@ -13,9 +13,9 @@ found: 2026-11-16
 found-at: 74f3f45c47e86300b2b262dc1dacd43b508b09aa
 scorecard: 2026-11-16_0514.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-16
+closed-how: reliable-reaudit
+closed-by: 2026-11-16_1333.md
 ---
 # AF-0823 - --aws-sigv4 with --oauth2-bearer and no -u sends no Authorization header where curl sends a SigV4-signed one
 
@@ -42,6 +42,9 @@ dotnet build Curl.Console -c Release -v q | Out-Null; ./Record-CurlExchange.ps1 
 
 ## Re-audits
 
+- 2026-11-16 | 2026-11-16_1333.md | reproduces: no | Ran the reproduction (port 62211, binaries already built in Release, outputs in the scratch folder): both request.bin files carry line 3 'Authorization: AWS4-HMAC-SHA256 Credential=/20261116/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=...'; only the signature differs (the request time). Curl now sends the SigV4 header under --oauth2-bearer.
+
 ## Log
 
 - 2026-11-16: filed proposed.
+- 2026-11-16: accepted -> closed. Re-audit 2026-11-16_1333.md: the reproduction no longer reproduces.
