@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/Http2StreamConnection.cs, Curl.Original.Protocol.Http.UnitTests/Http2StreamConnectionContentLengthTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5312 — End the HTTP/2 request stream when a -H Content-Length request has no body
 
@@ -48,3 +48,4 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 9ac009d6 651895f4 6360cca2 d7f42e9a a0b49a29.
 - 2026-11-16: Fix in `Http2StreamConnection.ReceiveFrameAsync` (via `EndBodylessRequestAsync`): a stream with `bodyLength == 0` whose request has not ended (a -H Content-Length and no body never reaches the body writer, so no one called EndRequestAsync) sends the empty DATA with END_STREAM before the first response read. Chosen over END_STREAM on HEADERS so `-d ''` keeps CGR-276's frame order and the file stays inside `touches`. h2 and h2c cases (Content-Length 0 and 5) end promptly and read the reply; a real body still ends on its last DATA frame; the three tests pass on the stand-in. Hand check against a live h2 server not run in this lane (no network repro); the stand-in proves the frames. Measure-CodeQuality for the library: 0 failing members (first run found complexity 12 in ReceiveFrameAsync; extracted the helper). Platform-neutral (no files or paths).
+- 2026-11-16: Doing -> Done. Bodyless -H Content-Length request now ends its h2 stream on first response read; 3 stand-in tests, quality clean
