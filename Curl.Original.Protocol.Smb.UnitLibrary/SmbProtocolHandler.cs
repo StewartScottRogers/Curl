@@ -130,14 +130,33 @@ public sealed class SmbProtocolHandler : IProtocolHandler
         TransferResult result;
         bool closes;
         long requestReady = context.TimeProvider.GetTimestamp();
+        context.Progress.ReportTransferStarted();
+        var receiveCount = new SmbReceiveCount();
         var counting = new SmbCountingConnection(connection, context.TimeProvider);
         await using (counting.ConfigureAwait(false))
         {
-            (result, closes) = await TransferAsync(counting, context, path!).ConfigureAwait(false);
+            try
+            {
+                (result, closes) = await TransferAsync(counting, context, path!, receiveCount).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (context.MaxTime is not null && context.CancellationToken.IsCancellationRequested)
+            {
+                ReportTimedOut(context, receiveCount, started, connect.ConnectionNumber);
+                throw;
+            }
         }
 
         ReportConnectionEnd(context.Events, result, closes, connect.ConnectionNumber);
         return StampReport(result, context.TimeProvider, new TransferTimings(started, connect.Timings, requestReady, null, null, 0), counting);
+    }
+
+    // curl's failf writes the -m timeout as a -v line before it closes the connection; the
+    // watchdog gives the transfer its exit 28 message from the same counts (BL-5329).
+    private static void ReportTimedOut(ITransferContext context, SmbReceiveCount receiveCount, long started, long connectionNumber)
+    {
+        long operationStarted = context.OperationStarted ?? started;
+        context.Events.ReportInfo(receiveCount.TimedOutMessage((long)context.TimeProvider.GetElapsedTime(operationStarted).TotalMilliseconds));
+        context.Events.ReportInfo(string.Create(CultureInfo.InvariantCulture, $"closing connection #{connectionNumber}"));
     }
 
     // Adds the timings behind %{time_*} and %{speed_*} and the request bytes behind %{size_request}
@@ -170,7 +189,7 @@ public sealed class SmbProtocolHandler : IProtocolHandler
     // Returns the outcome and whether it ended curl's connect phase (no user, or a session
     // that was not set up), which curl ends with "closing connection" rather than
     // "shutting down connection".
-    private async ValueTask<(TransferResult Result, bool Closes)> TransferAsync(IConnection connection, ITransferContext context, SmbUrlPath path)
+    private async ValueTask<(TransferResult Result, bool Closes)> TransferAsync(IConnection connection, ITransferContext context, SmbUrlPath path, SmbReceiveCount receiveCount)
     {
         if (context.Credentials is not { } credentials)
         {
@@ -191,7 +210,7 @@ public sealed class SmbProtocolHandler : IProtocolHandler
 
         TransferResult result = context.Upload is { CanSeek: false }
             ? TransferResult.Failure(CurlExitCode.SendError, SmbMessages.UploadSizeUnknown)
-            : await new SmbFileTransfer(connection, reader, userId, context)
+            : await new SmbFileTransfer(connection, reader, userId, context) { ReceiveCount = receiveCount }
                 .TransferAsync(context.Url.IdnHost, path)
                 .ConfigureAwait(false);
         return (result, false);

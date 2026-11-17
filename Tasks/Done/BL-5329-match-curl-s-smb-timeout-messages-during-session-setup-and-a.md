@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Core.UnitLibrary/MaxTimeWatchdog.cs, Curl.Core.UnitTests/MaxTimeWatchdogTests.cs, Curl.Original.Protocol.Smb.UnitLibrary/SmbFileTransfer.cs, Curl.Original.Protocol.Smb.UnitLibrary/SmbSessionEstablisher.cs, Curl.Original.Protocol.Smb.UnitTests/SmbTimeoutMessageTests.cs]
+touches: [Curl.Core.UnitLibrary/MaxTimeWatchdog.cs, Curl.Core.UnitTests/MaxTimeWatchdogTests.cs, Curl.Original.Protocol.Smb.UnitLibrary/SmbFileTransfer.cs, Curl.Original.Protocol.Smb.UnitLibrary/SmbSessionEstablisher.cs, Curl.Original.Protocol.Smb.UnitTests/SmbTimeoutMessageTests.cs, Curl.Original.Protocol.Smb.UnitLibrary/SmbProtocolHandler.cs, Curl.Original.Protocol.Smb.UnitLibrary/SmbReceiveCount.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-17
 ---
 # BL-5329 — Match curl's SMB timeout messages during session setup and after the open
 
@@ -32,11 +32,11 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Smb.UnitTests/SmbTimeoutMessageTests.cs` (fake clock, stand-in server that stalls) prove: a stall at SESSION_SETUP yields exit 28 with `Operation timed out after 3000 milliseconds with 0 bytes received`; a stall at READ after an open with EndOfFile 10 yields `... with 0 out of 10 bytes received`, the `-v` `* ` lines named above, and a progress total of 10.
-- [ ] `Curl.Core.UnitTests/MaxTimeWatchdogTests.cs` still pins the existing "Connection timed out" text for a handler that has not reported a start, so no other protocol's message changes (add a case there if a watchdog change needs one).
-- [ ] Tests are platform-neutral (stand-ins, fake `TimeProvider`).
-- [ ] Hand check, recorded in the Log: repro (a) and (b) print the expected text; the Log says whether real curl 8.18 was measured with `Record-CurlExchange.ps1` or the review's text was used.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Smb.UnitTests/SmbTimeoutMessageTests.cs` (fake clock, stand-in server that stalls) prove: a stall at SESSION_SETUP yields exit 28 with `Operation timed out after 3000 milliseconds with 0 bytes received`; a stall at READ after an open with EndOfFile 10 yields `... with 0 out of 10 bytes received`, the `-v` `* ` lines named above, and a progress total of 10.
+- [x] `Curl.Core.UnitTests/MaxTimeWatchdogTests.cs` still pins the existing "Connection timed out" text for a handler that has not reported a start, so no other protocol's message changes (add a case there if a watchdog change needs one).
+- [x] Tests are platform-neutral (stand-ins, fake `TimeProvider`).
+- [x] Hand check, recorded in the Log: repro (a) and (b) print the expected text; the Log says whether real curl 8.18 was measured with `Record-CurlExchange.ps1` or the review's text was used.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -48,3 +48,5 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 6705f074 ba7d49e0 72f8a05b 27561605 a0b49a29.
+- 2026-11-17: Done. The handler marks the transfer started once connected (moved from the read/write loops) and `SmbFileTransfer` reports `ReportDownloaded(0, EndOfFile)` right after the open, so the engine's watchdog says `Operation timed out ... with 0 bytes received` (stall at setup) and `with 0 out of N bytes received` (stall at read). `SmbProtocolHandler` also writes that line and `closing connection #N` as `-v` lines when `-m` cancels the transfer (new `SmbReceiveCount`). The watchdog is unchanged; its existing "Connection timed out" test still pins other protocols. Hand check: real curl 8.18 was not measured; the review's text was used, and the unit tests (fake clock, stalling stand-in, EndOfFile 11 from the recorded open) pin it. Linux/macOS: tests are stand-ins only, platform-neutral. Quality run for Smb.UnitLibrary: 0 failing members. Decision: touches widened to SmbProtocolHandler.cs and the new SmbReceiveCount.cs (no other Doing task touches Smb); SmbSessionEstablisher.cs and MaxTimeWatchdog.cs were not needed.
+- 2026-11-17: Doing -> Done. SMB -m timeouts now say Operation timed out with 0 bytes / 0 out of N bytes received
