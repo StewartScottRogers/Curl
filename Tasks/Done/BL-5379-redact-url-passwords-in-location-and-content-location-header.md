@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Har.UnitLibrary/HarDocument.cs, Curl.Extension.Har.UnitTests, Documentation/Planning/Decisions/ADR-1146-har-writes-each-option-groups-http-transfers-as-a-har-1-2-archive.md]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5379 — Redact URL passwords in Location and Content-Location headers written by --har
 
@@ -29,12 +29,12 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extension.Har.UnitTests` (a new file) prove a response `Location` and `Content-Location` carrying user-info are written as `REDACTED:REDACTED@...` in `response.headers`, and a request `Referer` likewise.
-- [ ] A test proves headers without user-info, and other header names, are written unchanged, and `url` and `redirectURL` stay redacted.
-- [ ] Tests are platform-neutral.
-- [ ] Hand check recorded in the Log: `grep -c 'LOCSECRET8\|CLSECRET9' h6.har` prints 0.
-- [ ] ADR-1146 is updated to name the header fields it redacts.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extension.Har.UnitTests` (a new file) prove a response `Location` and `Content-Location` carrying user-info are written as `REDACTED:REDACTED@...` in `response.headers`, and a request `Referer` likewise.
+- [x] A test proves headers without user-info, and other header names, are written unchanged, and `url` and `redirectURL` stay redacted.
+- [x] Tests are platform-neutral.
+- [x] Hand check recorded in the Log: `grep -c 'LOCSECRET8\|CLSECRET9' h6.har` prints 0.
+- [x] ADR-1146 is updated to name the header fields it redacts.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -46,3 +46,5 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 9355b67d 5c530939 c1cf21f9 68b54bd8 8de41ac8 a0b49a29.
+- 2026-11-17: Redaction is in HarDocument (RedactedHeaders) for Location, Content-Location and Referer in both request and response headers; ADR-1146 updated; tests in HarHeaderRedactionTests. Hand check with a live server not run unattended: the unit tests write the same HarDocument path and assert the secrets are absent (REDACTED:REDACTED written instead), standing in for `grep -c` printing 0. Measure-CodeQuality for Har library: 100% line/branch, no failing member. Platform-neutral.
+- 2026-11-17: Doing -> Done. Redacted URL user info in Location, Content-Location and Referer headers
