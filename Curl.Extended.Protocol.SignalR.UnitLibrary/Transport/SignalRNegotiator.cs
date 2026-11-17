@@ -10,7 +10,7 @@ namespace Curl.Extended.Protocol.SignalR.Transport;
 /// </summary>
 /// <param name="openConnection">Opens a connection to the host and port of a URL; each exchange has its own, disposed after it.</param>
 /// <param name="requestFields">The fields curl's options add to each request, or <see langword="null"/> for none.</param>
-/// <param name="sendsCredentialsToOtherOrigins"><c>--location-trusted</c>: keep the user's <c>Authorization</c> on a redirect to another scheme, host or port.</param>
+/// <param name="sendsCredentialsToOtherOrigins"><c>--location-trusted</c>: keep the user's <c>Authorization</c> and <c>Cookie</c> on a redirect to another scheme, host or port.</param>
 internal sealed class SignalRNegotiator(
     Func<Uri, CancellationToken, ValueTask<IConnection>> openConnection,
     IReadOnlyList<KeyValuePair<string, string>>? requestFields = null,
@@ -32,7 +32,7 @@ internal sealed class SignalRNegotiator(
 
         Uri redirectUrl = TryReadHttpUrl(response.Url) ?? throw new SignalRTransportException($"The negotiate response redirected to a URL that is not absolute: {response.Url}");
 
-        // Like -L without --location-trusted: another scheme, host or port gets none of the user's Authorization (BL-5311).
+        // Like -L without --location-trusted: another scheme, host or port gets none of the user's Authorization or Cookie (BL-5311, BL-5377).
         IReadOnlyList<KeyValuePair<string, string>>? redirectFields = FieldsForRedirect(endpointUrl, redirectUrl);
         NegotiateResponse redirected = await ExchangeAsync(redirectUrl, response.AccessToken, cancellationToken, redirectFields);
         return redirected.IsRedirect
@@ -43,7 +43,10 @@ internal sealed class SignalRNegotiator(
     private IReadOnlyList<KeyValuePair<string, string>>? FieldsForRedirect(Uri endpointUrl, Uri redirectUrl) =>
         sendsCredentialsToOtherOrigins || IsSameOrigin(endpointUrl, redirectUrl)
             ? requestFields
-            : (requestFields ?? []).Where(field => !field.Key.Equals("Authorization", StringComparison.OrdinalIgnoreCase)).ToList();
+            : (requestFields ?? []).Where(field => !IsUserCredential(field.Key)).ToList();
+
+    private static bool IsUserCredential(string name) =>
+        name.Equals("Authorization", StringComparison.OrdinalIgnoreCase) || name.Equals("Cookie", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsSameOrigin(Uri first, Uri second) =>
         first.Scheme == second.Scheme && string.Equals(first.IdnHost, second.IdnHost, StringComparison.OrdinalIgnoreCase) && first.Port == second.Port;
