@@ -222,6 +222,7 @@ public sealed class Lib567To572Tests
     [DataRow(new[] { (int)CurlCode.RtspCseqError, (int)CurlCode.SendError }, (int)CurlCode.SendError, "")]
     [DataRow(new[] { (int)CurlCode.RtspCseqError, 0, (int)CurlCode.RtspSessionError }, 0, "")]
     [DataRow(new[] { (int)CurlCode.RtspCseqError, 0, 0 }, (int)LibTestErrorCodes.Failure, "Failed to detect a Session ID mismatch")]
+    [DataRow(new[] { (int)CurlCode.RtspCseqError, 0, (int)CurlCode.SendError }, (int)LibTestErrorCodes.Failure, "Failed to detect a Session ID mismatch")]
     public async Task Lib570_ChecksTheCSeqAndSessionErrors(int[] codes, int exitCode, string error)
     {
         var queue = new Queue<int>(codes);
