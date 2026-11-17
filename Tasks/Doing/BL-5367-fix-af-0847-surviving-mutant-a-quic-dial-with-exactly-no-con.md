@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/QuicDialer.cs line 133`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/QuicDialer.cs line 133`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by the new test `TcpConnectorQuicTests.ConnectMultiplexedAsync_WhenTheFirstAddressUsesUpExactlyTheConnectTimeout_FailsWithExit28WithoutTryingTheNextAddress`: with `<` at QuicDialer.cs:133 it failed (exit 7 instead of 28), reverted it passes. Production code unchanged. Build clean, 4198 fast tests in Curl.Networking.UnitTests pass.
 
 ## Log
 
