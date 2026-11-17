@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.Plugin.UnitLibrary/HelperExchange.cs, Curl.Extended.Protocol.Plugin.UnitTests]
+touches: [Curl.Extended.Protocol.Plugin.UnitLibrary/HelperExchange.cs, Curl.Extended.Protocol.Plugin.UnitTests, Documentation/Conformance/Extended/Plugin.md]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5408 — Fail with exit 8 or 56 when a curl-proto helper exits before answering capabilities
 
@@ -30,12 +30,12 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.Plugin.UnitTests` (a new file, using the scripted helper process) prove a helper whose output ends before the empty line that ends `capabilities` fails with exit 8 (or 56 with `exited with status 3` when its exit status is 3), for both a get and a put transfer.
-- [ ] A test proves a helper that sends its capabilities and the terminating empty line, listing only `put`, still gives `does not offer the get capability` with exit 1 for a get transfer.
-- [ ] A test proves a helper that lists `get` and the empty line still transfers (no regression), and a mandatory unknown capability (`*x`) is still refused as before.
-- [ ] Tests are platform-neutral.
-- [ ] Hand check recorded in the Log: the first command exits 8 or 56 with a message naming the early end of output or `exited with status 3`.
-- [ ] `Plugin.md` states which of 8 and 56 applies to an early end; `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.Plugin.UnitTests` (a new file, using the scripted helper process) prove a helper whose output ends before the empty line that ends `capabilities` fails with exit 8 (or 56 with `exited with status 3` when its exit status is 3), for both a get and a put transfer.
+- [x] A test proves a helper that sends its capabilities and the terminating empty line, listing only `put`, still gives `does not offer the get capability` with exit 1 for a get transfer.
+- [x] A test proves a helper that lists `get` and the empty line still transfers (no regression), and a mandatory unknown capability (`*x`) is still refused as before.
+- [x] Tests are platform-neutral.
+- [x] Hand check recorded in the Log: the first command exits 8 or 56 with a message naming the early end of output or `exited with status 3`.
+- [x] `Plugin.md` states which of 8 and 56 applies to an early end; `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -46,3 +46,5 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 2b2f7ab2 2e3d5c4f 8b2416c0 c1cf21f9 631e97af 3bc62064.
+- 2026-11-17: Hand check: `curl -sS -m 10 bar://host/x` and `-d z` with a helper that echoes to stderr and `exit /b 3` now give `curl: (56) curl-proto-bar.cmd exited with status 3`, exit 56. Output ending with exit status 0 is exit 8 (`closed its output before ending its capabilities`). Quality run for the library: 100% line and branch, 0 failing members. Documentation/Conformance/Extended/Plugin.md row Reply-3 states 8 versus 56 (added to touches). Removed the old test row that expected exit 1 for empty output, which was the defect.
+- 2026-11-17: Doing -> Done. Early end of capabilities now exit 8 or 56

@@ -56,8 +56,14 @@ internal sealed class HelperExchange(IHelperProcess helper, ITransferContext con
     private async ValueTask<IReadOnlySet<string>> ReadCapabilitiesAsync()
     {
         HashSet<string> capabilities = new(StringComparer.Ordinal);
-        while (await ReadLineAsync().ConfigureAwait(false) is { Length: > 0 } line)
+        while (true)
         {
+            string line = await ReadLineAsync().ConfigureAwait(false) ?? await FailEndedCapabilitiesAsync().ConfigureAwait(false);
+            if (line.Length == 0)
+            {
+                break;
+            }
+
             // "Capabilities": a capability starting with '*' is mandatory, so one Curl does not know ends the transfer.
             string capability = line.TrimStart('*');
             if (line.StartsWith('*') && capability is not (Get or Put))
@@ -71,6 +77,14 @@ internal sealed class HelperExchange(IHelperProcess helper, ITransferContext con
         return capabilities;
     }
 
+    // The output ended before the empty line that ends the capabilities: a crash, not a helper lacking a capability.
+    private async ValueTask<string> FailEndedCapabilitiesAsync()
+    {
+        int exitStatus = await helper.WaitForExitAsync(context.CancellationToken).ConfigureAwait(false);
+        throw exitStatus == 0
+            ? Weird("closed its output before ending its capabilities")
+            : new HelperProtocolException(CurlExitCode.RecvError, $"{helperName} exited with status {exitStatus}");
+    }
     private async ValueTask ReadReplyAsync()
     {
         string reply = await ReadLineAsync().ConfigureAwait(false) ?? throw Weird("closed its output without a reply");

@@ -30,7 +30,7 @@ today and name the task that fixes them.
 | Plugin:ADR1142-Commands-4 | MUST | A helper lacking the capability the transfer needs fails it with exit 1, `<helper> does not offer the <command> capability`. | PluginExchangeCases.MissingCapabilityTheTransferNeeds_Exit1 |
 | Plugin:ADR1142-Reply-1 | MUST | After an `ok` line everything to the end of the helper's output is the body Curl writes. | PluginExchangeCases.Get_WritesCapabilitiesThenGetAndWritesTheBody |
 | Plugin:ADR1142-Reply-2 | MUST | `error <message>` is exit 56, `<helper>: <message>`. | PluginReplyCases.ErrorReply_Exit56WithTheMessage |
-| Plugin:ADR1142-Reply-3 | MUST | Any other reply, or the output ending first, is exit 8. | PluginReplyCases.ReplyNeitherOkNorError_Exit8 |
+| Plugin:ADR1142-Reply-3 | MUST | Any other reply, or the output ending first, is exit 8; the output ending inside `capabilities` is exit 8 too, or exit 56 with `<helper> exited with status <n>` when the helper exited non-zero. | PluginReplyCases.ReplyNeitherOkNorError_Exit8 |
 | Plugin:ADR1142-Reply-4 | MUST | Lines end with LF; a CR before it is dropped. | PluginReplyCases.CrlfLines_AreReadAsLfLines |
 | Plugin:ADR1142-Reply-5 | MUST | A line before the body is at most 8192 bytes; a longer one is exit 8. | PluginReplyCases.LineOf8193Bytes_Exit8 |
 | Plugin:ADR1142-Exit-1 | MUST | A helper exiting non-zero after its body fails the transfer with exit 56, `<helper> exited with status <n>`. | PluginReplyCases.HelperExitsNonZeroAfterItsBody_Exit56 |
