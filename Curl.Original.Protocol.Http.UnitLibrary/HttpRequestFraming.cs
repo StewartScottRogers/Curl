@@ -196,7 +196,7 @@ internal sealed class HttpRequestFraming
     /// <c>-H "Transfer-Encoding: chunked"</c> asked (<see cref="OfNoBody" />: an empty body with no
     /// <c>Content-Type</c>). Over HTTP/2 and HTTP/3 curl then sends no <c>content-length</c> (BL-5335).
     /// </summary>
-    private bool IsChunkedOnlyByHeader => IsChunked && KnownLength == 0 && Body is BytesBody { ContentType.Length: 0 };
+    private bool IsChunkedOnlyByHeader => IsChunked && Body is BytesBody { ContentType.Length: 0, Content.Length: 0 };
 
     /// <summary>
     /// Makes the same framing for an HTTP/1.1 request that asks to upgrade to h2c: with no
