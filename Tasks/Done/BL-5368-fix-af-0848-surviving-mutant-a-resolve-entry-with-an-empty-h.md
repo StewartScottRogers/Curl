@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ResolveOverrides.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5368 — Fix AF-0848: Surviving mutant: a --resolve entry with an empty host is kept instead of ignored
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/ResolveOverrides.cs line 150`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/ResolveOverrides.cs line 150`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The mutant `host.Length >= 0` at ResolveOverrides.cs:150 is killed by `ResolveOverridesTests.Parse_AnEntryWhoseBracketedHostIsEmpty_IsIgnoredNotKept` (entry `[]:80:127.0.0.1`: IsIgnoredAddition does not catch it, host unbrackets to empty; the colon-first form is caught earlier so the line-150 guard was only reachable this way). Verified by hand: fails with the mutant, Networking fast tests 4197 pass reverted. Production code unchanged, so no quality run. Linux and macOS: test is platform-neutral.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: c8509edd 9742157d.
+- 2026-11-17: Doing -> Done. Mutant killed by a new test; fast tests green
