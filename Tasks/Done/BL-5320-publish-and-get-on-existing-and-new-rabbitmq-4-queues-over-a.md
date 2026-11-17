@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ClientFlow.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Methods/Amqp0QueueDeclare.cs, Curl.Extended.Protocol.Amqp0.UnitTests]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5320 — Publish and get on existing and new RabbitMQ 4 queues over amqp:// with a passive declare first
 
@@ -50,3 +50,4 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 645cd3ad e1978299 82c723f0 c1cf21f9 175554a5 a0b49a29.
 - 2026-11-16: Done. Real RabbitMQ hand check NOT run (no broker in a lane); behaviour covered by scripted-frame tests. ADR-1284. Quality run: Amqp0 library one branch gap fixed by a test. Fast Amqp0 tests 119 pass.
+- 2026-11-16: Doing -> Done. Passive declare first; durable declare on 404; scripted-frame tests
