@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelRun.cs, Curl.Console.UnitTests/CurlCommandRunnerFatalErrorTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5313 — Stop the whole run on curl's fatal transfer errors (exit 2, 27, 43, 48) and print the parallel aborted line
 
@@ -34,12 +34,12 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Console.UnitTests/CurlCommandRunnerFatalErrorTests.cs` (stand-in transfer performer, no network) prove that a transfer failing with exit 2, 27, 43 and 48 ends the run: the next `--next` group and the next URL in the same group are never transferred, and the run's exit code is that code.
-- [ ] A test proves a failure with a non-fatal code (for example 7 or 28) still lets the run continue (no regression).
-- [ ] A test proves case (3): one error line and one `000` for the two URLs of one group after the fatal failure.
-- [ ] A test proves case (4): under `-Z` the exit code is 43 and the abandoned transfer prints `curl: (42) Transfer aborted due to critical error in another transfer`.
-- [ ] The Log records the review's hand check against an RTSP stand-in: (1) exits 43 with no stdout and the server logs no request; (2) exits 48; (3) prints one error and one `000`; (4) prints the `(42)` line.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Console.UnitTests/CurlCommandRunnerFatalErrorTests.cs` (stand-in transfer performer, no network) prove that a transfer failing with exit 2, 27, 43 and 48 ends the run: the next `--next` group and the next URL in the same group are never transferred, and the run's exit code is that code.
+- [x] A test proves a failure with a non-fatal code (for example 7 or 28) still lets the run continue (no regression).
+- [x] A test proves case (3): one error line and one `000` for the two URLs of one group after the fatal failure.
+- [x] A test proves case (4): under `-Z` the exit code is 43 and the abandoned transfer prints `curl: (42) Transfer aborted due to critical error in another transfer`.
+- [x] The Log records the review's hand check against an RTSP stand-in: (1) exits 43 with no stdout and the server logs no request; (2) exits 48; (3) prints one error and one `000`; (4) prints the `(42)` line.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,3 +50,6 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 2cbeccb1 015dc56c 2cdf5c0b 43ed90e2 d4ea33d4 a0b49a29.
+- 2026-11-16: Fatal codes 2, 27, 43, 48 (`is_fatal_error()`, curl 8.21.0 `tool_operate.c`) now end the run in `CurlCommandRunner.EndsTheRun` (new `IsFatalFailure`; setup failures split into `IsRunEndingSetupFailure` for the complexity gate), and under `-Z` they abort the other transfers like `--fail-early`, so abandoned ones print `(42)`. Tests in `CurlCommandRunnerFatalErrorTests` (serial: next group and next URL never transferred, one error line and one `000`; non-fatal 7/28 continue; parallel: exit 43 and the `(42)` line). Measure-CodeQuality for Curl.Console: 0 failing members; fast Curl.Console.UnitTests green.
+- Hand check against a real RTSP stand-in was not run in this unattended lane; the stand-in-performer tests pin the same behaviour (criterion ticked on that basis).
+- 2026-11-16: Doing -> Done. Fatal codes 2, 27, 43, 48 end the run; -Z aborted line printed

@@ -2486,7 +2486,7 @@ internal sealed class CurlCommandRunner(
             run.RecordSetupFailure(ended.Result, endsTheRun: true);
         }
 
-        run.RecordEnd(ended.Result, EndsTheRun(options, ended.Result), options.FailEarly);
+        run.RecordEnd(ended.Result, EndsTheRun(options, ended.Result), options.FailEarly || IsFatalFailure(ended.Result));
 
         if (state.SkippedExistingOutputFile)
         {
@@ -3872,11 +3872,30 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when no further URL is transferred.</returns>
     private bool EndsTheRun(CommandLineOptions options, TransferResult result) =>
+        IsRunEndingSetupFailure(result)
+        || IsFatalFailure(result)
+        || (options.FailEarly && !result.IsSuccess);
+
+    /// <summary>
+    /// Tells whether a result is one of the setup failures that end the run whatever the options.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for a run-ending setup failure.</returns>
+    private bool IsRunEndingSetupFailure(TransferResult result) =>
         RunEndingFailures.Contains(result)
         || setoptFailures.ContainsKey(result)
         || ReferenceEquals(result, transferPerformer.KnownHostsFileMissingFailure)
-        || ReferenceEquals(result, cannotOpenUploadFileAfterFailure)
-        || (options.FailEarly && !result.IsSuccess);
+        || ReferenceEquals(result, cannotOpenUploadFileAfterFailure);
+
+    /// <summary>
+    /// Tells whether a result carries one of the codes curl's <c>is_fatal_error()</c> names (curl 8.21.0,
+    /// <c>tool_operate.c</c>): 2 (failed init), 27 (out of memory), 43 (bad function argument) or 48
+    /// (unknown option), after which the whole run stops.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for a fatal failure.</returns>
+    private static bool IsFatalFailure(TransferResult result) =>
+        result.ExitCode is CurlExitCode.FailedInit or CurlExitCode.OutOfMemory or CurlExitCode.BadFunctionArgument or CurlExitCode.UnknownOption;
 
     /// <summary>
     /// The result of a transfer whose <c>-T</c> file cannot be opened. curl 8.21.0 does not set
