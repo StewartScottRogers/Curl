@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests/ServerCertificateVerificationTests.CaDirectoryPurpose.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5355 — Fix AF-0835: VerifyPeer_ProxyCaDirectoryAnchorAndClientAuthenticationLeaf_IsExit60UnsuitablePurpose never checks exit 60
 
@@ -53,3 +53,4 @@ Added the missing exit-code assertion to the two tests that asserted only the me
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-17: Doing -> Done. Added exit-code assertions to the two message-only tests; targeted tests pass
