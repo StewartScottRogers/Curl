@@ -14,6 +14,7 @@ public sealed class SocketIoUpgradeTests
     [TestMethod]
     [DataRow("socketio://example.com/chat?token=abc", "GET /socket.io/?EIO=4&transport=websocket&token=abc HTTP/1.1\r\nHost: example.com\r\n")]
     [DataRow("socketio://example.com:3000", "GET /socket.io/?EIO=4&transport=websocket HTTP/1.1\r\nHost: example.com:3000\r\n")]
+    [DataRow("socketio://example.com:0", "GET /socket.io/?EIO=4&transport=websocket HTTP/1.1\r\nHost: example.com:0\r\n")]
     [DataRow("socketio://[::1]:3000/?", "GET /socket.io/?EIO=4&transport=websocket HTTP/1.1\r\nHost: [::1]:3000\r\n")]
     public void Request_AsksForTheWebSocketTransport(string url, string start) =>
         Assert.AreEqual(
