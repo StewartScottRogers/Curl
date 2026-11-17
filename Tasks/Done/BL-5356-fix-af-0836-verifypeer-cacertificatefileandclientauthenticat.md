@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests/ServerCertificateVerificationTests.CaDirectoryPurpose.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5356 — Fix AF-0836: VerifyPeer_CaCertificateFileAndClientAuthenticationLeaf_IsExit60UnsuitablePurpose never checks exit 60
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Already fixed by b21f685329 (AF-0835): line 109 asserts exit 60. Reproduction matches at 109; the 11 CaDirectoryPurpose tests pass. Full build not rerun; no code changed.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-17: Doing -> Done. Already fixed by b21f685329; reproduction matches at line 109
