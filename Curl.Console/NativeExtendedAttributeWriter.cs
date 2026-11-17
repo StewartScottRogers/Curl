@@ -12,8 +12,8 @@ namespace Curl.Console;
 /// <remarks>
 /// curl writes through the open file's descriptor (<c>fsetxattr</c>, <c>extattr_set_fd</c>); this
 /// writes through its path, which names the same file, because .NET does not hand out a stream's
-/// descriptor. Windows has no curl build that writes extended attributes, so
-/// <see cref="ForCurrentPlatform" /> gives none there. Every line needs the real call, so per
+/// descriptor. On Windows (ADR-1286) the stream write is a
+/// <c>Zone.Identifier</c> file write handed to <see cref="WindowsZoneIdentifierWriter" />. Every line needs the real call, so per
 /// ADR-0083 the type is measured by <c>NativeExtendedAttributeWriterTests</c>' Integration run on
 /// Linux and macOS rather than by the fast run.
 /// </remarks>
@@ -36,28 +36,47 @@ internal sealed partial class NativeExtendedAttributeWriter : IExtendedAttribute
 
     /// <summary>
     /// Gives the writer for the running operating system, or <see langword="null" /> where curl
-    /// writes no extended attributes, as on Windows.
+    /// writes no extended attributes.
     /// </summary>
     /// <returns>The writer, or <see langword="null" />.</returns>
-    internal static NativeExtendedAttributeWriter? ForCurrentPlatform()
+    internal static IExtendedAttributeWriter? ForCurrentPlatform()
     {
+        if (OperatingSystem.IsWindows())
+        {
+            return new WindowsZoneIdentifierWriter(WriteZoneStream);
+        }
+
         if (OperatingSystem.IsLinux() || OperatingSystem.IsAndroid())
         {
-            return new((path, name, value) => LinuxSetXattr(path, name, value, (nuint)value.Length, 0));
+            return new NativeExtendedAttributeWriter((path, name, value) => LinuxSetXattr(path, name, value, (nuint)value.Length, 0));
         }
 
         if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacCatalyst())
         {
-            return new((path, name, value) => MacSetXattr(path, name, value, (nuint)value.Length, 0, 0));
+            return new NativeExtendedAttributeWriter((path, name, value) => MacSetXattr(path, name, value, (nuint)value.Length, 0, 0));
         }
 
         if (OperatingSystem.IsFreeBSD())
         {
-            return new((path, name, value) =>
+            return new NativeExtendedAttributeWriter((path, name, value) =>
                 FreeBsdExtattrSetFile(path, FreeBsdUserNamespace, name, value, (nuint)value.Length) < 0 ? -1 : 0);
         }
 
         return null;
+    }
+
+    /// <summary>Writes <paramref name="text" /> to the alternate data stream at <paramref name="streamPath" />; gives null on success, else the failure's message.</summary>
+    private static string? WriteZoneStream(string streamPath, string text)
+    {
+        try
+        {
+            File.WriteAllText(streamPath, text, new UTF8Encoding(false));
+            return null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return exception.Message;
+        }
     }
 
     /// <inheritdoc />

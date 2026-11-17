@@ -1328,3 +1328,4 @@ Each option and the specific reason it lost.
 | [1284](ADR-1284-amqp-declares-the-queue-passively-first-and-creates-it-durable-only-on-not-found.md) | amqp:// declares the queue passively first and creates it durable only on NOT_FOUND (BL-5320) | Accepted | 2026-11-16 |
 | [1285](ADR-1285-a-stomp-connect-names-the-virtual-host-slash-unless-h-host-gives-another.md) | A STOMP CONNECT names the virtual host / unless -H host gives another, and an ERROR shows its body (BL-5321) | Accepted | 2026-11-16 |
 | [1286](ADR-1286-a-signalr-negotiate-redirect-to-another-origin-drops-the-users-authorization.md) | A SignalR negotiate redirect to another origin drops the user's Authorization (BL-5311) | Accepted | 2026-11-16 |
+| [1286](ADR-1286-xattr-on-windows-writes-a-zone-identifier-stream-as-curl-8-22-does.md) | --xattr on Windows writes a Zone.Identifier stream, as curl 8.22 does (BL-5338) |
