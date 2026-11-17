@@ -21,6 +21,10 @@ public sealed class ArgumentBlankingTests
     [DataRow("-E")]
     [DataRow("--cert")]
     [DataRow("--proxy-cert")]
+    [DataRow("--tlsuser")]
+    [DataRow("--tlspassword")]
+    [DataRow("--proxy-tlsuser")]
+    [DataRow("--proxy-tlspassword")]
     public void SecretValues_SecretOptionWithSeparateValue_GivesTheValueWhole(string option)
     {
         IReadOnlyList<(int Index, int Start)> secrets = NativeArgumentBlanking.SecretValues(["-sS", option, "secret", "http://h/"]);
@@ -36,6 +40,10 @@ public sealed class ArgumentBlankingTests
     [DataRow("--user=alice:pw", 7)]
     [DataRow("--oauth2-bearer=token", 16)]
     [DataRow("--proxy-cert=c.pem:pw", 13)]
+    [DataRow("--tlsuser=u", 10)]
+    [DataRow("--tlspassword=S18cret", 14)]
+    [DataRow("--proxy-tlsuser=u", 16)]
+    [DataRow("--proxy-tlspassword=S", 20)]
     public void SecretValues_AttachedValue_GivesTheOffsetPastTheOption(string argument, int start)
     {
         IReadOnlyList<(int Index, int Start)> secrets = NativeArgumentBlanking.SecretValues(["http://h/", argument]);
@@ -47,7 +55,7 @@ public sealed class ArgumentBlankingTests
     public void SecretValues_OtherOptions_AreUntouched()
     {
         IReadOnlyList<(int Index, int Start)> secrets = NativeArgumentBlanking.SecretValues(
-            ["-H", "-u x", "--header=a", "-ofile", "--compressed", "-v", "-", "--no-such", "http://h/", "-:u", "-%u", "--unknown=1", "-x", "p", "-h"]);
+            ["-H", "-u x", "--header=a", "-ofile", "--compressed", "-v", "-", "--no-such", "http://h/", "-:u", "-%u", "--unknown=1", "-x", "p", "-h", "--user-agent", "ua", "--user-agent=ua"]);
 
         Assert.IsEmpty(secrets);
     }

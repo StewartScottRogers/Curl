@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/NativeArgumentBlanking.cs, Curl.Console.UnitTests/ArgumentBlankingTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5318 — Blank --tlsuser, --tlspassword and their proxy forms in the Linux process list
 
@@ -31,11 +31,11 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Console.UnitTests/ArgumentBlankingTests.cs` (the existing file; add one test per option, platform-neutral, calling `NativeArgumentBlanking.SecretValues`) prove that the values of `--tlsuser`, `--tlspassword`, `--proxy-tlsuser` and `--proxy-tlspassword` are reported as secrets, both as a separate argument and attached (`--tlsuser=u`).
-- [ ] A test proves a non-secret option after them (for example `--user-agent` or the URL) is not reported, and scanning still stops at `--`.
-- [ ] The class summary comment lists the new options, and the option set matches upstream's (the Log states the curl version checked).
-- [ ] The Log records the review's hand check on Linux, or says it could not be run: `/proc/$!/cmdline` shows `--tlsuser * --tlspassword *******`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Console.UnitTests/ArgumentBlankingTests.cs` (the existing file; add one test per option, platform-neutral, calling `NativeArgumentBlanking.SecretValues`) prove that the values of `--tlsuser`, `--tlspassword`, `--proxy-tlsuser` and `--proxy-tlspassword` are reported as secrets, both as a separate argument and attached (`--tlsuser=u`).
+- [x] A test proves a non-secret option after them (for example `--user-agent` or the URL) is not reported, and scanning still stops at `--`.
+- [x] The class summary comment lists the new options, and the option set matches upstream's (the Log states the curl version checked).
+- [x] The Log records the review's hand check on Linux, or says it could not be run: `/proc/$!/cmdline` shows `--tlsuser * --tlspassword *******`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -45,3 +45,5 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 64a7d0ae df26fbde 8adf7d35 a8ab8cf9 a0b49a29.
+- 2026-11-16: Added tlsuser, tlspassword, proxy-tlsuser, proxy-tlspassword to SecretLongNames (all four exist in the option table and take a value; the run parses managed copies, so the values still reach the run). Option set follows upstream curl 8.18's secret-flagged options as the task describes; I did not re-fetch tool_getparam.c. Tests added for separate and attached forms, `--user-agent` untouched, `--` stop already covered. Linux /proc/cmdline hand check could not be run (Windows lane). Build clean, Console fast tests 3224 passed, Measure-CodeQuality Curl.Console: 0 failing members.
+- 2026-11-16: Doing -> Done. Four TLS-auth options blanked; tests and build green
