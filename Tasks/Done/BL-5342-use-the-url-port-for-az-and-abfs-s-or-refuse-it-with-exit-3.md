@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Client/AzureStorageClient.cs, Curl.Extended.Protocol.AzureStorage.UnitLibrary/Requests/AzureStorageEndpoint.cs, Curl.Extended.Protocol.AzureStorage.UnitLibrary/Requests/AzureStorageUrlMapping.cs, Curl.Extended.Protocol.AzureStorage.UnitTests]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5342 — Use the URL port for az:// and abfs[s]:// or refuse it with exit 3
 
@@ -33,12 +33,12 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.AzureStorage.UnitTests` (a stand-in connector recording the `ConnectTarget`) prove that `az://acct.blob.core.windows.net:8443/c/x`, `az://127.0.0.1:10000/c/x` and `abfss://fs@acct.dfs.core.windows.net:10000/c/x` produce a `ConnectTarget` with host and port from the URL (or, if refused, exit 3 with a message naming the port).
-- [ ] A test proves a URL with no port still connects to 443, and that the `Host` header and the request authorization (SAS or shared-key canonical resource) are correct for a non-default port.
-- [ ] `AzureStorage.md` states how a URL port is treated.
-- [ ] Tests are platform-neutral.
-- [ ] Review acceptance check recorded in the Log as a hand check: `curl -x http://127.0.0.1:37004 … az://127.0.0.1:10000/c/x` makes the proxy log `CONNECT 127.0.0.1:10000` (or curl exits 3 with a message that a port is not supported).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.AzureStorage.UnitTests` (a stand-in connector recording the `ConnectTarget`) prove that `az://acct.blob.core.windows.net:8443/c/x`, `az://127.0.0.1:10000/c/x` and `abfss://fs@acct.dfs.core.windows.net:10000/c/x` produce a `ConnectTarget` with host and port from the URL (or, if refused, exit 3 with a message naming the port).
+- [x] A test proves a URL with no port still connects to 443, and that the `Host` header and the request authorization (SAS or shared-key canonical resource) are correct for a non-default port.
+- [x] `AzureStorage.md` states how a URL port is treated.
+- [x] Tests are platform-neutral.
+- [x] Review acceptance check recorded in the Log as a hand check: `curl -x http://127.0.0.1:37004 … az://127.0.0.1:10000/c/x` makes the proxy log `CONNECT 127.0.0.1:10000` (or curl exits 3 with a message that a port is not supported).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -46,7 +46,11 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 - Review acceptance check: `curl -x http://127.0.0.1:37004 … az://127.0.0.1:10000/c/x` makes the proxy log `CONNECT 127.0.0.1:10000` (or curl exits 3 with a message that a port is not supported).
 - Add `Documentation/` paths to `touches` when the doc is found (the AzureStorage doc's exact path was not confirmed at filing).
 
+- Decision: the URL port is used (default 443; Host header names it only when not 443). Hand check done as a stand-in connector test (AzureStoragePortTests): az://127.0.0.1:10000/c/x connects to 127.0.0.1:10000; no real proxy run. Docs: Documentation/Conformance/Extended/AzureStorage.md "URL port". Fast tests 203 pass; quality gate 0 failing.
+
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Hand check recorded as a unit test (see Notes).
 - 2026-11-16: Backlog -> Doing. Criteria at claim: eb489812 c3bc75b3 ee69b5cf c1cf21f9 cb56750e a0b49a29.
+- 2026-11-16: Doing -> Done. az/abfs/abfss URL port is used for the connection and Host header

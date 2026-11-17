@@ -22,7 +22,7 @@ public static class AzureStorageUrlMapping
         ArgumentNullException.ThrowIfNull(url);
         return url.Scheme switch
         {
-            "az" => new AzureStorageEndpoint(AccountHost(url, BlobHostSuffix), url.AbsolutePath, Query(url)),
+            "az" => new AzureStorageEndpoint(AccountHost(url, BlobHostSuffix), url.AbsolutePath, Query(url), PortOf(url)),
             "abfs" or "abfss" => MapDfs(url),
             _ => throw new AzureStorageRequestException(AzureStorageRequestFailure.UnsupportedScheme, $"Azure Storage does not handle the {url.Scheme} scheme."),
         };
@@ -38,7 +38,7 @@ public static class AzureStorageUrlMapping
         }
 
         var path = url.AbsolutePath == "/" ? string.Empty : url.AbsolutePath;
-        return new AzureStorageEndpoint(host, "/" + fileSystem + path, Query(url));
+        return new AzureStorageEndpoint(host, "/" + fileSystem + path, Query(url), PortOf(url));
     }
 
     private static string AccountHost(Uri url, string suffix)
@@ -51,6 +51,8 @@ public static class AzureStorageUrlMapping
 
         return host.Contains('.', StringComparison.Ordinal) ? host : host + suffix;
     }
+
+    private static int PortOf(Uri url) => url.Port < 0 ? AzureStorageEndpoint.DefaultPort : url.Port;
 
     private static string Query(Uri url) => url.Query.TrimStart('?');
 }
