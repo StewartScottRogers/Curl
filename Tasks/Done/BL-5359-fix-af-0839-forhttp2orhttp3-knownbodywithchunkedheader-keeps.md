@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitTests/Http2RequestHeadersTransferEncodingTests.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5359 — Fix AF-0839: ForHttp2OrHttp3_KnownBodyWithChunkedHeader_KeepsItsBody checks only that some body exists
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Line 77 was already fixed by 56e5de8c; this run replaced the remaining IsNotNull at line 58 with AreSame. Reproduction now gives no match; build clean, Http.UnitTests fast tests 2702 passed.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-17: Doing -> Done. Last IsNotNull(http2.Body) replaced by AreSame; reproduction gives no match

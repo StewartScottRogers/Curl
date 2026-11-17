@@ -55,7 +55,7 @@ public sealed class Http2RequestHeadersTransferEncodingTests
         HttpRequestOptions options = new() { Body = new BytesBody(Encoding.ASCII.GetBytes("abc"), "text/plain") };
         HttpRequestFraming http2 = HttpRequestFraming.Of(options, []).ForHttp2OrHttp3();
 
-        Assert.IsNotNull(http2.Body);
+        Assert.AreSame(options.Body, http2.Body);
         Assert.AreEqual(3L, http2.KnownLength);
     }
 
