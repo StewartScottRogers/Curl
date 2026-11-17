@@ -30,3 +30,4 @@ BL-5345 (oci:// hops matching --noproxy/NO_PROXY must skip the proxy) needs it: 
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: 26834e90 341127ee.
