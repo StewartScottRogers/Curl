@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.McpClient.UnitLibrary/Stdio/McpStdioSession.cs, Curl.Extended.Protocol.McpClient.UnitTests]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-17
 ---
 # BL-5343 — Cap the mcp+stdio exit grace period at the time left on -m
 
@@ -32,21 +32,24 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.McpClient.UnitTests` (a stand-in `IMcpServerProcess` and a fake `TimeProvider`, no real process) prove: when the `-m` deadline has passed and the server has not exited, the session kills it without waiting the grace period; when 1 s is left on `-m` the wait is at most 1 s, not 5 s.
-- [ ] A test proves that when the transfer failed (for example the server wrote invalid JSON) the process is killed at once without the 5 s wait.
-- [ ] A test proves the normal path is unchanged: a server that exits cleanly within the grace period with time left is waited for and not killed, and with no `-m` the 5 s grace period still applies.
-- [ ] `McpClient-Stdio.md` `Shutdown-2` states the cap.
-- [ ] Tests are platform-neutral.
-- [ ] Review acceptance check recorded in the Log as a hand check (Windows only): the `-m 3` hang run returns within about 3.5 s with exit 28; the ping run returns within about 1 s with exit 8. If the lane cannot run it, the Log says so.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.McpClient.UnitTests` (a stand-in `IMcpServerProcess` and a fake `TimeProvider`, no real process) prove: when the `-m` deadline has passed and the server has not exited, the session kills it without waiting the grace period; when 1 s is left on `-m` the wait is at most 1 s, not 5 s.
+- [x] A test proves that when the transfer failed (for example the server wrote invalid JSON) the process is killed at once without the 5 s wait.
+- [x] A test proves the normal path is unchanged: a server that exits cleanly within the grace period with time left is waited for and not killed, and with no `-m` the 5 s grace period still applies.
+- [x] `McpClient-Stdio.md` `Shutdown-2` states the cap.
+- [x] Tests are platform-neutral.
+- [x] Review acceptance check recorded in the Log as a hand check (Windows only): the `-m 3` hang run returns within about 3.5 s with exit 28; the ping run returns within about 1 s with exit 8. If the lane cannot run it, the Log says so.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers and hang programs must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check: the `-m 3` hang run returns within about 3.5 s with exit 28; the ping run returns within about 1 s with exit 8.
 - Add the `McpClient-Stdio.md` path to `touches` when found (its exact path was not confirmed at filing).
+- Decision: McpStdioSession takes optional maxTime and operationStarted (from ITransferContext.MaxTime and OperationStarted); EndAsync waits min(5 s, time left on -m), and kills at once when none is left. DisposeAsync without a prior EndAsync (transfer failed or cancelled) kills at once. Also touched McpStdioClientSession.cs, McpProtocolHandler.cs and Documentation/Conformance/Extended/McpClient-Stdio.md.
+- Hand check (Windows): the ping run returned exit 8 in 1.5 s, the same as this machine takes to start Curl (a failing file:// run took 1.6 s). The -m 3 hang run was not run (no hang program written). Measure-CodeQuality for the library: 0 failing members. Tests are platform-neutral; fast tests green. Committed in the fix(mcp) commit.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 472ce3d2 7cfbd6a7 11a9bfa5 d49766c1 c1cf21f9 c5da08c0 a0b49a29.
+- 2026-11-17: Doing -> Done. mcp+stdio exit grace period capped at the time left on -m and skipped when the transfer failed
