@@ -43,8 +43,13 @@ internal sealed class LdapEntryWriter(LdapDialect dialect, ITransferContext cont
     /// <returns><see langword="false" /> when the writing failed and <see cref="WriteFailure" /> says how.</returns>
     public ValueTask<bool> AddAsync(LdapSearchEntry entry)
     {
-        IReadOnlyList<byte[]> pieces = LdapEntryFormatter.FormatPieces(dialect, entry);
         EntryCount++;
+        if (context.NoBody)
+        {
+            return ValueTask.FromResult(true);
+        }
+
+        IReadOnlyList<byte[]> pieces = LdapEntryFormatter.FormatPieces(dialect, entry);
         if (dialect == LdapDialect.WinLdap)
         {
             held.AddRange(pieces);
