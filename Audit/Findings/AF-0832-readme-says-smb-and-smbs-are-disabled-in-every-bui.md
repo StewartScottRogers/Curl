@@ -3,12 +3,12 @@ id: AF-0832
 title: README says smb and smbs are disabled in every build and absent from curl -V, but Curl serves and lists them
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:README.md:smb-smbs-disabled:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-5306
+tasks: BL-5306
 found: 2026-11-16
 found-at: f28eba04920fb5d8dd2a1c70283f268a1891b7e5
 scorecard: 2026-11-16_1333.md

@@ -3,12 +3,12 @@ id: AF-0827
 title: Surviving mutant: a QUIC dial whose TLS setup fails can go on to the next address
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/QuicDialer.cs:DialThroughTunnelAsync-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/QuicDialer.cs:197:false
-task: none
-tasks:
+task: BL-5301
+tasks: BL-5301
 found: 2026-11-16
 found-at: f28eba04920fb5d8dd2a1c70283f268a1891b7e5
 scorecard: 2026-11-16_1333.md

@@ -3,12 +3,12 @@ id: AF-0830
 title: Surviving mutant: --csharp/--powershell can leave out a -F form body of exactly the 1 MiB read-ahead limit
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs:ReadAhead-le:surviving-mutant
 reproduction: mutation Curl.Extension.CodeGeneration.UnitLibrary/GeneratedRequest.cs:87:<=
-task: none
-tasks:
+task: BL-5304
+tasks: BL-5304
 found: 2026-11-16
 found-at: f28eba04920fb5d8dd2a1c70283f268a1891b7e5
 scorecard: 2026-11-16_1333.md
