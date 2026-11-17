@@ -41,6 +41,19 @@ public sealed class Lib2308To2504Tests
     }
 
     [TestMethod]
+    public async Task Lib2405_WhenTheMultiInitFails_StopsAtItWithoutRunningAnyTransfer()
+    {
+        CurlLibrary library = await PortRun.CleanedUpLibraryAsync();
+        var run = new PortRun(new FakeCurlEngine(), 2405, "http://x/");
+
+        await Lib2405.TestAsync(run.Context, run.Steps, library, CancellationToken.None);
+
+        Assert.AreEqual(LibTestErrorCodes.Multi, run.Steps.Result);
+        Assert.AreEqual(1, run.Error.ToString().Split("curl_multi_init() failed").Length - 1);
+        Assert.AreEqual(1, run.Error.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries).Length);
+    }
+
+    [TestMethod]
     public async Task EveryPort_OnACleanedUpLibrary_StopsAtItsInit()
     {
         CurlLibrary library = await PortRun.CleanedUpLibraryAsync();
