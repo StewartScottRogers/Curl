@@ -1,4 +1,4 @@
-# ADR-1286: ITransferContext carries the no-proxy list as text (BL-5346)
+# ADR-1288: ITransferContext carries the no-proxy list as text (BL-5346)
 
 Status: Accepted. Date: 2026-11-16. Decided by Claude under Stewart's delegation.
 

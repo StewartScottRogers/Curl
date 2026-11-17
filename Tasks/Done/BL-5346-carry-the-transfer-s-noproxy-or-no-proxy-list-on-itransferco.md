@@ -27,7 +27,7 @@ BL-5345 (oci:// hops matching --noproxy/NO_PROXY must skip the proxy) needs it: 
 
 ## Notes
 
-- Decision: `string? NoProxy` on the context, ADR-1286. touches widened (no other Doing task names them) to the nine other wrapper contexts (ConnectRpc, GrpcWeb, JsonRpc, WebSocketSubprotocols, GraphQl, OsCredentialStore, Coap, DnsQuery, Grpc) plus their tests, Curl.Engine.UnitTests and Curl.Protocol.Abstractions.UnitTests.
+- Decision: `string? NoProxy` on the context, ADR-1288. touches widened (no other Doing task names them) to the nine other wrapper contexts (ConnectRpc, GrpcWeb, JsonRpc, WebSocketSubprotocols, GraphQl, OsCredentialStore, Coap, DnsQuery, Grpc) plus their tests, Curl.Engine.UnitTests and Curl.Protocol.Abstractions.UnitTests.
 - Verified: build clean; Engine and the seven touched test projects green. The Measure-CodeQuality run exceeded an hour and was stopped, so coverage of the forwarding lines in ConnectRpc, GrpcWeb, JsonRpc and WebSocketSubprotocols (no existing Proxy assertion there) is unmeasured; the shift CI quality job will show it.
 
 ## Log
