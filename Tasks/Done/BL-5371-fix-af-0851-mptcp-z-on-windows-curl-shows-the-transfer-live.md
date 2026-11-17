@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpDialer.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/CurlCommandRunnerParallelProgressMeterTests.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5371 — Fix AF-0851: --mptcp -Z on Windows: Curl shows the transfer live in the parallel meter before the exit 7 error, where curl fails first and the meter shows Live 0
 
@@ -52,3 +52,4 @@ Fix is in Curl.Console/CurlCommandRunner.cs (touches widened; TcpDialer needs no
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-17: Doing -> Done. mptcp Z holds the meter until past connect, so curl 7 comes first
