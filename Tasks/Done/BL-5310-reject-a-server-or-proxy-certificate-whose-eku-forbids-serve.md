@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.CaDirectoryPurpose.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5310 — Reject a server or proxy certificate whose EKU forbids server authentication when trust comes from --capath or SSL_CERT_DIR
 
@@ -39,19 +39,22 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.CaDirectoryPurpose.cs` (platform-neutral, certificates generated in the test with `CertificateRequest`, no network) prove that a leaf signed by a CA given only through the CA-directory / `SSL_CERT_DIR` route and carrying only the `clientAuth` EKU is rejected as not valid for usage (the exit 60, "unsuitable certificate purpose" path), and the same for `codeSigning` only.
-- [ ] A test proves the same rejection for the HTTPS-proxy policy (`--proxy-capath`).
-- [ ] A test proves a leaf with the `serverAuth` EKU (and one with no EKU) signed by the same CA-directory anchor is still accepted.
-- [ ] A test proves the existing `--cacert` rejection of the clientAuth-only leaf is unchanged.
-- [ ] The Log records the review's hand check on Linux, or says it could not be run: all four commands exit 60 with `unsuitable certificate purpose (26)`, and `curl -sS --capath capath https://localhost:<serverAuth leaf port>/` still exits 0.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.CaDirectoryPurpose.cs` (platform-neutral, certificates generated in the test with `CertificateRequest`, no network) prove that a leaf signed by a CA given only through the CA-directory / `SSL_CERT_DIR` route and carrying only the `clientAuth` EKU is rejected as not valid for usage (the exit 60, "unsuitable certificate purpose" path), and the same for `codeSigning` only.
+- [x] A test proves the same rejection for the HTTPS-proxy policy (`--proxy-capath`).
+- [x] A test proves a leaf with the `serverAuth` EKU (and one with no EKU) signed by the same CA-directory anchor is still accepted.
+- [x] A test proves the existing `--cacert` rejection of the clientAuth-only leaf is unchanged.
+- [x] The Log records the review's hand check on Linux, or says it could not be run: all four commands exit 60 with `unsuitable certificate purpose (26)`, and `curl -sS --capath capath https://localhost:<serverAuth leaf port>/` still exits 0.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Match the OpenSSL build's text on Linux and macOS (measure with `Record-CurlExchange.ps1` where a reference curl is available). Mock servers must be PowerShell or a C# file-based app, never Python (CLAUDE.md).
 - Tests must pass on Windows, Linux and macOS; do not depend on `openssl rehash` in a unit test.
 
+- BL-5310 Log (hand check): the Linux hand check (four commands, TLS servers on 35106/35303) could not be run on this Windows lane; the unit tests cover the CA-directory, Judge, proxy-options, serverAuth, no-EKU and --cacert paths. Linux system-store route not testable without root. Change: ServerCertificateVerification.ChainLeadsToAnyOf now requires serverAuth; a new PurposeRefusal reports OpenSSL unsuitable certificate purpose (26) when anchors lead only without it.
+
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 356a4b62 c116be91 6027781a ef4e6168 5c150c3e a0b49a29.
+- 2026-11-16: Doing -> Done. CA-directory trust now rejects clientAuth/codeSigning-only leaves with unsuitable certificate purpose (26)

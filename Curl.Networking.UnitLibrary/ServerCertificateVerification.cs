@@ -280,7 +280,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         {
             RevocationCheckIncomplete = RevocationCheckIncomplete(chain, stapled),
         };
-        (observed, var refusal) = Refusal(observed, anchoredErrors, chain, targetHost, revocationLists, stapled);
+        (observed, var refusal) = Refusal(observed, anchoredErrors, chain, targetHost, revocationLists, stapled, anchorsBesideSystemStore);
         if (JudgesPinnedPublicKeyBeforeVerification)
         {
             var pinned = JudgePinnedPublicKey(observed, peerCertificates);
@@ -309,6 +309,14 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     private bool RevocationCheckIncomplete(X509Chain? chain, OcspStapleStatus? stapled) =>
         !options.Insecure && stapled != OcspStapleStatus.Good && RevocationBestEffortTolerates(chain);
 
+    private const string OpenSslUnsuitablePurposeRefusal = "SSL certificate OpenSSL verify result: unsuitable certificate purpose (26)";
+
+    // OpenSSL's server purpose check, run against the --capath roots: a certificate whose extended key usage forbids server authentication fails (BL-5310).
+    private (CurlExitCode ExitCode, string Message)? PurposeRefusal(SslPolicyErrors errors, X509Chain? chain, X509Certificate2Collection anchors) =>
+        options.Insecure || matchesSchannelBuild || errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch) || !AnchorsRefuseServerPurpose(chain, anchors)
+            ? null
+            : (CurlExitCode.PeerFailedVerification, OpenSslUnsuitablePurposeRefusal);
+
     // The first refusal: a revoked staple, the chain or name, then a --crlfile list. A list's
     // refusal is OpenSSL's verify result too, so %{ssl_verify_result} reports its code, 23 for
     // a revoked certificate and 12 for an expired list (measured with curl 8.18.0, CGR-168).
@@ -318,9 +326,10 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         X509Chain? chain,
         string targetHost,
         CertificateRevocationListFile? revocationLists,
-        OcspStapleStatus? stapled)
+        OcspStapleStatus? stapled,
+        X509Certificate2Collection anchorsBesideSystemStore)
     {
-        var refusal = RevokedStapleRefusal(stapled) ?? VerifyPeer(anchoredErrors, chain, targetHost, []);
+        var refusal = RevokedStapleRefusal(stapled) ?? PurposeRefusal(anchoredErrors, chain, anchorsBesideSystemStore) ?? VerifyPeer(anchoredErrors, chain, targetHost, []);
         if (refusal is not null)
         {
             return (observed, refusal);
@@ -399,6 +408,16 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
         errors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
+        if (PurposeRefusal(errors, chain, anchorsBesideSystemStore) is { } purposeRefusal)
+        {
+            return purposeRefusal;
+        }
+
+        return RefusalOfRemainingErrors(errors, chain, targetHost);
+    }
+
+    private (CurlExitCode ExitCode, string Message)? RefusalOfRemainingErrors(SslPolicyErrors errors, X509Chain? chain, string targetHost)
+    {
         if (options.Insecure)
         {
             // CURLOPT_SSL_VERIFYHOST without CURLOPT_SSL_VERIFYPEER: only the name counts.
@@ -779,8 +798,17 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         }
     }
 
-    // The server's own chain, rebuilt against the extra roots alone.
-    private static bool ChainLeadsToAnyOf(X509Chain? chain, X509Certificate2Collection anchors)
+    // The server's own chain, rebuilt against the extra roots alone, for server authentication.
+    private static bool ChainLeadsToAnyOf(X509Chain? chain, X509Certificate2Collection anchors) =>
+        BuildAgainstAnchors(chain, anchors, requireServerAuthentication: true);
+
+    // The chain leads to the anchors, but not for server authentication: OpenSSL's TLS server
+    // purpose check fails it with "unsuitable certificate purpose (26)" (BL-5310).
+    private static bool AnchorsRefuseServerPurpose(X509Chain? chain, X509Certificate2Collection anchors) =>
+        BuildAgainstAnchors(chain, anchors, requireServerAuthentication: false)
+        && !BuildAgainstAnchors(chain, anchors, requireServerAuthentication: true);
+
+    private static bool BuildAgainstAnchors(X509Chain? chain, X509Certificate2Collection anchors, bool requireServerAuthentication)
     {
         if (chain is null || chain.ChainElements.Count == 0 || anchors.Count == 0)
         {
@@ -790,6 +818,11 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         using var anchoredChain = new X509Chain();
         anchoredChain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
         anchoredChain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        if (requireServerAuthentication)
+        {
+            anchoredChain.ChainPolicy.ApplicationPolicy.Add(ServerAuthentication);
+        }
+
         anchoredChain.ChainPolicy.CustomTrustStore.AddRange(anchors);
         anchoredChain.ChainPolicy.ExtraStore.AddRange(chain.ChainPolicy.ExtraStore);
         foreach (var element in chain.ChainElements)
