@@ -275,7 +275,7 @@ public sealed class CurlCommandRunnerParallelTests
     {
         HeldTransferHandler http = new(observesCancellation: false);
 
-        Task<int> run = RunAsync(http, ["-Z", "--fail-early", "-sS", "-w", "%{urlnum} %{exitcode}\\n", A, M]);
+        Task<int> run = RunAsync(http, ["-Z", "--fail-early", "-sS", "-w", "%{urlnum} %{exitcode}\\n", A, M], standardOutput, timeProvider: new ManualTimerTimeProvider());
         await Task.WhenAll(http.WhenStartedAsync("/a"), http.WhenStartedAsync("/m"));
         http.Fail("/m", CurlExitCode.FileCouldntReadFile, MissingFile);
         await standardOutput.WhenEndsWithAsync("1 37\n");
