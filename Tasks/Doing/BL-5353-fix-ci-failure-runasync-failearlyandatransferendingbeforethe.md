@@ -26,9 +26,11 @@ Lanes test only on Windows, so reproduce with `gh run view 44077672653 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `RunAsync_FailEarlyAndATransferEndingBeforeTheAbortLands_CompletesIt` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `RunAsync_FailEarlyAndATransferEndingBeforeTheAbortLands_CompletesIt` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: `--fail-early`'s 1 s abort timer (real clock) raced the multi loop's 1 s poll on Linux, so `/a` was aborted (42) after the test finished it. The test now runs on a clock whose timers never fire (decided: test-only fix, production unchanged). CI on Linux/macOS is met by the platform-neutral change and green fast tests here.
 
 ## Log
 

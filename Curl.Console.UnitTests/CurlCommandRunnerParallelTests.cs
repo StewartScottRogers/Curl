@@ -531,7 +531,7 @@ public sealed class CurlCommandRunnerParallelTests
     /// Runs <paramref name="arguments" /> as on Windows through <paramref name="handler" /> alone, writing
     /// to <paramref name="runStandardOutput" /> and drawing the progress meter when <paramref name="writesProgressMeter" />.
     /// </summary>
-    private async Task<int> RunAsync(IProtocolHandler handler, string[] arguments, Stream runStandardOutput, bool writesProgressMeter = false)
+    private async Task<int> RunAsync(IProtocolHandler handler, string[] arguments, Stream runStandardOutput, bool writesProgressMeter = false, TimeProvider? timeProvider = null)
     {
         Diagnostics.Arrange("arguments", string.Join(' ', arguments));
         int exitCode;
@@ -545,7 +545,8 @@ public sealed class CurlCommandRunnerParallelTests
                     standardError,
                     new MemoryStream(),
                     runsOnWindows: true,
-                    writesProgressMeter: writesProgressMeter)
+                    writesProgressMeter: writesProgressMeter,
+                    timeProvider: timeProvider)
                 .RunAsync(arguments);
         }
 
