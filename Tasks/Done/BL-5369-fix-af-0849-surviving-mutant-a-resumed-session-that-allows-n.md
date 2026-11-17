@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitTests/HandBuiltTlsProviderTests.EarlyData.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5369 — Fix AF-0849: Surviving mutant: a resumed session that allows no early data can still be used for 0-RTT
 
@@ -43,3 +43,4 @@ Killed by `AuthenticateAsClientAsync_WithEarlyDataAndASessionThatAllowsNone_Offe
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 642b1693 9742157d.
+- 2026-11-17: Doing -> Done. Added a test that kills the >= 0 mutant; fast tests green
