@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs]
+touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs, Curl.Extended.Protocol.SocketIo.UnitTests/SocketIoUpgradeTests.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5365 — Fix AF-0845: Surviving mutant: a Socket.IO upgrade reply status line of two tokens can be refused with exit 8
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs line 88`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs line 88`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added SocketIoUpgradeTests.ReadReplyAsync_AStatusLineOfTwoTokens_IsAccepted (touches widened to the test file). With `< 2` -> `<= 2` applied it fails; reverted, all 98 pass. No production change.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: d25acb9e 9742157d.
+- 2026-11-17: Doing -> Done. Added two-token status line test; kills the <= 2 mutant

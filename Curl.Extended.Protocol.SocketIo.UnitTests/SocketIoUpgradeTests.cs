@@ -32,6 +32,16 @@ public sealed class SocketIoUpgradeTests
     }
 
     [TestMethod]
+    public async Task ReadReplyAsync_AStatusLineOfTwoTokens_IsAccepted()
+    {
+        ScriptedConnection connection = new(Encoding.ASCII.GetBytes($"HTTP/1.1 101\r\nSec-WebSocket-Accept: {SocketIoUpgrade.AcceptFor(ZeroRandomSource.Key)}\r\n\r\n"));
+
+        ReadOnlyMemory<byte> after = await SocketIoUpgrade.ReadReplyAsync(connection, ZeroRandomSource.Key, CancellationToken.None);
+
+        Assert.AreEqual(0, after.Length);
+    }
+
+    [TestMethod]
     public async Task ReadReplyAsync_AnAcceptHeaderInLowerCase_IsAccepted()
     {
         ScriptedConnection connection = new(Encoding.ASCII.GetBytes($"HTTP/1.1 101 OK\r\nsec-websocket-accept:{SocketIoUpgrade.AcceptFor(ZeroRandomSource.Key)}\r\n\r\n"));
