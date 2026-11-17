@@ -3,19 +3,19 @@ id: AF-0850
 title: --http3 and --http3-only are accepted (exit 0 / 3) where the Windows Schannel reference curl refuses them with exit 2
 auditor: conformance
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Duplicate of AF-0831: the same --http3/--http3-only acceptance on Windows, which Stewart closed on 2026-11-16 as a decided difference (ADR-1282); filed again under a different key. Task BL-5370 deferred.
 key: conformance:--http3:accepted-where-reference-refuses:refused-option
 reproduction: none
-task: none
-tasks:
+task: BL-5370
+tasks: BL-5370
 found: 2026-11-17
 found-at: 10c240a4859c7868ec16b722cde6234f80cc8fcb
 scorecard: 2026-11-17_0430.md
-duplicate-of:
-closed:
-closed-how:
-closed-by:
+duplicate-of: AF-0831
+closed: 2026-11-17
+closed-how: duplicate
+closed-by: session
 ---
 # AF-0850 - --http3 and --http3-only are accepted (exit 0 / 3) where the Windows Schannel reference curl refuses them with exit 2
 
@@ -45,3 +45,5 @@ Push-Location $env:TEMP; & ./Record-CurlExchange.ps1 -Port 57920 -Curl curl.exe 
 ## Log
 
 - 2026-11-17: filed proposed.
+- 2026-11-17: proposed -> accepted.
+- 2026-11-17: accepted -> closed. Duplicate of AF-0831: the same --http3/--http3-only acceptance on Windows, which Stewart closed on 2026-11-16 as a decided difference (ADR-1282); filed again under a different key. Task BL-5370 deferred.

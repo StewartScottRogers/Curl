@@ -8,7 +8,7 @@ reason: Stewart closed it on 2026-11-16: he keeps --http3 and --http3-only accep
 key: conformance:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:--http3:refused-option
 reproduction: none
 task: BL-5305
-tasks: BL-5305
+tasks: BL-5305, BL-5370
 found: 2026-11-16
 found-at: f28eba04920fb5d8dd2a1c70283f268a1891b7e5
 scorecard: 2026-11-16_1333.md
