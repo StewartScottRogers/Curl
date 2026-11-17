@@ -3,8 +3,8 @@ id: AF-0815
 title: Surviving mutant: a chunked DoH response larger than curl's buffer can be read on instead of refused
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-16_1333.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/DohResponseReader.cs:ReadChunkAsync-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DohResponseReader.cs:158:false
 task: BL-5269
@@ -13,9 +13,9 @@ found: 2026-11-16
 found-at: 74f3f45c47e86300b2b262dc1dacd43b508b09aa
 scorecard: 2026-11-16_0514.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-16
+closed-how: mechanical
+closed-by: 2026-11-16_1333.md
 ---
 # AF-0815 - Surviving mutant: a chunked DoH response larger than curl's buffer can be read on instead of refused
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-16 | 2026-11-16_1333.md | reproduces: no | Ran the -Site command: resolvedLine 158 ('return false;' to 'return true;'), outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-16: filed proposed.
+- 2026-11-16: accepted -> closed. Re-audit 2026-11-16_1333.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
