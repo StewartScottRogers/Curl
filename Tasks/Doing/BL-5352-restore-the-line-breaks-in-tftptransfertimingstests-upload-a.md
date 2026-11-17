@@ -39,3 +39,4 @@ formatting only; the test logic stays as it is.
 ## Log
 
 - 2026-11-17: Created.
+- 2026-11-17: Backlog -> Doing. Criteria at claim: 47436b55 41c7335f f7eb9f13.
