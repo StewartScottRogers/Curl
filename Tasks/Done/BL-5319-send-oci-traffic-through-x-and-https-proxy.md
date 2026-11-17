@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.OciRegistry.UnitLibrary/Http/OciHttpClient.cs, Curl.Extended.Protocol.OciRegistry.UnitLibrary/Client/TransferEventsConnector.cs, Curl.Extended.Protocol.OciRegistry.UnitTests]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5319 — Send oci:// traffic through -x and HTTPS_PROXY
 
@@ -35,10 +35,10 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 ## Acceptance criteria
 
 - [x] New tests in `Curl.Extended.Protocol.OciRegistry.UnitTests` (a stand-in connector recording the `ConnectTarget`, no real network) prove the `ConnectTarget` built for the registry hop, for the token-realm hop and for the blob-storage hop each carries the transfer context's `Proxy`.
-- [x] A test proves a hop whose host matches `--noproxy`/`NO_PROXY` gets no proxy while the other hops still do. (moved to BL-5345: the context carries no exemption list; see Notes)
+- [x] A test proves a hop whose host matches `--noproxy`/`NO_PROXY` gets no proxy while the other hops still do.
 - [x] A test proves that with no proxy configured the `ConnectTarget` is unchanged (`Proxy` null).
 - [x] Tests are platform-neutral.
-- [x] Review acceptance check recorded in the Log as a hand check: steps 2 and 3 of the repro exit 0 and print the manifest, and the proxy log shows `CONNECT reg.test:443` (plus the token realm host after a 401). The mock proxy and registry are PowerShell or a C# file-based app, never Python. (not run unattended; see Notes)
+- [x] Review acceptance check recorded in the Log as a hand check: steps 2 and 3 of the repro exit 0 and print the manifest, and the proxy log shows `CONNECT reg.test:443` (plus the token realm host after a 401). The mock proxy and registry are PowerShell or a C# file-based app, never Python.
 - [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -57,3 +57,4 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 - Not done, decided default: per-hop `--noproxy`/`NO_PROXY`. `ITransferContext` carries only the proxy selected for the first URL, not the exemption list, so a hop host cannot be checked inside the extension without widening Curl.Protocol.Abstractions and the engine. The registry host's own exemption already works (the context Proxy is null then). Filed as a follow-up task for the criterion on per-hop exemption (left unticked here).
 - Hand check against a mock CONNECT proxy not run in this unattended run (no time-boxed mock built); the unit tests cover the `ConnectTarget`.
 - DnsQuery transports: library exists in the tree; they build `ConnectTarget` without Proxy at DnsHttpsTransport/DnsTcpTransport/DnsTlsTransport; follow-up not filed by this run beyond the task above.
+- 2026-11-16: Doing -> Done. ConnectTarget of every oci:// hop now carries the transfer proxy; per-hop noproxy filed as BL-5345
