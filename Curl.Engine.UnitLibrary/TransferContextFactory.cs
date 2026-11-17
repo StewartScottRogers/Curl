@@ -238,9 +238,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         SshOptions? ssh = null,
         EngineFeatureMask featureMask = EngineFeatureMask.None)
     {
-        Stream? transferHeaderOutput = watchHeaderOutput is null
-            ? HeaderOutputOf(behaviour, transfer, url, output, headerOutput, bodyHeaderStyles)
-            : watchHeaderOutput(HeaderOutputOf(behaviour, transfer, url, output, headerOutput, bodyHeaderStyles));
+        Stream? transferHeaderOutput = WatchedHeaderOutput(watchHeaderOutput, HeaderOutputOf(behaviour, transfer, url, output, headerOutput, bodyHeaderStyles));
         return new()
         {
             Url = url,
@@ -256,7 +254,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Upload = UploadOf(url, upload),
             PostData = settings.PostData,
             PostWithoutData = settings.PostWithoutData,
-            Credentials = lookedUpCredentials ?? CredentialsOf(authentication) ?? AuthorizationIdentityNtlmCredentialsOf(authentication, url),
+            Credentials = lookedUpCredentials ?? CredentialsOrNtlmIdentityOf(authentication, url),
             TelnetOptions = protocol.Telnet.TelnetOptions,
             TftpBlockSize = BlockSizeOf(protocol.Tftp),
             TftpNoOptions = protocol.Tftp.NoOptions,
@@ -272,14 +270,14 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             FtpAcceptTimeout = FtpAcceptTimeoutOf(network),
             FtpServerResponseTimeout = FtpServerResponseTimeoutOf(network),
             SslLevel = settings.SslLevel,
-            FtpSslControlOnly = settings.FtpSslControlOnly && !settings.SslRequired,
+            FtpSslControlOnly = FtpSslControlOnlyOf(settings),
             FtpCommandChannelClearing = CommandChannelClearingOf(protocol.Ftp.ClearCommandChannel),
             ListOnly = settings.ListOnly,
             UseAscii = transfer.TransferText,
             Append = protocol.Ftp.Append,
             ConvertLineEndings = transfer.Crlf,
             QuoteCommands = QuoteCommandsOf(protocol.Ftp),
-            CreateFileMode = settings.CreateFileMode ?? TransferContext.DefaultCreateFileMode,
+            CreateFileMode = CreateFileModeOf(settings),
             PathAsIs = network.PathAsIs,
             ConnectTimeout = ConnectTimeoutOf(network),
             MaxTime = MaxTimeOf(transfer),
@@ -287,7 +285,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             TimeCondition = TimeConditionOf(transfer),
             RemoteTime = transfer.FileTime,
             Proxy = proxy,
-            NoProxy = proxyOptions.NoProxy ?? ReadEnvironmentVariable("no_proxy") ?? ReadEnvironmentVariable("NO_PROXY"),
+            NoProxy = NoProxyOf(proxyOptions),
             Http = HttpOptionsWithAltSvc(
                 url,
                 HttpRequestOptionsMapping.Of(settings, http, behaviour, transfer, authentication, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
@@ -309,6 +307,19 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             CancellationToken = TokenOf(abortToken, lowSpeedWatchdog, maxTimeWatchdog),
         };
     }
+
+    private static Stream? WatchedHeaderOutput(Func<Stream?, Stream>? watchHeaderOutput, Stream? headerOutput) =>
+        watchHeaderOutput is null ? headerOutput : watchHeaderOutput(headerOutput);
+
+    private static NetworkCredential? CredentialsOrNtlmIdentityOf(EasyAuthenticationOptions authentication, CurlUrl url) =>
+        CredentialsOf(authentication) ?? AuthorizationIdentityNtlmCredentialsOf(authentication, url);
+
+    private static bool FtpSslControlOnlyOf(EngineTransferSettings settings) => settings.FtpSslControlOnly && !settings.SslRequired;
+
+    private static UnixFileMode CreateFileModeOf(EngineTransferSettings settings) => settings.CreateFileMode ?? TransferContext.DefaultCreateFileMode;
+
+    private string? NoProxyOf(EasyProxyOptions proxyOptions) =>
+        proxyOptions.NoProxy ?? ReadEnvironmentVariable("no_proxy") ?? ReadEnvironmentVariable("NO_PROXY");
 
     /// <summary>
     /// Gets the <c>-u</c> credentials: <see cref="EasyAuthenticationOptions.UserPassword" /> split at its first colon
