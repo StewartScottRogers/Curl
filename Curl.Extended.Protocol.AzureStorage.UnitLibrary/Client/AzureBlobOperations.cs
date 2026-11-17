@@ -43,7 +43,7 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
     /// <returns>The number of bytes written or uploaded.</returns>
     internal Task<long> TransferAsync(AzureStorageEndpoint endpoint, Stream? upload, Stream output)
     {
-        (string container, string blob) = AzureStorageClient.Split(endpoint.Path);
+        (string accountPath, string container, string blob) = SplitPath(endpoint);
         if (container.Length == 0)
         {
             throw new AzureStorageTransferException(CurlExitCode.UrlMalformat, "An az:// URL needs a container after the account");
@@ -52,21 +52,36 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
         bool namesPrefix = blob.Length == 0 || blob.EndsWith('/');
         return upload switch
         {
-            null when namesPrefix => ListAsync(endpoint, container, blob, output),
+            null when namesPrefix => ListAsync(endpoint, accountPath, container, blob, output),
             null => client.ExchangeAsync("GET", endpoint, [], null, response => client.CopyAsync(response.Body, output)),
             _ when namesPrefix => throw new AzureStorageTransferException(CurlExitCode.UrlMalformat, "An Azure Storage upload needs a blob name in the URL"),
             { } bytes => UploadAsync(endpoint, bytes),
         };
     }
 
-    private async Task<long> ListAsync(AzureStorageEndpoint endpoint, string container, string prefix, Stream output)
+    // On a path-style emulator the first segment is the account; the container follows it.
+    private static (string AccountPath, string Container, string Blob) SplitPath(AzureStorageEndpoint endpoint)
+    {
+        int accountEnd = endpoint.AccountInPath ? AccountEnd(endpoint.Path) : 0;
+        string containerPath = endpoint.Path[accountEnd..];
+        (string container, string blob) = AzureStorageClient.Split(containerPath.Length == 0 ? "/" : containerPath);
+        return (endpoint.Path[..accountEnd], container, blob);
+    }
+
+    private static int AccountEnd(string path)
+    {
+        int slash = path.IndexOf('/', 1);
+        return slash < 0 ? path.Length : slash;
+    }
+
+    private async Task<long> ListAsync(AzureStorageEndpoint endpoint, string accountPath, string container, string prefix, Stream output)
     {
         long written = 0;
         string? marker = null;
         do
         {
             string query = $"restype=container&comp=list&delimiter=%2F&prefix={Uri.EscapeDataString(prefix)}" + (marker is null ? string.Empty : $"&marker={Uri.EscapeDataString(marker)}");
-            AzureBlobListing listing = await client.ExchangeAsync("GET", AzureStorageClient.Operation(endpoint, "/" + Uri.EscapeDataString(container), query), [], null, ReadListingAsync);
+            AzureBlobListing listing = await client.ExchangeAsync("GET", AzureStorageClient.Operation(endpoint, accountPath + "/" + Uri.EscapeDataString(container), query), [], null, ReadListingAsync);
             written += await client.WriteLinesAsync(listing.BlobPrefixes.Concat(listing.Blobs.Select(blob => blob.Name)), output);
             marker = listing.NextMarker;
         }

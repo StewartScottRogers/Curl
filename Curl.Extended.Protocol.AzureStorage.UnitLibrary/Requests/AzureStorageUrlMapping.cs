@@ -22,11 +22,21 @@ public static class AzureStorageUrlMapping
         ArgumentNullException.ThrowIfNull(url);
         return url.Scheme switch
         {
-            "az" => new AzureStorageEndpoint(AccountHost(url, BlobHostSuffix), url.AbsolutePath, Query(url), PortOf(url)),
+            "az" => MapBlob(url),
             "abfs" or "abfss" => MapDfs(url),
             _ => throw new AzureStorageRequestException(AzureStorageRequestFailure.UnsupportedScheme, $"Azure Storage does not handle the {url.Scheme} scheme."),
         };
     }
+
+    // A path-style emulator (Azurite) is an IP address or localhost: the account is the first path segment, not part of the host.
+    private static AzureStorageEndpoint MapBlob(Uri url) =>
+        IsPathStyleHost(url)
+            ? new(url.Host, url.AbsolutePath, Query(url), PortOf(url), true)
+            : new(AccountHost(url, BlobHostSuffix), url.AbsolutePath, Query(url), PortOf(url));
+
+    private static bool IsPathStyleHost(Uri url) =>
+        url.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6
+        || string.Equals(url.Host, "localhost", StringComparison.OrdinalIgnoreCase);
 
     private static AzureStorageEndpoint MapDfs(Uri url)
     {
