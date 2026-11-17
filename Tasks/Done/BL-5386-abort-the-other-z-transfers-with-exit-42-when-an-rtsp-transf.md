@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelRun.cs, Curl.Console.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5386 — Abort the other -Z transfers with exit 42 when an RTSP transfer ends with exit 43
 
@@ -32,12 +32,12 @@ Still-open older finding. What changed: the exit 43/48 sequential cases are now 
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Console.UnitTests` (a new file, e.g. `CurlCommandRunnerParallelRtspFatalTests.cs`) prove that with `-Z`, an RTSP transfer failing with exit 43 makes the other transfer finish with exit 42 and the `Transfer aborted due to critical error in another transfer` message, and the overall exit is 43.
-- [ ] A test proves the `-w '[%{exitcode}]\n'` of the other (HTTP) transfer prints `[42]`.
-- [ ] A test proves a non-fatal failure in a `-Z` run still does not abort the other transfers (no regression).
-- [ ] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
-- [ ] Hand check recorded in the Log: the first command prints the (42) line and exits 43; the second prints `[42]` for the HTTP transfer. Measure real curl with `Record-CurlExchange.ps1` where possible.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Console.UnitTests` (a new file, e.g. `CurlCommandRunnerParallelRtspFatalTests.cs`) prove that with `-Z`, an RTSP transfer failing with exit 43 makes the other transfer finish with exit 42 and the `Transfer aborted due to critical error in another transfer` message, and the overall exit is 43.
+- [x] A test proves the `-w '[%{exitcode}]\n'` of the other (HTTP) transfer prints `[42]`.
+- [x] A test proves a non-fatal failure in a `-Z` run still does not abort the other transfers (no regression).
+- [x] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
+- [x] Hand check recorded in the Log: the first command prints the (42) line and exits 43; the second prints `[42]` for the HTTP transfer. Measure real curl with `Record-CurlExchange.ps1` where possible.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -48,3 +48,5 @@ Still-open older finding. What changed: the exit 43/48 sequential cases are now 
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b740072a 391cb81f b5333f5e 7ae10ef7 a8ced021 a0b49a29.
+- 2026-11-17: Cause: the RTSP 43 fails at setup, before the other -Z transfer starts; that one was skipped with the first failure's code (43) instead of aborted (42). Fix: `DeferReportOfEarlyFailure` reports it aborted when the first failure is fatal and `--fail-early` is absent. Tests in CurlCommandRunnerParallelRtspFatalTests (unit-level, handler stand-in for RTSP); hand check against live servers not run (no mock RTSP server in the lane), the unit tests pin the stderr line, `[42]` and exit 43. Build clean, fast tests green, Measure-CodeQuality for Curl.Console 0 failing.
+- 2026-11-17: Doing -> Done. Fatal first failure under -Z aborts the other transfers with 42

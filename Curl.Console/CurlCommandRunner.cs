@@ -2280,7 +2280,7 @@ internal sealed class CurlCommandRunner(
 
         if (run.HasFailedEarly)
         {
-            run.DeferReport(transfer.TransferId, () => ReportSkippedAsync(dispatch, options, transfer, state, run.FirstFailure!));
+            DeferReportOfEarlyFailure(run, dispatch, options, transfer, state);
             return false;
         }
 
@@ -2291,6 +2291,25 @@ internal sealed class CurlCommandRunner(
         return false;
     }
 
+    /// <summary>
+    /// Leaves the report of a transfer <c>-Z</c> kept from starting once a failure ended the run: aborted
+    /// (exit 42) when the failure is fatal and <c>--fail-early</c> was not given, as curl aborts every other
+    /// transfer, otherwise skipped with the first failure's code (BL-5386).
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="dispatch">What the transfer would go through.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="state">The transfer's state.</param>
+    private void DeferReportOfEarlyFailure(ParallelRun run, TransferDispatch dispatch, CommandLineOptions options, UrlTransfer transfer, RunningTransferState state)
+    {
+        TransferResult first = run.FirstFailure!;
+        run.DeferReport(
+            transfer.TransferId,
+            !options.FailEarly && IsFatalFailure(first)
+                ? () => ReportAsync(dispatch, options, transfer, state, AbortedResultOf(state), transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol))
+                : () => ReportSkippedAsync(dispatch, options, transfer, state, first));
+    }
     /// <summary>
     /// Performs one transfer of a <c>-Z</c> run, then, holding the run's <see cref="writeGate" />,
     /// records how it ended and writes its report (<see cref="EndParallelTransferAsync" />). A transfer
