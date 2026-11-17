@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/UdpDatagramChannel.cs, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5351 — Dispose the UDP socket when connecting it to the server fails in UdpDatagramChannel
 
@@ -42,3 +42,4 @@ The bound-socket constructor now disposes the socket and rethrows when ConnectIf
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 65b665a8 75fb10e4 5669b010.
+- 2026-11-17: Doing -> Done. Socket disposed on connect failure; test added
