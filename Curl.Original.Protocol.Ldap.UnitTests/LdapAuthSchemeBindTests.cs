@@ -25,8 +25,7 @@ public sealed class LdapAuthSchemeBindTests
 
     [TestMethod]
     [DataRow(HttpAuthSchemes.Ntlm)]
-    [DataRow(HttpAuthSchemes.Negotiate)]
-    public async Task ExecuteAsync_NtlmOrNegotiateRefused_SendsTheSicilyNegotiateAndNoPasswordThenFailsWith38(HttpAuthSchemes schemes)
+    public async Task ExecuteAsync_NtlmRefused_SendsTheSicilyNegotiateAndNoPasswordThenFailsWith38(HttpAuthSchemes schemes)
     {
         (TransferResult result, byte[] sent) = await RunAsync(schemes, BindInvalidCredentials1);
 

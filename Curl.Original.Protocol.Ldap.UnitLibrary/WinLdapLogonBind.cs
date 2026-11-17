@@ -108,7 +108,7 @@ internal static class WinLdapLogonBind
     /// Reads the rootDSE as one attempt does and says whether to bind with <c>GSS-SPNEGO</c>;
     /// <see langword="null" /> when the server closed or sent bytes that are not an LDAPMessage.
     /// </summary>
-    private static async ValueTask<bool?> ReadOffersSpnegoAsync(LdapExchange exchange, bool offeredBefore, CancellationToken cancellationToken)
+    internal static async ValueTask<bool?> ReadOffersSpnegoAsync(LdapExchange exchange, bool offeredBefore, CancellationToken cancellationToken)
     {
         if (await ReadRootDseAsync(exchange, SupportedCapabilities, cancellationToken).ConfigureAwait(false) is null
             || await ReadRootDseAsync(exchange, SupportedSaslMechanisms, cancellationToken).ConfigureAwait(false) is not { } mechanisms)
@@ -197,7 +197,7 @@ internal static class WinLdapLogonBind
     }
 
     /// <summary>Sends <c>GSS-SPNEGO</c> binds, one for each token, until the server answers anything but <c>saslBindInProgress</c>.</summary>
-    private static async ValueTask<LdapBindReply> SaslBindAsync(LdapExchange exchange, ILdapLogonAuthentication authentication, CancellationToken cancellationToken)
+    internal static async ValueTask<LdapBindReply> SaslBindAsync(LdapExchange exchange, ILdapLogonAuthentication authentication, CancellationToken cancellationToken)
     {
         byte[]? token = authentication.NextToken([]);
         while (token is not null)

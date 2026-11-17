@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/WinLdapLogonBind.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapAuthenticatedBindNegotiateTests.cs]
+touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/WinLdapLogonBind.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapAuthenticatedBindNegotiateTests.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitLibrary/ILdapLogonTokenSource.cs, Curl.Original.Protocol.Ldap.UnitLibrary/NegotiateLogonTokenSource.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapAuthSchemeBindTests.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapAuthenticatedNtlmTests.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapAuthenticatedNtlmSealTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5314 — Bind LDAP -u --negotiate with SASL GSS-SPNEGO after a RootDSE read, not Sicily NTLM
 
@@ -32,11 +32,11 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Ldap.UnitTests/LdapAuthenticatedBindNegotiateTests.cs` (scripted `LdapExchange` stand-in, no network) prove that with `LdapBindKind.Negotiate` and `-u` credentials the PDUs go out in this order: RootDSE search first, then a SASL bind (tag 0xa3) with mechanism `GSS-SPNEGO`, and no Sicily 0x8a bind.
-- [ ] A test proves that when the RootDSE advertises only `DIGEST-MD5` the bind is SASL `DIGEST-MD5`.
-- [ ] A test proves `LdapBindKind.Ntlm` (`--ntlm`) still sends the Sicily 0x8a bind with SIGN|SEAL, unchanged.
-- [ ] The Log records the review's hand check against the BER stand-in: PORT's RootDSE searches come first, then a 0xa3 bind with `GSS-SPNEGO`, and no 0x8a bind; with the DIGEST-MD5-only server the bind is `DIGEST-MD5`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Ldap.UnitTests/LdapAuthenticatedBindNegotiateTests.cs` (scripted `LdapExchange` stand-in, no network) prove that with `LdapBindKind.Negotiate` and `-u` credentials the PDUs go out in this order: RootDSE search first, then a SASL bind (tag 0xa3) with mechanism `GSS-SPNEGO`, and no Sicily 0x8a bind.
+- [x] A test proves that when the RootDSE advertises only `DIGEST-MD5` the bind is SASL `DIGEST-MD5`.
+- [x] A test proves `LdapBindKind.Ntlm` (`--ntlm`) still sends the Sicily 0x8a bind with SIGN|SEAL, unchanged.
+- [x] The Log records the review's hand check against the BER stand-in: PORT's RootDSE searches come first, then a 0xa3 bind with `GSS-SPNEGO`, and no 0x8a bind; with the DIGEST-MD5-only server the bind is `DIGEST-MD5`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -47,3 +47,5 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 6710ff9a d9690f6a 10d46feb 3b1330a0 a0b49a29.
+- 2026-11-16: Done. SPNEGO token: NegotiateLogonTokenSource.ForCredential(-u credential) gives the BCL NegotiateAuthentication that credential (Kerberos with a reachable domain, NTLMSSP otherwise), then the logged-on bind's SASL GSS-SPNEGO loop. Hand check against the scripted stand-in (tests): rootDSE searches first, then a 0xa3 bind GSS-SPNEGO, no 0x8a; DIGEST-MD5-only server gives DIGEST-MD5; --ntlm still 0x8a with SIGN|SEAL. Added touches (handler, token source, three older tests) because the call signature and Negotiate DataRows changed. Quality run of the Ldap library: 100/100, 0 failing.
+- 2026-11-16: Doing -> Done. Negotiate -u binds GSS-SPNEGO after RootDSE, DIGEST-MD5 fallback

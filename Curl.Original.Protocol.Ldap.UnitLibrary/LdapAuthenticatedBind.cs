@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Security;
 using System.Security.Cryptography;
 using Curl.Ntlm;
 using Curl.Protocol.Abstractions;
@@ -7,8 +8,7 @@ namespace Curl.Original.Protocol.Ldap;
 
 /// <summary>
 /// Binds with <c>-u</c>'s credentials for <c>--ntlm</c>, <c>--negotiate</c> and <c>--digest</c> as
-/// curl's WinLDAP build does (ADR-1246): the Sicily NTLM bind (tag <c>0x8a</c>) or the
-/// DIGEST-MD5 SASL bind (tag <c>0xa3</c>), never a simple bind, so the password never crosses
+/// curl's WinLDAP build does (ADR-1246): the Sicily NTLM bind (tag <c>0x8a</c>) for <c>--ntlm</c>, or the SASL bind (tag <c>0xa3</c>): DIGEST-MD5, or for <c>--negotiate</c> GSS-SPNEGO after a rootDSE read (BL-5314), never a simple bind, so the password never crosses
 /// the wire in clear.
 /// </summary>
 /// <remarks>
@@ -36,16 +36,64 @@ internal static class LdapAuthenticatedBind
     /// <param name="exchange">The session to bind on.</param>
     /// <param name="credentials">The <c>-u</c> credentials.</param>
     /// <param name="host">The URL's host, for the digest-uri <c>ldap/host</c>.</param>
+    /// <param name="overTls">Whether the session is <c>ldaps</c>, so a negotiated bind asks for no signing or sealing.</param>
+    /// <param name="tokenSource">Produces the SPNEGO tokens of a negotiate bind for <paramref name="credentials" />.</param>
     /// <param name="cancellationToken">Cancels the bind.</param>
     /// <returns><see langword="null" /> once bound; otherwise the failed transfer's result.</returns>
-    public static async ValueTask<TransferResult?> BindAsync(LdapBindKind kind, LdapExchange exchange, NetworkCredential credentials, string host, CancellationToken cancellationToken)
+    public static async ValueTask<TransferResult?> BindAsync(LdapBindKind kind, LdapExchange exchange, NetworkCredential credentials, string host, bool overTls, ILdapLogonTokenSource tokenSource, CancellationToken cancellationToken)
     {
-        LdapBindReply reply = kind == LdapBindKind.Digest
-            ? await DigestAsync(exchange, credentials, host, cancellationToken).ConfigureAwait(false)
-            : await NtlmAsync(exchange, credentials, cancellationToken).ConfigureAwait(false);
+        LdapBindReply reply = await ChosenBindAsync(kind, exchange, credentials, host, overTls, tokenSource, cancellationToken).ConfigureAwait(false);
         return reply.Status != LdapBindReplyStatus.Answered ? LdapBind.WinLdapBindFailed(WinLdapResultText.Timeout)
             : reply.IsSuccess ? null
             : await LdapBind.UnbindAndFailAsync(exchange, LdapBind.WinLdapBindFailed(reply.ResultCode), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Makes the bind <paramref name="kind" /> names: DIGEST-MD5, negotiated or Sicily NTLM.</summary>
+    private static ValueTask<LdapBindReply> ChosenBindAsync(LdapBindKind kind, LdapExchange exchange, NetworkCredential credentials, string host, bool overTls, ILdapLogonTokenSource tokenSource, CancellationToken cancellationToken) =>
+        kind switch
+        {
+            LdapBindKind.Digest => DigestAsync(exchange, credentials, host, cancellationToken),
+            LdapBindKind.Negotiate => NegotiateAsync(exchange, credentials, host, overTls, tokenSource, cancellationToken),
+            _ => NtlmAsync(exchange, credentials, cancellationToken),
+        };
+
+    /// <summary>
+    /// Reads the rootDSE as WinLDAP's <c>LDAP_AUTH_NEGOTIATE</c> does, then binds with SASL <c>GSS-SPNEGO</c>
+    /// (tokens from <paramref name="tokenSource" /> with <c>-u</c>'s credentials) when the server offers it, otherwise with
+    /// SASL <c>DIGEST-MD5</c>; never the Sicily bind (BL-5314). A server that closes during the reads is a <c>Timeout</c>.
+    /// </summary>
+    private static async ValueTask<LdapBindReply> NegotiateAsync(LdapExchange exchange, NetworkCredential credentials, string host, bool overTls, ILdapLogonTokenSource tokenSource, CancellationToken cancellationToken)
+    {
+        if (await WinLdapLogonBind.ReadOffersSpnegoAsync(exchange, false, cancellationToken).ConfigureAwait(false) is not { } offersSpnego)
+        {
+            return new LdapBindReply(LdapBindReplyStatus.Closed, 0);
+        }
+
+        if (!offersSpnego)
+        {
+            return await DigestAsync(exchange, credentials, host, cancellationToken).ConfigureAwait(false);
+        }
+
+        ProtectionLevel protection = overTls ? ProtectionLevel.None : ProtectionLevel.EncryptAndSign;
+        ILdapLogonAuthentication authentication = tokenSource.ForCredential(credentials).Start(LdapLogonPackage.Negotiate, "ldap/" + host, protection);
+        LdapBindReply reply = new(LdapBindReplyStatus.Answered, WinLdapResultText.LocalError);
+        try
+        {
+            reply = await WinLdapLogonBind.SaslBindAsync(exchange, authentication, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (reply.IsSuccess && protection != ProtectionLevel.None)
+            {
+                exchange.StartSecurityLayer(authentication, WinLdapResultText.Unavailable);
+            }
+            else
+            {
+                authentication.Dispose();
+            }
+        }
+
+        return reply;
     }
 
     /// <summary>

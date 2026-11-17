@@ -27,7 +27,6 @@ public sealed class LdapAuthenticatedNtlmSealTests
 
     [TestMethod]
     [DataRow(HttpAuthSchemes.Ntlm)]
-    [DataRow(HttpAuthSchemes.Negotiate)]
     public async Task ExecuteAsync_ExplicitCredentials_OffersSignAndSealInTheNegotiateMessage(HttpAuthSchemes schemes)
     {
         var standIn = new UnsealingStandIn();
@@ -41,7 +40,6 @@ public sealed class LdapAuthenticatedNtlmSealTests
 
     [TestMethod]
     [DataRow(HttpAuthSchemes.Ntlm)]
-    [DataRow(HttpAuthSchemes.Negotiate)]
     public async Task ExecuteAsync_BoundWithSealing_SealsTheSearchAndTheUnbindForAServerThatUnseals(HttpAuthSchemes schemes)
     {
         var standIn = new UnsealingStandIn();
