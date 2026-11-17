@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-11-17 | 2026-11-17_0430.md | reproduces: no | Ran the reproduction: Documentation/Protocols.md 'Disabled in every build' count 0; EngineComposition.cs 'new SmbProtocolHandler' count 1. Protocols.md:35's SMB row now reads 'Served on every platform ... curl -V lists smb and smbs (ADR-1281 ...)', which matches the code.
+
 ## Log
 
 - 2026-11-16: filed proposed.

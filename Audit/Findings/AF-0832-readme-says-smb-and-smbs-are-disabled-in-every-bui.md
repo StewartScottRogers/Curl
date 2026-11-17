@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-11-17 | 2026-11-17_0430.md | reproduces: no | Ran the reproduction: README.md 'known but disabled in every build' count 0; EngineComposition.cs 'new SmbProtocolHandler' count 1 (line 197); ManagedCurlVersion.cs '"smb", "smbs"' count 1 (line 18). README.md:23-26 now lists smb and smbs among the served Original schemes and says curl -V lists them (ADR-1281), which matches the code.
+
 ## Log
 
 - 2026-11-16: filed proposed.

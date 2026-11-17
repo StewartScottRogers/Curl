@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-11-17 | 2026-11-17_0430.md | reproduces: no | Ran the reproduction: Documentation/Product/Requirements.md 'SMB is registered only' count 0; EngineComposition.cs 'new SmbProtocolHandler' count 1. Requirements.md:11-12 now says 'smb:// and smbs:// are served by the SMB handler, as in the OpenSSL reference build (ADR-1281)', which matches the code.
+
 ## Log
 
 - 2026-11-16: filed proposed.

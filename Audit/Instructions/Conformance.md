@@ -103,9 +103,11 @@ Report `loadDifferences` (`load.json`'s `different`) in `metrics`.
 
 ## 5. Platform differences an ADR decided
 
-Some differences from the reference curl are kept on purpose on one platform only, by an
+Some differences from the reference curl are kept on purpose on one or more platforms, by an
 accepted ADR: ADR-0786 keeps HTTP/2 (`--http2`, `--http2-prior-knowledge`, `--proxy-http2`)
-working on Windows, where the Schannel curl refuses it. They are listed in
+working on Windows, where the Schannel curl refuses it, and ADR-1282 keeps `--http3` and
+`--http3-only` accepted on every platform, where a reference curl built without a QUIC library
+refuses them (AF-0831 closed by Stewart, AF-0850 its duplicate). They are listed in
 `Gap/Baselines/platform-exclusions.json` in the audited tree, one item per difference with its
 `key` (`<area>:<item>`, such as `options:--http2` or `behaviour:test1704`), its `platform`
 (`windows`, `linux` or `macos`) and its reason (`decided:ADR-NNNN`). Read it before writing any
