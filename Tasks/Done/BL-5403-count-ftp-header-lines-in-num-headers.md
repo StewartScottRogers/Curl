@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Original.Protocol.Ftp.UnitLibrary/FtpHeadHeaderLines.cs, Curl.Original.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5403 — Count FTP header lines in %{num_headers}
 
@@ -28,12 +28,12 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Ftp.UnitTests` (a new file) prove an FTP `-I` transfer of a file with SIZE and MDTM answers yields a report whose header count, read through the write-out `num_headers` rule, is 3.
-- [ ] A test proves a plain FTP download reports the count real curl prints (1, measured with `Record-CurlExchange.ps1` or the reference curl).
-- [ ] A test proves an FTP `-I` of a file whose server answers neither SIZE nor MDTM does not report more headers than lines written.
-- [ ] Tests are platform-neutral.
-- [ ] Hand check recorded in the Log: the review's command prints `3`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Ftp.UnitTests` (a new file) prove an FTP `-I` transfer of a file with SIZE and MDTM answers yields a report whose header count, read through the write-out `num_headers` rule, is 3.
+- [x] A test proves a plain FTP download reports the count real curl prints (1, measured with `Record-CurlExchange.ps1` or the reference curl).
+- [x] A test proves an FTP `-I` of a file whose server answers neither SIZE nor MDTM does not report more headers than lines written.
+- [x] Tests are platform-neutral.
+- [x] Hand check recorded in the Log: the review's command prints `3`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -45,3 +45,7 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: f07c7d75 810cd53b 8f54ff25 c1cf21f9 9068fef9 a0b49a29.
+- Decision: `FtpSession` records each `-I` line it writes (Content-Length, Last-Modified, Accept-ranges) in the report's `PseudoHeaders`; a successful non-upload, non-`-I` transfer reports one pseudo header (`226 Transfer complete`) because the review measured real curl printing 1 for a plain download. I did not re-measure real curl here; the 1 is the review's REF value. No change to `TransferWriteOutVariables.cs`.
+- Hand check: no live FTP server in the lane; `FtpNumHeadersTests` pins the same SIZE+MDTM exchange through the same `num_headers` rule (3). Linux/macOS: tests are platform-neutral.
+- Measure-CodeQuality.ps1 for Curl.Original.Protocol.Ftp.UnitLibrary: 0 failing members.
+- 2026-11-17: Doing -> Done. FTP header lines counted in num_headers

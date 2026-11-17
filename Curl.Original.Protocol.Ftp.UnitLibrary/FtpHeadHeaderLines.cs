@@ -28,4 +28,15 @@ internal static class FtpHeadHeaderLines
     /// </returns>
     internal static string? LastModified(DateTimeOffset? modifiedUtc) =>
         modifiedUtc?.ToString("'Last-Modified: 'ddd, dd MMM yyyy HH:mm:ss' GMT'\r\n", CultureInfo.InvariantCulture);
-}
+
+    /// <summary>The one header curl counts for a successful download (BL-5403).</summary>
+    internal static readonly KeyValuePair<string, string> TransferComplete = new("226", "Transfer complete");
+
+    /// <summary>Splits a header <paramref name="line" /> written above into its name and value.</summary>
+    /// <param name="line">The line, ending in CRLF.</param>
+    /// <returns>The name and value.</returns>
+    internal static KeyValuePair<string, string> Split(string line)
+    {
+        int colon = line.IndexOf(": ", StringComparison.Ordinal);
+        return new(line[..colon], line[(colon + 2)..].TrimEnd('\r', '\n'));
+    }}

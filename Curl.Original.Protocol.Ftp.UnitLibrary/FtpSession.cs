@@ -369,6 +369,7 @@ internal sealed class FtpSession(
             {
                 ResponseCode = lastReplyCode,
                 FtpEntryPath = entryPath,
+                PseudoHeaders = PseudoHeadersOf(result, uploaded),
                 DownloadSize = uploaded ? 0 : result.BytesTransferred,
                 UploadSize = uploaded ? result.BytesTransferred : 0,
                 RequestSize = uploaded ? result.BytesTransferred : 0,
@@ -1493,6 +1494,17 @@ internal sealed class FtpSession(
             ?? await QuitAndKeepConnectionAsync().ConfigureAwait(false);
     }
 
+    private readonly List<KeyValuePair<string, string>> writtenHeaders = [];
+
+    /// <summary>
+    /// The lines counted by <c>%{num_headers}</c>: those <c>-I</c> wrote, or the one line curl 8.22.0
+    /// counts for a successful download (BL-5403).
+    /// </summary>
+    private IReadOnlyList<KeyValuePair<string, string>> PseudoHeadersOf(TransferResult result, bool uploaded) =>
+        writtenHeaders.Count > 0 ? [.. writtenHeaders]
+        : uploaded || context.NoBody || !result.IsSuccess ? []
+        : [FtpHeadHeaderLines.TransferComplete];
+
     /// <summary>
     /// Writes one <c>-I</c> header line to <see cref="ITransferContext.HeaderOutput" />;
     /// nothing when <paramref name="line" /> or the header output is absent.
@@ -1508,6 +1520,7 @@ internal sealed class FtpSession(
         try
         {
             await headerOutput.WriteAsync(bytes, context.CancellationToken).ConfigureAwait(false);
+            writtenHeaders.Add(FtpHeadHeaderLines.Split(line));
             return null;
         }
         catch (IOException)
