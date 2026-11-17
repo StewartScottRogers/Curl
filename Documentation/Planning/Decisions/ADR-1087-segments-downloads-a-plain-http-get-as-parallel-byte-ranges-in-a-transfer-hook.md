@@ -58,3 +58,7 @@ all the extension needs.
 
 - Without `--segments`, and for every transfer it does not split, curl's behaviour is unchanged.
 - A split transfer makes `n + 1` requests; the first is one byte.
+
+## Update (BL-5322)
+
+A first response carrying neither an ETag nor a Last-Modified gives nothing to compare segments by, so the hook runs the transfer again as curl runs it (one plain GET) instead of joining ranges taken at different times. Decided by Claude under Stewart's delegation. A weak ETag or a Last-Modified alone follows the rule above unchanged: ranges are sent without If-Range and joined only when every segment repeats the same validators.
