@@ -116,7 +116,15 @@ public sealed class UdpDatagramChannel : IDatagramChannel
         _connectRouteProbe = static (socket, remoteEndPoint) => socket.Connect(remoteEndPoint);
         _serverEndPoint = serverEndPoint;
         _socket = boundSocket;
-        ConnectIf(connectsToServer);
+        try
+        {
+            ConnectIf(connectsToServer);
+        }
+        catch
+        {
+            _socket.Dispose();
+            throw;
+        }
         ServerEndPoint = serverEndPoint;
     }
 

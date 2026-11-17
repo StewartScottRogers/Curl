@@ -30,11 +30,13 @@ The other constructor (lines 86-101) does this correctly: its catch calls `_sock
 
 ## Acceptance criteria
 
-- [ ] The `(serverEndPoint, boundSocket, connectsToServer)` constructor disposes `boundSocket` and rethrows when `ConnectIf` throws.
-- [ ] A unit test in `Curl.Networking.UnitTests` makes the connect fail, without network traffic, and asserts that the socket is disposed and the exception propagates.
-- [ ] `Curl.Networking.UnitLibrary` still meets the four quality gates.
+- [x] The `(serverEndPoint, boundSocket, connectsToServer)` constructor disposes `boundSocket` and rethrows when `ConnectIf` throws.
+- [x] A unit test in `Curl.Networking.UnitTests` makes the connect fail, without network traffic, and asserts that the socket is disposed and the exception propagates.
+- [x] `Curl.Networking.UnitLibrary` still meets the four quality gates.
 
 ## Notes
+
+The bound-socket constructor now disposes the socket and rethrows when ConnectIf throws. Test: an IPv4 socket given an IPv6 server endpoint makes Connect fail with no traffic. Measure-CodeQuality on Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
