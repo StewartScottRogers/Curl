@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitLibrary/McpClient/Stdio/ClosableObservedStream.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5348 — Fix CI failure job Quality gates (windows-latest) step Measure coverage, complexity and CRAP on Windows
 
@@ -26,11 +26,14 @@ Lanes test only on Windows, so reproduce with `gh run view 44041873836 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `job Quality gates (windows-latest) step Measure coverage, complexity and CRAP` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `job Quality gates (windows-latest) step Measure coverage, complexity and CRAP` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Added ClosableObservedStreamTests (commit "test(conformance): cover ClosableObservedStream"), platform-neutral; all members covered by fast tests. Same work as BL-5347, closed with it.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 10cc6e68.
+- 2026-11-17: Doing -> Done. Added ClosableObservedStreamTests; class fully covered.
