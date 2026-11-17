@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/QuicDialer.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5367 — Fix AF-0847: Surviving mutant: a QUIC dial with exactly no connect time left still tries the next address
 
@@ -43,3 +43,4 @@ Killed by the new test `TcpConnectorQuicTests.ConnectMultiplexedAsync_WhenTheFir
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: abdd7c5c 9742157d.
+- 2026-11-17: Doing -> Done. Added test pinning the exact-zero-remaining boundary; mutant < killed, reverted passes
