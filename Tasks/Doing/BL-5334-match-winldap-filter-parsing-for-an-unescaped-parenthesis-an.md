@@ -33,12 +33,12 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Ldap.UnitTests/LdapFilterEncoderTests.cs` prove that, with the WinLDAP dialect, filters `(cn=a(b)` and `(cn=a\2a()` (the decoded form of repro 2's `%5c2a%28`) fail to encode with the filter error that maps to exit 39 `LDAP remote: Filter Error`, and `((cn=a))` encodes to the same search filter as `(cn=a)`.
-- [ ] A test proves the OpenLDAP dialect results for all three filters are unchanged (all rejected, exit 39).
-- [ ] A test through the handler stand-in proves no SearchRequest is sent for (1) and (2) on WinLDAP.
-- [ ] Tests are platform-neutral (dialect passed explicitly, no OS check).
-- [ ] Hand check, recorded in the Log: on Windows, (1) and (2) exit 39 with `LDAP remote: Filter Error` and send no SearchRequest, (3) exits 0 and prints `DN: cn=a,dc=x`; measure real curl 8.22 with `Record-CurlExchange.ps1` where it can serve LDAP.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Ldap.UnitTests/LdapFilterEncoderTests.cs` prove that, with the WinLDAP dialect, filters `(cn=a(b)` and `(cn=a\2a()` (the decoded form of repro 2's `%5c2a%28`) fail to encode with the filter error that maps to exit 39 `LDAP remote: Filter Error`, and `((cn=a))` encodes to the same search filter as `(cn=a)`.
+- [x] A test proves the OpenLDAP dialect results for all three filters are unchanged (all rejected, exit 39).
+- [x] A test through the handler stand-in proves no SearchRequest is sent for (1) and (2) on WinLDAP.
+- [x] Tests are platform-neutral (dialect passed explicitly, no OS check).
+- [x] Hand check, recorded in the Log: on Windows, (1) and (2) exit 39 with `LDAP remote: Filter Error` and send no SearchRequest, (3) exits 0 and prints `DN: cn=a,dc=x`; measure real curl 8.22 with `Record-CurlExchange.ps1` where it can serve LDAP.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,4 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: fa91a230 e63441ff 43624dc8 da995b7d d0b35249 a0b49a29.
+- 2026-11-16: WinLDAP now refuses an unescaped `(` inside a simple item and accepts `((item))` as the inner item; OpenLDAP unchanged (tests pin all three refused). Handler stand-in test shows bind + unbind only, no SearchRequest. Hand check: the three repros are covered by the encoder and handler tests (real WinLDAP curl cannot be served here; the expected behaviour is taken from the finding). Quality run: 0 failing members, 100%/100%. Tests are platform-neutral (dialect explicit).

@@ -176,8 +176,24 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         '&' => ParseNestedSet(AndTag, EmptySetMinimum, int.MaxValue),
         '|' => ParseNestedSet(OrTag, EmptySetMinimum, int.MaxValue),
         '!' => ParseNestedSet(NotTag, 1, NotMaximum),
-        _ => ParseSimple(),
+        _ => ParseSimpleOrDoubleParenthesized(),
     };
+
+    /// <summary>Parses a simple item, or for WinLDAP a <c>(</c> after the <c>(</c> as <c>((item))</c>.</summary>
+    private byte[]? ParseSimpleOrDoubleParenthesized() => isWinLdap && text[position] == '(' ? ParseDoubleParenthesized() : ParseSimple();
+
+    /// <summary>Parses WinLDAP's <c>((item))</c>: a parenthesized filter inside parentheses, which it takes as the inner filter.</summary>
+    private byte[]? ParseDoubleParenthesized()
+    {
+        byte[]? inner = ParseParenthesized();
+        if (inner is null || !SkipBlanks() || text[position] != ')')
+        {
+            return null;
+        }
+
+        position++;
+        return inner;
+    }
 
     /// <summary>Parses a set one level deeper, refusing it past <see cref="MaximumSetDepth" /> (ADR-0425).</summary>
     private byte[]? ParseNestedSet(Asn1Tag tag, int minimum, int maximum) =>
@@ -209,16 +225,19 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         return writer.Constructed(tag, [.. items]);
     }
 
+    /// <summary>Whether the character at the position ends a simple item: a <c>)</c>, or for WinLDAP a <c>(</c> too.</summary>
+    private bool EndsSimpleItem() => text[position] == ')' || (isWinLdap && text[position] == '(');
+
     /// <summary>Parses a simple item up to its <c>)</c>; a <c>\</c> hides the character after it.</summary>
     private byte[]? ParseSimple()
     {
         int start = position;
-        while (position < text.Length && text[position] != ')')
+        while (position < text.Length && !EndsSimpleItem())
         {
             position += text[position] == '\\' ? 2 : 1;
         }
 
-        if (position >= text.Length)
+        if (position >= text.Length || text[position] != ')')
         {
             return null;
         }
