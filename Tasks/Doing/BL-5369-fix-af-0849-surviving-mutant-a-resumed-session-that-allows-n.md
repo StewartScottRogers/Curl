@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs]
+touches: [Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitTests/HandBuiltTlsProviderTests.EarlyData.cs]
 requirement: none
 created: 2026-11-17
 completed:
@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs line 372`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs line 372`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `AuthenticateAsClientAsync_WithEarlyDataAndASessionThatAllowsNone_OffersNoEarlyData` (HandBuiltTlsProviderTests.EarlyData.cs): with `>= 0` it fails on the early-data info line; reverted, all 4197 fast tests pass. No production change.
 
 ## Log
 
