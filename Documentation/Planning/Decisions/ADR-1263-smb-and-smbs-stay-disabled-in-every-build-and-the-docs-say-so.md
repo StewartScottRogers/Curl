@@ -1,6 +1,6 @@
 # ADR-1263 — `smb` and `smbs` stay disabled in every build, and README.md and Protocols.md say so
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-1281
 - **Date:** 2026-11-12
 
 Decided by Claude under Stewart's delegation (task BL-5034, finding STD-039).

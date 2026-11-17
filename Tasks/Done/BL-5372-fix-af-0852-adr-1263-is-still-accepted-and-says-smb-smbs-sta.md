@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions/ADR-1263-smb-and-smbs-stay-disabled-in-every-build-and-the-docs-say-so.md]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5372 — Fix AF-0852: ADR-1263 is still Accepted and says smb/smbs stay disabled in every build, but the engine serves them (superseded by ADR-1281)
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+ADR-1263 status set to "Superseded by ADR-1281" (file and Decisions README row). Reproduction now gives 0 then 1.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-17: Doing -> Done. ADR-1263 marked Superseded by ADR-1281
