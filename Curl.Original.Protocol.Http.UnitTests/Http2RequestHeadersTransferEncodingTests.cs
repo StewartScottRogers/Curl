@@ -55,7 +55,7 @@ public sealed class Http2RequestHeadersTransferEncodingTests
         HttpRequestOptions options = new() { Body = new BytesBody(Encoding.ASCII.GetBytes("abc"), "text/plain") };
         HttpRequestFraming http2 = HttpRequestFraming.Of(options, []).ForHttp2OrHttp3();
 
-        Assert.IsNotNull(http2.Body);
+        Assert.AreSame(options.Body, http2.Body);
         Assert.AreEqual(3L, http2.KnownLength);
     }
 
@@ -65,7 +65,7 @@ public sealed class Http2RequestHeadersTransferEncodingTests
         HttpRequestOptions options = new() { Body = new BytesBody(Array.Empty<byte>(), "a/b") };
         HttpRequestFraming http2 = HttpRequestFraming.Of(options, [HttpCustomHeader.Parse("Transfer-Encoding: chunked")]).ForHttp2OrHttp3();
 
-        Assert.IsNotNull(http2.Body);
+        Assert.AreSame(options.Body, http2.Body);
     }
 
     [TestMethod]
@@ -74,6 +74,6 @@ public sealed class Http2RequestHeadersTransferEncodingTests
         HttpRequestOptions options = new() { Body = new BytesBody(new byte[] { 1 }, "a/b") };
         HttpRequestFraming http2 = HttpRequestFraming.Of(options, [HttpCustomHeader.Parse("Transfer-Encoding: chunked")]).ForHttp2OrHttp3();
 
-        Assert.IsNotNull(http2.Body);
+        Assert.AreSame(options.Body, http2.Body);
     }
 }

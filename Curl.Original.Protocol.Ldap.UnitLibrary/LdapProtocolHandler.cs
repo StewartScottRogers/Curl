@@ -172,7 +172,8 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
 
     /// <summary>
     /// Binds and searches on <paramref name="connection" />, curl's own connection, or, for the WinLDAP
-    /// dialect's bind as the logged-on user, on a second connection WinLDAP opens beside it.
+    /// dialect over plaintext <c>ldap://</c> (with or without <c>-u</c>) or without credentials, on a
+    /// second connection WinLDAP opens beside it.
     /// </summary>
     private ValueTask<TransferResult> SearchAsync(IConnection connection, ConnectTarget target, ITransferContext context) =>
         dialect == LdapDialect.WinLdap && (context.Credentials is null || !target.UseTls)
@@ -184,10 +185,10 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         new(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
 
     /// <summary>
-    /// The WinLDAP dialect's bind as the logged-on user: curl's own connection,
+    /// The WinLDAP dialect's bind over plaintext <c>ldap://</c> (with or without <c>-u</c>) or as the logged-on user: curl's own connection,
     /// <paramref name="curlConnection" />, stays open and carries no bytes while WinLDAP opens a
     /// second connection to <paramref name="target" /> for the binds and the search, as curl
-    /// 8.22.0's Schannel build does without <c>-u</c> (CGR-234, BL-3999, ADR-0978).
+    /// 8.22.0's Schannel build does for every plaintext <c>ldap://</c> transfer and without <c>-u</c> (CGR-234, BL-3999, ADR-0978).
     /// </summary>
     private async ValueTask<TransferResult> SearchBesideEmptyConnectionAsync(IConnection curlConnection, ConnectTarget target, ITransferContext context)
     {

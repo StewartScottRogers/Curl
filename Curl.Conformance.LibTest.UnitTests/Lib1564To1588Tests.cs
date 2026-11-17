@@ -107,6 +107,20 @@ public sealed class Lib1564To1588Tests
     }
 
     [TestMethod]
+    public async Task Lib1564_OnEveryPollLastingExactlyTheThreshold_Passes()
+    {
+        var time = new ManualTimeProvider(DateTimeOffset.UnixEpoch);
+        var engine = new FakeCurlEngine();
+        engine.Multi.Polling = () => time.Advance(TimeSpan.FromMilliseconds(Lib1564.ThresholdMilliseconds));
+        var run = new PortRun(engine, 1564);
+
+        LibTestResult result = await new Lib1564(time).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual(string.Empty, run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task Lib1564_OnAFailingPoll_StopsWithMulti()
     {
         var engine = new FakeCurlEngine();

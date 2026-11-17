@@ -109,6 +109,20 @@ public sealed class CurlCommandRunnerParallelProgressMeterTests
         Assert.AreEqual(expectedStandardError, StandardErrorText);
     }
 
+    [TestMethod]
+    public async Task RunAsync_ParallelWithMptcpThatFails_WritesTheErrorLineBeforeTheMeter()
+    {
+        // AF-0851: curl opens the --mptcp socket in its blocking connect step, so its curl: (7) line
+        // comes before the meter, as the --interface bind failure's does.
+        RecordingProtocolHandler handler = new("http", _ =>
+            ValueTask.FromResult(TransferResult.Failure(CurlExitCode.CouldntConnect, "Could not connect to server")));
+
+        int exitCode = await RunAsync(["-Z", "--mptcp", "http://a.test/1"], handler);
+
+        Assert.AreEqual(7, exitCode);
+        StringAssert.StartsWith(StandardErrorText, "curl: (7) Could not connect to server" + NewLine + Header);
+    }
+
     private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments)

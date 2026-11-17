@@ -74,6 +74,7 @@ public sealed class ServerCertificateVerificationCaDirectoryPurposeTests
 
         var failure = Verify(proxyOptions, leaf);
 
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual(UnsuitablePurpose, failure?.Message);
     }
 
@@ -105,6 +106,7 @@ public sealed class ServerCertificateVerificationCaDirectoryPurposeTests
 
         var failure = verification.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, Host, []);
 
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual(UnsuitablePurpose, failure?.Message);
     }
 

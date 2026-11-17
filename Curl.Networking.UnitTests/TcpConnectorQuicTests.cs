@@ -514,6 +514,31 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectMultiplexedAsync_WhenTheFirstAddressUsesUpExactlyTheConnectTimeout_FailsWithExit28WithoutTryingTheNextAddress()
+    {
+        var clock = new ManualTimeProvider();
+        var opener = new QuicServerChannelOpener
+        {
+            OpenOutcome = _ =>
+            {
+                clock.Advance(1000);
+                throw new SocketException((int)SocketError.AddressFamilyNotSupported);
+            },
+        };
+        var events = new RecordingTransferEvents();
+        var connector = Connector(opener, clock, resolver: new FakeDnsResolver(IPAddress.Loopback, SecondAddress), connectTimeout: TimeSpan.FromSeconds(1));
+        Diagnostics.Arrange("connect timeout", "1000 ms; the first failed open advances the clock exactly 1000 ms");
+
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
+
+        Diagnostics.Act("info line count", events.Info.Count);
+        Diagnostics.Assert("exit code", CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Assert.AreEqual("Connection timed out after 1000 milliseconds", result.ErrorMessage);
+        Assert.DoesNotContain("  Trying 127.0.0.2:443...", events.Info);
+    }
+
+    [TestMethod]
     public async Task ConnectMultiplexedAsync_WhenCancelled_DisposesTheChannelAndThrows()
     {
         var opener = new QuicServerChannelOpener();
