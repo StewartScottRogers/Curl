@@ -16,14 +16,14 @@ public sealed class NativeExtendedAttributeWriterTests
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
-    public void ForCurrentPlatform_OnWindows_GivesNoWriter()
+    public void ForCurrentPlatform_OnWindows_GivesTheZoneIdentifierWriter()
     {
         Diagnostics.Arrange("platform", "Windows");
 
-        NativeExtendedAttributeWriter? writer = NativeExtendedAttributeWriter.ForCurrentPlatform();
-        Diagnostics.Act("writer is null", writer is null);
+        IExtendedAttributeWriter? writer = NativeExtendedAttributeWriter.ForCurrentPlatform();
+        Diagnostics.Act("writer type", writer?.GetType().Name);
 
-        Diagnostics.Assert("writer", null, writer);
-        Assert.IsNull(writer);
+        Diagnostics.Assert("writer", nameof(WindowsZoneIdentifierWriter), writer?.GetType().Name);
+        Assert.IsInstanceOfType<WindowsZoneIdentifierWriter>(writer);
     }
 }

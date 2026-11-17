@@ -1063,7 +1063,8 @@ internal sealed class CurlCommandRunner(
         _ = UrlTransfer.TryCreate(optionsRead, 0, 0, transferPerformer.TakeTransferId(), match, null, runsOnWindows, out UrlTransfer? transfer, out _);
         runningTransfer.Value = NewRunningTransferState(CancellationToken.None, deferringStandardOutput, GatedDeferringStandardOutput);
         TransferResult result = TransferResult.Failure(refusal.ExitCode, CurlEasyErrorText.Of(refusal.ExitCode));
-        await WriteOutAsync(optionsRead, transfer!, match.Url, match.Url, result, false).ConfigureAwait(false);
+        bool standardOutputIsBinary = DumpsHeadersToStandardOutput(optionsRead) || (!optionsRead.UseAscii && !WritesToFile(optionsRead, 0));
+        await WriteOutAsync(optionsRead, transfer!, match.Url, match.Url, result, standardOutputIsBinary).ConfigureAwait(false);
     }
 
     /// <summary>Whether <paramref name="options" /> has a <c>-C</c> offset past zero and a request body: a <c>-F</c> form or a <c>-d</c> body not moved into the query by <c>-G</c>.</summary>
@@ -2486,7 +2487,7 @@ internal sealed class CurlCommandRunner(
             run.RecordSetupFailure(ended.Result, endsTheRun: true);
         }
 
-        run.RecordEnd(ended.Result, EndsTheRun(options, ended.Result), options.FailEarly);
+        run.RecordEnd(ended.Result, EndsTheRun(options, ended.Result), options.FailEarly || IsFatalFailure(ended.Result));
 
         if (state.SkippedExistingOutputFile)
         {
@@ -2530,6 +2531,10 @@ internal sealed class CurlCommandRunner(
         TransferResult firstFailure)
     {
         TransferResult skipped = TransferResult.Failure(firstFailure.ExitCode, CurlEasyErrorText.Of(firstFailure.ExitCode));
+        if (ReferenceEquals(firstFailure, CannotOpenUploadFileFailure) || ReferenceEquals(firstFailure, cannotOpenUploadFileAfterFailure))
+        {
+            NoteUploadFileCouldNotBeOpened(state, options, transfer);
+        }
 
         if (!TryResolveTransferUrl(options, transfer.Url, transfer.UploadFile, out string transferUrl))
         {
@@ -3332,7 +3337,9 @@ internal sealed class CurlCommandRunner(
     /// <returns><see langword="true" /> when standard output is now in binary mode.</returns>
     private static bool SwitchesStandardOutputToBinary(CommandLineOptions options, UrlTransfer transfer, TransferResult result) =>
         DumpsHeadersToStandardOutput(options)
-        || (!options.UseAscii && !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure));
+        || (!options.UseAscii && !transfer.WritesToFile
+            && !ReferenceEquals(result, CannotOpenHeaderFileFailure)
+            && !ReferenceEquals(result, UploadUrlMalformedFailure));
 
     /// <summary>
     /// Tells whether the option group sends its header lines to standard output (<c>-D -</c>).
@@ -3424,7 +3431,7 @@ internal sealed class CurlCommandRunner(
         bool endsTheRun) =>
         !runsOnWindows
         || standardOutputSwitchedToBinary
-        || (!endsTheRun && LaterUrlSwitchesStandardOutputToBinary(options, index));
+        || ((!endsTheRun || parallelRun is not null) && LaterUrlSwitchesStandardOutputToBinary(options, index));
 
     /// <summary>
     /// Renders the <c>-w</c> template, when one was given, for the finished
@@ -3664,7 +3671,7 @@ internal sealed class CurlCommandRunner(
         Api.Info.TransferInfo info = WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider);
         return info with
         {
-            Scheme = TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
+            Scheme = Running.UploadFileCouldNotBeOpened ? null : TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
             Referer = info.Referer ?? options.Referer,
             ConnectionId = connectionId,
             TransferId = HasNoTransferNumber(result) ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
@@ -3872,11 +3879,30 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when no further URL is transferred.</returns>
     private bool EndsTheRun(CommandLineOptions options, TransferResult result) =>
+        IsRunEndingSetupFailure(result)
+        || IsFatalFailure(result)
+        || (options.FailEarly && !result.IsSuccess);
+
+    /// <summary>
+    /// Tells whether a result is one of the setup failures that end the run whatever the options.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for a run-ending setup failure.</returns>
+    private bool IsRunEndingSetupFailure(TransferResult result) =>
         RunEndingFailures.Contains(result)
         || setoptFailures.ContainsKey(result)
         || ReferenceEquals(result, transferPerformer.KnownHostsFileMissingFailure)
-        || ReferenceEquals(result, cannotOpenUploadFileAfterFailure)
-        || (options.FailEarly && !result.IsSuccess);
+        || ReferenceEquals(result, cannotOpenUploadFileAfterFailure);
+
+    /// <summary>
+    /// Tells whether a result carries one of the codes curl's <c>is_fatal_error()</c> names (curl 8.21.0,
+    /// <c>tool_operate.c</c>): 2 (failed init), 27 (out of memory), 43 (bad function argument) or 48
+    /// (unknown option), after which the whole run stops.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for a fatal failure.</returns>
+    private static bool IsFatalFailure(TransferResult result) =>
+        result.ExitCode is CurlExitCode.FailedInit or CurlExitCode.OutOfMemory or CurlExitCode.BadFunctionArgument or CurlExitCode.UnknownOption;
 
     /// <summary>
     /// The result of a transfer whose <c>-T</c> file cannot be opened. curl 8.21.0 does not set
@@ -4306,6 +4332,7 @@ internal sealed class CurlCommandRunner(
 
             await WriteErrorLinesAsync([$"curl: cannot open '{uploadFile}'", CommandLineRefusal.TryHelpLine], commandLineEchoEncoding)
                 .ConfigureAwait(false);
+            NoteUploadFileCouldNotBeOpened(Running, options, transfer);
             return CannotOpenUploadFileResult();
         }
 
@@ -4520,6 +4547,19 @@ internal sealed class CurlCommandRunner(
                 MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
                 MultipartFormPartMapping.RequestContentTypeOf(options.Headers),
                 CancellationToken.None);
+
+    /// <summary>
+    /// Records, for <c>-w</c>, that a transfer ended because its <c>-T</c> file could not be opened: curl has named the
+    /// <c>-o</c> file by then, so <c>%{filename_effective}</c> prints it, but it never reached the URL's scheme (BL-5339).
+    /// </summary>
+    /// <param name="running">The transfer's state.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
+    private static void NoteUploadFileCouldNotBeOpened(RunningTransferState running, CommandLineOptions options, UrlTransfer transfer)
+    {
+        running.OutputFileName = transfer.OutputFileName is { } fileName ? InOutputDirectory(options, fileName) : null;
+        running.UploadFileCouldNotBeOpened = true;
+    }
 
     /// <summary>
     /// Names the <c>-o</c> file for <c>%{filename_effective}</c> when the transfer is refused for an unsupported
@@ -6126,7 +6166,7 @@ internal sealed class CurlCommandRunner(
     /// <summary>The <c>--extended-help</c> line for the options of <see cref="CurlOnlyOptionsMarkdown" />.</summary>
     private static readonly string[] CurlOnlyOptionLines =
     [
-        "diagnostic-log: Curl's own diagnostic log, not curl's -v: --log-level <level> sets how much is logged and --log-file <file> where. Schemes: none. Options: --log-level, --log-file.",
+        "diagnostic-log: Curl's own diagnostic log, not curl's -v: --log-level <level> sets how much is logged and --log-file <file> where. Schemes: none. Options: --log-level <level>, --log-file <file>.",
     ];
 
     /// <summary>Whether <c>CURL_EXTENSIONS</c> is anything but <c>0</c>: under <c>0</c> the help pages are curl's own.</summary>

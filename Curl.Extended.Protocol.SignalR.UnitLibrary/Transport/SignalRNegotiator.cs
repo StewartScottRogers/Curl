@@ -10,9 +10,11 @@ namespace Curl.Extended.Protocol.SignalR.Transport;
 /// </summary>
 /// <param name="openConnection">Opens a connection to the host and port of a URL; each exchange has its own, disposed after it.</param>
 /// <param name="requestFields">The fields curl's options add to each request, or <see langword="null"/> for none.</param>
+/// <param name="sendsCredentialsToOtherOrigins"><c>--location-trusted</c>: keep the user's <c>Authorization</c> on a redirect to another scheme, host or port.</param>
 internal sealed class SignalRNegotiator(
     Func<Uri, CancellationToken, ValueTask<IConnection>> openConnection,
-    IReadOnlyList<KeyValuePair<string, string>>? requestFields = null)
+    IReadOnlyList<KeyValuePair<string, string>>? requestFields = null,
+    bool sendsCredentialsToOtherOrigins = false)
 {
     /// <summary>Negotiates with the endpoint at <paramref name="endpointUrl"/>.</summary>
     /// <exception cref="SignalRTransportException">
@@ -25,15 +27,26 @@ internal sealed class SignalRNegotiator(
         NegotiateResponse response = await ExchangeAsync(endpointUrl, null, cancellationToken);
         if (!response.IsRedirect)
         {
-            return WebSocketEndpoint(endpointUrl, response, null);
+            return WebSocketEndpoint(endpointUrl, response, null, requestFields);
         }
 
         Uri redirectUrl = TryReadHttpUrl(response.Url) ?? throw new SignalRTransportException($"The negotiate response redirected to a URL that is not absolute: {response.Url}");
-        NegotiateResponse redirected = await ExchangeAsync(redirectUrl, response.AccessToken, cancellationToken);
+
+        // Like -L without --location-trusted: another scheme, host or port gets none of the user's Authorization (BL-5311).
+        IReadOnlyList<KeyValuePair<string, string>>? redirectFields = FieldsForRedirect(endpointUrl, redirectUrl);
+        NegotiateResponse redirected = await ExchangeAsync(redirectUrl, response.AccessToken, cancellationToken, redirectFields);
         return redirected.IsRedirect
             ? throw new SignalRTransportException("The negotiate response redirected a second time.")
-            : WebSocketEndpoint(redirectUrl, redirected, response.AccessToken);
+            : WebSocketEndpoint(redirectUrl, redirected, response.AccessToken, redirectFields);
     }
+
+    private IReadOnlyList<KeyValuePair<string, string>>? FieldsForRedirect(Uri endpointUrl, Uri redirectUrl) =>
+        sendsCredentialsToOtherOrigins || IsSameOrigin(endpointUrl, redirectUrl)
+            ? requestFields
+            : (requestFields ?? []).Where(field => !field.Key.Equals("Authorization", StringComparison.OrdinalIgnoreCase)).ToList();
+
+    private static bool IsSameOrigin(Uri first, Uri second) =>
+        first.Scheme == second.Scheme && string.Equals(first.IdnHost, second.IdnHost, StringComparison.OrdinalIgnoreCase) && first.Port == second.Port;
 
     // On Linux and macOS Uri reads a rooted path such as "/elsewhere" as an absolute file URL, so the scheme decides.
     private static Uri? TryReadHttpUrl(string? text) =>
@@ -41,9 +54,9 @@ internal sealed class SignalRNegotiator(
             ? url
             : null;
 
-    private static NegotiatedWebSocketEndpoint WebSocketEndpoint(Uri endpointUrl, NegotiateResponse response, string? accessToken) =>
+    private static NegotiatedWebSocketEndpoint WebSocketEndpoint(Uri endpointUrl, NegotiateResponse response, string? accessToken, IReadOnlyList<KeyValuePair<string, string>>? fields) =>
         response.OffersWebSockets
-            ? new NegotiatedWebSocketEndpoint(SignalRUrls.WebSocketUrl(endpointUrl, response), accessToken)
+            ? new NegotiatedWebSocketEndpoint(SignalRUrls.WebSocketUrl(endpointUrl, response), accessToken, fields)
             : throw new SignalRTransportException("The negotiate response offers no WebSockets transport.");
 
     // A refused login (401, 403) exits 22 like the port's other WebSocket schemes; any other non-2xx status exits 8.
@@ -59,14 +72,15 @@ internal sealed class SignalRNegotiator(
             statusCode is 401 or 403 ? CurlExitCode.HttpReturnedError : CurlExitCode.WeirdServerReply);
     }
 
-    private async Task<NegotiateResponse> ExchangeAsync(Uri endpointUrl, string? accessToken, CancellationToken cancellationToken)
+    private async Task<NegotiateResponse> ExchangeAsync(Uri endpointUrl, string? accessToken, CancellationToken cancellationToken, IReadOnlyList<KeyValuePair<string, string>>? fields = null)
     {
+        fields ??= requestFields;
         Uri negotiateUrl = SignalRUrls.NegotiateUrl(endpointUrl);
         await using IConnection connection = await openConnection(negotiateUrl, cancellationToken);
         byte[] request = HttpRequestWriter.Write(
             "POST",
             negotiateUrl,
-            HttpRequestWriter.Combine([new("Content-Length", "0")], requestFields, accessToken));
+            HttpRequestWriter.Combine([new("Content-Length", "0")], fields, accessToken));
         await connection.WriteAsync(request, cancellationToken);
         await connection.FlushAsync(cancellationToken);
 

@@ -9,7 +9,7 @@ public static class Amqp0Extension
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "amqp0",
-        "Publishes or gets one message over AMQP 0-9-1 (RabbitMQ): the URL path is /<virtual host>/<queue>, the queue is declared, -d publishes the data to it through the default exchange, without -d basic.get writes one message's body; --user or the URL's user information log in with PLAIN, amqps:// adds TLS.",
+        "Publishes or gets one message over AMQP 0-9-1 (RabbitMQ): the URL path is /<virtual host>/<queue>, the queue is declared passively first so an existing queue is used as it is, and a missing one is created durable, -d publishes the data to it through the default exchange, without -d basic.get writes one message's body; --user or the URL's user information log in with PLAIN, amqps:// adds TLS.",
         ["amqp", "amqps"],
         [],
         new Uri("https://www.rabbitmq.com/resources/specs/amqp0-9-1.pdf"));

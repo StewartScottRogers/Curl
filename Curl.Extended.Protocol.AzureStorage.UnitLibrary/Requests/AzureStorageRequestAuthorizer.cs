@@ -24,7 +24,7 @@ public sealed class AzureStorageRequestAuthorizer(TimeProvider timeProvider)
         ArgumentNullException.ThrowIfNull(credential);
         var headers = new List<KeyValuePair<string, string>>
         {
-            new("Host", endpoint.Host),
+            new("Host", endpoint.HostHeader),
             new("x-ms-version", ServiceVersion),
             new("x-ms-date", timeProvider.GetUtcNow().ToString("R", CultureInfo.InvariantCulture)),
         };

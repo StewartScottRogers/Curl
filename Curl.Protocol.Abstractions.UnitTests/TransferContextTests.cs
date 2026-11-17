@@ -171,6 +171,7 @@ public sealed class TransferContextTests
         Assert.IsNull(context.MaxTime);
         Assert.IsNull(context.OperationStarted);
         Assert.IsNull(context.Proxy);
+        Assert.IsNull(context.NoProxy);
         Assert.IsNull(context.Http);
         Assert.IsNull(context.Mail);
         Assert.IsNull(context.Ssh);
@@ -243,6 +244,7 @@ public sealed class TransferContextTests
             MaxTime = TimeSpan.FromMilliseconds(12500),
             OperationStarted = 42,
             Proxy = proxy,
+            NoProxy = "a.example",
             Http = http,
             Mail = mail,
             Ssh = ssh,
@@ -292,6 +294,7 @@ public sealed class TransferContextTests
         Assert.AreEqual(TimeSpan.FromMilliseconds(12500), context.MaxTime);
         Assert.AreEqual(42L, context.OperationStarted);
         Assert.AreSame(proxy, context.Proxy);
+        Assert.AreEqual("a.example", context.NoProxy);
         Assert.AreSame(http, context.Http);
         Assert.AreSame(mail, context.Mail);
         Assert.AreSame(ssh, context.Ssh);

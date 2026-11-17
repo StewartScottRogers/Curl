@@ -489,6 +489,17 @@ public interface ITransferContext
     ProxyEndpoint? Proxy { get; }
 
     /// <summary>
+    /// Gets the list of hosts exempt from the transfer's proxy: the <c>--noproxy</c> text when
+    /// given (even empty), else the <c>no_proxy</c> or <c>NO_PROXY</c> variable, or
+    /// <see langword="null" /> when neither is set.
+    /// </summary>
+    /// <remarks>
+    /// A handler that opens more than one connection matches each host against it with its own
+    /// matcher, as <c>NoProxyMatcher</c> in <c>Curl.Core.UnitLibrary</c> does for the first URL.
+    /// </remarks>
+    string? NoProxy { get; }
+
+    /// <summary>
     /// Gets the HTTP-only options, or <see langword="null" /> when no HTTP option was
     /// given.
     /// </summary>

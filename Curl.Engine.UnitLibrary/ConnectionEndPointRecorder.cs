@@ -38,6 +38,11 @@ internal sealed partial class ConnectionEndPointRecorder
     /// does, keeps its own.
     /// </summary>
     /// <param name="result">The transfer's result, as its handler returned it.</param>
+    /// <param name="handlerCountsConnections">
+    /// Whether the handler counted the connections on its own report, as the HTTP handler does: a 0 there is a transfer
+    /// that reused a connection, not one to count the connection another transfer of a parallel run opened through this
+    /// shared recorder (BL-5337).
+    /// </param>
     /// <returns>
     /// <paramref name="result" /> with the recorded end points on its report; a result without
     /// a report gets one carrying only the end points and <see cref="TransferResult.BytesTransferred" />
@@ -45,9 +50,10 @@ internal sealed partial class ConnectionEndPointRecorder
     /// without a report. <paramref name="result" /> itself when nothing was recorded or the
     /// handler reported an end point.
     /// </returns>
-    internal TransferResult ReportOn(TransferResult result)
+    internal TransferResult ReportOn(TransferResult result, bool handlerCountsConnections = false)
     {
         RememberResponseCode(result);
-        return WithEarlierHop(WithConnectionCount(WithEndPoints(WithConnectFailure(result))));
+        TransferResult withEndPoints = WithEndPoints(WithConnectFailure(result));
+        return WithEarlierHop(handlerCountsConnections ? withEndPoints : WithConnectionCount(withEndPoints));
     }
 }

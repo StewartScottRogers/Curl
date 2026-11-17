@@ -139,6 +139,8 @@ public sealed partial class LdapProtocolHandlerTests
     [DataRow("x???(cn=)")]
     [DataRow("x???(&)")]
     [DataRow("x???(cn=a)x")]
+    [DataRow("x???(cn=a(b)")]
+    [DataRow(@"x???(cn=a\2a()")]
     public async Task ExecuteAsync_WinLdapRefusedFilter_UnbindsWithMessageId3AndFailsWith39FilterError(string path)
     {
         (TransferResult result, byte[] sent) = await RunSearchAsync(LdapDialect.WinLdap, path, BindSuccess1);

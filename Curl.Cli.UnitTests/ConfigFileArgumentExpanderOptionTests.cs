@@ -43,7 +43,9 @@ public sealed class ConfigFileArgumentExpanderOptionTests
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         string[] lines = [.. result.Refusal.StandardErrorLines];
         Assert.AreEqual($"curl: k.cfg:1 config file option '{written}' cannot be used in a config file", lines[0]);
-        Assert.AreEqual("curl: option -K: cannot be used in a config file", lines[1]);
+        Assert.HasCount(2, lines);
+        Assert.AreEqual(CommandLineRefusal.TryHelpLine, lines[1]);
+        Assert.IsTrue(result.Refusal.EchoesConfigFileText);
     }
 
     [TestMethod]

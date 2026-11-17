@@ -346,6 +346,16 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         await session.GrowStreamReceiveWindowAsync(streamId, ReceiveBytesPerSecond, cancellationToken).ConfigureAwait(false);
     }
 
+    // BL-5312: a request with a -H Content-Length and no body never reaches the body writer, so
+    // nothing else ends its stream; reading the response ends it.
+    private async ValueTask EndBodylessRequestAsync(CancellationToken cancellationToken)
+    {
+        if (streamId != 0 && !isRequestEnded && bodyLength == 0)
+        {
+            await EndRequestAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>
     /// Takes the next frame the session handed this stream, reading one from the connection
     /// first when none is waiting; a frame read for another stream goes to that stream and
@@ -358,6 +368,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             throw malformedResponseFailure;
         }
 
+        await EndBodylessRequestAsync(cancellationToken).ConfigureAwait(false);
         await GrowReceiveWindowOnceAsync(cancellationToken).ConfigureAwait(false);
         if (!inbox.TryDequeue(out ReceivedFrame? next))
         {

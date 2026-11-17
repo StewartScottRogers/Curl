@@ -4,7 +4,7 @@ namespace Curl.Extended.Protocol.OciRegistry.Client;
 
 /// <summary>
 /// Opens every connection of one <c>oci://</c> transfer (registry, token endpoint, redirect target) with the transfer's
-/// <see cref="ITransferContext.Events"/> and <see cref="ITransferContext.DiagnosticLog"/> on its <see cref="ConnectTarget"/>,
+/// <see cref="ITransferContext.Proxy"/> (ADR-0056), <see cref="ITransferContext.Events"/> and <see cref="ITransferContext.DiagnosticLog"/> on its <see cref="ConnectTarget"/>,
 /// so <c>-v</c> tells each connection and its TLS handshake as curl does (ADR-0046, ADR-0222).
 /// </summary>
 /// <param name="inner">Opens the connection.</param>
@@ -13,5 +13,5 @@ internal sealed class TransferEventsConnector(IConnector inner, ITransferContext
 {
     /// <inheritdoc />
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-        inner.ConnectAsync(target with { Events = context.Events, DiagnosticLog = context.DiagnosticLog }, cancellationToken);
+        inner.ConnectAsync(target with { Proxy = context.Proxy, Events = context.Events, DiagnosticLog = context.DiagnosticLog }, cancellationToken);
 }

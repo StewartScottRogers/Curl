@@ -35,6 +35,9 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
 
     private readonly SmbTransferLog log = new(context.DiagnosticLog);
 
+    /// <summary>Gets what the download has received and expects, which a timeout reports (BL-5329).</summary>
+    public SmbReceiveCount ReceiveCount { get; init; } = new();
+
     /// <summary>Connects to the share, downloads or uploads the file and disconnects.</summary>
     /// <param name="hostName">The host name the transfer connected to, sent in the tree connect.</param>
     /// <param name="path">The share and file the URL names.</param>
@@ -127,7 +130,8 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
 
     private async ValueTask<(TransferResult Outcome, bool FrameRefused)> ReadFileAsync(ushort treeId, SmbOpenResponse file)
     {
-        context.Progress.ReportTransferStarted();
+        ReceiveCount.Expected = file.EndOfFile;
+        context.Progress.ReportDownloaded(0, file.EndOfFile);
         long offset = 0;
         while (true)
         {
@@ -149,6 +153,7 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
             }
 
             offset += data.Length;
+            ReceiveCount.Received = offset;
             context.Progress.ReportDownloaded(offset, file.EndOfFile);
             if (data.Length < SmbReadRequest.MaxPayloadSize)
             {
@@ -163,7 +168,6 @@ internal sealed class SmbFileTransfer(IConnection connection, SmbMessageReader r
     private async ValueTask<(TransferResult Outcome, bool FrameRefused)> WriteFileAsync(ushort treeId, ushort fileId, Stream upload)
     {
         long size = Math.Max(0, upload.Length - upload.Position);
-        context.Progress.ReportTransferStarted();
         byte[] buffer = new byte[SmbWriteRequest.MaxDataLength];
         long written = 0;
         while (true)

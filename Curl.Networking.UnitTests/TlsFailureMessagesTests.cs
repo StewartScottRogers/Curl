@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
@@ -909,4 +910,75 @@ public sealed partial class TlsFailureMessagesTests
         Assert.AreEqual(
             "schannel: the certificate or certificate chain is based on an untrusted root",
             TlsFailureMessages.SchannelCaCertificateFileChainError(X509ChainStatusFlags.UntrustedRoot));
+
+    private const string SchannelReadAlertText =
+        "schannel: failed to read data from server: SEC_E_ILLEGAL_MESSAGE (0x80090326) - This error usually occurs when a fatal SSL/TLS alert is received (e.g. handshake failed). More detail may be available in the Windows System event log.";
+
+    private sealed class AlertOnReadStream(bool fromServer) : Stream
+    {
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => true;
+
+        public override long Length => 0;
+
+        public override long Position { get => 0; set => throw new NotSupportedException(); }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            throw new Curl.Tls.TlsAlertException(Curl.Tls.TlsAlertDescription.CertificateUnknown, fromServer);
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+    }
+
+    [TestMethod]
+    public void SchannelHandBuiltAlertReadFailure_WithoutAutomaticCertificate_IsTheSchannelReadPhaseText() =>
+        Assert.AreEqual(SchannelReadAlertText, TlsFailureMessages.SchannelHandBuiltAlertReadFailure(automaticClientCertificate: false));
+
+    [TestMethod]
+    public void SchannelHandBuiltAlertReadFailure_WithAutomaticCertificate_IsRecvFailureConnectionAborted() =>
+        Assert.AreEqual("Recv failure: Connection was aborted", TlsFailureMessages.SchannelHandBuiltAlertReadFailure(automaticClientCertificate: true));
+
+    [TestMethod]
+    public async Task HandBuiltReadAsync_ServerAlertWithMessageSet_FailsWithThatMessage()
+    {
+        var connection = new HandBuiltTlsConnection(new AlertOnReadStream(fromServer: true), new StallingConnection(), null, string.Empty, matchesOpenSslBuild: false)
+        {
+            AlertReadFailureMessage = SchannelReadAlertText,
+        };
+
+        var failure = await Assert.ThrowsExactlyAsync<MissingCloseNotifyException>(async () => await connection.ReadAsync(new byte[8], CancellationToken.None));
+
+        Assert.AreEqual(SchannelReadAlertText, failure.Message);
+    }
+
+    [TestMethod]
+    public async Task HandBuiltReadAsync_ServerAlertWithNoMessageSet_LetsTheAlertEscape()
+    {
+        var connection = new HandBuiltTlsConnection(new AlertOnReadStream(fromServer: true), new StallingConnection(), null, string.Empty, matchesOpenSslBuild: true);
+
+        await Assert.ThrowsExactlyAsync<Curl.Tls.TlsAlertException>(async () => await connection.ReadAsync(new byte[8], CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task HandBuiltReadAsync_ClientAlertWithMessageSet_LetsTheAlertEscape()
+    {
+        var connection = new HandBuiltTlsConnection(new AlertOnReadStream(fromServer: false), new StallingConnection(), null, string.Empty, matchesOpenSslBuild: false)
+        {
+            AlertReadFailureMessage = SchannelReadAlertText,
+        };
+
+        await Assert.ThrowsExactlyAsync<Curl.Tls.TlsAlertException>(async () => await connection.ReadAsync(new byte[8], CancellationToken.None));
+    }
 }

@@ -26,6 +26,9 @@ internal sealed record CapturedResponse(TransferResult Result, byte[] Headers, b
     public string? Field(string name) =>
         Result.Report!.ResponseHeaders.FirstOrDefault(field => string.Equals(field.Key, name, StringComparison.OrdinalIgnoreCase)).Value;
 
+    /// <summary>Gets whether the response carries an ETag or a Last-Modified; only for a response with a <see cref="Code" />.</summary>
+    public bool HasValidator => Field("ETag") is not null || Field("Last-Modified") is not null;
+
     /// <summary>Writes the captured headers to <paramref name="context" />'s header outputs, those it has.</summary>
     public async Task WriteHeadersAsync(ITransferContext context)
     {

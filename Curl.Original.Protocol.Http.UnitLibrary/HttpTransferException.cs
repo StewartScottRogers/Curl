@@ -72,6 +72,12 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     internal int HeadersStoredBeforeFailure { get; set; }
 
     /// <summary>
+    /// Gets or sets the header lines of the complete 401 or 407 head whose challenge the authenticator could not answer, which
+    /// curl keeps and <c>%{num_headers}</c> counts after exit 94 (BL-5331); <see langword="null" /> by default.
+    /// </summary>
+    internal IReadOnlyList<KeyValuePair<string, string>>? AnsweredHeadersBeforeFailure { get; set; }
+
+    /// <summary>
     /// Gets or sets the <c>Content-Type</c> of the 1xx head a failure came after, which libcurl 8.22.0 still reports as
     /// <c>CURLINFO_CONTENT_TYPE</c> (BL-3301); <see langword="null" /> by default.
     /// </summary>

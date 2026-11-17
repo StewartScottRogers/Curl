@@ -733,8 +733,15 @@ internal static class CurlComposition
     /// <returns><see cref="TransferHooks.Around" /> of the activated hooks, or <see langword="null" /> when the group activated none, so the engine runs no hook.</returns>
     internal static Func<IProtocolHandler, IProtocolHandler>? ExtensionTransferHooksOf(CommandLineOptions options, IEnumerable<Func<ExtensionOptionValues, ITransferHook?>> activators, IConnector connector, IConnectionListener listener)
     {
-        TransferHooks hooks = TransferHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators, new TransferHookServices(connector, listener));
-        return hooks.Hooks.Count == 0 ? null : hooks.Around;
+        try
+        {
+            TransferHooks hooks = TransferHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators, new TransferHookServices(connector, listener));
+            return hooks.Hooks.Count == 0 ? null : hooks.Around;
+        }
+        catch (ArgumentException badValue) when (badValue.GetType() == typeof(ArgumentException))
+        {
+            throw OptionValueErrorOf(badValue);
+        }
     }
 
     /// <summary>

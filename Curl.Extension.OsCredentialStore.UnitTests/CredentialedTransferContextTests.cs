@@ -63,6 +63,7 @@ public sealed class CredentialedTransferContextTests
         Assert.AreEqual(inner.MaxTime, context.MaxTime);
         Assert.AreEqual(inner.OperationStarted, context.OperationStarted);
         Assert.AreSame(inner.Proxy, context.Proxy);
+        Assert.AreSame(inner.NoProxy, context.NoProxy);
         Assert.AreSame(inner.Mail, context.Mail);
         Assert.AreSame(inner.Ssh, context.Ssh);
         Assert.AreSame(inner.TimeProvider, context.TimeProvider);

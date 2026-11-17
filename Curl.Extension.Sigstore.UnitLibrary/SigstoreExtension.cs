@@ -43,14 +43,21 @@ public static class SigstoreExtension
         [BundleOption, IdentityOption, IssuerOption, RootOption],
         new Uri("https://docs.sigstore.dev/about/bundle/"));
 
-    /// <summary>Gives the extension's transfer hook when the option group gave <c>--sigstore-bundle</c>.</summary>
+    /// <summary>
+    /// Gives the extension's transfer hook when the option group gave any <c>--sigstore-*</c> option; a companion option
+    /// without <c>--sigstore-bundle</c> makes the hook refuse the transfer with exit code 2 rather than download unverified.
+    /// </summary>
     /// <param name="values">The option group's extension options.</param>
-    /// <returns>The hook, or <see langword="null" /> when <c>--sigstore-bundle</c> was not given.</returns>
+    /// <returns>The hook, or <see langword="null" /> when no <c>--sigstore-*</c> option was given.</returns>
     public static ITransferHook? HookFor(ExtensionOptionValues values)
     {
         ArgumentNullException.ThrowIfNull(values);
-        return values.ValueOf(BundleOption) is { } bundlePath
-            ? new SigstoreTransferHook(new SigstoreExpectation(bundlePath, values.ValueOf(IdentityOption), values.ValueOf(IssuerOption), values.ValueOf(RootOption)))
-            : null;
+        var bundlePath = values.ValueOf(BundleOption);
+        var identity = values.ValueOf(IdentityOption);
+        var issuer = values.ValueOf(IssuerOption);
+        var root = values.ValueOf(RootOption);
+        return bundlePath is null && identity is null && issuer is null && root is null
+            ? null
+            : new SigstoreTransferHook(new SigstoreExpectation(bundlePath, identity, issuer, root));
     }
 }

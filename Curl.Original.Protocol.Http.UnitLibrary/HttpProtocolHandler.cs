@@ -1626,6 +1626,13 @@ public sealed class HttpProtocolHandler(
     /// <paramref name="report" /> itself when the head was read whole or the failure came before its status line.
     /// </summary>
     private static TransferReport WithHeadBeforeFailure(TransferReport report, HttpTransferException failure) =>
+        WithStatusLineBeforeFailure(WithAnsweredHeaders(report, failure), failure);
+
+    /// <summary>Puts the headers of the 401 or 407 whose challenge went unanswered on <paramref name="report" />, which curl keeps (BL-5331).</summary>
+    private static TransferReport WithAnsweredHeaders(TransferReport report, HttpTransferException failure) =>
+        failure.AnsweredHeadersBeforeFailure is { } headers ? report with { ResponseHeaders = headers } : report;
+
+    private static TransferReport WithStatusLineBeforeFailure(TransferReport report, HttpTransferException failure) =>
         report.ResponseCode != 0 || failure.StatusLineBeforeFailure is not { } statusLine
             ? WithReceiveErrno(report, failure)
             : WithReceiveErrno(report, failure) with
@@ -3135,6 +3142,7 @@ public sealed class HttpProtocolHandler(
             // curl keeps the response whose challenge it could not answer: its code and header count (BL-5118).
             failure.StatusLineBeforeFailure = head.StatusLine;
             failure.HeadersStoredBeforeFailure = head.Headers.Count + 1;
+            failure.AnsweredHeadersBeforeFailure = [.. head.Headers.Select(header => KeyValuePair.Create(header.Name, header.Value))];
             return plan.WithAuthorizationFailure(failure, retryLines.Lines, RepeatProxyAuthorization(plan));
         }
 

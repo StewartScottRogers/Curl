@@ -17,15 +17,23 @@ public sealed class McpStdioSession : IAsyncDisposable
     private readonly IMcpServerProcess process;
     private readonly TimeProvider timeProvider;
     private readonly McpLineReader lineReader;
+    private readonly TimeSpan? maxTime;
+    private readonly long operationStarted;
     private bool ended;
 
     /// <summary>Creates a session over the started <paramref name="process"/>.</summary>
-    public McpStdioSession(IMcpServerProcess process, TimeProvider timeProvider)
+    /// <param name="process">The started server.</param>
+    /// <param name="timeProvider">The clock the grace period and <paramref name="maxTime"/> are counted on.</param>
+    /// <param name="maxTime">The <c>-m</c> limit on the whole operation, or <see langword="null"/> for none.</param>
+    /// <param name="operationStarted">The <paramref name="timeProvider"/> timestamp the operation began at, or <see langword="null"/> for now.</param>
+    public McpStdioSession(IMcpServerProcess process, TimeProvider timeProvider, TimeSpan? maxTime = null, long? operationStarted = null)
     {
         ArgumentNullException.ThrowIfNull(process);
         ArgumentNullException.ThrowIfNull(timeProvider);
         this.process = process;
         this.timeProvider = timeProvider;
+        this.maxTime = maxTime;
+        this.operationStarted = operationStarted ?? timeProvider.GetTimestamp();
         lineReader = new McpLineReader(process.StandardOutput);
     }
 
@@ -70,10 +78,30 @@ public sealed class McpStdioSession : IAsyncDisposable
 
     /// <summary>
     /// Ends the session ("Lifecycle &gt; Shutdown &gt; stdio"): closes the server's standard input,
-    /// waits up to <see cref="ExitGracePeriod"/> for it to exit, and kills it if it has not.
-    /// Ending a session twice does nothing the second time.
+    /// waits for it to exit for <see cref="ExitGracePeriod"/> or the time left on <c>-m</c>,
+    /// whichever is shorter, and kills it if it has not. Ending a session twice does nothing the second time.
     /// </summary>
-    public async Task EndAsync()
+    public Task EndAsync() => EndWithGraceAsync(GraceLeft());
+
+    /// <summary>
+    /// Ends the session: after a normal <see cref="EndAsync()"/> it does nothing more; a session
+    /// disposed without one (the transfer failed or was cancelled) closes the server's standard
+    /// input and kills the server at once, without the grace period.
+    /// </summary>
+    public async ValueTask DisposeAsync() => await EndWithGraceAsync(TimeSpan.Zero).ConfigureAwait(false);
+
+    private TimeSpan GraceLeft()
+    {
+        if (maxTime is not { } limit)
+        {
+            return ExitGracePeriod;
+        }
+
+        var left = limit - timeProvider.GetElapsedTime(operationStarted);
+        return left <= TimeSpan.Zero ? TimeSpan.Zero : left < ExitGracePeriod ? left : ExitGracePeriod;
+    }
+
+    private async Task EndWithGraceAsync(TimeSpan grace)
     {
         if (ended)
         {
@@ -82,10 +110,10 @@ public sealed class McpStdioSession : IAsyncDisposable
 
         ended = true;
         process.StandardInput.Dispose();
-        using var grace = new CancellationTokenSource(ExitGracePeriod, timeProvider);
+        using var graceSource = new CancellationTokenSource(grace, timeProvider);
         try
         {
-            await process.WaitForExitAsync(grace.Token).ConfigureAwait(false);
+            await process.WaitForExitAsync(graceSource.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -94,7 +122,4 @@ public sealed class McpStdioSession : IAsyncDisposable
 
         process.Dispose();
     }
-
-    /// <inheritdoc/>
-    public async ValueTask DisposeAsync() => await EndAsync().ConfigureAwait(false);
 }

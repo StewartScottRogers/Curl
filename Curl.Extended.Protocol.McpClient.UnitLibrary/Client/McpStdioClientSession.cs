@@ -11,7 +11,7 @@ internal sealed class McpStdioClientSession(McpStdioSession session) : IMcpSessi
 {
     /// <summary>Starts the server <paramref name="command"/> names.</summary>
     /// <exception cref="McpClientException">The server could not be started: exit 7, as when curl cannot reach a server.</exception>
-    public static McpStdioClientSession Start(IMcpServerProcessStarter starter, McpStdioCommand command, TimeProvider timeProvider)
+    public static McpStdioClientSession Start(IMcpServerProcessStarter starter, McpStdioCommand command, TimeProvider timeProvider, TimeSpan? maxTime = null, long? operationStarted = null)
     {
         IMcpServerProcess process;
         try
@@ -24,7 +24,7 @@ internal sealed class McpStdioClientSession(McpStdioSession session) : IMcpSessi
             throw new McpClientException(CurlExitCode.CouldntConnect, $"Failed to start the MCP server {command.FileName}: {failure.Message}");
         }
 
-        return new McpStdioClientSession(new McpStdioSession(process, timeProvider));
+        return new McpStdioClientSession(new McpStdioSession(process, timeProvider, maxTime, operationStarted));
     }
 
     /// <inheritdoc />

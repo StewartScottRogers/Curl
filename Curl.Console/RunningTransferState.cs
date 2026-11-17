@@ -63,6 +63,12 @@ internal sealed class RunningTransferState(
     internal string? OutputFileName { get; set; }
 
     /// <summary>
+    /// Gets or sets whether the transfer ended because its <c>-T</c> file could not be opened: curl named the
+    /// <c>-o</c> file by then but never reached the URL's scheme, so <c>%{scheme}</c> prints nothing (BL-5339).
+    /// </summary>
+    internal bool UploadFileCouldNotBeOpened { get; set; }
+
+    /// <summary>
     /// Gets or sets whether <c>--skip-existing</c> skipped the transfer because its output file was
     /// already there; under <c>-Z</c> its report then waits for the running transfers (CGR-293).
     /// </summary>

@@ -91,11 +91,11 @@ public sealed class SignalRProtocolHandler(IConnector connector, IWebSocketRando
             // Past connect: curl sends the negotiate POST as the transfer's request, so -m during it is "Operation timed out".
             context.Progress.ReportTransferStarted();
             return negotiation;
-        }, requestFields);
+        }, requestFields, context.Http?.SendsCredentialsToOtherOrigins ?? false);
         NegotiatedWebSocketEndpoint endpoint = await negotiator.NegotiateAsync(EndpointUrlOf(context.Url), context.CancellationToken);
         await using IConnection connection = await OpenAsync(endpoint.WebSocketUrl, context, context.CancellationToken);
         SignalRWebSocketSession session = await SignalRWebSocketUpgrade.UpgradeAsync(
-            connection, endpoint.WebSocketUrl, endpoint.AccessToken, randomSource, context.CancellationToken, requestFields);
+            connection, endpoint.WebSocketUrl, endpoint.AccessToken, randomSource, context.CancellationToken, endpoint.RequestFields);
         context.Progress.ReportTransferStarted();
         return await new SignalRHubSession(session, callRecord, context.Output, context.Progress).RunAsync(context.CancellationToken);
     }

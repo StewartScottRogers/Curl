@@ -111,8 +111,16 @@ internal sealed class StompClientFlow(IConnection transport, Stream output, ITra
 
     private static StompClientException Unexpected(StompFrame frame, CurlExitCode errorFrameExitCode) =>
         frame.Command == "ERROR"
-            ? new(errorFrameExitCode, StompClientMessages.ServerError(frame.HeaderValue("message")))
+            ? new(errorFrameExitCode, ServerErrorMessage(frame))
             : new(CurlExitCode.WeirdServerReply, StompClientMessages.UnexpectedFrame(frame.Command));
+
+    private static string ServerErrorMessage(StompFrame frame)
+    {
+        string body = System.Text.Encoding.UTF8.GetString(frame.Body).Trim();
+        return body.Length == 0
+            ? StompClientMessages.ServerError(frame.HeaderValue("message"))
+            : StompClientMessages.ServerError(frame.HeaderValue("message"), body);
+    }
 
     private async ValueTask WriteOutputAsync(byte[] body)
     {

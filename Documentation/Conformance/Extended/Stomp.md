@@ -25,7 +25,7 @@ client relies on) that binds a client is a row; statements that bind only a serv
 | Stomp:STOMP12-Size-1 | MAY | A server may limit the frame, header count, header line and body sizes. | n/a: limits a server sets; curl sends one small frame of each kind and sets no limit of its own |
 | Stomp:STOMP12-Lingering-1 | SHOULD | A server lingers before closing after an ERROR so the client can read it. | n/a: the server's; the client reads the ERROR before the close (Error-2) |
 | Stomp:STOMP12-Connect-1 | MUST | A 1.2 client's CONNECT carries `accept-version`. | StompConnectCases.Publish_NoCredentials_SendsConnectSendAndDisconnectAndEndsOnTheReceipt |
-| Stomp:STOMP12-Connect-2 | MUST | A 1.2 client's CONNECT carries `host`, the virtual host it connects to. | StompConnectCases.Publish_CredentialsWithBackslashAndColon_AreSentUnescapedAsLoginAndPasscode |
+| Stomp:STOMP12-Connect-2 | MUST | A 1.2 client's CONNECT carries `host`, the virtual host it connects to: `/` unless `-H "host: name"` names another (ADR-1285). | StompConnectCases.Publish_CredentialsWithBackslashAndColon_AreSentUnescapedAsLoginAndPasscode |
 | Stomp:STOMP12-Connect-3 | MAY | CONNECT carries `login` and `passcode` for a secured server. | StompConnectCases.Publish_CredentialsWithBackslashAndColon_AreSentUnescapedAsLoginAndPasscode |
 | Stomp:STOMP12-Connect-4 | MAY | CONNECT carries `heart-beat`; `0,0` offers and asks for no heart-beating. | StompConnectCases.Publish_NoCredentials_SendsConnectSendAndDisconnectAndEndsOnTheReceipt |
 | Stomp:STOMP12-Connect-5 | MUST | The client sends no further frame until the server answers CONNECT with CONNECTED. | StompConnectCases.Publish_ErrorAtConnect_FailsWithItsMessageAndSendsNothingMore |

@@ -44,3 +44,7 @@ Data Lake Storage Gen2 (`abfs://`, `abfss://`) has its own matrix: [AzureStorage
 ## Request methods
 
 `az://` sends only the methods its operations need: GET to download or list, and with `-T` PUT (Put Blob, Put Block, Put Block List); `abfs://` and `abfss://` behave the same. `-X GET` without `-T` and `-X PUT` with it are accepted, since they name what is sent anyway. `-I`/`--head` and every other `-X` (`DELETE`, `HEAD`, `POST`, ...) fail with exit 4 and `az:// does not support ...` before any connection, so a destructive method is never reported done while a GET was sent instead (ADR-1249, `AzureStorageRequestMethodTests`).
+
+## URL port
+
+A port in an `az://`, `abfs://` or `abfss://` URL is used (BL-5342): `az://127.0.0.1:10000/c/x` connects to `127.0.0.1` on port 10000, so an Azurite-style emulator works, and the `Host` header is `127.0.0.1:10000`. With no port, or port 443, the connection goes to 443 and `Host` is the bare host. The request is always HTTPS. SAS and bearer authorization carry no host or port in what they sign, so they are unchanged (`AzureStoragePortTests`, `AzureStorageRequestAuthorizerTests`).

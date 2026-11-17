@@ -18,9 +18,6 @@ namespace Curl.Extended.Protocol.AzureStorage.Client;
 /// <param name="headReporter">Shows the heads and keeps what <c>-w</c> reports about the response.</param>
 internal sealed class AzureStorageClient(IConnector connector, ITransferContext context, AzureStorageRequestAuthorizer authorizer, AzureStorageCredential credential, AzureStorageHttpHeadReporter headReporter)
 {
-    /// <summary>The port every request goes to: Azure Storage is reached over HTTPS.</summary>
-    internal const int HttpsPort = 443;
-
     /// <summary>Gives the endpoint of an operation on <paramref name="path"/>: its query first, then the URL's own query.</summary>
     /// <param name="endpoint">The URL's endpoint.</param>
     /// <param name="path">The resource path, percent-encoded.</param>
@@ -49,7 +46,7 @@ internal sealed class AzureStorageClient(IConnector connector, ITransferContext 
         AzureStorageHttpRequest request = body is null
             ? new(method, authorized.Target, fields)
             : new(method, authorized.Target, fields, new MemoryStream(body), body.Length);
-        ConnectTarget target = new(endpoint.Host, HttpsPort, true) { Proxy = context.Proxy, Events = context.Events, DiagnosticLog = context.DiagnosticLog };
+        ConnectTarget target = new(endpoint.Host, endpoint.Port, true) { Proxy = context.Proxy, Events = context.Events, DiagnosticLog = context.DiagnosticLog };
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken);
         if (connect.Connection is not { } connection)
         {

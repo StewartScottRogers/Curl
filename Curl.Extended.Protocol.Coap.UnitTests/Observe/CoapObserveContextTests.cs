@@ -74,6 +74,7 @@ public sealed class CoapObserveContextTests
         Assert.AreEqual(inner.ConnectTimeout, observed.ConnectTimeout);
         Assert.AreEqual(inner.OperationStarted, observed.OperationStarted);
         Assert.AreEqual(inner.Proxy, observed.Proxy);
+        Assert.AreEqual(inner.NoProxy, observed.NoProxy);
         Assert.AreEqual(inner.Mail, observed.Mail);
         Assert.AreEqual(inner.Ssh, observed.Ssh);
     }

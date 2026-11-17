@@ -14,6 +14,21 @@ namespace Curl.Extension.RecordReplay;
 /// <param name="record">Where exchanges are recorded to, or <see langword="null" /> without <c>--record</c>.</param>
 internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, ExchangeDirectory? record) : ITransferHook
 {
+    /// <summary>What a recorded URL puts in place of a user and password (ADR-1134 uses the same text for <c>url.full</c>).</summary>
+    internal const string RedactedUserInfo = "REDACTED:REDACTED";
+
+    /// <summary>Puts <see cref="RedactedUserInfo" /> in place of any user information in <paramref name="url" />.</summary>
+    /// <param name="url">The URL as given.</param>
+    /// <returns>The URL with no credentials; a URL with no user information is returned unchanged.</returns>
+    internal static string Redacted(string url)
+    {
+        var authorityStart = url.IndexOf("://", StringComparison.Ordinal) + 3;
+        var authorityEnd = url.IndexOfAny(['/', '?', '#'], authorityStart);
+        var authority = authorityEnd < 0 ? url[authorityStart..] : url[authorityStart..authorityEnd];
+        var at = authority.LastIndexOf('@');
+        return authorityStart < 3 || at < 0 ? url : url[..authorityStart] + RedactedUserInfo + url[(authorityStart + at)..];
+    }
+
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
         if (context.Http is null)
@@ -22,7 +37,7 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
         }
 
         var method = ExchangeKey.MethodOf(context);
-        var url = context.Url.OriginalString;
+        var url = Redacted(context.Url.OriginalString);
         var key = ExchangeKey.For(method, url, context.PostData is { } data ? data.Span : default);
         if (replay is not null)
         {
