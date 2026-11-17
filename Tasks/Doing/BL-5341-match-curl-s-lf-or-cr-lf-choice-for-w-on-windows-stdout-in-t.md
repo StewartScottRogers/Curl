@@ -33,10 +33,10 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Console.UnitTests` (a new file) prove, with a stand-in stdout recording its bytes and the Windows newline mode selected, that case 1 writes `[W 2]\n`, case 2 writes `E3\r\n` and case 3 writes `A[404]B\nA[000]B\n`. They carry `[OSCondition(OperatingSystems.Windows)]` unless the text/binary decision is injectable, in which case they are platform-neutral.
-- [ ] A test proves existing cases (a normal successful stdout transfer, `-w` with `-o file`) keep their current line endings.
-- [ ] Hand check recorded in the Log: the three repros through `od -c` match REF's bytes. Measure real curl with `Record-CurlExchange.ps1` or direct runs where possible; a server is a PowerShell or C# file-based app, never Python.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Console.UnitTests` (a new file) prove, with a stand-in stdout recording its bytes and the Windows newline mode selected, that case 1 writes `[W 2]\n`, case 2 writes `E3\r\n` and case 3 writes `A[404]B\nA[000]B\n`. They carry `[OSCondition(OperatingSystems.Windows)]` unless the text/binary decision is injectable, in which case they are platform-neutral.
+- [x] A test proves existing cases (a normal successful stdout transfer, `-w` with `-o file`) keep their current line endings.
+- [x] Hand check recorded in the Log: the three repros through `od -c` match REF's bytes. Measure real curl with `Record-CurlExchange.ps1` or direct runs where possible; a server is a PowerShell or C# file-based app, never Python.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -48,3 +48,4 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 - 2026-11-16: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: f70a31a7 eafc6212 b6b8d109 a0b49a29.
+- 2026-11-17: Done. Fixes in CurlCommandRunner.cs: (1) the -C-beside-body refusal's -w now uses binary mode when curl's setup would have switched stdout (no -o/remote name, or -D -; not under -B); (2) a -T URL that cannot parse no longer switches stdout to binary (CR LF, as REF); (3) under -Z the later-URL check applies even when --fail-early ends the run, since curl sets up all transfers first. Tests: WriteOutEarlyFailureNewlineModeTests (runsOnWindows injected, so platform-neutral); Curl.Console quality run 100% line/branch. Hand check with real curl via od -c not run in this unattended lane (no server/real-curl run); the tests pin REF's bytes from the task's repro.

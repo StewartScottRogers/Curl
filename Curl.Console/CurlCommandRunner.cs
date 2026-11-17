@@ -1063,7 +1063,8 @@ internal sealed class CurlCommandRunner(
         _ = UrlTransfer.TryCreate(optionsRead, 0, 0, transferPerformer.TakeTransferId(), match, null, runsOnWindows, out UrlTransfer? transfer, out _);
         runningTransfer.Value = NewRunningTransferState(CancellationToken.None, deferringStandardOutput, GatedDeferringStandardOutput);
         TransferResult result = TransferResult.Failure(refusal.ExitCode, CurlEasyErrorText.Of(refusal.ExitCode));
-        await WriteOutAsync(optionsRead, transfer!, match.Url, match.Url, result, false).ConfigureAwait(false);
+        bool standardOutputIsBinary = DumpsHeadersToStandardOutput(optionsRead) || (!optionsRead.UseAscii && !WritesToFile(optionsRead, 0));
+        await WriteOutAsync(optionsRead, transfer!, match.Url, match.Url, result, standardOutputIsBinary).ConfigureAwait(false);
     }
 
     /// <summary>Whether <paramref name="options" /> has a <c>-C</c> offset past zero and a request body: a <c>-F</c> form or a <c>-d</c> body not moved into the query by <c>-G</c>.</summary>
@@ -3336,7 +3337,9 @@ internal sealed class CurlCommandRunner(
     /// <returns><see langword="true" /> when standard output is now in binary mode.</returns>
     private static bool SwitchesStandardOutputToBinary(CommandLineOptions options, UrlTransfer transfer, TransferResult result) =>
         DumpsHeadersToStandardOutput(options)
-        || (!options.UseAscii && !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure));
+        || (!options.UseAscii && !transfer.WritesToFile
+            && !ReferenceEquals(result, CannotOpenHeaderFileFailure)
+            && !ReferenceEquals(result, UploadUrlMalformedFailure));
 
     /// <summary>
     /// Tells whether the option group sends its header lines to standard output (<c>-D -</c>).
@@ -3428,7 +3431,7 @@ internal sealed class CurlCommandRunner(
         bool endsTheRun) =>
         !runsOnWindows
         || standardOutputSwitchedToBinary
-        || (!endsTheRun && LaterUrlSwitchesStandardOutputToBinary(options, index));
+        || ((!endsTheRun || parallelRun is not null) && LaterUrlSwitchesStandardOutputToBinary(options, index));
 
     /// <summary>
     /// Renders the <c>-w</c> template, when one was given, for the finished
