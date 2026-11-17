@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5366 — Fix AF-0846: Surviving mutant: the Socket.IO upgrade Host header's port boundary is untested
 
@@ -43,3 +43,4 @@ Killed by a new DataRow `socketio://example.com:0` in `Request_AsksForTheWebSock
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 46ea5fce 9742157d.
+- 2026-11-17: Doing -> Done. Added port-0 DataRow to Request_AsksForTheWebSocketTransport; kills the <= 0 mutant
