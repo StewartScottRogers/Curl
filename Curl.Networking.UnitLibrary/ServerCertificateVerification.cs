@@ -58,6 +58,13 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     internal Func<X509Chain?, X509ChainStatus[]> ReadChainStatus { get; init; } = chain => chain?.ChainStatus ?? [];
 
     /// <summary>
+    /// Reads the statuses of every chain element but the last, the trust anchor. A test seam,
+    /// like <see cref="ReadChainStatus" />.
+    /// </summary>
+    internal Func<X509Chain, X509ChainStatus[]> ReadCertificatesBelowAnchorStatus { get; init; } = chain =>
+        chain.ChainElements.Cast<X509ChainElement>().SkipLast(1).SelectMany(element => element.ChainElementStatus).ToArray();
+
+    /// <summary>
     /// The CA bundles curl's <c>configure</c> looks for, in its order, the first that exists
     /// being the OpenSSL build's built-in bundle (ADR-1168).
     /// </summary>
@@ -535,8 +542,28 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         HasCaCertificates
         && chain is not null
         && chain.ChainElements.Count > 0
-        && HasOnlyMissingRootStatus(ReadChainStatus(chain))
+        && HasOnlyMissingRootOrAnchorRevocationStatus(chain)
         && ListsAnAnchorCandidate(chain);
+
+    // With revocation checking on, a chain ending at a non-self-signed anchor also carries
+    // RevocationStatusUnknown / OfflineRevocation, for the anchor has no issuer to ask (BL-5317):
+    // tolerated only when no certificate below the anchor carries it.
+    private bool HasOnlyMissingRootOrAnchorRevocationStatus(X509Chain chain) =>
+        HasOnlyMissingRootStatus(ReadChainStatus(chain))
+        || (HasOnlyMissingRootOrUnavailableRevocationStatus(ReadChainStatus(chain))
+            && !IsSelfSigned(chain.ChainElements[^1].Certificate)
+            && ReadCertificatesBelowAnchorStatus(chain).All(status => (status.Status & UnavailableRevocationFlags) == 0));
+
+    private static bool IsSelfSigned(X509Certificate2 certificate) =>
+        certificate.SubjectName.RawData.AsSpan().SequenceEqual(certificate.IssuerName.RawData);
+
+    private static bool HasOnlyMissingRootOrUnavailableRevocationStatus(X509ChainStatus[] chainStatus) =>
+        chainStatus.All(status => (status.Status & ~(MissingRootFlags | UnavailableRevocationFlags)) == 0);
+
+    private const X509ChainStatusFlags MissingRootFlags = X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.UntrustedRoot;
+
+    private const X509ChainStatusFlags UnavailableRevocationFlags =
+        X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation;
 
     private static bool ListsAnAnchorCandidate(X509Chain chain) =>
         chain.ChainElements.Cast<X509ChainElement>()

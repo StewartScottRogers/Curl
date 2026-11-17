@@ -38,16 +38,19 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.NonSelfSignedAnchorRevocation.cs` (certificates built in the test with `CertificateRequest`, chain-status stand-ins, no network) prove that a chain ending at a non-self-signed `--cacert` anchor is accepted when its only extra statuses are `RevocationStatusUnknown` / `OfflineRevocation` on the anchor element, for the default revocation mode, with `--no-sessionid`, and with `--ssl-revoke-best-effort`.
-- [ ] A test proves the same acceptance for the HTTPS-proxy policy (`--proxy-cacert`).
-- [ ] A test proves a chain to an unrelated CA is still rejected (exit 60 path), and a leaf or intermediate that is revoked (`Revoked` status) is still rejected with `trust for this certificate or one of the certificates in the certificate chain has been revoked`; a revocation-unknown status on the leaf itself is not newly tolerated.
-- [ ] Tests are platform-neutral, or marked `[OSCondition(OperatingSystems.Windows)]` where the Windows chain engine is the point.
+- [x] New tests in `Curl.Networking.UnitTests/ServerCertificateVerificationTests.NonSelfSignedAnchorRevocation.cs` (certificates built in the test with `CertificateRequest`, chain-status stand-ins, no network) prove that a chain ending at a non-self-signed `--cacert` anchor is accepted when its only extra statuses are `RevocationStatusUnknown` / `OfflineRevocation` on the anchor element, for the default revocation mode, with `--no-sessionid`, and with `--ssl-revoke-best-effort`.
+- [x] A test proves the same acceptance for the HTTPS-proxy policy (`--proxy-cacert`).
+- [x] A test proves a chain to an unrelated CA is still rejected (exit 60 path), and a leaf or intermediate that is revoked (`Revoked` status) is still rejected with `trust for this certificate or one of the certificates in the certificate chain has been revoked`; a revocation-unknown status on the leaf itself is not newly tolerated.
+- [x] Tests are platform-neutral, or marked `[OSCondition(OperatingSystems.Windows)]` where the Windows chain engine is the point.
 - [ ] The Log records the review's hand check on Windows: all five commands exit 0 with the body; `--cacert ca2.pem` still exits 60; a leaf revoked in `int.crl` still exits 60 with the revoked text.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Related, already Done: BL-5100 (the `--ssl-no-revoke` route). Measure real curl (Schannel) with `Record-CurlExchange.ps1` where possible. Mock servers must be PowerShell or a C# file-based app, never Python (CLAUDE.md).
+
+- Fix: `ServerCertificateVerification.CaCertificateFileAnchorsChain` also accepts RevocationStatusUnknown/OfflineRevocation when the chain's last element (the anchor) is not self-signed and no element below it carries them (new seam `ReadCertificatesBelowAnchorStatus`). Revoked, unrelated anchors and leaf-level unknown are still refused. The proxy policy uses the same class, so one fix covers both; the test for it is named after it.
+- Not done: the live Windows hand check against real curl with CRL servers (five commands) was not run in this unattended lane; unit tests stand in. Quality run for Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
