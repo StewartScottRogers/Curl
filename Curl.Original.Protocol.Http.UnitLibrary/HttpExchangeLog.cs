@@ -26,7 +26,7 @@ internal sealed class HttpExchangeLog(IDiagnosticLog log, string component)
     private static readonly string[] SecretHeaders = ["Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"];
 
     /// <summary>The headers whose values are URLs, logged with any user-info replaced by <see cref="RedactedUserInfo" />.</summary>
-    private static readonly string[] UrlHeaders = ["Location", "Content-Location"];
+    private static readonly string[] UrlHeaders = ["Location", "Content-Location", "Referer"];
 
     /// <summary>What a URL header's user-info is written as.</summary>
     internal const string RedactedUserInfo = "REDACTED:REDACTED";

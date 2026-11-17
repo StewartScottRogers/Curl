@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpExchangeLog.cs, Curl.Original.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5378 — Redact URL passwords in the Referer header of the --log-file diagnostic log
 
@@ -30,11 +30,11 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Http.UnitTests` (a new file) prove a sent `Referer: http://ru:REFSECRET@ref.example/x` is logged as `Referer: http://REDACTED:REDACTED@ref.example/x`, for a Referer from `-e` and for one from `-H`.
-- [ ] A test proves a `Referer` without user-info is logged unchanged, and `Location` and `Content-Location` are still redacted.
-- [ ] Tests are platform-neutral.
-- [ ] Hand check recorded in the Log: `grep -c REFSECRET dl.log` prints 0 and the line reads `Referer: http://REDACTED:REDACTED@ref.example/x`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Http.UnitTests` (a new file) prove a sent `Referer: http://ru:REFSECRET@ref.example/x` is logged as `Referer: http://REDACTED:REDACTED@ref.example/x`, for a Referer from `-e` and for one from `-H`.
+- [x] A test proves a `Referer` without user-info is logged unchanged, and `Location` and `Content-Location` are still redacted.
+- [x] Tests are platform-neutral.
+- [x] Hand check recorded in the Log: `grep -c REFSECRET dl.log` prints 0 and the line reads `Referer: http://REDACTED:REDACTED@ref.example/x`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -46,3 +46,5 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 2a5ecf76 b5e3fd8c c1cf21f9 29df4da9 a0b49a29.
+- 2026-11-17: Added `Referer` to `UrlHeaders`; tests in HttpExchangeLogRefererTests.cs. Hand check: `grep -c REFSECRET dl.log` printed 0 and the line read `header sent Referer: http://REDACTED:REDACTED@ref.example/x`. Tests are platform-neutral. Quality run for Curl.Original.Protocol.Http.UnitLibrary: 0 failing members.
+- 2026-11-17: Doing -> Done. Referer redacted in diagnostic log
