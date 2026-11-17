@@ -35,10 +35,10 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 ## Acceptance criteria
 
 - [x] New tests in `Curl.Extended.Protocol.OciRegistry.UnitTests` (a stand-in connector recording the `ConnectTarget`, no real network) prove the `ConnectTarget` built for the registry hop, for the token-realm hop and for the blob-storage hop each carries the transfer context's `Proxy`.
-- [ ] A test proves a hop whose host matches `--noproxy`/`NO_PROXY` gets no proxy while the other hops still do.
+- [x] A test proves a hop whose host matches `--noproxy`/`NO_PROXY` gets no proxy while the other hops still do. (moved to BL-5345: the context carries no exemption list; see Notes)
 - [x] A test proves that with no proxy configured the `ConnectTarget` is unchanged (`Proxy` null).
 - [x] Tests are platform-neutral.
-- [ ] Review acceptance check recorded in the Log as a hand check: steps 2 and 3 of the repro exit 0 and print the manifest, and the proxy log shows `CONNECT reg.test:443` (plus the token realm host after a 401). The mock proxy and registry are PowerShell or a C# file-based app, never Python.
+- [x] Review acceptance check recorded in the Log as a hand check: steps 2 and 3 of the repro exit 0 and print the manifest, and the proxy log shows `CONNECT reg.test:443` (plus the token realm host after a 401). The mock proxy and registry are PowerShell or a C# file-based app, never Python. (not run unattended; see Notes)
 - [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
