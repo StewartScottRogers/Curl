@@ -66,7 +66,7 @@ public sealed class NatsProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("pong", Encoding.UTF8.GetString(output.ToArray()));
-        Assert.AreEqual(Connect + "SUB _INBOX.t 1\r\nUNSUB 1 1\r\nPUB svc.echo _INBOX.t 4\r\nping\r\nPING\r\n", connection.Sent);
+        Assert.AreEqual(Connect.Replace("\"protocol\":1", "\"protocol\":1,\"headers\":true,\"no_responders\":true") + "SUB _INBOX.t 1\r\nUNSUB 1 1\r\nPUB svc.echo _INBOX.t 4\r\nping\r\nPING\r\n", connection.Sent);
     }
 
     [TestMethod]

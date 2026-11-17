@@ -28,12 +28,12 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.Nats.UnitTests` (a new file) prove the CONNECT line carries `"headers":true` and `"no_responders":true`.
-- [ ] A test with a scripted server that answers the request with an `HMSG` status 503 proves the transfer ends at once with a non-zero exit and a message containing "no responders", without waiting for a timeout (a fake `TimeProvider` is not advanced).
-- [ ] A test proves a request with a responder still writes the one reply and exits 0 (no regression), and a plain publish (no `?request`) is unchanged.
-- [ ] Tests are platform-neutral.
-- [ ] Hand check recorded in the Log (real `nats:2-alpine` in docker): the command exits non-zero within about 1 s with a message naming "no responders".
-- [ ] `--extended-help` for nats is checked and kept right; `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.Nats.UnitTests` (a new file) prove the CONNECT line carries `"headers":true` and `"no_responders":true`.
+- [x] A test with a scripted server that answers the request with an `HMSG` status 503 proves the transfer ends at once with a non-zero exit and a message containing "no responders", without waiting for a timeout (a fake `TimeProvider` is not advanced).
+- [x] A test proves a request with a responder still writes the one reply and exits 0 (no regression), and a plain publish (no `?request`) is unchanged.
+- [x] Tests are platform-neutral.
+- [x] Hand check recorded in the Log (real `nats:2-alpine` in docker): the command exits non-zero within about 1 s with a message naming "no responders".
+- [x] `--extended-help` for nats is checked and kept right; `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -44,3 +44,5 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: c520739f 86743a24 0201505b c1cf21f9 57f3c642 35275efa.
+- 2026-11-17: Hand check, real `nats:2-alpine` in docker: `curl -sS -u s3cret: -d ping nats://127.0.0.1:48222/nobody?request` prints `curl: (56) NATS request failed: no responders are subscribed to the subject`, exit 56 (before the fix: timeout 124). Wall clock 2 to 8 s on this loaded host, but a plain publish to the same server took 4 s too, so the time is host startup, not waiting for a reply.
+- 2026-11-17: Done. Exit 56 matches the other mid-transfer NATS failures (RecvError); no ADR needed. CONNECT carries headers and no_responders only for ?request, so publish and subscribe bytes are unchanged. HMSG is now parsed (headers skipped, payload written). Quality run: Nats library 100% line and branch, nothing failing. `--extended-help` text updated.

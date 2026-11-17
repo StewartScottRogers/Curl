@@ -20,8 +20,9 @@ internal static class NatsConnect
     /// </summary>
     /// <param name="tlsRequired">Whether the connection is TLS.</param>
     /// <param name="credentials">The user name and password, if any.</param>
+    /// <param name="noResponders">Whether to add <c>headers</c> and <c>no_responders</c>, so a request nobody subscribes to is answered with a 503 status.</param>
     /// <returns>The line's bytes.</returns>
-    public static byte[] LineFor(bool tlsRequired, NetworkCredential? credentials)
+    public static byte[] LineFor(bool tlsRequired, NetworkCredential? credentials, bool noResponders = false)
     {
         var json = new MemoryStream();
         using (var writer = new Utf8JsonWriter(json))
@@ -34,6 +35,7 @@ internal static class NatsConnect
             writer.WriteString("lang", ClientName);
             writer.WriteString("version", ClientVersion);
             writer.WriteNumber("protocol", 1);
+            WriteNoResponders(writer, noResponders);
             WriteCredentials(writer, credentials);
             writer.WriteEndObject();
         }
@@ -55,6 +57,15 @@ internal static class NatsConnect
     {
         string head = replyTo is null ? $"PUB {subject} {payload.Length}" : $"PUB {subject} {replyTo} {payload.Length}";
         return [.. Line(head), .. payload, .. "\r\n"u8];
+    }
+
+    private static void WriteNoResponders(Utf8JsonWriter writer, bool noResponders)
+    {
+        if (noResponders)
+        {
+            writer.WriteBoolean("headers", true);
+            writer.WriteBoolean("no_responders", true);
+        }
     }
 
     private static void WriteCredentials(Utf8JsonWriter writer, NetworkCredential? credentials)
