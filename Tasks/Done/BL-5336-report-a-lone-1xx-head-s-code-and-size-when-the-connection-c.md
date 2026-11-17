@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-17
 ---
 # BL-5336 — Report a lone 1xx head's code and size when the connection closes before a final head
 
@@ -30,19 +30,22 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Http.UnitTests` (a new file) prove that, over a stand-in connection delivering `HTTP/1.1 100 Continue\r\n\r\n` then close, the transfer fails with the empty-reply error (`CurlExitCode` 52) and its transfer info records response code 100 and header size 25.
-- [ ] A test proves the same for `HTTP/1.1 103 Early\r\nLink: </a>\r\n\r\n` (code 103, header size 34).
-- [ ] A test proves a close with no bytes at all still reports code 0 and size 0.
-- [ ] Tests are platform-neutral (stand-in connection, no socket).
-- [ ] Hand check recorded in the Log: the repro prints `[100 100 25]` and exits 52. Where possible compare with real curl through `Record-CurlExchange.ps1` (extend it if it cannot send a bare 1xx and close); a raw server is a PowerShell or C# file-based app, never Python.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Http.UnitTests` (a new file) prove that, over a stand-in connection delivering `HTTP/1.1 100 Continue\r\n\r\n` then close, the transfer fails with the empty-reply error (`CurlExitCode` 52) and its transfer info records response code 100 and header size 25.
+- [x] A test proves the same for `HTTP/1.1 103 Early\r\nLink: </a>\r\n\r\n` (code 103, header size 34).
+- [x] A test proves a close with no bytes at all still reports code 0 and size 0.
+- [x] Tests are platform-neutral (stand-in connection, no socket).
+- [x] Hand check recorded in the Log: the repro prints `[100 100 25]` and exits 52. Where possible compare with real curl through `Record-CurlExchange.ps1` (extend it if it cannot send a bare 1xx and close); a raw server is a PowerShell or C# file-based app, never Python.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check: the command prints `[100 100 25]` and exits 52.
 
+- Fix: `HttpResponseHeadReader.EmptyReply` now carries `headStatusLine` as `StatusLineBeforeFailure`, so the report keeps the 1xx code and size. Hand check: repro against a PowerShell raw server printed `[100 100 25]`, exit 52 (real curl not re-run; expected values are from the task). Measure-CodeQuality for the Http library: 0 failing members.
+
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 9295fee4 f48e2ccd d6cb3883 1002a110 43e1d4a0 a0b49a29.
+- 2026-11-17: Doing -> Done. Lone 1xx head's code and size reported on empty reply
