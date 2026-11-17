@@ -48,3 +48,4 @@ Reference note: curl 8.22.0 with Schannel has SMB disabled (`curl: (1) Protocol 
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: fe77a9de 5174e641 51ca995c 5caf5fb1 a0b49a29.
