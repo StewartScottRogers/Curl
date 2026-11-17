@@ -434,7 +434,7 @@ Under `--xattr`, just before that stamp, a successful transfer to an `-o`/`-O` f
 `user.xdg.referrer.url`, `user.mime_type`, `user.xdg.origin.url` without credentials - from
 `OutputFileExtendedAttributes` through the runner's `IExtendedAttributeWriter`. The composition
 passes `NativeExtendedAttributeWriter.ForCurrentPlatform()`: libc `setxattr` on Linux and macOS,
-`extattr_set_file` on FreeBSD, and on Windows a `Zone.Identifier` stream (`WindowsZoneIdentifierWriter`, ADR-1286). A failure prints
+`extattr_set_file` on FreeBSD, and on Windows a `Zone.Identifier` stream (`WindowsZoneIdentifierWriter`, ADR-1287). A failure prints
 `Warning: Error setting extended attributes on '<file>': <strerror>` unless `-s` (ADR-0320, BL-651).
 
 Under `-v`, `--trace` or `--trace-ascii` every transfer's context carries the run's

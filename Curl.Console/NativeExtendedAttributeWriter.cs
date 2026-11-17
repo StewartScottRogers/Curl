@@ -12,7 +12,7 @@ namespace Curl.Console;
 /// <remarks>
 /// curl writes through the open file's descriptor (<c>fsetxattr</c>, <c>extattr_set_fd</c>); this
 /// writes through its path, which names the same file, because .NET does not hand out a stream's
-/// descriptor. On Windows (ADR-1286) the stream write is a
+/// descriptor. On Windows (ADR-1287) the stream write is a
 /// <c>Zone.Identifier</c> file write handed to <see cref="WindowsZoneIdentifierWriter" />. Every line needs the real call, so per
 /// ADR-0083 the type is measured by <c>NativeExtendedAttributeWriterTests</c>' Integration run on
 /// Linux and macOS rather than by the fast run.

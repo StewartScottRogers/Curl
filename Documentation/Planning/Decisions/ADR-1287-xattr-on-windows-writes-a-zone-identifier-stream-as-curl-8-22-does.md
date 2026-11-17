@@ -1,4 +1,4 @@
-# ADR-1286: --xattr on Windows writes a Zone.Identifier stream, as curl 8.22 does
+# ADR-1287: --xattr on Windows writes a Zone.Identifier stream, as curl 8.22 does
 
 - Status: Accepted
 - Date: 2026-11-16

@@ -2,7 +2,7 @@ using Curl.Testing;
 
 namespace Curl.Console.UnitTests;
 
-/// <summary>Pins the Zone.Identifier stream <c>--xattr</c> writes on Windows (ADR-1286, BL-5338), through a stand-in stream write.</summary>
+/// <summary>Pins the Zone.Identifier stream <c>--xattr</c> writes on Windows (ADR-1287, BL-5338), through a stand-in stream write.</summary>
 [TestClass]
 public sealed class WindowsZoneIdentifierWriterTests
 {

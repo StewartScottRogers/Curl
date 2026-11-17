@@ -6,7 +6,7 @@ namespace Curl.Console;
 /// The Windows <see cref="IExtendedAttributeWriter" />: curl 8.22's <c>--xattr</c> on Windows writes no
 /// extended attributes but the <c>Zone.Identifier</c> alternate data stream, <c>[ZoneTransfer]</c>
 /// followed by <c>HostUrl=</c> (the URL without credentials) and, when a <c>Referer</c> was sent,
-/// <c>ReferrerUrl=</c> (ADR-1286).
+/// <c>ReferrerUrl=</c> (ADR-1287).
 /// </summary>
 /// <remarks>
 /// <see cref="OutputFileExtendedAttributes" /> hands over the referrer before the origin URL, so the
