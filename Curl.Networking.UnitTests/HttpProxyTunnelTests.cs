@@ -472,6 +472,19 @@ public sealed class HttpProxyTunnelTests
     }
 
     [TestMethod]
+    public async Task ReadReplyAsync_PlainConnectOverload_ReadsA101AsAReplyThatDoesNotIgnoreContentLength()
+    {
+        // BL-5300 (AF-0826): the two-argument overload is plain CONNECT, never CONNECT-UDP.
+        const string Reply = "HTTP/1.1 101 Switching\r\nContent-Length: abc\r\n\r\n";
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(Reply));
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.FailureExitCode);
+        Assert.AreEqual("Unsupported Content-Length value", result.FailureMessage);
+    }
+
+    [TestMethod]
     [DataRow("HTTP/1.1 407 Proxy Auth\r\n", "Content-Length: abc\r\n", false, DisplayName = "a 407, measured")]
     [DataRow("HTTP/1.1 407 Proxy Auth\r\nContent-Length: 3\r\n", "content-length: -1\r\n", false, DisplayName = "a sign")]
     [DataRow("HTTP/1.1 403 No\r\n", "Content-Length: 99999999999999999999\r\n", false, DisplayName = "an overflow")]

@@ -71,7 +71,8 @@ public sealed class Cgr099Tests
             mutable =>
             {
                 mutable.FtpPort = "-";
-                mutable.FtpAcceptTimeout = TimeSpan.FromSeconds(5);
+                // Far past any scheduling stall on a loaded CI runner: no test here waits for it to run out.
+                mutable.FtpAcceptTimeout = TimeSpan.FromMinutes(5);
             });
         var handler = new FtpProtocolHandler(
             new QueuedConnector(ConnectResult.Connected(control)),

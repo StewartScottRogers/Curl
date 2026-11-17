@@ -58,7 +58,7 @@ internal static class CommandLineProtocolSet
     /// unrecognized or unsupported (BL-3888, BL-3889).
     /// </summary>
     private static FrozenSet<string> ProtoSchemes { get; } =
-        KnownSchemes.Except(["smb", "smbs"], StringComparer.OrdinalIgnoreCase).ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+        KnownSchemes;
 
     /// <summary>
     /// Reads a <c>--proto</c> or <c>--proto-redir</c> value into the schemes it allows, stopping at the first

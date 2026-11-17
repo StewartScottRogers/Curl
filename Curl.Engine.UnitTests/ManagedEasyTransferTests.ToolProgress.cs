@@ -162,7 +162,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_NoToolProgress_StartsNoWatchdog()
+    public async Task PerformAsync_NoToolProgressAndATimeout_StartsTheMaxTimeWatchdogAsLibcurlsTimeoutDoes()
     {
         RecordingProtocolHandler handler = RecordingProtocolHandler.WritingPath("http");
         await using ManagedEasyTransfer easy = EasyOn(new SteppingTimeProvider(), handler);
@@ -170,7 +170,7 @@ public sealed partial class ManagedEasyTransferTests
 
         await easy.PerformAsync(CancellationToken.None);
 
-        Assert.IsNull(handler.Contexts.Single().OperationStarted);
+        Assert.IsNotNull(handler.Contexts.Single().OperationStarted);
     }
 
     [TestMethod]

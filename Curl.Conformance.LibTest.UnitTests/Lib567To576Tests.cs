@@ -222,6 +222,7 @@ public sealed class Lib567To572Tests
     [DataRow(new[] { (int)CurlCode.RtspCseqError, (int)CurlCode.SendError }, (int)CurlCode.SendError, "")]
     [DataRow(new[] { (int)CurlCode.RtspCseqError, 0, (int)CurlCode.RtspSessionError }, 0, "")]
     [DataRow(new[] { (int)CurlCode.RtspCseqError, 0, 0 }, (int)LibTestErrorCodes.Failure, "Failed to detect a Session ID mismatch")]
+    [DataRow(new[] { (int)CurlCode.RtspCseqError, 0, (int)CurlCode.SendError }, (int)LibTestErrorCodes.Failure, "Failed to detect a Session ID mismatch")]
     public async Task Lib570_ChecksTheCSeqAndSessionErrors(int[] codes, int exitCode, string error)
     {
         var queue = new Queue<int>(codes);
@@ -290,6 +291,19 @@ public sealed class Lib567To572Tests
 
         Assert.AreEqual(19, rtp.PacketCount);
         Assert.AreEqual(1, run.Error.ToString().Split("LOOPY LOOP!").Length - 1);
+    }
+
+    [TestMethod]
+    public void Lib571_RtpWriter_CorruptFinalFullSizeChunk_ReportsEndCorrupted()
+    {
+        var output = new MemoryStream();
+        var rtp = new Lib571.RtpWriter(output, new StringWriter());
+
+        Assert.AreEqual(16, rtp.Write(Packet("X_1234\n\0Rsdf"u8.ToArray())));
+
+        Assert.AreEqual(
+            "RTP: message size 12, channel 0\nRTP PAYLOAD END CORRUPTED (12), [X_1234\n]\n",
+            Encoding.Latin1.GetString(output.ToArray()));
     }
 
     [TestMethod]
@@ -388,6 +402,21 @@ public sealed class Lib573To576Tests
         string trace = run.Error.ToString();
         StringAssert.Contains(trace, "AB");
         Assert.DoesNotContain("41 42", trace);
+    }
+
+    [TestMethod]
+    public async Task Lib573_DebugTrace_StartsEachLineWithTheLocalTime()
+    {
+        var engine = new FakeCurlEngine();
+        var run = new PortRun(engine, 573, "http://x/573");
+        await new Lib573(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+        run.Error.GetStringBuilder().Clear();
+
+        _ = engine.Multi.Added!.Options.Callbacks.Debug!(CurlInfoType.DataIn, "AB"u8);
+
+        Assert.IsTrue(
+            System.Text.RegularExpressions.Regex.IsMatch(run.Error.ToString(), @"^\d\d:\d\d:\d\d\.\d{6} "),
+            run.Error.ToString());
     }
 
     [TestMethod]

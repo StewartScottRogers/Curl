@@ -387,6 +387,17 @@ public sealed class Lib1564To1588Tests
     }
 
     [TestMethod]
+    public void Lib1576_Read_CopiesTheBodyIntoABufferExactlyItsLength()
+    {
+        byte[] exact = new byte[Lib1576.Body.Length];
+
+        long count = Lib1576.Read(exact);
+
+        Assert.AreEqual(Lib1576.Body.Length, count);
+        CollectionAssert.AreEqual(Lib1576.Body.ToArray(), exact);
+    }
+
+    [TestMethod]
     [DataRow(SeekOrigin.Begin, SeekResult.Ok)]
     [DataRow(SeekOrigin.Current, SeekResult.Fail)]
     [DataRow(SeekOrigin.End, SeekResult.Fail)]

@@ -1,0 +1,41 @@
+---
+id: BL-5298
+title: Fix CI failure Conversation_AnswersAsRecorded on Linux and Windows
+priority: High
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Mcp.IntegrationTests, Curl.Mcp.UnitLibrary, Curl.Mcp]
+requirement: none
+created: 2026-11-16
+completed: 2026-11-16
+---
+# BL-5298 — Fix CI failure Conversation_AnswersAsRecorded on Linux and Windows
+
+## Goal
+
+`Conversation_AnswersAsRecorded` passes on Windows, Linux and macOS, so the `CI` workflow on the shift's branch is green again.
+
+## Context
+
+Filed by the dark factory's CI watch (BL-987). `Conversation_AnswersAsRecorded` failed on Linux and Windows in CI run 43936333856 (https://github.com/StewartScottRogers/Curl/actions/runs/43936333856). First failing commit: 1d6b1a5d.
+
+    Assertion failed. Expected condition to be true.
+
+Failing data rows: `Conversation_AnswersAsRecorded ("tools-call-version")`.
+
+Lanes test only on Windows, so reproduce with `gh run view 43936333856 --log-failed` and fix it platform-neutrally (CLAUDE.md, "Tests pass on Windows, Linux and macOS").
+
+## Acceptance criteria
+
+- [x] `Conversation_AnswersAsRecorded` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+
+## Notes
+
+Golden `tools-call-version.json` lacked `smb` and `smbs` in `protocols` (SMB was added to the version tool); added them. Platform-neutral data change; 28 of 28 golden conversations pass. No production code changed.
+
+## Log
+
+- 2026-11-16: Created.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: e70e753a.
+- 2026-11-16: Doing -> Done. Golden tools-call-version now lists smb and smbs; 28 of 28 conversations pass

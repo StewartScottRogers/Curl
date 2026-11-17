@@ -37,6 +37,17 @@ public sealed class CodeGenerationTextFormTests
     }
 
     [TestMethod]
+    public void From_AFormOfExactlyTheReadAheadLimit_IsStillRead()
+    {
+        var stream = new MemoryStream(new byte[GeneratedRequest.MaxReadAheadBytes]);
+
+        var body = GeneratedRequest.From(Context(new StreamBody(stream, stream.Length, "multipart/form-data"))).Body;
+
+        Assert.IsNotNull(body);
+        Assert.AreEqual(GeneratedRequest.MaxReadAheadBytes, body.Length);
+    }
+
+    [TestMethod]
     public void From_AWriteOnlySeekableStream_GivesNoBody()
     {
         Assert.IsNull(GeneratedRequest.From(Context(new StreamBody(new WriteOnlyStream(), 3, "multipart/form-data"))).Body);

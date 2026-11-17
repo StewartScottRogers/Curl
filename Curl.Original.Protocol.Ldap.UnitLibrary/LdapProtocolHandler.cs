@@ -148,10 +148,10 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         }
 
         ConnectTarget target = TargetOf(context);
-        ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        (ConnectResult connect, TransferResult? connectFailure) = await ConnectAsync(target, context).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return ConnectFailure(connect);
+            return connectFailure!;
         }
 
         context.Progress.ReportTransferStarted();
@@ -160,13 +160,23 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         return result;
     }
 
+    // Over ldaps with -u WinLDAP checks the certificate against the Windows store itself, so -k
+    // does not help and a handshake it refuses is the bind's Server Down (BL-5285).
+    private async ValueTask<(ConnectResult Connect, TransferResult? Failure)> ConnectAsync(ConnectTarget target, ITransferContext context)
+    {
+        bool winLdapChecksCertificate = dialect == LdapDialect.WinLdap && target.UseTls && context.Credentials is not null;
+        ConnectResult connect = await connector.ConnectAsync(winLdapChecksCertificate ? target with { TrustsSystemStoreOnly = true } : target, context.CancellationToken).ConfigureAwait(false);
+        TransferResult? failure = connect.Connection is not null ? null : winLdapChecksCertificate ? WinLdapConnectFailure(connect, target) : ConnectFailure(connect);
+        return (connect, failure);
+    }
+
     /// <summary>
     /// Binds and searches on <paramref name="connection" />, curl's own connection, or, for the WinLDAP
     /// dialect's bind as the logged-on user, on a second connection WinLDAP opens beside it.
     /// </summary>
     private ValueTask<TransferResult> SearchAsync(IConnection connection, ConnectTarget target, ITransferContext context) =>
-        dialect == LdapDialect.WinLdap && context.Credentials is null
-            ? SearchBesideEmptyConnectionAsync(connection, target, context)
+        dialect == LdapDialect.WinLdap && (context.Credentials is null || !target.UseTls)
+            ?SearchBesideEmptyConnectionAsync(connection, target, context)
             : SearchOnAsync(connection, context);
 
     /// <summary>The failure a connect that opened no connection ends the transfer with.</summary>
@@ -206,7 +216,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// target is unchanged.
     /// </summary>
     private static ConnectTarget WinLdapTargetOf(ConnectTarget target) =>
-        target.UseTls ? target with { TlsServerName = Environment.MachineName, TrustsSystemStoreOnly = true } : target;
+        (target.UseTls ? target with { TlsServerName = Environment.MachineName, TrustsSystemStoreOnly = true } : target) with { Events = NoTransferEvents.Instance };
     /// <summary>Reads the URL, then binds and searches on <paramref name="connection" />, which it disposes.</summary>
     /// <remarks>The WinLDAP dialect first names the library and the URL, and once the URL is read, the kind of connection.</remarks>
     private async ValueTask<TransferResult> SearchOnAsync(IConnection connection, ITransferContext context)

@@ -35,29 +35,17 @@ internal static class HttpVersionMapping
     };
 
     /// <summary>
-    /// Returns what HTTP over TLS offers through ALPN on the running platform
-    /// (<see cref="OperatingSystem.IsWindows" />).
+    /// Returns what HTTP over TLS offers through ALPN, as curl 8.21.0 offers it: <c>http/1.1</c> alone under
+    /// <c>-0</c> and <c>--http1.1</c>, <c>h2,http/1.1</c> under <c>--http2</c> (and libcurl's
+    /// <see cref="HttpVersion.Http2Tls" />), under <c>--http3</c> and <c>--http3-only</c> for the TCP connection they
+    /// fall back to or take through a proxy (measured, ADR-0144), and with no version option
+    /// (<see cref="HttpVersion.None" />) on every platform, because curl negotiates HTTP/2 in the TLS handshake by
+    /// default (ADR-1274, which amends ADR-0141 for Windows), and <c>h2</c> alone under <c>--http2-prior-knowledge</c>.
     /// </summary>
     /// <param name="version">The option group's HTTP version.</param>
-    /// <returns>As <see cref="HttpOverTlsApplicationProtocolsOf(HttpVersion, bool)" />.</returns>
-    internal static IReadOnlyList<string> HttpOverTlsApplicationProtocolsOf(HttpVersion version) =>
-        HttpOverTlsApplicationProtocolsOf(version, OperatingSystem.IsWindows());
-
-    /// <summary>
-    /// Returns what HTTP over TLS offers through ALPN, as the platform's curl offers it
-    /// (measured, ADR-0141): <c>http/1.1</c> alone under <c>-0</c> and <c>--http1.1</c>,
-    /// <c>h2,http/1.1</c> under <c>--http2</c> (and libcurl's <see cref="HttpVersion.Http2Tls" />), and on every
-    /// platform under <c>--http3</c> and <c>--http3-only</c> for the TCP connection they fall back to or take
-    /// through a proxy (measured, ADR-0144), <c>h2</c> alone under
-    /// <c>--http2-prior-knowledge</c>, and with no version option (<see cref="HttpVersion.None" />)
-    /// <c>http/1.1</c> alone on Windows, as the Schannel build offers, and <c>h2,http/1.1</c> elsewhere, as the
-    /// OpenSSL builds with nghttp2 offer.
-    /// </summary>
-    /// <param name="version">The option group's HTTP version.</param>
-    /// <param name="isWindows">Whether the running system is Windows.</param>
     /// <returns>One of <see cref="HttpApplicationProtocols" />' lists.</returns>
-    internal static IReadOnlyList<string> HttpOverTlsApplicationProtocolsOf(HttpVersion version, bool isWindows) =>
-        version == HttpVersion.None ? DefaultOffer(isWindows) : OfferedFor(version);
+    internal static IReadOnlyList<string> HttpOverTlsApplicationProtocolsOf(HttpVersion version) =>
+        version == HttpVersion.None ? HttpApplicationProtocols.H2ThenHttp11 : OfferedFor(version);
 
     private static IReadOnlyList<string> OfferedFor(HttpVersion version) => version switch
     {
@@ -65,7 +53,4 @@ internal static class HttpVersionMapping
         HttpVersion.Http2PriorKnowledge => HttpApplicationProtocols.H2Only,
         _ => HttpApplicationProtocols.Http11Only,
     };
-
-    private static IReadOnlyList<string> DefaultOffer(bool isWindows) =>
-        isWindows ? HttpApplicationProtocols.Http11Only : HttpApplicationProtocols.H2ThenHttp11;
 }

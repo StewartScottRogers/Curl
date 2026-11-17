@@ -10,7 +10,7 @@ public sealed class KafkaFramingTests
 {
     // The first request: size 27, Metadata (3) v4, correlation id 1, client id "curl", one topic, no auto-creation.
     private static readonly byte[] MetadataRequest =
-        new KafkaWireWriter().Int32(27).Int16(3).Int16(4).Int32(1).String("curl").Int32(1).String(Topic).Int8(0).ToArray();
+        new KafkaWireWriter().Int32(27).Int16(3).Int16(4).Int32(1).String("curl").Int32(1).String(Topic).Int8(1).ToArray();
 
     [TestMethod]
     [SpecRequirement("Kafka:Guide-Framing-1")]
@@ -37,9 +37,9 @@ public sealed class KafkaFramingTests
     public Task Response_WrongCorrelationId_FailsWithWeirdServerReply() =>
         Known.RunCaseAsync(["Kafka:Guide-Framing-2"], async () =>
         {
-            byte[] body = Metadata(1).Answer(new KafkaReferenceRequest(3, 4, 1, "curl", new KafkaWireWriter().Int32(1).String(Topic).Int8(0).ToArray()));
+            byte[] body = Metadata(1).Answer(new KafkaReferenceRequest(3, 4, 1, "curl", new KafkaWireWriter().Int32(1).String(Topic).Int8(1).ToArray()));
             byte[] response = new KafkaWireWriter().Int32(4 + body.Length).Int32(2).Raw(body).ToArray();
-            ScriptedReferenceServer server = new(ScriptStep.ReceiveUntil(Topic + "\0"), ScriptStep.Send(response));
+            ScriptedReferenceServer server = new(ScriptStep.ReceiveUntil(Topic + "\u0001"), ScriptStep.Send(response));
 
             CurlRunResult result = await ExtendedConformanceHarness.RunAsync(CurlRunner, [ReferenceRoute.Tcp(Port, server)], ["-sS", "-m", "10", $"kafka://localhost/{Topic}/0"]);
 
@@ -53,7 +53,7 @@ public sealed class KafkaFramingTests
     public Task Response_TruncatedBeforeItsSize_FailsWithRecvError() =>
         Known.RunCaseAsync(["Kafka:Guide-Framing-3"], async () =>
         {
-            ScriptedReferenceServer server = new(ScriptStep.ReceiveUntil(Topic + "\0"), ScriptStep.Send(new KafkaWireWriter().Int32(100).Int32(1).Int32(0).ToArray()));
+            ScriptedReferenceServer server = new(ScriptStep.ReceiveUntil(Topic + "\u0001"), ScriptStep.Send(new KafkaWireWriter().Int32(100).Int32(1).Int32(0).ToArray()));
 
             CurlRunResult result = await ExtendedConformanceHarness.RunAsync(CurlRunner, [ReferenceRoute.Tcp(Port, server)], ["-sS", "-m", "10", $"kafka://localhost/{Topic}/0"]);
 

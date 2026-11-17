@@ -126,6 +126,14 @@ public sealed class ObliviousDohWireTests
     }
 
     [TestMethod]
+    public void Config_SelectFrom_UsableListWithBytesAfterTheVector_GivesNull()
+    {
+        byte[] entry = [0x00, 0x01, .. TestTarget.Vector(Contents(0x0010, 0x0001, 0x0001, P256Key))];
+
+        Assert.IsNull(ObliviousDohConfig.SelectFrom([.. TestTarget.Vector(entry), 0x00]));
+    }
+
+    [TestMethod]
     public void LengthPrefix_Prepend_OverTheVectorLimit_Throws() =>
         Assert.ThrowsExactly<OverflowException>(() => LengthPrefix.Prepend(new byte[65536]));
 

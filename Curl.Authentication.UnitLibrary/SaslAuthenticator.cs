@@ -186,13 +186,17 @@ public sealed class SaslAuthenticator(
         return $"n,a={user},{FieldSeparator}host={host}{FieldSeparator}{portField}auth=Bearer {token}{FieldSeparator}{FieldSeparator}";
     }
 
-    // GSSAPI runs on the raw Kerberos mechanism with signing keys for its security-layer
-    // message and the --delegation level; NTLM on an NTLM context with neither.
+    // GSSAPI runs on the raw Kerberos mechanism with the --delegation level and no required
+    // message protection; NTLM on an NTLM context with neither. Curl 8.21.0's SSPI build asks
+    // InitializeSecurityContext for no flags, and its context still wraps the security-layer
+    // answer. Asking ProtectionLevel.Sign adds ISC_REQ_INTEGRITY, and with it SSPI's Kerberos
+    // wraps that answer with sequence number 0 rather than the authenticator's, which an RFC 4121
+    // acceptor refuses (535, exit 67; BL-5281).
     private SecurityContextSaslExchange BeginOnSecurityContext(string name, SaslRequest request, ISecurityContextFactory contexts) =>
         name == SaslMechanismRanking.Gssapi
             ? new SecurityContextSaslExchange(
                 name,
-                contexts.Create(SecurityContextSaslExchange.ContextRequestFor(SecurityMechanism.Kerberos, request) with { MessageProtection = ProtectionLevel.Sign, Delegation = GssapiDelegation }),
+                contexts.Create(SecurityContextSaslExchange.ContextRequestFor(SecurityMechanism.Kerberos, request) with { MessageProtection = ProtectionLevel.None, Delegation = GssapiDelegation }),
                 credentialEncoding.GetBytes(request.AuthorizationIdentity ?? string.Empty),
                 WordsGssapiFailuresAsSspi)
             : new SecurityContextSaslExchange(name, contexts.Create(SecurityContextSaslExchange.ContextRequestFor(SecurityMechanism.Ntlm, request)), securityLayerAuthorizationIdentity: null, WordsGssapiFailuresAsSspi);

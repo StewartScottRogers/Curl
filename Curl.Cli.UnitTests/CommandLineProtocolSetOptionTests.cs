@@ -17,7 +17,7 @@ public sealed class CommandLineProtocolSetOptionTests
     private static readonly string[] EveryKnownScheme =
     [
         "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap", "imaps", "ldap", "ldaps",
-        "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smtp", "smtps", "telnet", "tftp", "ws", "wss",
+        "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smb", "smbs", "smtp", "smtps", "telnet", "tftp", "ws", "wss",
     ];
 
     public TestContext TestContext { get; set; } = null!;

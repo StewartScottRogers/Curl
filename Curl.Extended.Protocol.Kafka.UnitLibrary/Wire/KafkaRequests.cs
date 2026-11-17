@@ -71,12 +71,12 @@ internal static class KafkaRequests
             .Int64(offset)
             .Int32(FetchMaxBytes));
 
-    /// <summary>Gives Metadata v4 for one topic, with <c>allow_auto_topic_creation</c> false.</summary>
+    /// <summary>Gives Metadata v4 for one topic, with <c>allow_auto_topic_creation</c> true so a broker that allows it creates an undeclared topic.</summary>
     internal static byte[] Metadata(int correlationId, string topic) =>
         Framed(Header(MetadataApiKey, MetadataVersion, correlationId)
             .Int32(1)
             .String(topic)
-            .Int8(0));
+            .Int8(1));
 
     private static KafkaWriter Header(short apiKey, short apiVersion, int correlationId) =>
         new KafkaWriter().Int16(apiKey).Int16(apiVersion).Int32(correlationId).String(ClientId);

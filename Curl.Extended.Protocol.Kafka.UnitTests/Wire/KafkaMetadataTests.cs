@@ -5,11 +5,11 @@ namespace Curl.Extended.Protocol.Kafka.Wire;
 public sealed class KafkaMetadataTests
 {
     [TestMethod]
-    public void Metadata_Topic_IsHeaderV1AndOneTopicWithoutAutoCreation()
+    public void Metadata_Topic_IsHeaderV1AndOneTopicWithAutoCreation()
     {
         byte[] request = KafkaRequests.Metadata(7, "t");
 
-        byte[] body = new KafkaWriter().Int16(3).Int16(4).Int32(7).String("curl").Int32(1).String("t").Int8(0).ToArray();
+        byte[] body = new KafkaWriter().Int16(3).Int16(4).Int32(7).String("curl").Int32(1).String("t").Int8(1).ToArray();
         CollectionAssert.AreEqual(new KafkaWriter().Int32(body.Length).Raw(body).ToArray(), request);
     }
 

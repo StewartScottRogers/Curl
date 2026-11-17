@@ -34,7 +34,7 @@ public sealed class Cgr234ConnectionTests
 
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Protocol Error"), result);
         Assert.AreEqual(2, connector.Targets.Count);
-        Assert.AreEqual(connector.Targets[0], connector.Targets[1]);
+        Assert.AreEqual(connector.Targets[0] with { Events = NoTransferEvents.Instance }, connector.Targets[1]);
         Assert.IsEmpty(curlConnection.Sent);
         Assert.IsNotEmpty(winLdapConnection.Sent);
         Assert.IsTrue(curlConnection.IsDisposed);
@@ -57,11 +57,28 @@ public sealed class Cgr234ConnectionTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_WinLdapWithCredentials_OpensOneConnection()
+    public async Task ExecuteAsync_WinLdapSimpleBindOverLdap_LeavesCurlsConnectionIdleBesideWinLdapsOwn()
+    {
+        var curlConnection = new ScriptedConnection();
+        var winLdapConnection = new ScriptedConnection();
+        var connector = new SequenceConnector(ConnectResult.Connected(curlConnection), ConnectResult.Connected(winLdapConnection));
+        var handler = new LdapProtocolHandler(connector, LdapDialect.WinLdap, new FakeLogonTokenSource(2, NtlmNegotiate, NtlmNegotiate));
+        var context = new TransferContext { Url = CurlUrl.Parse("ldap://127.0.0.1:21001/dc=bench"), Output = new MemoryStream(), Credentials = new NetworkCredential("user", "secret") };
+
+        await handler.ExecuteAsync(context);
+
+        Assert.HasCount(2, connector.Targets);
+        Assert.IsEmpty(curlConnection.Sent);
+        Assert.IsNotEmpty(winLdapConnection.Sent);
+        Assert.IsTrue(curlConnection.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WinLdapWithCredentialsOverLdaps_OpensOneConnection()
     {
         var connector = new SequenceConnector(ConnectResult.Connected(new ScriptedConnection()));
         var handler = new LdapProtocolHandler(connector, LdapDialect.WinLdap, new FakeLogonTokenSource(2, NtlmNegotiate, NtlmNegotiate));
-        var context = new TransferContext { Url = CurlUrl.Parse("ldap://127.0.0.1:21001/dc=bench"), Output = new MemoryStream(), Credentials = new NetworkCredential("user", "secret") };
+        var context = new TransferContext { Url = CurlUrl.Parse("ldaps://127.0.0.1:21001/dc=bench"), Output = new MemoryStream(), Credentials = new NetworkCredential("user", "secret") };
 
         await handler.ExecuteAsync(context);
 

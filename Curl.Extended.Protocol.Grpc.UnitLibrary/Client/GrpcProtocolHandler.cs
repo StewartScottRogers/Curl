@@ -173,7 +173,22 @@ internal sealed class GrpcProtocolHandler(IConnector connector) : IProtocolHandl
     /// own) as <c>user-agent</c> and each <c>-H</c> as Custom-Metadata (ADR-1227).
     /// </summary>
     private static GrpcRequestHeaderValues HeaderValuesOf(ITransferContext context) =>
-        new(context.MaxTime, GrpcRequestHeaderValues.UserAgentFor(context.Http?.UserAgent), context.Http?.Headers ?? []);
+        new(context.MaxTime, GrpcRequestHeaderValues.UserAgentFor(context.Http?.UserAgent), WithBasicLogin(context.Credentials, context.Http?.Headers ?? []));
+
+    /// <summary>
+    /// Adds <c>-u user:password</c> as an <c>authorization: Basic</c> header in front of the <c>-H</c> values, unless one of them
+    /// already sets <c>Authorization</c> (BL-5296).
+    /// </summary>
+    private static IReadOnlyList<string> WithBasicLogin(System.Net.NetworkCredential? login, IReadOnlyList<string> headers)
+    {
+        if (login is null || headers.Any(static header => header.StartsWith("authorization:", StringComparison.OrdinalIgnoreCase)))
+        {
+            return headers;
+        }
+
+        string token = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{login.UserName}:{login.Password}"));
+        return [$"Authorization: Basic {token}", .. headers];
+    }
 
     /// <summary>Writes one response message as JSON the moment it arrives, flushes it and reports the bytes downloaded so far.</summary>
     /// <returns>The bytes written.</returns>

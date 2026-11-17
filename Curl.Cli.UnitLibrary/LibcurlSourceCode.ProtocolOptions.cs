@@ -13,8 +13,6 @@ public static partial class LibcurlSourceCode
     /// <summary>The buffer size curl's tool sets, and the largest a <c>--limit-rate</c> lowers it from.</summary>
     private const long DefaultBufferSize = 102400;
 
-    /// <summary>The schemes curl 8.22.0's Schannel build writes for <c>--proto all</c>: it has no SMB.</summary>
-    private static readonly HashSet<string> SchemesWithoutLibcurlSupport = ["smb", "smbs"];
 
     private static readonly string[] DebugCallbackLines =
     [
@@ -178,7 +176,7 @@ public static partial class LibcurlSourceCode
     private static string? ProtocolList(IReadOnlySet<string>? schemes) =>
         schemes is null
             ? null
-            : string.Join(",", schemes.Select(scheme => scheme.ToLowerInvariant()).Where(scheme => !SchemesWithoutLibcurlSupport.Contains(scheme)).Order(StringComparer.Ordinal));
+            : string.Join(",", schemes.Select(scheme => scheme.ToLowerInvariant()).Order(StringComparer.Ordinal));
 
     /// <summary>
     /// The <c>--upload-flags</c> line, the last of <c>misc_setopts</c>: written whenever the flags are not

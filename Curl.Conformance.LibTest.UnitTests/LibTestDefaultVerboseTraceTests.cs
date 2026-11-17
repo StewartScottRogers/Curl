@@ -27,6 +27,17 @@ public sealed class LibTestDefaultVerboseTraceTests
     }
 
     [TestMethod]
+    public void Trace_TextStartingWithLineFeed_PrefixesTheEmptyFirstLineAndTheRest()
+    {
+        var output = new StringWriter();
+        var trace = new LibTestDefaultVerboseTrace(output);
+
+        trace.Trace(CurlInfoType.Text, Encoding.Latin1.GetBytes("\nrest\n"));
+
+        Assert.AreEqual("* \n* rest\n", output.ToString());
+    }
+
+    [TestMethod]
     public void Trace_DataAndEmptyText_WritesNothing()
     {
         var output = new StringWriter();
