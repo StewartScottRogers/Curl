@@ -1,4 +1,4 @@
-# ADR-1284: A SignalR negotiate redirect to another origin drops the user's Authorization
+# ADR-1286: A SignalR negotiate redirect to another origin drops the user's Authorization
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-5311).
 
