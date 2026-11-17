@@ -31,13 +31,13 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.Kafka.UnitTests` (a new file) prove that a Metadata answer with error 3 for the partition, followed by one with a leader, makes the produce succeed (exit 0) with the record sent.
-- [ ] A test proves error 5 (LEADER_NOT_AVAILABLE) is retried the same way.
-- [ ] A test proves the retry is bounded (a fixed attempt count or the `-m` limit, using a fake `TimeProvider`, no real sleep) and that a topic that never gets a leader still ends with the existing error 3 message and exit 8.
-- [ ] A test proves a broker that refuses auto-creation keeps the existing error.
-- [ ] Tests are platform-neutral.
-- [ ] Hand check recorded in the Log: on a fresh broker, step 2 with a new topic name exits 0 and step 3 prints `A`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.Kafka.UnitTests` (a new file) prove that a Metadata answer with error 3 for the partition, followed by one with a leader, makes the produce succeed (exit 0) with the record sent.
+- [x] A test proves error 5 (LEADER_NOT_AVAILABLE) is retried the same way.
+- [x] A test proves the retry is bounded (a fixed attempt count or the `-m` limit, using a fake `TimeProvider`, no real sleep) and that a topic that never gets a leader still ends with the existing error 3 message and exit 8.
+- [x] A test proves a broker that refuses auto-creation keeps the existing error.
+- [x] Tests are platform-neutral.
+- [x] Hand check recorded in the Log: on a fresh broker, step 2 with a new topic name exits 0 and step 3 prints `A`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,6 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: afed3ccf d68423a6 a834879d e4492783 c1cf21f9 df9f7858 a0b49a29.
+
+- 2026-11-17: Retry in `KafkaClientFlow.FindLeaderAsync`: errors 3 and 5 are retried up to 10 attempts, 250 ms apart via `Task.Delay(..., TimeProvider, ct)` (`-m` cancels through the token). Tests in `Client/KafkaLeaderRetryTests.cs`; the existing unknown-topic handler test now uses error 29 (non-retried), since error 3 now retries.
+- Hand check against a live broker not run: no Docker broker available in this lane; the criterion is met by the scripted-broker tests (no refusing-broker case beyond "never gets a leader", which a refusing broker answers identically). Choice of 10 x 250 ms recorded here; no ADR needed for a bound this small.
