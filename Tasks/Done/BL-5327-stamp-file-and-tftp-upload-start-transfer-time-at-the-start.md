@@ -8,7 +8,7 @@ depends-on: [BL-5326]
 touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs, Curl.Original.Protocol.File.UnitTests/FileTransferTimingsTests.cs, Curl.Original.Protocol.Tftp.UnitLibrary/TftpTransferTimings.cs, Curl.Original.Protocol.Tftp.UnitLibrary/TftpUpload.cs, Curl.Original.Protocol.Tftp.UnitTests/TftpTransferTimingsTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5327 — Stamp FILE and TFTP upload start-transfer time at the start of the upload
 
@@ -48,3 +48,4 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 99955f53 a365cfcb 79ab3049 821941df a0b49a29.
 - 2026-11-16: Done. Upload timings now carry no first-byte stamp (FILE `WithTimings`, TFTP `Stamp(result, isUpload)`), so `%{time_starttransfer}` is 0.000000. Hand check: Curl and real curl 8.22.0 (Schannel) both print `tst=0.000000` with non-zero `tt` for `-T big.bin file:///C:/temp/w.out`; the TFTP case is covered by the in-memory stand-in tests. Download keeps its stamp; a TFTP download's stamp equals its total by BL-5102's design (first byte counts at completion), so the test pins it as kept and above start, not strictly below total. Measure-CodeQuality for File and Tftp: 0 failing members.
+- 2026-11-16: Doing -> Done. Upload start-transfer stamp removed for FILE and TFTP
