@@ -6166,7 +6166,7 @@ internal sealed class CurlCommandRunner(
     /// <summary>The <c>--extended-help</c> line for the options of <see cref="CurlOnlyOptionsMarkdown" />.</summary>
     private static readonly string[] CurlOnlyOptionLines =
     [
-        "diagnostic-log: Curl's own diagnostic log, not curl's -v: --log-level <level> sets how much is logged and --log-file <file> where. Schemes: none. Options: --log-level, --log-file.",
+        "diagnostic-log: Curl's own diagnostic log, not curl's -v: --log-level <level> sets how much is logged and --log-file <file> where. Schemes: none. Options: --log-level <level>, --log-file <file>.",
     ];
 
     /// <summary>Whether <c>CURL_EXTENSIONS</c> is anything but <c>0</c>: under <c>0</c> the help pages are curl's own.</summary>

@@ -66,6 +66,25 @@ public sealed class ExtensionTransferHookTests
         Assert.IsNull(CurlComposition.ExtensionTransferHooksOf(new CommandLineOptions(), server, new TcpConnectionListener()));
     }
 
+    [TestMethod]
+    public async Task RunAsync_ATransferHookRefusesItsOptions_PrintsACommandLineErrorWithoutDotNetText()
+    {
+        int exitCode = await CurlComposition.CreateRunner(
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                server,
+                new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
+                extensionOptions: [HookOption],
+                extensionTransferHookActivators: [_ => throw new ArgumentException("--test-hook needs --other", "values")])
+            .RunAsync(["--test-hook", "x", "http://127.0.0.1/"]);
+
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(
+            "curl: --test-hook needs --other" + Environment.NewLine + CommandLineRefusal.TryHelpLine + Environment.NewLine,
+            Encoding.UTF8.GetString(standardError.ToArray()).Replace("\r\n", "\n").Replace("\n", Environment.NewLine));
+    }
+
     private ITransferHook? ActivatedByTheTestOption(ExtensionOptionValues values) =>
         values.ValueOf(HookOption) is { } value ? hook.WithValue(value) : null;
 

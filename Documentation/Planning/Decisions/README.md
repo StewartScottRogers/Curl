@@ -1330,3 +1330,4 @@ Each option and the specific reason it lost.
 | [1286](ADR-1286-a-signalr-negotiate-redirect-to-another-origin-drops-the-users-authorization.md) | A SignalR negotiate redirect to another origin drops the user's Authorization (BL-5311) | Accepted | 2026-11-16 |
 | [1287](ADR-1287-xattr-on-windows-writes-a-zone-identifier-stream-as-curl-8-22-does.md) | --xattr on Windows writes a Zone.Identifier stream, as curl 8.22 does (BL-5338) |
 | [1288](ADR-1288-itransfercontext-carries-the-no-proxy-list-as-text.md) | ITransferContext carries the no-proxy list as text (BL-5346) | Accepted | 2026-11-16 |
+| [1289](ADR-1289-extension-option-errors-are-command-line-errors-without-net-exception-text.md) | Extension option errors are command-line errors without .NET exception text (BL-5344) | Accepted | 2026-11-17 |
