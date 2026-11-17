@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapFilterEncoder.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapFilterEncoderTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5334 — Match WinLDAP filter parsing for an unescaped parenthesis and a doubly parenthesized filter
 
@@ -50,3 +50,4 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: fa91a230 e63441ff 43624dc8 da995b7d d0b35249 a0b49a29.
 - 2026-11-16: WinLDAP now refuses an unescaped `(` inside a simple item and accepts `((item))` as the inner item; OpenLDAP unchanged (tests pin all three refused). Handler stand-in test shows bind + unbind only, no SearchRequest. Hand check: the three repros are covered by the encoder and handler tests (real WinLDAP curl cannot be served here; the expected behaviour is taken from the finding). Quality run: 0 failing members, 100%/100%. Tests are platform-neutral (dialect explicit).
+- 2026-11-16: Doing -> Done. WinLDAP refuses an unescaped ( in a filter item and accepts ((item)); tests and quality gate green
