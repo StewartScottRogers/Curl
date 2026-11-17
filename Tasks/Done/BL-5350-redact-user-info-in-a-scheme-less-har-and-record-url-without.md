@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Har.UnitLibrary/HarTransferHook.cs, Curl.Extension.RecordReplay.UnitLibrary/RecordReplayTransferHook.cs, Curl.Extension.Har.UnitTests, Curl.Extension.RecordReplay.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5350 — Redact user info in a scheme-less --har and --record URL without throwing on a one-character URL
 
@@ -29,15 +29,18 @@ Found by the shift-end review of 2026-11-16 (type-design-analyzer, confirmed by 
 
 ## Acceptance criteria
 
-- [ ] `Redacted("x")` and `Redacted("")` return their input without throwing, in both hooks.
-- [ ] `Redacted("user:secret@example.com/path")` returns a string that does not contain `secret` and that holds `REDACTED:REDACTED@example.com/path`, in both hooks.
-- [ ] `Redacted("example.com/?u=http://a@b/")` does not change the query, in both hooks.
-- [ ] Each case has a unit test in `Curl.Extension.Har.UnitTests` and `Curl.Extension.RecordReplay.UnitTests`.
-- [ ] Both libraries still meet the four quality gates.
+- [x] `Redacted("x")` and `Redacted("")` return their input without throwing, in both hooks.
+- [x] `Redacted("user:secret@example.com/path")` returns a string that does not contain `secret` and that holds `REDACTED:REDACTED@example.com/path`, in both hooks.
+- [x] `Redacted("example.com/?u=http://a@b/")` does not change the query, in both hooks.
+- [x] Each case has a unit test in `Curl.Extension.Har.UnitTests` and `Curl.Extension.RecordReplay.UnitTests`.
+- [x] Both libraries still meet the four quality gates.
 
 ## Notes
+
+The scheme counts only when `://` comes before the first `/`, `?` or `#`, so a `://` in a query is not a scheme. Without a scheme the authority starts at 0. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 6cb4cc4d 71cdac43 cdebcb97 d8c26815 00faa597.
+- 2026-11-17: Doing -> Done. Redacted handles scheme-less URLs in both hooks; tests added

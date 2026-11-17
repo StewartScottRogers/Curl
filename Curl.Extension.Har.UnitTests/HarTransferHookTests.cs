@@ -254,6 +254,10 @@ public sealed class HarTransferHookTests
     [DataRow("http://u@example.com:80/p@q", "http://REDACTED:REDACTED@example.com:80/p@q")]
     [DataRow("example.com/u@v", "example.com/u@v")]
     [DataRow("http://example.com", "http://example.com")]
+    [DataRow("x", "x")]
+    [DataRow("", "")]
+    [DataRow("user:secret@example.com/path", "REDACTED:REDACTED@example.com/path")]
+    [DataRow("example.com/?u=http://a@b/", "example.com/?u=http://a@b/")]
     public void Redacted_AUrl_ReplacesOnlyTheUserInfo(string url, string expected) =>
         Assert.AreEqual(expected, HarTransferHook.Redacted(url));
 

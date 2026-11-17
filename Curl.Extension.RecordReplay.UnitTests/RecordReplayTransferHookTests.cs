@@ -234,6 +234,10 @@ public sealed class RecordReplayTransferHookTests
     [DataRow("http://u:p@example.com", "http://REDACTED:REDACTED@example.com")]
     [DataRow("example.com/u@v", "example.com/u@v")]
     [DataRow("http://example.com", "http://example.com")]
+    [DataRow("x", "x")]
+    [DataRow("", "")]
+    [DataRow("user:secret@example.com/path", "REDACTED:REDACTED@example.com/path")]
+    [DataRow("example.com/?u=http://a@b/", "example.com/?u=http://a@b/")]
     public void Redacted_AUrl_ReplacesOnlyTheUserInfo(string url, string expected) =>
         Assert.AreEqual(expected, RecordReplayTransferHook.Redacted(url));
 
