@@ -47,6 +47,6 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
             result = TransferResult.Failure(CurlExitCode.CouldntConnect, refused.Message);
         }
 
-        return recorder.ReportOn(result);
+        return recorder.ReportOn(result, handlerCountsConnections: result.Report is not null && context.Url.Scheme is "http" or "https");
     }
 }
