@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Smb.UnitLibrary/SmbProtocolHandler.cs, Curl.Original.Protocol.Smb.UnitLibrary/SmbFileTransfer.cs, Curl.Original.Protocol.Smb.UnitTests/SmbWriteOutReportTests.cs]
+touches: [Curl.Original.Protocol.Smb.UnitLibrary/SmbProtocolHandler.cs, Curl.Original.Protocol.Smb.UnitLibrary/SmbFileTransfer.cs, Curl.Original.Protocol.Smb.UnitTests/SmbWriteOutReportTests.cs, Curl.Original.Protocol.Smb.UnitLibrary/SmbCountingConnection.cs, Curl.Original.Protocol.Smb.UnitTests/SmbProtocolHandlerTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5328 — Report SMB timings, speeds and request size in write-out
 
@@ -34,11 +34,11 @@ Reference note: curl 8.22.0 with Schannel has SMB disabled (`curl: (1) Protocol 
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Smb.UnitTests/SmbWriteOutReportTests.cs`, driven by the existing fake SMB connection and a fake advancing `TimeProvider`, prove a download and an upload each return a `TransferReport` with non-zero connect, pretransfer, start-transfer and total timings, `RequestSize` equal to the bytes the stand-in saw the client send, and (upload) `UploadSize` unchanged.
-- [ ] A test proves a failed transfer (for example a refused session setup) still returns its exit code with whatever timings were reached.
-- [ ] Tests are platform-neutral (stand-ins, no real network).
-- [ ] Hand check, recorded in the Log: both repro commands print non-zero `time_total`, `time_connect` and `speed_*`, and `size_request` > 0; if no SMB server is available the Log says so.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Smb.UnitTests/SmbWriteOutReportTests.cs`, driven by the existing fake SMB connection and a fake advancing `TimeProvider`, prove a download and an upload each return a `TransferReport` with non-zero connect, pretransfer, start-transfer and total timings, `RequestSize` equal to the bytes the stand-in saw the client send, and (upload) `UploadSize` unchanged.
+- [x] A test proves a failed transfer (for example a refused session setup) still returns its exit code with whatever timings were reached.
+- [x] Tests are platform-neutral (stand-ins, no real network).
+- [x] Hand check, recorded in the Log: both repro commands print non-zero `time_total`, `time_connect` and `speed_*`, and `size_request` > 0; if no SMB server is available the Log says so.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,5 @@ Reference note: curl 8.22.0 with Schannel has SMB disabled (`curl: (1) Protocol 
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: fe77a9de 5174e641 51ca995c 5caf5fb1 a0b49a29.
+- 2026-11-16: Done. `SmbProtocolHandler` wraps the connection in new `SmbCountingConnection` (counts bytes written = RequestSize, stamps first read) and adds `TransferTimings` (connector's connect timings, request ready after connect, first byte, completed) to the report, keeping UploadSize. SmbFileTransfer.cs needed no change. One old test asserted a null report on a failure; now asserts the upload size 0. Added files to `touches`. Hand check: no SMB server available in this lane (impacket is Python, forbidden), so the repro was not run; the unit tests with a fake advancing clock cover it. Platform-neutral stand-ins. Smb tests 203 pass; Measure-CodeQuality for the library: 0 failing members. Built clean.
+- 2026-11-16: Doing -> Done. SMB write-out timings and request size reported

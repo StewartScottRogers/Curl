@@ -106,6 +106,7 @@ public sealed class SmbProtocolHandler : IProtocolHandler
             return credentialsRefused;
         }
 
+        long started = context.TimeProvider.GetTimestamp();
         CurlUrl url = context.Url;
         if (SmbUrlPath.TryParse(url.AbsolutePath, out SmbUrlPath? path) is { } pathError)
         {
@@ -128,13 +129,25 @@ public sealed class SmbProtocolHandler : IProtocolHandler
 
         TransferResult result;
         bool closes;
-        await using (connection.ConfigureAwait(false))
+        long requestReady = context.TimeProvider.GetTimestamp();
+        var counting = new SmbCountingConnection(connection, context.TimeProvider);
+        await using (counting.ConfigureAwait(false))
         {
-            (result, closes) = await TransferAsync(connection, context, path!).ConfigureAwait(false);
+            (result, closes) = await TransferAsync(counting, context, path!).ConfigureAwait(false);
         }
 
         ReportConnectionEnd(context.Events, result, closes, connect.ConnectionNumber);
-        return result;
+        return StampReport(result, context.TimeProvider, new TransferTimings(started, connect.Timings, requestReady, null, null, 0), counting);
+    }
+
+    // Adds the timings behind %{time_*} and %{speed_*} and the request bytes behind %{size_request}
+    // to the report the transfer made, keeping what it already reported such as the upload size (BL-5328).
+    private static TransferResult StampReport(TransferResult result, TimeProvider timeProvider, TransferTimings reached, SmbCountingConnection counting)
+    {
+        long completed = timeProvider.GetTimestamp();
+        TransferTimings timings = reached with { FirstByteReceived = counting.FirstReadAt, Completed = completed };
+        TransferReport report = (result.Report ?? new TransferReport()) with { Timings = timings, RequestSize = counting.BytesWritten };
+        return result with { Report = report };
     }
 
     /// <summary>
