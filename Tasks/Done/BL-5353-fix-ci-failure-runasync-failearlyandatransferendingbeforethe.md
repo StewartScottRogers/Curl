@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests, Curl.Console]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5353 — Fix CI failure RunAsync_FailEarlyAndATransferEndingBeforeTheAbortLands_CompletesIt on Linux
 
@@ -36,3 +36,4 @@ Cause: `--fail-early`'s 1 s abort timer (real clock) raced the multi loop's 1 s 
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 2d5ad350.
+- 2026-11-17: Doing -> Done. Test now uses a clock whose timers never fire, so the 1 s abort cannot race the multi poll
