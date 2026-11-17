@@ -4,7 +4,7 @@ title: Skip the oci:// proxy on a hop whose host matches --noproxy or NO_PROXY
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-5346]
 touches: [Curl.Extended.Protocol.OciRegistry.UnitLibrary/Client/TransferEventsConnector.cs, Curl.Extended.Protocol.OciRegistry.UnitTests/Client/OciRegistryProxyTests.cs]
 requirement: none
 created: 2026-11-16
