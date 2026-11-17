@@ -46,3 +46,4 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 - 2026-11-16: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b3f913f3 22fb8e7e 3e2c923c d5c8ccad a0b49a29.
 - 2026-11-17: Doing -> Backlog. Lane 8 could not integrate: quality gates missed by 1 member(s) of files it changed: HttpRequestFraming.get_IsChunkedOnlyByHeader() (Curl.Original.Protocol.Http.UnitLibrary/HttpRequestFraming.cs: branch); the repair run's commit failed. The work is on branch factory/BL-5335-lane-8-20261116-204618; start with git cherry-pick --no-commit factory/BL-5335-lane-8-20261116-204618 and fix it.
+- 2026-11-17: Backlog -> Doing. Criteria at claim: b3f913f3 22fb8e7e 3e2c923c d5c8ccad a0b49a29.
