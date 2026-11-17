@@ -126,6 +126,80 @@ public sealed class McpStdioSessionTests
     }
 
     [TestMethod]
+    public async Task EndAsync_MaxTimeAlreadyPassed_KillsAtOnceWithoutWaiting()
+    {
+        var process = new InMemoryMcpServerProcess(string.Empty, exitsWhenInputCloses: false);
+        var timeProvider = new FiredOnDemandTimeProvider();
+        var session = new McpStdioSession(process, timeProvider, TimeSpan.FromSeconds(3), operationStarted: 0);
+        timeProvider.NowSeconds = 4;
+
+        await session.EndAsync();
+
+        Assert.IsTrue(process.Killed);
+        Assert.IsTrue(process.Disposed);
+        Assert.IsEmpty(timeProvider.DueTimes);
+    }
+
+    [TestMethod]
+    public async Task EndAsync_OneSecondLeftOnMaxTime_WaitsAtMostOneSecond()
+    {
+        var process = new InMemoryMcpServerProcess(string.Empty, exitsWhenInputCloses: false);
+        var timeProvider = new FiredOnDemandTimeProvider();
+        var session = new McpStdioSession(process, timeProvider, TimeSpan.FromSeconds(3), operationStarted: 0);
+        timeProvider.NowSeconds = 2;
+
+        var ending = session.EndAsync();
+        timeProvider.FireTimers();
+        await ending;
+
+        Assert.IsTrue(process.Killed);
+        CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1) }, timeProvider.DueTimes);
+    }
+
+    [TestMethod]
+    public async Task EndAsync_MoreThanTheGracePeriodLeftOnMaxTime_WaitsTheGracePeriod()
+    {
+        var process = new InMemoryMcpServerProcess(string.Empty, exitsWhenInputCloses: false);
+        var timeProvider = new FiredOnDemandTimeProvider();
+        var session = new McpStdioSession(process, timeProvider, TimeSpan.FromSeconds(60));
+
+        var ending = session.EndAsync();
+        timeProvider.FireTimers();
+        await ending;
+
+        CollectionAssert.AreEqual(new[] { McpStdioSession.ExitGracePeriod }, timeProvider.DueTimes);
+    }
+
+    [TestMethod]
+    public async Task EndAsync_CleanExitWithTimeLeft_IsWaitedForAndNotKilled()
+    {
+        var process = new InMemoryMcpServerProcess(string.Empty);
+        var timeProvider = new FiredOnDemandTimeProvider();
+        var session = new McpStdioSession(process, timeProvider, TimeSpan.FromSeconds(10), operationStarted: 0);
+
+        await session.EndAsync();
+
+        Assert.IsFalse(process.Killed);
+        Assert.IsTrue(process.InputClosedBeforeExitWait);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_WithoutEndAsync_KillsAtOnceWithoutWaiting()
+    {
+        // The transfer failed (for example the server wrote invalid JSON): no 5-second wait.
+        var process = new InMemoryMcpServerProcess(string.Empty, exitsWhenInputCloses: false);
+        var timeProvider = new FiredOnDemandTimeProvider();
+        var session = new McpStdioSession(process, timeProvider);
+
+        await session.DisposeAsync();
+
+        Assert.IsTrue(process.InputClosed);
+        Assert.IsTrue(process.Killed);
+        Assert.IsTrue(process.Disposed);
+        Assert.IsEmpty(timeProvider.DueTimes);
+    }
+
+    [TestMethod]
     public async Task DisposeAsync_AfterEndAsync_DoesNothingMore()
     {
         var process = new InMemoryMcpServerProcess(string.Empty, exitsWhenInputCloses: false);

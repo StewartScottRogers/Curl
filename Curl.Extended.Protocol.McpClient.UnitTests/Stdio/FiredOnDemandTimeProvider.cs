@@ -7,6 +7,13 @@ internal sealed class FiredOnDemandTimeProvider : TimeProvider
 
     public List<TimeSpan> DueTimes { get; } = [];
 
+    /// <summary>Gets or sets the clock: <see cref="GetTimestamp"/> returns this many seconds.</summary>
+    public double NowSeconds { get; set; }
+
+    public override long TimestampFrequency => 1000;
+
+    public override long GetTimestamp() => (long)(NowSeconds * 1000);
+
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
         timers.Add((callback, state));
