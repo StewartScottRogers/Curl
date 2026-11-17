@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Sigstore.UnitLibrary/SigstoreTransferHook.cs, Curl.Extension.Sigstore.UnitLibrary/SigstoreExtension.cs, Curl.Extension.Sigstore.UnitTests]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5325 — Refuse --sigstore-identity, --sigstore-root and --sigstore-issuer without --sigstore-bundle
 
@@ -30,11 +30,11 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extension.Sigstore.UnitTests` prove each of `--sigstore-identity`, `--sigstore-root` and `--sigstore-issuer` given alone, and all three together, without `--sigstore-bundle`, return exit 2 with a message naming `--sigstore-bundle` and the option given, and that the transfer never starts (the stand-in transport sees no request).
-- [ ] A test proves the existing cases are unchanged: `--sigstore-bundle` with identity and root still verifies, `--sigstore-bundle` alone still exits 2 with its existing message, and no sigstore option at all is a no-op.
-- [ ] Tests are platform-neutral.
-- [ ] Review acceptance check recorded in the Log as a hand check: the repro command exits 2 naming `--sigstore-bundle`, `sg.out` is not created, and the server logs no request.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extension.Sigstore.UnitTests` prove each of `--sigstore-identity`, `--sigstore-root` and `--sigstore-issuer` given alone, and all three together, without `--sigstore-bundle`, return exit 2 with a message naming `--sigstore-bundle` and the option given, and that the transfer never starts (the stand-in transport sees no request).
+- [x] A test proves the existing cases are unchanged: `--sigstore-bundle` with identity and root still verifies, `--sigstore-bundle` alone still exits 2 with its existing message, and no sigstore option at all is a no-op.
+- [x] Tests are platform-neutral.
+- [x] Review acceptance check recorded in the Log as a hand check: the repro command exits 2 naming `--sigstore-bundle`, `sg.out` is not created, and the server logs no request.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -45,3 +45,5 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 3721fc72 605337b5 c1cf21f9 116dc05a a0b49a29.
+- 2026-11-16: Hand check: the repro exits 2 with `--sigstore-identity, --sigstore-root, --sigstore-issuer needs --sigstore-bundle`, sg.out is not created, no request is sent (refused in the hook before transfer). Hook now activates on any --sigstore-* option; BundlePath is nullable. Quality run: Sigstore library 100/100.
+- 2026-11-16: Doing -> Done. Companion sigstore options without --sigstore-bundle exit 2

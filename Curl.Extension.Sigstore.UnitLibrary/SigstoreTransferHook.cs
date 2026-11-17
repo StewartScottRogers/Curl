@@ -17,20 +17,29 @@ internal sealed class SigstoreTransferHook(SigstoreExpectation expectation) : IT
 
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
+        if (expectation.BundlePath is not { } bundlePath)
+        {
+            return TransferResult.Failure(CurlExitCode.FailedInit, $"{CompanionsGiven()} needs --sigstore-bundle");
+        }
+
         if (expectation.Identity is not { } identity || expectation.RootPath is not { } rootPath)
         {
             return TransferResult.Failure(CurlExitCode.FailedInit, "--sigstore-bundle needs --sigstore-identity and --sigstore-root");
         }
 
-        if (await ReadBundleAsync(context.CancellationToken) is not { } bundle)
+        if (await ReadBundleAsync(bundlePath, context.CancellationToken) is not { } bundle)
         {
-            return TransferResult.Failure(CurlExitCode.ReadError, $"--sigstore-bundle: {expectation.BundlePath} is not a readable Sigstore bundle");
+            return TransferResult.Failure(CurlExitCode.ReadError, $"--sigstore-bundle: {bundlePath} is not a readable Sigstore bundle");
         }
 
         return ReadRoots(rootPath) is { Count: > 0 } roots
             ? await VerifiedTransferAsync(context, next, bundle, roots, identity)
             : TransferResult.Failure(CurlExitCode.ReadError, $"--sigstore-root: {rootPath} holds no readable PEM certificate");
     }
+
+    private string CompanionsGiven() =>
+        string.Join(", ", new[] { (expectation.Identity, "--sigstore-identity"), (expectation.RootPath, "--sigstore-root"), (expectation.Issuer, "--sigstore-issuer") }
+            .Where(option => option.Item1 is not null).Select(option => option.Item2));
 
     private async Task<TransferResult> VerifiedTransferAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next, SigstoreBundle bundle, X509Certificate2Collection roots, string identity)
     {
@@ -61,11 +70,11 @@ internal sealed class SigstoreTransferHook(SigstoreExpectation expectation) : IT
     private static bool IsRedirect(TransferResult result) =>
         result.Report is { ResponseCode: >= 300 and < 400, RedirectUrl: not null };
 
-    private async Task<SigstoreBundle?> ReadBundleAsync(CancellationToken cancellationToken)
+    private async Task<SigstoreBundle?> ReadBundleAsync(string bundlePath, CancellationToken cancellationToken)
     {
         try
         {
-            return SigstoreBundle.Parse(await File.ReadAllBytesAsync(expectation.BundlePath, cancellationToken));
+            return SigstoreBundle.Parse(await File.ReadAllBytesAsync(bundlePath, cancellationToken));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
         {

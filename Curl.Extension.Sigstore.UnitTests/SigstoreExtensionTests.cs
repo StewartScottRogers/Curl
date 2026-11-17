@@ -17,10 +17,9 @@ public sealed class SigstoreExtensionTests
     }
 
     [TestMethod]
-    public void HookFor_NoBundleGiven_GivesNone()
+    public void HookFor_NoSigstoreOptionGiven_GivesNone()
     {
         Assert.IsNull(SigstoreExtension.HookFor(ExtensionOptionValues.None));
-        Assert.IsNull(SigstoreExtension.HookFor(Given(("sigstore-identity", "me@example.com"))));
         Assert.ThrowsExactly<ArgumentNullException>(() => SigstoreExtension.HookFor(null!));
     }
 
@@ -38,9 +37,10 @@ public sealed class SigstoreExtensionTests
     }
 
     [TestMethod]
-    public void Composition_ActivatesTheHookOnlyWhenTheBundleIsGiven()
+    public void Composition_ActivatesTheHookOnlyWhenASigstoreOptionIsGiven()
     {
         Assert.IsTrue(TransferHooks.ActivatedBy(Given(("sigstore-bundle", "a.sigstore.json")), ExtensionTransferHookCatalogue.Entries).Hooks.OfType<SigstoreTransferHook>().Any());
+        Assert.IsTrue(TransferHooks.ActivatedBy(Given(("sigstore-root", "r.pem")), ExtensionTransferHookCatalogue.Entries).Hooks.OfType<SigstoreTransferHook>().Any());
         Assert.IsFalse(TransferHooks.ActivatedBy(ExtensionOptionValues.None, ExtensionTransferHookCatalogue.Entries).Hooks.OfType<SigstoreTransferHook>().Any());
     }
 
