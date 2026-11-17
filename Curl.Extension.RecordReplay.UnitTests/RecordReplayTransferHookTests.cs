@@ -194,6 +194,49 @@ public sealed class RecordReplayTransferHookTests
         Assert.IsNull(result.Report.RedirectUrl);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_RecordAUrlWithUserInfo_WritesNoPasswordAndReplayStillFindsIt_Adr1135()
+    {
+        const string url = "http://bob:URLSECRET5@example.com/r";
+        await Hook(record: _directory).ExecuteAsync(Context(url), new FakeServer(Head, "body").Invoke);
+        var context = Context(url);
+
+        var result = await Hook(replay: _directory).ExecuteAsync(context, NeverCalled);
+
+        var file = Directory.GetFiles(_directory).Single();
+        var text = Encoding.Latin1.GetString(File.ReadAllBytes(file));
+        Assert.DoesNotContain("URLSECRET5", text);
+        Assert.DoesNotContain("URLSECRET5", Path.GetFileName(file));
+        Assert.StartsWith("CURL-EXCHANGE 1\nGET http://REDACTED:REDACTED@example.com/r\n", text);
+        Assert.AreEqual("body", Text(context.Output));
+        Assert.AreEqual("http://REDACTED:REDACTED@example.com/r", result.Report!.EffectiveUrl);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReplayAMissingExchangeForAUrlWithUserInfo_FailsWithoutThePassword_Adr1135()
+    {
+        var result = await Hook(replay: _directory).ExecuteAsync(Context("http://bob:URLSECRET5@example.com/r"), NeverCalled);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.DoesNotContain("URLSECRET5", result.ErrorMessage ?? string.Empty);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RecordAUrlWithoutUserInfo_WritesItUnchanged_Adr1135()
+    {
+        await Hook(record: _directory).ExecuteAsync(Context("http://example.com/r?a=b@c"), new FakeServer(Head, "body").Invoke);
+
+        var text = Encoding.Latin1.GetString(File.ReadAllBytes(Directory.GetFiles(_directory).Single()));
+        Assert.StartsWith("CURL-EXCHANGE 1\nGET http://example.com/r?a=b@c\n", text);
+    }
+
+    [TestMethod]
+    [DataRow("http://u:p@example.com", "http://REDACTED:REDACTED@example.com")]
+    [DataRow("example.com/u@v", "example.com/u@v")]
+    [DataRow("http://example.com", "http://example.com")]
+    public void Redacted_AUrl_ReplacesOnlyTheUserInfo(string url, string expected) =>
+        Assert.AreEqual(expected, RecordReplayTransferHook.Redacted(url));
+
     private static ValueTask<TransferResult> NeverCalled(ITransferContext context) => throw new AssertFailedException("The server was contacted.");
 
     private static string Text(Stream stream) => Encoding.Latin1.GetString(((MemoryStream)stream).ToArray());

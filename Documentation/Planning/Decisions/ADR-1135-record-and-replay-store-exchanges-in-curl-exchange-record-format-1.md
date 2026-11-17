@@ -29,7 +29,7 @@ response, which is all record and replay need.
    creates. A recording replaces the file of the same key by writing a temporary file and moving it into place, so a
    reader sees the old exchange or the new one, never half of one.
 2. **Key.** The request's method and the URL as the transfer was given it form the Latin-1 line
-   `<method> <url>` and an LF; the `-d` body bytes follow; the key is the lowercase hexadecimal SHA-256 of those
+   `<method> <url>` (the URL with any user information replaced by `REDACTED:REDACTED`, BL-5323, so the recording holds no password and replay keys on the same form) and an LF; the `-d` body bytes follow; the key is the lowercase hexadecimal SHA-256 of those
    bytes. The method is `-X`'s when given, else `HEAD` for `-I`, `POST` for a `-d` or `-F` body, `PUT` for `-T`, and
    `GET` otherwise.
 3. **File.** The Latin-1 line `CURL-EXCHANGE 1`, the line `<method> <url>`, the line
