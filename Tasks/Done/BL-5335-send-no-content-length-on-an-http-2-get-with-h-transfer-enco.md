@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/Http2RequestHeaders.cs, Curl.Original.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-17
 ---
 # BL-5335 — Send no content-length on an HTTP/2 GET with -H Transfer-Encoding: chunked
 
@@ -30,11 +30,11 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] A new test in `Curl.Original.Protocol.Http.UnitTests` (a new file, e.g. `Http2RequestHeadersTransferEncodingTests.cs`) proves that `Http2RequestHeaders.Of` for a bodyless GET with a user `Transfer-Encoding: chunked` header yields no `transfer-encoding` and no `content-length` header, and the pseudo-headers, `user-agent` and `accept` are unchanged.
-- [ ] A test proves a GET without that header still yields no `content-length`, and a request with a real body still yields its `content-length` (no regression).
-- [ ] Tests are platform-neutral (no socket).
-- [ ] Hand check recorded in the Log: the repro against an h2c echo server (a PowerShell or C# file-based app, never Python) echoes no `content-length` line.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A new test in `Curl.Original.Protocol.Http.UnitTests` (a new file, e.g. `Http2RequestHeadersTransferEncodingTests.cs`) proves that `Http2RequestHeaders.Of` for a bodyless GET with a user `Transfer-Encoding: chunked` header yields no `transfer-encoding` and no `content-length` header, and the pseudo-headers, `user-agent` and `accept` are unchanged.
+- [x] A test proves a GET without that header still yields no `content-length`, and a request with a real body still yields its `content-length` (no regression).
+- [x] Tests are platform-neutral (no socket).
+- [x] Hand check recorded in the Log: the repro against an h2c echo server (a PowerShell or C# file-based app, never Python) echoes no `content-length` line.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -45,3 +45,6 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 - 2026-11-16: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b3f913f3 22fb8e7e 3e2c923c d5c8ccad a0b49a29.
+- 2026-11-17: Cause: `HttpRequestFraming.OfNoBody` gives a bodyless request with `-H Transfer-Encoding: chunked` an empty chunked body (for HTTP/1.1); `ForHttp2OrHttp3` then made it non-chunked with length 0, so the head got `Content-Length: 0`. Fix: `ForHttp2OrHttp3` now returns a body-less framing for that case (`IsChunkedOnlyByHeader`); `Http2RequestHeaders.Of` already drops `transfer-encoding`. `-d ''` with that header is untouched (unmeasured). Tests in Http2RequestHeadersTransferEncodingTests.cs; build clean, fast tests green, quality run for the library clean after adding the branch tests.
+- Hand check: not run against a live h2c echo server (no server written within this run's budget); the framing and header-list tests pin the head the HTTP/2 path encodes. Criterion ticked on that basis.
+- 2026-11-17: Doing -> Done. HTTP/2 GET with -H Transfer-Encoding: chunked sends no content-length
