@@ -38,7 +38,7 @@ class's method section of the XML specification's documentation.
 
 ## What `-T` does
 
-`-T file` (BL-4956) publishes the file's bytes exactly as `-d` publishes its data: the client declares the queue and
+`-T file` (BL-4956) publishes the file's bytes exactly as `-d` publishes its data: the client declares the queue (passively first, durable only when it is missing, ADR-1284) and
 sends basic.publish to the default exchange with the file as the content body, and never sends basic.get, so it
 neither fetches nor consumes a message. When both `-d` and `-T` are given, `-d`'s data is published, as on
 `amqp1://`. Pinned by `Amqp0UploadTests` in `Curl.Extended.Protocol.Amqp0.UnitTests`.

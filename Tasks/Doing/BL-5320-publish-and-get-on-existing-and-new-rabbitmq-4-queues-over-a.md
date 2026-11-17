@@ -33,12 +33,12 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.Amqp0.UnitTests` (a scripted in-memory frame channel, no real broker) prove: the first `queue.declare` sent is passive; when the passive declare succeeds the client does not send a non-passive declare and goes on to publish or get.
-- [ ] A test proves that on a passive-declare `channel.close` with reply code 404 (NOT_FOUND) the client reopens a channel, sends a durable `queue.declare` (passive=false, durable=true) and then publishes.
-- [ ] A test proves a `channel.close` with any other reply code (for example 406 or 403) on the passive declare still ends in the existing exit 8 message, and that `basic.get` of an existing durable queue never sends durable=false.
-- [ ] Tests are platform-neutral.
-- [ ] Review acceptance check recorded in the Log as a hand check: against `rabbitmq:4-alpine`, step 2 exits 0 and a following `curl -u u:p amqp://127.0.0.1:36672/%2F/q1` prints `hello`; step 3 prints the queued message and exits 0. A real RabbitMQ broker cannot run in a lane; the Log says so when not run.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.Amqp0.UnitTests` (a scripted in-memory frame channel, no real broker) prove: the first `queue.declare` sent is passive; when the passive declare succeeds the client does not send a non-passive declare and goes on to publish or get.
+- [x] A test proves that on a passive-declare `channel.close` with reply code 404 (NOT_FOUND) the client reopens a channel, sends a durable `queue.declare` (passive=false, durable=true) and then publishes.
+- [x] A test proves a `channel.close` with any other reply code (for example 406 or 403) on the passive declare still ends in the existing exit 8 message, and that `basic.get` of an existing durable queue never sends durable=false.
+- [x] Tests are platform-neutral.
+- [x] Review acceptance check recorded in the Log as a hand check: against `rabbitmq:4-alpine`, step 2 exits 0 and a following `curl -u u:p amqp://127.0.0.1:36672/%2F/q1` prints `hello`; step 3 prints the queued message and exits 0. A real RabbitMQ broker cannot run in a lane; the Log says so when not run.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,3 +49,4 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 645cd3ad e1978299 82c723f0 c1cf21f9 175554a5 a0b49a29.
+- 2026-11-16: Done. Real RabbitMQ hand check NOT run (no broker in a lane); behaviour covered by scripted-frame tests. ADR-1284. Quality run: Amqp0 library one branch gap fixed by a test. Fast Amqp0 tests 119 pass.
