@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitTests/DigestFailureNumHeadersTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-17
 ---
 # BL-5331 — Report the 401 head's header count in %{num_headers} when Digest fails with exit 94
 
@@ -30,18 +30,21 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Http.UnitTests/DigestFailureNumHeadersTests.cs` (in-memory connection stand-in answering 401 with the Digest challenge above) prove the transfer fails with `CurlExitCode` 94 and its report carries the response code 401 and a header count of 2 (the number `Cgr135NumHeadersTests.cs` shows the write-out reads).
-- [ ] A test proves the same count when the challenge is NTLM or the failure is another auth exit, if BL-5118's path covers it, and that a successful Digest exchange still reports its final response's count.
-- [ ] Tests are platform-neutral (stand-ins, no real network).
-- [ ] Hand check, recorded in the Log: the repro command prints `[401 401 2]` and exits 94; measure real curl with `Record-CurlExchange.ps1` and say which version.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Http.UnitTests/DigestFailureNumHeadersTests.cs` (in-memory connection stand-in answering 401 with the Digest challenge above) prove the transfer fails with `CurlExitCode` 94 and its report carries the response code 401 and a header count of 2 (the number `Cgr135NumHeadersTests.cs` shows the write-out reads).
+- [x] A test proves the same count when the challenge is NTLM or the failure is another auth exit, if BL-5118's path covers it, and that a successful Digest exchange still reports its final response's count.
+- [x] Tests are platform-neutral (stand-ins, no real network).
+- [x] Hand check, recorded in the Log: the repro command prints `[401 401 2]` and exits 94; measure real curl with `Record-CurlExchange.ps1` and say which version.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check: the command prints `[401 401 2]` and exits 94.
+- The write-out `num_headers` reads `TransferReport.ResponseHeaders`, not `ResponseHeadersStored`; BL-5118 only set the latter. The failure now carries the 401 head's header pairs (`AnsweredHeadersBeforeFailure`) and `WithAnsweredHeaders` puts them on the report. Left the existing `ResponseHeadersStored` (+1) untouched, unmeasured. NTLM covered by a test; Linux/macOS: tests are stand-ins, platform-neutral.
 
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 5dd10b50 93631cc4 51ca995c 330a282c a0b49a29.
+- 2026-11-17: Hand check: real curl 8.22.0 (Schannel, Git ucrt64) printed `[401 401 2]`, exit 94; Curl built from this tree printed `[401 401 2]`, exit 94 (before the fix `[401 401 0]`). Quality run for Curl.Original.Protocol.Http.UnitLibrary: 100/100, worst CRAP 10.
+- 2026-11-17: Doing -> Done. Digest exit 94 now reports the 401 head's header count in num_headers
