@@ -37,3 +37,4 @@ Check first whether the multi loop's own poll waits on the injected clock; if it
 ## Log
 
 - 2026-11-17: Created.
+- 2026-11-17: Backlog -> Doing. Criteria at claim: 21ea1363 bbde421c 2e86499b.
