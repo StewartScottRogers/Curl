@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests/CurlCommandRunnerParallelTests.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5354 — Pass the never-firing clock to the fail-early parallel test BL-5353 meant to fix
 
@@ -26,9 +26,9 @@ Commit 6437528ce8 (BL-5353) added an optional `TimeProvider? timeProvider = null
 
 ## Acceptance criteria
 
-- [ ] `RunAsync_FailEarlyAndATransferEndingBeforeTheAbortLands_CompletesIt` passes a `TimeProvider` whose timers fire only when the test moves it (e.g. `new ManualTimerTimeProvider()`) to `RunAsync`, and still asserts exit 37 and stdout `1 37\n0 0\n`.
-- [ ] No other test in the class changes behaviour; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` is green.
-- [ ] The `timeProvider` parameter of `RunAsync` has at least one caller (no dead parameter left behind).
+- [x] `RunAsync_FailEarlyAndATransferEndingBeforeTheAbortLands_CompletesIt` passes a `TimeProvider` whose timers fire only when the test moves it (e.g. `new ManualTimerTimeProvider()`) to `RunAsync`, and still asserts exit 37 and stdout `1 37\n0 0\n`.
+- [x] No other test in the class changes behaviour; `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` is green.
+- [x] The `timeProvider` parameter of `RunAsync` has at least one caller (no dead parameter left behind).
 
 ## Notes
 
@@ -38,3 +38,5 @@ Check first whether the multi loop's own poll waits on the injected clock; if it
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 21ea1363 bbde421c 2e86499b.
+- 2026-11-17: Fixed in Curl.Console.UnitTests/CurlCommandRunnerParallelTests.cs; the multi poll does not wait on the injected clock, so no advance is needed. Fast tests green.
+- 2026-11-17: Doing -> Done. Test now passes ManualTimerTimeProvider
