@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib1564.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5362 — Fix AF-0842: Surviving mutant: lib1564's too-early check has an untested boundary
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib1564.cs line 89`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib1564.cs line 89`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killed by Lib1564_OnEveryPollLastingExactlyTheThreshold_Passes (mutant `<=` fails it; reverted, all 1224 LibTest tests pass). Test-only change; build clean.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: d1663b1a 9742157d.
+- 2026-11-17: Doing -> Done. Boundary test added; the <= mutant at Lib1564.cs:89 now fails a test
