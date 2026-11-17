@@ -81,6 +81,13 @@ public sealed class ClosedStandardInputStream : Stream
         return new LazyStandardInputStream(opener, isInputRedirected);
     }
 
+    /// <summary>
+    /// Reports whether the process's standard input is redirected rather than a terminal, as
+    /// <see cref="Console.IsInputRedirected"/> does; the <c>isInputRedirected</c> argument of <see cref="Lazy"/> in production.
+    /// </summary>
+    /// <returns><see langword="true"/> when standard input is not a terminal.</returns>
+    public static bool ProcessInputIsRedirected() => Console.IsInputRedirected;
+
     private sealed class LazyStandardInputStream(Func<Stream> opener, Func<bool> isInputRedirected) : Stream
     {
         private Stream? _opened;
