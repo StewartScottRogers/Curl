@@ -110,21 +110,14 @@ public sealed class McpStdioSession : IAsyncDisposable
 
         ended = true;
         process.StandardInput.Dispose();
-        if (grace == TimeSpan.Zero)
+        using var graceSource = new CancellationTokenSource(grace, timeProvider);
+        try
+        {
+            await process.WaitForExitAsync(graceSource.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
         {
             process.Kill();
-        }
-        else
-        {
-            using var graceSource = new CancellationTokenSource(grace, timeProvider);
-            try
-            {
-                await process.WaitForExitAsync(graceSource.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                process.Kill();
-            }
         }
 
         process.Dispose();

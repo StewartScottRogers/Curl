@@ -25,6 +25,8 @@ public sealed class McpStdioReferenceProcess : IExtensionProcess
     private readonly TaskCompletionSource<int> exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource killed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private volatile bool exitedEarly;
+    private readonly ClosableObservedStream standardInput;
+    private volatile bool serverSawInputEnd;
     private int messages;
 
     /// <summary>Starts the stand-in for <paramref name="program" /> with <paramref name="arguments" />.</summary>
@@ -40,7 +42,7 @@ public sealed class McpStdioReferenceProcess : IExtensionProcess
         this.behaviour = behaviour;
         Program = program;
         Arguments = [.. arguments];
-        StandardInput = input.Writer.AsStream();
+        standardInput = new ClosableObservedStream(input.Writer.AsStream());
         StandardOutput = output.Reader.AsStream();
         _ = ServeAsync();
     }
@@ -52,7 +54,7 @@ public sealed class McpStdioReferenceProcess : IExtensionProcess
     public IReadOnlyList<string> Arguments { get; }
 
     /// <inheritdoc />
-    public Stream StandardInput { get; }
+    public Stream StandardInput => standardInput;
 
     /// <inheritdoc />
     public Stream StandardOutput { get; }
@@ -64,7 +66,7 @@ public sealed class McpStdioReferenceProcess : IExtensionProcess
     public IReadOnlyList<string> StandardErrorLines => standardErrorLines;
 
     /// <summary>Gets a value indicating whether the server saw its standard input closed.</summary>
-    public bool StandardInputClosed { get; private set; }
+    public bool StandardInputClosed => standardInput.Closed || serverSawInputEnd;
 
     /// <summary>Gets a value indicating whether Curl killed the server.</summary>
     public bool Killed { get; private set; }
@@ -98,15 +100,17 @@ public sealed class McpStdioReferenceProcess : IExtensionProcess
         }
         while (!read.IsCompleted && !exitedEarly);
 
-        StandardInputClosed = read.IsCompleted;
-        if (StandardInputClosed && behaviour.IgnoresClosedStandardInput)
+        serverSawInputEnd = read.IsCompleted;
+        if (serverSawInputEnd && behaviour.IgnoresClosedStandardInput)
         {
             await killed.Task.ConfigureAwait(false);
         }
 
+        // The exit is recorded before the output ends, so a client that sees the end of the output
+        // already finds the server exited.
+        exited.SetResult(exitedEarly ? ExitedEarlyCode : 0);
         await input.Reader.CompleteAsync().ConfigureAwait(false);
         await output.Writer.CompleteAsync().ConfigureAwait(false);
-        exited.SetResult(exitedEarly ? ExitedEarlyCode : 0);
     }
 
     // Answers every whole line in buffer and returns where the unread rest starts.
