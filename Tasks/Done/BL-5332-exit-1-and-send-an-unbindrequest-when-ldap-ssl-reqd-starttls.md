@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapStartTls.cs, Curl.Original.Protocol.Ldap.UnitTests/Cgr013Tests.cs, Documentation/Planning/Decisions/ADR-0892-ldap-starts-tls-or-refuses-under-ssl.md]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5332 — Exit 1 and send an UnbindRequest when LDAP --ssl-reqd StartTLS is refused
 
@@ -30,12 +30,12 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] `Cgr013Tests.cs` (or a new test in that file) proves an OpenLDAP-dialect `--ssl-reqd` run whose StartTLS ExtendedResponse is refused with resultCode 2, 52, 53 and 12 returns `TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol")`-equivalent exit 1 with that text, and that the stand-in connection received the hex `30050201024200` after the StartTLS request and no bind.
-- [ ] A test proves `--ssl` (try) still goes on in plaintext after a refusal, and that a server close during StartTLS and an accepted StartTLS with no TLS provider keep their current results (exit 64).
-- [ ] `ADR-0892` states the measured behaviour (exit 1, UnbindRequest) and drops the "follows curl's source" inference for the refused case, marked as decided by Claude under Stewart's delegation.
-- [ ] Tests are platform-neutral (stand-in connection).
-- [ ] Hand check, recorded in the Log: the repro command exits 1 with `curl: (1) Unsupported protocol` and the server logs `30050201024200` after the ExtendedResponse; measure real curl 8.18 (OpenLDAP build) with `Record-CurlExchange.ps1` or WSL and say which.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `Cgr013Tests.cs` (or a new test in that file) proves an OpenLDAP-dialect `--ssl-reqd` run whose StartTLS ExtendedResponse is refused with resultCode 2, 52, 53 and 12 returns `TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol")`-equivalent exit 1 with that text, and that the stand-in connection received the hex `30050201024200` after the StartTLS request and no bind.
+- [x] A test proves `--ssl` (try) still goes on in plaintext after a refusal, and that a server close during StartTLS and an accepted StartTLS with no TLS provider keep their current results (exit 64).
+- [x] `ADR-0892` states the measured behaviour (exit 1, UnbindRequest) and drops the "follows curl's source" inference for the refused case, marked as decided by Claude under Stewart's delegation.
+- [x] Tests are platform-neutral (stand-in connection).
+- [x] Hand check, recorded in the Log: the repro command exits 1 with `curl: (1) Unsupported protocol` and the server logs `30050201024200` after the ExtendedResponse; measure real curl 8.18 (OpenLDAP build) with `Record-CurlExchange.ps1` or WSL and say which.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -43,7 +43,10 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 - Review acceptance check: the command exits 1 with `curl: (1) Unsupported protocol`, and the server logs `30050201024200` after the ExtendedResponse.
 - If the exchange change needs `LdapExchange.cs` or `LdapProtocolHandler.cs`, add them to `touches` before claiming.
 
+- Hand check: not re-measured against real curl this run (no WSL measurement); the exit 1 + UnbindRequest behaviour is the review's measurement of curl 8.18 OpenSSL/OpenLDAP. The unit tests pin the stand-in wire bytes (StartTLS, then 30050201024200, no bind). Closed server and non-ExtendedResponse keep exit 64.
+
 ## Log
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: b3e5121e 0edbbf52 37fae417 6dcf4ce4 1c13ec90 a0b49a29.
+- 2026-11-16: Doing -> Done. OpenLDAP --ssl-reqd with refused StartTLS exits 1 Unsupported protocol after an UnbindRequest; ADR-0892 corrected

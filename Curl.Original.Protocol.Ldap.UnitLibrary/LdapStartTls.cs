@@ -8,8 +8,8 @@ namespace Curl.Original.Protocol.Ldap;
 /// </summary>
 /// <remarks>
 /// When the server refuses StartTLS, <c>--ssl</c> goes on in plaintext and <c>--ssl-reqd</c>
-/// fails with exit 64 and libldap's text for the result code, as curl's <c>openldap.c</c>
-/// does. When the server accepts it, the session continues through the TLS handshake of
+/// fails with exit 1 <c>Unsupported protocol</c> after an UnbindRequest, as measured against
+/// curl 8.18 (ADR-0892). When the server accepts it, the session continues through the TLS handshake of
 /// <see cref="ITlsProvider" />, whose failure is returned as it reported it.
 /// </remarks>
 internal static class LdapStartTls
@@ -30,7 +30,7 @@ internal static class LdapStartTls
         LdapBindReply reply = await exchange.StartTlsAsync(context.CancellationToken).ConfigureAwait(false);
         if (!reply.IsSuccess)
         {
-            return context.SslLevel == TransportSecurityLevel.Try ? null : Refused(reply);
+            return context.SslLevel == TransportSecurityLevel.Try ? null : await RefusedAsync(exchange, reply, context.CancellationToken).ConfigureAwait(false);
         }
 
         if (tlsProvider is null)
@@ -48,9 +48,13 @@ internal static class LdapStartTls
         return null;
     }
 
-    /// <summary>The exit 64 <c>--ssl-reqd</c> fails with when the server refuses StartTLS.</summary>
-    private static TransferResult Refused(LdapBindReply reply) =>
-        TransferResult.Failure(
-            CurlExitCode.UseSslFailed,
-            FailurePrefix + (reply.Status == LdapBindReplyStatus.Answered ? LibLdapResultText.Of(reply.ResultCode) : CannotContactServer));
+    /// <summary>
+    /// What <c>--ssl-reqd</c> fails with when the server refuses StartTLS: an answered refusal is exit 1
+    /// <c>Unsupported protocol</c> after an UnbindRequest (measured, ADR-0892); a close or a reply that
+    /// is not an ExtendedResponse is exit 64 and sends nothing.
+    /// </summary>
+    private static async ValueTask<TransferResult?> RefusedAsync(LdapExchange exchange, LdapBindReply reply, CancellationToken cancellationToken) =>
+        reply.Status == LdapBindReplyStatus.Answered
+            ? await LdapBind.UnbindAndFailAsync(exchange, TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol"), cancellationToken).ConfigureAwait(false)
+            : TransferResult.Failure(CurlExitCode.UseSslFailed, FailurePrefix + CannotContactServer);
 }
