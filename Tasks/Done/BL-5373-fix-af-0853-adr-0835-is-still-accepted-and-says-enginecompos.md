@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions/ADR-0835-smb-and-smbs-are-disabled-as-in-the-reference-builds.md]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5373 — Fix AF-0853: ADR-0835 is still Accepted and says EngineComposition serves smb/smbs with a DisabledProtocolHandler (exit 1); ADR-1281 superseded it and the engine serves SMB
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- ADR-0835 status set to Superseded by ADR-1281 and its row in the ADR README updated. Reproduction gives 0 then 1. Build clean, fast tests green.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-17: Doing -> Done. ADR-0835 marked Superseded by ADR-1281
