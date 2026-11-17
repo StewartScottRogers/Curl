@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5374 — Fix AF-0854: LdapProtocolHandler.SearchAsync's doc says the second WinLDAP connection is only for the logged-on-user bind; the code uses it for every plaintext ldap:// and every credential-less transfer
 
@@ -52,3 +52,4 @@ Doc comments on SearchAsync and SearchBesideEmptyConnectionAsync now name plaint
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-17: Doing -> Done. Doc comments now name every case taking WinLDAP's second connection.
