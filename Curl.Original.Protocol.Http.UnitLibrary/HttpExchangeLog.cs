@@ -25,6 +25,12 @@ internal sealed class HttpExchangeLog(IDiagnosticLog log, string component)
     /// <summary>The headers whose values carry credentials, written as <see cref="ValueNotLogged" />.</summary>
     private static readonly string[] SecretHeaders = ["Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"];
 
+    /// <summary>The headers whose values are URLs, logged with any user-info replaced by <see cref="RedactedUserInfo" />.</summary>
+    private static readonly string[] UrlHeaders = ["Location", "Content-Location"];
+
+    /// <summary>What a URL header's user-info is written as.</summary>
+    internal const string RedactedUserInfo = "REDACTED:REDACTED";
+
     /// <summary>What a secret header's value is written as.</summary>
     internal const string ValueNotLogged = "(value not logged)";
 
@@ -227,7 +233,30 @@ internal sealed class HttpExchangeLog(IDiagnosticLog log, string component)
 
     /// <summary>Gives <c>name: value</c>, the value hidden when <paramref name="name" /> is a secret header.</summary>
     private static string Loggable(string name, string value) =>
-        name + ": " + (IsSecret(name) ? ValueNotLogged : value);
+        name + ": " + (IsSecret(name) ? ValueNotLogged : IsUrlHeader(name) ? WithoutUserInfo(value) : value);
+
+    /// <summary>Tells whether <paramref name="name" /> names a header whose value is a URL that may carry user-info.</summary>
+    private static bool IsUrlHeader(string name) =>
+        UrlHeaders.Contains(name, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Gives an absolute URL with its user-info replaced by <see cref="RedactedUserInfo" />; a value
+    /// with no user-info, a relative reference or a value that is not a URL comes back unchanged.
+    /// </summary>
+    private static string WithoutUserInfo(string value)
+    {
+        int schemeEnd = value.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd <= 0)
+        {
+            return value;
+        }
+
+        int authorityStart = schemeEnd + 3;
+        int authorityEnd = value.AsSpan(authorityStart).IndexOfAny('/', '?', '#');
+        authorityEnd = authorityEnd < 0 ? value.Length : authorityStart + authorityEnd;
+        int at = value.LastIndexOf('@', authorityEnd - 1, authorityEnd - authorityStart);
+        return at < 0 ? value : string.Concat(value.AsSpan(0, authorityStart), RedactedUserInfo, value.AsSpan(at));
+    }
 
     /// <summary>Tells whether <paramref name="name" /> names a header whose value carries credentials.</summary>
     private static bool IsSecret(string name) =>
