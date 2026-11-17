@@ -126,6 +126,7 @@ internal static class HttpRequestOptionsMapping
             MaxRedirects = (int)http.MaxRedirects,
             AuthSchemes = HttpSignatureSetup.Of(authentication).Settings is null ? AuthSchemesOf(authentication) : HttpAuthSchemes.None,
             BearerToken = authentication.XOAuth2Bearer,
+            SendsCredentialsToOtherOrigins = authentication.UnrestrictedAuthentication,
             SaslAuthorizationIdentity = authentication.SaslAuthorizationIdentity,
             ServiceName = authentication.ServiceName,
             AwsSigV4 = authentication.AwsSigV4,

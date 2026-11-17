@@ -86,6 +86,13 @@ public sealed record HttpRequestOptions
     public bool FollowedToAnotherHost { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the user's credentials may go to another scheme, host or port than the
+    /// URL's: <c>--location-trusted</c> (<c>CURLOPT_UNRESTRICTED_AUTH</c>). A handler that follows a redirect itself,
+    /// as the SignalR negotiate does, drops <c>Authorization</c> on an origin change unless this is set (BL-5311).
+    /// </summary>
+    public bool SendsCredentialsToOtherOrigins { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether an <c>-H</c> value naming <c>Authorization</c> was left out
     /// of this followed request because it goes to another host, port or scheme without
     /// <c>--location-trusted</c>. curl 8.22.0's <c>output_auth_headers</c> still sees that value,
