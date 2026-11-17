@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5363 — Fix AF-0843: Surviving mutant: a successful transfer can count as a connection cut off after its head
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs line 296`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs line 296`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added NumConnectsOf_SuccessfulTransferWithAHeadAndNoReport_IsZero and NumConnectsOf_ReceiveFailedAfterTheHeadWithNoReport_IsOne in ManagedEasyTransferTests.NumConnects.cs; with line 296 mutated to == both fail, reverted all pass. Engine fast tests: 3072 passed, 0 failed. No production code changed.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 5f2fe122 9742157d.
+- 2026-11-17: Doing -> Done. Tests now kill the CutOffAfterHead != mutant

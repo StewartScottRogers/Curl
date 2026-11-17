@@ -52,4 +52,12 @@ public sealed partial class ManagedEasyTransferTests
     [TestMethod]
     public void NumConnectsOf_TlsHandshakeTimeout_IsOne() =>
         Assert.AreEqual(1, ManagedEasyTransfer.NumConnectsOf(new TransferInfo(), TimedOutWithNoReport, new EasyOptions(), "https://127.0.0.1:18080/echo"));
+
+    [TestMethod]
+    public void NumConnectsOf_SuccessfulTransferWithAHeadAndNoReport_IsZero() =>
+        Assert.AreEqual(0, ManagedEasyTransfer.NumConnectsOf(new TransferInfo { ResponseCode = 200 }, OkResult, new EasyOptions(), "http://h/"));
+
+    [TestMethod]
+    public void NumConnectsOf_ReceiveFailedAfterTheHeadWithNoReport_IsOne() =>
+        Assert.AreEqual(1, ManagedEasyTransfer.NumConnectsOf(new TransferInfo { ResponseCode = 200 }, new TransferResult(CurlExitCode.RecvError, 0), new EasyOptions(), "http://h/"));
 }
