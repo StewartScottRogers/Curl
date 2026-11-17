@@ -52,7 +52,7 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Decision
 
-- ADR-1284: vhost is /, named by -H "host: name" (no new option or URL syntax); ERROR body appended as "message: body".
+- ADR-1285: vhost is /, named by -H "host: name" (no new option or URL syntax); ERROR body appended as "message: body".
 - Added the conformance Stomp tests/doc to touches: their pinned CONNECT frame and ERROR text changed.
 - Hand check: a real RabbitMQ cannot run in a lane; not run. The CONNECT frame is proven by scripted-connection tests instead (no PowerShell raw listener run).
 - --extended-help text updated in StompExtension.cs. Quality run: Stomp library 100/100, CRAP 10.
@@ -61,4 +61,4 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: d4a99f7b d5cf54e7 04d7f89c c1cf21f9 58e840da 4f0b2ea1 a0b49a29.
-- 2026-11-16: Doing -> Done. Stomp CONNECT host defaults to / and is named by -H host; ERROR body shown (ADR-1284)
+- 2026-11-16: Doing -> Done. Stomp CONNECT host defaults to / and is named by -H host; ERROR body shown (ADR-1285)

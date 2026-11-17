@@ -18,7 +18,7 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
     /// <summary>The port <c>stomps://</c> connects to when the URL names none.</summary>
     internal const int SecureDefaultPort = 61614;
 
-    /// <summary>The virtual host <c>CONNECT</c> names when no <c>-H "host: ..."</c> gives one (ADR-1284): <c>/</c>, the default of stock brokers.</summary>
+    /// <summary>The virtual host <c>CONNECT</c> names when no <c>-H "host: ..."</c> gives one (ADR-1285): <c>/</c>, the default of stock brokers.</summary>
     internal const string DefaultVirtualHost = "/";
 
     private const string SecureScheme = "stomps";
@@ -55,7 +55,7 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
 
     /// <summary>
     /// Gives the <c>CONNECT</c> frame (STOMP 1.2, "CONNECT or STOMP Frame"): version 1.2 only, <paramref name="host"/> as the
-    /// virtual host (ADR-1284), no heart-beating, and <c>login</c> and <c>passcode</c> from <paramref name="credentials"/>.
+    /// virtual host (ADR-1285), no heart-beating, and <c>login</c> and <c>passcode</c> from <paramref name="credentials"/>.
     /// </summary>
     internal static StompFrame ConnectFor(string host, System.Net.NetworkCredential? credentials)
     {
@@ -78,7 +78,7 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
         LastHeaderValue(headers, "content-type") ?? StompClientFlow.SendContentType;
 
     /// <summary>
-    /// Gives the virtual host for <c>CONNECT</c>'s <c>host</c> (ADR-1284): the value of the last <c>-H "host: ..."</c> in
+    /// Gives the virtual host for <c>CONNECT</c>'s <c>host</c> (ADR-1285): the value of the last <c>-H "host: ..."</c> in
     /// <paramref name="headers"/> (name matched without regard to case), or <see cref="DefaultVirtualHost"/> when there is
     /// none or its value is empty.
     /// </summary>

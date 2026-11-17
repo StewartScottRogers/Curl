@@ -1,4 +1,4 @@
-# ADR-1284: A STOMP CONNECT names the virtual host `/` unless -H "host: ..." gives another, and an ERROR shows its body
+# ADR-1285: A STOMP CONNECT names the virtual host `/` unless -H "host: ..." gives another, and an ERROR shows its body
 
 - Status: Accepted
 - Date: 2026-11-16
