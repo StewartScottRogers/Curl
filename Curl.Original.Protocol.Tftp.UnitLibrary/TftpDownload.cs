@@ -407,7 +407,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
             return null;
         }
 
-        return payloadLength < blockSize ? TransferResult.Success(bytesTransferred) : null;
+        return payloadLength < blockSize ? TransferResult.Success(bytesTransferred) with { Report = new TransferReport { DownloadSize = bytesTransferred } } : null;
     }
 
     /// <summary>

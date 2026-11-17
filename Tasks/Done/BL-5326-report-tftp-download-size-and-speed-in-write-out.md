@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Tftp.UnitLibrary/TftpTransferTimings.cs, Curl.Original.Protocol.Tftp.UnitLibrary/TftpDownload.cs, Curl.Original.Protocol.Tftp.UnitTests/TftpDownloadSizeReportTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-16
 ---
 # BL-5326 — Report TFTP download size and speed in write-out
 
@@ -30,11 +30,11 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Tftp.UnitTests/TftpDownloadSizeReportTests.cs` prove that a TFTP download of N bytes (in-memory UDP stand-ins, including one with a negotiated `blksize`) returns a `TransferReport` with `DownloadSize` equal to N and `Timings` still set, and that the speed derived from them is non-zero with a fake advancing `TimeProvider`.
-- [ ] A test proves a failed download keeps its error exit code, and that the upload tests in `TftpUploadSizeReportTests.cs` and `TftpTransferTimingsTests.cs` stay green.
-- [ ] Tests are platform-neutral (stand-ins, no real network).
-- [ ] Hand check, recorded in the Log: the repro command prints `sd=300000` and a non-zero `spd`, and `%{json}` shows `"size_download":300000`, on Windows (and Linux if available).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Tftp.UnitTests/TftpDownloadSizeReportTests.cs` prove that a TFTP download of N bytes (in-memory UDP stand-ins, including one with a negotiated `blksize`) returns a `TransferReport` with `DownloadSize` equal to N and `Timings` still set, and that the speed derived from them is non-zero with a fake advancing `TimeProvider`.
+- [x] A test proves a failed download keeps its error exit code, and that the upload tests in `TftpUploadSizeReportTests.cs` and `TftpTransferTimingsTests.cs` stay green.
+- [x] Tests are platform-neutral (stand-ins, no real network).
+- [x] Hand check, recorded in the Log: the repro command prints `sd=300000` and a non-zero `spd`, and `%{json}` shows `"size_download":300000`, on Windows (and Linux if available).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -45,3 +45,5 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 
 - 2026-11-16: Created.
 - 2026-11-16: Backlog -> Doing. Criteria at claim: 74c6e938 e4c7c582 51ca995c 8ae67a56 a0b49a29.
+- 2026-11-16: Hand check on Windows (PowerShell UDP server, 300000 bytes): `sd=300000 spd=159065`, exit 0, file complete. `tst` still equals `tt` (BL-5327). Linux not available. Fix: `TftpDownload` sets `DownloadSize` on success; `Stamp()` keeps the report and adds timings. Quality run for the library: 0 failing members.
+- 2026-11-16: Doing -> Done. TFTP download reports size_download and a non-zero speed
