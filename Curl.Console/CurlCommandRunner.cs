@@ -2368,7 +2368,9 @@ internal sealed class CurlCommandRunner(
             return (timedOut, transfer.Url, url);
         }
 
-        Running.ParallelProgress?.MarkLive(bindsInterface: options.Interface is not null);
+        // AF-0851: curl opens the --mptcp socket inside its blocking connect step, as it binds --interface, so a refused
+        // socket prints its curl: (7) line before the meter draws.
+        Running.ParallelProgress?.MarkLive(bindsInterface: options.Interface is not null || options.MultipathTcp);
         bool connectionStayedOpen = false;
         try
         {

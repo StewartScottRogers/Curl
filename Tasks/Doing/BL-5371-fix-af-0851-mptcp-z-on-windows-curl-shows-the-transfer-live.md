@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/TcpDialer.cs]
+touches: [Curl.Networking.UnitLibrary/TcpDialer.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/CurlCommandRunnerParallelProgressMeterTests.cs]
 requirement: none
 created: 2026-11-17
 completed:
@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Fix is in Curl.Console/CurlCommandRunner.cs (touches widened; TcpDialer needs no change): -Z with --mptcp holds the meter draws until the transfer is past connect, as --interface does (AF-0237), so the curl: (7) line precedes the header. Measured with the Debug build: first stderr line is the curl: (7) error. Decided by Claude under delegation; no ADR needed (reuses ADR-0661 mechanism). Measure-CodeQuality for Curl.Console: 0 failing members.
 
 ## Log
 
