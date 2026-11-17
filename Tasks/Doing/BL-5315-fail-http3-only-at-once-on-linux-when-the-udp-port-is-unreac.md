@@ -46,3 +46,4 @@ From the outside fitness review of 2026-11-16 (commit 64e9144, `preview` build),
 ## Log
 
 - 2026-11-16: Created.
+- 2026-11-16: Backlog -> Doing. Criteria at claim: f7dff19f e39c669d 269372e6 abc70256 a0b49a29.
