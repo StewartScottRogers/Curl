@@ -44,6 +44,12 @@ internal sealed class HandBuiltTlsConnection(
     /// </summary>
     internal ITransferEvents? TicketEvents { get; init; }
 
+    /// <summary>
+    /// Gets the message a read fails with when the server's alert ends it, or <see langword="null" />
+    /// to let the alert escape as it is (the OpenSSL build; BL-5330).
+    /// </summary>
+    internal string? AlertReadFailureMessage { get; init; }
+
     public bool IsSecure => true;
 
     public EndPoint? RemoteEndPoint => plaintext.RemoteEndPoint;
@@ -57,7 +63,16 @@ internal sealed class HandBuiltTlsConnection(
     /// <exception cref="MissingCloseNotifyException">The connection ended without <c>close_notify</c>.</exception>
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
-        var read = await tlsStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        int read;
+        try
+        {
+            read = await tlsStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        }
+        catch (TlsAlertException alert) when (alert.IsFromServer && AlertReadFailureMessage is not null)
+        {
+            throw new MissingCloseNotifyException(AlertReadFailureMessage);
+        }
+
         if (read == 0 && !buffer.IsEmpty && !CloseNotifyReceived(tlsStream))
         {
             throw new MissingCloseNotifyException(missingCloseNotifyMessage);

@@ -131,6 +131,14 @@ internal static class TlsFailureMessages
             ? SchannelAlertReadFailure(failure)
             : OpenSslAlertReadFailure(failure, presentedClientCertificate);
 
+    /// <summary>The Schannel build's exit 56 text for a read the hand-built client saw a server alert end (BL-5330).</summary>
+    /// <param name="automaticClientCertificate"><see langword="true" /> under <c>--ssl-auto-client-cert</c>, where curl's read is aborted instead.</param>
+    /// <returns>The message curl prints.</returns>
+    internal static string SchannelHandBuiltAlertReadFailure(bool automaticClientCertificate) =>
+        automaticClientCertificate
+            ? "Recv failure: " + SchannelSocketErrorTexts[SocketError.ConnectionAborted]
+            : SchannelFatalAlertReceived.Replace("next InitializeSecurityContext failed", "failed to read data from server", StringComparison.Ordinal);
+
     private static string? SchannelAlertReadFailure(IOException failure)
     {
         var code = FindInnerException<Win32Exception>(failure)?.NativeErrorCode;
