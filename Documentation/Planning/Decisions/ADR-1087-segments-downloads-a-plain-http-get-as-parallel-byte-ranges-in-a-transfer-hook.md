@@ -61,4 +61,4 @@ all the extension needs.
 
 ## Update (BL-5322)
 
-A first response carrying neither an ETag nor a Last-Modified gives nothing to compare segments by, so the hook runs the transfer again as curl runs it (one plain GET) instead of joining ranges taken at different times. Decided by Claude under Stewart's delegation. A weak ETag or a Last-Modified alone follows the rule above unchanged: ranges are sent without If-Range and joined only when every segment repeats the same validators.
+A first response carrying neither an ETag nor a Last-Modified gives nothing to compare segments by, so the hook runs the transfer again as curl runs it (one plain GET) instead of joining ranges taken at different times. Decided by Claude under Stewart's delegation. Update 2026-11-17 (BL-5380, EXT-074), decided by Claude under Stewart's delegation: a weak ETag or a Last-Modified alone is treated the same way. RFC 9110 section 15.3.7.3 allows partial responses to be combined only when they share a strong validator, and a weak tag or a date can stay the same while the bytes change, so the hook runs one plain GET and ranges are joined only for a strong ETag, each segment sent with If-Range.

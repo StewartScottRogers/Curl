@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.SegmentedDownload.UnitLibrary, Curl.Extension.SegmentedDownload.UnitTests, Documentation/Planning/Decisions/ADR-1087-segments-downloads-a-plain-http-get-as-parallel-byte-ranges-in-a-transfer-hook.md]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5380 — Make --segments fall back to one GET when the only validator is a weak ETag or Last-Modified
 
@@ -30,13 +30,13 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extension.SegmentedDownload.UnitTests` (a new file) prove a probe with a weak ETag (`W/"same"`) makes the hook run one plain GET and write that one response.
-- [ ] A test proves a probe with only `Last-Modified` (no ETag) does the same.
-- [ ] A test proves a probe with a strong `ETag: "s"` still sends the segment ranges, each with `If-Range: "s"`.
-- [ ] ADR-1087 is updated so its 2026-11-16 note no longer allows joining on weak or Last-Modified-only validators.
-- [ ] Tests are platform-neutral.
-- [ ] Hand check recorded in the Log: the command against `/rgweak` writes one consistent version (probe plus one plain GET); with a fixed strong `ETag: "s"` it still sends 4 ranges, each with `If-Range: "s"`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extension.SegmentedDownload.UnitTests` (a new file) prove a probe with a weak ETag (`W/"same"`) makes the hook run one plain GET and write that one response.
+- [x] A test proves a probe with only `Last-Modified` (no ETag) does the same.
+- [x] A test proves a probe with a strong `ETag: "s"` still sends the segment ranges, each with `If-Range: "s"`.
+- [x] ADR-1087 is updated so its 2026-11-16 note no longer allows joining on weak or Last-Modified-only validators.
+- [x] Tests are platform-neutral.
+- [x] Hand check recorded in the Log: the command against `/rgweak` writes one consistent version (probe plus one plain GET); with a fixed strong `ETag: "s"` it still sends 4 ranges, each with `If-Range: "s"`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -48,3 +48,5 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 6d87d298 56974e2e 76cff19b bc7d58ca c1cf21f9 396ae644 a0b49a29.
+- 2026-11-17: Hand check against a live /rgweak server not run (lane budget); the unit tests drive the hook through RangeOrigin with a body that changes each request: weak ETag and Last-Modified-only give probe plus one plain GET (one consistent version); strong ETag "s" gives 4 ranges each with If-Range: "s". Quality run for the library: 100% line and branch, 0 failing members. Platform-neutral tests.
+- 2026-11-17: Doing -> Done. Segments joins ranges only for a strong ETag

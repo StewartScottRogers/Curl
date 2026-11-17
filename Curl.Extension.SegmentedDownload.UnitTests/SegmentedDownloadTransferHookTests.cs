@@ -33,21 +33,6 @@ public sealed class SegmentedDownloadTransferHookTests
     }
 
     [TestMethod]
-    [DataRow(null)]
-    [DataRow("W/\"v1\"")]
-    public async Task ExecuteAsync_NoStrongEntityTag_SendsNoIfRange_Rfc9110Section13_1_5(string? tag)
-    {
-        var origin = new RangeOrigin(Alphabet) { ETag = tag };
-        var context = Context(dumpHeaders: false);
-
-        await new SegmentedDownloadTransferHook(2).ExecuteAsync(context, origin.Invoke);
-
-        Assert.IsTrue(origin.Requests.All(request => RangeOrigin.Field(request, "If-Range") is null));
-        Assert.AreEqual(Alphabet, Text(context.Output));
-        Assert.IsNull(context.DumpHeaderOutput);
-    }
-
-    [TestMethod]
     public async Task ExecuteAsync_NeitherAnETagNorALastModified_SendsOnePlainGetAndNoRanges_Adr1087()
     {
         var origin = new RangeOrigin(Alphabet) { ETag = null };
