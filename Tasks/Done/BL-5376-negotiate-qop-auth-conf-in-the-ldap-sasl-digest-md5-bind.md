@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5Bind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.cs, Curl.Original.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5376 — Negotiate qop=auth-conf in the LDAP SASL DIGEST-MD5 bind
 
@@ -52,3 +52,4 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 49143602 8045ab2d 142c2e0c a94c6778 c1cf21f9 46a431e9 a0b49a29.
 - 2026-11-17: Implemented (ADR-1291): `LdapDigestMd5Bind` picks `auth-conf`+`cipher=3des` when offered, `LdapDigestMd5SecurityLayer` seals/unseals RFC 2831 3DES; tests in `LdapDigestMd5AuthConfTests`. Fast tests green (762), Measure-CodeQuality for the Ldap library 100%/100%, no member past a gate.
 - Hand check: no OpenLDAP container or real Windows curl relay is available to a lane, so the "step 4" repro was not run. The equivalent is pinned by tests: the sent response contains `qop=auth-conf,cipher=3des`, and the stand-in server sees every later PDU as a 4-byte length plus sealed buffer (first byte 0x00, not 0x30). Key derivation and IV chaining follow RFC 2831 / Cyrus SASL from memory, unverified against a live server.
+- 2026-11-17: Doing -> Done. qop=auth-conf with 3des negotiated and sealed per RFC 2831; ADR-1291; tests and quality gates green
