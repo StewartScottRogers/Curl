@@ -52,10 +52,41 @@ public sealed class OciRegistryProxyTests
         Assert.IsNull(connector.Targets[0].Proxy);
     }
 
-    private static async Task<TransferResult> PullAsync(SequenceConnector connector, ProxyEndpoint? proxy, string url = "oci://reg.example/alpine:3")
+    [TestMethod]
+    public async Task ExecuteAsync_TokenHostMatchesNoProxy_OnlyThatHopSkipsTheProxy()
+    {
+        var connector = new SequenceConnector(
+            SequenceConnector.Respond(Challenge),
+            SequenceConnector.Respond("200 OK", """{"token":"t"}"""),
+            SequenceConnector.Respond("200 OK", "{}"));
+
+        var result = await PullAsync(connector, Proxy, noProxy: "localhost, .auth.example");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreSame(Proxy, connector.Targets[0].Proxy);
+        Assert.AreEqual("auth.example", connector.Targets[1].Host);
+        Assert.IsNull(connector.Targets[1].Proxy);
+        Assert.AreSame(Proxy, connector.Targets[2].Proxy);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RedirectTargetMatchesNoProxy_BlobHopSkipsTheProxy()
+    {
+        var connector = new SequenceConnector(
+            SequenceConnector.Respond("307 Temporary Redirect\r\nLocation: https://blobs.example/b/1"),
+            SequenceConnector.Respond("200 OK", "blob"));
+
+        var result = await PullAsync(connector, Proxy, "oci://reg.example/alpine@sha256:" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes("blob"))), "blobs.example");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreSame(Proxy, connector.Targets[0].Proxy);
+        Assert.IsNull(connector.Targets[1].Proxy);
+    }
+
+    private static async Task<TransferResult> PullAsync(SequenceConnector connector, ProxyEndpoint? proxy, string url = "oci://reg.example/alpine:3", string? noProxy = null)
     {
         using var output = new MemoryStream();
         return await new OciRegistryProtocolHandler(connector).ExecuteAsync(
-            new TransferContext { Url = CurlUrl.Parse(url), Output = output, Proxy = proxy });
+            new TransferContext { Url = CurlUrl.Parse(url), Output = output, Proxy = proxy, NoProxy = noProxy });
     }
 }
