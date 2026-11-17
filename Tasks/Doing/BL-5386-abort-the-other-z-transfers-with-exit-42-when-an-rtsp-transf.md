@@ -47,3 +47,4 @@ Still-open older finding. What changed: the exit 43/48 sequential cases are now 
 ## Log
 
 - 2026-11-17: Created.
+- 2026-11-17: Backlog -> Doing. Criteria at claim: b740072a 391cb81f b5333f5e 7ae10ef7 a8ced021 a0b49a29.
