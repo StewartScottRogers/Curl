@@ -37,7 +37,26 @@ public sealed class TftpTransferTimingsTests
         AssertTimings(result);
         Assert.AreEqual(600, result.Report!.UploadSize);
     }
-[TestMethod]    public async Task ExecuteAsync_Upload_HasNoStartTransferStampButANonZeroTotal()    {        var clock = new SteppingTimeProvider();        var channel = new AcknowledgingDatagramChannel(ServerEndPoint, TransferEndPoint);        var result = await RunAsync(channel, clock, new MemoryStream(new byte[600]), upload: true);        Assert.IsNull(result.Report?.Timings?.FirstByteReceived);        Assert.IsTrue(result.Report!.Timings!.Completed > result.Report.Timings.Started);    }    [TestMethod]    public async Task ExecuteAsync_Download_KeepsItsStartTransferStamp()    {        var clock = new SteppingTimeProvider();        var channel = new FallsSilentDatagramChannel(ServerEndPoint, clock.Inner, [([0, 3, 0, 1, .. "hello"u8.ToArray()], TransferEndPoint)]);        var result = await RunAsync(channel, clock, new MemoryStream(), upload: false);        Assert.IsTrue(result.Report!.Timings!.FirstByteReceived > result.Report.Timings.Started);    }
+    [TestMethod]
+    public async Task ExecuteAsync_Upload_HasNoStartTransferStampButANonZeroTotal()
+    {
+        var clock = new SteppingTimeProvider();
+        var channel = new AcknowledgingDatagramChannel(ServerEndPoint, TransferEndPoint);
+        var result = await RunAsync(channel, clock, new MemoryStream(new byte[600]), upload: true);
+
+        Assert.IsNull(result.Report?.Timings?.FirstByteReceived);
+        Assert.IsTrue(result.Report!.Timings!.Completed > result.Report.Timings.Started);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Download_KeepsItsStartTransferStamp()
+    {
+        var clock = new SteppingTimeProvider();
+        var channel = new FallsSilentDatagramChannel(ServerEndPoint, clock.Inner, [([0, 3, 0, 1, .. "hello"u8.ToArray()], TransferEndPoint)]);
+        var result = await RunAsync(channel, clock, new MemoryStream(), upload: false);
+
+        Assert.IsTrue(result.Report!.Timings!.FirstByteReceived > result.Report.Timings.Started);
+    }
 
     [TestMethod]
     public async Task ExecuteAsync_FailedTransfer_ReportsTimingsWithoutAFirstByte()
