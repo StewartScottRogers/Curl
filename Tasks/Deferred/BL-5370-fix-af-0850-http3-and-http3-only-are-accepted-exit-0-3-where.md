@@ -49,3 +49,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 ## Log
 
 - 2026-11-17: Created.
+- 2026-11-17: Backlog -> Deferred. AF-0850 closed as a duplicate of AF-0831: Stewart keeps --http3 and --http3-only accepted on every platform (ADR-1282); same deferral as BL-5305
