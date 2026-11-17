@@ -1326,3 +1326,4 @@ Each option and the specific reason it lost.
 | [1282](ADR-1282-http3-and-http3-only-are-accepted-and-curl-v-lists-http3.md) | --http3 and --http3-only are accepted and curl -V lists HTTP3, superseding ADR-0540 (BL-5289) | Accepted | 2026-11-16 |
 | [1283](ADR-1283-a-libcurl-rtsp-receive-keeps-its-connection-and-curlopt-timeout-bounds-every-library-perform.md) | A libcurl RTSP RECEIVE keeps its connection, and CURLOPT_TIMEOUT bounds every library perform (BL-5291) | Accepted | 2026-11-16 |
 | [1284](ADR-1284-amqp-declares-the-queue-passively-first-and-creates-it-durable-only-on-not-found.md) | amqp:// declares the queue passively first and creates it durable only on NOT_FOUND (BL-5320) | Accepted | 2026-11-16 |
+| [1284](ADR-1284-a-stomp-connect-names-the-virtual-host-slash-unless-h-host-gives-another.md) | A STOMP CONNECT names the virtual host / unless -H host gives another, and an ERROR shows its body (BL-5321) | Accepted | 2026-11-16 |

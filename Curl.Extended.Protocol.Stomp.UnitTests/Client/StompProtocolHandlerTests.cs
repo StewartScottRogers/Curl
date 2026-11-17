@@ -11,7 +11,7 @@ public sealed class StompProtocolHandlerTests
 {
     private const string Connected = "CONNECTED\nversion:1.2\n\n\0";
 
-    private const string ConnectFrame = "CONNECT\naccept-version:1.2\nhost:broker\nheart-beat:0,0\n\n\0";
+    private const string ConnectFrame = "CONNECT\naccept-version:1.2\nhost:/\nheart-beat:0,0\n\n\0";
 
     [TestMethod]
     public async Task ExecuteAsync_Body_SendsConnectSendAndDisconnectAndWaitsForTheReceipt()
@@ -87,7 +87,7 @@ public sealed class StompProtocolHandlerTests
 
         await new StompProtocolHandler(new ScriptedStompConnector(ConnectResult.Connected(connection))).ExecuteAsync(context);
 
-        Assert.AreEqual("CONNECT\naccept-version:1.2\nhost:broker\nheart-beat:0,0\nlogin:guest\npasscode:secret\n\n\0", connection.WrittenText.First());
+        Assert.AreEqual("CONNECT\naccept-version:1.2\nhost:/\nheart-beat:0,0\nlogin:guest\npasscode:secret\n\n\0", connection.WrittenText.First());
     }
 
     [TestMethod]
@@ -121,6 +121,52 @@ public sealed class StompProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual("No STOMP destination found in the URL", result.ErrorMessage);
         Assert.IsNull(connector.Target);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HostHeader_NamesTheVirtualHostAndKeepsTheRestOfConnect()
+    {
+        ScriptedStompConnection connection = ScriptedStompConnection.Replaying(Connected);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("stomp://broker/q"),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential("u", "p"),
+            Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Headers = ["Host: orders"] },
+        };
+
+        await new StompProtocolHandler(new ScriptedStompConnector(ConnectResult.Connected(connection))).ExecuteAsync(context);
+
+        Assert.AreEqual("CONNECT\naccept-version:1.2\nhost:orders\nheart-beat:0,0\nlogin:u\npasscode:p\n\n\0", connection.WrittenText.First());
+    }
+
+    [TestMethod]
+    [DataRow("host: a", "a")]
+    [DataRow("HOST:b", "b")]
+    [DataRow("host:", "/")]
+    [DataRow("x-host: c", "/")]
+    public void VirtualHostOf_Header_GivesItsValueOrTheDefault(string header, string expected) =>
+        Assert.AreEqual(expected, StompProtocolHandler.VirtualHostOf([header]));
+
+    [TestMethod]
+    public void VirtualHostOf_NoHeaders_GivesSlash() =>
+        Assert.AreEqual("/", StompProtocolHandler.VirtualHostOf(null));
+
+    [TestMethod]
+    public async Task ExecuteAsync_ErrorWithBody_ReportsMessageAndBody()
+    {
+        TransferResult result = await ExecuteAsync(ScriptedStompConnection.Replaying("ERROR\nmessage:Bad CONNECT\n\nAccess refused for user u\n\0"), "stomp://broker/q", new MemoryStream(), "hi");
+
+        Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
+        Assert.AreEqual("STOMP server sent ERROR: Bad CONNECT: Access refused for user u", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ErrorWithoutBody_KeepsTheShortMessage()
+    {
+        TransferResult result = await ExecuteAsync(ScriptedStompConnection.Replaying("ERROR\nmessage:Bad CONNECT\n\n\0"), "stomp://broker/q", new MemoryStream(), "hi");
+
+        Assert.AreEqual("STOMP server sent ERROR: Bad CONNECT", result.ErrorMessage);
     }
 
     [TestMethod]

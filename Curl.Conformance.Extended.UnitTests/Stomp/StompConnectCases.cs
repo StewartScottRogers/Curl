@@ -57,7 +57,7 @@ public sealed class StompConnectCases
         StompRun.AssertExit(result, 0, string.Empty);
         StringAssert.StartsWith(
             StompRun.ClientText(result),
-            "CONNECT\naccept-version:1.2\nhost:mq.example\nheart-beat:0,0\nlogin:al\\ice\npasscode:pa:ss\n\n\0SEND\n");
+            "CONNECT\naccept-version:1.2\nhost:/\nheart-beat:0,0\nlogin:al\\ice\npasscode:pa:ss\n\n\0SEND\n");
     }
 
     [TestMethod]
@@ -108,7 +108,7 @@ public sealed class StompConnectCases
             "hi",
             "stomp://localhost/q");
 
-        StompRun.AssertExit(result, 67, "curl: (67) STOMP server sent ERROR: Supported protocol versions are 1.0\n");
+        StompRun.AssertExit(result, 67, "curl: (67) STOMP server sent ERROR: Supported protocol versions are 1.0: bad\n");
         Assert.AreEqual(StompRun.PlainConnect, StompRun.ClientText(result));
     }
 
