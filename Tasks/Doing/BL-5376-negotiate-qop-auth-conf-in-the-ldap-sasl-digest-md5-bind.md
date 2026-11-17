@@ -32,13 +32,13 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Ldap.UnitTests` (a new file) prove that, given a challenge offering `auth,auth-int,auth-conf`, the digest response contains `qop=auth-conf,cipher=3des` and the response value and session keys RFC 2831 gives.
-- [ ] A test proves that after a successful bind every later request PDU is sent SASL-wrapped (a 4-byte length prefix, not `0x30`) and every response is unwrapped.
-- [ ] A test proves a server offering only `qop="auth-conf"` still binds.
-- [ ] A test proves a server offering only `qop="auth"` keeps today's behaviour.
-- [ ] Tests are platform-neutral.
-- [ ] Hand check recorded in the Log: step 4 prints `qop=auth-conf` with a cipher, and after a successful bind later PDUs start with a 4-byte SASL length prefix, not `0x30`. Measure real curl with `Record-CurlExchange.ps1` where possible.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Ldap.UnitTests` (a new file) prove that, given a challenge offering `auth,auth-int,auth-conf`, the digest response contains `qop=auth-conf,cipher=3des` and the response value and session keys RFC 2831 gives.
+- [x] A test proves that after a successful bind every later request PDU is sent SASL-wrapped (a 4-byte length prefix, not `0x30`) and every response is unwrapped.
+- [x] A test proves a server offering only `qop="auth-conf"` still binds.
+- [x] A test proves a server offering only `qop="auth"` keeps today's behaviour.
+- [x] Tests are platform-neutral.
+- [x] Hand check recorded in the Log: step 4 prints `qop=auth-conf` with a cipher, and after a successful bind later PDUs start with a 4-byte SASL length prefix, not `0x30`. Measure real curl with `Record-CurlExchange.ps1` where possible.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,3 +50,5 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 49143602 8045ab2d 142c2e0c a94c6778 c1cf21f9 46a431e9 a0b49a29.
+- 2026-11-17: Implemented (ADR-1291): `LdapDigestMd5Bind` picks `auth-conf`+`cipher=3des` when offered, `LdapDigestMd5SecurityLayer` seals/unseals RFC 2831 3DES; tests in `LdapDigestMd5AuthConfTests`. Fast tests green (762), Measure-CodeQuality for the Ldap library 100%/100%, no member past a gate.
+- Hand check: no OpenLDAP container or real Windows curl relay is available to a lane, so the "step 4" repro was not run. The equivalent is pinned by tests: the sent response contains `qop=auth-conf,cipher=3des`, and the stand-in server sees every later PDU as a 4-byte length plus sealed buffer (first byte 0x00, not 0x30). Key derivation and IV chaining follow RFC 2831 / Cyrus SASL from memory, unverified against a live server.

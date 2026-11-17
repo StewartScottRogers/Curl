@@ -158,11 +158,29 @@ internal static class LdapAuthenticatedBind
 
         string clientNonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(ClientNonceBytes));
         byte[]? probe = LdapDigestMd5Bind.AnswerRequest(exchange.Writer, 0, initial.ServerSaslCredentials, credentials.UserName, credentials.Password, "ldap/" + host, clientNonce);
-        return probe is null
-            ? new LdapBindReply(LdapBindReplyStatus.Answered, WinLdapResultText.LocalError)
-            : await exchange.BindWithRequestAsync(
-                messageId => LdapDigestMd5Bind.AnswerRequest(exchange.Writer, messageId, initial.ServerSaslCredentials, credentials.UserName, credentials.Password, "ldap/" + host, clientNonce)!,
-                cancellationToken).ConfigureAwait(false);
+        if (probe is null)
+        {
+            return new LdapBindReply(LdapBindReplyStatus.Answered, WinLdapResultText.LocalError);
+        }
+
+        LdapBindReply bound = await exchange.BindWithRequestAsync(
+            messageId => LdapDigestMd5Bind.AnswerRequest(exchange.Writer, messageId, initial.ServerSaslCredentials, credentials.UserName, credentials.Password, "ldap/" + host, clientNonce)!,
+            cancellationToken).ConfigureAwait(false);
+        if (bound.IsSuccess)
+        {
+            StartConfidentialityLayer(exchange, initial.ServerSaslCredentials, credentials, clientNonce);
+        }
+
+        return bound;
+    }
+
+    // Seals the rest of the session when the answer to the challenge chose qop=auth-conf.
+    private static void StartConfidentialityLayer(LdapExchange exchange, byte[] challenge, NetworkCredential credentials, string clientNonce)
+    {
+        if (LdapDigestMd5Bind.SecurityLayerFor(challenge, credentials.UserName, credentials.Password, clientNonce) is { } layer)
+        {
+            exchange.StartSecurityLayer(layer, WinLdapResultText.Unavailable);
+        }
     }
 
     /// <summary>The NTLMSSP negotiate (type 1) message with no domain and no workstation.</summary>

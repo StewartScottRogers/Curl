@@ -16,6 +16,8 @@ internal static class LdapDigestMd5Bind
     /// <summary>The only nonce count sent: one challenge is answered per bind.</summary>
     private const string NonceCount = "00000001";
 
+    private const string QopConfidential = "auth-conf";
+
     /// <summary>
     /// Encodes the initial BindRequest: SASL authentication (tag 0xa3) naming
     /// <see cref="Mechanism" /> with empty credentials, so the server answers with its challenge.
@@ -43,32 +45,70 @@ internal static class LdapDigestMd5Bind
     internal static byte[]? AnswerRequest(LdapBerWriter writer, int messageId, ReadOnlySpan<byte> challenge, string user, string password, string digestUri, string clientNonce)
     {
         Dictionary<string, string> directives = ParseChallenge(Encoding.Latin1.GetString(challenge));
-        if (!directives.TryGetValue("nonce", out string? nonce)
-            || !directives.GetValueOrDefault("qop", "auth").Split(',').Any(option => option.Trim().Equals("auth", StringComparison.OrdinalIgnoreCase)))
+        if (!directives.TryGetValue("nonce", out string? nonce) || ChooseQop(directives) is not { } qop)
         {
             return null;
         }
 
+        bool confidential = qop == QopConfidential;
         string realm = directives.GetValueOrDefault("realm", string.Empty);
         bool isUtf8 = directives.GetValueOrDefault("charset", string.Empty).Equals("utf-8", StringComparison.OrdinalIgnoreCase);
         Encoding encoding = isUtf8 ? Encoding.UTF8 : Encoding.Latin1;
-        string response = ResponseHex(encoding, user, realm, password, nonce, clientNonce, digestUri);
-        string text = $"username=\"{Quoted(user)}\",realm=\"{Quoted(realm)}\",nonce=\"{Quoted(nonce)}\",cnonce=\"{Quoted(clientNonce)}\",nc={NonceCount},qop=auth,digest-uri=\"{Quoted(digestUri)}\",response={response}"
+        string response = ResponseHex(encoding, user, realm, password, nonce, clientNonce, digestUri, confidential);
+        string text = $"username=\"{Quoted(user)}\",realm=\"{Quoted(realm)}\",nonce=\"{Quoted(nonce)}\",cnonce=\"{Quoted(clientNonce)}\",nc={NonceCount},qop={qop}"
+            + (confidential ? ",cipher=3des" : string.Empty)
+            + $",digest-uri=\"{Quoted(digestUri)}\",response={response}"
             + (isUtf8 ? ",charset=utf-8" : string.Empty);
         return LdapRequests.SaslBind(writer, messageId, Mechanism, encoding.GetBytes(text));
     }
 
     /// <summary>
-    /// RFC 2831 section 2.1.2.1: HEX(KD(HEX(H(A1)), nonce:nc:cnonce:qop:HEX(H(A2)))) for
-    /// algorithm <c>md5-sess</c>, <c>qop=auth</c>.
+    /// Creates the RFC 2831 confidentiality layer when <see cref="AnswerRequest" /> answers
+    /// <paramref name="challenge" /> with <c>qop=auth-conf</c>; the session's later PDUs travel through it.
     /// </summary>
-    internal static string ResponseHex(Encoding encoding, string user, string realm, string password, string nonce, string clientNonce, string digestUri)
+    /// <param name="challenge">The server's digest-challenge.</param>
+    /// <param name="user">The user name.</param>
+    /// <param name="password">The password.</param>
+    /// <param name="clientNonce">The client nonce sent in the answer.</param>
+    /// <returns>The layer; <see langword="null" /> when the answer used <c>qop=auth</c> or no answer was possible.</returns>
+    internal static LdapDigestMd5SecurityLayer? SecurityLayerFor(ReadOnlySpan<byte> challenge, string user, string password, string clientNonce)
+    {
+        Dictionary<string, string> directives = ParseChallenge(Encoding.Latin1.GetString(challenge));
+        if (!directives.TryGetValue("nonce", out string? nonce) || ChooseQop(directives) != QopConfidential)
+        {
+            return null;
+        }
+
+        Encoding encoding = directives.GetValueOrDefault("charset", string.Empty).Equals("utf-8", StringComparison.OrdinalIgnoreCase) ? Encoding.UTF8 : Encoding.Latin1;
+        return LdapDigestMd5SecurityLayer.Create(HashA1(encoding, user, directives.GetValueOrDefault("realm", string.Empty), password, nonce, clientNonce));
+    }
+
+    /// <summary>
+    /// RFC 2831 section 2.1.2.1: HEX(KD(HEX(H(A1)), nonce:nc:cnonce:qop:HEX(H(A2)))) for
+    /// algorithm <c>md5-sess</c>; <c>qop=auth</c>, or <c>auth-conf</c> when <paramref name="confidential" />
+    /// (whose A2 ends in the 32 zeros of the unused message hash).
+    /// </summary>
+    internal static string ResponseHex(Encoding encoding, string user, string realm, string password, string nonce, string clientNonce, string digestUri, bool confidential = false)
+    {
+        string a1Hex = Convert.ToHexStringLower(HashA1(encoding, user, realm, password, nonce, clientNonce));
+        string a2Hex = Convert.ToHexStringLower(MD5.HashData(encoding.GetBytes($"AUTHENTICATE:{digestUri}" + (confidential ? ":00000000000000000000000000000000" : string.Empty))));
+        return Convert.ToHexStringLower(MD5.HashData(encoding.GetBytes($"{a1Hex}:{nonce}:{NonceCount}:{clientNonce}:{(confidential ? QopConfidential : "auth")}:{a2Hex}")));
+    }
+
+    // H(A1) of algorithm md5-sess: MD5(MD5(user:realm:password):nonce:cnonce).
+    private static byte[] HashA1(Encoding encoding, string user, string realm, string password, string nonce, string clientNonce)
     {
         byte[] secret = MD5.HashData(encoding.GetBytes($"{user}:{realm}:{password}"));
-        byte[] a1 = [.. secret, .. encoding.GetBytes($":{nonce}:{clientNonce}")];
-        string a1Hex = Convert.ToHexStringLower(MD5.HashData(a1));
-        string a2Hex = Convert.ToHexStringLower(MD5.HashData(encoding.GetBytes($"AUTHENTICATE:{digestUri}")));
-        return Convert.ToHexStringLower(MD5.HashData(encoding.GetBytes($"{a1Hex}:{nonce}:{NonceCount}:{clientNonce}:auth:{a2Hex}")));
+        return MD5.HashData([.. secret, .. encoding.GetBytes($":{nonce}:{clientNonce}")]);
+    }
+
+    // auth-conf when offered with the 3des cipher, else auth when offered, else null.
+    private static string? ChooseQop(Dictionary<string, string> directives)
+    {
+        string[] qops = directives.GetValueOrDefault("qop", "auth").Split(',', StringSplitOptions.TrimEntries);
+        bool offersConf = qops.Contains(QopConfidential, StringComparer.OrdinalIgnoreCase)
+            && directives.GetValueOrDefault("cipher", string.Empty).Split(',', StringSplitOptions.TrimEntries).Contains("3des", StringComparer.OrdinalIgnoreCase);
+        return offersConf ? QopConfidential : qops.Contains("auth", StringComparer.OrdinalIgnoreCase) ? "auth" : null;
     }
 
     // Escapes each backslash and double quote for a quoted-string.
