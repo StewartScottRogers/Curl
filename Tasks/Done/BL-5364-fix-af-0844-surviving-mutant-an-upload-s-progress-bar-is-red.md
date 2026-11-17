@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ProgressBarRecorder.cs]
+touches: [Curl.Engine.UnitLibrary/ProgressBarRecorder.cs, Curl.Engine.UnitTests/ProgressBarRecorderTests.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5364 — Fix AF-0844: Surviving mutant: an upload's progress bar is redrawn as a download at the end
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ProgressBarRecorder.cs line 156`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ProgressBarRecorder.cs line 156`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by Finish_SucceededAfterAnUploadReport_DrawsNothingMore (new; failed with the mutant, passes reverted). Test file added to touches. Build clean, Engine fast tests green.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 91036ec4 9742157d.
+- 2026-11-17: Doing -> Done. Mutant killed by new Finish test
