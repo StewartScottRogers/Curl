@@ -2530,6 +2530,10 @@ internal sealed class CurlCommandRunner(
         TransferResult firstFailure)
     {
         TransferResult skipped = TransferResult.Failure(firstFailure.ExitCode, CurlEasyErrorText.Of(firstFailure.ExitCode));
+        if (ReferenceEquals(firstFailure, CannotOpenUploadFileFailure) || ReferenceEquals(firstFailure, cannotOpenUploadFileAfterFailure))
+        {
+            NoteUploadFileCouldNotBeOpened(state, options, transfer);
+        }
 
         if (!TryResolveTransferUrl(options, transfer.Url, transfer.UploadFile, out string transferUrl))
         {
@@ -3664,7 +3668,7 @@ internal sealed class CurlCommandRunner(
         Api.Info.TransferInfo info = WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider);
         return info with
         {
-            Scheme = TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
+            Scheme = Running.UploadFileCouldNotBeOpened ? null : TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
             Referer = info.Referer ?? options.Referer,
             ConnectionId = connectionId,
             TransferId = HasNoTransferNumber(result) ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
@@ -4325,6 +4329,7 @@ internal sealed class CurlCommandRunner(
 
             await WriteErrorLinesAsync([$"curl: cannot open '{uploadFile}'", CommandLineRefusal.TryHelpLine], commandLineEchoEncoding)
                 .ConfigureAwait(false);
+            NoteUploadFileCouldNotBeOpened(Running, options, transfer);
             return CannotOpenUploadFileResult();
         }
 
@@ -4539,6 +4544,19 @@ internal sealed class CurlCommandRunner(
                 MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
                 MultipartFormPartMapping.RequestContentTypeOf(options.Headers),
                 CancellationToken.None);
+
+    /// <summary>
+    /// Records, for <c>-w</c>, that a transfer ended because its <c>-T</c> file could not be opened: curl has named the
+    /// <c>-o</c> file by then, so <c>%{filename_effective}</c> prints it, but it never reached the URL's scheme (BL-5339).
+    /// </summary>
+    /// <param name="running">The transfer's state.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
+    private static void NoteUploadFileCouldNotBeOpened(RunningTransferState running, CommandLineOptions options, UrlTransfer transfer)
+    {
+        running.OutputFileName = transfer.OutputFileName is { } fileName ? InOutputDirectory(options, fileName) : null;
+        running.UploadFileCouldNotBeOpened = true;
+    }
 
     /// <summary>
     /// Names the <c>-o</c> file for <c>%{filename_effective}</c> when the transfer is refused for an unsupported
