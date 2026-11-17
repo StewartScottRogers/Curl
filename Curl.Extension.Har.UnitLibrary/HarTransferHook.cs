@@ -23,11 +23,13 @@ internal sealed class HarTransferHook(string path) : ITransferHook
     /// <returns>The URL with no credentials; a URL with no user information is returned unchanged.</returns>
     internal static string Redacted(string url)
     {
-        var authorityStart = url.IndexOf("://", StringComparison.Ordinal) + 3;
+        var schemeEnd = url.IndexOf("://", StringComparison.Ordinal);
+        var firstDelimiter = url.IndexOfAny(['/', '?', '#']);
+        var authorityStart = schemeEnd >= 0 && (firstDelimiter < 0 || schemeEnd < firstDelimiter) ? schemeEnd + 3 : 0;
         var authorityEnd = url.IndexOfAny(['/', '?', '#'], authorityStart);
         var authority = authorityEnd < 0 ? url[authorityStart..] : url[authorityStart..authorityEnd];
         var at = authority.LastIndexOf('@');
-        return authorityStart < 3 || at < 0 ? url : url[..authorityStart] + RedactedUserInfo + url[(authorityStart + at)..];
+        return at < 0 ? url : url[..authorityStart] + RedactedUserInfo + url[(authorityStart + at)..];
     }
 
     private readonly List<HarExchange> _exchanges = [];

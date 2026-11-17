@@ -19,8 +19,9 @@ internal sealed class TftpTransferTimings(TimeProvider timeProvider, long starte
     /// Returns <paramref name="result" /> with its report carrying the transfer's timings.
     /// </summary>
     /// <param name="result">The outcome of the transfer.</param>
+    /// <param name="isUpload">Whether the transfer was an upload, which has no first byte received (BL-5327).</param>
     /// <returns>The same outcome with <see cref="TransferReport.Timings" /> set.</returns>
-    internal TransferResult Stamp(TransferResult result)
+    internal TransferResult Stamp(TransferResult result, bool isUpload)
     {
         var completed = timeProvider.GetTimestamp();
         TransferTimings timings = new(
@@ -28,7 +29,7 @@ internal sealed class TftpTransferTimings(TimeProvider timeProvider, long starte
             new ConnectTimings(started, channelReady, channelReady, null),
             channelReady,
             null,
-            result.IsSuccess ? completed : null,
+            result.IsSuccess && !isUpload ? completed : null,
             completed);
         return result with { Report = (result.Report ?? new TransferReport()) with { Timings = timings } };
     }
