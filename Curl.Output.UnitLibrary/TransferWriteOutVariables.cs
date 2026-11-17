@@ -118,7 +118,7 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
         ("user", url => url.User),
         ("password", url => url.Password),
         ("options", url => url.Options),
-        ("host", url => url.Host),
+        ("host", url => url.Host.Length == 0 ? null : url.Host),
         ("port", FormatUrlPort),
         ("path", url => url.AbsolutePath),
         ("query", url => url.Query),
