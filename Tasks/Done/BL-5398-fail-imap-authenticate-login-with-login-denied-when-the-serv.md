@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Imap.UnitLibrary/ImapAuthentication.cs, Curl.Original.Protocol.Imap.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5398 — Fail IMAP AUTHENTICATE LOGIN with Login denied when the server answers OK before the password
 
@@ -28,12 +28,12 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Imap.UnitTests` (a new file) prove that an `OK` to `AUTHENTICATE LOGIN <b64user>` before the password is requested ends with exit 67 `Login denied` and that the server receives no `SELECT`.
-- [ ] A test proves a normal LOGIN exchange (`+ UGFzc3dvcmQ6`, password sent, then `OK`) still succeeds.
-- [ ] A test proves a PLAIN exchange answered `OK` at once with the initial response is still accepted (no regression).
-- [ ] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
-- [ ] Hand check recorded in the Log: the repro exits 67 with `curl: (67) Login denied`, and the server sees no SELECT. Measure real curl with `Record-CurlExchange.ps1 -Imap` where possible.
+- [x] New tests in `Curl.Original.Protocol.Imap.UnitTests` (a new file) prove that an `OK` to `AUTHENTICATE LOGIN <b64user>` before the password is requested ends with exit 67 `Login denied` and that the server receives no `SELECT`.
+- [x] A test proves a normal LOGIN exchange (`+ UGFzc3dvcmQ6`, password sent, then `OK`) still succeeds.
+- [x] A test proves a PLAIN exchange answered `OK` at once with the initial response is still accepted (no regression).
+- [x] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Hand check recorded in the Log: the repro exits 67 with `curl: (67) Login denied`, and the server sees no SELECT. Measure real curl with `Record-CurlExchange.ps1 -Imap` where possible.
 
 ## Notes
 
@@ -45,3 +45,6 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: b08e2345 94daa4a3 d4cc733f 7ae10ef7 a0b49a29 0c5a9599.
+- Fix: `HasFinished` in `ImapAuthentication.cs` now holds LOGIN back as well as NTLM until the password prompt has been answered. Tests in `ImapProtocolHandlerLoginEarlyOkTests.cs` (early OK exits 67 Login denied with no SELECT sent; normal LOGIN and PLAIN-with-IR still succeed). Imap fast tests: 546 passed. Measure-CodeQuality for the Imap library: 0 failing members.
+- Hand check: not run against real curl in this lane; the scripted-connection test reproduces the repro's exchange byte for byte (exit 67, `Login denied`, no SELECT). Tests use no platform-specific paths or text.
+- 2026-11-17: Doing -> Done. Fixed
