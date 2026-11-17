@@ -3,8 +3,8 @@ id: AF-0845
 title: Surviving mutant: a Socket.IO upgrade reply status line of two tokens can be refused with exit 8
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs:CheckHead-lt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs:88:<
 task: none

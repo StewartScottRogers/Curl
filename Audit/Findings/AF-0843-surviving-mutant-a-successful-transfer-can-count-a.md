@@ -3,8 +3,8 @@ id: AF-0843
 title: Surviving mutant: a successful transfer can count as a connection cut off after its head
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs:CutOffAfterHead-ne:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs:296:!=
 task: none

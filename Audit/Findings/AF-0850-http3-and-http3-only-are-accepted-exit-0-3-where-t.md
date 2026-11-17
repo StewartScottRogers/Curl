@@ -3,8 +3,8 @@ id: AF-0850
 title: --http3 and --http3-only are accepted (exit 0 / 3) where the Windows Schannel reference curl refuses them with exit 2
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:--http3:accepted-where-reference-refuses:refused-option
 reproduction: none
 task: none

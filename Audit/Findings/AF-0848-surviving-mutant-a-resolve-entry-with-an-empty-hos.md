@@ -3,8 +3,8 @@ id: AF-0848
 title: Surviving mutant: a --resolve entry with an empty host is kept instead of ignored
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/ResolveOverrides.cs:TryParseAddition-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ResolveOverrides.cs:150:>
 task: none

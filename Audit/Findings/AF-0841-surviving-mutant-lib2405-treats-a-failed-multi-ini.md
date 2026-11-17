@@ -3,8 +3,8 @@ id: AF-0841
 title: Surviving mutant: lib2405 treats a failed multi init as a passed empty-multi test
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib2405.cs:EmptyMultiTestAsync-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib2405.cs:161:false
 task: none

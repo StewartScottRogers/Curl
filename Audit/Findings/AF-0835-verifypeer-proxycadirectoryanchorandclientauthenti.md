@@ -3,8 +3,8 @@ id: AF-0835
 title: VerifyPeer_ProxyCaDirectoryAnchorAndClientAuthenticationLeaf_IsExit60UnsuitablePurpose never checks exit 60
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/ServerCertificateVerificationTests.CaDirectoryPurpose.cs:VerifyPeer_ProxyCaDirectoryAnchorAndClientAuthenticationLeaf_IsExit60UnsuitablePurpose:name-lies
 reproduction: none
 task: none

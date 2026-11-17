@@ -3,8 +3,8 @@ id: AF-0844
 title: Surviving mutant: an upload's progress bar is redrawn as a download at the end
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ProgressBarRecorder.cs:ReportUploaded-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ProgressBarRecorder.cs:156:true
 task: none

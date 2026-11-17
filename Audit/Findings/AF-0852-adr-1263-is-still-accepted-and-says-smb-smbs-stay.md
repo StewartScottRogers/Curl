@@ -3,8 +3,8 @@ id: AF-0852
 title: ADR-1263 is still Accepted and says smb/smbs stay disabled in every build, but the engine serves them (superseded by ADR-1281)
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1263-smb-and-smbs-stay-disabled-in-every-build-and-the-docs-say-so.md:ADR-1263-Status:stale-adr
 reproduction: none
 task: none

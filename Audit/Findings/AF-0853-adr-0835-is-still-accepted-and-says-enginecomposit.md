@@ -3,8 +3,8 @@ id: AF-0853
 title: ADR-0835 is still Accepted and says EngineComposition serves smb/smbs with a DisabledProtocolHandler (exit 1); ADR-1281 superseded it and the engine serves SMB
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0835-smb-and-smbs-are-disabled-as-in-the-reference-builds.md:ADR-0835-Status:stale-adr
 reproduction: none
 task: none

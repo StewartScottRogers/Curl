@@ -3,8 +3,8 @@ id: AF-0837
 title: StartsTheMaxTimeWatchdog test asserts only that OperationStarted is not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitTests/ManagedEasyTransferTests.ToolProgress.cs:PerformAsync_NoToolProgressAndATimeout_StartsTheMaxTimeWatchdogAsLibcurlsTimeoutDoes:weak-assertion
 reproduction: none
 task: none

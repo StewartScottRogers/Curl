@@ -3,8 +3,8 @@ id: AF-0842
 title: Surviving mutant: lib1564's too-early check has an untested boundary
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1564.cs:PollAsync-lt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1564.cs:89:<
 task: none

@@ -3,8 +3,8 @@ id: AF-0838
 title: ForHttp2OrHttp3_EmptyBodyWithChunkedHeader_KeepsItsBody checks only that some body exists
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Http.UnitTests/Http2RequestHeadersTransferEncodingTests.cs:ForHttp2OrHttp3_EmptyBodyWithChunkedHeader_KeepsItsBody:weak-assertion
 reproduction: none
 task: none

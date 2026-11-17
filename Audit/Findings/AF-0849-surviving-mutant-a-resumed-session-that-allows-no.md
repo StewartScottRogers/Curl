@@ -3,8 +3,8 @@ id: AF-0849
 title: Surviving mutant: a resumed session that allows no early data can still be used for 0-RTT
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs:EarlyDataProtocolOf-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs:372:>
 task: none

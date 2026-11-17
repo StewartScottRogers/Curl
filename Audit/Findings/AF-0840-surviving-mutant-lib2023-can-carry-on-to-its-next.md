@@ -3,8 +3,8 @@ id: AF-0840
 title: Surviving mutant: lib2023 can carry on to its next requests after a failed easy init
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib2023.cs:RequestsOnOneHandleAsync-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib2023.cs:95:false
 task: none

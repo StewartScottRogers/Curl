@@ -3,8 +3,8 @@ id: AF-0851
 title: --mptcp -Z on Windows: Curl shows the transfer live in the parallel meter before the exit 7 error, where curl fails first and the meter shows Live 0
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:--mptcp:parallel-socket-open-failure-order:stderr
 reproduction: none
 task: none

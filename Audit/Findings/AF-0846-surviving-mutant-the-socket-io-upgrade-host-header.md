@@ -3,8 +3,8 @@ id: AF-0846
 title: Surviving mutant: the Socket.IO upgrade Host header's port boundary is untested
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs:Request-lt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs:36:<
 task: none
