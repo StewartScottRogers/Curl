@@ -47,3 +47,4 @@ Still-open older finding. What changed: the TFTP size and speed are now fixed; t
 ## Log
 
 - 2026-11-17: Created.
+- 2026-11-17: Backlog -> Doing. Criteria at claim: 189f7e59 1f484b78 992872fd 374f82e6 182da9f6 a0b49a29.
