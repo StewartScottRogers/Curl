@@ -45,3 +45,4 @@ Still-open older finding. What changed: the HTTP-proxy, SOCKS5h and `--ssl-auto-
 ## Log
 
 - 2026-11-17: Created.
+- 2026-11-17: Backlog -> Doing. Criteria at claim: 11f0b356 6ebf42a7 382e1205 7ae10ef7 5bb5acb2 a0b49a29.
