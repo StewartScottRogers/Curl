@@ -15,7 +15,7 @@ internal static class RevocationListDownload
 
     /// <summary>Gets the list at <paramref name="uri" />; throws when it cannot be fetched, saying why.</summary>
     /// <param name="uri">The distribution point's http address.</param>
-    /// <param name="cancellation">Cuts the fetch short, headers and body both.</param>
+    /// <param name="cancellation">Cuts the fetch short: while waiting for headers, and while a body read waits for bytes (cancelling disposes the response, which aborts the blocked read).</param>
     /// <returns>The response body.</returns>
     /// <exception cref="IOException">The server did not answer with success, or the body passed <see cref="MaximumBodyBytes" />.</exception>
     internal static byte[] Fetch(Uri uri, CancellationToken cancellation)
@@ -29,6 +29,7 @@ internal static class RevocationListDownload
         }
 
         using var body = response.Content.ReadAsStream(cancellation);
+        using var abortBlockedRead = cancellation.Register(static state => ((IDisposable)state!).Dispose(), response);
         using var buffer = new MemoryStream();
         var chunk = new byte[16 * 1024];
         int read;
@@ -43,6 +44,7 @@ internal static class RevocationListDownload
             buffer.Write(chunk, 0, read);
         }
 
+        cancellation.ThrowIfCancellationRequested();
         return buffer.ToArray();
     }
 }

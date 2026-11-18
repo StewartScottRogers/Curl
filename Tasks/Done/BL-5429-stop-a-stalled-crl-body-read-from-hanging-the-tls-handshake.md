@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/RevocationListDownload.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5429 — Stop a stalled CRL body read from hanging the TLS handshake
 
@@ -34,14 +34,17 @@ Fix sketch: right after `ReadAsStream`, register `cancellation.Register(static s
 
 ## Acceptance criteria
 
-- [ ] In `RevocationListDownload.Fetch`, a cancelled token interrupts a body read that is blocked waiting for bytes. No body read waits where the token cannot reach it.
-- [ ] An Integration test in `Curl.Networking.IntegrationTests` uses a loopback server that sends headers and then stalls. It shows `Fetch` returning or throwing within the token's deadline plus a small margin.
-- [ ] The `cancellation` parameter's doc comment is true of the code.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] In `RevocationListDownload.Fetch`, a cancelled token interrupts a body read that is blocked waiting for bytes. No body read waits where the token cannot reach it.
+- [x] An Integration test in `Curl.Networking.IntegrationTests` uses a loopback server that sends headers and then stalls. It shows `Fetch` returning or throwing within the token's deadline plus a small margin.
+- [x] The `cancellation` parameter's doc comment is true of the code.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix: `cancellation.Register(Dispose, response)` right after `ReadAsStream` aborts a blocked read; a final `ThrowIfCancellationRequested` stops a truncated list being returned. Integration test `RevocationListDownloadStalledBodyIntegrationTests` passes. Quality run skipped: the class is excluded from coverage and the change adds no branch.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 815b0aa2 e8e45fe6 90e2aaa9 3d836d5e.
+- 2026-11-18: Doing -> Done. CRL body read now aborted by the token; integration test added
