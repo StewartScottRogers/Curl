@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests/Cgr170Tests.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5515 — Fix AF-0855: RunAsync_UnreadableUploadFileInTheFirstBatch_ReportsEveryTransferWithExit26AndUploadsNothing asserts exit 25, not the 26 its name states
 
@@ -52,3 +52,4 @@ Already fixed by an earlier commit (27116a06b4, BL-3968): the test asserts 26 an
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-18: Doing -> Done. Already fixed in 27116a06b4; test asserts 26, reproduction clean
