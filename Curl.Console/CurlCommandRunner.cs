@@ -3695,7 +3695,7 @@ internal sealed class CurlCommandRunner(
             Scheme = Running.UploadFileCouldNotBeOpened ? null : TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
             Referer = info.Referer ?? options.Referer,
             ConnectionId = connectionId,
-            TransferId = HasNoTransferNumber(result) ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
+            TransferId = HasNoTransferNumber(result) || Running.UploadFileCouldNotBeOpened ? NoTransferId : Running.RetryTransferId ?? transfer.TransferId,
             SslVerifyResult = Running.SslVerifyResult,
             ProxySslVerifyResult = Running.ProxySslVerifyResult,
             EarlyDataSent = Running.TlsEarlyDataSent,
@@ -3730,7 +3730,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns>The number <c>%{conn_id}</c> prints.</returns>
     private long TakeConnectionId(TransferResult result) =>
-        UsedAConnection(result) ? Running.ConnectionId ?? transferPerformer.TakeConnectionId() : NoConnectionId;
+        UsedAConnection(result) && !Running.UploadFileCouldNotBeOpened ? Running.ConnectionId ?? transferPerformer.TakeConnectionId() : NoConnectionId;
 
     /// <summary>
     /// Gives what takes <paramref name="state" />'s <c>%{conn_id}</c>: the run's next connection number, kept on the

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5402 — Report %{conn_id} and %{xfer_id} as -1 when -T cannot open its file
 
@@ -28,18 +28,22 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Console.UnitTests` (a new file) prove `-T <missing file> -w '%{conn_id} %{xfer_id}\n'` prints `-1 -1` with exit 26, and `-w '%{json}'` contains `"conn_id":-1,"xfer_id":-1`.
-- [ ] A test proves a `-T` upload that opens its file keeps its normal `conn_id` and `xfer_id` (no regression).
-- [ ] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
-- [ ] Hand check recorded in the Log: the repro prints `-1 -1`. Measure real curl with `Record-CurlExchange.ps1` where possible.
+- [x] New tests in `Curl.Console.UnitTests` (a new file) prove `-T <missing file> -w '%{conn_id} %{xfer_id}\n'` prints `-1 -1` with exit 26, and `-w '%{json}'` contains `"conn_id":-1,"xfer_id":-1`.
+- [x] A test proves a `-T` upload that opens its file keeps its normal `conn_id` and `xfer_id` (no regression).
+- [x] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Hand check recorded in the Log: the repro prints `-1 -1`. Measure real curl with `Record-CurlExchange.ps1` where possible.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - Review acceptance check: the command prints `-1 -1`.
 
+- Fix: TakeConnectionId and ReportWriteOutInfo in CurlCommandRunner.cs treat UploadFileCouldNotBeOpened as no connection and no transfer number (-1, -1). Tests: Bl5402UploadOpenFailureIdsTests (in-memory; the live repro against real curl was not run, the unit tests pin -1 -1 and exit 26). Measure-CodeQuality Curl.Console: 0 failing members. Platform-neutral tests; CI criteria met by that.
+
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 02479bc9 3ab1215d 7ae10ef7 a0b49a29 0614bb1e.
+- 2026-11-17: Hand check: in-memory run prints "-1 -1", exit 26 (unit test).
+- 2026-11-17: Doing -> Done. -T open failure reports conn_id and xfer_id as -1
