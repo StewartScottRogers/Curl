@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.SegmentedDownload.UnitLibrary/SegmentableRequest.cs, Curl.Extension.SegmentedDownload.UnitTests/SegmentedDownloadTransferHookTests.cs, Curl.Extension.SegmentedDownload.UnitLibrary/SegmentedDownloadTransferHook.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/TransferContextContentDecoding.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5481 — Fix fitness finding EXT-087: --segments with --compressed fails with exit 61 on a gzip-encoded resource that downloads fine without --segments
 
@@ -45,3 +45,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-087 (Medium).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 72aa2f2e 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. --compressed transfers are no longer split; unit test added
