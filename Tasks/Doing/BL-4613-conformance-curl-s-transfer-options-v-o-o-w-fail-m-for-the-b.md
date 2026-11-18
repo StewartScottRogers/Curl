@@ -42,3 +42,4 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 41b31e62 636af73a fe617ef5 be674468 9438adeb ef6c9026.
 - 2026-11-02: Doing -> Deferred. Split into BL-4628, BL-4629, BL-4630, BL-4631, BL-4632
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 41b31e62 636af73a fe617ef5 be674468 9438adeb ef6c9026.
