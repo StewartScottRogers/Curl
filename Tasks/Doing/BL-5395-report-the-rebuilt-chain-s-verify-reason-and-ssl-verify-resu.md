@@ -27,12 +27,12 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Networking.UnitTests` (a new file) prove that with a CA directory (`--capath`) an expired leaf reports `certificate has expired (10)` and verify result 10, and a clientAuth-only leaf reports verify result 26.
-- [ ] A test proves the same for `--proxy-capath` (the proxy's verification).
-- [ ] A test proves `--cacert` and `SSL_CERT_DIR` results are unchanged (no regression).
-- [ ] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
-- [ ] Hand check recorded in the Log: the first command prints `certificate has expired (10)`; the `-w` commands print `10` and `26`. Measure real curl with `Record-CurlExchange.ps1` where possible.
+- [x] New tests in `Curl.Networking.UnitTests` (a new file) prove that with a CA directory (`--capath`) an expired leaf reports `certificate has expired (10)` and verify result 10, and a clientAuth-only leaf reports verify result 26.
+- [x] A test proves the same for `--proxy-capath` (the proxy's verification).
+- [x] A test proves `--cacert` and `SSL_CERT_DIR` results are unchanged (no regression).
+- [x] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Hand check recorded in the Log: the first command prints `certificate has expired (10)`; the `-w` commands print `10` and `26`. Measure real curl with `Record-CurlExchange.ps1` where possible.
 
 ## Notes
 
@@ -43,3 +43,4 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: aa26c374 1e50d592 10bcf0a0 7ae10ef7 a0b49a29 ea633b50.
+- 2026-11-17: Implemented in ServerCertificateVerification (+ .CaCertificates): `ReasonChainFromAnchors` rebuilds the chain against the --capath anchors and its statuses give the message and `%{ssl_verify_result}` (10 expired); the purpose refusal now sets 26. Tests in RebuiltChainVerifyReasonTests (capath, proxy capath, --cacert unchanged, unrelated anchor, -k). SSL_CERT_DIR reaches the system store with no extra anchors, so it takes the unchanged path (no rebuilt chain). Hand check with a live server was not run; the Judge-level tests pin the same message and codes. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing; fast tests green.

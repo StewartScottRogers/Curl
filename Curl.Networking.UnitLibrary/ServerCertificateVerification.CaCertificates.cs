@@ -147,12 +147,21 @@ internal sealed partial class ServerCertificateVerification
 
     private static bool BuildAgainstAnchors(X509Chain? chain, X509Certificate2Collection anchors, bool requireServerAuthentication)
     {
+        using var anchoredChain = RebuildAgainstAnchors(chain, anchors, requireServerAuthentication, out var built);
+        return built;
+    }
+
+    // The server's chain built against the anchors alone, built whether or not it succeeds so its
+    // statuses give the reason it failed; null when there is no chain or no anchor. The caller disposes it.
+    private static X509Chain? RebuildAgainstAnchors(X509Chain? chain, X509Certificate2Collection anchors, bool requireServerAuthentication, out bool built)
+    {
+        built = false;
         if (chain is null || chain.ChainElements.Count == 0 || anchors.Count == 0)
         {
-            return false;
+            return null;
         }
 
-        using var anchoredChain = new X509Chain();
+        var anchoredChain = new X509Chain();
         anchoredChain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
         anchoredChain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
         if (requireServerAuthentication)
@@ -167,7 +176,15 @@ internal sealed partial class ServerCertificateVerification
             anchoredChain.ChainPolicy.ExtraStore.Add(element.Certificate);
         }
 
-        return anchoredChain.Build(chain.ChainElements[0].Certificate);
+        built = anchoredChain.Build(chain.ChainElements[0].Certificate);
+        return anchoredChain;
     }
-}
 
+    // OpenSSL names the reason from the chain it built against the --capath roots, so an expired
+    // leaf under one of them is "certificate has expired (10)", not the system store's "unable to
+    // get local issuer certificate (20)" (BL-5395). Null where the system store's chain stands.
+    private X509Chain? ReasonChainFromAnchors(SslPolicyErrors errors, X509Chain? chain, X509Certificate2Collection anchors) =>
+        options.Insecure || matchesSchannelBuild || (errors & SslPolicyErrors.RemoteCertificateChainErrors) == 0
+            ? null
+            : RebuildAgainstAnchors(chain, anchors, requireServerAuthentication: true, out _);
+}

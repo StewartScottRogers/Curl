@@ -283,11 +283,12 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         errors = WithoutUnavailableRevocationAGoodStapleAnswers(errors, chain, stapled);
         var anchoredErrors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
-        var observed = ObservePeerVerification(anchoredErrors, chain, peerCertificates) with
+        using var reasonChain = ReasonChainFromAnchors(anchoredErrors, chain, anchorsBesideSystemStore);
+        var observed = ObservePeerVerification(anchoredErrors, reasonChain ?? chain, chain, peerCertificates) with
         {
             RevocationCheckIncomplete = RevocationCheckIncomplete(chain, stapled),
         };
-        (observed, var refusal) = Refusal(observed, anchoredErrors, chain, targetHost, revocationLists, stapled, anchorsBesideSystemStore);
+        (observed, var refusal) = Refusal(observed, anchoredErrors, chain, targetHost, revocationLists, stapled, anchorsBesideSystemStore, reasonChain);
         if (JudgesPinnedPublicKeyBeforeVerification)
         {
             var pinned = JudgePinnedPublicKey(observed, peerCertificates);
@@ -316,6 +317,11 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     private bool RevocationCheckIncomplete(X509Chain? chain, OcspStapleStatus? stapled) =>
         !options.Insecure && stapled != OcspStapleStatus.Good && RevocationBestEffortTolerates(chain);
 
+    private const long UnsuitablePurposeVerifyResult = 26;
+
+    private static PeerVerification WithPurposeVerifyResult(PeerVerification observed, string refusalMessage) =>
+        refusalMessage == OpenSslUnsuitablePurposeRefusal ? observed with { VerifyResult = UnsuitablePurposeVerifyResult } : observed;
+
     private const string OpenSslUnsuitablePurposeRefusal = "SSL certificate OpenSSL verify result: unsuitable certificate purpose (26)";
 
     // OpenSSL's server purpose check, run against the --capath roots: a certificate whose extended key usage forbids server authentication fails (BL-5310).
@@ -334,12 +340,14 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         string targetHost,
         CertificateRevocationListFile? revocationLists,
         OcspStapleStatus? stapled,
-        X509Certificate2Collection anchorsBesideSystemStore)
+        X509Certificate2Collection anchorsBesideSystemStore,
+        X509Chain? reasonChain)
     {
-        var refusal = RevokedStapleRefusal(stapled) ?? PurposeRefusal(anchoredErrors, chain, anchorsBesideSystemStore) ?? VerifyPeer(anchoredErrors, chain, targetHost, []);
+        var purposeRefusal = PurposeRefusal(anchoredErrors, chain, anchorsBesideSystemStore);
+        var refusal = RevokedStapleRefusal(stapled) ?? purposeRefusal ?? VerifyPeer(anchoredErrors, chain, targetHost, [], reasonChain);
         if (refusal is not null)
         {
-            return (observed, refusal);
+            return (WithPurposeVerifyResult(observed, refusal.Value.Message), refusal);
         }
 
         return revocationLists?.FirstRefusal(chain!, timeProvider.GetUtcNow()) is { } verifyResult
@@ -397,6 +405,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     /// Roots trusted in addition to the system store, from <c>--capath</c> without
     /// <c>--cacert</c>.
     /// </param>
+    /// <param name="reasonChain">The chain rebuilt against <paramref name="anchorsBesideSystemStore" />, whose statuses name the reason, or <see langword="null" /> to name it from <paramref name="chain" />.</param>
     /// <returns>
     /// <see langword="null" /> to accept the certificate, otherwise the exit code and message:
     /// exit 60, except in the Schannel build without <c>--cacert</c>, where a certificate
@@ -406,7 +415,8 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         SslPolicyErrors errors,
         X509Chain? chain,
         string targetHost,
-        X509Certificate2Collection anchorsBesideSystemStore)
+        X509Certificate2Collection anchorsBesideSystemStore,
+        X509Chain? reasonChain = null)
     {
         if (options.Insecure && !options.ChecksHostNameWhenInsecure)
         {
@@ -420,10 +430,10 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
             return purposeRefusal;
         }
 
-        return RefusalOfRemainingErrors(errors, chain, targetHost);
+        return RefusalOfRemainingErrors(errors, chain, targetHost, reasonChain);
     }
 
-    private (CurlExitCode ExitCode, string Message)? RefusalOfRemainingErrors(SslPolicyErrors errors, X509Chain? chain, string targetHost)
+    private (CurlExitCode ExitCode, string Message)? RefusalOfRemainingErrors(SslPolicyErrors errors, X509Chain? chain, string targetHost, X509Chain? reasonChain)
     {
         if (options.Insecure)
         {
@@ -438,13 +448,14 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
 
         return matchesSchannelBuild
             ? SchannelRefusal(errors, chain, targetHost)
-            : (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost));
+            : (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslPeerFailedVerification(errors, reasonChain ?? chain, targetHost));
     }
 
     // Taken while the chain is alive, whether or not -k lets the handshake go on, because
     // SslStream disposes the chain once its callback returns.
     private PeerVerification ObservePeerVerification(
         SslPolicyErrors anchoredErrors,
+        X509Chain? reasonChain,
         X509Chain? chain,
         ReadOnlyMemory<byte>[] peerCertificates)
     {
@@ -456,7 +467,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
             anchoredErrors == SslPolicyErrors.None,
             RefusesTheName(anchoredErrors)
                 ? OpenSslVerifyResult.Unspecified
-                : OpenSslVerifyResult.Of(anchoredErrors, chain, timeProvider.GetUtcNow()),
+                : OpenSslVerifyResult.Of(anchoredErrors, reasonChain, timeProvider.GetUtcNow()),
             reportedChain);
     }
 
