@@ -4,6 +4,8 @@ namespace Curl.Extended.Protocol.AzureStorage.Requests;
 /// Maps <c>az://account/container/blob</c> to the Blob service endpoint ("Addressing Blob Service Resources") and
 /// <c>abfs://filesystem@account.dfs.core.windows.net/path</c> (or <c>abfss://</c>) to the Data Lake Storage Gen2 DFS
 /// endpoint (the ADLS Gen2 URI). A bare account name gets the public cloud's suffix; a host with a dot is used as it is.
+/// An IPv4 or IPv6 address or <c>localhost</c> is a path-style emulator host (ADR-1291): the host is kept as it is
+/// and the first path segment is the account, not the host.
 /// </summary>
 public static class AzureStorageUrlMapping
 {

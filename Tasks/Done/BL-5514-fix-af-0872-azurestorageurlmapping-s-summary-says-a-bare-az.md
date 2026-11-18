@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Requests/AzureStorageUrlMapping.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5514 — Fix AF-0872: AzureStorageUrlMapping's summary says a bare az:// host always gets the public suffix and is the account; an IP or localhost host is a path-style emulator
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Summary of AzureStorageUrlMapping now states the IP/localhost path-style emulator rule (ADR-1291). The library CLAUDE.md has the same omission but is outside this task's touches; left alone. Library built, 214 unit tests pass.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-18: Doing -> Done. Summary states the emulator rule
