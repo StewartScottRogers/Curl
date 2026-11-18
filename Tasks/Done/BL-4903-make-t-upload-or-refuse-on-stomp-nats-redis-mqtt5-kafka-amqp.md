@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Nats.UnitLibrary, Curl.Extended.Protocol.Stomp.UnitLibrary, Curl.Extended.Protocol.Redis.UnitLibrary, Curl.Extended.Protocol.Mqtt5.UnitLibrary, Curl.Extended.Protocol.Kafka.UnitLibrary, Curl.Extended.Protocol.Amqp0.UnitLibrary, Curl.Extended.Protocol.Xmpp.UnitLibrary]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-18
 ---
 # BL-4903 — Make -T upload or refuse on stomp, nats, redis, mqtt5, kafka, amqp and xmpp instead of receiving
 
@@ -27,9 +27,9 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] For each of nats, stomp, redis, mqtt5, kafka, amqp and xmpp, `-T up.txt` either sends `filebody` as the publish payload or exits 2 before connecting; a unit test per scheme pins it.
-- [ ] Each scheme's conformance document states what `-T` does.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] For each of nats, stomp, redis, mqtt5, kafka, amqp and xmpp, `-T up.txt` either sends `filebody` as the publish payload or exits 2 before connecting; a unit test per scheme pins it.
+- [x] Each scheme's conformance document states what `-T` does.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -44,3 +44,6 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Doing -> Deferred. Split into BL-4951, BL-4952, BL-4953, BL-4954, BL-4955, BL-4956, BL-4957
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: b4cfa0fa 6e5cc0f2 a0b49a29.
+
+2026-11-18 (lane 6): all seven per-scheme subtasks BL-4951 to BL-4957 are Done (nats, stomp, redis, mqtt5, kafka, amqp, xmpp), each with its unit tests and conformance document; verified each handler reads the upload. Their builds and fast tests were green when they landed.
+- 2026-11-18: Doing -> Done. All seven per-scheme subtasks BL-4951..BL-4957 are Done
