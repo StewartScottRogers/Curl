@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4514, BL-4
 touches: [Curl.Conformance.Extended.UnitLibrary/DnsQuery/Encrypted, Curl.Conformance.Extended.UnitTests/DnsQuery/Encrypted, Documentation/Conformance/Extended/DnsQuery-Encrypted.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-18
 ---
 # BL-4474 — Conformance: DNS over TLS (RFC 7858), QUIC (RFC 9250) and HTTPS (RFC 8484) for dns:// (DnsQuery part 2 of 2)
 
@@ -44,20 +44,20 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/DnsQuery-Encrypted.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
+- [x] `Documentation/Conformance/Extended/DnsQuery-Encrypted.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
       RFC 7858, RFC 9250 and RFC 8484 that binds a client an `DnsQuery:` ID mapped to a test or to `n/a: <reason>`;
       the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/DnsQuery/Encrypted/` run curl in process and assert wire bytes,
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/DnsQuery/Encrypted/` run curl in process and assert wire bytes,
       stdout, stderr and exit code for at least: DoT on port 853 with the length prefix, a refused certificate (and
       `-k`), DoQ with ALPN `doq`, Message ID 0 and FIN, a DoQ server that sends a non-zero ID or a QUIC error code,
       DoH GET and POST bodies and media types, a DoH non-2xx status, and the default port of each transport.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix DnsQuery conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/DnsQuery/Encrypted/` is at 100% line and branch
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/DnsQuery/Encrypted/` is at 100% line and branch
       coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
 
 ## Notes
 
@@ -68,6 +68,8 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
   `Http3ServerTlsHandshake`) (BL-4682); and the DoQ cases and RFC 9250 rows (BL-4683, depends on BL-4681 and
   BL-4682). No task outside Done names BL-4474 in its `depends-on`.
 
+- 2026-11-18 (lane 4): all work was done by BL-4681, BL-4682 and BL-4683 (commits 933234a4d2, 1aaf1e3b47, e99ec71046), all Done; matrix, cases, reference servers and known-failure handling are in the tree. No new code here.
+
 ## Log
 
 - 2026-11-02: Created.
@@ -75,3 +77,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 - 2026-11-03: Doing -> Deferred. Split into BL-4681, BL-4682, BL-4683
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 6df4d420 7e22ddf2 f3c72898 d8e3fb0e 627fbee3 17248609.
+- 2026-11-18: Doing -> Done. DoT, DoQ and DoH conformance carried by BL-4681, BL-4682, BL-4683
