@@ -51,3 +51,4 @@ Shared root cause with STD-095 (BL-5384) and STD-092 (BL-5375) in `Curl.Networki
 ## Log
 
 - 2026-11-17: Created.
+- 2026-11-17: Backlog -> Doing. Criteria at claim: 8d51fad3 7e1200c5 c1a4a6ec 6297e33c 7ae10ef7 9b136022 a0b49a29.
