@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests/Cgr170Tests.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5498 — Fix AF-0856: RunAsync_UnreadableUploadFilePastTheFirstBatch_ReportsExit26WhateverFailedBeforeAndStartsNothingMore asserts exit 25, not 26
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The test already asserted exit 26 and stdout "0 7
+1 7
+2 26
+" in this tree (fixed by an earlier change to Cgr170Tests.cs); the reproduction finds no `Assert.AreEqual(25, exitCode)`. Cgr170Tests: 7 passed. No code change needed.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-18: Doing -> Done. Test already asserts exit 26 matching its name; reproduction clean, Cgr170Tests pass
