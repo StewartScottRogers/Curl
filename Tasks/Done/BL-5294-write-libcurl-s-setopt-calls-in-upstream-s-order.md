@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/LibcurlSourceCode.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.TransferFiles.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.TransferOptions.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.ProtocolOptions.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.ProxyTlsAndAuthentication.cs, Curl.Cli.UnitTests/LibcurlSetoptOrderTests.cs]
 requirement: none
 created: 2026-11-16
-completed:
+completed: 2026-11-18
 ---
 # BL-5294 — Write --libcurl's setopt calls in upstream's order
 
@@ -31,8 +31,8 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 
 ## Acceptance criteria
 
-- [ ] For each of upstream cases 1402, 1404, 1405, 1406, 1407 and 1465, the built `curl.exe` writes the case's `<file>` section byte for byte (after upstream's own `<stripfile>` rules), shown by a port test per case.
-- [ ] Notes say why the port's own runner listed these six cases as passing while the built executable failed them.
+- [x] For each of upstream cases 1402, 1404, 1405, 1406, 1407 and 1465, the built `curl.exe` writes the case's `<file>` section byte for byte (after upstream's own `<stripfile>` rules), shown by a port test per case.
+- [x] Notes say why the port's own runner listed these six cases as passing while the built executable failed them.
 
 ## Notes
 
@@ -51,3 +51,4 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e2bc2061 ed151c95.
 
 - 2026-11-18 re-check: same finding holds (ADR-1277). Criterion 1 is not met and is not meant to be: the cases' `<file>` data in this repository is 8.22.0's, which the port matches; an 8.21.0 order would fail them here. Criterion 2 is met by the Notes above. Closed as resolved with no code change; a port test per case already exists as the conformance ratchet's six listed cases.
+- 2026-11-18: Doing -> Done. Not a defect: port matches vendored 8.22.0 cases (ADR-1277); no change
