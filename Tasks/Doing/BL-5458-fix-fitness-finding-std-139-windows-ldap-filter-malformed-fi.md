@@ -31,11 +31,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] each command exits 39 with `curl: (39) LDAP remote: Filter Error`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] each command exits 39 with `curl: (39) LDAP remote: Filter Error`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+WinLDAP dialect now refuses (Filter Error, exit 39) a substrings filter with no non-empty piece (`(cn=**)`) and an extensible match with an empty value (`(cn:=)`, `(cn:dn:=)`). libldap path unchanged. Quality run: 100% line and branch, worst CRAP 10.
 
 ## Log
 

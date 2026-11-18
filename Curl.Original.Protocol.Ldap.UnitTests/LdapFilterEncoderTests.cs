@@ -68,6 +68,9 @@ public sealed class LdapFilterEncoderTests
 
     [TestMethod]
     [DataRow("(cn=)")]
+    [DataRow("(cn=**)")]
+    [DataRow("(cn:=)")]
+    [DataRow("(cn:dn:=)")]
     [DataRow("()")]
     [DataRow("(&)")]
     [DataRow("(|)")]

@@ -322,7 +322,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
             }
         }
 
-        return writer.Constructed(SubstringsTag, OctetString(attribute), writer.Constructed(Asn1Tag.Sequence, [.. substrings]));
+        return substrings.Count == 0 && isWinLdap ? null : writer.Constructed(SubstringsTag, OctetString(attribute), writer.Constructed(Asn1Tag.Sequence, [.. substrings]));
     }
 
     /// <summary>
@@ -400,7 +400,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
     /// <param name="writeFalse">Whether to write <c>dnAttributes</c> when it is false, as WinLDAP does.</param>
     private byte[]? WriteExtensible(ExtensibleMatch match, bool writeFalse)
     {
-        byte[]? assertion = DecodeValue(match.Value);
+        byte[]? assertion = match.Value.Length == 0 && isWinLdap ? null : DecodeValue(match.Value);
         if (assertion is null)
         {
             return null;
