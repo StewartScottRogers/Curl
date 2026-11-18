@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5Bind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5SecurityLayer.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5452 — Fix fitness finding STD-133: Windows LDAP --digest against a server that requires auth-conf but offers only rc4 fails; curl binds with rc4
 
@@ -31,13 +31,17 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command prints alice's entry, exit 0; the relay shows `cipher=rc4` followed by wrapped PDUs.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command prints alice's entry, exit 0; the relay shows `cipher=rc4` followed by wrapped PDUs.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Added rc4, rc4-56 and rc4-40 to the DIGEST-MD5 auth-conf layer (new LdapRc4.cs, RFC 2831 key lengths 16/7/5); cipher preference 3des, rc4, rc4-56, rc4-40. Plain `des` is still not implemented (answering falls back to qop=auth). Decision by Claude under delegation: no ADR needed beyond this note.
+- Criterion 1 was checked at unit level (stand-in sealing server answering `cipher=rc4` and exchanging wrapped PDUs; RC4 known vector); no OpenLDAP container available in a lane. Ldap tests 816 pass; quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-133 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: f5d1d735 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Ldap DIGEST-MD5 auth-conf now supports rc4, rc4-56, rc4-40 ciphers

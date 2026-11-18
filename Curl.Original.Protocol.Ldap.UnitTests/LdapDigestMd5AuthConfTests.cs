@@ -36,7 +36,8 @@ public sealed class LdapDigestMd5AuthConfTests
 
     [TestMethod]
     [DataRow("realm=\"r\",nonce=\"n1\",qop=\"auth-conf\",cipher=\"3des\"", true, DisplayName = "Only auth-conf")]
-    [DataRow("nonce=\"n1\",qop=\"auth,auth-conf\",cipher=\"rc4\"", false, DisplayName = "auth-conf without 3des falls back to auth")]
+    [DataRow("nonce=\"n1\",qop=\"auth,auth-conf\",cipher=\"rc4\"", true, DisplayName = "auth-conf with only rc4")]
+    [DataRow("nonce=\"n1\",qop=\"auth,auth-conf\",cipher=\"des\"", false, DisplayName = "auth-conf without a supported cipher falls back to auth")]
     [DataRow("nonce=\"n1\",qop=\"auth\",cipher=\"3des\"", false, DisplayName = "Only auth")]
     [DataRow("nonce=\"n1\",qop=\"auth-conf\",cipher=\"3des\",charset=utf-8", true, DisplayName = "UTF-8 charset")]
     [DataRow("qop=\"auth-conf\",cipher=\"3des\"", false, DisplayName = "No nonce")]
@@ -86,6 +87,63 @@ public sealed class LdapDigestMd5AuthConfTests
         Assert.AreEqual(1, next[^5]);
         Assert.IsNull(client.NextToken([]));
         Assert.IsTrue(client.IsAuthenticated);
+    }
+
+    [TestMethod]
+    public void Rc4_KnownVector_MatchesRfc6229StyleTestCase()
+    {
+        // The widely published RC4 test vector: key "Key", plaintext "Plaintext".
+        byte[] encrypted = new LdapRc4("Key"u8).Transform("Plaintext"u8);
+
+        Assert.AreEqual("BBF316E8D940AF0AD3", Convert.ToHexString(encrypted));
+    }
+
+    [TestMethod]
+    [DataRow("rc4")]
+    [DataRow("rc4-56")]
+    [DataRow("rc4-40")]
+    public void WrapAndUnwrap_StreamCipher_RoundTripWithoutPaddingAndRejectDamage(string cipher)
+    {
+        byte[] hashA1 = MD5.HashData("a1"u8);
+        using LdapDigestMd5SecurityLayer client = LdapDigestMd5SecurityLayer.Create(hashA1, cipher: cipher);
+        using LdapDigestMd5SecurityLayer server = LdapDigestMd5SecurityLayer.Create(hashA1, isServer: true, cipher: cipher);
+
+        foreach (int length in new[] { 0, 1, 7, 8, 100 })
+        {
+            byte[] message = RandomNumberGenerator.GetBytes(length);
+            byte[] wrapped = client.Wrap(message);
+            Assert.AreEqual(length + 10 + 6, wrapped.Length);
+            CollectionAssert.AreEqual(message, server.Unwrap(wrapped));
+            CollectionAssert.AreEqual(message, client.Unwrap(server.Wrap(message)));
+        }
+
+        byte[] flipped = client.Wrap("hello"u8);
+        flipped[1] ^= 0x01;
+        Assert.IsNull(server.Unwrap(flipped));
+        Assert.IsNull(server.Unwrap(new byte[9]));
+        Assert.IsNull(server.Unwrap(client.Wrap("x"u8)[..^1]));
+    }
+
+    [TestMethod]
+    public void Create_Rc4VersusRc456_SealDifferently()
+    {
+        byte[] hashA1 = MD5.HashData("a1"u8);
+        using LdapDigestMd5SecurityLayer full = LdapDigestMd5SecurityLayer.Create(hashA1, cipher: "rc4");
+        using LdapDigestMd5SecurityLayer weak = LdapDigestMd5SecurityLayer.Create(hashA1, cipher: "rc4-56");
+
+        CollectionAssert.AreNotEqual(full.Wrap("same"u8), weak.Wrap("same"u8));
+    }
+
+    [TestMethod]
+    [DataRow("realm=\"r\",nonce=\"n\",qop=\"auth-conf\",cipher=\"rc4-40,rc4\"", "rc4")]
+    [DataRow("nonce=\"n\",qop=\"auth-conf\",cipher=\"rc4-40,rc4-56,des\"", "rc4-56")]
+    [DataRow("nonce=\"n\",qop=\"auth-conf\",cipher=\"rc4,3des\"", "3des")]
+    public void AnswerRequest_PrefersTheStrongestSupportedCipher(string challenge, string expected)
+    {
+        byte[]? request = LdapDigestMd5Bind.AnswerRequest(Writer, 2, Encoding.ASCII.GetBytes(challenge), "u", "p", "ldap/h", "c");
+
+        Assert.IsNotNull(request);
+        StringAssert.Contains(Encoding.ASCII.GetString(request), $"qop=auth-conf,cipher={expected},digest-uri=");
     }
 
     [TestMethod]
@@ -165,6 +223,8 @@ public sealed class LdapDigestMd5AuthConfTests
     [TestMethod]
     [DataRow("nonce=\"n1\",qop=\"auth,auth-int,auth-conf\",cipher=\"3des\"", DisplayName = "auth, auth-int and auth-conf offered")]
     [DataRow("nonce=\"n1\",qop=\"auth-conf\",cipher=\"3des\"", DisplayName = "Only auth-conf offered")]
+    [DataRow("nonce=\"n1\",qop=\"auth-conf\",cipher=\"rc4\"", DisplayName = "Only rc4 offered")]
+    [DataRow("nonce=\"n1\",qop=\"auth-conf\",cipher=\"rc4-40\"", DisplayName = "Only rc4-40 offered")]
     public async Task ExecuteAsync_AuthConfBind_SealsEveryLaterPduAndUnsealsEveryReply(string challenge)
     {
         var standIn = new SealingServer(challenge);
@@ -180,7 +240,7 @@ public sealed class LdapDigestMd5AuthConfTests
         TransferResult result = await handler.ExecuteAsync(context);
 
         Assert.AreEqual(TransferResult.Success(0), result);
-        StringAssert.Contains(standIn.AnswerText, "qop=auth-conf,cipher=3des");
+        StringAssert.Contains(standIn.AnswerText, "qop=auth-conf,cipher=" + challenge.Split("cipher=\"")[1].Split('"')[0]);
         Assert.IsTrue(standIn.Unsealed.Any(message => message.Contains((byte)0x63)), "The SearchRequest arrives sealed.");
         Assert.IsTrue(standIn.AllLaterWritesStartWithALength);
     }
@@ -227,7 +287,8 @@ public sealed class LdapDigestMd5AuthConfTests
                 string cnonce = AnswerText.Split("cnonce=\"")[1].Split('"')[0];
                 string nonce = challenge.Split("nonce=\"")[1].Split('"')[0];
                 byte[] secret = MD5.HashData(Encoding.Latin1.GetBytes("u::secret"));
-                layer = LdapDigestMd5SecurityLayer.Create(MD5.HashData([.. secret, .. Encoding.Latin1.GetBytes($":{nonce}:{cnonce}")]), isServer: true);
+                string cipher = AnswerText.Split("cipher=")[1].Split(',')[0];
+                layer = LdapDigestMd5SecurityLayer.Create(MD5.HashData([.. secret, .. Encoding.Latin1.GetBytes($":{nonce}:{cnonce}")]), isServer: true, cipher: cipher);
                 replies.AddRange(Hex.Bytes("30 0c 02 01 02 61 07 0a 01 00 04 00 04 00"));
             }
             else
