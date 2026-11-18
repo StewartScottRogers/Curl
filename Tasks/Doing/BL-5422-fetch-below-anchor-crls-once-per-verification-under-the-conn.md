@@ -34,3 +34,4 @@ Found by the shift-end review (ADR-0710) of the 2026-11-17 shift (silent-failure
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 69438f19 92f4726d 6eef085d 4e923170 9abf1d2b.
