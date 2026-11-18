@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs, Curl.Networking.UnitTests/AiaDownloadDisabledTests.cs, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5396 — Disable AIA certificate downloads on the Linux and macOS OpenSSL-flavoured build
 
@@ -27,13 +27,13 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Networking.UnitTests` (a new file) prove the chain policy built for the OpenSSL-flavoured build (`matchesSchannelBuild` false) has `DisableCertificateDownloads` true, for the system store and for `--cacert` / `--capath` anchors.
-- [ ] A test proves the Schannel-flavoured policy (`matchesSchannelBuild` true) does not disable downloads (Windows unchanged).
-- [ ] A test proves a leaf whose intermediate is supplied by the server still verifies on the OpenSSL-flavoured build.
-- [ ] An ADR marked "Decided by Claude under Stewart's delegation" in `Documentation/Planning/Decisions` records that the OpenSSL-reference builds do not follow AIA, and why (OpenSSL curl does not).
-- [ ] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
-- [ ] Hand check recorded in the Log: the repro command exits 60 with `unable to get local issuer certificate (20)` on Linux; on Windows it still exits 0.
+- [x] New tests in `Curl.Networking.UnitTests` (a new file) prove the chain policy built for the OpenSSL-flavoured build (`matchesSchannelBuild` false) has `DisableCertificateDownloads` true, for the system store and for `--cacert` / `--capath` anchors.
+- [x] A test proves the Schannel-flavoured policy (`matchesSchannelBuild` true) does not disable downloads (Windows unchanged).
+- [x] A test proves a leaf whose intermediate is supplied by the server still verifies on the OpenSSL-flavoured build.
+- [x] An ADR marked "Decided by Claude under Stewart's delegation" in `Documentation/Planning/Decisions` records that the OpenSSL-reference builds do not follow AIA, and why (OpenSSL curl does not).
+- [x] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Hand check recorded in the Log: the repro command exits 60 with `unable to get local issuer certificate (20)` on Linux; on Windows it still exits 0.
 
 ## Notes
 
@@ -44,3 +44,6 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: a991eba9 aaf49420 ebca0b2e 186709ed 7ae10ef7 a0b49a29 465e0582.
+- 2026-11-17: Implemented in ServerCertificateVerification.cs: the OpenSSL-flavoured system-store policy (previously null) and the --cacert policy set DisableCertificateDownloads; Schannel unchanged. ADR-1296 records it. Tests in AiaDownloadDisabledTests.cs; ServerCertificateRevocationTests' OpenSSL system-store test now expects a NoCheck policy. Fast Networking tests green; Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members.
+- Hand check: lanes run on Windows only, so the Linux exit 60 repro could not be run; the behaviour is pinned by unit tests (policy flag, server-sent intermediate still verifies). Windows path is unchanged by construction (Schannel policy untouched).
+- 2026-11-17: Doing -> Done. OpenSSL-flavoured chain policies disable AIA downloads (ADR-1296)

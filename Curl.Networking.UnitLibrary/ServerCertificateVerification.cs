@@ -220,6 +220,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
             RevocationMode = matchesSchannelBuild && !options.SkipRevocationCheck
                 ? X509RevocationMode.Online
                 : X509RevocationMode.NoCheck,
+            DisableCertificateDownloads = !matchesSchannelBuild,
         };
         chainPolicy.ApplicationPolicy.Add(ServerAuthentication);
         chainPolicy.CustomTrustStore.AddRange(ReadCaCertificates());
@@ -230,9 +231,22 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     // The Schannel build checks the system store chain for revocation as Schannel's default
     // flags do: online, CRL distribution points and OCSP, every certificate but the root,
     // unless --ssl-no-revoke (ADR-0930). The OpenSSL build checks none: SslStream's default.
+    // The OpenSSL build follows no AIA link, so a server that omits its intermediate is
+    // refused with exit 60 as OpenSSL curl does (ADR-1296).
     private X509ChainPolicy? SystemStoreChainPolicy()
     {
-        if (!matchesSchannelBuild || options.SkipRevocationCheck)
+        if (!matchesSchannelBuild)
+        {
+            var openSslPolicy = new X509ChainPolicy
+            {
+                RevocationMode = X509RevocationMode.NoCheck,
+                DisableCertificateDownloads = true,
+            };
+            openSslPolicy.ApplicationPolicy.Add(ServerAuthentication);
+            return openSslPolicy;
+        }
+
+        if (options.SkipRevocationCheck)
         {
             return null;
         }
