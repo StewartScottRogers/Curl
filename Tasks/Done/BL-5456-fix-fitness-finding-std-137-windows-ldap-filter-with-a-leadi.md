@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/WinLdapUrlReader.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5456 — Fix fitness finding STD-137: Windows LDAP filter with a leading or trailing TAB/CR/LF: curl exits 3 "Bad LDAP URL"; the port sends a garbage filter (exit 0) or exits 39
 
@@ -43,3 +43,4 @@ WinLdapUrlReader now refuses a decoded filter starting or ending with TAB, CR or
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-137 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 2516460f 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Windows filter with leading or trailing TAB/CR/LF now exits 3 Bad LDAP URL: No Memory
