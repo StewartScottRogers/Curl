@@ -293,6 +293,12 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         ReadOnlyMemory<byte>[] peerCertificates,
         byte[]? stapledResponse = null)
     {
+        if (RelyingOnAnIntermediateTheServerDidNotSend(chain, peerCertificates))
+        {
+            return (
+                new PeerVerification(false, OpenSslVerifyResult.UnableToGetIssuerCertificateLocally, peerCertificates),
+                (CurlExitCode.PeerFailedVerification, UnableToGetLocalIssuerRefusal));
+        }
         var stapled = StapledRevocationStatus(stapledResponse, chain, peerCertificates);
         errors = WithoutUnavailableRevocationAGoodStapleAnswers(errors, chain, stapled);
         var anchoredErrors = WithTheNameCheckCurlRuns(
@@ -312,6 +318,25 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         return refusal is null ? JudgePinnedPublicKey(observed, peerCertificates) : (observed, refusal);
     }
 
+    private const string UnableToGetLocalIssuerRefusal = "SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)";
+
+    // curl's OpenSSL build builds the chain from what the server sent and its trust anchors alone.
+    // .NET's Unix X509Chain also reads, and saves AIA-downloaded certificates to, the CurrentUser CA
+    // store (~/.dotnet/corefx/cryptography/x509stores/ca), so a chain whose middle certificate the
+    // server did not send was completed from that store, which OpenSSL never reads: it fails
+    // with "unable to get local issuer certificate (20)" (BL-5449, STD-131). The first
+    // element is the server's own and the last the anchor, neither of which need be sent.
+    private bool RelyingOnAnIntermediateTheServerDidNotSend(X509Chain? chain, ReadOnlyMemory<byte>[] peerCertificates)
+    {
+        return !matchesSchannelBuild
+            && !options.Insecure
+            && chain is not null
+            && peerCertificates.Length > 0
+            && chain.ChainElements.Skip(1).SkipLast(1).Any(element => !WasSent(element.Certificate, peerCertificates));
+    }
+
+    private static bool WasSent(X509Certificate2 certificate, ReadOnlyMemory<byte>[] peerCertificates) =>
+        peerCertificates.Any(sent => sent.Span.SequenceEqual(certificate.RawData));
     // The Schannel build checks revocation with CertGetCertificateChain on the context Schannel
     // attached the server's stapled OCSP response to, so a staple that says good or revoked
     // answers for the server's own certificate before any online check (CGR-014, ADR-0834).

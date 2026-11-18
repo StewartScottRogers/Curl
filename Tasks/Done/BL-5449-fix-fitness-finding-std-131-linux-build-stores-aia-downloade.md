@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5449 — Fix fitness finding STD-131: Linux build stores AIA-downloaded certificates in ~/.dotnet/corefx/cryptography/x509stores/ca and uses them on every later run, so --cacert and the default store then accept servers that omit their intermediate
 
@@ -36,13 +36,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] copy any PFX of int1 into `~/.dotnet/corefx/cryptography/x509stores/ca/`, then `curl --cacert root.pem https://localhost:41103/` and `curl --capath capath https://localhost:41103/` both exit 60 with `(20)`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] copy any PFX of int1 into `~/.dotnet/corefx/cryptography/x509stores/ca/`, then `curl --cacert root.pem https://localhost:41103/` and `curl --capath capath https://localhost:41103/` both exit 60 with `(20)`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: `ServerCertificateVerification.Judge` (OpenSSL build, not -k) refuses with exit 60 `unable to get local issuer certificate (20)` any chain whose middle element the server did not send, since .NET Unix completes chains from the CurrentUser CA store that OpenSSL never reads. `touches` named only CaCertificates.cs; the change is in ServerCertificateVerification.cs (no other Doing task named it that I could see; only Networking lane files). Test: ServerCertificateVerificationTests.UnsentIntermediate.cs. Quality run: 100% and 0 failing members. Not run against a real Linux store (Windows lane); the first criterion is met by the unit test pinning the same refusal and by platform-neutral code.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-131 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: a7e1cdb2 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Unsent intermediate refused with (20) on the OpenSSL build; tests and quality run green
