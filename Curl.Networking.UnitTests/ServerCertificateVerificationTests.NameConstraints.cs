@@ -187,12 +187,124 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual(0, CertificateNameConstraints.FindViolation(chain));
     }
 
+    private const string NotPermitted = "schannel: error 0x00004000";
+
+    private const string Excluded = "schannel: error 0x00008000";
+
+    [TestMethod]
+    public void VerifyPeer_SubjectOutsideThePermittedDirectoryName_IsSchannelError0x4000() =>
+        Assert.AreEqual(NotPermitted, Verify(Constraints(permittedName: DirectoryName("O=Good")), Host, true, subject: "O=Evil")?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_SubjectEqualToThePermittedDirectoryName_Accepts() =>
+        Assert.IsNull(Verify(Constraints(permittedName: DirectoryName("O=Good")), Host, true, subject: "O=Good"));
+
+    [TestMethod]
+    public void VerifyPeer_SubjectShorterThanThePermittedDirectoryName_IsSchannelError0x4000()
+    {
+        var good = ReadRelativeNames("O=Good");
+        var extra = ReadRelativeNames("CN=Extra");
+
+        Assert.AreEqual(NotPermitted, Verify(Constraints(permittedName: DirectoryName(good, extra)), Host, true, subject: "O=Good")?.Message);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_SubjectEqualToTheExcludedDirectoryName_IsSchannelError0x8000() =>
+        Assert.AreEqual(Excluded, Verify(Constraints(excludedName: DirectoryName("O=Evil")), Host, true, subject: "O=Evil")?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_EmptySubjectUnderAPermittedDirectoryName_Accepts() =>
+        Assert.IsNull(Verify(Constraints(permittedName: DirectoryName("O=Good")), Host, true, subject: "", alternativeNames: AlternativeNames(GeneralName(2, Host))));
+
+    [TestMethod]
+    public void VerifyPeer_AlternativeDirectoryNameOutsideThePermittedDirectoryName_IsSchannelError0x4000() =>
+        Assert.AreEqual(
+            NotPermitted,
+            Verify(Constraints(permittedName: DirectoryName("O=Good")), Host, true, subject: "O=Good", alternativeNames: AlternativeNames(GeneralName(2, Host), DirectoryName("O=Evil")))?.Message);
+
+    [TestMethod]
+    [DataRow("example.com", "evil@other.org", NotPermitted)]
+    [DataRow("example.com", "a@example.com", null)]
+    [DataRow(".example.com", "a@x.example.com", null)]
+    [DataRow(".example.com", "a@example.com", NotPermitted)]
+    [DataRow("a@example.com", "a@example.com", null)]
+    [DataRow("a@example.com", "b@example.com", NotPermitted)]
+    public void VerifyPeer_EmailAlternativeNameAgainstAPermittedEmailConstraint_FollowsTheConstraint(string constraint, string email, string? expected) =>
+        Assert.AreEqual(expected, Verify(Constraints(permittedName: GeneralName(1, constraint)), Host, true, alternativeNames: AlternativeNames(GeneralName(2, Host), GeneralName(1, email)))?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_EmailAlternativeNameInTheExcludedEmailDomain_IsSchannelError0x8000() =>
+        Assert.AreEqual(Excluded, Verify(Constraints(excludedName: GeneralName(1, "other.org")), Host, true, alternativeNames: AlternativeNames(GeneralName(2, Host), GeneralName(1, "evil@other.org")))?.Message);
+
+    [TestMethod]
+    [DataRow(".example.com", "https://evil.other.org/", NotPermitted)]
+    [DataRow(".example.com", "https://a.example.com/", null)]
+    [DataRow("example.com", "https://example.com/x", null)]
+    [DataRow("example.com", "https://a.example.com/", NotPermitted)]
+    [DataRow(".example.com", "nothing", NotPermitted)]
+    public void VerifyPeer_UriAlternativeNameAgainstAPermittedUriConstraint_FollowsTheConstraint(string constraint, string uri, string? expected) =>
+        Assert.AreEqual(expected, Verify(Constraints(permittedName: GeneralName(6, constraint)), Host, true, alternativeNames: AlternativeNames(GeneralName(2, Host), GeneralName(6, uri)))?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_UriAlternativeNameInTheExcludedUriHost_IsSchannelError0x8000() =>
+        Assert.AreEqual(Excluded, Verify(Constraints(excludedName: GeneralName(6, "evil.other.org")), Host, true, alternativeNames: AlternativeNames(GeneralName(2, Host), GeneralName(6, "https://evil.other.org/")))?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_AlternativeNameOfAnUnconstrainedKind_Accepts() =>
+        Assert.IsNull(Verify(Constraints(permitted: Host), Host, true, alternativeNames: AlternativeNames(GeneralName(2, Host), [0x88, 0x01, 0x2A])));
+
+    private static byte[] GeneralName(int tag, string value)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        writer.WriteCharacterString(UniversalTagNumber.IA5String, value, new Asn1Tag(TagClass.ContextSpecific, tag));
+        return writer.Encode();
+    }
+
+    private static byte[] ReadRelativeNames(string name)
+    {
+        var rdns = new AsnReader(new X500DistinguishedName(name).RawData, AsnEncodingRules.DER).ReadSequence();
+        return rdns.ReadEncodedValue().ToArray();
+    }
+
+    private static byte[] DirectoryName(string name) => DirectoryName(ReadRelativeNames(name));
+
+    private static byte[] DirectoryName(params byte[][] relativeNames)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 4, true)))
+        {
+            using (writer.PushSequence())
+            {
+                foreach (var relativeName in relativeNames)
+                {
+                    writer.WriteEncodedValue(relativeName);
+                }
+            }
+        }
+
+        return writer.Encode();
+    }
+
+    private static byte[] AlternativeNames(params byte[][] generalNames)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            foreach (var generalName in generalNames)
+            {
+                writer.WriteEncodedValue(generalName);
+            }
+        }
+
+        return writer.Encode();
+    }
+
     private (CurlExitCode ExitCode, string Message)? Verify(
-        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false, string? subject = null)
+        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false, string? subject = null, byte[]? alternativeNames = null)
     {
         using var root = CreateAuthority("CN=Constraint Root", null, null);
         using var intermediate = CreateAuthority("CN=Constraint Intermediate", root, constraints);
-        using var leaf = CreateLeaf(intermediate, host, ipAddress, withNames, malformedNames, subject);
+        using var leaf = CreateLeaf(intermediate, host, ipAddress, withNames, malformedNames, subject, alternativeNames);
         var caFile = Path.Combine(_directory, "anchor.pem");
         File.WriteAllText(caFile, intermediate.ExportCertificatePem());
         var verification = new ServerCertificateVerification(
@@ -209,21 +321,21 @@ public sealed class ServerCertificateVerificationNameConstraintTests
 
     private static byte[] Constraints(
         string? permitted = null, string? excluded = null, byte[]? permittedIp = null, byte[]? excludedIp = null,
-        bool permittedDirectoryName = false)
+        bool permittedDirectoryName = false, byte[]? permittedName = null, byte[]? excludedName = null)
     {
         var writer = new AsnWriter(AsnEncodingRules.DER);
         using (writer.PushSequence())
         {
-            WriteSubtrees(writer, 0, permitted, permittedIp, permittedDirectoryName);
-            WriteSubtrees(writer, 1, excluded, excludedIp, false);
+            WriteSubtrees(writer, 0, permitted, permittedIp, permittedDirectoryName, permittedName);
+            WriteSubtrees(writer, 1, excluded, excludedIp, false, excludedName);
         }
 
         return writer.Encode();
     }
 
-    private static void WriteSubtrees(AsnWriter writer, int tag, string? dns, byte[]? ip, bool directoryName)
+    private static void WriteSubtrees(AsnWriter writer, int tag, string? dns, byte[]? ip, bool directoryName, byte[]? generalName = null)
     {
-        if (dns is null && ip is null && !directoryName)
+        if (dns is null && ip is null && !directoryName && generalName is null)
         {
             return;
         }
@@ -232,7 +344,11 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         {
             using (writer.PushSequence())
             {
-                if (dns is not null)
+                if (generalName is not null)
+                {
+                    writer.WriteEncodedValue(generalName);
+                }
+                else if (dns is not null)
                 {
                     writer.WriteCharacterString(UniversalTagNumber.IA5String, dns, new Asn1Tag(TagClass.ContextSpecific, 2));
                 }
@@ -273,13 +389,14 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         return unkeyed.CopyWithPrivateKey(key);
     }
 
-    private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, string host, bool ipAddress, bool withNames, bool malformedNames, string? subject = null)
+    private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, string host, bool ipAddress, bool withNames, bool malformedNames, string? subject = null, byte[]? alternativeNames = null)
     {
         using var key = RSA.Create(2048);
         var request = new CertificateRequest(subject ?? $"CN={host}", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        if (malformedNames)
+        var rawNames = alternativeNames ?? (malformedNames ? new byte[] { 0x04, 0x01, 0xFF } : null);
+        if (rawNames is not null)
         {
-            request.CertificateExtensions.Add(new X509Extension(new Oid("2.5.29.17"), new byte[] { 0x04, 0x01, 0xFF }, false));
+            request.CertificateExtensions.Add(new X509Extension(new Oid("2.5.29.17"), rawNames, false));
         }
         else if (withNames)
         {

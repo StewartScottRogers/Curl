@@ -1341,3 +1341,4 @@ Each option and the specific reason it lost.
 | [1297](ADR-1297-https-carried-extension-schemes-honour-https-proxy.md) | The HTTPS-carried extension schemes honour HTTPS_PROXY (BL-5405) | Accepted | 2026-11-17 |
 | [1298](ADR-1298-winldap-drops-a-named-matching-rule-in-an-extensible-match-filter.md) | The WinLDAP dialect drops a named matching rule from an extensible-match filter (BL-5400) | Accepted | 2026-11-17 |
 | [1299](ADR-1299-openldap-binds-with-sasl-when-the-auth-mask-or-auth-options-ask.md) | The OpenLDAP dialect binds with SASL when the auth mask or AUTH= login options ask (BL-5435) | Accepted | 2026-11-18 |
+| [1300](ADR-1300-name-constraints-cover-directory-email-and-uri-names.md) | Name constraints cover directoryName, rfc822Name and URI names (BL-5436) | Accepted | 2026-11-18 |

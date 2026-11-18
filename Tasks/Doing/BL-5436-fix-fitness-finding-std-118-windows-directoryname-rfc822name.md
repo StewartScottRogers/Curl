@@ -35,11 +35,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the three commands exit 60 with `schannel: error 0x00004000`; the `O=Good` leaf still exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the three commands exit 60 with `schannel: error 0x00004000`; the `O=Good` leaf still exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Criterion 1 is met by unit tests with the same constraint shapes (Windows run here; the real-curl comparison is the finding's). Subject checked as directoryName; ADR-1300. Quality run on Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
