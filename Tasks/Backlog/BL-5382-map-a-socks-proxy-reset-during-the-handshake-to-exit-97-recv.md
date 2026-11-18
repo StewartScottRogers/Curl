@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/SocksProxyTunnel.cs, Curl.Networking.UnitLibrary/Socks5Handshake.cs, Curl.Networking.UnitLibrary/Socks4Handshake.cs, Curl.Networking.UnitTests]
+touches: [Curl.Networking.UnitLibrary/SocksProxyTunnel.cs, Curl.Networking.UnitLibrary/Socks5Handshake.cs, Curl.Networking.UnitLibrary/Socks4Handshake.cs, Curl.Networking.UnitTests/SocksProxyResetDuringHandshakeTests.cs]
 requirement: none
 created: 2026-11-17
 completed:

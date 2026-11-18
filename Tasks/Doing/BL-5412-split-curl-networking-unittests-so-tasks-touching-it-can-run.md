@@ -24,11 +24,13 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 ## Acceptance criteria
 
-- [ ] The per-case or per-stand-in content of `Curl.Networking.UnitTests` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
-- [ ] After the waiting tasks' `touches` (BL-5375, BL-5382, BL-5384, BL-5385, BL-5388, BL-5393, BL-5394, BL-5395, BL-5396) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Networking.UnitTests`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The per-case or per-stand-in content of `Curl.Networking.UnitTests` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
+- [x] After the waiting tasks' `touches` (BL-5375, BL-5382, BL-5384, BL-5385, BL-5388, BL-5393, BL-5394, BL-5395, BL-5396) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Networking.UnitTests`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The project already holds one test class per file (321 files, none shared by these tasks), so no code moved. The serialising came from the whole-project `touches`; I narrowed each waiting task's `touches` to its own new test file. `hotspots` now lists no Curl.Networking.UnitTests path. Build and tests unaffected (no code change).
 
 ## Log
 
