@@ -18,6 +18,12 @@ internal sealed class Socks5GssapiFailureText(bool usesSspi, string credentialCa
 
     private readonly string _api = usesSspi ? "SSPI" : "GSS-API";
 
+    /// <summary>Gets the text when the authentication message cannot be written.</summary>
+    public string AuthenticationRequestNotSent => $"Failed to send {_api} authentication request.";
+
+    /// <summary>Gets the text when the protection-level message cannot be written.</summary>
+    public string EncryptionRequestNotSent => $"Failed to send {_api} encryption request.";
+
     /// <summary>Gets the text when the proxy's answer to a token cannot be read in full.</summary>
     public string AuthenticationResponseLost => $"Failed to receive {_api} authentication response.";
 
