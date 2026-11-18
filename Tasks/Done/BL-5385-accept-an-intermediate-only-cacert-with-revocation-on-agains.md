@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/Curl.Networking.UnitLibrary.csproj, Curl.Networking.IntegrationTests/IntermediateOnlyCacertRevocationIntegrationTests.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5385 — Accept an intermediate-only --cacert with revocation on against a live Windows handshake
 
@@ -55,3 +55,4 @@ Shared root cause with STD-095 (BL-5384) and STD-092 (BL-5375) in `Curl.Networki
 - 2026-11-17: Production fix had already landed in BL-5384 (ADR-1294: the verifier reads the CRLs below the anchor itself). This task adds the live proof: `Curl.Networking.IntegrationTests/IntermediateOnlyCacertRevocationIntegrationTests.cs` builds a real root/intermediate/leaf, serves the intermediate's CRL from a real loopback listener, runs the production verifier with the production downloader and no stubbed statuses: accepted; leaf revoked gives exit 60 with the "has been revoked" text; `--ssl-revoke-best-effort` accepts the same chain; a name constraint excluding the host on the anchor is refused. The proxy policy builds the same `ServerCertificateVerification` from the proxy's options (covered by IntermediateOnlyProxyCacertTests).
 - Decision: the tests send bytes over a socket, so they are Integration tests in the IntegrationTests project (repo rule); added `InternalsVisibleTo Curl.Networking.IntegrationTests` to the library csproj for them. Windows-only (OSCondition), as the engine behaviour is Windows-specific.
 - Hand check: not run against a live TLS server with curl.exe in this lane; the live-chain integration tests above run the production verification code on a real chain and CRL over loopback (4 pass). Fast tests: Curl.Networking.UnitTests 4243 passed. No production code changed, so no quality run.
+- 2026-11-17: Doing -> Done. Live-chain integration tests with a real loopback CRL prove accept, revoked text, best-effort and name-constraint refusal; fix landed in BL-5384
