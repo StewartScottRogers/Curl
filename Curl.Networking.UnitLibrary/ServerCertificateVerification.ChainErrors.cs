@@ -142,7 +142,7 @@ internal sealed partial class ServerCertificateVerification
     private bool HasOnlyMissingRootOrAnchorRevocationStatus(X509Chain chain) =>
         HasOnlyMissingRootStatus(ReadChainStatus(chain))
         || (HasOnlyMissingRootOrUnavailableRevocationStatus(ReadChainStatus(chain))
-            && !IsSelfSigned(chain.ChainElements[^1].Certificate)
+            && !IsSelfSigned(chain.ChainElements[AnchorIndexOf(chain)].Certificate)
             && NothingBelowAnchorIsRevokedOrUnresolvedUnlessBestEffort(chain));
 
     // --ssl-revoke-best-effort masks an unknown revocation status, so a certificate below the
@@ -157,9 +157,25 @@ internal sealed partial class ServerCertificateVerification
         chain is not null
         && chain.ChainElements.Count > 0
         && HasOnlyMissingRootOrUnavailableRevocationStatus(ReadChainStatus(chain))
-        && !IsSelfSigned(chain.ChainElements[^1].Certificate)
+        && !IsSelfSigned(chain.ChainElements[AnchorIndexOf(chain)].Certificate)
         && ListsAnAnchorCandidate(chain)
         && ReadBelowAnchorRevocation(chain) == BelowAnchorRevocation.Revoked;
+
+    // The chain is cut at the first certificate the --cacert file lists, so a root the server
+    // sent beyond it is not the anchor (BL-5438); the last element when none is listed.
+    internal static int AnchorIndexOf(X509Chain chain)
+    {
+        var elements = chain.ChainElements;
+        for (var index = 0; index < elements.Count; index++)
+        {
+            if (ListsCertificate(chain.ChainPolicy.CustomTrustStore, elements[index].Certificate))
+            {
+                return index;
+            }
+        }
+
+        return elements.Count - 1;
+    }
 
     private static bool IsSelfSigned(X509Certificate2 certificate) =>
         certificate.SubjectName.RawData.AsSpan().SequenceEqual(certificate.IssuerName.RawData);

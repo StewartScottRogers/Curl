@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.NonSelfSignedAnchorRevocation.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5438 — Fix fitness finding STD-120: Windows: a server that also sends the self-signed root is refused as "untrusted root" when --cacert holds only the intermediate and revocation is on
 
@@ -31,13 +31,17 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command exits 0 with the body; the same server with a revoked leaf exits 60 with "has been revoked".
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command exits 0 with the body; the same server with a revoked leaf exits 60 with "has been revoked".
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Chain is now cut at the first certificate the --cacert file lists (`AnchorIndexOf`): the self-signed check, below-anchor statuses and CRL reads use that anchor, not the last element, so a server-sent root no longer causes the untrusted-root refusal. Touches widened to the sibling partial files and the test file in the same project. Revoked leaf still exits 60 via RevokesBelowNonSelfSignedAnchor. Not measured against real curl on Windows (no revocation server here); unit-pinned. Linux/macOS CI: tests are platform-neutral.
+- Quality run for Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-120 (Medium).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 32607c38 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Chain cut at the first --cacert-listed certificate; server-sent root no longer refused

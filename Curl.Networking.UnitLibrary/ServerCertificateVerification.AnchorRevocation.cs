@@ -94,7 +94,7 @@ internal sealed partial class ServerCertificateVerification
             return BelowAnchorRevocation.Clean;
         }
 
-        var elements = chain.ChainElements.Cast<X509ChainElement>().Select(element => element.Certificate).ToArray();
+        var elements = chain.ChainElements.Cast<X509ChainElement>().Select(element => element.Certificate).Take(AnchorIndexOf(chain) + 1).ToArray();
         using var budget = new CancellationTokenSource(RevocationFetchBudget, timeProvider);
         using var limited = CancellationTokenSource.CreateLinkedTokenSource(budget.Token, RevocationLimit);
         var outcomes = elements.Take(elements.Length - 1).Select((certificate, index) => RevocationOf(certificate, elements[index + 1], limited.Token)).ToArray();

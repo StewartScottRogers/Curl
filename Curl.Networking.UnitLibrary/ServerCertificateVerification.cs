@@ -62,7 +62,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     /// like <see cref="ReadChainStatus" />.
     /// </summary>
     internal Func<X509Chain, X509ChainStatus[]> ReadCertificatesBelowAnchorStatus { get; init; } = chain =>
-        chain.ChainElements.Cast<X509ChainElement>().SkipLast(1).SelectMany(element => element.ChainElementStatus).ToArray();
+        chain.ChainElements.Cast<X509ChainElement>().Take(AnchorIndexOf(chain)).SelectMany(element => element.ChainElementStatus).ToArray();
 
     /// <summary>
     /// The CA bundles curl's <c>configure</c> looks for, in its order, the first that exists

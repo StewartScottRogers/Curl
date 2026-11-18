@@ -97,6 +97,59 @@ public sealed class ServerCertificateVerificationNonSelfSignedAnchorRevocationTe
     }
 
     [TestMethod]
+    public void VerifyPeer_ServerAlsoSendsTheSelfSignedRootBeyondTheListedIntermediate_Accepts()
+    {
+        var failure = Verify(
+            Status(X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.RevocationStatusUnknown),
+            [], listUnrelated: false, noSessionId: false, bestEffort: false, sendRoot: true);
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_ServerSendsTheRootAndACertificateBelowTheListedIntermediateIsUnresolved_IsExit60()
+    {
+        var failure = Verify(
+            Status(X509ChainStatusFlags.UntrustedRoot | X509ChainStatusFlags.RevocationStatusUnknown),
+            Status(X509ChainStatusFlags.RevocationStatusUnknown), listUnrelated: false, noSessionId: false, bestEffort: false, sendRoot: true);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+    }
+
+    [TestMethod]
+    public void AnchorIndexOf_NoCertificateListed_IsTheLastElement()
+    {
+        using var root = CreateCertificateAuthority("CN=Revocation Root", null);
+        using var leaf = CreateLeaf(root);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.CustomTrustStore.Add(root);
+        chain.Build(leaf);
+        chain.ChainPolicy.CustomTrustStore.Clear();
+
+        Assert.AreEqual(chain.ChainElements.Count - 1, ServerCertificateVerification.AnchorIndexOf(chain));
+    }
+
+    [TestMethod]
+    public void AnchorIndexOf_IntermediateListedAndRootSent_IsTheIntermediate()
+    {
+        using var root = CreateCertificateAuthority("CN=Revocation Root", null);
+        using var intermediate = CreateCertificateAuthority("CN=Revocation Intermediate", root);
+        using var leaf = CreateLeaf(intermediate);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.CustomTrustStore.Add(intermediate);
+        chain.ChainPolicy.ExtraStore.Add(root);
+        chain.Build(leaf);
+
+        var anchor = chain.ChainElements[ServerCertificateVerification.AnchorIndexOf(chain)].Certificate;
+
+        Assert.AreEqual(intermediate.Thumbprint, anchor.Thumbprint);
+    }
+
+    [TestMethod]
     public void VerifyPeer_SelfSignedAnchorWithUnavailableRevocationStatus_IsExit60()
     {
         var failure = Verify(
@@ -126,7 +179,7 @@ public sealed class ServerCertificateVerificationNonSelfSignedAnchorRevocationTe
     private static X509ChainStatus[] Status(X509ChainStatusFlags flags) => [new() { Status = flags }];
 
     private (CurlExitCode ExitCode, string Message)? Verify(
-        X509ChainStatus[] chainStatus, X509ChainStatus[] belowAnchorStatus, bool listUnrelated, bool noSessionId, bool bestEffort, bool listRoot = false)
+        X509ChainStatus[] chainStatus, X509ChainStatus[] belowAnchorStatus, bool listUnrelated, bool noSessionId, bool bestEffort, bool listRoot = false, bool sendRoot = false)
     {
         using var root = CreateCertificateAuthority("CN=Revocation Root", null);
         using var intermediate = CreateCertificateAuthority("CN=Revocation Intermediate", root);
@@ -143,6 +196,11 @@ public sealed class ServerCertificateVerificationNonSelfSignedAnchorRevocationTe
         };
         var (chainPolicy, _, _) = verification.ReadTrustAnchors();
         chainPolicy!.RevocationMode = X509RevocationMode.NoCheck;
+        if (sendRoot)
+        {
+            chainPolicy.ExtraStore.Add(root);
+        }
+
         using var chain = new X509Chain { ChainPolicy = chainPolicy };
         chain.Build(leaf);
         return verification.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, Host, []);
