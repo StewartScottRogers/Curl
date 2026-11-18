@@ -1,6 +1,6 @@
 namespace Curl.Core;
 
-/// <summary>Pins that the HTTPS-carried extension schemes read https_proxy and HTTPS_PROXY, and no other scheme but wss does (BL-5405, ADR-1296).</summary>
+/// <summary>Pins that the HTTPS-carried extension schemes read https_proxy and HTTPS_PROXY, and no other scheme but wss does (BL-5405, ADR-1297).</summary>
 [TestClass]
 public sealed class ProxySelectorHttpsExtensionSchemeTests
 {

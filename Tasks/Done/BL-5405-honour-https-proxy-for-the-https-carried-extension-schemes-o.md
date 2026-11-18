@@ -50,7 +50,7 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Notes addendum
 
-- Done: ProxySelector.cs (HttpsProxySchemes set), ADR-1296, Protocols.md, the five extension descriptions (--extended-help; --ai-help renders the same descriptions), tests in Curl.Core.UnitTests and Curl.Engine.UnitTests. Measure-CodeQuality.ps1 for Curl.Core.UnitLibrary: 0 failing members.
+- Done: ProxySelector.cs (HttpsProxySchemes set), ADR-1297, Protocols.md, the five extension descriptions (--extended-help; --ai-help renders the same descriptions), tests in Curl.Core.UnitTests and Curl.Engine.UnitTests. Measure-CodeQuality.ps1 for Curl.Core.UnitLibrary: 0 failing members.
 - Hand check with a live CONNECT proxy not run in this unattended lane; the Engine test proves selection of the proxy for an oci:// URL and the unit tests cover the variable order for all five schemes (the selector is shared by all extensions).
 - CI on Linux and macOS: tests are platform-neutral.
 
@@ -58,4 +58,4 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 62e2e095 8d1fc3f5 189dd866 0eefac87 7cd334ef c1cf21f9 80baa94b a0b49a29.
-- 2026-11-17: Doing -> Done. HTTPS_PROXY honoured for oci, s3, gs, az, signalrs; ADR-1296
+- 2026-11-17: Doing -> Done. HTTPS_PROXY honoured for oci, s3, gs, az, signalrs; ADR-1297

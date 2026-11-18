@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
-/// <summary>Pins that an <c>oci://</c> transfer with only HTTPS_PROXY set goes through that proxy unless no-proxy matches (BL-5405, ADR-1296).</summary>
+/// <summary>Pins that an <c>oci://</c> transfer with only HTTPS_PROXY set goes through that proxy unless no-proxy matches (BL-5405, ADR-1297).</summary>
 [TestClass]
 public sealed class TransferProxySelectionHttpsExtensionTests
 {

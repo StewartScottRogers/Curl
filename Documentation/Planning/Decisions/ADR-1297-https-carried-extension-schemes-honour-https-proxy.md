@@ -1,4 +1,4 @@
-# ADR-1296: The HTTPS-carried extension schemes honour HTTPS_PROXY (BL-5405)
+# ADR-1297: The HTTPS-carried extension schemes honour HTTPS_PROXY (BL-5405)
 
 Decided by Claude under Stewart's delegation.
 

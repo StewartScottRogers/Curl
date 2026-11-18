@@ -11,7 +11,7 @@ public static class SignalRExtension
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "signalr",
-        "Connects to ASP.NET Core SignalR hubs: negotiates, opens the WebSocket transport with the JSON hub protocol, sends the -d message {\"type\":1|4,\"target\":\"Method\",\"arguments\":[...]} as an invocation (1) or stream invocation (4) and writes its result or each stream item as one JSON line; without -d writes each call the hub makes as a JSON array [\"target\", args...] per line until it closes. A signalrs:// URL uses signalrs_proxy, else https_proxy or HTTPS_PROXY, else ALL_PROXY, as wss:// does (ADR-1296).",
+        "Connects to ASP.NET Core SignalR hubs: negotiates, opens the WebSocket transport with the JSON hub protocol, sends the -d message {\"type\":1|4,\"target\":\"Method\",\"arguments\":[...]} as an invocation (1) or stream invocation (4) and writes its result or each stream item as one JSON line; without -d writes each call the hub makes as a JSON array [\"target\", args...] per line until it closes. A signalrs:// URL uses signalrs_proxy, else https_proxy or HTTPS_PROXY, else ALL_PROXY, as wss:// does (ADR-1297).",
         ["signalr", "signalrs"],
         [],
         new Uri("https://github.com/dotnet/aspnetcore/blob/main/src/SignalR/docs/specs/HubProtocol.md"));
