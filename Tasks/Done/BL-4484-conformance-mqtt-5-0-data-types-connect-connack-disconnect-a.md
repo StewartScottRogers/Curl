@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Mqtt5, Curl.Conformance.Extended.UnitTests/Mqtt5, Documentation/Conformance/Extended/Mqtt5.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-18
 ---
 # BL-4484 — Conformance: MQTT 5.0 data types, CONNECT, CONNACK, DISCONNECT and AUTH for mqtt5:// (Mqtt5 part 1 of 3)
 
@@ -44,29 +44,31 @@ in the extension library is listed in `KnownFailures.txt` with a filed High task
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Mqtt5.md` lists every `[MQTT-…]` statement of this scope that binds a client
+- [x] `Documentation/Conformance/Extended/Mqtt5.md` lists every `[MQTT-…]` statement of this scope that binds a client
       (and every MUST/SHOULD sentence there without a number, given a `Mqtt5:` ID of its own), each mapped to a test
       or to `n/a: <reason>`, links to `Mqtt5-PublishSubscribe.md` (BL-4485) and `Mqtt5-Transports.md` (BL-4486), and
       the harness's matrix check passes.
-- [ ] A reference MQTT 5 broker in `Curl.Conformance.Extended.UnitLibrary/Mqtt5/` lets BL-4485 and BL-4486 add
+- [x] A reference MQTT 5 broker in `Curl.Conformance.Extended.UnitLibrary/Mqtt5/` lets BL-4485 and BL-4486 add
       behaviour in `Mqtt5/PublishSubscribe/` and `Mqtt5/Transports/` without editing this task's files.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Mqtt5/` run curl in process and assert wire bytes, stdout,
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Mqtt5/` run curl in process and assert wire bytes, stdout,
       stderr and exit code for at least: CONNECT fields and flags (clean start, keep alive, credentials from `-u`),
       CONNACK with each failure reason code, CONNACK properties the client must honour (Maximum Packet Size, Receive
       Maximum, Topic Alias Maximum, Server Keep Alive, Assigned Client Identifier), a malformed packet from the
       server answered by DISCONNECT with the right reason code, a server DISCONNECT, AUTH with an unknown method,
       and invalid UTF-8 in a server string.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Mqtt5 conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Mqtt5/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Mqtt5/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
 - 2026-11-02 (lane 2): Split before any edit for size (reference broker, full matrix and a dozen-plus cases exceed one run): BL-4517 (broker, chapters 1.5, 2, 3.1 CONNECT), BL-4518 (3.2 CONNACK), BL-4519 (3.14, 3.15, 4.1, 4.12, 4.13; last part). BL-4485 and BL-4486 now depend on the three new IDs.
+
+- 2026-11-18 (lane 3): Work landed in BL-4517, BL-4518, BL-4519 (Done); Conformance.Extended.UnitTests green (1735 passed). No code changed here.
 
 ## Log
 
@@ -75,3 +77,4 @@ in the extension library is listed in `KnownFailures.txt` with a filed High task
 - 2026-11-02: Doing -> Deferred. Split into BL-4517, BL-4518, BL-4519
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: f2bdcaab 1ef8b608 6809fc35 28fcee0c d8e3fb0e 6f1f0535 ef6c9026.
+- 2026-11-18: Doing -> Done. Delivered by BL-4517, BL-4518, BL-4519
