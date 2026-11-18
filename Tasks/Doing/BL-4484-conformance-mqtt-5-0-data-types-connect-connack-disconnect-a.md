@@ -74,3 +74,4 @@ in the extension library is listed in `KnownFailures.txt` with a filed High task
 - 2026-11-02: Backlog -> Doing. Criteria at claim: f2bdcaab 1ef8b608 6809fc35 28fcee0c d8e3fb0e 6f1f0535 ef6c9026.
 - 2026-11-02: Doing -> Deferred. Split into BL-4517, BL-4518, BL-4519
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: f2bdcaab 1ef8b608 6809fc35 28fcee0c d8e3fb0e 6f1f0535 ef6c9026.
