@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5442 — Fix fitness finding STD-124: -F with a missing file: %{conn_id}/%{xfer_id} are 0 instead of -1, and a --next run continues and exits 0
 
@@ -45,3 +45,4 @@ Fixed in CurlCommandRunner: a -F form whose file cannot be opened now returns Ca
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-124 (Medium).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 4515bfa8 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. -F missing file now ends the run via CannotOpenUploadFileFailure; ids -1, exit 26
