@@ -1338,3 +1338,4 @@ Each option and the specific reason it lost.
 | [1294](ADR-1294-intermediate-only-cacert-revocation-is-read-from-the-crl.md) | Revocation below an intermediate-only --cacert anchor is read from the CRL (BL-5384) | Accepted | 2026-11-17 |
 | [1295](ADR-1295-remaining-extension-option-errors-name-the-option-and-bad-resolvers-are-refused.md) | The remaining extension option errors name the option and carry no .NET text, and bad DoT and DoQ resolvers are refused (BL-5406) | Accepted | 2026-11-17 |
 | [1296](ADR-1296-openssl-reference-builds-do-not-follow-aia.md) | The OpenSSL-reference builds do not follow AIA certificate links (BL-5396) | Accepted | 2026-11-17 |
+| [1296](ADR-1296-https-carried-extension-schemes-honour-https-proxy.md) | The HTTPS-carried extension schemes honour HTTPS_PROXY (BL-5405) | Accepted | 2026-11-17 |

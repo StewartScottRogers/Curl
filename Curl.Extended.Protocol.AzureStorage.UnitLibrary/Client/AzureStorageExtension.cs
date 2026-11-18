@@ -12,7 +12,7 @@ public static class AzureStorageExtension
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "azure-storage",
-        "Reads and writes Azure Blob Storage at az://account/container/blob (an Azurite-style emulator at an IP address or localhost: az://127.0.0.1:10000/account/container/blob) and Data Lake Storage Gen2 at abfs[s]://filesystem@account/path: a blob or file downloads, -T uploads it (in 8 MiB blocks from 8 MiB), an empty name or one ending in / lists the names under it; --oauth2-bearer or AZURE_STORAGE_BEARER_TOKEN sends an Entra ID token, AZURE_STORAGE_SAS_TOKEN a shared access signature.",
+        "Reads and writes Azure Blob Storage at az://account/container/blob (an Azurite-style emulator at an IP address or localhost: az://127.0.0.1:10000/account/container/blob) and Data Lake Storage Gen2 at abfs[s]://filesystem@account/path: a blob or file downloads, -T uploads it (in 8 MiB blocks from 8 MiB), an empty name or one ending in / lists the names under it; --oauth2-bearer or AZURE_STORAGE_BEARER_TOKEN sends an Entra ID token, AZURE_STORAGE_SAS_TOKEN a shared access signature. An az:// URL uses az_proxy, else https_proxy or HTTPS_PROXY, else ALL_PROXY, as wss:// does (ADR-1296).",
         ["az", "abfs", "abfss"],
         [],
         new Uri("https://learn.microsoft.com/rest/api/storageservices/blob-service-rest-api"));

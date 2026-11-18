@@ -9,7 +9,7 @@ public static class OciRegistryExtension
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "oci",
-        "Pulls from and pushes to an OCI or Docker registry over HTTPS: oci://registry[:port]/name[:tag] writes the manifest (tag latest when none is given), oci://registry[:port]/name@digest writes the blob; a 401 is answered with the registry's Bearer token, anonymous or for --user, and a blob's redirect to storage is followed. With -T it pushes instead: to name@digest as a blob through a monolithic upload session (skipped when the registry has it), to name[:tag] as a manifest with its mediaType.",
+        "Pulls from and pushes to an OCI or Docker registry over HTTPS: oci://registry[:port]/name[:tag] writes the manifest (tag latest when none is given), oci://registry[:port]/name@digest writes the blob; a 401 is answered with the registry's Bearer token, anonymous or for --user, and a blob's redirect to storage is followed. With -T it pushes instead: to name@digest as a blob through a monolithic upload session (skipped when the registry has it), to name[:tag] as a manifest with its mediaType. An oci:// URL uses oci_proxy, else https_proxy or HTTPS_PROXY, else ALL_PROXY, as wss:// does (ADR-1296).",
         ["oci"],
         [],
         new Uri("https://github.com/opencontainers/distribution-spec/blob/v1.1.0/spec.md"));

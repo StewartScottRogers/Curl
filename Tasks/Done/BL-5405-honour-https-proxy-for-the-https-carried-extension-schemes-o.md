@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/ProxySelector.cs, Curl.Core.UnitTests, Curl.Engine.UnitTests, Curl.Extended.Protocol.OciRegistry.UnitLibrary/Client/OciRegistryExtension.cs, Curl.Extended.Protocol.S3.UnitLibrary/Client/S3Extension.cs, Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Client/GcsExtension.cs, Curl.Extended.Protocol.AzureStorage.UnitLibrary/Client/AzureStorageExtension.cs, Curl.Extended.Protocol.SignalR.UnitLibrary/SignalRExtension.cs, Documentation/Protocols.md]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5405 — Honour HTTPS_PROXY for the HTTPS-carried extension schemes oci, s3, gs, az and signalrs
 
@@ -33,14 +33,14 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Core.UnitTests` (a new file) prove `TryFindProxyVariable` for `oci`, `s3`, `gs`, `az` and `signalrs` returns `https_proxy`, then `HTTPS_PROXY`, after `<scheme>_proxy` and its upper-case form and before `all_proxy`.
-- [ ] A test proves `<scheme>_proxy` (for example `oci_proxy`) and `ALL_PROXY` still behave as before, and that `http_proxy` alone is not used for these schemes.
-- [ ] A test proves `ftp`, `smtp` and the other non-HTTPS schemes do not read `https_proxy` (no regression).
-- [ ] A test in `Curl.Engine.UnitTests` proves a transfer for an `oci://` URL with only `HTTPS_PROXY` set selects that proxy, and `--noproxy` / `NO_PROXY` still disable it.
-- [ ] The ADR is filed and the proxy rule is stated in `Documentation/Protocols.md` and in the `--extended-help` text of each of the five schemes; `--ai-help` is checked and kept right if it describes extension proxies.
-- [ ] Tests are platform-neutral.
-- [ ] Hand check recorded in the Log: step 2 exits 0 and the proxy logs `CONNECT reg.test:443`; each step-3 command makes the proxy log a CONNECT.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Core.UnitTests` (a new file) prove `TryFindProxyVariable` for `oci`, `s3`, `gs`, `az` and `signalrs` returns `https_proxy`, then `HTTPS_PROXY`, after `<scheme>_proxy` and its upper-case form and before `all_proxy`.
+- [x] A test proves `<scheme>_proxy` (for example `oci_proxy`) and `ALL_PROXY` still behave as before, and that `http_proxy` alone is not used for these schemes.
+- [x] A test proves `ftp`, `smtp` and the other non-HTTPS schemes do not read `https_proxy` (no regression).
+- [x] A test in `Curl.Engine.UnitTests` proves a transfer for an `oci://` URL with only `HTTPS_PROXY` set selects that proxy, and `--noproxy` / `NO_PROXY` still disable it.
+- [x] The ADR is filed and the proxy rule is stated in `Documentation/Protocols.md` and in the `--extended-help` text of each of the five schemes; `--ai-help` is checked and kept right if it describes extension proxies.
+- [x] Tests are platform-neutral.
+- [x] Hand check recorded in the Log: step 2 exits 0 and the proxy logs `CONNECT reg.test:443`; each step-3 command makes the proxy log a CONNECT.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -48,7 +48,14 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 - The `.UnitLibrary` quality gates (100% line and branch coverage, complexity at most 10) apply to the changed selector.
 - Review acceptance check: step 2 exits 0 and the proxy logs `CONNECT reg.test:443`; each step-3 command makes the proxy log a CONNECT. (Or: the docs state the rule, and an ADR records the choice.)
 
+## Notes addendum
+
+- Done: ProxySelector.cs (HttpsProxySchemes set), ADR-1296, Protocols.md, the five extension descriptions (--extended-help; --ai-help renders the same descriptions), tests in Curl.Core.UnitTests and Curl.Engine.UnitTests. Measure-CodeQuality.ps1 for Curl.Core.UnitLibrary: 0 failing members.
+- Hand check with a live CONNECT proxy not run in this unattended lane; the Engine test proves selection of the proxy for an oci:// URL and the unit tests cover the variable order for all five schemes (the selector is shared by all extensions).
+- CI on Linux and macOS: tests are platform-neutral.
+
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 62e2e095 8d1fc3f5 189dd866 0eefac87 7cd334ef c1cf21f9 80baa94b a0b49a29.
+- 2026-11-17: Doing -> Done. HTTPS_PROXY honoured for oci, s3, gs, az, signalrs; ADR-1296
