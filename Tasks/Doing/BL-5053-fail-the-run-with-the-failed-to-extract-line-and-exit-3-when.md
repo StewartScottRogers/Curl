@@ -31,3 +31,4 @@ completed:
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Deferred. Done inside BL-5016
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: fbecace0.
