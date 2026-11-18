@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/AzureStorage, Curl.Conformance.Extended.UnitTests/AzureStorage, Documentation/Conformance/Extended/AzureStorage.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-18
 ---
 # BL-4468 — Conformance: Azure Blob service REST API for az:// (AzureStorage part 1 of 2)
 
@@ -44,23 +44,23 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/AzureStorage.md` gives every requirement of this scope that binds a client
+- [x] `Documentation/Conformance/Extended/AzureStorage.md` gives every requirement of this scope that binds a client
       (MUST/REQUIRED, MUST NOT, SHOULD, SHOULD NOT, and each header or parameter the API documents as required) an
       `AzureStorage:` ID mapped to a test or to `n/a: <reason>`, links to `AzureStorage-DataLake.md` (BL-4469), and
       the harness's matrix check passes.
-- [ ] A reference Blob endpoint in `Curl.Conformance.Extended.UnitLibrary/AzureStorage/` lets BL-4469 add the DFS
+- [x] A reference Blob endpoint in `Curl.Conformance.Extended.UnitLibrary/AzureStorage/` lets BL-4469 add the DFS
       endpoint in `AzureStorage/DataLake/` without editing this task's files.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/AzureStorage/` run curl in process and assert wire bytes, stdout,
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/AzureStorage/` run curl in process and assert wire bytes, stdout,
       stderr and exit code for at least: download, a small upload, an upload of 8 MiB or more as blocks with block ids
       of equal length and the block list in order, a listing over several `NextMarker` pages, an `Error` body with exit
       22, each credential source in order of precedence, anonymous access, chunked and close-delimited responses.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix AzureStorage conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/AzureStorage/` is at 100% line and branch
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/AzureStorage/` is at 100% line and branch
       coverage, complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
@@ -73,3 +73,6 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 - 2026-11-02: Doing -> Deferred. Split into BL-4520, BL-4521, BL-4522, BL-4523
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 69e23036 24c40727 82a03bfc 9592b2e5 d8e3fb0e a8cb0c29 ef6c9026.
+
+- 2026-11-18 (lane 1): Reclaimed after Deferred was cleared. The split parts BL-4520, BL-4521, BL-4522 and BL-4523 are all Done and carry the work: the reference endpoint (`AzureStorage/`, with `DataLake/` ready for BL-4469), the cases in `Curl.Conformance.Extended.UnitTests/AzureStorage/`, `Documentation/Conformance/Extended/AzureStorage.md` and the known-failures check (no AzureStorage lines remain). Nothing left to change here; criteria ticked as met by those tasks.
+- 2026-11-18: Doing -> Done. Work delivered by split parts BL-4520 to BL-4523, all Done
