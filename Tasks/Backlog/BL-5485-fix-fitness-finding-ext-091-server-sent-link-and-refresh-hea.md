@@ -4,8 +4,8 @@ title: Fix fitness finding EXT-091: Server-sent Link and Refresh headers with UR
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpExchangeLog.cs, Curl.Extension.Har.UnitLibrary/HarDocument.cs]
+depends-on: [BL-5484]
+touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpExchangeLog.cs, Curl.Extension.Har.UnitLibrary/HarDocument.cs, Curl.Extension.RecordReplay.UnitLibrary/RecordReplayTransferHook.cs, Curl.Extension.RecordReplay.UnitTests]
 requirement: none
 created: 2026-11-18
 completed:
@@ -39,7 +39,11 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Notes
 
+- Done and committed (24b4e090b3): Link and Refresh values are redacted URL by URL in HttpExchangeLog (--log-file) and HarDocument (--har), with unit tests; Http and Har libraries at 100%/100% in Measure-CodeQuality.
+- Left: --record. RecordReplayTransferHook stores the raw response head, so the same per-URL redaction (Link, Refresh; Location too if BL-5484 does not) must be applied to the head bytes before RecordedExchange is written. BL-5484 (in Doing) touches RecordReplay, so this waits on it (depends-on). Then add a test in Curl.Extension.RecordReplay.UnitTests and run Measure-CodeQuality for that library.
+
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-091 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 81e4bf08 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Backlog. Waits on BL-5484 (holds RecordReplay): --record redaction of Link and Refresh is left; Http and Har parts committed
