@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitTests]
+touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapProtocolHandlerTests.WinLdapWeirdReply.cs]
 requirement: none
 created: 2026-11-17
 completed:
