@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.RecordReplay.UnitLibrary/RecordReplayTransferHook.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5489 — Fix fitness finding EXT-095: --record <dir> that cannot be written records nothing, with no warning and exit 0
 
@@ -46,3 +46,4 @@ A record directory that cannot be written now fails the transfer with exit 23 an
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-095 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 6cbbc8f0 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Unwritable --record directory now fails with exit 23 naming --record; unit test added, quality clean
