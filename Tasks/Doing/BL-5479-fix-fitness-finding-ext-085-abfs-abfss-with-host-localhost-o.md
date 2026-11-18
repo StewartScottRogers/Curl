@@ -45,3 +45,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-085 (High).
+- 2026-11-18: Backlog -> Doing. Criteria at claim: d85d9694 69116afe 3d836d5e.
