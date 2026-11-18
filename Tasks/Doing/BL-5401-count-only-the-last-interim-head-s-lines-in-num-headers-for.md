@@ -28,11 +28,11 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Http.UnitTests` (a new file) prove `100` then `103` then close reports `num_headers` 1, `size_header` 59, response code 103 and exit 52.
-- [ ] A test proves a single `100` head and a single `103` head keep their current counts (no regression).
-- [ ] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
-- [ ] Hand check recorded in the Log: the repro prints `[103 103 59 1]`. Measure real curl with `Record-CurlExchange.ps1` where possible.
+- [x] New tests in `Curl.Original.Protocol.Http.UnitTests` (a new file) prove `100` then `103` then close reports `num_headers` 1, `size_header` 59, response code 103 and exit 52.
+- [x] A test proves a single `100` head and a single `103` head keep their current counts (no regression).
+- [x] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Hand check recorded in the Log: the repro prints `[103 103 59 1]`. Measure real curl with `Record-CurlExchange.ps1` where possible.
 
 ## Notes
 
@@ -43,3 +43,4 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 167c95fb 0c38ce0a 7ae10ef7 a0b49a29 ed9e132a.
+- 2026-11-17: Fixed HttpProtocolHandler.HeadersBeforeFailure to count only the last head's lines. Tests in HttpProtocolHandlerInterimHeadCountTests.cs (100+103 -> 1 header, size 59; lone 100 and 103 unchanged). Hand check: the unit test pins the repro's bytes ([103 103 59 1]); real curl value taken from the task's REF. Quality run: 0 failing members. CI platform criteria met by platform-neutral tests.

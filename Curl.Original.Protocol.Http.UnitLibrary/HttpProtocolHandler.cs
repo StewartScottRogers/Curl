@@ -1649,13 +1649,19 @@ public sealed class HttpProtocolHandler(
     /// Gives the whole header lines a failure let through before it cut the head short, from the
     /// head's bytes after its status line: curl stores each header line as it writes it, so
     /// <c>%{num_headers}</c> counts them (CGR-135 <c>cltwo</c>, curl 8.18.0 with nghttp2 1.68
-    /// measured, BL-4005 Notes). A line cut off before its end is not one of them.
+    /// measured, BL-4005 Notes). A line cut off before its end is not one of them. Only the last
+    /// head's lines count, when 1xx heads came before it (BL-5401).
     /// </summary>
-    private static KeyValuePair<string, string>[] HeadersBeforeFailure(byte[] headBytes) =>
-        [.. System.Text.Encoding.Latin1.GetString(headBytes).Split('\n').Skip(1).SkipLast(1)
-            .Select(line => line.TrimEnd('\r'))
-            .Where(line => line.Length > 0)
-            .Select(HeaderOfLine)];
+    private static KeyValuePair<string, string>[] HeadersBeforeFailure(byte[] headBytes)
+    {
+        List<string> lines = [.. System.Text.Encoding.Latin1.GetString(headBytes).Split('\n').SkipLast(1).Select(line => line.TrimEnd('\r'))];
+        if (lines.LastOrDefault() == string.Empty)
+        {
+            lines.RemoveAt(lines.Count - 1);
+        }
+
+        return [.. lines.Skip(lines.LastIndexOf(string.Empty) + 1).Skip(1).Select(HeaderOfLine)];
+    }
 
     private static KeyValuePair<string, string> HeaderOfLine(string line)
     {
