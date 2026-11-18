@@ -103,11 +103,11 @@ internal sealed class SslStreamConnection(
             throw new MissingCloseNotifyException(missingCloseNotifyMessage);
         }
         catch (IOException failure) when (
-            TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null) is not null)
+            TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null, plaintext.IsSecure) is not null)
         {
             // MissingCloseNotifyException is the exception whose message the HTTP handler prints as it stands.
             throw new MissingCloseNotifyException(
-                TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null)!);
+                TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null, plaintext.IsSecure)!);
         }
 
         if (read == 0 && !buffer.IsEmpty && transport.TransportEnded)

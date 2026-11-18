@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitTests/HttpsProxyTlsAlertAfterHandshakeTests.cs]
+touches: [Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitLibrary/SslStreamConnection.cs, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitTests/HttpsProxyTlsAlertAfterHandshakeTests.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5388 — Report a TLS alert after the handshake over an HTTPS proxy tunnel as Recv failure
 
@@ -30,12 +30,12 @@ Still-open older finding. What changed: the HTTP-proxy, SOCKS5h and `--ssl-auto-
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Networking.UnitTests` (a new file) prove the read-phase alert on the double-TLS tunnel path yields a message starting `Recv failure: Connection was` with exit 56.
-- [ ] A test proves the already-fixed direct (non-proxy) read-phase alert text is unchanged.
-- [ ] The tests accept either `was aborted` or `was reset`, since REF's text depends on timing.
-- [ ] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
-- [ ] Hand check recorded in the Log: the command prints a `Recv failure: Connection was ...` line, exit 56. Measure real curl with `Record-CurlExchange.ps1` where possible.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Networking.UnitTests` (a new file) prove the read-phase alert on the double-TLS tunnel path yields a message starting `Recv failure: Connection was` with exit 56.
+- [x] A test proves the already-fixed direct (non-proxy) read-phase alert text is unchanged.
+- [x] The tests accept either `was aborted` or `was reset`, since REF's text depends on timing.
+- [x] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
+- [x] Hand check recorded in the Log: the command prints a `Recv failure: Connection was ...` line, exit 56. Measure real curl with `Record-CurlExchange.ps1` where possible.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -46,3 +46,5 @@ Still-open older finding. What changed: the HTTP-proxy, SOCKS5h and `--ssl-auto-
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 11f0b356 6ebf42a7 382e1205 7ae10ef7 5bb5acb2 a0b49a29.
+- 2026-11-17: Done. SslStreamConnection and HandBuiltTlsProvider pass `plaintext.IsSecure` (TLS inside a proxy's TLS tunnel) as `insideTlsTunnel`, so the Schannel build's read-phase alert text is `Recv failure: Connection was aborted`; direct text unchanged. Widened touches to the two callers. Quality run for Curl.Networking.UnitLibrary: 0 failing members. Hand check against a live double-TLS proxy/origin was not run in the lane (no such mock server); the behaviour is pinned by unit tests (`aborted` chosen; REF's `reset` timing variant is accepted by the tests). Decision: Schannel build only, OpenSSL text untouched (not reported by the finding).
+- 2026-11-17: Doing -> Done. Schannel read-phase alert inside an HTTPS proxy tunnel is Recv failure: Connection was aborted

@@ -347,7 +347,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         new(handshake.Stream!, run.Plaintext, run.Prepared.ClientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), !_matchesSchannelBuild)
         {
             TicketEvents = _matchesSchannelBuild ? run.Events : null,
-            AlertReadFailureMessage = _matchesSchannelBuild ? TlsFailureMessages.SchannelHandBuiltAlertReadFailure(_options.AutoClientCertificate) : null,
+            AlertReadFailureMessage = _matchesSchannelBuild ? TlsFailureMessages.SchannelHandBuiltAlertReadFailure(_options.AutoClientCertificate, run.Plaintext.IsSecure) : null,
         };
 
     // The OpenSSL build's line for a session it offers (openssl.c, after SSL_set_session; BL-1142),
