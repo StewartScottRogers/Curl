@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-11-18 | 2026-11-18_0810.md | reproduces: no | Ran the reproduction: ADR-1263 'Status:** Accepted' count 0. Its status line is now '- **Status:** Superseded by ADR-1281'.
+
 ## Log
 
 - 2026-11-17: filed proposed.

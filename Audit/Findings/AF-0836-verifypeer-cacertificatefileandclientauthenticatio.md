@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/ServerCertificateVerificationTests
 
 ## Re-audits
 
+- 2026-11-18 | 2026-11-18_0810.md | reproduces: no | Ran the Select-String. VerifyPeer_CaCertificateFileAndClientAuthenticationLeaf_IsExit60UnsuitablePurpose (line 95) now asserts line 109 Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);.
+
 ## Log
 
 - 2026-11-17: filed proposed.

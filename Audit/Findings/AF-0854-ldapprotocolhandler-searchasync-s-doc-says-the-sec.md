@@ -42,6 +42,8 @@ Select-String -Path Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.
 
 ## Re-audits
 
+- 2026-11-18 | 2026-11-18_0810.md | reproduces: no | Ran the reproduction: only '182: dialect == LdapDialect.WinLdap && (context.Credentials is null || !target.UseTls)' matches. The old 'bind as the logged-on user, on a second' phrase is gone. SearchAsync's summary (lines 176-179) now says the second WinLDAP connection is used over plaintext ldap:// (with or without -u) or without credentials, which matches the condition.
+
 ## Log
 
 - 2026-11-17: filed proposed.
