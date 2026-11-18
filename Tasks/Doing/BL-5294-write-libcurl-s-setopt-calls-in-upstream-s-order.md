@@ -48,3 +48,4 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 - Decision in ADR-1277: keep 8.22.0's order. Making the six pass against 8.21.0 would break them against the repository's own data.
 - 2026-11-16: Doing -> Deferred. Not a defect: port already writes 8.22.0 setopt order matching vendored cases; 8.21.0 oracle differs (ADR-1277)
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: e2bc2061 ed151c95.
