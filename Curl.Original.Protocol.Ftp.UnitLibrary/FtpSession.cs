@@ -1504,7 +1504,9 @@ internal sealed class FtpSession(
     private IReadOnlyList<KeyValuePair<string, string>> PseudoHeadersOf(TransferResult result, bool uploaded)
     {
         KeyValuePair<string, string>[] counted = uploaded ? [] : [.. control.ColonReplyLines, .. writtenHeaders];
-        return counted.Length > 0 ? counted\r\n            : uploaded || context.NoBody || !result.IsSuccess ? []\r\n            : [FtpHeadHeaderLines.TransferComplete];
+        return counted.Length > 0 ? counted
+            : uploaded || context.NoBody || !result.IsSuccess ? []
+            : [FtpHeadHeaderLines.TransferComplete];
     }
 
     /// <summary>
