@@ -43,7 +43,7 @@ public sealed class TftpDownloadStartAndPostTransferTimingsTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_Upload_KeepsItsConnectAndHasNoStartOrPostTransfer()
+    public async Task ExecuteAsync_Upload_HasNoConnectOrStartTransferButAPostTransfer()
     {
         var clock = new SteppingTimeProvider();
         var result = await new TftpProtocolHandler(new RecordingDatagramConnector(DatagramOpenResult.Opened(new AcknowledgingDatagramChannel(ServerEndPoint, TransferEndPoint))))
@@ -56,9 +56,9 @@ public sealed class TftpDownloadStartAndPostTransferTimingsTests
             });
 
         var timings = result.Report!.Timings!;
-        Assert.IsTrue(timings.Connect!.Connected > timings.Started);
+        Assert.IsNull(timings.Connect!.Connected);
         Assert.IsNull(timings.FirstByteReceived);
-        Assert.IsNull(timings.RequestSent);
+        Assert.AreEqual(timings.Completed, timings.RequestSent);
     }
 
     private static async Task<TransferTimings> DownloadTimingsAsync()

@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Tftp.UnitLibrary/TftpTransferTimings.cs]
+touches: [Curl.Original.Protocol.Tftp.UnitLibrary/TftpTransferTimings.cs, Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5471 — Fix fitness finding STD-150: TFTP and FILE uploads report a non-zero %{time_connect} (TFTP) and a 0 %{time_posttransfer}; TFTP downloads stamp %{time_pretransfer} at the start
 
@@ -34,13 +34,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] both uploads print `c=0.000000` and `post` > 0 ≈ `tot`; the TFTP download prints `pre` ≈ `tot`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] both uploads print `c=0.000000` and `post` > 0 ≈ `tot`; the TFTP download prints `pre` ≈ `tot`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Upload timings (TFTP and FILE) now: no connect stamp, pretransfer and posttransfer at completion, no starttransfer. TFTP download pretransfer is stamped at completion. FILE was added to touches (the finding names its upload path). Tests updated in both .UnitTests projects. Quality run clean for both libraries.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-150 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e04a0b74 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Timings fixed

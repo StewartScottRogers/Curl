@@ -26,13 +26,13 @@ internal sealed class TftpTransferTimings(TimeProvider timeProvider, long starte
         var completed = timeProvider.GetTimestamp();
         // A download never connects (curl's UDP "connect" is not timed, so %{time_connect} is 0),
         // its first byte is taken as received when the channel was ready, and the request counts as
-        // sent once the transfer is over (BL-5387). An upload keeps its BL-5327 timings.
+        // sent once the transfer is over (BL-5387). An upload connects no more than a download does, its request is ready and sent when the transfer is over, and it has no first byte (BL-5327, BL-5471).
         TransferTimings timings = isUpload
-            ? new(started, new ConnectTimings(started, channelReady, channelReady, null), channelReady, null, null, completed)
+            ? new(started, new ConnectTimings(started, channelReady, null, null), completed, completed, null, completed)
             : new(
                 started,
                 new ConnectTimings(started, channelReady, null, null),
-                channelReady,
+                completed,
                 completed,
                 result.IsSuccess ? channelReady : null,
                 completed);
