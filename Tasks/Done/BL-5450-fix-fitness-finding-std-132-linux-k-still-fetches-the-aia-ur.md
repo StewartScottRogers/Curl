@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5450 — Fix fitness finding STD-132: Linux -k still fetches the AIA URL named in the server's certificate
 
@@ -43,3 +43,4 @@ Fix: ReadTrustAnchors under -k in the OpenSSL build returns the downloads-disabl
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-132 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: c86390a1 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. OpenSSL build -k now uses the downloads-disabled chain policy; unit tests pin it
