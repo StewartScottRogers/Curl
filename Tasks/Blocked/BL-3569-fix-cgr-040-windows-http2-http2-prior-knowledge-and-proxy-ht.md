@@ -104,3 +104,4 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
 - 2026-11-02: Doing -> Blocked. Stewart: your 11-02 bulk return asks to complete BL-3569, but meeting it means refusing --http2/--http2-prior-knowledge/--proxy-http2 on Windows (exit 2), which reverses your ADR-0871 that you upheld 10-26. Reverse ADR-0871, or close CGR-040 as an accepted difference?
 - 2026-11-02: Blocked -> Deferred. Stewart 2026-11-02 ('keep 0871'): ADR-0871 stays - --http2, --http2-prior-knowledge and --proxy-http2 keep running HTTP/2 on Windows; the exit-2 criterion would undo it. Closed as an accepted platform difference, listed in the handoff's known differences. GF-0098 and GF-0099 are already closed on the ADR-0871 exclusion.
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Blocked. Stewart: would undo ADR-0871/ADR-1282 (keep HTTP/2 and HTTP/3 on); held off lanes until Stewart reverses those ADRs

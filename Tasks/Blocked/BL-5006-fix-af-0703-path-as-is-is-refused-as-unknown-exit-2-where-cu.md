@@ -51,3 +51,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-11-12: Created.
 - 2026-11-12: Backlog -> Deferred. Stewart rejected AF-0703 (2026-11-12): it is audit 20261111-200237's planted --path-as-is removal, not a Curl defect; --path-as-is is registered at CommandLineOptionTable.cs:332. Do not work it.
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Blocked. Stewart: rejected AF-0703 (planted defect, not a Curl bug); held off lanes until Stewart says otherwise

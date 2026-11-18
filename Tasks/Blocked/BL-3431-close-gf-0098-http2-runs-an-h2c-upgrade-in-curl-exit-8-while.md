@@ -63,3 +63,4 @@ No change to Curl's HTTP/2 Upgrade handling: Curl.Original.Protocol.Http.UnitLib
 - 2026-11-02: Backlog -> Doing. Criteria at claim: bbcffc50 1fd5de8c 28346828.
 - 2026-11-02: Doing -> Deferred. ADR-0871 and ADR-0929 (Stewart's 'Keep HTTP/2 on', confirmed twice) keep --http2 running on Windows; the exit-2 criterion would undo them; GF-0098 closes on the ADR-0871 exclusion. Revisit only if Stewart reverses ADR-0871.
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Blocked. Stewart: would undo ADR-0871/ADR-1282 (keep HTTP/2 and HTTP/3 on); held off lanes until Stewart reverses those ADRs
