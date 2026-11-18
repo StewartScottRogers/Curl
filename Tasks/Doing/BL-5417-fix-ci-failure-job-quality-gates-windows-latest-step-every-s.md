@@ -37,3 +37,4 @@ Lanes test only on Windows, so reproduce with `gh run view 44224595726 --log-fai
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 96723aaa.
 - 2026-11-17: Doing -> Backlog. Depends on BL-5416: the step only reports shard 3's failure
+- 2026-11-17: Backlog -> Doing. Criteria at claim: 96723aaa.
