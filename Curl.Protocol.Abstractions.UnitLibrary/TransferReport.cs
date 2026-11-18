@@ -76,6 +76,13 @@ public sealed record TransferReport
     public int TrailerCount { get; init; }
 
     /// <summary>
+    /// Gets how many header fields the 1xx head a failed transfer ended in carried; zero otherwise. They are
+    /// not in <see cref="ResponseHeaders" />, so <c>%{header_json}</c> and <c>%header{}</c> show none, but
+    /// <c>%{num_headers}</c> counts them, as curl does (STD-147).
+    /// </summary>
+    public int InformationalHeaderCount { get; init; }
+
+    /// <summary>
     /// Gets every header of every response before the last one in a <c>-L</c> chain, hop by
     /// hop and in the order received, duplicates kept; empty when no redirect was followed.
     /// <c>%header{name:all:separator}</c> writes these values before the last response's.

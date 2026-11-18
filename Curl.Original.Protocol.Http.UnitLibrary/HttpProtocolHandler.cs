@@ -1659,15 +1659,33 @@ public sealed class HttpProtocolHandler(
     private static TransferReport WithStatusLineBeforeFailure(TransferReport report, HttpTransferException failure) =>
         report.ResponseCode != 0 || failure.StatusLineBeforeFailure is not { } statusLine
             ? WithReceiveErrno(report, failure)
-            : WithReceiveErrno(report, failure) with
+            : WithHeadersBeforeFailure(report, failure, statusLine, WithReceiveErrno(report, failure) with
             {
                 ResponseCode = statusLine.StatusCode,
                 HttpVersion = statusLine.Version,
                 HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
                 ResponseHeadersStored = Math.Max(report.ResponseHeadersStored, failure.HeadersStoredBeforeFailure),
-                ResponseHeaders = failure.HeadBytesBeforeFailure.Length == 0 ? report.ResponseHeaders : HeadersBeforeFailure(failure.HeadBytesBeforeFailure),
                 ContentType = failure.ContentTypeBeforeFailure ?? report.ContentType,
-            };
+            });
+
+    /// <summary>
+    /// Gives <paramref name="cut" /> the header lines of the head a failure cut short. When that head is a 1xx
+    /// one they are counted (<see cref="TransferReport.InformationalHeaderCount" />, for <c>%{num_headers}</c>)
+    /// but kept out of <see cref="TransferReport.ResponseHeaders" />, which <c>%{header_json}</c> and
+    /// <c>%header{}</c> read: curl 8.22.0 and 8.18.0 show none of them (STD-147, BL-5466).
+    /// </summary>
+    private static TransferReport WithHeadersBeforeFailure(TransferReport report, HttpTransferException failure, HttpStatusLine statusLine, TransferReport cut)
+    {
+        if (failure.HeadBytesBeforeFailure.Length == 0)
+        {
+            return cut with { ResponseHeaders = report.ResponseHeaders };
+        }
+
+        KeyValuePair<string, string>[] headers = HeadersBeforeFailure(failure.HeadBytesBeforeFailure);
+        return statusLine.IsInformational
+            ? cut with { ResponseHeaders = [], InformationalHeaderCount = headers.Length }
+            : cut with { ResponseHeaders = headers };
+    }
 
     /// <summary>
     /// Gives the whole header lines a failure let through before it cut the head short, from the

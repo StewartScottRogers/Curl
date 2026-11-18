@@ -38,7 +38,8 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(responseCode, result.Report!.ResponseCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(headerSize, result.Report!.HeaderSize, $"Chunk size {chunkSize}");
-            Assert.AreEqual(headerCount, result.Report!.ResponseHeaders.Count, $"Chunk size {chunkSize}");
+            Assert.AreEqual(headerCount, result.Report!.ResponseHeaders.Count + result.Report!.InformationalHeaderCount, $"Chunk size {chunkSize}");
+            Assert.AreEqual(0, result.Report!.ResponseHeaders.Count, $"Chunk size {chunkSize}: a 1xx head's fields are not response headers");
         }
     }
 }

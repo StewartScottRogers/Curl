@@ -31,11 +31,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command prints `{` newline `}||`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command prints `{` newline `}||`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: a failed transfer's last head, when 1xx, is kept out of `TransferReport.ResponseHeaders` and counted in the new `InformationalHeaderCount` (Abstractions, added to touches with Curl.Output.UnitLibrary/TransferWriteOutVariables.cs: no other Doing task holds them) so `%{num_headers}` keeps its BL-5401 count. Tested in HttpProtocolHandlerInterimHeadCountTests. Quality run for the Http library clean.
 
 ## Log
 
