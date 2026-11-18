@@ -52,3 +52,4 @@ Where to start: `Curl.Mcp.UnitLibrary/McpConfinementRoot.cs` (path resolution ag
 ## Log
 
 - 2026-11-18: Created from bug report 2026-11-18T1233-Curl-bug-report.md, finding 1.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: e262f720 b1ab0af4 2ca0edb9 e965303b c215a6a1 3d836d5e.
