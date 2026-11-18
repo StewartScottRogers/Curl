@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.SegmentedDownload.UnitLibrary/SegmentableRequest.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5483 — Fix fitness finding EXT-089: --segments with -H "Range: …" sends two Range fields per request and can write the whole file instead of the requested range
 
@@ -33,13 +33,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the `--segments 4` command prints `206 100`, writes 100 bytes, and the server logs exactly one request with a single `Range: bytes=0-99`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the `--segments 4` command prints `206 100`, writes 100 bytes, and the server logs exactly one request with a single `Range: bytes=0-99`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+SegmentableRequest.Is now also refuses a transfer whose -H headers carry Range or If-Range (case-insensitive, name ends at : or ;), so it runs as without --segments: one request, one Range. Unit test extended; quality run 0 failing members. The mock-server repro was not run (the unit test pins the single-request pass-through).
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-089 (Medium).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 03310bb8 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. SegmentableRequest refuses -H Range/If-Range

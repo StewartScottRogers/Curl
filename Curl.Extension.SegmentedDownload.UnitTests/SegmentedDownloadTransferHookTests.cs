@@ -204,6 +204,9 @@ public sealed class SegmentedDownloadTransferHookTests
             new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions(), NoBody = true },
             new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions(), Range = ByteRange.Bounded(0, 1) },
             new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions(), ResumeFrom = 3 },
+            new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions { Headers = ["Range: bytes=0-99"] } },
+            new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions { Headers = ["NoSeparator", "accept: */*", "  if-range : \"v1\""] } },
+            new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions { Headers = ["Range;"] } },
             new() { Url = Url, Output = Stream.Null, Http = new HttpRequestOptions(), TimeCondition = new TimeCondition(DateTimeOffset.UnixEpoch, TimeConditionKind.IfModifiedSince) },
         ];
 
