@@ -164,12 +164,13 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     }
 
     // Over ldaps with -u WinLDAP checks the certificate against the Windows store itself, so -k
-    // does not help and a handshake it refuses is the bind's Server Down (BL-5285).
+    // does not help (BL-5285); curl's own handshake is that connection, so a handshake it refuses
+    // is curl's own failure (exit 60, SEC_E_UNTRUSTED_ROOT), not the bind's Server Down (BL-5461).
     private async ValueTask<(ConnectResult Connect, TransferResult? Failure)> ConnectAsync(ConnectTarget target, ITransferContext context)
     {
         bool winLdapChecksCertificate = dialect == LdapDialect.WinLdap && target.UseTls && context.Credentials is not null;
         ConnectResult connect = await connector.ConnectAsync(winLdapChecksCertificate ? target with { TrustsSystemStoreOnly = true } : target, context.CancellationToken).ConfigureAwait(false);
-        TransferResult? failure = connect.Connection is not null ? null : winLdapChecksCertificate ? WinLdapConnectFailure(connect, target) : ConnectFailure(connect);
+        TransferResult? failure = connect.Connection is not null ? null : ConnectFailure(connect);
         return (connect, failure);
     }
 
@@ -180,7 +181,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// </summary>
     private ValueTask<TransferResult> SearchAsync(IConnection connection, ConnectTarget target, ITransferContext context) =>
         dialect == LdapDialect.WinLdap && (context.Credentials is null || !target.UseTls)
-            ?SearchBesideEmptyConnectionAsync(connection, target, context)
+            ? SearchBesideEmptyConnectionAsync(connection, target, context)
             : SearchOnAsync(connection, context);
 
     /// <summary>The failure a connect that opened no connection ends the transfer with.</summary>

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5461 — Fix fitness finding STD-142: Windows ldaps:// with -u and an untrusted server certificate exits 38 "Server Down"; curl exits 60
 
@@ -31,13 +31,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command exits 60 with the `SEC_E_UNTRUSTED_ROOT` message.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command exits 60 with the `SEC_E_UNTRUSTED_ROOT` message.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix: LdapProtocolHandler.ConnectAsync reports a failed -u ldaps handshake as curl's own failure (exit 60); the system-store-only trust stays. Test LdapsInsecureWinLdapTests updated. Ldap quality run: 0 failing members. Linux/macOS: change is platform-neutral.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-142 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e232b4ef 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. ldaps -u untrusted cert now exits 60
