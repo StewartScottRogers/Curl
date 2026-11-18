@@ -52,3 +52,4 @@ Shares `SaslAuthenticator.cs` with BL-5281, so the two run one after the other.
 - 2026-11-16: Doing -> Deferred. Decided against: platform curl 8.22.0 sends the empty line, ADR-1279; Surl's 8.21.0 oracle differs
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e7bd11d6 5df6465a 668b5e4d.
+- 2026-11-18: Doing -> Blocked. Stewart: criteria 1 and 2 demand '=' but platform curl 8.22.0 sends an empty line (ADR-1279); approve rewording the criteria to 8.22.0 behaviour or drop the task?
