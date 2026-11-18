@@ -51,3 +51,4 @@ Shares `SaslAuthenticator.cs` with BL-5281, so the two run one after the other.
 - Acceptance criteria 1 and 2 ask for `=`, contradicting the measured platform curl, so they are not met by design. Surl should move its oracle to curl 8.22.0 for these cases.
 - 2026-11-16: Doing -> Deferred. Decided against: platform curl 8.22.0 sends the empty line, ADR-1279; Surl's 8.21.0 oracle differs
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: e7bd11d6 5df6465a 668b5e4d.
