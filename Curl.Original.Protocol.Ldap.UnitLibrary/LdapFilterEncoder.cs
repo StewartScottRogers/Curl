@@ -482,6 +482,13 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
 
         if (isWinLdap)
         {
+            // WinLDAP also decodes a backslash and one hex digit not followed by another (BL-5457).
+            if (value[index] == '\\' && index + 1 < value.Length && char.IsAsciiHexDigit(value[index + 1]))
+            {
+                bytes.Add((byte)Convert.ToInt32(value[index + 1].ToString(), 16));
+                return 2;
+            }
+
             bytes.AddRange(LdapWireText.Encode(dialect, value[index].ToString()));
             return 1;
         }

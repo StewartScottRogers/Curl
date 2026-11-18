@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapFilterEncoder.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapHexEscape.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5457 — Fix fitness finding STD-138: Windows LDAP filter: a one-digit hex escape (\2, \4) is sent literally; WinLDAP decodes it
 
@@ -31,13 +31,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the first command's filter ends in `04026102`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first command's filter ends in `04026102`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+WinLDAP decodes a backslash plus one hex digit (not followed by a hex digit) as that octet; LdapFilterEncoder.DecodeAt does it for WinLdap only. Only LdapFilterEncoder.cs needed changing. Quality run: Ldap library 100%/100%, 0 failing. Platform-neutral tests.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-138 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 220348b7 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. WinLDAP one-digit hex escape decoded; tests green, Ldap library 100%
