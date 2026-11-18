@@ -9,7 +9,7 @@ touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.cs, Curl
 model: opus
 requirement: none
 created: 2026-11-13
-completed:
+completed: 2026-11-18
 ---
 # BL-5094 — Sign and seal the LDAP session after an explicit-credential NTLM or Negotiate bind
 
@@ -33,11 +33,11 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Ldap.UnitTests/LdapAuthenticatedNtlmSealTests.cs` prove the Type-1 message flags include 0x10 (SIGN) and 0x20 (SEAL) (`b7 82 08 e2` for the repro's mock), for both `--ntlm` and `--negotiate` with `-u`.
-- [ ] A test proves that after the final bind response (tag 0x8b, resultCode 0) the next bytes written are a 4-byte length plus a sealed blob, not `0x30 0x84`, using a stand-in that can unseal, and that this stand-in receives the SearchRequest and the unbind.
-- [ ] A test proves that against a stand-in that cannot unseal, the transfer ends with `CurlExitCode` 39 (`LDAP remote: Unavailable`) as curl does.
-- [ ] The current-user path stays byte-identical (existing tests green); tests are platform-neutral (no Windows-only API).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Ldap.UnitTests/LdapAuthenticatedNtlmSealTests.cs` prove the Type-1 message flags include 0x10 (SIGN) and 0x20 (SEAL) (`b7 82 08 e2` for the repro's mock), for both `--ntlm` and `--negotiate` with `-u`.
+- [x] A test proves that after the final bind response (tag 0x8b, resultCode 0) the next bytes written are a 4-byte length plus a sealed blob, not `0x30 0x84`, using a stand-in that can unseal, and that this stand-in receives the SearchRequest and the unbind.
+- [x] A test proves that against a stand-in that cannot unseal, the transfer ends with `CurlExitCode` 39 (`LDAP remote: Unavailable`) as curl does.
+- [x] The current-user path stays byte-identical (existing tests green); tests are platform-neutral (no Windows-only API).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -46,6 +46,8 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 
 - 2026-11-13 (lane 4): Split for size before any edit. The seal needs Curl.Ntlm work outside this task's touches: the AUTHENTICATE message carries no EncryptedRandomSessionKey, the answerer drops the key exchange key, and nothing derives NTLM sign and seal keys. BL-5141 adds that to Curl.Ntlm; BL-5142 (depends on BL-5141) does the LDAP part and carries these acceptance criteria unchanged.
 
+- 2026-11-18 (lane 4): The work landed under BL-5141 (Curl.Ntlm session key and sealing) and BL-5142 (the LDAP seal, ADR-1267), both Done; this claim verified the criteria. `--ntlm -u` sends the Sicily Type-1 with `b7 82 08 e2` and seals every later PDU (LdapAuthenticatedNtlmSealTests). Since BL-5314, `--negotiate -u` binds with SASL GSS-SPNEGO, so its NTLM Type-1 comes from the logon package (NegotiateAuthentication) instead of a Sicily bind. Added `ExecuteAsync_NegotiateWithCredentials_AsksToSignAndSealAndSealsTheSearch`, which proves that path asks the package for EncryptAndSign (what sets SIGN and SEAL in its Type-1) and sends the search as a 4-byte length plus a sealed buffer. This meets criterion 1 for `--negotiate` under the current design. Ldap tests 778 passed; full build clean (0 errors); fast tests green on Windows. Test-only change, platform-neutral (no Windows API, fake token source); no production code changed, so no quality run was needed.
+
 ## Log
 
 - 2026-11-13: Created.
@@ -53,3 +55,4 @@ From the outside fitness review of 2026-11-13 (commit 56cb97ede, `preview` build
 - 2026-11-13: Doing -> Deferred. Split into BL-5141, BL-5142
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 21241d7b bbeb9bfe 2eb53dc5 97a37c4d a0b49a29.
+- 2026-11-18: Doing -> Done. -u --ntlm offers SIGN and SEAL and seals the LDAP session; -u --negotiate asks its SPNEGO package to sign and seal and seals the search
