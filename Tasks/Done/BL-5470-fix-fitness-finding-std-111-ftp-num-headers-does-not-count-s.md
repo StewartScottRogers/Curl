@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5470 — Fix fitness finding STD-111: FTP %{num_headers} does not count server reply lines; curl counts every header-stream line that contains a colon (STILL OPEN; the old acceptance check passes only because its mock had no colons)
 
@@ -46,3 +46,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-111 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 3616bde4 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. FTP num_headers counts colon reply lines
