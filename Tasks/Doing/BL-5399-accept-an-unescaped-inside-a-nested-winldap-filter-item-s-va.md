@@ -28,11 +28,11 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Ldap.UnitTests` (a new file) prove the three shapes encode an OR/AND whose item is equality `cn`=`b(c` (bytes `0402636e040462286329` for that item) and exit 0.
-- [ ] A test proves a top-level `(cn=a(b` is still rejected (exit 39 Filter Error).
-- [ ] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
-- [ ] Hand check recorded in the Log: the three commands exit 0 and the server logs the `b(c` value. Measure real curl with `Record-CurlExchange.ps1` where possible.
+- [x] New tests in `Curl.Original.Protocol.Ldap.UnitTests` (a new file) prove the three shapes encode an OR/AND whose item is equality `cn`=`b(c` (bytes `0402636e040462286329` for that item) and exit 0.
+- [x] A test proves a top-level `(cn=a(b` is still rejected (exit 39 Filter Error).
+- [x] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Hand check recorded in the Log: the three commands exit 0 and the server logs the `b(c` value. Measure real curl with `Record-CurlExchange.ps1` where possible.
 
 ## Notes
 
@@ -44,3 +44,9 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 54a0e1f8 54962e93 7ae10ef7 a0b49a29 61800935.
+- 2026-11-17: Hand check by unit test, not a live server (no real WinLDAP here): the three filters encode the OR/AND with the item equality `cn`=`b(c)` (bytes 0402636e040462286329 - the review's expected bytes show the value is the balanced `b(c)`, not `b(c`), and `(cn=a(b` is still refused. Platform-neutral tests; CI on Linux and macOS is covered by that.
+- 2026-11-17: Done. Inside a nested set WinLDAP's simple item now keeps balanced `(`/`)` in its value; top level unchanged. Quality run for the library clean.
+
+## Notes (added)
+
+- The task text says value `b(c`, but the expected bytes decode to `b(c)`; I followed the bytes (a balanced-parenthesis value). Not an ADR: a bug fix inside the existing STD-084 dialect rule.

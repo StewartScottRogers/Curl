@@ -225,15 +225,23 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         return writer.Constructed(tag, [.. items]);
     }
 
-    /// <summary>Whether the character at the position ends a simple item: a <c>)</c>, or for WinLDAP a <c>(</c> too.</summary>
-    private bool EndsSimpleItem() => text[position] == ')' || (isWinLdap && text[position] == '(');
+    /// <summary>Whether the character at the position ends a simple item: a <c>)</c>, or for WinLDAP outside a nested set a <c>(</c> too.</summary>
+    private bool EndsSimpleItem() => text[position] == ')' || (isWinLdap && setDepth == 0 && text[position] == '(');
 
-    /// <summary>Parses a simple item up to its <c>)</c>; a <c>\</c> hides the character after it.</summary>
+    /// <summary>Whether the position is past the text or at the <c>)</c> (or outside a nested set <c>(</c>) that ends the simple item with no <c>(</c> left open in its value.</summary>
+    private bool AtSimpleItemEnd(int open) => position >= text.Length || (open == 0 && EndsSimpleItem());
+
+    /// <summary>How a character changes the count of open parentheses in a value: <c>(</c> opens one, <c>)</c> closes one.</summary>
+    private static int ParenthesisChange(char character) => character == '(' ? 1 : character == ')' ? -1 : 0;
+
+    /// <summary>Parses a simple item up to its <c>)</c>; a <c>\</c> hides the character after it, and inside a nested set WinLDAP keeps balanced <c>(</c> and <c>)</c> in the value (BL-5399).</summary>
     private byte[]? ParseSimple()
     {
         int start = position;
-        while (position < text.Length && !EndsSimpleItem())
+        int open = 0;
+        while (!AtSimpleItemEnd(open))
         {
+            open += ParenthesisChange(text[position]);
             position += text[position] == '\\' ? 2 : 1;
         }
 
