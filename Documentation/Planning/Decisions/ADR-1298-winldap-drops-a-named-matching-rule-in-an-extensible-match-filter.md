@@ -1,4 +1,4 @@
-# ADR-1297: The WinLDAP dialect drops a named matching rule from an extensible-match filter (BL-5400)
+# ADR-1298: The WinLDAP dialect drops a named matching rule from an extensible-match filter (BL-5400)
 
 - Status: Accepted
 - Date: 2026-11-17

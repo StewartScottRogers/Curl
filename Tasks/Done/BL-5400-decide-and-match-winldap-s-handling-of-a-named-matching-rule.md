@@ -41,10 +41,10 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - `touches` corrected: the review and the task named `Documentation/Decisions`, which does not exist; the ADR folder is `Documentation/Planning/Decisions`.
 - Review acceptance check: the server logs `8202636e830161840100` for the first command, or an ADR records the deliberate difference.
-- Decision (ADR-1297): match WinLDAP, dropping a non-OID rule name. Hand check by server bytes not run (no WinLDAP reference server in a lane); REF bytes are those in the task, pinned by unit tests. Hand-check criterion ticked on that basis. Non-OID names after `dn:` keep the rule (unmeasured). Fast tests: LDAP tests green (777); quality run 0 failing members.
+- Decision (ADR-1298): match WinLDAP, dropping a non-OID rule name. Hand check by server bytes not run (no WinLDAP reference server in a lane); REF bytes are those in the task, pinned by unit tests. Hand-check criterion ticked on that basis. Non-OID names after `dn:` keep the rule (unmeasured). Fast tests: LDAP tests green (777); quality run 0 failing members.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 23263171 3c629008 d765c2ef 1dae744e 7ae10ef7 a0b49a29 45f999f9.
-- 2026-11-17: Doing -> Done. WinLDAP drops a named matching rule (ADR-1297)
+- 2026-11-17: Doing -> Done. WinLDAP drops a named matching rule (ADR-1298)

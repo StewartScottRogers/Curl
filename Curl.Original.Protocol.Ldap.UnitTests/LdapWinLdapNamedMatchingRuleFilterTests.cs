@@ -1,6 +1,6 @@
 namespace Curl.Original.Protocol.Ldap;
 
-/// <summary>Pins how the dialects encode a named matching rule in an extensible-match filter (BL-5400, ADR-1297).</summary>
+/// <summary>Pins how the dialects encode a named matching rule in an extensible-match filter (BL-5400, ADR-1298).</summary>
 [TestClass]
 public sealed class LdapWinLdapNamedMatchingRuleFilterTests
 {

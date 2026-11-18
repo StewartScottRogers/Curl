@@ -378,7 +378,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
             : null;
     }
 
-    /// <summary>Whether WinLDAP loses the rule: a name (not an OID, not after <c>dn:</c>) is left out of the wire form (BL-5400, ADR-1297).</summary>
+    /// <summary>Whether WinLDAP loses the rule: a name (not an OID, not after <c>dn:</c>) is left out of the wire form (BL-5400, ADR-1298).</summary>
     private static bool IsNamedRule(string rest) => !char.IsAsciiDigit(rest[0]) && !rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase);
 
     private bool IsOpenLdapExtensible(string attribute, string? rule) =>

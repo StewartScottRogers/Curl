@@ -1339,4 +1339,4 @@ Each option and the specific reason it lost.
 | [1295](ADR-1295-remaining-extension-option-errors-name-the-option-and-bad-resolvers-are-refused.md) | The remaining extension option errors name the option and carry no .NET text, and bad DoT and DoQ resolvers are refused (BL-5406) | Accepted | 2026-11-17 |
 | [1296](ADR-1296-openssl-reference-builds-do-not-follow-aia.md) | The OpenSSL-reference builds do not follow AIA certificate links (BL-5396) | Accepted | 2026-11-17 |
 | [1297](ADR-1297-https-carried-extension-schemes-honour-https-proxy.md) | The HTTPS-carried extension schemes honour HTTPS_PROXY (BL-5405) | Accepted | 2026-11-17 |
-| [1297](ADR-1297-winldap-drops-a-named-matching-rule-in-an-extensible-match-filter.md) | The WinLDAP dialect drops a named matching rule from an extensible-match filter (BL-5400) | Accepted | 2026-11-17 |
+| [1298](ADR-1298-winldap-drops-a-named-matching-rule-in-an-extensible-match-filter.md) | The WinLDAP dialect drops a named matching rule from an extensible-match filter (BL-5400) | Accepted | 2026-11-17 |
