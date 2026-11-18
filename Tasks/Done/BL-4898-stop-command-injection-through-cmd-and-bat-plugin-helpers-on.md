@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Plugin.UnitLibrary/SystemHelperProcessStarter.cs, Curl.Extended.Protocol.Plugin.UnitTests/BatchHelperArgumentTests.cs, Documentation/Conformance/Extended/Plugin.md]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-18
 ---
 # BL-4898 — Stop command injection through .cmd and .bat plugin helpers on Windows
 
@@ -27,14 +27,16 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] None of the three repro commands creates a `pwn*.txt` file; the helper either receives exactly one argument byte-equal to the URL (with `%PATH%` literal) or the transfer is refused with a clear error and a non-zero exit.
-- [ ] A regression test in `Curl.Extended.Protocol.Plugin.UnitTests` covers `&`, `"` and `%` in a URL bound for a batch helper.
-- [ ] `Documentation/Conformance/Extended/Plugin.md` Discovery-3 states how batch helpers are handled.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] None of the three repro commands creates a `pwn*.txt` file; the helper either receives exactly one argument byte-equal to the URL (with `%PATH%` literal) or the transfer is refused with a clear error and a non-zero exit.
+- [x] A regression test in `Curl.Extended.Protocol.Plugin.UnitTests` covers `&`, `"` and `%` in a URL bound for a batch helper.
+- [x] `Documentation/Conformance/Extended/Plugin.md` Discovery-3 states how batch helpers are handled.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
+
+- 2026-11-18 (lane 1): The work landed through BL-4977 (SystemHelperProcessStarter.RefuseUnsafeBatchArgument, BatchHelperArgumentTests) and BL-4971 (Plugin.md Discovery-3, ADR-1248), both Done. Verified here: with a `curl-proto-demo.cmd` helper first on PATH, the three repro URLs each end `curl: (7) Failed to run curl-proto-demo.cmd: the URL holds a character cmd.exe would run as a command ...` with exit 7 and no pwn*.txt file; a clean URL gets `body` and exit 0. The only change in this run: Discovery-3 quoted the error with "the vertical bar" in place of the real character list, so it now describes the list. The matrix parser splits table cells on every `|`, even an escaped `|`, so the cell cannot quote the list itself. No production code changed, so there was no quality run. dotnet build is clean and the fast tests pass. CI on Linux and macOS: the change is documentation only.
 
 ## Log
 
@@ -44,3 +46,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Backlog -> Deferred. Split into BL-4977 (refuse cmd metacharacters for batch helpers, with tests) and BL-4971 (Plugin.md and ADR)
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 8f505c9f ff2b8363 fab8595d a0b49a29.
+- 2026-11-18: Doing -> Done. A URL with & " or % bound for a .cmd/.bat plugin helper is refused with exit 7; no command runs
