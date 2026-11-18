@@ -34,11 +34,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] step 1 prints a warning or error naming `--record` and `recfile` (exit 23, or exit 0 with a `Warning:` line).
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 1 prints a warning or error naming `--record` and `recfile` (exit 23, or exit 0 with a `Warning:` line).
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+A record directory that cannot be written now fails the transfer with exit 23 and "Failed writing the --record directory <dir>" (as --har does); the response body is still written. Quality run: 0 failing members.
 
 ## Log
 

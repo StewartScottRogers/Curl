@@ -111,14 +111,16 @@ public sealed class RecordReplayTransferHookTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_ARecordDirectoryThatCannotBeWritten_LeavesTheTransferAsItWas_Adr1129Section4()
+    public async Task ExecuteAsync_ARecordDirectoryThatCannotBeWritten_FailsWithExit23NamingRecordAndTheDirectory_Ext095()
     {
         await File.WriteAllTextAsync(_directory, "a file, not a directory");
         var context = Context();
 
         var result = await Hook(record: _directory).ExecuteAsync(context, new FakeServer(Head, "body").Invoke);
 
-        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        StringAssert.Contains(result.ErrorMessage!, "--record");
+        StringAssert.Contains(result.ErrorMessage!, _directory);
         Assert.AreEqual("body", Text(context.Output));
         File.Delete(_directory);
     }

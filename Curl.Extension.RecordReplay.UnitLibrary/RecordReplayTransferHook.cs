@@ -135,21 +135,27 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
         await context.Output.WriteAsync(body.ToArray(), context.CancellationToken);
         if (result is { IsSuccess: true, Report: { } report })
         {
-            await TryRecordAsync(directory, key, request with { StatusCode = report.ResponseCode, Head = RedactedHead(head.ToArray()), Body = body.ToArray() }, context.CancellationToken);
+            var failure = await TryRecordAsync(directory, key, request with { StatusCode = report.ResponseCode, Head = RedactedHead(head.ToArray()), Body = body.ToArray() }, context.CancellationToken);
+            if (failure is not null)
+            {
+                return failure;
+            }
         }
 
         return result;
     }
 
-    private static async Task TryRecordAsync(ExchangeDirectory directory, string key, RecordedExchange exchange, CancellationToken cancellationToken)
+    /// <summary>Writes the exchange; a failure is exit 23 naming <c>--record</c> and the directory, as --har names its file.</summary>
+    private static async Task<TransferResult?> TryRecordAsync(ExchangeDirectory directory, string key, RecordedExchange exchange, CancellationToken cancellationToken)
     {
         try
         {
             await directory.WriteAsync(key, exchange, cancellationToken);
+            return null;
         }
         catch (IOException)
         {
-            // A record directory that cannot be written leaves the transfer as it was.
+            return TransferResult.Failure(CurlExitCode.WriteError, $"Failed writing the --record directory {directory.Path}");
         }
     }
 
