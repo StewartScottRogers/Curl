@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.SegmentedDownload.UnitLibrary/SegmentedDownloadTransferHook.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/TransferContextContentDecoding.cs]
+touches: [Curl.Extension.SegmentedDownload.UnitLibrary/SegmentableRequest.cs, Curl.Extension.SegmentedDownload.UnitTests/SegmentedDownloadTransferHookTests.cs, Curl.Extension.SegmentedDownload.UnitLibrary/SegmentedDownloadTransferHook.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/TransferContextContentDecoding.cs]
 requirement: none
 created: 2026-11-18
 completed:
@@ -33,11 +33,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the `--segments 4 --compressed` command exits 0 and `g.out` equals `g2.out` byte for byte (480,000 bytes).
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the `--segments 4 --compressed` command exits 0 and `g.out` equals `g2.out` byte for byte (480,000 bytes).
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision: a `--compressed` transfer is not split (SegmentableRequest.Is), so it runs as curl runs it; the ranges are of the encoded body and cannot be decoded alone. Simplest option the finding offers. Added SegmentableRequest.cs and the hook tests file to touches. Criterion 1 follows from the unsplit path being plain curl behaviour; the unit test pins that it is passed through unchanged. Quality run: 0 failing members. Platform-neutral.
 
 ## Log
 

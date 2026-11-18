@@ -2,7 +2,7 @@ namespace Curl.Extension.SegmentedDownload;
 
 /// <summary>
 /// Decides whether a transfer is one <c>--segments</c> splits: a plain HTTP GET of the whole resource, with no body,
-/// upload, custom method, <c>HEAD</c>, range, resume or time condition (RFC 9110 §14.2: range requests are defined for GET).
+/// upload, custom method, <c>--compressed</c> (the ranges are of the encoded representation and cannot each be decoded alone, BL-5481), <c>HEAD</c>, range, resume or time condition (RFC 9110 §14.2: range requests are defined for GET).
 /// Any other transfer runs as curl runs it.
 /// </summary>
 internal static class SegmentableRequest
@@ -11,7 +11,7 @@ internal static class SegmentableRequest
     public static bool Is(ITransferContext context) =>
         context.Http is { } http && IsPlainGet(http) && SendsNoBody(context) && AsksForTheWholeResource(context) && SetsNoRangeField(http);
 
-    private static bool IsPlainGet(HttpRequestOptions http) => http is { CustomMethod: null, Body: null };
+    private static bool IsPlainGet(HttpRequestOptions http) => http is { CustomMethod: null, Body: null, Compressed: false };
 
     private static bool SendsNoBody(ITransferContext context) =>
         context is { PostData: null, PostWithoutData: false, Upload: null };
