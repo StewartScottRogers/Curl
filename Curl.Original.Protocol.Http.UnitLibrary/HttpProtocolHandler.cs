@@ -803,11 +803,7 @@ public sealed class HttpProtocolHandler(
             }
 
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.Closing(connect.ConnectionNumber));
-            return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!) with
-            {
-                Report = FailedConnectReport(plan, connect),
-                IsConnectionRefused = connect.IsConnectionRefused,
-            };
+            return FailedConnectResult(plan, connect);
         }
 
         plan.OpenedConnection = true;
@@ -1097,6 +1093,22 @@ public sealed class HttpProtocolHandler(
             && target.UseTls
             && (plan.Options.ForwardProxy is null || IsHttpProxy(plan.Options.ForwardProxy))
             && !plan.Options.OverUnixSocket;
+
+    /// <summary>
+    /// Gives the failed connect's result: its own exit code, or exit 22 under <c>-f</c> when a proxy refused the CONNECT with 400 or above (STD-125).
+    /// </summary>
+    private static TransferResult FailedConnectResult(HttpRequestPlan plan, ConnectResult connect)
+    {
+        // -f turns a refused CONNECT (status 400 or above) into exit 22, as curl does (STD-125, BL-5443).
+        bool failsOnConnectStatus = plan.Options.Fail == HttpFailMode.Fail && connect.ProxyConnectResponseCode >= 400;
+        return TransferResult.Failure(
+            failsOnConnectStatus ? CurlExitCode.HttpReturnedError : connect.ExitCode,
+            failsOnConnectStatus ? HttpTransferMessages.RequestedUrlReturnedError(connect.ProxyConnectResponseCode) : connect.ErrorMessage!) with
+        {
+            Report = FailedConnectReport(plan, connect),
+            IsConnectionRefused = connect.IsConnectionRefused,
+        };
+    }
 
     /// <summary>
     /// Reports a connect that failed: whether it went to a forward proxy, and the transfer's

@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/TcpConnector.cs]
+touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5443 — Fix fitness finding STD-125: -f/--fail with a proxy that refuses CONNECT (403/407) exits 7; curl exits 22
 
@@ -34,13 +34,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the first command prints `curl: (22) The requested URL returned error: 403` and `[22 403]`, exit 22; without `-f` it still exits 7.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first command prints `curl: (22) The requested URL returned error: 403` and `[22 403]`, exit 22; without `-f` it still exits 7.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Handler fix, not the connector: TcpConnector cannot see --fail, so HttpProtocolHandler.FailedConnectResult maps a refused CONNECT (>=400) under -f to exit 22; --fail-with-body and no -f stay exit 7 (REF behaviour per finding). touches widened to the HTTP handler and its tests; no other Doing task holds them. Tests in Cgr242Tests.cs; quality run clean for Curl.Original.Protocol.Http.UnitLibrary. CI on Linux/macOS: change is platform-neutral.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-125 (Medium).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 3ee16ced 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. -f maps a refused CONNECT (>=400) to exit 22 in HttpProtocolHandler
