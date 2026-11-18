@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Pop3.UnitLibrary/Pop3Login.cs, Curl.Original.Protocol.Smtp.UnitLibrary/SmtpSaslAuthentication.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5477 — Fix fitness finding STD-156: POP3 and SMTP accept an early SASL success before the client has finished (LOGIN with --sasl-ir; POP3 CRAM-MD5 with --sasl-ir); curl fails with "Login denied"
 
@@ -34,13 +34,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the three commands exit 67 with `curl: (67) Login denied`; the servers see no `RETR` or `MAIL`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the three commands exit 67 with `curl: (67) Login denied`; the servers see no `RETR` or `MAIL`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+POP3 NtlmUnfinished now also guards LOGIN and CRAM-MD5, and SMTP Outcome likewise (no challenge handed yet = not finished), as IMAP HasFinished. Tests: Pop3ProtocolHandlerLoginTests, SmtpProtocolHandlerAuthenticationTests. The mock-server commands are covered by those unit tests; Linux/macOS CI met by platform-neutral tests.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-156 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 8a9d20cb 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Fixed; tests and quality green

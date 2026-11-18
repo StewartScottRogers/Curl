@@ -520,4 +520,17 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
         Assert.AreEqual(Ehlo + "AUTH NTLM\r\ndHlwZTE=\r\ndHlwZTM=\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
-}
+
+    [TestMethod]
+    public async Task ExecuteAsync_LoginWithSaslIrAnd235BeforePasswordPrompt_DoesNotAuthenticate()
+    {
+        // BL-5477 STD-156: 235 straight after AUTH LOGIN <user> is not a finished exchange.
+        var sasl = new RankedSaslAuthenticator(("LOGIN", "u"u8.ToArray(), ["p"u8.ToArray()]));
+        var context = Context(new MailRequestOptions { SaslInitialResponse = true });
+
+        const string Replies = Greeting + "250-localhost\r\n250-AUTH LOGIN\r\n250 OK\r\n" + Accepted + HelpReplyAndBye;
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(Replies)), sasl);
+
+        Assert.IsFalse(run.Sent.Contains("HELP", StringComparison.Ordinal));
+        Assert.AreNotEqual(SmtpRun.HelpAnswered, run.Result);
+    }}
