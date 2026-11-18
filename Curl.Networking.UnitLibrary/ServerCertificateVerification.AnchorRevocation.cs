@@ -140,16 +140,25 @@ internal sealed partial class ServerCertificateVerification
     private bool IsCurrentListOf(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer, Uri uri) =>
         list.CoversCertificatesIssuedFor(certificate) && list.IsSignedBy(issuer) && list.NextUpdate >= timeProvider.GetUtcNow() && list.CoversScopeOf(certificate, uri);
 
-    private static CertificateRevocationList? DecodeOrNothing(byte[] der)
+    // A list served as DER or as PEM text (curl accepts both); PEM armour is stripped before decoding.
+    internal static CertificateRevocationList? DecodeOrNothing(byte[] body)
     {
         try
         {
-            return CertificateRevocationList.Decode(der);
+            return CertificateRevocationList.Decode(DerOf(body));
         }
-        catch (AsnContentException)
+        catch (Exception exception) when (exception is AsnContentException or FormatException)
         {
             return null;
         }
+    }
+
+    private static byte[] DerOf(byte[] body)
+    {
+        var text = System.Text.Encoding.ASCII.GetString(body);
+        return PemEncoding.TryFind(text, out var fields) && text[fields.Label] == "X509 CRL"
+            ? Convert.FromBase64String(text[fields.Base64Data])
+            : body;
     }
 
     // The http addresses in a certificate's CRL distribution points (RFC 5280, 4.2.1.13); none

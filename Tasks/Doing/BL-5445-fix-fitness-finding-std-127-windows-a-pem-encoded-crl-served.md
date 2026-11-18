@@ -31,11 +31,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the good leaf exits 0; the revoked leaf exits 60 with the "has been revoked" text.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the good leaf exits 0; the revoked leaf exits 60 with the "has been revoked" text.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix: `DecodeOrNothing` now strips PEM armour (`X509 CRL` label) before decoding; DER still works; bad base64 or another label yields no list (fails closed). Tests: `ServerCertificateVerificationTests.PemRevocationList.cs`. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members. Linux/macOS: change is platform-neutral.
 
 ## Log
 
