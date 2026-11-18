@@ -31,11 +31,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command prints alice's entry and its filter bytes equal REF's.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command prints alice's entry and its filter bytes equal REF's.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fixed in LdapFilterEncoder.Encode: WinLDAP bare filters now skip leading spaces like the parenthesised form. Test replaces the old one that pinned spaces in the attribute. Quality run: 0 failing members. Filter bytes pinned to REF hex A3840000000C04037569640405616C696365.
 
 ## Log
 

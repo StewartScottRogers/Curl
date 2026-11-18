@@ -89,7 +89,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         text = filter;
         position = 0;
         setDepth = 0;
-        return filter.StartsWith('(') || (isWinLdap && filter.TrimStart(' ').StartsWith('(')) ? ParseTopLevel() : EncodeItem(filter);
+        return filter.StartsWith('(') || (isWinLdap && filter.TrimStart(' ').StartsWith('(')) ? ParseTopLevel() : EncodeItem(isWinLdap ? filter.TrimStart(' ') : filter);
     }
 
     private static bool IsBetween(int count, int minimum, int maximum) => count >= minimum && count <= maximum;

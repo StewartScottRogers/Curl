@@ -35,11 +35,15 @@ public sealed class LdapWinLdapLeadingSpaceFilterTests
     }
 
     [TestMethod]
-    public void Encode_WinLdapLeadingSpacesBeforeBareEquality_KeepsSpacesInAttribute()
+    [DataRow(" uid=alice")]
+    [DataRow("  uid=alice")]
+    public void Encode_WinLdapLeadingSpacesBeforeBareEquality_EqualsUnspacedFilter(string filter)
     {
-        byte[]? actual = Encoder().Encode(" cn=a");
+        byte[]? expected = Encoder().Encode("uid=alice");
+        byte[]? actual = Encoder().Encode(filter);
         Assert.IsNotNull(actual);
-        Assert.IsTrue(Convert.ToHexString(actual).EndsWith("040320636E040161", StringComparison.Ordinal));
+        Assert.AreEqual(Convert.ToHexString(expected!), Convert.ToHexString(actual));
+        Assert.AreEqual("A3840000000C04037569640405616C696365", Convert.ToHexString(actual));
     }
 
     private static LdapFilterEncoder Encoder() => new(LdapDialect.WinLdap, new LdapBerWriter(LdapDialect.WinLdap));
