@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapFilterEncoder.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapWinLdapNestedUnescapedParenthesisFilterTests.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5399 — Accept an unescaped ( inside a nested WinLDAP filter item's value
 
@@ -50,3 +50,4 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 ## Notes (added)
 
 - The task text says value `b(c`, but the expected bytes decode to `b(c)`; I followed the bytes (a balanced-parenthesis value). Not an ADR: a bug fix inside the existing STD-084 dialect rule.
+- 2026-11-17: Doing -> Done. Nested WinLDAP filter items keep balanced parentheses in the value; tests and quality run clean
