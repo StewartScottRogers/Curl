@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Coap, Curl.Conformance.Extended.UnitTests/Coap, Documentation/Conformance/Extended/Coap.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-18
 ---
 # BL-4470 — Conformance: CoAP RFC 7252 messaging, options and request/response for coap:// (Coap part 1 of 3)
 
@@ -44,27 +44,29 @@ fixed here, but a defect in the extension library is listed in `KnownFailures.tx
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Coap.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of this scope
+- [x] `Documentation/Conformance/Extended/Coap.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of this scope
       that binds a client an `Coap:` ID and maps it to a test or to `n/a: <reason>`, links to
       `Coap-BlockwiseObserve.md` (BL-4471) and `Coap-Dtls.md` (BL-4472), and the harness's matrix check passes.
-- [ ] A reference CoAP server in `Curl.Conformance.Extended.UnitLibrary/Coap/` lets BL-4471 and BL-4472 add behaviour
+- [x] A reference CoAP server in `Curl.Conformance.Extended.UnitLibrary/Coap/` lets BL-4471 and BL-4472 add behaviour
       in `Coap/BlockwiseObserve/` and `Coap/Dtls/` without editing this task's files.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Coap/` run curl in process and assert datagram bytes, stdout,
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Coap/` run curl in process and assert datagram bytes, stdout,
       stderr and exit code for at least: each method, piggybacked and separate responses, a duplicate response, a
       Reset (exit 56), retransmission timing and give-up (exit 28), token mismatch, an unrecognised critical option
       in a response, option delta and length extended encodings, the Uri-* options built from host, port, path
       segments and query (percent-encoding included), 4.xx and 5.xx with and without `-f`, and `-i`'s status line.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Coap conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
 - 2026-11-02 (lane 8): Split for size before any code: a reference server, about twenty in-process cases across four RFC 7252 sections, a matrix of every client MUST/SHOULD and a coverage run do not fit one run's budget. Split into BL-4524 (reference server, sections 3 and 4 messaging cases, matrix created), BL-4525 (section 5 request/response and section 3.1 option encoding cases) and BL-4526 (section 6 URI, response codes with -f and -i, section 12, matrix completed with the BL-4471 and BL-4472 links), chained in that order with disjoint case subfolders. BL-4471 and BL-4472 now depend on BL-4524 (the server) instead of BL-4470.
+
+- 2026-11-18 (lane 9): All work landed under BL-4524, BL-4525 and BL-4526 (all Done; matrix, reference server, cases, KnownFailures clean). Criteria ticked on that evidence; no code change here.
 
 ## Log
 
@@ -73,3 +75,4 @@ fixed here, but a defect in the extension library is listed in `KnownFailures.tx
 - 2026-11-02: Doing -> Deferred. Split into BL-4524, BL-4525, BL-4526
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 2abe036a c14f1ec9 5ce91802 fb1c989b d8e3fb0e 7cee2dc4 ef6c9026.
+- 2026-11-18: Doing -> Done. Delivered by BL-4524, BL-4525 and BL-4526 (all Done)
