@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5421 — Stamp timings in EndPointReportingProtocolHandler only on a result that has a report
 
@@ -42,3 +42,4 @@ Found by the shift-end review (ADR-0710) of the 2026-11-17 shift (type-design-an
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 5bbb1515 f8d8edf1 b7a34fb5 049772bf.
+- 2026-11-18: Doing -> Done. done
