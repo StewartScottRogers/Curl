@@ -31,11 +31,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] each command exits 3 with `curl: (3) Bad LDAP URL: No Memory`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] each command exits 3 with `curl: (3) Bad LDAP URL: No Memory`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+WinLdapUrlReader now refuses a decoded filter starting or ending with TAB, CR or LF with "Bad LDAP URL: No Memory" (exit 3). Leading or trailing space was not in the finding and is left as is. Not re-measured against real curl here; pinned from the finding. Quality run: 0 failing.
 
 ## Log
 

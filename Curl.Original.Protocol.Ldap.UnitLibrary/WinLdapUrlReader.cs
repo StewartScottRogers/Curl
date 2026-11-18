@@ -70,7 +70,7 @@ internal static class WinLdapUrlReader
     private static LdapUrlReading ReadFilter(LdapSearchParameters search, string[] parts)
     {
         string? filter = Decode(PartAt(parts, 2));
-        if (filter is null)
+        if (filter is null || HasControlWhitespaceAtAnEnd(filter))
         {
             return LdapUrlReading.Refused(NoMemory);
         }
@@ -79,6 +79,10 @@ internal static class WinLdapUrlReader
             ? LdapUrlReading.Refused(InvalidSyntax)
             : new LdapUrlReading(search with { Filter = filter.Length > 0 ? filter : null }, null);
     }
+
+    /// <summary>Whether the filter starts or ends with a TAB, CR or LF, which the Windows build refuses with <c>No Memory</c> (BL-5456).</summary>
+    private static bool HasControlWhitespaceAtAnEnd(string filter) =>
+        filter.Trim('\t', '\r', '\n').Length != filter.Length;
 
     /// <summary>The query part at <paramref name="index" />, or the empty string when the query has fewer.</summary>
     private static string PartAt(string[] parts, int index) => index < parts.Length ? parts[index] : string.Empty;
