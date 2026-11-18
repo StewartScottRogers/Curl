@@ -47,3 +47,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Blocked -> Backlog. SDK 10.0.404 installed 2026-11-11 ~09:20 Arizona; global.json resolves. Any work a lane kept is in that lane's stash - apply by hash, never pop.
 - 2026-11-11: Backlog -> Deferred. Split into BL-4963 and BL-4964 (over cost cap)
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: a9c45dfd 6a5bb400 a0b49a29.
