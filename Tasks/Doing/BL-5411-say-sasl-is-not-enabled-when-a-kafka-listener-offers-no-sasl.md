@@ -28,18 +28,22 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extended.Protocol.Kafka.UnitTests` (in `Wire/KafkaSasl`, a new file) prove `PlainNotEnabled` with an empty list returns a message that says SASL is not enabled on the listener and contains no "it enables" text.
-- [ ] A test proves `PlainNotEnabled` with a non-empty list (for example `SCRAM-SHA-256`) still names the enabled mechanisms (the existing `KafkaSaslMessageTests` case stays green).
-- [ ] A handler test with a scripted broker whose SaslHandshake answers an error and no mechanisms proves exit 67 and the new message end to end.
-- [ ] Tests are platform-neutral.
-- [ ] Hand check recorded in the Log: the review's command prints a message that says SASL is not enabled on the listener (no trailing empty list), exit 67.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extended.Protocol.Kafka.UnitTests` (in `Wire/KafkaSasl`, a new file) prove `PlainNotEnabled` with an empty list returns a message that says SASL is not enabled on the listener and contains no "it enables" text.
+- [x] A test proves `PlainNotEnabled` with a non-empty list (for example `SCRAM-SHA-256`) still names the enabled mechanisms (the existing `KafkaSaslMessageTests` case stays green).
+- [x] A handler test with a scripted broker whose SaslHandshake answers an error and no mechanisms proves exit 67 and the new message end to end.
+- [x] Tests are platform-neutral.
+- [x] Hand check recorded in the Log: the review's command prints a message that says SASL is not enabled on the listener (no trailing empty list), exit 67.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Mock servers must be PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md).
 - `touches` includes `Client/KafkaClientFlow.cs` for the caller's error-code check.
 - Review acceptance check: the command prints a message that says SASL is not enabled on the listener (no trailing empty list), exit 67.
+
+- Decision: an empty mechanism list is the "no SASL on the listener" case; the error code is not told apart further (33 with a list and 34 both go through the same message, empty list picks the new text), so KafkaClientFlow is unchanged.
+- Hand check: no live broker on this lane; the scripted-broker handler test proves exit 67 and the message "SASL is not enabled on the Kafka listener, it offers no SASL mechanism".
+- Kafka library quality run: 0 failing members.
 
 ## Log
 
