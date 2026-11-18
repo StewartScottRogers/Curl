@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/DnsQuery, Curl.Conformance.Extended.UnitTests/DnsQuery, Documentation/Conformance/Extended/DnsQuery.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-18
 ---
 # BL-4473 — Conformance: DNS RFC 1035 messages over UDP and TCP and the RFC 4501 URL for dns:// (DnsQuery part 1 of 2)
 
@@ -44,27 +44,29 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/DnsQuery.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of this
+- [x] `Documentation/Conformance/Extended/DnsQuery.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of this
       scope that binds a resolver client or stub an `DnsQuery:` ID mapped to a test or to `n/a: <reason>`, links to
       `DnsQuery-Encrypted.md` (BL-4474), and the harness's matrix check passes.
-- [ ] A reference DNS server in `Curl.Conformance.Extended.UnitLibrary/DnsQuery/` (UDP and TCP) lets BL-4474 add the
+- [x] A reference DNS server in `Curl.Conformance.Extended.UnitLibrary/DnsQuery/` (UDP and TCP) lets BL-4474 add the
       encrypted transports in `DnsQuery/Encrypted/` without editing this task's files.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/DnsQuery/` run curl in process and assert query bytes, stdout
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/DnsQuery/` run curl in process and assert query bytes, stdout
       (text and `--dns-json`), stderr and exit code for at least: each record type listed above and an unknown one,
       compression pointers (forward and looping pointers refused), a reply with a wrong ID or question ignored, TC
       set then retried over TCP, UDP retries and give-up on the injected clock, each RCODE, `type=` and `class=` in the
       URL, and a server and port given in the URL.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix DnsQuery conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/DnsQuery/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/DnsQuery/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
 - 2026-11-02 (lane 10): Split for size before any edit: a new reference DNS server (UDP and TCP, its own codec) plus some 25 cases and a seven-RFC matrix will not fit one run, and no protocol on the extended harness exists yet to copy from. BL-4514 (server, record types, URL), BL-4515 (compression, ID and question matching, RCODEs) and BL-4516 (TC to TCP, UDP retries, matrix completion and link to DnsQuery-Encrypted.md) carry every criterion; BL-4474's depends-on now names them instead of BL-4473.
+
+- 2026-11-18 (lane 4): Every criterion was carried by BL-4514, BL-4515 and BL-4516 (all Done). Verified: the 63 DnsQuery conformance tests pass; nothing is listed in KnownFailures.txt for DnsQuery. No new code in this run.
 
 ## Log
 
@@ -73,3 +75,4 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 - 2026-11-02: Doing -> Deferred. Split into BL-4514, BL-4515, BL-4516
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 33bfa3c9 3c00e6c1 6ba469e8 f3c72898 d8e3fb0e 0cbf2573 ef6c9026.
+- 2026-11-18: Doing -> Done. All criteria met by Done subtasks BL-4514, BL-4515, BL-4516; DnsQuery conformance tests verified green
