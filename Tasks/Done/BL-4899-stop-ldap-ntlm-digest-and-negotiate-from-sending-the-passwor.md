@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapAuthSchemeBindTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-18
 ---
 # BL-4899 — Stop LDAP --ntlm, --digest and --negotiate from sending the password as a cleartext simple bind
 
@@ -27,14 +27,16 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] Against the mock, `--ntlm` sends a bind with tag 0x8a and an `NTLMSSP` payload and never tag 0x80 with `pw`; `--digest` sends tag 0xa3; each exits 38 as REF does.
-- [ ] `--basic` and no auth option still send the simple bind (tag 0x80, `pw`) and exit 0.
-- [ ] Unit tests in `Curl.Original.Protocol.Ldap.UnitTests` pin the bind choice for each auth mask.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] Against the mock, `--ntlm` sends a bind with tag 0x8a and an `NTLMSSP` payload and never tag 0x80 with `pw`; `--digest` sends tag 0xa3; each exits 38 as REF does.
+- [x] `--basic` and no auth option still send the simple bind (tag 0x80, `pw`) and exit 0.
+- [x] Unit tests in `Curl.Original.Protocol.Ldap.UnitTests` pin the bind choice for each auth mask.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
+
+- 2026-11-18 (lane 2): Nothing left to code: the split subtasks BL-4965, BL-4966, BL-4967 and BL-4968 (and BL-5094) are Done and carry the fix and its tests (LdapAuthSchemeBindTests, LdapBindKindChoiceTests). Checked the built curl.exe against a PowerShell TCP stand-in on 127.0.0.1: `--ntlm` sends name `NTLM`, tag 0x8a, `NTLMSSP` and exits 38; `--digest` sends tag 0xa3 `DIGEST-MD5` and exits 38; `--basic` sends tag 0x80 with `pw`. The basic exit 0 path is pinned by ExecuteAsync_BasicInTheMask_SendsTheSimpleBindWithThePassword and ExecuteAsync_NoHttpOptions_SendsTheSimpleBind (the stand-in did not answer the bind). LDAP fast tests: 778 passed; Curl.Console builds clean. No code changed in this run.
 
 ## Log
 
@@ -44,3 +46,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Backlog -> Deferred. Split over its cost cap into BL-4965, BL-4966, BL-4967 and BL-4968
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: a3192bff f721d6be c47b4c7f a0b49a29.
+- 2026-11-18: Doing -> Done. LDAP binds follow the auth mask: --ntlm/--negotiate Sicily 0x8a, --digest SASL 0xa3, Basic simple bind; verified on curl.exe, LDAP fast tests green
