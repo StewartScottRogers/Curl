@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5448 — Fix fitness finding STD-130: Linux --capath / SSL_CERT_DIR / --proxy-capath still download a missing intermediate via AIA (the STD-103 fix covered only the file and system-store routes)
 
@@ -36,13 +36,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] with the cache cleared, the three commands exit 60 with `(20)` and the 41080 log stays empty; `--capath capath` against a server sending leaf + int1 still exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] with the cache cleared, the three commands exit 60 with `(20)` and the 41080 log stays empty; `--capath capath` against a server sending leaf + int1 still exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decided by Claude under Stewart's delegation: extends ADR-1296 (no new ADR). `RebuildAgainstAnchors` now sets `DisableCertificateDownloads = true` (only the OpenSSL build reads --capath anchors; Schannel ignores them). Covered by `ServerCertificateVerificationCaDirectoryNoAiaTests`, which fails without the fix (a loopback listener sees the AIA fetch). The 41080 live repro was not run; platform-neutral change, fast tests green, Measure-CodeQuality clean for Networking.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-130 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 70d404e5 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. STD-130 fixed: capath anchor rebuild downloads no AIA intermediate

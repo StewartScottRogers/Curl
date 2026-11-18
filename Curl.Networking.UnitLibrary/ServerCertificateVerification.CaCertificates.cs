@@ -161,7 +161,10 @@ internal sealed partial class ServerCertificateVerification
             return null;
         }
 
+        // OpenSSL follows no AIA link, so a missing intermediate is not downloaded here either (BL-5448);
+        // only the OpenSSL build reads --capath anchors, the Schannel build ignores them.
         var anchoredChain = new X509Chain();
+        anchoredChain.ChainPolicy.DisableCertificateDownloads = true;
         anchoredChain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
         anchoredChain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
         if (requireServerAuthentication)
