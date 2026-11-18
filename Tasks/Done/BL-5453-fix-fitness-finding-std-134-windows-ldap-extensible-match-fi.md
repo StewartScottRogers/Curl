@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapFilterEncoder.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5453 — Fix fitness finding STD-134: Windows LDAP extensible-match filter with :dn: before a named matching rule sends the bogus matchingRule dn:<rule>; the search silently returns nothing
 
@@ -32,13 +32,17 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the first command's filter equals REF's bytes above and it prints alice's entry.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first command's filter equals REF's bytes above and it prints alice's entry.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix: IsNamedRule now looks past a leading dn: so a named rule after :dn: is dropped (OID still kept). Filter bytes match the finding's REF by unit test; no live relay run.
+
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-134 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 1eade6bc 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. WinLDAP named rule after :dn: is dropped like REF
