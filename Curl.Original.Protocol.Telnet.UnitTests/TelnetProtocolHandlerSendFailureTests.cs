@@ -65,7 +65,7 @@ public sealed class TelnetProtocolHandlerSendFailureTests
         Diagnostics.AssertResult(TransferResult.Success(5), session.Result);
         Diagnostics.Diff("output", "hello", session.Output);
         Diagnostics.AssertLines("transcript", expectedTranscript, session.Transcript);
-        Assert.AreEqual(TransferResult.Success(5), session.Result);
+        Assert.AreEqual(TransferResult.Success(5), session.Result with { Report = null });
         Assert.AreEqual("hello", session.Output);
         CollectionAssert.AreEqual(
             new[]
@@ -129,7 +129,7 @@ public sealed class TelnetProtocolHandlerSendFailureTests
         Diagnostics.Diff("output", "hi", session.Output);
         Diagnostics.AssertLines("transcript", expectedTranscript, session.Transcript);
         Diagnostics.AssertLines("first four writes", ["FFFB1F", "FFFA1F", "00500018", "FFF0"], firstWrites);
-        Assert.AreEqual(TransferResult.Success(2), session.Result);
+        Assert.AreEqual(TransferResult.Success(2), session.Result with { Report = null });
         Assert.AreEqual("hi", session.Output);
         CollectionAssert.AreEqual(
             new[]

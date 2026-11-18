@@ -351,7 +351,7 @@ public sealed class TelnetProtocolHandlerAdversarialTests
         (TransferResult Result, string Output) second = await RunOnAsync(handler);
 
         Assert.AreEqual(first.Output, second.Output);
-        Assert.AreEqual(first.Result, second.Result);
+        Assert.AreEqual(first.Result with { Report = null }, second.Result with { Report = null });
         Assert.HasCount(2, connector.Connections);
         Assert.IsTrue(connector.Connections.All(connection => ToHex(connection.Sent) == "FF FD 01 " + Offers));
     }

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Dict.UnitLibrary, Curl.Original.Protocol.Dict.UnitTests, Curl.Original.Protocol.Gopher.UnitLibrary, Curl.Original.Protocol.Gopher.UnitTests, Curl.Original.Protocol.Telnet.UnitLibrary, Curl.Original.Protocol.Telnet.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5390 — Report DICT, Gopher and TELNET transfer timings and download speed in write-out
 
@@ -36,12 +36,12 @@ The same gap affects the Part B messaging extension protocols (EXT-083, BL-5410)
 
 ## Acceptance criteria
 
-- [ ] New tests in each of `Curl.Original.Protocol.Dict.UnitTests`, `Curl.Original.Protocol.Gopher.UnitTests` and `Curl.Original.Protocol.Telnet.UnitTests` (a new file each) prove the `TransferReport` carries timings with `time_connect`, `time_starttransfer` and `time_total` set from an injected `TimeProvider` that advances, so they are non-zero.
-- [ ] Tests prove download speed is non-zero when bytes and elapsed time are both non-zero.
-- [ ] Tests prove the already-correct `size_download` is unchanged.
-- [ ] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
-- [ ] Hand check recorded in the Log: the three commands print non-zero `time_connect`, `time_starttransfer`, `time_total` and `speed_download`. Measure real curl with `Record-CurlExchange.ps1` where possible.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in each of `Curl.Original.Protocol.Dict.UnitTests`, `Curl.Original.Protocol.Gopher.UnitTests` and `Curl.Original.Protocol.Telnet.UnitTests` (a new file each) prove the `TransferReport` carries timings with `time_connect`, `time_starttransfer` and `time_total` set from an injected `TimeProvider` that advances, so they are non-zero.
+- [x] Tests prove download speed is non-zero when bytes and elapsed time are both non-zero.
+- [x] Tests prove the already-correct `size_download` is unchanged.
+- [x] Tests are platform-neutral (or OS-conditioned where curl differs by platform).
+- [x] Hand check recorded in the Log: the three commands print non-zero `time_connect`, `time_starttransfer`, `time_total` and `speed_download`. Measure real curl with `Record-CurlExchange.ps1` where possible.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -49,7 +49,11 @@ The same gap affects the Part B messaging extension protocols (EXT-083, BL-5410)
 - Review acceptance check: the three commands print non-zero `time_connect`, `time_starttransfer`, `time_total` and `speed_download`.
 - Related: EXT-083 (BL-5410), the same gap in the messaging extension protocols.
 
+- Decision: stamped by each handler (no shared engine change): Started at transfer start, Connect from the connector, FirstByteReceived = Completed (the reply is read to the server close). Only Ok results are stamped. TELNET now reports DownloadSize = bytes written. Existing tests pinning result equality or stepping-clock milliseconds were adjusted.
+- Hand check 2026-11-17 (PowerShell loopback servers, Curl build): gopher `0.184069 0.553417 0.553417 15 27`, telnet `0.153110 0.540669 0.540669 15 27`, dict `0.065888 0.406618 0.406618 33 81`. Quality run: Dict, Gopher, Telnet libraries at the gates.
+
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: ab061ebd 5e1ac160 bc933de7 7ae10ef7 d9c86291 a0b49a29.
+- 2026-11-17: Doing -> Done. DICT, Gopher and TELNET write-out report non-zero connect, start-transfer, total times and download speed

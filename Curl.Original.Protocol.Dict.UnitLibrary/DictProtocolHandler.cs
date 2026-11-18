@@ -101,6 +101,7 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
             return credentialsRefused;
         }
 
+        long started = context.TimeProvider.GetTimestamp();
         CurlUrl url = context.Url;
         var target = new ConnectTarget(url.IdnHost, url.IsDefaultPort ? DefaultPort : url.Port, false)
         {
@@ -122,7 +123,21 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
         }
 
         ReportConnectionEnd(context.Events, result, connect.ConnectionNumber);
-        return result;
+        return StampTimings(result, context.TimeProvider, started, connect.Timings);
+    }
+
+    // Adds the timings behind %{time_*} and %{speed_download} to the report the transfer made (BL-5390).
+    // The first byte is stamped with the completion time: the reply is read until the server closes.
+    private static TransferResult StampTimings(TransferResult result, TimeProvider timeProvider, long started, ConnectTimings? connect)
+    {
+        if (result.ExitCode != CurlExitCode.Ok)
+        {
+            return result;
+        }
+
+        long completed = timeProvider.GetTimestamp();
+        var timings = new TransferTimings(started, connect, null, null, completed, completed);
+        return result with { Report = result.Report! with { Timings = timings } };
     }
 
     /// <summary>
