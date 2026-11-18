@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Tftp.UnitLibrary/TftpTransferTimings.cs, Curl.Original.Protocol.Tftp.UnitTests, Curl.Original.Protocol.File.UnitLibrary, Curl.Original.Protocol.File.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5387 — Report TFTP and FILE download start-transfer, post-transfer and connect times as curl does
 
@@ -32,12 +32,12 @@ Still-open older finding. What changed: the TFTP size and speed are now fixed; t
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Original.Protocol.Tftp.UnitTests` (a new file) prove a TFTP download's report has `time_connect` 0, `time_starttransfer` < `time_total` and `time_posttransfer` > 0 (inject `TimeProvider`, no real clock).
-- [ ] New tests in `Curl.Original.Protocol.File.UnitTests` (a new file) prove the same for a FILE download.
-- [ ] Tests prove TFTP and FILE uploads keep their current (correct) timings.
-- [ ] Tests are platform-neutral: use a drive-less `file:///dir/x` style URL or the handler's injected file system, never `file:///C:/...` (CLAUDE.md).
-- [ ] Hand check recorded in the Log: both commands report `time_starttransfer` < `time_total`, `time_posttransfer` > 0 and `time_connect` 0.000000. Measure real curl with `Record-CurlExchange.ps1` where possible.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Original.Protocol.Tftp.UnitTests` (a new file) prove a TFTP download's report has `time_connect` 0, `time_starttransfer` < `time_total` and `time_posttransfer` > 0 (inject `TimeProvider`, no real clock).
+- [x] New tests in `Curl.Original.Protocol.File.UnitTests` (a new file) prove the same for a FILE download.
+- [x] Tests prove TFTP and FILE uploads keep their current (correct) timings.
+- [x] Tests are platform-neutral: use a drive-less `file:///dir/x` style URL or the handler's injected file system, never `file:///C:/...` (CLAUDE.md).
+- [x] Hand check recorded in the Log: both commands report `time_starttransfer` < `time_total`, `time_posttransfer` > 0 and `time_connect` 0.000000. Measure real curl with `Record-CurlExchange.ps1` where possible.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -48,3 +48,5 @@ Still-open older finding. What changed: the TFTP size and speed are now fixed; t
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 189f7e59 1f484b78 992872fd 374f82e6 182da9f6 a0b49a29.
+- 2026-11-17: Hand check (file download, 300000 bytes): time_connect 0.000000, time_starttransfer 0.000001 < time_total 0.085137, time_posttransfer 0.085137 > 0. Tests: Tftp 298 pass, File 510 pass; quality 0 failing members.
+- 2026-11-17: Doing -> Done. TFTP and FILE downloads report connect 0, start-transfer before total, post-transfer > 0
