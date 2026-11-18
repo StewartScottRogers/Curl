@@ -235,7 +235,50 @@ public sealed class IntermediateOnlyProxyCacertTests
         Assert.AreEqual($"CRL {UnreachableCrlAddress} could not be fetched: the server answered 404", lines[0]);
     }
 
-    private (CurlExitCode ExitCode, string Message)? VerifyStubbedWith(Pki pki, Func<Uri, CancellationToken, byte[]> fetch, IDiagnosticLog log, TimeSpan budget)
+    [TestMethod]
+    public void ForHandshake_FailedFetch_ReachesTheGivenLogAsATlsWarning()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var log = new Fakes.RecordingDiagnosticLog(DiagnosticLogLevel.Warning);
+
+        VerifyStubbedWith(pki, (_, _) => throw new IOException("the server answered 503"), log, TimeSpan.FromSeconds(5), viaHandshake: true);
+
+        var lines = log.At(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Tls);
+        Assert.IsNotEmpty(lines);
+        Assert.AreEqual($"CRL {UnreachableCrlAddress} could not be fetched: the server answered 503", lines[0]);
+    }
+
+    [TestMethod]
+    public void ForHandshake_StalledFetch_DoesNotOutlastTheConnectLimit()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        using var connectLimit = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        var started = System.Diagnostics.Stopwatch.StartNew();
+
+        var failure = VerifyStubbedWith(
+            pki,
+            (_, token) => { token.WaitHandle.WaitOne(TimeSpan.FromSeconds(30)); token.ThrowIfCancellationRequested(); return []; },
+            NoDiagnosticLog.Instance,
+            TimeSpan.FromMinutes(5),
+            viaHandshake: true,
+            limit: connectLimit.Token);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.IsLessThan(TimeSpan.FromSeconds(20), started.Elapsed);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithALog_ValidatesItsArgumentsInBothProviders()
+    {
+        var events = new Fakes.RecordingTransferEvents();
+        var sslStream = new SslStreamTlsProvider(new TlsClientOptions());
+        var handBuilt = new HandBuiltTlsProvider(new TlsClientOptions(), TimeProvider.System);
+
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await sslStream.AuthenticateAsClientAsync(null!, Host, events, false, [], NoDiagnosticLog.Instance, CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handBuilt.AuthenticateAsClientAsync(null!, Host, events, false, [], NoDiagnosticLog.Instance, CancellationToken.None));
+    }
+
+    private (CurlExitCode ExitCode, string Message)? VerifyStubbedWith(Pki pki, Func<Uri, CancellationToken, byte[]> fetch, IDiagnosticLog log, TimeSpan budget, bool viaHandshake = false, CancellationToken limit = default)
     {
         var caFile = Path.Combine(_directory, "proxy-cacert.pem");
         File.WriteAllText(caFile, pki.Intermediate.ExportCertificatePem());
@@ -244,11 +287,12 @@ public sealed class IntermediateOnlyProxyCacertTests
         var verification = new ServerCertificateVerification(new TlsClientOptions(CaCertificateFile: caFile), true, TimeProvider.System)
         {
             FetchRevocationList = fetch,
-            RevocationDiagnosticLog = log,
+            RevocationDiagnosticLog = viaHandshake ? NoDiagnosticLog.Instance : log,
             RevocationFetchBudget = budget,
             ReadChainStatus = _ => partial,
             ReadCertificatesBelowAnchorStatus = _ => unknown,
         };
+        verification = viaHandshake ? verification.ForHandshake(log, limit) : verification;
         var (chainPolicy, _, _) = verification.ReadTrustAnchors();
         chainPolicy!.RevocationMode = X509RevocationMode.NoCheck;
         chainPolicy.ExtraStore.Add(pki.Intermediate);

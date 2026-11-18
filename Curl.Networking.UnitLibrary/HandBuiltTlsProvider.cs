@@ -257,7 +257,40 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns>The same result <see cref="ITlsProvider.AuthenticateAsClientAsync(IConnection, string, CancellationToken)" /> describes.</returns>
-    public async ValueTask<ConnectResult> AuthenticateAsClientAsync(
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
+        CancellationToken cancellationToken) =>
+        AuthenticateWithAsync(_verification, plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
+
+    /// <summary>
+    /// Performs the handshake as the overload without a log does, its below-anchor revocation
+    /// list fetches writing their failures to <paramref name="diagnosticLog" /> and ending when
+    /// <paramref name="cancellationToken" />, the connect's limit, does (BL-5428).
+    /// </summary>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the trust and the completed handshake are reported.</param>
+    /// <param name="isProxy"><see langword="true" /> when the handshake is with an HTTPS proxy.</param>
+    /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
+    /// <param name="diagnosticLog">The connect target's diagnostic log.</param>
+    /// <param name="cancellationToken">Cancels the handshake at the connect's limit.</param>
+    /// <returns>The same result the overload without a log returns.</returns>
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
+        IDiagnosticLog diagnosticLog,
+        CancellationToken cancellationToken) =>
+        AuthenticateWithAsync(_verification.ForHandshake(diagnosticLog, cancellationToken), plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
+
+    private async ValueTask<ConnectResult> AuthenticateWithAsync(
+        ServerCertificateVerification verification,
         IConnection plaintext,
         string targetHost,
         ITransferEvents events,
@@ -271,7 +304,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ArgumentNullException.ThrowIfNull(applicationProtocols);
 
         var offeredApplicationProtocols = OfferedApplicationProtocols(applicationProtocols);
-        var (prepared, preparationFailure, alertRecord) = await PrepareWithEchAsync(events, targetHost, offeredApplicationProtocols, plaintext.RemoteEndPoint, cancellationToken).ConfigureAwait(false);
+        var (prepared, preparationFailure, alertRecord) = await PrepareWithEchAsync(verification, events, targetHost, offeredApplicationProtocols, plaintext.RemoteEndPoint, cancellationToken).ConfigureAwait(false);
         if (prepared is null)
         {
             return await FailBeforeHandshakeAsync(plaintext, preparationFailure!, alertRecord, cancellationToken).ConfigureAwait(false);
@@ -447,13 +480,14 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // Prepare, then the --ech offer (ADR-0327): --ech hard with no usable configuration fails
     // here, before a byte is sent, and the --cert certificate is disposed.
     private async ValueTask<(PreparedHandshake? Prepared, ConnectResult? Failure, byte[]? AlertRecord)> PrepareWithEchAsync(
+        ServerCertificateVerification verification,
         ITransferEvents events,
         string targetHost,
         IReadOnlyList<string> offeredApplicationProtocols,
         EndPoint? remoteEndPoint,
         CancellationToken cancellationToken)
     {
-        var preparation = Prepare(events, targetHost, offeredApplicationProtocols);
+        var preparation = Prepare(verification, events, targetHost, offeredApplicationProtocols);
         if (preparation.Prepared is not { } prepared)
         {
             return preparation;
@@ -643,6 +677,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // --curves or --sigalgs leaving nothing to offer (exit 35, not a refused list's 59) is
     // the one failure OpenSSL announces with an internal_error alert (BL-1087).
     private (PreparedHandshake? Prepared, ConnectResult? Failure, byte[]? AlertRecord) Prepare(
+        ServerCertificateVerification verification,
         ITransferEvents events,
         string targetHost,
         IReadOnlyList<string> offeredApplicationProtocols)
@@ -667,12 +702,13 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         }
 
         events.ReportTlsTrust(SslStreamTlsProvider.DescribeTrust(_options, targetHost));
-        return PrepareTrust(targetHost, offeredApplicationProtocols, suites, profile!, clientCertificate);
+        return PrepareTrust(verification, targetHost, offeredApplicationProtocols, suites, profile!, clientCertificate);
     }
 
     // The OpenSSL build's refusal of a legacy ceiling (BL-1152), then the trust anchors; a
     // failure disposes the --cert certificate.
     private (PreparedHandshake? Prepared, ConnectResult? Failure, byte[]? AlertRecord) PrepareTrust(
+        ServerCertificateVerification verification,
         string targetHost,
         IReadOnlyList<string> offeredApplicationProtocols,
         IReadOnlyList<ushort>? suites,
@@ -687,7 +723,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
         try
         {
-            var (chainPolicy, anchorsBesideSystemStore, revocationLists) = _verification.ReadTrustAnchors();
+            var (chainPolicy, anchorsBesideSystemStore, revocationLists) = verification.ReadTrustAnchors();
             return (new PreparedHandshake(
                 ClientSettings.Of(targetHost, offeredApplicationProtocols, suites, ToTlsClientCertificate(clientCertificate), profile) with
                 {
@@ -696,12 +732,12 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                     KeyLog = _options.KeyLogFile is { } keyLogFile ? new NssKeyLogFile(keyLogFile) : null,
                 },
                 clientCertificate,
-                new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost, UntrustedStapleClock)), null, null);
+                new HandBuiltCertificateVerifier(verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost, UntrustedStapleClock)), null, null);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
             clientCertificate?.Dispose();
-            var (exitCode, message) = _verification.TrustAnchorsUnusable(exception);
+            var (exitCode, message) = verification.TrustAnchorsUnusable(exception);
             return (null, ConnectResult.Failed(exitCode, message), null);
         }
     }

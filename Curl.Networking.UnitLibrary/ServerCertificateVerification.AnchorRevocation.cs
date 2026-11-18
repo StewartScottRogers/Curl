@@ -35,6 +35,34 @@ internal sealed partial class ServerCertificateVerification
     /// <summary>Where a failed list fetch is written, at <c>warning</c> as <c>tls</c>.</summary>
     internal IDiagnosticLog RevocationDiagnosticLog { get; init; } = NoDiagnosticLog.Instance;
 
+    /// <summary>
+    /// Ends every list fetch of the verification when it is cancelled; the connect's limit, so a
+    /// stalled fetch does not outlast what is left of the connect (ADR-0117).
+    /// </summary>
+    internal CancellationToken RevocationLimit { get; init; }
+
+    /// <summary>
+    /// Returns a verification with this one's settings and seams whose below-anchor list fetches
+    /// write their failures to <paramref name="diagnosticLog" /> and stop at
+    /// <paramref name="limit" />, and are bounded by the lesser of this one's budget and what is
+    /// left of the connect, which <paramref name="limit" /> cancels at.
+    /// </summary>
+    /// <param name="diagnosticLog">The connect target's diagnostic log.</param>
+    /// <param name="limit">Cancelled when the connect's limit passes.</param>
+    /// <returns>A verification for one handshake.</returns>
+    internal ServerCertificateVerification ForHandshake(IDiagnosticLog diagnosticLog, CancellationToken limit) =>
+        new(options, matchesSchannelBuild, timeProvider)
+        {
+            FetchRevocationList = FetchRevocationList,
+            RevocationFetchBudget = RevocationFetchBudget,
+            RevocationDiagnosticLog = diagnosticLog,
+            RevocationLimit = limit,
+            ReadChainStatus = ReadChainStatus,
+            ReadCertificatesBelowAnchorStatus = ReadCertificatesBelowAnchorStatus,
+            ReadEnvironmentVariable = ReadEnvironmentVariable,
+            DefaultCaBundleCandidates = DefaultCaBundleCandidates,
+        };
+
     private readonly ConditionalWeakTable<X509Chain, BelowAnchorRevocationAnswer> _belowAnchorAnswers = new();
 
     private sealed record BelowAnchorRevocationAnswer(BelowAnchorRevocation Value);
@@ -68,7 +96,8 @@ internal sealed partial class ServerCertificateVerification
 
         var elements = chain.ChainElements.Cast<X509ChainElement>().Select(element => element.Certificate).ToArray();
         using var budget = new CancellationTokenSource(RevocationFetchBudget, timeProvider);
-        var outcomes = elements.Take(elements.Length - 1).Select((certificate, index) => RevocationOf(certificate, elements[index + 1], budget.Token)).ToArray();
+        using var limited = CancellationTokenSource.CreateLinkedTokenSource(budget.Token, RevocationLimit);
+        var outcomes = elements.Take(elements.Length - 1).Select((certificate, index) => RevocationOf(certificate, elements[index + 1], limited.Token)).ToArray();
         return outcomes.Contains(BelowAnchorRevocation.Revoked)
             ? BelowAnchorRevocation.Revoked
             : outcomes.Contains(BelowAnchorRevocation.Unresolved) ? BelowAnchorRevocation.Unresolved : BelowAnchorRevocation.Clean;
