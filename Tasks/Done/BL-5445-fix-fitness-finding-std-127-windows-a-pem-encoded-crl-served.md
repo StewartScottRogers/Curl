@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5445 — Fix fitness finding STD-127: Windows: a PEM-encoded CRL served at the distribution point is not used (curl accepts it)
 
@@ -43,3 +43,4 @@ Fix: `DecodeOrNothing` now strips PEM armour (`X509 CRL` label) before decoding;
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-127 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e0f43b79 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. PEM CRL decoded; tests and quality gate green
