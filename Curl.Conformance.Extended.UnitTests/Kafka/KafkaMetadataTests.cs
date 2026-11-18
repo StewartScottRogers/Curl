@@ -60,7 +60,7 @@ public sealed class KafkaMetadataTests
             CurlRunResult result = await ExtendedConformanceHarness.RunAsync(CurlRunner, [ReferenceRoute.Tcp(Port, broker)], Arguments);
 
             Assert.AreEqual(8, result.ExitCode);
-            Assert.HasCount(1, broker.Requests);
+            Assert.HasCount(10, broker.Requests);
             Assert.AreEqual($"curl: (8) Kafka broker answered error 3 (UNKNOWN_TOPIC_OR_PARTITION) for topic {Topic} partition 0" + Environment.NewLine, Text(result.StandardError));
         });
 

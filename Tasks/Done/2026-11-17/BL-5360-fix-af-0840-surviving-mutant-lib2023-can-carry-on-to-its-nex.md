@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib2023.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5360 — Fix AF-0840: Surviving mutant: lib2023 can carry on to its next requests after a failed easy init
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib2023.cs line 95`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib2023.cs line 95`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `Lib1978To2306Tests.Lib2023_WhenTheFirstHandleCannotBeMade_StopsWithoutTryingTheNextRequests`: with the mutant applied it failed (the second block wrote `curl_easy_init() failed` twice); reverted, all 1224 fast tests in the project pass. Test-only change, no production edit.
 
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 10c5abd6 9742157d.
+- 2026-11-17: Doing -> Done. Test kills the AF-0840 mutant

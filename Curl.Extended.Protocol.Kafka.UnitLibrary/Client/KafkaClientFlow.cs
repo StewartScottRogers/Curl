@@ -11,9 +11,14 @@ namespace Curl.Extended.Protocol.Kafka.Client;
 /// feed to the output and fetching again until the partition's high watermark. A topic or partition error, a malformed
 /// response or a wrong correlation id ends with exit 8.
 /// </summary>
-internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
+internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITransferProgress progress, TimeProvider timeProvider, CancellationToken cancellationToken)
 {
     private static readonly byte[] RecordDelimiter = [(byte)'\n'];
+
+    private const int MetadataAttempts = 10;
+    private const short UnknownTopicOrPartition = 3;
+    private const short LeaderNotAvailable = 5;
+    private static readonly TimeSpan MetadataRetryDelay = TimeSpan.FromMilliseconds(250);
 
     private int correlationId;
 
@@ -44,15 +49,27 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
 
     /// <summary>
     /// Sends Metadata for the address's topic and gives the host and port of the broker that leads its partition; a
+    /// UNKNOWN_TOPIC_OR_PARTITION or LEADER_NOT_AVAILABLE (a broker that auto-creates the topic has no leader for it yet) is
+    /// asked again up to ten times, 250 ms apart on the transfer's time provider, within the transfer's cancellation; any other
     /// topic or partition error, or a partition with no leader among the brokers, ends with exit 8 naming the error.
     /// </summary>
     internal async ValueTask<KafkaMetadataLeader> FindLeaderAsync(KafkaAddress address)
     {
-        ReadOnlyMemory<byte> body = await ExchangeAsync("Metadata", id => KafkaRequests.Metadata(id, address.Topic)).ConfigureAwait(false);
-        KafkaMetadataLeader leader = Decoded(() => KafkaMetadataResponse.ReadLeader(body, address.Partition));
-        ThrowOnError(leader.ErrorCode, address);
-        return leader;
+        for (int attempt = 1; ; attempt++)
+        {
+            ReadOnlyMemory<byte> body = await ExchangeAsync("Metadata", id => KafkaRequests.Metadata(id, address.Topic)).ConfigureAwait(false);
+            KafkaMetadataLeader leader = Decoded(() => KafkaMetadataResponse.ReadLeader(body, address.Partition));
+            if (!IsLeaderPending(leader.ErrorCode) || attempt >= MetadataAttempts)
+            {
+                ThrowOnError(leader.ErrorCode, address);
+                return leader;
+            }
+
+            await Task.Delay(MetadataRetryDelay, timeProvider, cancellationToken).ConfigureAwait(false);
+        }
     }
+
+    private static bool IsLeaderPending(short errorCode) => errorCode is UnknownTopicOrPartition or LeaderNotAvailable;
 
     /// <summary>Produces one record whose value is <paramref name="value"/> to the address's partition.</summary>
     internal async ValueTask ProduceAsync(KafkaAddress address, ReadOnlyMemory<byte> value, long timestampMilliseconds)

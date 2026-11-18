@@ -28,7 +28,7 @@ option.
   specification says; `cache` is empty (curl keeps no cache); `serverIPAddress` comes from the report's remote end
   point when known. `connection` is left out: curl reports no connection identifier.
 - **Request (§request).** The method is the report's, else `-X`, else the one curl's options imply (`HEAD` for `-I`,
-  `PUT` for `-T`, `POST` for a body, `GET`). The URL is the effective URL, else the URL typed, with any user information (`user:password@`) replaced by `REDACTED:REDACTED` as `--otel-endpoint`'s `url.full` is (ADR-1134, BL-5323), and so is `redirectURL`. The headers are those
+  `PUT` for `-T`, `POST` for a body, `GET`). The URL is the effective URL, else the URL typed, with any user information (`user:password@`) replaced by `REDACTED:REDACTED` as `--otel-endpoint`'s `url.full` is (ADR-1134, BL-5323), and so is `redirectURL`; the `Location`, `Content-Location` and `Referer` header fields, which hold URLs, get the same replacement (BL-5379). The headers are those
   the hook can see: `User-Agent` (the default `curl/8.22.0` when `-A` is not given), `Referer` and the `Cookie` header for `-b` strings from curl's options and every `-H` field, a `-H` field of the same
   name winning and `Name:` or `Name;` (which remove or empty a field) left out; the fields curl's handler adds
   itself (`Host`, `Accept`, `Content-Length`) are not visible to a transfer hook and are not listed.

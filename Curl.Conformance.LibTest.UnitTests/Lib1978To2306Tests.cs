@@ -182,6 +182,18 @@ public sealed class Lib1978To2306Tests
     }
 
     [TestMethod]
+    public async Task Lib2023_WhenTheFirstHandleCannotBeMade_StopsWithoutTryingTheNextRequests()
+    {
+        CurlLibrary library = await PortRun.CleanedUpLibraryAsync();
+        var run = new PortRun(new FakeCurlEngine(), 2023, "http://x/2023", "basic", "basic");
+
+        await Lib2023.TestAsync(run.Context, run.Steps, library, HttpAuthenticationMethods.Basic, HttpAuthenticationMethods.Basic, CancellationToken.None);
+
+        Assert.AreEqual(LibTestErrorCodes.MajorBad, run.Steps.Result);
+        Assert.AreEqual("curl_easy_init() failed\n", run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task Lib2023_WhenTheSecondHandleCannotBeMade_EndsMajorBad()
     {
         var holder = new PortRun.LibraryHolder();

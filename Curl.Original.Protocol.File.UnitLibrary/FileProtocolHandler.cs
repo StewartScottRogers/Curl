@@ -206,7 +206,11 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     private static TransferResult WithTimings(TransferResult result, long started, long resolved, long completed, bool isUpload)
     {
         TransferReport report = result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };
-        var timings = new TransferTimings(started, new ConnectTimings(started, resolved, resolved, null), completed, null, isUpload ? null : completed, completed);
+        // A download has no connect (%{time_connect} is 0), is ready and first read right after the
+        // path resolves, and is posted when it ends (BL-5387); an upload keeps its BL-5327 timings.
+        var timings = isUpload
+            ? new TransferTimings(started, new ConnectTimings(started, resolved, resolved, null), completed, null, null, completed)
+            : new TransferTimings(started, new ConnectTimings(started, resolved, null, null), resolved, completed, resolved, completed);
         return result with { Report = report with { Timings = timings } };
     }
     /// <summary>

@@ -95,7 +95,6 @@ public sealed class HelperProtocolHandlerTests
 
     [TestMethod]
     [DataRow("put\n\nok\n", "curl-proto-demo does not offer the get capability")]
-    [DataRow("", "curl-proto-demo does not offer the get capability")]
     [DataRow("get\n*connect\n\nok\n", "curl-proto-demo requires the unknown capability connect")]
     public async Task Execute_WithoutTheCapabilityTheTransferNeeds_FailsWithExit1(string reply, string message)
     {

@@ -360,9 +360,10 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
 
     /// <summary>
     /// Tells whether a mechanism that needs the server's challenge has had it: NTLM finishes only once its Type 2 is
-    /// answered with the Type 3, so a tagged <c>OK</c> before that is a refusal (RFC 4422 section 3.6, BL-5013).
+    /// answered with the Type 3, and LOGIN finishes only once its password prompt is answered, so a tagged <c>OK</c>
+    /// before that is a refusal (RFC 4422 section 3.6, BL-5013, BL-5398).
     /// </summary>
-    private bool HasFinished(string mechanism) => mechanism != "NTLM" || challengesHanded > 0;
+    private bool HasFinished(string mechanism) => (mechanism != "NTLM" && mechanism != "LOGIN") || challengesHanded > 0;
 
     /// <summary>Reads the next tagged response or <c>+</c> continuation, skipping untagged lines.</summary>
     /// <exception cref="ImapResponseMissingException">The server closed before a response was complete.</exception>

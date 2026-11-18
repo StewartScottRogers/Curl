@@ -245,14 +245,14 @@ public sealed class KafkaProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_TopicUnknownToMetadata_EndsWithWeirdServerReplyNamingTheError()
+    public async Task ExecuteAsync_TopicRefusedByMetadata_EndsWithWeirdServerReplyNamingTheError()
     {
-        ScriptedKafkaConnection connection = new(KafkaTestBytes.MetadataResponse(1, 3, [(1, "broker", 9092)]));
+        ScriptedKafkaConnection connection = new(KafkaTestBytes.MetadataResponse(1, 29, [(1, "broker", 9092)]));
 
         TransferResult result = await ExecuteAsync(connection, "kafka://broker/orders", new MemoryStream());
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
-        Assert.AreEqual("Kafka broker answered error 3 (UNKNOWN_TOPIC_OR_PARTITION) for topic orders partition 0", result.ErrorMessage);
+        Assert.AreEqual("Kafka broker answered error 29 (TOPIC_AUTHORIZATION_FAILED) for topic orders partition 0", result.ErrorMessage);
         Assert.AreEqual(1, connection.Writes.Count);
     }
 

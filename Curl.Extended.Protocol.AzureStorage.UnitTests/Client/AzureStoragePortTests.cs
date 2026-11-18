@@ -8,7 +8,7 @@ public sealed class AzureStoragePortTests
 {
     [TestMethod]
     [DataRow("az://acct.blob.core.windows.net:8443/c/x", "acct.blob.core.windows.net", 8443, "acct.blob.core.windows.net:8443")]
-    [DataRow("az://127.0.0.1:10000/c/x", "127.0.0.1", 10000, "127.0.0.1:10000")]
+    [DataRow("az://127.0.0.1:10000/devstoreaccount1/c/x", "127.0.0.1", 10000, "127.0.0.1:10000")]
     [DataRow("abfss://fs@acct.dfs.core.windows.net:10000/c/x", "acct.dfs.core.windows.net", 10000, "acct.dfs.core.windows.net:10000")]
     [DataRow("az://acct.blob.core.windows.net/c/x", "acct.blob.core.windows.net", 443, "acct.blob.core.windows.net")]
     [DataRow("az://acct.blob.core.windows.net:443/c/x", "acct.blob.core.windows.net", 443, "acct.blob.core.windows.net")]

@@ -16,6 +16,8 @@ internal sealed class NatsSession(IConnection connection, ITransferContext conte
     /// <summary>The <c>sid</c> of the one subscription a transfer makes.</summary>
     public const string SubscriptionId = "1";
 
+    private static readonly byte[] NoRespondersStatus = "NATS/1.0 503"u8.ToArray();
+
     private const string AuthorizationViolation = "Authorization Violation";
 
     private readonly NatsWireReader reader = new(connection);
@@ -40,7 +42,7 @@ internal sealed class NatsSession(IConnection connection, ITransferContext conte
         }
 
         maxPayload = info.MaxPayload;
-        await SendAsync([.. NatsConnect.LineFor(isSecure, context.Credentials), .. OpeningLinesOf(request), .. NatsConnect.Line(NatsOperations.Ping)]).ConfigureAwait(false);
+        await SendAsync([.. NatsConnect.LineFor(isSecure, context.Credentials, request.Kind == NatsRequestKind.Request), .. OpeningLinesOf(request), .. NatsConnect.Line(NatsOperations.Ping)]).ConfigureAwait(false);
         while (await reader.ReadLineAsync(context.CancellationToken).ConfigureAwait(false) is { } line)
         {
             if (await IsDoneAfterAsync(line, request).ConfigureAwait(false))
@@ -88,7 +90,7 @@ internal sealed class NatsSession(IConnection connection, ITransferContext conte
     {
         switch (NatsOperations.OperationOf(line).ToUpperInvariant())
         {
-            case NatsOperations.Message:
+            case NatsOperations.Message or NatsOperations.HeaderMessage:
                 return await DeliverAsync(NatsMessageLine.Parse(line, maxPayload), request).ConfigureAwait(false);
             case NatsOperations.Ping:
                 await SendAsync(NatsConnect.Line(NatsOperations.Pong)).ConfigureAwait(false);
@@ -106,7 +108,13 @@ internal sealed class NatsSession(IConnection connection, ITransferContext conte
 
     private async ValueTask<bool> DeliverAsync(NatsMessageLine message, NatsRequest request)
     {
-        byte[] payload = await reader.ReadPayloadAsync(message.PayloadLength, context.CancellationToken).ConfigureAwait(false);
+        byte[] body = await reader.ReadPayloadAsync(message.HeaderLength + message.PayloadLength, context.CancellationToken).ConfigureAwait(false);
+        if (body.AsSpan(0, message.HeaderLength).StartsWith(NoRespondersStatus))
+        {
+            throw new NatsException(CurlExitCode.RecvError, NatsMessages.NoResponders);
+        }
+
+        byte[] payload = body[message.HeaderLength..];
         await context.Output.WriteAsync(payload, context.CancellationToken).ConfigureAwait(false);
         written += payload.Length;
         context.Progress.ReportDownloaded(written, null);

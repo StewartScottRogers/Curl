@@ -81,7 +81,7 @@ public sealed class FileTransferTimingsTests
         Assert.IsNotNull(timings);
         Assert.IsNotNull(timings.Connect?.NameResolved);
         Assert.IsTrue(timings.Connect.NameResolved > timings.Started);
-        Assert.IsTrue(timings.RequestReady > timings.Connect.NameResolved);
+        Assert.IsTrue(timings.RequestReady >= timings.Connect.NameResolved);
         if (!isUpload)
         {
             Assert.IsTrue(timings.FirstByteReceived > timings.Started);

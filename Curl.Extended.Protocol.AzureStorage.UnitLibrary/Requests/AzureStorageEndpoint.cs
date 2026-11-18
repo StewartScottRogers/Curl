@@ -5,7 +5,8 @@ namespace Curl.Extended.Protocol.AzureStorage.Requests;
 /// <param name="Path">The resource path, percent-encoded, such as <c>/container/blob</c>; <c>/</c> for the account itself.</param>
 /// <param name="Query">The URL's query without its <c>?</c>, or empty for none.</param>
 /// <param name="Port">The TCP port the URL names, or <see cref="DefaultPort"/> when it names none.</param>
-public sealed record AzureStorageEndpoint(string Host, string Path, string Query, int Port = AzureStorageEndpoint.DefaultPort)
+/// <param name="AccountInPath">Whether <paramref name="Path"/> starts with the account name, as on a path-style emulator such as Azurite.</param>
+public sealed record AzureStorageEndpoint(string Host, string Path, string Query, int Port = AzureStorageEndpoint.DefaultPort, bool AccountInPath = false)
 {
     /// <summary>The HTTPS port used when the URL names no port.</summary>
     public const int DefaultPort = 443;

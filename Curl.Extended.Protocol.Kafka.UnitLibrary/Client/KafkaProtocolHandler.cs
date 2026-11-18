@@ -117,7 +117,7 @@ internal sealed class KafkaProtocolHandler(IConnector connector) : IProtocolHand
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            var flow = new KafkaClientFlow(connection, context.Output, context.Progress, context.CancellationToken);
+            var flow = new KafkaClientFlow(connection, context.Output, context.Progress, context.TimeProvider, context.CancellationToken);
             try
             {
                 if (context.Credentials is { } credentials)

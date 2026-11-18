@@ -512,11 +512,23 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         string targetHost)
     {
         var hasCaCertificateFile = HasCaCertificates;
+        if (hasCaCertificateFile && ConstraintViolationOf(errors, chain) is var violation and not 0)
+        {
+            return (CurlExitCode.PeerFailedVerification, $"schannel: error 0x{violation:x8}");
+        }
+
         return !hasCaCertificateFile && TlsFailureMessages.IsSchannelCertificateExpired(errors, chain)
             ? (CurlExitCode.SslConnectError, TlsFailureMessages.SchannelCertificateExpired)
             : (CurlExitCode.PeerFailedVerification,
                 TlsFailureMessages.SchannelPeerFailedVerification(errors, chain, targetHost, hasCaCertificateFile));
     }
+
+    // A chain error with a name constraint of a CA in the chain broken by the server certificate
+    // is named by Schannel's trust error (BL-5375); 0 for any other failure.
+    private static int ConstraintViolationOf(SslPolicyErrors errors, X509Chain? chain) =>
+        errors.HasFlag(SslPolicyErrors.RemoteCertificateChainErrors) && chain is not null
+            ? CertificateNameConstraints.FindViolation(chain)
+            : 0;
 
     // The chain's errors do not count when it leads to a --capath root trusted beside the
     // system store, when --ssl-revoke-best-effort tolerates every one of them, or when the
@@ -543,7 +555,8 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         && chain is not null
         && chain.ChainElements.Count > 0
         && HasOnlyMissingRootOrAnchorRevocationStatus(chain)
-        && ListsAnAnchorCandidate(chain);
+        && ListsAnAnchorCandidate(chain)
+        && CertificateNameConstraints.FindViolation(chain) == 0;
 
     // With revocation checking on, a chain ending at a non-self-signed anchor also carries
     // RevocationStatusUnknown / OfflineRevocation, for the anchor has no issuer to ask (BL-5317):

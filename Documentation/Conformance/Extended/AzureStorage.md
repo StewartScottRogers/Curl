@@ -48,3 +48,5 @@ Data Lake Storage Gen2 (`abfs://`, `abfss://`) has its own matrix: [AzureStorage
 ## URL port
 
 A port in an `az://`, `abfs://` or `abfss://` URL is used (BL-5342): `az://127.0.0.1:10000/c/x` connects to `127.0.0.1` on port 10000, so an Azurite-style emulator works, and the `Host` header is `127.0.0.1:10000`. With no port, or port 443, the connection goes to 443 and `Host` is the bare host. The request is always HTTPS. SAS and bearer authorization carry no host or port in what they sign, so they are unchanged (`AzureStoragePortTests`, `AzureStorageRequestAuthorizerTests`).
+
+A host that is an IP address or `localhost` is a path-style emulator (BL-5407): the account is the first path segment and the container the second, as in `az://127.0.0.1:10000/devstoreaccount1/ctr/` listing `GET /devstoreaccount1/ctr?restype=container&comp=list&delimiter=%2F`. A blob GET or PUT keeps the account in the path. A public-cloud host (a bare account name or a name with a dot) is unchanged.

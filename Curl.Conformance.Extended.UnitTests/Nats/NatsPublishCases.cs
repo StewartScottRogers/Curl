@@ -53,7 +53,7 @@ public sealed partial class NatsPublishCases
         NatsRun.AssertExit(first, 0, string.Empty, "pong");
         string inbox = InboxOf(NatsRun.ClientText(first));
         Assert.AreEqual(
-            NatsRun.PlainConnect + $"SUB {inbox} 1\r\nUNSUB 1 1\r\nPUB svc.echo {inbox} 4\r\nping\r\nPING\r\n",
+            NatsRun.PlainConnect.Replace("\"protocol\":1}", "\"protocol\":1,\"headers\":true,\"no_responders\":true}", StringComparison.Ordinal) + $"SUB {inbox} 1\r\nUNSUB 1 1\r\nPUB svc.echo {inbox} 4\r\nping\r\nPING\r\n",
             NatsRun.ClientText(first));
         Assert.AreNotEqual(inbox, InboxOf(NatsRun.ClientText(second)));
     }

@@ -147,7 +147,7 @@ public sealed class SmbProtocolHandler : IProtocolHandler
         }
 
         ReportConnectionEnd(context.Events, result, closes, connect.ConnectionNumber);
-        return StampReport(result, context.TimeProvider, new TransferTimings(started, connect.Timings, requestReady, null, null, 0), counting);
+        return StampReport(result, context.TimeProvider, context.Upload is not null, new TransferTimings(started, connect.Timings, requestReady, null, null, 0), counting);
     }
 
     // curl's failf writes the -m timeout as a -v line before it closes the connection; the
@@ -161,11 +161,11 @@ public sealed class SmbProtocolHandler : IProtocolHandler
 
     // Adds the timings behind %{time_*} and %{speed_*} and the request bytes behind %{size_request}
     // to the report the transfer made, keeping what it already reported such as the upload size (BL-5328).
-    private static TransferResult StampReport(TransferResult result, TimeProvider timeProvider, TransferTimings reached, SmbCountingConnection counting)
+    private static TransferResult StampReport(TransferResult result, TimeProvider timeProvider, bool isUpload, TransferTimings reached, SmbCountingConnection counting)
     {
         long completed = timeProvider.GetTimestamp();
         TransferTimings timings = reached with { FirstByteReceived = counting.FirstReadAt, Completed = completed };
-        TransferReport report = (result.Report ?? new TransferReport()) with { Timings = timings, RequestSize = counting.BytesWritten };
+        TransferReport report = (result.Report ?? new TransferReport()) with { Timings = timings, RequestSize = counting.BytesWritten, DownloadSize = isUpload ? 0 : result.BytesTransferred };
         return result with { Report = report };
     }
 

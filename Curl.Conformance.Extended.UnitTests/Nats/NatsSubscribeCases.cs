@@ -67,13 +67,13 @@ public sealed class NatsSubscribeCases
 
     [TestMethod]
     [SpecRequirement("Nats:NATS-HMSG-1")]
-    public async Task Subscribe_HmsgWithoutHeadersInConnect_IsAWeirdServerReply()
+    public async Task Subscribe_Hmsg_WritesThePayloadWithoutTheHeaders()
     {
         CurlRunResult result = await NatsRun.RunAsync(
             [ScriptStep.Send("INFO {\"headers\":true}\r\n"), ScriptStep.ReceiveUntil("PING\r\n"), ScriptStep.Send("PONG\r\nHMSG t 1 12 16\r\nNATS/1.0\r\n\r\na\r\nb\r\n")],
             "nats://localhost/t");
 
-        NatsRun.AssertExit(result, 8, "curl: (8) NATS server sent an unexpected line: HMSG t 1 12 16\n");
+        NatsRun.AssertExit(result, 0, string.Empty, "a\r\nb\n");
     }
 
     [TestMethod]

@@ -41,7 +41,7 @@ internal sealed class SegmentedDownloadTransferHook(int count) : ITransferHook
     }
 
     private static ContentRange? FirstRangeOf(CapturedResponse probe) =>
-        probe.Code == PartialContent && probe.HasValidator ? ContentRange.Parse(probe.Field("Content-Range")) : null;
+        probe.Code == PartialContent && probe.HasStrongETag ? ContentRange.Parse(probe.Field("Content-Range")) : null;
 
     private async Task<TransferResult> DownloadSegmentsAsync(CapturedResponse probe, long completeLength, ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
@@ -70,7 +70,7 @@ internal sealed class SegmentedDownloadTransferHook(int count) : ITransferHook
     }
 
     private static string[] IfRangeFor(CapturedResponse probe) =>
-        probe.Field("ETag") is { } tag && tag.StartsWith('"') ? ["If-Range: " + tag] : [];
+        ["If-Range: " + probe.Field("ETag")];
 
     /// <summary>The first response, the ranges asked for and the segments received, in the same order.</summary>
     private sealed record Download(CapturedResponse Probe, IReadOnlyList<SegmentRange> Ranges, CapturedResponse[] Segments, long CompleteLength)
