@@ -631,7 +631,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// </summary>
     private async ValueTask EndResponseAsync(bool isEndStream, CancellationToken cancellationToken)
     {
-        if (isEndStream && isFinalHeadReceived && bodyBytesReceived != (promisedBodyLength ?? bodyBytesReceived))
+        if (isEndStream && isFinalHeadReceived && !EndsAtFinalHead && bodyBytesReceived != (promisedBodyLength ?? bodyBytesReceived))
         {
             await ShutDownMalformedAsync(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError), cancellationToken).ConfigureAwait(false);
             return;

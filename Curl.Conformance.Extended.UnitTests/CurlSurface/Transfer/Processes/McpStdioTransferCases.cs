@@ -78,7 +78,7 @@ public sealed class McpStdioTransferCases
         CurlRunResult result = await RunAsync(Starter(new McpStdioServerBehaviour { ExitBeforeAnsweringMessage = 3 }), null, "-w", WriteOut, Url);
 
         Assert.AreEqual(8, result.ExitCode);
-        Assert.AreEqual($"8|{ServerExitedMessage}|{Url}|{Url}|mcp+stdio||-1|0|0.000001", Text(result.StandardOutput));
+        Assert.AreEqual($"8|{ServerExitedMessage}|{Url}|{Url}|mcp+stdio||-1|0|0.000000", Text(result.StandardOutput));
         Assert.AreEqual($"curl: (8) {ServerExitedMessage}" + Environment.NewLine, Text(result.StandardError));
     }
 

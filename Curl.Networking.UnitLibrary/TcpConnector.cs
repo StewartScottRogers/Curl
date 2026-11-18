@@ -2479,7 +2479,7 @@ public sealed partial class TcpConnector(
         }
 
         var capturing = log.IsEnabled(DiagnosticLogLevel.Warning) ? new HandshakeCapturingTransferEvents(target.Events) : null;
-        var secured = await reportingProvider.AuthenticateAsClientAsync(plaintext, host, capturing ?? target.Events, isProxy, applicationProtocols, cancellationToken).ConfigureAwait(false);
+        var secured = await reportingProvider.AuthenticateAsClientAsync(plaintext, host, capturing ?? target.Events, isProxy, applicationProtocols, target.DiagnosticLog, cancellationToken).ConfigureAwait(false);
         if (!LoggedFailure(log, secured))
         {
             LogReportedHandshake(log, host, reportingProvider, capturing, secured);

@@ -193,6 +193,114 @@ public sealed class IntermediateOnlyProxyCacertTests
         Assert.IsEmpty(ServerCertificateVerification.CrlDistributionPointUris(CertificateWith([1, 2, 3])));
     }
 
+    [TestMethod]
+    public void VerifyPeer_RevokedLeafChecked_FetchesEachListOnce()
+    {
+        using var pki = new Pki(revokeLeaf: true);
+        var fetched = new List<Uri>();
+
+        var failure = VerifyStubbedWith(pki, (uri, _) => { fetched.Add(uri); return pki.CrlBytes; }, NoDiagnosticLog.Instance, TimeSpan.FromSeconds(5));
+
+        Assert.AreEqual(TlsFailureMessages.SchannelChainRevoked, failure?.Message);
+        Assert.IsNotEmpty(fetched);
+        Assert.AreEqual(fetched.Count, fetched.Distinct().Count());
+    }
+
+    [TestMethod]
+    public void VerifyPeer_StalledFetch_EndsWithinTheBudgetAsUnfetchable()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var started = System.Diagnostics.Stopwatch.StartNew();
+
+        var failure = VerifyStubbedWith(
+            pki,
+            (_, token) => { token.WaitHandle.WaitOne(TimeSpan.FromSeconds(30)); token.ThrowIfCancellationRequested(); return []; },
+            NoDiagnosticLog.Instance,
+            TimeSpan.FromMilliseconds(100));
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.IsLessThan(TimeSpan.FromSeconds(20), started.Elapsed);
+    }
+
+    [TestMethod]
+    public void VerifyPeer_FailedFetch_IsWrittenToTheTlsLogAtWarning()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var log = new Fakes.RecordingDiagnosticLog(DiagnosticLogLevel.Warning);
+
+        VerifyStubbedWith(pki, (_, _) => throw new IOException("the server answered 404"), log, TimeSpan.FromSeconds(5));
+
+        var lines = log.At(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Tls);
+        Assert.IsNotEmpty(lines);
+        Assert.AreEqual($"CRL {UnreachableCrlAddress} could not be fetched: the server answered 404", lines[0]);
+    }
+
+    [TestMethod]
+    public void ForHandshake_FailedFetch_ReachesTheGivenLogAsATlsWarning()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        var log = new Fakes.RecordingDiagnosticLog(DiagnosticLogLevel.Warning);
+
+        VerifyStubbedWith(pki, (_, _) => throw new IOException("the server answered 503"), log, TimeSpan.FromSeconds(5), viaHandshake: true);
+
+        var lines = log.At(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Tls);
+        Assert.IsNotEmpty(lines);
+        Assert.AreEqual($"CRL {UnreachableCrlAddress} could not be fetched: the server answered 503", lines[0]);
+    }
+
+    [TestMethod]
+    public void ForHandshake_StalledFetch_DoesNotOutlastTheConnectLimit()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+        using var connectLimit = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        var started = System.Diagnostics.Stopwatch.StartNew();
+
+        var failure = VerifyStubbedWith(
+            pki,
+            (_, token) => { token.WaitHandle.WaitOne(TimeSpan.FromSeconds(30)); token.ThrowIfCancellationRequested(); return []; },
+            NoDiagnosticLog.Instance,
+            TimeSpan.FromMinutes(5),
+            viaHandshake: true,
+            limit: connectLimit.Token);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.IsLessThan(TimeSpan.FromSeconds(20), started.Elapsed);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithALog_ValidatesItsArgumentsInBothProviders()
+    {
+        var events = new Fakes.RecordingTransferEvents();
+        var sslStream = new SslStreamTlsProvider(new TlsClientOptions());
+        var handBuilt = new HandBuiltTlsProvider(new TlsClientOptions(), TimeProvider.System);
+
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await sslStream.AuthenticateAsClientAsync(null!, Host, events, false, [], NoDiagnosticLog.Instance, CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handBuilt.AuthenticateAsClientAsync(null!, Host, events, false, [], NoDiagnosticLog.Instance, CancellationToken.None));
+    }
+
+    private (CurlExitCode ExitCode, string Message)? VerifyStubbedWith(Pki pki, Func<Uri, CancellationToken, byte[]> fetch, IDiagnosticLog log, TimeSpan budget, bool viaHandshake = false, CancellationToken limit = default)
+    {
+        var caFile = Path.Combine(_directory, "proxy-cacert.pem");
+        File.WriteAllText(caFile, pki.Intermediate.ExportCertificatePem());
+        X509ChainStatus[] partial = [new() { Status = X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.RevocationStatusUnknown }];
+        X509ChainStatus[] unknown = [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }];
+        var verification = new ServerCertificateVerification(new TlsClientOptions(CaCertificateFile: caFile), true, TimeProvider.System)
+        {
+            FetchRevocationList = fetch,
+            RevocationDiagnosticLog = viaHandshake ? NoDiagnosticLog.Instance : log,
+            RevocationFetchBudget = budget,
+            ReadChainStatus = _ => partial,
+            ReadCertificatesBelowAnchorStatus = _ => unknown,
+        };
+        verification = viaHandshake ? verification.ForHandshake(log, limit) : verification;
+        var (chainPolicy, _, _) = verification.ReadTrustAnchors();
+        chainPolicy!.RevocationMode = X509RevocationMode.NoCheck;
+        chainPolicy.ExtraStore.Add(pki.Intermediate);
+        using var chain = new X509Chain { ChainPolicy = chainPolicy };
+        chain.Build(pki.Leaf);
+        return verification.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, Host, []);
+    }
+
     private (CurlExitCode ExitCode, string Message)? VerifyRealChain(Pki pki, X509Certificate2 anchor, bool skipRevocationCheck, byte[]? list)
     {
         var verification = ProxyVerification(anchor, skipRevocationCheck, list);
@@ -225,11 +333,11 @@ public sealed class IntermediateOnlyProxyCacertTests
         return stubStatuses
             ? new ServerCertificateVerification(options, true, TimeProvider.System)
             {
-                FetchRevocationList = _ => list,
+                FetchRevocationList = (_, _) => list ?? throw new IOException("no list"),
                 ReadChainStatus = _ => partial,
                 ReadCertificatesBelowAnchorStatus = _ => unknown,
             }
-            : new ServerCertificateVerification(options, true, TimeProvider.System) { FetchRevocationList = _ => list };
+            : new ServerCertificateVerification(options, true, TimeProvider.System) { FetchRevocationList = (_, _) => list ?? throw new IOException("no list") };
     }
 
     private static X509Certificate2 CertificateWith(byte[] crlDistributionPoints)

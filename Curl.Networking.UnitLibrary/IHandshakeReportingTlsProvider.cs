@@ -49,4 +49,28 @@ internal interface IHandshakeReportingTlsProvider : ITlsProvider
         bool isProxy,
         IReadOnlyList<string> applicationProtocols,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Performs the handshake as the overload without a diagnostic log does, and writes the
+    /// failures of a below-anchor revocation list fetch to <paramref name="diagnosticLog" />
+    /// (<c>tls</c>, <c>warning</c>); <paramref name="cancellationToken" />, the connect's limit,
+    /// also ends such a fetch. By default the log is not used.
+    /// </summary>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the trust and the completed handshake are reported.</param>
+    /// <param name="isProxy"><see langword="true" /> when the handshake is with an HTTPS proxy.</param>
+    /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
+    /// <param name="diagnosticLog">The connect target's diagnostic log.</param>
+    /// <param name="cancellationToken">Cancels the handshake at the connect's limit.</param>
+    /// <returns>The same result the overload without a log returns.</returns>
+    ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
+        IDiagnosticLog diagnosticLog,
+        CancellationToken cancellationToken) =>
+        AuthenticateAsClientAsync(plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
 }

@@ -182,9 +182,26 @@ internal sealed partial class ServerCertificateVerification
 
     // OpenSSL names the reason from the chain it built against the --capath roots, so an expired
     // leaf under one of them is "certificate has expired (10)", not the system store's "unable to
-    // get local issuer certificate (20)" (BL-5395). Null where the system store's chain stands.
-    private X509Chain? ReasonChainFromAnchors(SslPolicyErrors errors, X509Chain? chain, X509Certificate2Collection anchors) =>
-        options.Insecure || matchesSchannelBuild || (errors & SslPolicyErrors.RemoteCertificateChainErrors) == 0
-            ? null
-            : RebuildAgainstAnchors(chain, anchors, requireServerAuthentication: true, out _);
+    // get local issuer certificate (20)" (BL-5395). Null where the system store's chain stands: when
+    // the rebuilt chain does not end at one of the anchors the server's chain does not lead to a
+    // --capath root, and OpenSSL's default CA bundle beside it names the reason (BL-5425).
+    private X509Chain? ReasonChainFromAnchors(SslPolicyErrors errors, X509Chain? chain, X509Certificate2Collection anchors)
+    {
+        if (options.Insecure || matchesSchannelBuild || (errors & SslPolicyErrors.RemoteCertificateChainErrors) == 0)
+        {
+            return null;
+        }
+
+        var rebuilt = RebuildAgainstAnchors(chain, anchors, requireServerAuthentication: true, out _);
+        if (rebuilt is not null && !EndsAtAnchor(rebuilt, anchors))
+        {
+            rebuilt.Dispose();
+            return null;
+        }
+
+        return rebuilt;
+    }
+
+    private static bool EndsAtAnchor(X509Chain rebuilt, X509Certificate2Collection anchors) =>
+        anchors.Any(anchor => anchor.Thumbprint == rebuilt.ChainElements[^1].Certificate.Thumbprint);
 }

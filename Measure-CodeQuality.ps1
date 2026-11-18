@@ -263,9 +263,13 @@ function Invoke-CoverageTestRun {
             $attemptExitCode = $LASTEXITCODE
             $hostCrashed = $attemptExitCode -ne 0 -and
                 @($attemptOutput | Where-Object { $_ -match 'Test host process crashed' }).Count -gt 0 -and
-                @($attemptOutput | Where-Object { $_ -match 'Failed!\s+-\s+Failed:' }).Count -eq 0
+                @($attemptOutput | Where-Object { $_ -match 'Failed:\s+[1-9]' }).Count -eq 0
             if (-not $hostCrashed) { break }
             Write-Warning "The test host crashed running $(Split-Path $target -Leaf); running it once more."
+            # An aborted run prints a "Failed!  - Failed: 0" summary, so only a count of 1 or
+            # more is a real failure above. Drop the first attempt's coverage files so the
+            # retry's are the only ones merged.
+            if (Test-Path $projectDirectory) { Remove-Item $projectDirectory -Recurse -Force }
         }
         $testOutput.AddRange($attemptOutput)
         if ($attemptExitCode -ne 0) { $testExitCode = $attemptExitCode }

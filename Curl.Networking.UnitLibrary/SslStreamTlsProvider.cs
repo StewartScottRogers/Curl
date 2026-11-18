@@ -386,7 +386,40 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
     /// <param name="cancellationToken">Cancels the handshake.</param>
     /// <returns>The same result the three-argument overload describes.</returns>
-    public async ValueTask<ConnectResult> AuthenticateAsClientAsync(
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
+        CancellationToken cancellationToken) =>
+        AuthenticateWithAsync(_verification, plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
+
+    /// <summary>
+    /// Performs the handshake as the overload without a log does, its below-anchor revocation
+    /// list fetches writing their failures to <paramref name="diagnosticLog" /> and ending when
+    /// <paramref name="cancellationToken" />, the connect's limit, does (BL-5428).
+    /// </summary>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the trust and the completed handshake are reported.</param>
+    /// <param name="isProxy"><see langword="true" /> when the handshake is with an HTTPS proxy.</param>
+    /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
+    /// <param name="diagnosticLog">The connect target's diagnostic log.</param>
+    /// <param name="cancellationToken">Cancels the handshake at the connect's limit.</param>
+    /// <returns>The same result the overload without a log returns.</returns>
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        bool isProxy,
+        IReadOnlyList<string> applicationProtocols,
+        IDiagnosticLog diagnosticLog,
+        CancellationToken cancellationToken) =>
+        AuthenticateWithAsync(_verification.ForHandshake(diagnosticLog, cancellationToken), plaintext, targetHost, events, isProxy, applicationProtocols, cancellationToken);
+
+    private async ValueTask<ConnectResult> AuthenticateWithAsync(
+        ServerCertificateVerification verification,
         IConnection plaintext,
         string targetHost,
         ITransferEvents events,
@@ -420,13 +453,13 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CertificateRevocationListFile? revocationLists;
         try
         {
-            (chainPolicy, anchorsBesideSystemStore, revocationLists) = _verification.ReadTrustAnchors();
+            (chainPolicy, anchorsBesideSystemStore, revocationLists) = verification.ReadTrustAnchors();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
             clientCertificate?.Dispose();
             await plaintext.DisposeAsync().ConfigureAwait(false);
-            var (exitCode, message) = _verification.TrustAnchorsUnusable(exception);
+            var (exitCode, message) = verification.TrustAnchorsUnusable(exception);
             return ConnectResult.Failed(exitCode, message);
         }
 
@@ -447,7 +480,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             {
                 judgedHandshake = DescribeNegotiation((SslStream)sender, offeredApplicationProtocols);
                 peerCertificates = ListPeerCertificates(certificate, chain);
-                (peerVerification, verificationFailure) = _verification.Judge(
+                (peerVerification, verificationFailure) = verification.Judge(
                     errors, chain, targetHost, anchorsBesideSystemStore, revocationLists, peerCertificates);
                 return verificationFailure is null;
             },

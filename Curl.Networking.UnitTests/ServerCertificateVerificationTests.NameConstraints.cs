@@ -140,6 +140,24 @@ public sealed class ServerCertificateVerificationNameConstraintTests
 
         Assert.AreEqual(CertificateNameConstraints.NotPermitted, CertificateNameConstraints.FindViolation(chain));
     }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)] // OpenSSL-backed chain building never hands the malformed chain over (BL-5420).
+    public void FindViolation_MalformedLeafAlternativeNamesWithoutAnyConstraints_FindsNone()
+    {
+        using var root = CreateAuthority("CN=Constraint Root", null, null);
+        using var intermediate = CreateAuthority("CN=Constraint Intermediate", root, null);
+        using var leaf = CreateLeaf(intermediate, Host, false, true, true);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(root);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.ExtraStore.Add(intermediate);
+        chain.Build(leaf);
+
+        Assert.AreEqual(0, CertificateNameConstraints.FindViolation(chain));
+    }
+
     private (CurlExitCode ExitCode, string Message)? Verify(
         byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false)
     {
