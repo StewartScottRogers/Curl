@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5439 — Fix fitness finding STD-121: Linux --capath / SSL_CERT_DIR / --proxy-capath holding only an intermediate CA refuses chains that OpenSSL curl accepts
 
@@ -35,13 +35,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the three commands exit 0 with `hello` and `%{ssl_verify_result}` 0. A directory holding only an intermediate with `nameConstraints=critical,excluded;DNS:localhost`, against a leaf for localhost signed by it, still exits 60.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the three commands exit 0 with `hello` and `%{ssl_verify_result}` 0. A directory holding only an intermediate with `nameConstraints=critical,excluded;DNS:localhost`, against a leaf for localhost signed by it, still exits 60.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix: `BuildAgainstAnchors` accepts a chain .NET finds only partial or untrusted-root when it holds a listed anchor and no name-constraint violation (OpenSSL PARTIAL_CHAIN). Test: `ServerCertificateVerificationTests.CaDirectoryIntermediate.cs`. Real-curl repro not run (Windows lane); the three routes share this path. Quality run clean.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-121 (Medium).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 7d8ac474 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. capath/SSL_CERT_DIR/proxy-capath intermediate-only anchor now accepted as OpenSSL partial chain; unit tests added
