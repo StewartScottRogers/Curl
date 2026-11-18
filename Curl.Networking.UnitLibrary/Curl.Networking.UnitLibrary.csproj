@@ -16,6 +16,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Conformance.UnitProgram.UnitLibrary" />
     <InternalsVisibleTo Include="Curl.Networking.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Networking.IntegrationTests" />
   </ItemGroup>
 
 </Project>
