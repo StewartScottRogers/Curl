@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5469 — Fix fitness finding STD-074: -Z does not abort the other transfers when one fails at setup with exit 43 (RTSP) or 48 (TELNET) (STILL OPEN; TELNET 48 newly found)
 
@@ -34,13 +34,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] (1) prints `[42]` and the (42) line, exit 43; (3) prints `[48]` `[42]`, exit 48; neither prints `hello`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] (1) prints `[42]` and the (42) line, exit 43; (3) prints `[48]` `[42]`, exit 48; neither prints `hello`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Under -Z, a rtsp `Session` -H header (43) or an unknown telnet -t option (48) is now detected while the first batch is held (`FatalSetupFailureOf`); nothing starts, the failing transfer reports its own message first, the others report (42). Fast tests green; Measure-CodeQuality Curl.Console 0 failing. Linux/macOS criteria met by platform-neutral tests.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-074 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 9c2a20c6 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Fatal 43/48 setup failures end a -Z run before any transfer starts

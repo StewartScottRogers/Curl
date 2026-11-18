@@ -2220,7 +2220,65 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
+        if (FatalSetupFailureOf(options, transfer) is { } fatalFailure)
+        {
+            fatalSetupFailure ??= fatalFailure;
+            run.NoteFatalSetupFailureOfLastHeld(fatalFailure);
+        }
+
         return batchIsComplete && await run.StartHeldAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>The fatal setup failure that abandoned a <c>-Z</c> run's first batch, reported as it is.</summary>
+    private TransferResult? fatalSetupFailure;
+
+    /// <summary>
+    /// Finds the failure curl 8.22.0 meets while setting an <c>rtsp</c> or <c>telnet</c> transfer up, one of its fatal
+    /// codes (43 for a <c>Session</c> <c>-H</c> header, 48 for an unknown <c>-t</c> option): it ends a <c>-Z</c> run
+    /// before any transfer starts (STD-074, BL-5469).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>The failure, or <see langword="null" /> when setup finds none.</returns>
+    private static TransferResult? FatalSetupFailureOf(CommandLineOptions options, UrlTransfer transfer)
+    {
+        string url = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
+        return url.StartsWith("rtsp:", StringComparison.OrdinalIgnoreCase)
+            ? RtspSessionHeaderFailure(options)
+            : url.StartsWith("telnet:", StringComparison.OrdinalIgnoreCase)
+                ? options.TelnetOptions.Select(UnknownTelnetOptionFailure).FirstOrDefault(failure => failure is not null)
+                : null;
+    }
+
+    private static TransferResult? RtspSessionHeaderFailure(CommandLineOptions options) =>
+        options.Headers.Any(NamesSessionHeader)
+            ? TransferResult.Failure(CurlExitCode.BadFunctionArgument, "Session ID cannot be set as a custom header.")
+            : null;
+
+    private static bool NamesSessionHeader(string header)
+    {
+        int end = header.AsSpan().IndexOfAny(':', ';');
+        return end >= 0 && header.AsSpan(0, end).Trim().Equals("Session", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static TransferResult? UnknownTelnetOptionFailure(string option)
+    {
+        int separator = option.IndexOf('=', StringComparison.Ordinal);
+        if (separator < 0 || !System.Text.Ascii.IsValid(option.AsSpan(separator + 1)))
+        {
+            return null;
+        }
+
+        string name = option[..separator];
+        string? known = Array.Find(["TTYPE", "XDISPLOC", "NEW_ENV", "WS", "BINARY"], candidate => candidate.Length == System.Text.Encoding.UTF8.GetByteCount(name));
+        if (known is null)
+        {
+            return TransferResult.Failure(CurlExitCode.UnknownOption, $"Unknown telnet option {option}");
+        }
+
+        return string.Equals(name, known, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : TransferResult.Failure(CurlExitCode.UnknownOption, "An unknown option was passed in to libcurl");
     }
 
     private static bool ReadsStandardInput(EasyMimeBody mimePost) =>
@@ -2588,7 +2646,9 @@ internal sealed class CurlCommandRunner(
         RunningTransferState state,
         TransferResult firstFailure)
     {
-        TransferResult skipped = TransferResult.Failure(firstFailure.ExitCode, CurlEasyErrorText.Of(firstFailure.ExitCode));
+        TransferResult skipped = ReferenceEquals(firstFailure, ParallelRun.AbortedResult) || ReferenceEquals(firstFailure, fatalSetupFailure)
+            ? firstFailure
+            : TransferResult.Failure(firstFailure.ExitCode, CurlEasyErrorText.Of(firstFailure.ExitCode));
         if (ReferenceEquals(firstFailure, CannotOpenUploadFileFailure) || ReferenceEquals(firstFailure, cannotOpenUploadFileAfterFailure))
         {
             NoteUploadFileCouldNotBeOpened(state, options, transfer);
