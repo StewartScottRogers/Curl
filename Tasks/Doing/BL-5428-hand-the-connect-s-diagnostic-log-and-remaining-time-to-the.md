@@ -31,3 +31,4 @@ BL-5422 gave `ServerCertificateVerification` the init properties `RevocationDiag
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 59b0f4ef 5dbbc2cb 9abf1d2b.
