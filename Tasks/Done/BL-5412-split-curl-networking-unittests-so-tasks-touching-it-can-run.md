@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5412 — Split Curl.Networking.UnitTests so tasks touching it can run in parallel
 
@@ -36,3 +36,4 @@ The project already holds one test class per file (321 files, none shared by the
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 4b32355d 8256450c a0b49a29.
+- 2026-11-17: Doing -> Done. Narrowed the nine waiting tasks' touches to their own test files; hotspots no longer lists Curl.Networking.UnitTests
