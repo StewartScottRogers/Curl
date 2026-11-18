@@ -1125,6 +1125,9 @@ public sealed class HttpProtocolHandler(
         {
             UsedProxy = plan.Options.ForwardProxy is not null,
             ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
+            HeaderSize = connect.ProxyConnectHeaderBytes,
+            ResponseHeadersStored = connect.ConnectReplyHeadersStored,
+            RefusedConnectHeaderCount = connect.ConnectReplyHeadersStored,
             Timings = new TransferTimings(plan.Started, connect.Timings, failed, failed, failed, failed),
         };
     }

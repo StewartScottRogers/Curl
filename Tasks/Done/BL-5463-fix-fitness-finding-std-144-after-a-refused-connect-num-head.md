@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/TcpConnector.cs]
+touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitLibrary/NumberedConnectFailure.cs, Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Protocol.Abstractions.UnitLibrary/TransferReport.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Output.UnitLibrary/TransferWriteOutVariables.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5463 — Fix fitness finding STD-144: After a refused CONNECT, %{num_headers} and %{size_header} are 0
 
@@ -31,13 +31,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command prints `[7 2 59]`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command prints `[7 2 59]`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- A failed ConnectResult now carries the refused CONNECT reply's header count and head bytes; the HTTP handler puts them in the failed report (HeaderSize, new RefusedConnectHeaderCount for num_headers). touches widened: no other Doing task holds these files. Measured with the finding repro: prints [7 2 59]. Tests added in TcpConnectorTests.ConnectReplyHead.cs and TransferWriteOutVariablesTests.cs. Measure-CodeQuality.ps1 did not finish in 60 minutes (lane contention) and was stopped; the change adds no branches or methods.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-144 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 353a0f33 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. STD-144 fixed: refused CONNECT reports [7 2 59]

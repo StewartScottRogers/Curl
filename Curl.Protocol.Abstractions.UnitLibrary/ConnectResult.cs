@@ -297,6 +297,8 @@ public sealed class ConnectResult
     /// The socket error of the last connect attempt that failed; <see cref="SocketError.Success" />
     /// when the failure had none.
     /// </param>
+    /// <param name="proxyConnectHeadersStored">How many header lines the proxy's refusing reply to a CONNECT held; <c>0</c> when none.</param>
+    /// <param name="proxyConnectHeaderBytes">How many bytes the heads of the proxy's replies to a CONNECT held, which curl still adds to <c>%{size_header}</c> when the CONNECT is refused (STD-144).</param>
     /// <param name="proxyError">
     /// Why the SOCKS proxy handshake failed; <see cref="CurlProxyCode.Ok" /> when the failure was
     /// not a SOCKS handshake's.
@@ -313,7 +315,9 @@ public sealed class ConnectResult
         long connectionNumber = 0,
         int proxyConnectResponseCode = 0,
         SocketError lastSocketError = SocketError.Success,
-        CurlProxyCode proxyError = CurlProxyCode.Ok)
+        CurlProxyCode proxyError = CurlProxyCode.Ok,
+        int proxyConnectHeadersStored = 0,
+        long proxyConnectHeaderBytes = 0)
     {
         if (exitCode == CurlExitCode.Ok)
         {
@@ -330,6 +334,8 @@ public sealed class ConnectResult
             ProxyConnectResponseCode = proxyConnectResponseCode,
             LastSocketError = lastSocketError,
             ProxyError = proxyError,
+            ConnectReplyHeadersStored = proxyConnectHeadersStored,
+            ProxyConnectHeaderBytes = proxyConnectHeaderBytes,
         };
     }
 
