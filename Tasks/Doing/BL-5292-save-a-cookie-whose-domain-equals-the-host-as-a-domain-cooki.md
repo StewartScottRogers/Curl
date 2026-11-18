@@ -49,3 +49,4 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 - Decision recorded in ADR-1275. No code changed; acceptance criteria 1 and 2 would contradict 8.22.0 and are not met, so the task goes to Deferred.
 - 2026-11-16: Doing -> Deferred. Not a defect: curl 8.22.0 writes Domain=host as a host cookie (FALSE, no dot); see ADR-1275
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: ad4d9a77 82a66894 4701464d.
