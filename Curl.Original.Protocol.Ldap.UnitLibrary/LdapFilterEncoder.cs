@@ -354,7 +354,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         string rest = halves.Length == 2 ? halves[1] : string.Empty;
         bool dnOnly = IsDn(rest);
         bool dnAttributes = dnOnly || rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase);
-        string? rule = rest.Length == 0 || dnOnly ? null : rest;
+        string? rule = rest.Length == 0 || dnOnly || IsNamedRule(rest) ? null : rest;
         return WriteExtensible(new ExtensibleMatch(rule, halves[0], value, dnAttributes), writeFalse: true);
     }
 
@@ -377,6 +377,9 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
             ? WriteExtensible(new ExtensibleMatch(rule, parts[0], value, dnAttributes), writeFalse: false)
             : null;
     }
+
+    /// <summary>Whether WinLDAP loses the rule: a name (not an OID, not after <c>dn:</c>) is left out of the wire form (BL-5400, ADR-1297).</summary>
+    private static bool IsNamedRule(string rest) => !char.IsAsciiDigit(rest[0]) && !rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase);
 
     private bool IsOpenLdapExtensible(string attribute, string? rule) =>
         rule is null ? IsAttribute(attribute) : IsAttribute(rule) && (attribute.Length == 0 || IsAttribute(attribute));
