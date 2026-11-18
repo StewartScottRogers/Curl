@@ -96,6 +96,29 @@ public sealed class Cgr175Tests
         Assert.AreEqual(0, exitCode, stderr);
         CollectionAssert.AreEquivalent(new long[] { 0, 153 }, sent);
     }
+    [TestMethod]
+    public async Task RunAsync_FormWithMissingFile_ReportsMinusOneIds()
+    {
+        (int exitCode, string stdout, _, List<long> sent) = await RunAsync(
+            "-w", "%{conn_id} %{xfer_id} %{exitcode}\n", "-F", "f=@nofile.txt", "http://127.0.0.1:22000/a");
+
+        Assert.AreEqual(26, exitCode);
+        Assert.IsEmpty(sent);
+        Assert.AreEqual("-1 -1 26\n", stdout.ReplaceLineEndings("\n"));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_FormWithMissingFileBeforeNext_StopsTheRun()
+    {
+        (int exitCode, string stdout, _, List<long> sent) = await RunAsync(
+            "-w", "%{conn_id} %{xfer_id} %{exitcode}\n", "-F", "f=@nofile.txt", "http://127.0.0.1:22000/a",
+            "--next", "-w", "%{conn_id} %{xfer_id} %{exitcode}\n", "http://127.0.0.1:22000/b");
+
+        Assert.AreEqual(26, exitCode);
+        Assert.IsEmpty(sent);
+        Assert.AreEqual("-1 -1 26\n", stdout.ReplaceLineEndings("\n"));
+    }
+
     private async Task<(int ExitCode, string Stdout, string Stderr, List<long> Sent)> RunAsync(params string[] form)
     {
         List<long> sent = [];

@@ -33,11 +33,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] (1) prints `-1 -1 26`; (2) prints only `-1 -1 26` and exits 26.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] (1) prints `-1 -1 26`; (2) prints only `-1 -1 26` and exits 26.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fixed in CurlCommandRunner: a -F form whose file cannot be opened now returns CannotOpenUploadFileFailure (run-ending, conn_id/xfer_id -1) via FormSetupFailureOf. Two tests in Cgr175Tests. Measure-CodeQuality for Curl.Console: 0 failing members. CI criterion met by platform-neutral tests.
 
 ## Log
 

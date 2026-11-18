@@ -4505,7 +4505,7 @@ internal sealed class CurlCommandRunner(
         MultipartFormBuildResult form = await BuildFormAsync(options, mimePost, transferUrl.Scheme, mimeMessage).ConfigureAwait(false);
         if (!form.IsBuilt)
         {
-            return form.Failure;
+            return FormSetupFailureOf(form.Failure, options, transfer);
         }
 
         await using (form.Body.Content.ConfigureAwait(false))
@@ -4605,6 +4605,25 @@ internal sealed class CurlCommandRunner(
                 MultipartFormPartMapping.NameEscapingOf(options.FormEscape, scheme),
                 MultipartFormPartMapping.RequestContentTypeOf(options.Headers),
                 CancellationToken.None);
+
+    /// <summary>
+    /// Turns a <c>-F</c> form whose file cannot be opened into <see cref="CannotOpenUploadFileFailure" />, which ends
+    /// the run and leaves <c>%{conn_id}</c> and <c>%{xfer_id}</c> at -1 as for <c>-T</c> (STD-124, BL-5442).
+    /// </summary>
+    /// <param name="failure">The form builder's failure.</param>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>The run-ending failure for a file that cannot be opened, else <paramref name="failure" />.</returns>
+    private TransferResult FormSetupFailureOf(TransferResult failure, CommandLineOptions options, UrlTransfer transfer)
+    {
+        if (failure.ExitCode != CurlExitCode.ReadError || failure.ErrorMessage != MultipartFormBodyBuilder.OpenFailedMessage)
+        {
+            return failure;
+        }
+
+        NoteUploadFileCouldNotBeOpened(Running, options, transfer);
+        return CannotOpenUploadFileFailure;
+    }
 
     /// <summary>
     /// Records, for <c>-w</c>, that a transfer ended because its <c>-T</c> file could not be opened: curl has named the
