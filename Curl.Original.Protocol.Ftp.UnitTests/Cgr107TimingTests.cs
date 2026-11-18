@@ -45,6 +45,7 @@ public sealed class Cgr107TimingTests
         Assert.IsTrue(timings.RequestReady < timings.FirstByteReceived, "starttransfer after pretransfer");
         Assert.IsTrue(timings.FirstByteReceived < timings.Completed, "the total after starttransfer");
         Assert.AreEqual(0L, report.RequestSize);
+        Assert.AreEqual(timings.RequestReady, timings.RequestSent, "posttransfer equals pretransfer, as curl 8.22.0 reports it for FTP (BL-5474)");
     }
 
     [TestMethod]
@@ -69,6 +70,7 @@ public sealed class Cgr107TimingTests
 
         TransferTimings timings = report.Timings!;
         Assert.IsNull(timings.RequestReady);
+        Assert.IsNull(timings.RequestSent);
         Assert.IsNull(timings.FirstByteReceived);
         Assert.IsTrue(timings.Completed > timings.Started);
     }

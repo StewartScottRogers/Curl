@@ -401,7 +401,7 @@ internal sealed class FtpSession(
     /// transfer <paramref name="completed" />, and neither when the connect phase failed.
     /// </summary>
     private TransferTimings TimingsAt(long completed) =>
-        new(TransferStarted, ControlConnectTimings, connectPhaseEnded, null, connectPhaseEnded is null ? null : firstByteReceived ?? completed, completed);
+        new(TransferStarted, ControlConnectTimings, connectPhaseEnded, connectPhaseEnded, connectPhaseEnded is null ? null : firstByteReceived ?? completed, completed);
 
     /// <summary>
     /// Runs only curl's connect phase - the greeting, <c>AUTH</c>, the login, <c>PBSZ</c>,
