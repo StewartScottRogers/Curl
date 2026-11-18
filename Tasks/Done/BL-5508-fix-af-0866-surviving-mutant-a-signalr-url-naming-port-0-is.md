@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SignalR.UnitLibrary/Client/SignalRProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5508 — Fix AF-0866: Surviving mutant: a SignalR URL naming port 0 is sent to the default port
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.SignalR.UnitLibrary/Client/SignalRProtocolHandler.cs line 60`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.SignalR.UnitLibrary/Client/SignalRProtocolHandler.cs line 60`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by the new row `EndpointUrlOf_MapsTheSchemeToHttpAndKeepsPortPathAndQuery` (`signalr://example.com:0/chat`); verified by hand with `> 0` applied, then reverted. Fast tests of the SignalR UnitTests pass (156). Test-only change, so no production quality run.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 41f3ae6f 9742157d.
+- 2026-11-18: Doing -> Done. Port-0 row added to EndpointUrlOf test; kills the > 0 mutant.

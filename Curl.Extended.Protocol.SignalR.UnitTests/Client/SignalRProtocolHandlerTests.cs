@@ -207,6 +207,7 @@ public sealed class SignalRProtocolHandlerTests
     [DataRow("signalrs://example.com/chat", "https://example.com/chat")]
     [DataRow("SIGNALRS://example.com:8443/chat?a=b", "https://example.com:8443/chat?a=b")]
     [DataRow("signalr://example.com", "http://example.com/")]
+    [DataRow("signalr://example.com:0/chat", "http://example.com:0/chat")]
     public void EndpointUrlOf_MapsTheSchemeToHttpAndKeepsPortPathAndQuery(string url, string expected) =>
         Assert.AreEqual(expected, SignalRProtocolHandler.EndpointUrlOf(CurlUrl.Parse(url)).AbsoluteUri);
 
