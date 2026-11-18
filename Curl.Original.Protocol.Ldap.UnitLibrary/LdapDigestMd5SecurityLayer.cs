@@ -34,8 +34,9 @@ internal sealed class LdapDigestMd5SecurityLayer : ILdapLogonAuthentication
 
     private uint receiveSequence;
 
-    private LdapDigestMd5SecurityLayer(byte[] hashA1, bool isServer)
+    private LdapDigestMd5SecurityLayer(byte[] hashA1, bool isServer, int maxBuffer)
     {
+        MaxPlainLength = Math.Max(1, (Math.Max(0, maxBuffer - TrailerLength) / BlockLength * BlockLength) - MacLength - 1);
         string sendDirection = isServer ? "server-to-client" : "client-to-server";
         string receiveDirection = isServer ? "client-to-server" : "server-to-client";
         sendIntegrityKey = Magic(hashA1, $"Digest session key to {sendDirection} signing key magic constant");
@@ -52,7 +53,14 @@ internal sealed class LdapDigestMd5SecurityLayer : ILdapLogonAuthentication
     /// <param name="isServer">Whether the layer sends as the server does; the tests' stand-in server is one.</param>
     /// <param name="hashA1">H(A1): the 16-byte MD5 of A1.</param>
     /// <returns>The layer.</returns>
-    internal static LdapDigestMd5SecurityLayer Create(byte[] hashA1, bool isServer = false) => new(hashA1, isServer);
+    /// <param name="maxBuffer">The longest sealed buffer the peer accepts: the challenge's <c>maxbuf</c>.</param>
+    internal static LdapDigestMd5SecurityLayer Create(byte[] hashA1, bool isServer = false, int maxBuffer = DefaultMaxBuffer) => new(hashA1, isServer, maxBuffer);
+
+    /// <summary>RFC 2831 section 2.4: the <c>maxbuf</c> when the challenge gives none.</summary>
+    internal const int DefaultMaxBuffer = 65536;
+
+    /// <summary>The longest message that <see cref="Wrap" /> seals into a buffer of at most the peer's maxbuf.</summary>
+    internal int MaxPlainLength { get; }
 
     /// <inheritdoc />
     public bool IsAuthenticated => true;

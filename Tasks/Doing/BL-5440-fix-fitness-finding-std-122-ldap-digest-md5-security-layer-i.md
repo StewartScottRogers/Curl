@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapSaslSecurityLayer.cs]
+touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapSaslSecurityLayer.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5SecurityLayer.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5Bind.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5MaxBufferTests.cs]
 requirement: none
 created: 2026-11-18
 completed:
@@ -34,11 +34,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] both commands print alice's entry, exit 0; the relay log shows no client SASL buffer longer than the challenge's maxbuf.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] both commands print alice's entry, exit 0; the relay log shows no client SASL buffer longer than the challenge's maxbuf.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Widened touches to the DIGEST-MD5 layer and bind (no other Doing task touches Ldap). `SecurityLayerFor` parses the challenge maxbuf (default 65536); the layer splits each write so every sealed buffer is at most maxbuf (plain chunk = floor((maxbuf-6)/8)*8-11). No live OpenLDAP here: the relay-log criterion is pinned by unit tests of frame lengths, not measured against the container. Quality run: 0 failing members.
 
 ## Log
 

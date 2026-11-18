@@ -80,8 +80,14 @@ internal static class LdapDigestMd5Bind
         }
 
         Encoding encoding = directives.GetValueOrDefault("charset", string.Empty).Equals("utf-8", StringComparison.OrdinalIgnoreCase) ? Encoding.UTF8 : Encoding.Latin1;
-        return LdapDigestMd5SecurityLayer.Create(HashA1(encoding, user, directives.GetValueOrDefault("realm", string.Empty), password, nonce, clientNonce));
+        return LdapDigestMd5SecurityLayer.Create(HashA1(encoding, user, directives.GetValueOrDefault("realm", string.Empty), password, nonce, clientNonce), maxBuffer: MaxBufferOf(directives));
     }
+
+    // The challenge's maxbuf when it is a positive number, else the RFC 2831 default.
+    private static int MaxBufferOf(Dictionary<string, string> directives) =>
+        int.TryParse(directives.GetValueOrDefault("maxbuf", string.Empty), out int maxBuffer) && maxBuffer > 0
+            ? maxBuffer
+            : LdapDigestMd5SecurityLayer.DefaultMaxBuffer;
 
     /// <summary>
     /// RFC 2831 section 2.1.2.1: HEX(KD(HEX(H(A1)), nonce:nc:cnonce:qop:HEX(H(A2)))) for
