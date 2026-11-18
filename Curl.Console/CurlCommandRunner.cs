@@ -2214,7 +2214,44 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
+        if (await FormSetupFailureAsync(options, transfer).ConfigureAwait(false) is { } formFailure)
+        {
+            await run.AbandonFirstBatchAsync(formFailure).ConfigureAwait(false);
+            return true;
+        }
+
         return batchIsComplete && await run.StartHeldAsync().ConfigureAwait(false);
+    }
+
+    private static bool ReadsStandardInput(EasyMimeBody mimePost) =>
+        MultipartFormPartMapping.FromMimeBody(mimePost).Any(part => part.ReadsStandardInput);
+
+    /// <summary>
+    /// Sets up the <c>-F</c> form of an option group's last URL in a <c>-Z</c> run's first batch, as curl 8.22.0 sets
+    /// every handle up before it performs any: a part whose file cannot be opened abandons the batch with exit 26 and
+    /// nothing is sent (STD-123, BL-5441). A form reading standard input is left to the transfer, which must not drain it.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns>The failure, or <see langword="null" /> when the form builds or the transfer does not carry it.</returns>
+    private async Task<TransferResult?> FormSetupFailureAsync(CommandLineOptions options, UrlTransfer transfer)
+    {
+        EasyMimeBody? mimePost = EasyOptionsFromCommandLine.HttpOf(options).MimePost;
+        if (mimePost is null || transfer.UrlIndex != options.Urls.Count - 1 || ReadsStandardInput(mimePost))
+        {
+            return null;
+        }
+
+        _ = TryResolveTransferUrl(options, transfer.Url, transfer.UploadFile, out string transferUrl);
+        string scheme = transferUrl[..Math.Max(transferUrl.IndexOf(':', StringComparison.Ordinal), 0)];
+        MultipartFormBuildResult form = await BuildFormAsync(options, mimePost, scheme, MailRequestOptionsMapping.SendsFormAsMimeMessage(scheme)).ConfigureAwait(false);
+        if (!form.IsBuilt)
+        {
+            return form.Failure;
+        }
+
+        await form.Body.Content.DisposeAsync().ConfigureAwait(false);
+        return null;
     }
 
     /// <summary>

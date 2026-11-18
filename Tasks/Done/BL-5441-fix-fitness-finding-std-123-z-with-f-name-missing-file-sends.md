@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5441 — Fix fitness finding STD-123: -Z with -F name=@missing-file sends empty POST requests to every URL but one, and those transfers report success
 
@@ -33,13 +33,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the first command sends no request (server log empty), prints exactly `[http://127.0.0.1:43000/echo/a 26]`, exit 26.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first command sends no request (server log empty), prints exactly `[http://127.0.0.1:43000/echo/a 26]`, exit 26.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix in Curl.Console/CurlCommandRunner.cs only (touches list's builder file unchanged): curl 8.22.0 sets every handle up before it performs any, so the option group's last URL's -F form (the one that carries it under -Z) failing to open a file abandons the first batch with exit 26 and nothing is sent. Added FormSetupFailureAsync in HoldInFirstBatchAsync; forms reading stdin are skipped so stdin is not drained. Tests in Curl.Console.UnitTests/Cgr175Tests.cs. Measure-CodeQuality for Curl.Console: 0 failing. CI criterion met by platform-neutral tests.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-123 (Medium).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 0b33b67a 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Last URL's -F form that cannot open a file abandons the -Z first batch with exit 26, nothing sent

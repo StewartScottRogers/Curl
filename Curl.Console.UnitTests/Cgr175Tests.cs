@@ -63,6 +63,39 @@ public sealed class Cgr175Tests
         CollectionAssert.AreEqual(new long[] { 0, 176 }, sent);
     }
 
+    [TestMethod]
+    public async Task RunAsync_ParallelFormWithMissingFileForThreeUrls_SendsNothingAndReportsExit26ForEach()
+    {
+        (int exitCode, string stdout, string stderr, List<long> sent) = await RunAsync(
+            "-Z", "-F", "a=b", "-F", "f=@nofile.txt",
+            "http://127.0.0.1:22000/a", "http://127.0.0.1:22000/b", "http://127.0.0.1:22000/c");
+
+        Diagnostics.Assert("bodies sent", string.Empty, string.Join(", ", sent));
+        Assert.AreEqual(26, exitCode);
+        Assert.IsEmpty(sent);
+        Assert.AreEqual("0 26 000 0\n1 26 000 0\n2 26 000 0\n", stdout.ReplaceLineEndings("\n"));
+        Assert.Contains("curl: (26) Failed to open/read local data from file/application", stderr);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ParallelMissingFileFormInFirstGroup_StopsTheLaterGroupToo()
+    {
+        (int exitCode, _, _, List<long> sent) = await RunAsync(
+            "-Z", "-F", "f=@nofile.txt", "http://127.0.0.1:22000/a",
+            "--next", "-F", "f=present", "http://127.0.0.1:22000/b");
+
+        Assert.AreEqual(26, exitCode);
+        Assert.IsEmpty(sent);
+    }
+    [TestMethod]
+    public async Task RunAsync_ParallelTextFormForTwoUrls_SetsTheLastFormUpAndSendsItOnlyToTheLast()
+    {
+        (int exitCode, _, string stderr, List<long> sent) = await RunAsync(
+            "-Z", "-F", "f=value", "http://127.0.0.1:22000/a", "http://127.0.0.1:22000/b");
+
+        Assert.AreEqual(0, exitCode, stderr);
+        CollectionAssert.AreEquivalent(new long[] { 0, 153 }, sent);
+    }
     private async Task<(int ExitCode, string Stdout, string Stderr, List<long> Sent)> RunAsync(params string[] form)
     {
         List<long> sent = [];
