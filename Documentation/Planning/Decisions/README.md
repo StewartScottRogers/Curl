@@ -1335,3 +1335,4 @@ Each option and the specific reason it lost.
 | [1291](ADR-1291-az-url-on-an-ip-address-or-localhost-is-a-path-style-emulator.md) | An az:// URL on an IP address or localhost is a path-style emulator (BL-5407) | Accepted | 2026-11-17 |
 | [1292](ADR-1292-ldap-digest-md5-negotiates-auth-conf-with-3des.md) | The LDAP DIGEST-MD5 bind negotiates qop=auth-conf with 3des (BL-5376) | Accepted | 2026-11-17 |
 | [1293](ADR-1293-socks-handshake-reset-is-exit-97-recv-failure.md) | A SOCKS handshake reset is exit 97 "Recv failure" (BL-5382) | Accepted | 2026-11-17 |
+| [1294](ADR-1294-intermediate-only-cacert-revocation-is-read-from-the-crl.md) | Revocation below an intermediate-only --cacert anchor is read from the CRL (BL-5384) | Accepted | 2026-11-17 |

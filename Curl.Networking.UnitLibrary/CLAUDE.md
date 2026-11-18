@@ -136,7 +136,7 @@ and below a TLS 1.3 ceiling the Schannel build's hello is in a record of the cei
 (`ClientHelloProfile.Tls12RecordVersionIsTheCeiling`), OpenSSL's in a TLS 1.0 one.
 The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 live in
 `TlsFailureMessages` and nowhere else; the `More details here` block after an exit 60 is
-the console's to print. No type here constructs an `HttpClient`.
+the console's to print. Only `RevocationListDownload` constructs an `HttpClient`, to fetch a certificate revocation list from a CRL distribution point (ADR-1294).
 
 `TcpConnector` dials a host's or proxy's addresses through `AddressFamilyRace` (ADR-0254): the
 first address's family in turn, the other family beside it once `happyEyeballsTimeout`
