@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/BufferedConnectionReader.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5510 — Fix AF-0868: Surviving mutant: a SignalR line feed at buffer index 0 is not seen as a line end
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/BufferedConnectionReader.cs line 26`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/BufferedConnectionReader.cs line 26`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added BufferedConnectionReaderTests (two tests, LF at buffer index 0). With the `<= 0` mutant applied by hand both fail (ReadLineAsync_LineFeedIsTheFirstBufferedByte_ReturnsAnEmptyLineWithoutReadingMore, ReadLineAsync_OnlyALineFeedThenTheConnectionEnds_ReturnsAnEmptyLine); reverted, all 157 SignalR fast tests pass. Test-only change, no production code touched.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 816f0cd6 9742157d.
+- 2026-11-18: Doing -> Done. Mutant killed by new BufferedConnectionReaderTests
