@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.File.UnitLibrary/FileProtocolHandler.cs, Curl.Original.Protocol.File.UnitTests/FileUploadResumeUnknownOffsetTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-18
 ---
 # BL-4902 — Make file:// upload with -C - append from the destination size instead of overwriting it
 
@@ -27,14 +27,17 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] `dst` = `ZZ` ends as `ZZLOAD\n`, exit 0.
-- [ ] `dst` = `ZZZZZZZZZZZ` is unchanged, exit 0.
-- [ ] A unit test in `Curl.Original.Protocol.File.UnitTests` pins both cases.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dst` = `ZZ` ends as `ZZLOAD\n`, exit 0.
+- [x] `dst` = `ZZZZZZZZZZZ` is unchanged, exit 0.
+- [x] A unit test in `Curl.Original.Protocol.File.UnitTests` pins both cases.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Mock servers in the review were Python; build stand-ins in PowerShell, a C# file-based app or `Record-CurlExchange.ps1`, never Python (CLAUDE.md). Measure real curl (the platform build) before pinning any output text, and add a focused unit test in the fixed library's own `.UnitTests` project.
+
+- 2026-11-18 (lane 3): Already delivered by the split: BL-4972 (47ef63356b, FileProtocolHandler appends a `-C -` upload from the destination size, lines 881-924) and BL-4973 (FileUploadResumeUnknownOffsetTests: ZZ -> ZZLOAD
+ and 11 Zs unchanged, plus missing destination and explicit offset). Re-ran Curl.Original.Protocol.File.UnitTests here: 510 passed, 0 failed. No code change was needed, so no quality run. The tests use temporary files only and do not depend on the platform.
 
 ## Log
 
@@ -44,3 +47,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Backlog -> Deferred. Split into BL-4972 and BL-4973
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: c912ec10 47b56d31 903bc26c a0b49a29.
+- 2026-11-18: Doing -> Done. Delivered by BL-4972 and BL-4973; File unit tests pin both append cases and pass
