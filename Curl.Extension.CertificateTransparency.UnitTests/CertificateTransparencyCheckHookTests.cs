@@ -41,7 +41,7 @@ public sealed class CertificateTransparencyCheckHookTests
 
         var refusal = await hook.RefusalOfAsync([], "example.com", 443, CancellationToken.None);
 
-        Assert.AreEqual("Certificate Transparency: the log list missing.json could not be read: gone", refusal);
+        Assert.AreEqual("--require-sct cannot read the log list 'missing.json'", refusal);
     }
 
     [TestMethod]
@@ -51,7 +51,7 @@ public sealed class CertificateTransparencyCheckHookTests
 
         var refusal = await hook.RefusalOfAsync([], "example.com", 443, CancellationToken.None);
 
-        Assert.AreEqual("Certificate Transparency: the log list locked.json could not be read: denied", refusal);
+        Assert.AreEqual("--require-sct cannot read the log list 'locked.json'", refusal);
     }
 
     [TestMethod]
@@ -63,7 +63,7 @@ public sealed class CertificateTransparencyCheckHookTests
 
         var refusal = await hook.RefusalOfAsync([], "example.com", 443, CancellationToken.None);
 
-        StringAssert.StartsWith(refusal, "Certificate Transparency: the log list bad.json could not be read: ");
+        Assert.AreEqual("--require-sct: 'bad.json' is not a valid log list", refusal);
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider

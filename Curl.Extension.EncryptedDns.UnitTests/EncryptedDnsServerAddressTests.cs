@@ -15,6 +15,8 @@ public sealed class EncryptedDnsServerAddressTests
     [DataRow("[2001:db8::1]:5353", "2001:db8::1", 5353)]
     [DataRow("[2001:db8::1]", "2001:db8::1", 853)]
     [DataRow("2001:db8::1", "2001:db8::1", 853)]
+    [DataRow("::1", "::1", 853)]
+    [DataRow("[::1]:853", "::1", 853)]
     public void Parse_HostAndOptionalPort_GivesTheHostAndPort(string value, string expectedHost, int expectedPort)
     {
         (string host, int port) = EncryptedDnsServerAddress.Parse(value, Option, 853);
@@ -34,6 +36,10 @@ public sealed class EncryptedDnsServerAddressTests
     [DataRow("[2001:db8::1")]
     [DataRow("[2001:db8::1]853")]
     [DataRow("[]:853")]
+    [DataRow("::bad::")]
+    [DataRow("a b")]
+    [DataRow("-5")]
+    [DataRow("[::xyz]:853")]
     public void Parse_NotHostAndPort_ThrowsNamingTheOption(string value)
     {
         ArgumentException error = Assert.ThrowsExactly<ArgumentException>(() => EncryptedDnsServerAddress.Parse(value, Option, 853));

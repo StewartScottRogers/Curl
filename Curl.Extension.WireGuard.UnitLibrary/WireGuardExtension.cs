@@ -81,7 +81,7 @@ public static class WireGuardExtension
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            throw new ArgumentException($"--wireguard cannot read '{path}': {exception.Message}", "values", exception);
+            throw new ArgumentException($"--wireguard cannot read '{path}'", "values", exception);
         }
 
         try

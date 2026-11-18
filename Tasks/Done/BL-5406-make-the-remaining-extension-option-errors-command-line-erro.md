@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.WireGuard.UnitLibrary/WireGuardExtension.cs, Curl.Extension.WireGuard.UnitTests, Curl.Extension.CertificateTransparency.UnitLibrary/CertificateTransparencyCheckHook.cs, Curl.Extension.CertificateTransparency.UnitTests, Curl.Extension.Sigstore.UnitLibrary/SigstoreTransferHook.cs, Curl.Extension.Sigstore.UnitTests, Curl.Extension.OAuth2.UnitLibrary/Options/OAuth2Configuration.cs, Curl.Extension.OAuth2.UnitTests, Curl.Extension.HttpFile.UnitLibrary/HttpFileArgumentExpander.cs, Curl.Extension.HttpFile.UnitTests, Curl.Extension.OpenApi.UnitLibrary/OpenApiArgumentExpander.cs, Curl.Extension.OpenApi.UnitTests, Curl.Extension.EncryptedDns.UnitLibrary/EncryptedDnsExtension.cs, Curl.Extension.EncryptedDns.UnitLibrary/DnsOverTls, Curl.Extension.EncryptedDns.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5406 — Make the remaining extension option errors command-line errors without .NET text and refuse bad DoT and DoQ resolvers
 
@@ -37,17 +37,19 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Extension.WireGuard.UnitTests` prove a missing `--wireguard` file gives `--wireguard cannot read 'nonexist.conf'` as a command-line error (exit 2) whose text contains neither a directory path nor .NET exception wording.
-- [ ] New tests in `Curl.Extension.CertificateTransparency.UnitTests` prove a missing `--require-sct` log list gives a message naming the option and the file as given, with no full path or .NET text.
-- [ ] New tests in `Curl.Extension.Sigstore.UnitTests` and `Curl.Extension.OAuth2.UnitTests` prove `--sigstore-identity` without `--sigstore-bundle` and `--oauth2-device` without `--oauth2-client-id` are refused at activation as command-line errors (message, try-help line, exit 2).
-- [ ] The unreadable `--http-file` and `--openapi` cases give a command-line error in the same style (tests in each extension's `.UnitTests`), with no `(26)` mismatch.
-- [ ] New tests in `Curl.Extension.EncryptedDns.UnitTests` prove `"::bad::"`, `"a b"` and `-5` are refused for both `--dns-over-tls` and `--dns-over-quic` with exit 2 and a message naming the option and the value, and that `host`, `host:853`, `[::1]:853` and `::1` are still accepted.
-- [ ] Tests are platform-neutral (no assertion on a Windows path or Windows error text).
-- [ ] Hand check recorded in the Log: command 1 prints `curl: --wireguard cannot read 'nonexist.conf'` plus the try-help line, exit 2, with no .NET text or path; command 3 prints `curl: --sigstore-identity needs --sigstore-bundle` plus the try-help line, exit 2; command 5 exits 2 with a message naming `--dns-over-tls` and `'::bad::'`.
-- [ ] `--extended-help` and `--ai-help` are checked and kept right if they quote any changed message.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Extension.WireGuard.UnitTests` prove a missing `--wireguard` file gives `--wireguard cannot read 'nonexist.conf'` as a command-line error (exit 2) whose text contains neither a directory path nor .NET exception wording.
+- [x] New tests in `Curl.Extension.CertificateTransparency.UnitTests` prove a missing `--require-sct` log list gives a message naming the option and the file as given, with no full path or .NET text.
+- [x] New tests in `Curl.Extension.Sigstore.UnitTests` and `Curl.Extension.OAuth2.UnitTests` prove `--sigstore-identity` without `--sigstore-bundle` and `--oauth2-device` without `--oauth2-client-id` are refused at activation as command-line errors (message, try-help line, exit 2).
+- [x] The unreadable `--http-file` and `--openapi` cases give a command-line error in the same style (tests in each extension's `.UnitTests`), with no `(26)` mismatch.
+- [x] New tests in `Curl.Extension.EncryptedDns.UnitTests` prove `"::bad::"`, `"a b"` and `-5` are refused for both `--dns-over-tls` and `--dns-over-quic` with exit 2 and a message naming the option and the value, and that `host`, `host:853`, `[::1]:853` and `::1` are still accepted.
+- [x] Tests are platform-neutral (no assertion on a Windows path or Windows error text).
+- [x] Hand check recorded in the Log: command 1 prints `curl: --wireguard cannot read 'nonexist.conf'` plus the try-help line, exit 2, with no .NET text or path; command 3 prints `curl: --sigstore-identity needs --sigstore-bundle` plus the try-help line, exit 2; command 5 exits 2 with a message naming `--dns-over-tls` and `'::bad::'`.
+- [x] `--extended-help` and `--ai-help` are checked and kept right if they quote any changed message.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Decisions (ADR-1295): the unreadable --http-file/--openapi/environment file refusals now exit 2 (not 26) with ``--<option> cannot read '<file>'``; the OAuth2 and Sigstore hooks keep their transfer-time checks for hooks built directly. --extended-help and --ai-help quote none of the changed messages (grep found none). Ending the shared-/tmp: other lanes share /tmp, so scratch files went to a lane directory.
 
 - One task, five libraries by design: the change is one message style. If it grows past one run, split per library.
 - `touches` lists the exact files found by grep on 2026-11-17 (the `--http-file` and `--openapi` expanders are included); a fix may need a neighbouring file in the same library, which is fine, but adding a new library to `touches` means the task has outgrown one run.
@@ -58,3 +60,5 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: a4c06614 9483f70b e7d0030b 39d6f7d1 2b23cfda b5f75c39 8a1d8b43 5a95a163 a0b49a29.
+- 2026-11-17: Done. Hand check (Curl.Console debug build): `--wireguard nonexist.conf` -> `curl: --wireguard cannot read 'nonexist.conf'` + try-help line, exit 2; `--sigstore-identity me` -> `--sigstore-identity needs --sigstore-bundle` + try-help, exit 2; `--oauth2-device x` likewise; `--dns-over-tls "::bad::"` -> `--dns-over-tls needs a resolver as host[:port], not '::bad::'` + try-help, exit 2. Quality run on the seven libraries: 100% line and branch, no member past a gate (after splitting two methods). Fast tests green. `--http-file`/`--openapi` print no try-help line yet: needs CurlCommandRunner.cs, held by BL-5402, so BL-5419 is filed for it (ADR-1295).
+- 2026-11-17: Doing -> Done. Extension option errors name the option with no .NET text; bad DoT/DoQ resolvers refused (ADR-1295)

@@ -27,7 +27,7 @@ public sealed class HttpFileArgumentExpander : ITrailingArgumentExpander
     {
         ArgumentNullException.ThrowIfNull(claimed);
         ArgumentNullException.ThrowIfNull(context);
-        byte[] bytes = context.ReadFile(claimed.Value) ?? throw new ArgumentExpansionException($"http-file: cannot read {claimed.Value}", CurlExitCode.ReadError);
+        byte[] bytes = context.ReadFile(claimed.Value) ?? throw new ArgumentExpansionException($"--http-file cannot read '{claimed.Value}'", CurlExitCode.FailedInit);
         HttpFileVariables variables = new(context.ReadEnvironmentVariable);
         foreach (CompanionOptionValue environment in claimed.CompanionValues)
         {

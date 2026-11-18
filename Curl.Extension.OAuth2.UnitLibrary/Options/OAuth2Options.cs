@@ -98,7 +98,7 @@ public static class OAuth2Options
         }
         catch (OAuth2OptionException exception)
         {
-            return new OAuth2TransferHook(null, exception.Message, messages, randomBytes);
+            throw new ArgumentException(exception.Message.TrimEnd('.'), nameof(values), exception);
         }
     }
 }
