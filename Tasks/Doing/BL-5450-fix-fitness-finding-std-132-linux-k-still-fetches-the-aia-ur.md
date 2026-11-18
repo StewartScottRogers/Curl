@@ -31,11 +31,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command exits 0 and the 41080 log stays empty.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command exits 0 and the 41080 log stays empty.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix: ReadTrustAnchors under -k in the OpenSSL build returns the downloads-disabled system-store policy (no AIA fetch); Schannel build keeps null. Linux behaviour kept platform-neutral; unit tests in AiaDownloadDisabledTests. Quality run: 0 failing members.
 
 ## Log
 

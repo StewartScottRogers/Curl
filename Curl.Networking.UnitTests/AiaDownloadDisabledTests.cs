@@ -46,6 +46,22 @@ public sealed class AiaDownloadDisabledTests
     }
 
     [TestMethod]
+    public void ReadTrustAnchors_InsecureInTheOpenSslBuild_DisablesCertificateDownloads()
+    {
+        var policy = new ServerCertificateVerification(new TlsClientOptions(Insecure: true), false, TimeProvider.System).ReadTrustAnchors().ChainPolicy;
+
+        Assert.IsTrue(policy?.DisableCertificateDownloads);
+    }
+
+    [TestMethod]
+    public void ReadTrustAnchors_InsecureInTheSchannelBuild_HasNoChainPolicy()
+    {
+        var policy = new ServerCertificateVerification(new TlsClientOptions(Insecure: true), true, TimeProvider.System).ReadTrustAnchors().ChainPolicy;
+
+        Assert.IsNull(policy);
+    }
+
+    [TestMethod]
     public void ReadTrustAnchors_SystemStoreInTheSchannelBuild_KeepsCertificateDownloads()
     {
         var policy = new ServerCertificateVerification(new TlsClientOptions(), true, TimeProvider.System).ReadTrustAnchors().ChainPolicy;

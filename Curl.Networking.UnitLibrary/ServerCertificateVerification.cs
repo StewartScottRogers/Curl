@@ -138,7 +138,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     /// revocation endpoint fails with exit 60 as in curl (ADR-0321); the OpenSSL build never
     /// checks it. The OpenSSL build then loads the <c>--crlfile</c> lists, as curl loads them
     /// after the <c>--cacert</c> file (BL-609); the Schannel build ignores <c>--crlfile</c>.
-    /// Under <c>-k</c> nothing is read.
+    /// Under <c>-k</c> no trust anchor is read; the OpenSSL build still gets the policy that disables certificate downloads.
     /// </summary>
     /// <returns>
     /// The chain policy, or <see langword="null" />, the roots trusted beside the system store, and
@@ -154,7 +154,8 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     {
         if (options.Insecure)
         {
-            return (null, [], null);
+            // The OpenSSL build follows no AIA link even under -k (BL-5450).
+            return (matchesSchannelBuild ? null : SystemStoreChainPolicy(), [], null);
         }
 
         var (chainPolicy, anchorsBesideSystemStore) = ReadChainAnchors();
