@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Curl.Extension.Abstractions.Transfer;
 
 namespace Curl.Extension.RecordReplay;
@@ -31,6 +32,19 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
         return at < 0 ? url : url[..authorityStart] + RedactedUserInfo + url[(authorityStart + at)..];
     }
 
+    private static readonly Regex UrlFieldLine = new(@"^(?:Location|Content-Location|Link|Refresh):[^\r\n]*", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.CultureInvariant);
+
+    private static readonly Regex UserInfo = new(@"(?<=//)[^/?#\s<>""]*@", RegexOptions.CultureInvariant);
+
+    /// <summary>Puts <see cref="RedactedUserInfo" /> in place of the user information of every URL in the <c>Location</c>, <c>Content-Location</c>, <c>Link</c> and <c>Refresh</c> lines of <paramref name="head" />.</summary>
+    /// <param name="head">The head bytes as received.</param>
+    /// <returns>The head with no credentials in those lines; a head with none is returned unchanged.</returns>
+    internal static byte[] RedactedHead(byte[] head)
+    {
+        var text = Encoding.Latin1.GetString(head);
+        var redacted = UrlFieldLine.Replace(text, line => UserInfo.Replace(line.Value, RedactedUserInfo + "@"));
+        return redacted == text ? head : Encoding.Latin1.GetBytes(redacted);
+    }
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
     {
         if (context.Http is null)
@@ -121,7 +135,7 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
         await context.Output.WriteAsync(body.ToArray(), context.CancellationToken);
         if (result is { IsSuccess: true, Report: { } report })
         {
-            await TryRecordAsync(directory, key, request with { StatusCode = report.ResponseCode, Head = head.ToArray(), Body = body.ToArray() }, context.CancellationToken);
+            await TryRecordAsync(directory, key, request with { StatusCode = report.ResponseCode, Head = RedactedHead(head.ToArray()), Body = body.ToArray() }, context.CancellationToken);
         }
 
         return result;

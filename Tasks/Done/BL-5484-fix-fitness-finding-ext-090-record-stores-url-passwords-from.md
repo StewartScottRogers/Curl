@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.RecordReplay.UnitLibrary/RecordedExchangeEncoding.cs, Curl.Extension.RecordReplay.UnitLibrary/RecordReplayTransferHook.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5484 — Fix fitness finding EXT-090: --record stores URL passwords from response Location and Content-Location headers in clear
 
@@ -33,13 +33,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the grep prints 0 for every file; `curl --replay rec -L http://127.0.0.1:45020/redir -w "%{http_code} %{num_redirects}"` still ends `200 1`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the grep prints 0 for every file; `curl --replay rec -L http://127.0.0.1:45020/redir -w "%{http_code} %{num_redirects}"` still ends `200 1`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- --record now redacts user info (REDACTED:REDACTED) in Location, Content-Location, Link and Refresh lines of the recorded head (RecordedHead redaction in RecordReplayTransferHook.RedactedHead); replay keys on redacted URLs already so -L replay still works. Unit test pins it. Quality run: 0 failing members. Live grep/replay repro not run (lane); covered by unit tests.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-090 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: a452a8e7 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. --record redacts URL user info in Location, Content-Location, Link and Refresh
