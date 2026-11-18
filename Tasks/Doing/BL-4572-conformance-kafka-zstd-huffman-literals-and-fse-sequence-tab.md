@@ -51,3 +51,4 @@ Repeat_Mode. Cases go in `Curl.Conformance.Extended.UnitTests/Kafka/Compression/
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 99c0a8f4 d822d055 0fc765d5 914c30cc c1434b50.
 - 2026-11-02: Doing -> Deferred. Split into BL-4620, BL-4621, BL-4622
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 99c0a8f4 d822d055 0fc765d5 914c30cc c1434b50.
