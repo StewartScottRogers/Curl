@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Curl.Engine.UnitLibrary/TransferContextFactory.cs, Curl.Engine.UnitTests/UrlUserWithOptionPasswordTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-18
 ---
 # BL-4915 — Merge URL user name and -u password per field instead of dropping the -u password
 
@@ -27,9 +27,9 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] `curl -sS http://user@127.0.0.1:18500/ -u :secret` sends `Authorization: Basic dXNlcjpzZWNyZXQ=`.
-- [ ] `curl -sS "imap://user@127.0.0.1:18500/INBOX/;UID=1" -u :secret` makes the IMAP mock log `A002 LOGIN user secret`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `curl -sS http://user@127.0.0.1:18500/ -u :secret` sends `Authorization: Basic dXNlcjpzZWNyZXQ=`.
+- [x] `curl -sS "imap://user@127.0.0.1:18500/INBOX/;UID=1" -u :secret` makes the IMAP mock log `A002 LOGIN user secret`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -38,6 +38,8 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 
 - 2026-11-11 (lane 2): Fixed in `TransferCredentialLookup`: `OptionPasswordOf` (`-u`'s `Password`, else what follows `UserPassword`'s first colon) fills the password a URL with a user name leaves out, both with no netrc option (`CredentialsWrittenInUrl`) and when the netrc file has no entry (`TryLookUpInNetrcFile`); a URL password still wins, and a netrc entry's password still wins. `TransferContextFactory` needed no change: the lookup's credentials replace `-u`'s whole. Expected output taken from the review's REF 8.22.0 measurement (Context). Tests in `Curl.Engine.UnitTests/UrlUserWithOptionPasswordTests.cs`; `Curl.Engine.UnitLibrary/CLAUDE.md` updated (added to touches: its BL-791 line would otherwise be false).
 - 2026-11-11 (lane 2): NOT built or tested: this machine has no .NET SDK 10.0.401, which `global.json` pins (installed: 10.0.100-rc.1, 11.0.100-rc.2, 11.0.100; same blocker as BL-4911). The change is left uncommitted for the shift to stash. Left: build, run the fast tests, run Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary, measure the two criteria with Curl.Console, commit.
+
+- 2026-11-18 (lane 7): Nothing left to do: BL-4975 (72b2353a4a) landed the fix with UrlUserWithOptionPasswordTests, and BL-4976 measured both criteria against the built Curl.Console (HTTP `Basic dXNlcjpzZWNyZXQ=`, IMAP `A002 LOGIN user secret`) and found the quality gates clean; both are Done. The stash 145061c0 is the same change and is superseded. Curl.Engine.UnitTests fast tests re-run on this branch: 3083 passed, 0 failed.
 
 ## Log
 
@@ -48,3 +50,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Backlog -> Deferred. Split into BL-4975 and BL-4976
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 1a064b66 5225096c a0b49a29.
+- 2026-11-18: Doing -> Done. Delivered by BL-4975 and BL-4976
