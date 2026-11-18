@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/RebuiltChainVerifyReasonTests.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5395 — Report the rebuilt chain's verify reason and ssl_verify_result for --capath failures on Linux
 
@@ -44,3 +44,4 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: aa26c374 1e50d592 10bcf0a0 7ae10ef7 a0b49a29 ea633b50.
 - 2026-11-17: Implemented in ServerCertificateVerification (+ .CaCertificates): `ReasonChainFromAnchors` rebuilds the chain against the --capath anchors and its statuses give the message and `%{ssl_verify_result}` (10 expired); the purpose refusal now sets 26. Tests in RebuiltChainVerifyReasonTests (capath, proxy capath, --cacert unchanged, unrelated anchor, -k). SSL_CERT_DIR reaches the system store with no extra anchors, so it takes the unchanged path (no rebuilt chain). Hand check with a live server was not run; the Judge-level tests pin the same message and codes. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing; fast tests green.
+- 2026-11-17: Doing -> Done. --capath failures report the rebuilt chain's reason and verify result
