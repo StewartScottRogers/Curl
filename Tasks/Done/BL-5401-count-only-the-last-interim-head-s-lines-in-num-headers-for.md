@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5401 — Count only the last interim head's lines in %{num_headers} for 100 then 103 then close
 
@@ -44,3 +44,4 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 167c95fb 0c38ce0a 7ae10ef7 a0b49a29 ed9e132a.
 - 2026-11-17: Fixed HttpProtocolHandler.HeadersBeforeFailure to count only the last head's lines. Tests in HttpProtocolHandlerInterimHeadCountTests.cs (100+103 -> 1 header, size 59; lone 100 and 103 unchanged). Hand check: the unit test pins the repro's bytes ([103 103 59 1]); real curl value taken from the task's REF. Quality run: 0 failing members. CI platform criteria met by platform-neutral tests.
+- 2026-11-17: Doing -> Done. num_headers counts only the last head's lines
