@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapEntryFormatter.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapValueBase64RuleTests.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapProtocolHandlerTests.Output.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapEntryFormatterTests.cs]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-18
 ---
 # BL-4913 — Base64-encode LDAP values that need it, as curl's ldap_value_needs_base64 does
 
@@ -29,7 +29,7 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 - [x] The repro prints exactly `DN: cn=a\n\td1:: YQpi\n\n\td2:: OmNvbG9u\n\n\td3:: PGx0\n\n\td4: plain\n\n`.
 - [x] Unit tests pin TAB, CR, leading blank and trailing blank cases.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -40,6 +40,7 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - Widened `touches` to `LdapProtocolHandlerTests.Output.cs` (BL-588's recordings from curl 8.21.0 and 8.18.0 wrote tab, LF, VT, FF and CR raw; their expected text now follows 8.22.0) and `LdapEntryFormatterTests.cs` (its summary described the old rule); no other task in Doing names them.
 - Blocker: `global.json` pins SDK 10.0.401 (latestFeature) and this machine has only 10.0.100-rc.1 and 11.x (as BL-4909 found), so `dotnet build` at the root fails "SDK not found" and Measure-CodeQuality.ps1 cannot run. Built and tested from outside the repository with SDK 11.0.100: Curl.Original.Protocol.Ldap.UnitTests and Curl.Console build with 0 warnings; LDAP fast tests 662 of 663 pass. The one failure (`Start_NtlmWithNoProtection_FirstTokenAsksNeitherToSignNorSeal`) is in code this task does not change and is filed as BL-4962. The change adds one trivial predicate (complexity 2), and `LdapValueBase64RuleTests` covers every branch. Once the SDK is back: run `dotnet build`, the fast tests and `Measure-CodeQuality.ps1 -Library Curl.Original.Protocol.Ldap.UnitLibrary -ReportPath ...`, tick the last criterion and finish. The change is committed on lane 9 (the `fix(ldap)` commit).
 - Filed BL-4961: an entry whose last value is empty prints only its DN line (curl 8.22.0 prints `\tdb: \n\n`).
+- 2026-11-18 (lane 3): BL-4970 verified the committed fix (build, Ldap tests, quality gate). Re-checked today: `dotnet build` at the root 0 warnings 0 errors; Curl.Original.Protocol.Ldap.UnitTests fast tests 798 of 798 pass. No code change needed; Linux and macOS are covered by the change being byte-level and platform-neutral.
 
 ## Log
 
@@ -50,3 +51,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Backlog -> Deferred. Split into BL-4970 (build, fast tests and quality gate on the committed fix); the code work is done.
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: bce392b4 f5708407 a0b49a29.
+- 2026-11-18: Doing -> Done. LDAP values starting with : < or blank, ending with blank, or holding non-ISPRINT bytes print as :: base64, as curl 8.22.0 does
