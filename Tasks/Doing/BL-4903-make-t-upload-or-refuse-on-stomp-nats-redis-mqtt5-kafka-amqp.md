@@ -43,3 +43,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Backlog -> Doing. Criteria at claim: b4cfa0fa 6e5cc0f2 a0b49a29.
 - 2026-11-11: Doing -> Deferred. Split into BL-4951, BL-4952, BL-4953, BL-4954, BL-4955, BL-4956, BL-4957
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: b4cfa0fa 6e5cc0f2 a0b49a29.
