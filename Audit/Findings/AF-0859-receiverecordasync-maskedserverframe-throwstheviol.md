@@ -3,12 +3,12 @@ id: AF-0859
 title: ReceiveRecordAsync_MaskedServerFrame_ThrowsTheViolation checks only that the message is not empty
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.SignalR.UnitTests/Transport/SignalRWebSocketSessionTests.cs:ReceiveRecordAsync_MaskedServerFrame_ThrowsTheViolation_Rfc6455Section5Point1:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5501
+tasks: BL-5501
 found: 2026-11-18
 found-at: 4f902456d88c3fda856546dbe0c9a7674b1f04c4
 scorecard: 2026-11-18_0810.md

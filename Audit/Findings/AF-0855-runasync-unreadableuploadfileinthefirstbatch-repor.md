@@ -3,12 +3,12 @@ id: AF-0855
 title: RunAsync_UnreadableUploadFileInTheFirstBatch_ReportsEveryTransferWithExit26AndUploadsNothing asserts exit 25, not the 26 its name states
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Console.UnitTests/Cgr170Tests.cs:RunAsync_UnreadableUploadFileInTheFirstBatch_ReportsEveryTransferWithExit26AndUploadsNothing:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-5497
+tasks: BL-5497
 found: 2026-11-18
 found-at: 4f902456d88c3fda856546dbe0c9a7674b1f04c4
 scorecard: 2026-11-18_0810.md

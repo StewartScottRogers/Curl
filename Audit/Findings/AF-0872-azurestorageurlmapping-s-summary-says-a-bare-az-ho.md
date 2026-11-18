@@ -3,12 +3,12 @@ id: AF-0872
 title: AzureStorageUrlMapping's summary says a bare az:// host always gets the public suffix and is the account; an IP or localhost host is a path-style emulator
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Extended.Protocol.AzureStorage.UnitLibrary/Requests/AzureStorageUrlMapping.cs:AzureStorageUrlMapping:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-5514
+tasks: BL-5514
 found: 2026-11-18
 found-at: 4f902456d88c3fda856546dbe0c9a7674b1f04c4
 scorecard: 2026-11-18_0810.md

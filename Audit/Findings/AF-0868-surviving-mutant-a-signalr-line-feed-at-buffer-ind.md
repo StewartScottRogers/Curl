@@ -3,12 +3,12 @@ id: AF-0868
 title: Surviving mutant: a SignalR line feed at buffer index 0 is not seen as a line end
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/BufferedConnectionReader.cs:ReadLineAsync-lt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/BufferedConnectionReader.cs:26:<
-task: none
-tasks:
+task: BL-5510
+tasks: BL-5510
 found: 2026-11-18
 found-at: 4f902456d88c3fda856546dbe0c9a7674b1f04c4
 scorecard: 2026-11-18_0810.md

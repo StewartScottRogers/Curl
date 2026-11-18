@@ -3,12 +3,12 @@ id: AF-0871
 title: IAltSvcStore remarks name Curl.Core's AltSvcCache as its implementation and Curl.Console as its setter; neither is true
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Protocol.Abstractions.UnitLibrary/IAltSvcStore.cs:IAltSvcStore:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-5513
+tasks: BL-5513
 found: 2026-11-18
 found-at: 4f902456d88c3fda856546dbe0c9a7674b1f04c4
 scorecard: 2026-11-18_0810.md
