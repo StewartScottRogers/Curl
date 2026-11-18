@@ -115,6 +115,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.IsNull(Verify(Constraints(excluded: "example.com"), Host, true));
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)] // OpenSSL-backed chain building reports the chain incomplete instead (BL-5420).
     public void VerifyPeer_MalformedNameConstraintsExtension_IsRefusedAsATrustError()
     {
         var failure = Verify([0x04, 0x01, 0xFF], Host, true);
@@ -124,6 +125,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)] // OpenSSL-backed chain building never hands the malformed chain over (BL-5420).
     public void FindViolation_MalformedLeafAlternativeNames_RefusesTheChain()
     {
         using var root = CreateAuthority("CN=Constraint Root", null, null);
