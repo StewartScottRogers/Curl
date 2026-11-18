@@ -4,7 +4,7 @@ title: Fix CI failure job Quality gates (windows-latest) step Every shard succee
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-5416]
 touches: [Measure-CodeQuality.ps1]
 requirement: none
 created: 2026-11-17
@@ -30,7 +30,10 @@ Lanes test only on Windows, so reproduce with `gh run view 44224595726 --log-fai
 
 ## Notes
 
+- The "Every shard succeeded" step only fails when a shard job fails; here shard 3 (BL-5416). No fault in Measure-CodeQuality.ps1 found. Requeued to wait on BL-5416; re-check once it is Done.
+
 ## Log
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 96723aaa.
+- 2026-11-17: Doing -> Backlog. Depends on BL-5416: the step only reports shard 3's failure
