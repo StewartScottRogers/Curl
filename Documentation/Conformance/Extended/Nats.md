@@ -36,7 +36,7 @@ Server-only statements and features curl does not use are `n/a`.
 | Nats:NATS-UNSUB-1 | MUST | UNSUB with max_msgs ends the subscription after that many messages; the client stops reading there. | NatsSubscribeCases.Subscribe_CountTwo_SendsUnsubWithMaxMsgsAndStopsAfterTwo |
 | Nats:NATS-MSG-1 | MUST | MSG gives subject, subscription ID, an optional reply-to and the byte count. | NatsSubscribeCases.Subscribe_MsgPayloadsWithCrLf_AreWrittenWholeUntilTheServerCloses |
 | Nats:NATS-MSG-2 | MUST | A MSG payload is read by its byte count, CR LF inside it included, and is followed by CRLF. | NatsSubscribeCases.Subscribe_MsgPayloadsWithCrLf_AreWrittenWholeUntilTheServerCloses |
-| Nats:NATS-HMSG-1 | MUST | HMSG reaches only a client whose CONNECT set `headers`; one that did not treats HMSG as a protocol error. | NatsSubscribeCases.Subscribe_HmsgWithoutHeadersInConnect_IsAWeirdServerReply |
+| Nats:NATS-HMSG-1 | MUST | HMSG reaches only a client whose CONNECT set `headers`; one that did not treats HMSG as a protocol error. | NatsSubscribeCases.Subscribe_Hmsg_WritesThePayloadWithoutTheHeaders |
 | Nats:NATS-PING-1 | MUST | A client answers the server's PING with PONG, or the server closes the connection. | NatsSubscribeCases.Subscribe_ServerPing_IsAnsweredWithPong |
 | Nats:NATS-PING-2 | SHOULD | A client sends PING after CONNECT and waits for PONG to know its earlier lines were processed. | NatsPublishCases.Publish_PayloadWithCrLf_IsFramedByItsByteCount |
 | Nats:NATS-OK-1 | MUST | `+OK` (sent when `verbose` is on) is accepted and ignored. | NatsConnectCases.Publish_OkAndInfoBeforePong_AreAccepted |
