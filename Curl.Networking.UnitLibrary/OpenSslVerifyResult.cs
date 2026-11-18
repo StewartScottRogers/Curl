@@ -53,6 +53,9 @@ internal static class OpenSslVerifyResult
     /// <summary><c>X509_V_ERR_PERMITTED_VIOLATION</c>.</summary>
     internal const long PermittedSubtreeViolation = 47;
 
+    /// <summary><c>X509_V_ERR_EXCLUDED_VIOLATION</c>.</summary>
+    internal const long ExcludedSubtreeViolation = 48;
+
     /// <summary><c>X509_V_ERR_INVALID_CA</c>.</summary>
     internal const long InvalidCaCertificate = 79;
 
@@ -162,6 +165,11 @@ internal static class OpenSslVerifyResult
         if ((status & X509ChainStatusFlags.HasNotPermittedNameConstraint) != 0)
         {
             return PermittedSubtreeViolation;
+        }
+
+        if ((status & X509ChainStatusFlags.HasExcludedNameConstraint) != 0)
+        {
+            return ExcludedSubtreeViolation;
         }
 
         return (status & X509ChainStatusFlags.NotSignatureValid) != 0 ? CertificateSignatureFailure : null;

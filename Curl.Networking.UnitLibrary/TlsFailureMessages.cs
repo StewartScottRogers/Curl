@@ -215,6 +215,7 @@ internal static class TlsFailureMessages
         [OpenSslVerifyResult.CertificateSignatureFailure] = "certificate signature failure",
         [OpenSslVerifyResult.PathLengthExceeded] = "path length constraint exceeded",
         [OpenSslVerifyResult.PermittedSubtreeViolation] = "permitted subtree violation",
+        [OpenSslVerifyResult.ExcludedSubtreeViolation] = "excluded subtree violation",
         [OpenSslVerifyResult.InvalidCaCertificate] = "invalid CA certificate",
     }.ToFrozenDictionary();
 
