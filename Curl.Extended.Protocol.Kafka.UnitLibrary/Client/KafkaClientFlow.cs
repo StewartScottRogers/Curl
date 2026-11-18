@@ -49,7 +49,9 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
 
     /// <summary>
     /// Sends Metadata for the address's topic and gives the host and port of the broker that leads its partition; a
-    /// UNKNOWN_TOPIC_OR_PARTITION or LEADER_NOT_AVAILABLE (a broker that auto-creates the topic has no leader for it yet) is\n    /// asked again up to ten times, 250 ms apart on the transfer's time provider, within the transfer's cancellation; any other\n    /// topic or partition error, or a partition with no leader among the brokers, ends with exit 8 naming the error.
+    /// UNKNOWN_TOPIC_OR_PARTITION or LEADER_NOT_AVAILABLE (a broker that auto-creates the topic has no leader for it yet) is
+    /// asked again up to ten times, 250 ms apart on the transfer's time provider, within the transfer's cancellation; any other
+    /// topic or partition error, or a partition with no leader among the brokers, ends with exit 8 naming the error.
     /// </summary>
     internal async ValueTask<KafkaMetadataLeader> FindLeaderAsync(KafkaAddress address)
     {
