@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http/AzureStorageHttpConnectionReader.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5506 — Fix AF-0864: Surviving mutant: the Azure HTTP reader's line-length limit boundary is untested
 
@@ -43,3 +43,4 @@ Killed by `SendAsync_LineOfExactlyTheLimitWithItsCarriageReturn_IsRead` (verifie
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: f511ce0d 9742157d.
+- 2026-11-18: Doing -> Done. Added boundary tests that kill the mutant
