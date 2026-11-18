@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/ProxySelector.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5480 — Fix fitness finding EXT-086: NO_PROXY / --noproxy for s3, gs, az and abfs are matched against the bucket or account name, not the host actually connected to
 
@@ -36,13 +36,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] steps 1–4 leave the proxy log empty and behave as direct connections (step 1 prints `hello`, exit 0); step 5 goes through the proxy (`CONNECT bkt.s3.us-east-1.amazonaws.com:443`).
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] steps 1–4 leave the proxy log empty and behave as direct connections (step 1 prints `hello`, exit 0); step 5 goes through the proxy (`CONNECT bkt.s3.us-east-1.amazonaws.com:443`).
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+ProxySelector now matches NO_PROXY and --noproxy against the effective host: s3 endpoint (AWS_ENDPOINT_URL_S3, AWS_ENDPOINT_URL, else bucket.s3.region.amazonaws.com), gs (STORAGE_EMULATOR_HOST, else storage.googleapis.com), az (account.blob.core.windows.net, local hosts as written), abfs and abfss (account.dfs.core.windows.net). The bucket or account name no longer exempts (step 5 goes via proxy, per the criterion). The mapping is duplicated in Core because Core cannot reference the protocol libraries. Tests in ProxySelectorStorageSchemeNoProxyTests; the Core quality run is clean.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-086 (Medium).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 1033c7c6 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. NO_PROXY and --noproxy for s3, gs, az and abfs are matched against the host actually connected to
