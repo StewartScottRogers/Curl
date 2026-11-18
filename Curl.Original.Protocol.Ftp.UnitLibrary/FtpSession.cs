@@ -1497,13 +1497,15 @@ internal sealed class FtpSession(
     private readonly List<KeyValuePair<string, string>> writtenHeaders = [];
 
     /// <summary>
-    /// The lines counted by <c>%{num_headers}</c>: those <c>-I</c> wrote, or the one line curl 8.22.0
-    /// counts for a successful download (BL-5403).
+    /// The lines counted by <c>%{num_headers}</c>: every server reply line holding a colon plus those
+    /// <c>-I</c> wrote (BL-5470), or, when no reply holds a colon, the one line curl 8.22.0 counts for a
+    /// successful download (BL-5403).
     /// </summary>
-    private IReadOnlyList<KeyValuePair<string, string>> PseudoHeadersOf(TransferResult result, bool uploaded) =>
-        writtenHeaders.Count > 0 ? [.. writtenHeaders]
-        : uploaded || context.NoBody || !result.IsSuccess ? []
-        : [FtpHeadHeaderLines.TransferComplete];
+    private IReadOnlyList<KeyValuePair<string, string>> PseudoHeadersOf(TransferResult result, bool uploaded)
+    {
+        KeyValuePair<string, string>[] counted = uploaded ? [] : [.. control.ColonReplyLines, .. writtenHeaders];
+        return counted.Length > 0 ? counted\r\n            : uploaded || context.NoBody || !result.IsSuccess ? []\r\n            : [FtpHeadHeaderLines.TransferComplete];
+    }
 
     /// <summary>
     /// Writes one <c>-I</c> header line to <see cref="ITransferContext.HeaderOutput" />;

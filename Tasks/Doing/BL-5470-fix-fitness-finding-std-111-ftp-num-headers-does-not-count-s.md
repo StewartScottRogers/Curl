@@ -34,11 +34,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the three commands print `5`, `8`, `7`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the three commands print `5`, `8`, `7`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision: FtpControlChannel records every reply line holding a colon (split at the first colon) until QUIT; PseudoHeadersOf counts them plus the -I lines. A transfer whose replies hold no colon keeps the BL-5403 single count. Measured values (5, 8, 7) taken from the finding, not re-measured; the -Q case follows the same rule. Linux/macOS neutral.
 
 ## Log
 
