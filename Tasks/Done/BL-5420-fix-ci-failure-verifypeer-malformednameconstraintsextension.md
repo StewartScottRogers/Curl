@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests, Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5420 — Fix CI failure VerifyPeer_MalformedNameConstraintsExtension_IsRefusedAsATrustError on Linux and macOS
 
@@ -36,3 +36,4 @@ CI log: on Linux the chain through the malformed extension builds as "incomplete
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: ea635f6c.
+- 2026-11-17: Doing -> Done. Both tests Windows-only; Linux cannot build the chain
