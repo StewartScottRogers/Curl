@@ -184,6 +184,9 @@ if ($TestHeartbeat) {
             ,@('the next shift is handed -StopAtUsage, -StopAtWeeklyUsage and -UnpacedLanes (BL-4800)', 'True True True', $(
                 $handOn = Get-Content -Raw (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
                 "$($handOn -match "'-StopAtUsage', \`$StopAtUsage") $($handOn -match "'-StopAtWeeklyUsage', \`$StopAtWeeklyUsage") $($handOn -match "'-UnpacedLanes', \`$UnpacedLanes")"))
+            ,@('every lane is handed the shift''s -StopAtUsage and -StopAtWeeklyUsage (BL-5418)', 'True', $(
+                $laneArgs = [regex]::Match((Get-Content -Raw (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')), '(?s)\$laneArgsFor = \{.*?\n    \}').Value
+                [bool]($laneArgs -match "'-StopAtUsage', \`$StopAtUsage" -and $laneArgs -match "'-StopAtWeeklyUsage', \`$StopAtWeeklyUsage")))
             ,@('the Auto step, the capacity step and the unpaced ramp each pass -AddingTo to Get-ShiftCapacity (BL-4848)', '3', $(
                 $wired = Get-Content (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
                 @($wired | Where-Object { $_ -match 'Get-ShiftCapacity -Fallback \S+ -AddingTo \S+' }).Count))
