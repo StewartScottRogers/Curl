@@ -78,3 +78,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 123b988a 102ec5aa a66e083a 2d0dc877 d8e3fb0e 378fd6f7 ef6c9026.
 - 2026-11-02: Doing -> Deferred. Split into BL-4530, BL-4531, BL-4532, BL-4533
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 123b988a 102ec5aa a66e083a 2d0dc877 d8e3fb0e 378fd6f7 ef6c9026.
