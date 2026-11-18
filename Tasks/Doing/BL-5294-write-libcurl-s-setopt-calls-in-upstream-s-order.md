@@ -49,3 +49,5 @@ Filed from Surl's Phase 7 measurement of the port (Stewart approved filing on th
 - 2026-11-16: Doing -> Deferred. Not a defect: port already writes 8.22.0 setopt order matching vendored cases; 8.21.0 oracle differs (ADR-1277)
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e2bc2061 ed151c95.
+
+- 2026-11-18 re-check: same finding holds (ADR-1277). Criterion 1 is not met and is not meant to be: the cases' `<file>` data in this repository is 8.22.0's, which the port matches; an 8.21.0 order would fail them here. Criterion 2 is met by the Notes above. Closed as resolved with no code change; a port test per case already exists as the conformance ratchet's six listed cases.
