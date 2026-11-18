@@ -233,6 +233,26 @@ public sealed class SegmentedDownloadTransferHookTests
 
     private static string Text(Stream stream) => Encoding.Latin1.GetString(((MemoryStream)stream).ToArray());
 
+    [TestMethod]
+    public async Task ExecuteAsync_CompleteLengthAboveMaxFileSize_FailsWithExit63AfterOnlyTheProbe_Ext088()
+    {
+        var origin = new RangeOrigin(Alphabet);
+        var context = new TransferContext
+        {
+            Url = Url,
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions(),
+            MaxFileSize = 10,
+        };
+
+        var result = await new SegmentedDownloadTransferHook(3).ExecuteAsync(context, origin.Invoke);
+
+        Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Assert.AreEqual("Maximum file size exceeded", result.ErrorMessage);
+        Assert.HasCount(1, origin.Requests);
+        Assert.AreEqual(0, context.Output.Length);
+    }
+
     private static TransferContext Context(bool dumpHeaders = true) => new()
     {
         Url = Url,

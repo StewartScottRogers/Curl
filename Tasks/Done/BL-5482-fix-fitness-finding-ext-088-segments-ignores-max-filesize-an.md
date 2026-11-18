@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.SegmentedDownload.UnitLibrary/SegmentedDownloadTransferHook.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5482 — Fix fitness finding EXT-088: --segments ignores --max-filesize and writes the whole file with exit 0
 
@@ -33,13 +33,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the `--segments` command prints `curl: (63) Maximum file size exceeded`, exits 63, and the server logs only the one-byte probe (or one plain GET).
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the `--segments` command prints `curl: (63) Maximum file size exceeded`, exits 63, and the server logs only the one-byte probe (or one plain GET).
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fixed in SegmentedDownloadTransferHook.ExecuteAsync: a probe Content-Range complete length above MaxFileSize returns exit 63 "Maximum file size exceeded" after only the probe. CI on Linux/macOS: change is platform-neutral.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-088 (Medium).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: f5134b31 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. --segments now fails with exit 63 when the probe's complete length exceeds --max-filesize

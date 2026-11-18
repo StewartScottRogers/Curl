@@ -35,9 +35,14 @@ internal sealed class SegmentedDownloadTransferHook(int count) : ITransferHook
             return await probe.WriteAsync(context);
         }
 
-        return FirstRangeOf(probe) is { } first
-            ? await DownloadSegmentsAsync(probe, first.CompleteLength, context, next)
-            : await next(context);
+        if (FirstRangeOf(probe) is not { } first)
+        {
+            return await next(context);
+        }
+
+        return first.CompleteLength > context.MaxFileSize
+            ? TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Maximum file size exceeded")
+            : await DownloadSegmentsAsync(probe, first.CompleteLength, context, next);
     }
 
     private static ContentRange? FirstRangeOf(CapturedResponse probe) =>
