@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.OciRegistry.UnitLibrary/Http/OciHttpRequestWriter.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5507 — Fix AF-0865: Surviving mutant: an OCI request field name starting with a space, colon or line break is sent
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.OciRegistry.UnitLibrary/Http/OciHttpRequestWriter.cs line 42`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.OciRegistry.UnitLibrary/Http/OciHttpRequestWriter.cs line 42`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Mutant `<= 0` applied by hand at line 42: 4 new cases of `SendAsync_FieldThatWouldBreakTheHead_FailsWithoutWriting` fail (colon, space, CR LF first in a name; LF first in the method); reverted, all 231 pass. Fast tests of the OCI project pass; production code unchanged.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: c3a9b46d 9742157d.
+- 2026-11-18: Doing -> Done. Added leading-forbidden-character cases; mutant <= 0 now fails 4 tests

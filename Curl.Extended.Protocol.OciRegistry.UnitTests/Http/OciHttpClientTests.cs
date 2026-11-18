@@ -233,6 +233,10 @@ public sealed class OciHttpClientTests
     [DataRow("GET", "Authorization", "Bearer a\nb", DisplayName = "LF in a value")]
     [DataRow("GET", "Bad Name", "x", DisplayName = "Space in a name")]
     [DataRow("GET", "X:Y", "x", DisplayName = "Colon in a name")]
+    [DataRow("GET", ":X", "x", DisplayName = "Colon first in a name")]
+    [DataRow("GET", " X", "x", DisplayName = "Space first in a name")]
+    [DataRow("GET", "\r\nX-Injected: 1", "x", DisplayName = "CR LF first in a name")]
+    [DataRow("\nGET", "Accept", "x", DisplayName = "LF first in the method")]
     [DataRow("GET", "", "x", DisplayName = "Empty name")]
     [DataRow("GET /x", "Accept", "x", DisplayName = "Space in the method")]
     public async Task SendAsync_FieldThatWouldBreakTheHead_FailsWithoutWriting(string method, string name, string value)
