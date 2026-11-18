@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapFilterEncoder.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5454 — Fix fitness finding STD-135: Windows LDAP filter: leading spaces in an assertion value are sent; WinLDAP strips them
 
@@ -31,13 +31,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the first command's filter bytes equal `a3840000000c04037569640405616c696365`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first command's filter bytes equal `a3840000000c04037569640405616c696365`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+WinLDAP: LdapFilterEncoder.ValueAfterEquals drops leading spaces after =, ~=, >=, <= (not extensible matches); libldap keeps them. Measure-CodeQuality for the Ldap library: 0 failing members.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-135 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 4c1d41f6 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Fixed: WinLDAP drops leading spaces in assertion values

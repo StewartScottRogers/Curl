@@ -258,7 +258,14 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
     private byte[]? EncodeItem(string item)
     {
         int equals = item.IndexOf('=', StringComparison.Ordinal);
-        return equals > 0 ? EncodeOperator(item[equals - 1], item[..equals], item[(equals + 1)..]) : null;
+        return equals > 0 ? EncodeOperator(item[equals - 1], item[..equals], ValueAfterEquals(item, equals)) : null;
+    }
+
+    /// <summary>The text after the <c>=</c>; WinLDAP drops the spaces that lead it for <c>=</c>, <c>~=</c>, <c>&gt;=</c> and <c>&lt;=</c> (BL-5454).</summary>
+    private string ValueAfterEquals(string item, int equals)
+    {
+        string value = item[(equals + 1)..];
+        return isWinLdap && item[equals - 1] != ':' ? value.TrimStart(' ') : value;
     }
 
     /// <summary>Encodes an item by <paramref name="operatorCharacter" />, the character before its <c>=</c>.</summary>
