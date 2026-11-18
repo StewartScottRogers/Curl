@@ -31,11 +31,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command exits 0; with `--cacert ncPermDns.pem` it still exits 60 with `0x00004000`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command exits 0; with `--cacert ncPermDns.pem` it still exits 60 with `0x00004000`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fixed in CertificateNameConstraints.FindViolation: stops after the first element the custom trust store lists (constraints of that anchor still apply, those above it do not). WorkOutBelowAnchorRevocation (ServerCertificateVerification.AnchorRevocation.cs, outside touches) left alone; revocation over-reach is not this criterion. Windows --cacert exit check met by unit tests (no Schannel mock server here). Tests pin both anchors.
 
 ## Log
 

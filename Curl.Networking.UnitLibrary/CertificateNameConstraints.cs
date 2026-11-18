@@ -57,7 +57,8 @@ internal static class CertificateNameConstraints
         try
         {
             List<(Asn1Tag Tag, byte[] Value)>? names = null;
-            for (var index = 1; index < elements.Count; index++)
+            var end = CountThroughAnchor(chain);
+            for (var index = 1; index < end; index++)
             {
                 var extension = elements[index].Certificate.Extensions[NameConstraintsOid];
                 if (extension is null)
@@ -81,6 +82,17 @@ internal static class CertificateNameConstraints
             // A server-controlled name or constraint that does not decode is a refused chain (BL-5415).
             return NotPermitted;
         }
+    }
+
+    // A certificate the custom trust store lists is the anchor: those above it, sent by the server, do not apply (BL-5444).
+    private static int CountThroughAnchor(X509Chain chain)
+    {
+        var elements = chain.ChainElements;
+        var anchor = Enumerable.Range(1, elements.Count - 1)
+            .Where(index => chain.ChainPolicy.CustomTrustStore.Any(listed => listed.RawDataMemory.Span.SequenceEqual(elements[index].Certificate.RawDataMemory.Span)))
+            .Select(index => index + 1)
+            .FirstOrDefault();
+        return anchor == 0 ? elements.Count : anchor;
     }
 
     private static List<(Asn1Tag Tag, byte[] Value)> ListNames(X509Certificate2 leaf)

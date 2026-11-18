@@ -187,6 +187,34 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual(0, CertificateNameConstraints.FindViolation(chain));
     }
 
+    [TestMethod]
+    public void FindViolation_ConstraintsAboveTheListedAnchor_DoNotApply() =>
+        Assert.AreEqual(0, FindViolationWithAnchorListed(anchorIsTheTopCertificate: false));
+
+    [TestMethod]
+    public void FindViolation_ConstraintsOfTheListedTopCertificate_StillApply() =>
+        Assert.AreEqual(CertificateNameConstraints.NotPermitted, FindViolationWithAnchorListed(anchorIsTheTopCertificate: true));
+
+    // root -> top (permitted example.com) -> sub (permitted localhost) -> leaf localhost, the server sending all of them (BL-5444).
+    private static int FindViolationWithAnchorListed(bool anchorIsTheTopCertificate)
+    {
+        using var root = CreateAuthority("CN=Anchor Root", null, null);
+        using var top = CreateAuthority("CN=Anchor Top", root, Constraints(permitted: "example.com"));
+        using var sub = CreateAuthority("CN=Anchor Sub", top, Constraints(permitted: "localhost"));
+        using var leaf = CreateLeaf(sub, Host, false, true, false);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(root);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.ExtraStore.Add(top);
+        chain.ChainPolicy.ExtraStore.Add(sub);
+        chain.Build(leaf);
+        chain.ChainPolicy.CustomTrustStore.Clear();
+        chain.ChainPolicy.CustomTrustStore.Add(anchorIsTheTopCertificate ? top : sub);
+
+        return CertificateNameConstraints.FindViolation(chain);
+    }
+
     private const string NotPermitted = "schannel: error 0x00004000";
 
     private const string Excluded = "schannel: error 0x00008000";
