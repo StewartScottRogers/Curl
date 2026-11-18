@@ -82,7 +82,9 @@ public sealed class ServerCertificateVerificationCaDirectoryIntermediateTests
             return request.CreateSelfSigned(notBefore, notAfter);
         }
 
-        using var certificate = request.Create(issuer, notBefore, notAfter, RandomNumberGenerator.GetBytes(8));
+        // The issuer's validity is truncated to whole seconds, so a child ending "now + 30 days" can outlast it.
+        var childNotAfter = new DateTimeOffset(issuer.NotAfter.AddDays(-1));
+        using var certificate = request.Create(issuer, notBefore, childNotAfter, RandomNumberGenerator.GetBytes(8));
         return certificate.CopyWithPrivateKey(key);
     }
 

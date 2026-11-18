@@ -26,9 +26,11 @@ Lanes test only on Windows, so reproduce with `gh run view 44411823897 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `VerifyPeer_CaDirectoryHoldingOnlyAnIntermediateThatExcludesTheName_IsExit60` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `VerifyPeer_CaDirectoryHoldingOnlyAnIntermediateThatExcludesTheName_IsExit60` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: the test CA helper gave the intermediate notAfter = now+30d while the issuer's notAfter (truncated to seconds, made earlier) was slightly earlier, so CertificateRequest.Create threw on Linux. Fix: the child ends one day before its issuer. Test-only; CI on Linux/macOS met by the platform-neutral change.
 
 ## Log
 
