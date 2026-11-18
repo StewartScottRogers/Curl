@@ -35,11 +35,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] on Linux, the `--digest` command prints alice's entry, exit 0, and the relay log shows a SASL bind (`0xa3`, `DIGEST-MD5`) and no `secret`. The `--ntlm` command exits 67 `Login denied` with no `secret` on the wire.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] on Linux, the `--digest` command prints alice's entry, exit 0, and the relay log shows a SASL bind (`0xa3`, `DIGEST-MD5`) and no `secret`. The `--ntlm` command exits 67 `Login denied` with no `secret` on the wire.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decided in ADR-1299. Acceptance 1 verified by unit tests (DIGEST-MD5 SASL bind with no password on the wire, exit 67 for NTLM/negotiate/unoffered mechanisms), not against a live OpenLDAP. Login options are read from `context.Mail?.LoginOptions`.
 
 ## Log
 

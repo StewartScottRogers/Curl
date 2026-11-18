@@ -334,6 +334,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         {
             LdapBindKind.LogonUser => await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.Url.Scheme == TlsScheme, context.CancellationToken).ConfigureAwait(false),
             LdapBindKind.Simple => await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false),
+            LdapBindKind.Sasl => await LdapOpenLdapSaslBind.BindAsync(exchange, context.Credentials!, context.Url.IdnHost, LdapOpenLdapSaslBind.AllowsDigest(context.Mail?.LoginOptions, context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic), context.CancellationToken).ConfigureAwait(false),
             _ => await LdapAuthenticatedBind.BindAsync(bindKind, exchange, context.Credentials!, context.Url.IdnHost, context.Url.Scheme == TlsScheme, logonTokenSource, context.CancellationToken).ConfigureAwait(false),
         };
     }
@@ -345,6 +346,13 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     private LdapBindKind ChooseBindKind(ITransferContext context) =>
         dialect == LdapDialect.WinLdap
             ? LdapBindKindChoice.Choose(context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic, context.Credentials is not null)
+            : ChooseOpenLdapBindKind(context);
+
+    /// <summary>OpenLDAP's choice: SASL with credentials when <c>AUTH=</c> login options are given or the mask lacks Basic, otherwise a simple bind.</summary>
+    private static LdapBindKind ChooseOpenLdapBindKind(ITransferContext context) =>
+        context.Credentials is not null
+        && (LdapOpenLdapSaslBind.HasAuthOption(context.Mail?.LoginOptions) || !(context.Http?.AuthSchemes ?? HttpAuthSchemes.Basic).HasFlag(HttpAuthSchemes.Basic))
+            ? LdapBindKind.Sasl
             : LdapBindKind.Simple;
 
     /// <summary>Names a bind for the diagnostic log by its kind and DN, never its password.</summary>
