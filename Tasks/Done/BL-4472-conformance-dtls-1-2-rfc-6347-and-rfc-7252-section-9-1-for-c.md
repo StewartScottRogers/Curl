@@ -9,7 +9,7 @@ touches: [Curl.Conformance.Extended.UnitLibrary/Coap/Dtls, Curl.Conformance.Exte
 model: opus
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-18
 ---
 # BL-4472 — Conformance: DTLS 1.2 (RFC 6347) and RFC 7252 section 9.1 for coaps:// (Coap part 3 of 3)
 
@@ -44,25 +44,27 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Coap-Dtls.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 6347
+- [x] `Documentation/Conformance/Extended/Coap-Dtls.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of RFC 6347
       (and the RFC 5246 handshake rules it inherits) and RFC 7252 section 9.1 that binds a client an `Coap:` ID mapped
       to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` run curl in process for `coaps://` and assert datagram
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Coap/Dtls/` run curl in process for `coaps://` and assert datagram
       bytes, stdout, stderr and exit code for at least: a full handshake with a HelloVerifyRequest cookie, a server
       flight fragmented and reordered, a lost flight retransmitted on the timer, a replayed and an old-epoch record
       dropped, a fatal alert, a certificate the TLS provider refuses (and `-k`), and a CoAP exchange over the
       protected records.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Coap conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Coap/Dtls/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
 
 ## Notes
 
 - 2026-11-02 (lane 5): Split for size before any edit: a DTLS 1.2 server written from RFC 6347 and RFC 5246 (cookie exchange, ECDHE handshake, AEAD records), eight case groups and the full matrix are more than one run. BL-4573 (reference server, cookie handshake, certificate and `-k`, CoAP over protected records), BL-4574 (fragmentation and reordering, retransmission, replay, old epoch, fatal alert; depends on BL-4573) and BL-4575 (the full matrix and any cases it still needs; depends on both) carry every acceptance criterion between them. No task outside Done names BL-4472 in `depends-on`.
+
+- 2026-11-18 (lane 9): All work landed under BL-4573, BL-4574 and BL-4575 (all Done): the reference DTLS server in `Coap/Dtls/`, 13 case files, and the matrix, which those parts wrote as `Coap-Dtls-Handshake.md`, `Coap-Dtls-Faults.md` and `Coap-Dtls-Remaining.md` together standing for `Coap-Dtls.md` (an index file with no rows would fail the matrix check, so none was added). Rechecked here: `dotnet test Curl.Conformance.Extended.UnitTests` built clean and passed 1735, 1 skipped, matrix and known-failures checks included; no Coap line in `KnownFailures.txt`. The full fast run, quality run and platform check are those BL-4575 recorded; no code changed here, so they still hold. Criteria ticked on that evidence.
 
 ## Log
 
@@ -71,3 +73,4 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 - 2026-11-02: Doing -> Deferred. Split into BL-4573, BL-4574, BL-4575
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 35340c3a 488321ad fb1c989b d8e3fb0e f055b099 17248609.
+- 2026-11-18: Doing -> Done. Delivered by BL-4573, BL-4574 and BL-4575 (all Done); coaps:// DTLS 1.2 conformance matrix and cases green
