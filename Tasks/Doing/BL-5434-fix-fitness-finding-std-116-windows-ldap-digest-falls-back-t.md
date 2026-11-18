@@ -4,8 +4,8 @@ title: Fix fitness finding STD-116: Windows LDAP --digest falls back to qop=auth
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5Bind.cs]
+depends-on: [BL-5094]
+touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5Bind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/WinLdapResultText.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5BindTests.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5AuthConfTests.cs, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-11-18
 completed:
@@ -42,6 +42,8 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 - [ ] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Plan (no code edited): ChooseQop returns auth-conf-with-3des or null (WinLDAP dialect only uses it). The refusal must read "Operations Error" (code 1) but LdapAuthenticatedBind.cs:163 reports LocalError (82, "Local Error"): add WinLdapResultText.OperationsError = 1 and use it there. Tests to rewrite: LdapDigestMd5BindTests (qop=auth answer tests, ChallengeReply in ExecuteAsync) and AuthConf OnlyAuthOffered. Supersede ADR-1292 fallback with a new ADR. LdapAuthenticatedBind.cs is held by BL-5094 (lane 4), so waiting on it.
 
 ## Log
 
