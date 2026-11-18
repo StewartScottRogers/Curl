@@ -1562,7 +1562,7 @@ public sealed class HttpProtocolHandler(
         TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
             with
         {
-            Report = WithHeadBeforeFailure(exchange.Report(body), failure),
+            Report = WithoutFirstByteWhenHttp09Refused(WithHeadBeforeFailure(exchange.Report(body), failure), failure),
             WriteOutErrorMessage = failure.ExitCode == CurlExitCode.HttpReturnedError && plan.Options.Fail == HttpFailMode.FailWithBody
                 ? HttpTransferMessages.HttpResponseCodeSaidError
                 : null,
@@ -1571,6 +1571,15 @@ public sealed class HttpProtocolHandler(
         ReportEmptyReply(plan.Context.Events, failure, outcome);
         return outcome;
     }
+
+    /// <summary>
+    /// Drops the first-byte time of a reply refused as HTTP/0.9: curl 8.22.0 reports <c>%{time_starttransfer}</c> 0 for it,
+    /// as the bytes were never a response (STD-146).
+    /// </summary>
+    private static TransferReport? WithoutFirstByteWhenHttp09Refused(TransferReport? report, HttpTransferException failure) =>
+        report is { Timings: { } timings } && failure.Message == HttpTransferMessages.Http09NotAllowed
+            ? report with { Timings = timings with { FirstByteReceived = null } }
+            : report;
 
     /// <summary>
     /// Echoes <c>-f</c>'s <c>The requested URL returned error: N</c>, <c>--max-redirs</c>'s and <c>--max-filesize</c>'s messages as a <c>-v</c> line, as

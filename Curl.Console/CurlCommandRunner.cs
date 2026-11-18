@@ -3757,8 +3757,18 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when the transfer numbers a connection.</returns>
     private static bool UsedAConnection(TransferResult result) =>
-        result.ExitCode is not (CurlExitCode.UnsupportedProtocol or CurlExitCode.UrlMalformat)
+        result.ExitCode is not CurlExitCode.UrlMalformat
+        && !IsUnsupportedProtocolRejection(result)
         && !IsIpfsGatewayFailure(result);
+
+    /// <summary>
+    /// Tells whether a result is an exit 1 refusal of a URL's scheme, which happens before any connection;
+    /// the one exit 1 failure that comes after a connection is a reply refused as HTTP/0.9 (STD-146).
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> for the unsupported-protocol refusal.</returns>
+    private static bool IsUnsupportedProtocolRejection(TransferResult result) =>
+        result.ExitCode == CurlExitCode.UnsupportedProtocol && result.ErrorMessage != "Received HTTP/0.9 when not allowed";
 
     /// <summary>
     /// Gives a finished transfer its <c>%{conn_id}</c>: the next connection number when it
