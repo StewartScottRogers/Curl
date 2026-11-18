@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/SessionTicketRecordDetector.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5502 — Fix AF-0860: Surviving mutant: the received close_notify event can be reported as sent
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/SessionTicketRecordDetector.cs line 51`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/SessionTicketRecordDetector.cs line 51`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `Cgr225RemainderTests.ReportTicketRecords_CloseNotifyAfterResponse_ReportsCloseNotifyAlert`: the test recorder now renders the alert direction and the test expects `alert 1,0 received`. With Sent = true at line 51 it failed; reverted, all 4328 Networking fast tests pass. Test-only change; no production code changed.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: f053ec40 9742157d.
+- 2026-11-18: Doing -> Done. Pinned the received close_notify direction in Cgr225RemainderTests; mutant killed
