@@ -42,3 +42,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-154 (Low).
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 2eabf6aa 69116afe 3d836d5e.
