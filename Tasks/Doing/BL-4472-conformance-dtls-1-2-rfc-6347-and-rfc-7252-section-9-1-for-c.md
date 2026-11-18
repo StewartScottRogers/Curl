@@ -70,3 +70,4 @@ or cases is fixed here, but a defect in the extension library is listed in `Know
 - 2026-11-02: Backlog -> Doing. Criteria at claim: 35340c3a 488321ad fb1c989b d8e3fb0e f055b099 17248609.
 - 2026-11-02: Doing -> Deferred. Split into BL-4573, BL-4574, BL-4575
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 35340c3a 488321ad fb1c989b d8e3fb0e f055b099 17248609.
