@@ -32,3 +32,4 @@ Found by the shift-end review (ADR-0710) of the 2026-11-17 shift (code-reviewer 
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: e5924e49 b2fe075a 4f17513b.
