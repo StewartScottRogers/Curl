@@ -72,7 +72,7 @@ internal static class StorageTransferChecks
             Assert.AreEqual(string.Empty, Text(result.StandardError));
             Assert.AreEqual(0, result.ExitCode);
             Assert.AreEqual(
-                string.Create(CultureInfo.InvariantCulture, $"0||{target.ObjectUrl}|{target.ObjectUrl}|{scheme}|127.0.0.1|443|{target.Body.Length}|0.000000"),
+                string.Create(CultureInfo.InvariantCulture, $"0||{target.ObjectUrl}|{target.ObjectUrl}|{scheme}|127.0.0.1|443|{target.Body.Length}|0.000001"),
                 Text(result.StandardOutput));
         }));
 

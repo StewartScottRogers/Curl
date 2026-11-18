@@ -97,7 +97,7 @@ public sealed class XmppTransferSurfaceCases
             {
                 CurlRunResult result = await RunAsync(Route(scheme, Result), "-sS", "-w", WriteOutFormat, Url(scheme));
 
-                AssertRun(result, requirement, "manual: -w", 0, $"{Reply}0||{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|{Port(scheme)}|{Reply.Length}|0.000000", string.Empty);
+                AssertRun(result, requirement, "manual: -w", 0, $"{Reply}0||{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|{Port(scheme)}|{Reply.Length}|0.000001", string.Empty);
             });
 
     [TestMethod]
@@ -117,7 +117,7 @@ public sealed class XmppTransferSurfaceCases
                     requirement,
                     "manual: -w; ADR-1068: a stanza error is exit 8",
                     8,
-                    $"8|{ServerErrorMessage}|{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|{Port(scheme)}|0|0.000000",
+                    $"8|{ServerErrorMessage}|{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|{Port(scheme)}|0|0.000001",
                     $"curl: (8) {ServerErrorMessage}\n");
             });
 

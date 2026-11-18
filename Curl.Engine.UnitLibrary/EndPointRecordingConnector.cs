@@ -25,7 +25,7 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
         ConnectResult connect = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
         if (connect.Connection is { } connection)
         {
-            recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint, connect.IsReused);
+            recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint, connect.IsReused, connect.Timings);
             recorder.RecordFailedConnect(connect.LastSocketError);
         }
         else
@@ -70,7 +70,7 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
         ConnectResult connect = await connector.ConnectMultiplexedSessionAsync(target, openSession, cancellationToken).ConfigureAwait(false);
         if (connect.Connection is { } connection)
         {
-            recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint, connect.IsReused);
+            recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint, connect.IsReused, connect.Timings);
         }
         else
         {

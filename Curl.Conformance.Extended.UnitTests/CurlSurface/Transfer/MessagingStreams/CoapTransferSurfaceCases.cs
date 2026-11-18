@@ -109,7 +109,7 @@ public sealed class CoapTransferSurfaceCases
             {
                 CurlRunResult result = await RunAsync(scheme, CoapResponses.Content, Reply, "-w", WriteOutFormat);
 
-                AssertRun(result, requirement, "manual: -w", 0, $"{Reply}0||{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|{Port(scheme)}|{Reply.Length}|0.000000", string.Empty);
+                AssertRun(result, requirement, "manual: -w", 0, $"{Reply}0||{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|{Port(scheme)}|{Reply.Length}|0.000001", string.Empty);
             });
 
     [TestMethod]
@@ -129,7 +129,7 @@ public sealed class CoapTransferSurfaceCases
                     requirement,
                     "manual: -w, --fail; RFC 7252 section 5.9: 4.04 is an error response",
                     22,
-                    $"22|{ErrorMessage}|{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|{Port(scheme)}|0|0.000000",
+                    $"22|{ErrorMessage}|{Url(scheme)}|{Url(scheme)}|{scheme}|127.0.0.1|{Port(scheme)}|0|0.000001",
                     $"curl: (22) {ErrorMessage}\n");
             });
 

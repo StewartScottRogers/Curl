@@ -17,6 +17,9 @@ internal sealed partial class ConnectionEndPointRecorder
     /// </summary>
     private int connectionsOpened;
 
+    /// <summary>Gets the connect timings of the transfer's first connection, or <see langword="null" /> when none was given.</summary>
+    internal ConnectTimings? FirstConnectTimings { get; private set; }
+
     /// <summary>Whether the transfer's first connection has been recorded.</summary>
     private bool connectionRecorded;
 
@@ -48,7 +51,8 @@ internal sealed partial class ConnectionEndPointRecorder
     /// Whether the connection came from the pool rather than being opened, which curl does not
     /// count in <c>%{num_connects}</c>.
     /// </param>
-    internal void Record(IPEndPoint? local, EndPoint? remote, bool reused = false)
+    /// <param name="timings">The connect's timings, kept for the first connection: the source of <c>%{time_connect}</c> for a handler that reports none.</param>
+    internal void Record(IPEndPoint? local, EndPoint? remote, bool reused = false, ConnectTimings? timings = null)
     {
         if (remote is not (IPEndPoint or UnixDomainSocketEndPoint))
         {
@@ -59,6 +63,7 @@ internal sealed partial class ConnectionEndPointRecorder
         if (!connectionRecorded)
         {
             RecordFirstConnection(local, remote);
+            FirstConnectTimings = timings;
         }
     }
 
@@ -78,6 +83,7 @@ internal sealed partial class ConnectionEndPointRecorder
     {
         connectionsOpened = 0;
         connectionRecorded = false;
+        FirstConnectTimings = null;
         localEndPoint = null;
         remoteEndPoint = null;
         unixSocketRemoteIp = null;
