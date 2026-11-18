@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503, BL-4463]
 touches: [Curl.Conformance.Extended.UnitTests/CurlSurface/Transfer/MessagingStreams, Documentation/Conformance/Extended/CurlSurface-Transfer-MessagingStreams.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-18
 ---
 # BL-4614 — Conformance: curl's transfer options (-v, -o, -O, -w, --fail, -m) for mqtt5, redis, xmpp, coap and dns
 
@@ -42,3 +42,4 @@ Split from BL-4496 (the transfer surface for every extended protocol), which hol
 - 2026-11-02: Doing -> Deferred. Split into BL-4625, BL-4626, BL-4627, BL-4623, BL-4624
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: a0f8b8b0 9605f2d3 fe617ef5 be674468 9438adeb ef6c9026.
+- 2026-11-18: Doing -> Done. Carried by BL-4623 to BL-4627; matrices and cases exist, tests green
