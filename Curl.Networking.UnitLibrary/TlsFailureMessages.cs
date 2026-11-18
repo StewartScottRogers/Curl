@@ -39,7 +39,7 @@ internal static class TlsFailureMessages
 
     private const string SchannelChainIncomplete = "schannel: the certificate chain is incomplete";
 
-    private const string SchannelRevocationStatusUnknown = "schannel: the revocation status is unknown";
+    internal const string SchannelRevocationStatusUnknown = "schannel: the revocation status is unknown";
 
     /// <summary>
     /// The Schannel build's message for exit 60 when, with <c>--cacert</c>, a certificate of the

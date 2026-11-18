@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5446 — Fix fitness finding STD-128: Windows: an unusable CRL below an intermediate anchor gives "the certificate chain is incomplete"; curl says "the revocation status is unknown"
 
@@ -31,13 +31,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the 404 variant prints `schannel: the revocation status is unknown`, exit 60.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the 404 variant prints `schannel: the revocation status is unknown`, exit 60.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix in `BelowNonSelfSignedAnchorFailure`: an Unresolved below-anchor revocation under a listed non-self-signed --cacert anchor now reports `schannel: the revocation status is unknown` (exit 60). Test pinned in IntermediateOnlyProxyCacertTests; quality run clean.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-128 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: b3371520 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Unresolved CRL below an intermediate --cacert anchor now reports the revocation status is unknown
