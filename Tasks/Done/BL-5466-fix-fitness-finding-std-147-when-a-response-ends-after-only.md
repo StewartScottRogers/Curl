@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Engine.UnitLibrary/TransferHeaderStore.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5466 — Fix fitness finding STD-147: When a response ends after only 1xx heads, %{header_json} and %header{} show the 1xx header fields; curl shows none
 
@@ -43,3 +43,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-147 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 60577158 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Lone 1xx head fields are kept out of header_json and %header{}; num_headers still counts them
