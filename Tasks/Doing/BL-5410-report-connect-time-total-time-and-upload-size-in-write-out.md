@@ -46,3 +46,4 @@ The same pattern for kafka, amqp1, mqtt5 and nats with `-d`.
 ## Log
 
 - 2026-11-17: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 05bdf0ad 5902434f 1c28bb7d d4059c66 66536c10 f50bf17d a0b49a29.
