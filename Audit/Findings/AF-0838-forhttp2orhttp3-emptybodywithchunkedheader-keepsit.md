@@ -42,6 +42,8 @@ Select-String -Path Curl.Original.Protocol.Http.UnitTests/Http2RequestHeadersTra
 
 ## Re-audits
 
+- 2026-11-18 | 2026-11-18_0810.md | reproduces: no | Ran the Select-String: no match for 'Assert.IsNotNull(http2.Body);'. ForHttp2OrHttp3_EmptyBodyWithChunkedHeader_KeepsItsBody now asserts line 68 Assert.AreSame(options.Body, http2.Body);.
+
 ## Log
 
 - 2026-11-17: filed proposed.

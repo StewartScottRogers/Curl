@@ -3,8 +3,8 @@ id: AF-0851
 title: --mptcp -Z on Windows: Curl shows the transfer live in the parallel meter before the exit 7 error, where curl fails first and the meter shows Live 0
 auditor: conformance
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-18_0810.md: the reproduction no longer reproduces.
 key: conformance:--mptcp:parallel-socket-open-failure-order:stderr
 reproduction: none
 task: BL-5371
@@ -13,9 +13,9 @@ found: 2026-11-17
 found-at: 10c240a4859c7868ec16b722cde6234f80cc8fcb
 scorecard: 2026-11-17_0430.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-18
+closed-how: reliable-reaudit
+closed-by: 2026-11-18_0810.md
 ---
 # AF-0851 - --mptcp -Z on Windows: Curl shows the transfer live in the parallel meter before the exit 7 error, where curl fails first and the meter shows Live 0
 
@@ -42,6 +42,9 @@ Push-Location $env:TEMP; & ./Record-CurlExchange.ps1 -Port 57920 -Curl curl.exe 
 
 ## Re-audits
 
+- 2026-11-18 | 2026-11-18_0810.md | reproduces: no | Ran the reproduction's two Record-CurlExchange.ps1 commands (by full path, from the scratch folder; the given './Record-CurlExchange.ps1' does not resolve from $env:TEMP) against curl 8.22.0 Schannel (Debug-enabled libcurl) and Curl.Console Release. Both exit 7. Both stderr files start with 'curl: (7) Failed to connect to 127.0.0.1:57920 after N ms: Could not connect to server', followed by the parallel meter header and rows showing Xfers 1, Live 0. The ordering and the Live column now match curl.
+
 ## Log
 
 - 2026-11-17: filed proposed.
+- 2026-11-18: accepted -> closed. Re-audit 2026-11-18_0810.md: the reproduction no longer reproduces.
