@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib1501.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5512 — Fix AF-0870: Surviving mutant: lib1501 can carry on after a failed first multi perform
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib1501.cs line 79`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib1501.cs line 79`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test `Lib1501_WhenTheFirstPerformFailsWithTransfersStillRunning_StopsBeforeTheLoop` (hand-applied `||` at line 79 made it fail; reverted, all 1227 pass). The existing failing-first-perform case returned running 0, so the loop never ran. Test-only change; build and fast tests green.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: c6f8bc9b 9742157d.
+- 2026-11-18: Doing -> Done. Mutant killed by a new Lib1501 test

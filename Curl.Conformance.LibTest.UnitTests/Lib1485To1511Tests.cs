@@ -225,6 +225,20 @@ public sealed class Lib1485To1511Tests
     }
 
     [TestMethod]
+    public async Task Lib1501_WhenTheFirstPerformFailsWithTransfersStillRunning_StopsBeforeTheLoop()
+    {
+        var engine = new FakeCurlEngine();
+        engine.Multi.PerformResults.Enqueue((CurlMultiCode.BadHandle, 1));
+        engine.Multi.PerformResult = (CurlMultiCode.Ok, 1);
+        var run = new PortRun(engine, 1501, "ftp://x/1501/");
+
+        LibTestResult result = await new Lib1501(new ManualTimeProvider(DateTimeOffset.UnixEpoch)).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual((int)CurlCode.Obsolete32, result.ExitCode);
+        Assert.DoesNotContain("ping", run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task Lib1501_WhenAPerformBlocksPastTheLimit_EndsTooLarge()
     {
         var time = new ManualTimeProvider(DateTimeOffset.UnixEpoch);
