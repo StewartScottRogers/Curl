@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/Http2StreamConnection.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5468 — Fix fitness finding STD-149: HTTP/2 -I: a trailer HEADERS frame right after the response head (no DATA) is dropped from -I, -i and -D output
 
@@ -43,3 +43,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-149 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 22553eed 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. -I over HTTP/2 now reads a trailer HEADERS right after the head; unit test added
