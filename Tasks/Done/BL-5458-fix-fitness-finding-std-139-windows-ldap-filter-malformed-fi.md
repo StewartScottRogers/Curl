@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapFilterEncoder.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5458 — Fix fitness finding STD-139: Windows LDAP filter: malformed filters that curl rejects with "Filter Error" are sent
 
@@ -43,3 +43,4 @@ WinLDAP dialect now refuses (Filter Error, exit 39) a substrings filter with no 
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-139 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: fd9b9753 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. WinLDAP now rejects (cn=**), (cn:=), (cn:dn:=) with Filter Error exit 39; unit tests added, quality gates green
