@@ -52,3 +52,4 @@ The same gap affects the Part B messaging extension protocols (EXT-083, BL-5410)
 ## Log
 
 - 2026-11-17: Created.
+- 2026-11-17: Backlog -> Doing. Criteria at claim: ab061ebd 5e1ac160 bc933de7 7ae10ef7 d9c86291 a0b49a29.
