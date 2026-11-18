@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Amqp1, Curl.Conformance.Extended.UnitTests/Amqp1, Documentation/Conformance/Extended/Amqp1.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-18
 ---
 # BL-4466 — Conformance: AMQP 1.0 types, transport, connection, session, link and SASL for amqp1:// (Amqp1 part 1 of 2)
 
@@ -42,27 +42,29 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Amqp1.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of this scope
+- [x] `Documentation/Conformance/Extended/Amqp1.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of this scope
       that binds a client an `Amqp1:` ID and maps it to a test or to `n/a: <reason>`, links to `Amqp1-Messaging.md`
       (written by BL-4467), and the harness's matrix check passes.
-- [ ] A reference AMQP 1.0 container in `Curl.Conformance.Extended.UnitLibrary/Amqp1/` lets BL-4467 add transfer
+- [x] A reference AMQP 1.0 container in `Curl.Conformance.Extended.UnitLibrary/Amqp1/` lets BL-4467 add transfer
       behaviour in `Amqp1/Messaging/` without editing this task's files.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Amqp1/` run curl in process for `amqp1://` and `amqp1s://` and
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Amqp1/` run curl in process for `amqp1://` and `amqp1s://` and
       assert wire bytes, stdout, stderr and exit code for at least: both protocol headers and a server answering
       with another one, SASL PLAIN from `-u`, ANONYMOUS without it, a SASL outcome other than ok, max-frame-size
       negotiation, idle-timeout empty frames, open/begin/attach/detach/end/close order, a close carrying an error,
       and every encoding width the server may choose for a value the client reads.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Amqp1 conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Amqp1/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Amqp1/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
 - 2026-11-02 (lane 5): Split for size before any code: no protocol has a reference server yet, so this run would have had to build the whole AMQP 1.0 container, every case group, the matrix and a coverage run inside one claim. Split into BL-4527 (reference container, protocol headers, SASL, matrix skeleton), BL-4528 (connection, session, link, frame size, idle timeout, errors) and BL-4529 (encoding widths, complete matrix, link to Amqp1-Messaging.md), each depending on the one before; BL-4467 now depends on all three instead of BL-4466.
+
+- 2026-11-18 (lane 5): All work landed through the split parts BL-4528, BL-4529, BL-4545 and BL-4546 (BL-4527's remaining quality fixes were done by the latter two). Verified: Curl.Conformance.Extended.UnitTests builds clean and 1735 tests pass; Measure-CodeQuality.ps1 for Curl.Conformance.Extended.UnitLibrary reports 0 failing members. Criteria ticked on that evidence; platform-neutral by construction.
 
 ## Log
 
@@ -71,3 +73,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 - 2026-11-02: Doing -> Deferred. Split into BL-4527, BL-4528, BL-4529
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: bb81a338 63d78303 0a6c8824 9fbc674d d8e3fb0e 59a9ad50 ef6c9026.
+- 2026-11-18: Doing -> Done. Amqp1 conformance complete via BL-4528, BL-4529, BL-4545, BL-4546; tests green, quality gate 0 failing
