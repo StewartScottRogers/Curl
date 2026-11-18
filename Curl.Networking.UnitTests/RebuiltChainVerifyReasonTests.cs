@@ -58,6 +58,26 @@ public sealed class RebuiltChainVerifyReasonTests
     }
 
     [TestMethod]
+    public void Judge_ExpiredLeafUnderSystemTrustedCaOutsideTheCaDirectory_ReportsExpiredAndVerifyResult10()
+    {
+        using var systemRoot = CreateRoot("CN=System Trusted Root");
+        using var unrelated = CreateRoot("CN=Unrelated Rebuilt Root");
+        using var leaf = CreateLeaf(systemRoot, null, expired: true);
+        var verification = new ServerCertificateVerification(new TlsClientOptions(CaCertificateDirectory: WriteDirectory(unrelated)), false, TimeProvider.System);
+        var (_, anchors, _) = verification.ReadTrustAnchors();
+        using var chain = new X509Chain();
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(systemRoot);
+        chain.Build(leaf);
+
+        var (observed, failure) = verification.Judge(SslPolicyErrors.RemoteCertificateChainErrors, chain, Host, anchors, null, []);
+
+        Assert.AreEqual(Expired, failure?.Message);
+        Assert.AreEqual(10L, observed.VerifyResult);
+    }
+
+    [TestMethod]
     public void Judge_CaDirectoryAnchorAndClientAuthenticationLeaf_ReportsVerifyResult26()
     {
         using var root = CreateRoot();

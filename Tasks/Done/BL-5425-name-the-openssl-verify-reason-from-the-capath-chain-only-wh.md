@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5425 — Name the OpenSSL verify reason from the --capath chain only when it reaches an anchor
 
@@ -23,13 +23,16 @@ Found by the shift-end review (ADR-0710) of the 2026-11-17 shift (code-reviewer 
 
 ## Acceptance criteria
 
-- [ ] `ReasonChainFromAnchors` returns the rebuilt chain only when it ends at one of the anchors; otherwise it returns null, so the system-store chain names the reason.
-- [ ] A unit test: an expired leaf under a CA outside `--capath` (trusted as a system root in the test) reports verify result 10 and its message; BL-5395's test (an expired leaf under a `--capath` root) still reports 10.
-- [ ] Quality gates hold.
+- [x] `ReasonChainFromAnchors` returns the rebuilt chain only when it ends at one of the anchors; otherwise it returns null, so the system-store chain names the reason.
+- [x] A unit test: an expired leaf under a CA outside `--capath` (trusted as a system root in the test) reports verify result 10 and its message; BL-5395's test (an expired leaf under a `--capath` root) still reports 10.
+- [x] Quality gates hold.
 
 ## Notes
+
+- ReasonChainFromAnchors now disposes and returns null unless the rebuilt chain ends at an anchor (thumbprint). Test added in RebuiltChainVerifyReasonTests. Measure-CodeQuality for Curl.Networking.UnitLibrary: 100% line, 100% branch, 0 failing; its Networking tests pass.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 4d76b3fe 725f71d9 d17de588.
+- 2026-11-18: Doing -> Done. ReasonChainFromAnchors names the reason only when the --capath chain reaches an anchor
