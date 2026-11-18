@@ -1,4 +1,6 @@
 using System.Formats.Asn1;
+using System.Runtime.CompilerServices;
+using Curl.Protocol.Abstractions;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
@@ -18,9 +20,24 @@ internal sealed partial class ServerCertificateVerification
 
     /// <summary>
     /// Downloads a certificate revocation list from the address a certificate's CRL distribution
-    /// point names, or returns <see langword="null" /> when it cannot be had. A test seam.
+    /// point names, or throws (an <see cref="IOException" />, <see cref="HttpRequestException" />,
+    /// <see cref="OperationCanceledException" /> or <see cref="InvalidOperationException" />, its
+    /// message the reason) when it cannot be had. It must stop when the token is cancelled. A test seam.
     /// </summary>
-    internal Func<Uri, byte[]?> FetchRevocationList { get; init; } = RevocationListDownload.Fetch;
+    internal Func<Uri, CancellationToken, byte[]> FetchRevocationList { get; init; } = RevocationListDownload.Fetch;
+
+    /// <summary>
+    /// The most time all the list fetches of one verification may take together; what is left of
+    /// it bounds each fetch, and a fetch past it counts as unfetchable. Five seconds unless set.
+    /// </summary>
+    internal TimeSpan RevocationFetchBudget { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>Where a failed list fetch is written, at <c>warning</c> as <c>tls</c>.</summary>
+    internal IDiagnosticLog RevocationDiagnosticLog { get; init; } = NoDiagnosticLog.Instance;
+
+    private readonly ConditionalWeakTable<X509Chain, BelowAnchorRevocationAnswer> _belowAnchorAnswers = new();
+
+    private sealed record BelowAnchorRevocationAnswer(BelowAnchorRevocation Value);
 
     /// <summary>What the CRLs say of the certificates below an anchor.</summary>
     private enum BelowAnchorRevocation
@@ -38,7 +55,11 @@ internal sealed partial class ServerCertificateVerification
     // With a chain ending at a non-self-signed anchor the Windows engine reports every element's
     // revocation status unknown, even with a valid CRL one fetch away, so the lists are read
     // here: the certificates below the anchor are looked up in the list their issuer signed.
-    private BelowAnchorRevocation ReadBelowAnchorRevocation(X509Chain chain)
+    // Worked out once per chain, so once per verification, however many checks ask.
+    private BelowAnchorRevocation ReadBelowAnchorRevocation(X509Chain chain) =>
+        _belowAnchorAnswers.GetValue(chain, key => new BelowAnchorRevocationAnswer(WorkOutBelowAnchorRevocation(key))).Value;
+
+    private BelowAnchorRevocation WorkOutBelowAnchorRevocation(X509Chain chain)
     {
         if (ReadCertificatesBelowAnchorStatus(chain).All(status => (status.Status & UnavailableRevocationFlags) == 0))
         {
@@ -46,26 +67,45 @@ internal sealed partial class ServerCertificateVerification
         }
 
         var elements = chain.ChainElements.Cast<X509ChainElement>().Select(element => element.Certificate).ToArray();
-        var outcomes = elements.Take(elements.Length - 1).Select((certificate, index) => RevocationOf(certificate, elements[index + 1])).ToArray();
+        using var budget = new CancellationTokenSource(RevocationFetchBudget, timeProvider);
+        var outcomes = elements.Take(elements.Length - 1).Select((certificate, index) => RevocationOf(certificate, elements[index + 1], budget.Token)).ToArray();
         return outcomes.Contains(BelowAnchorRevocation.Revoked)
             ? BelowAnchorRevocation.Revoked
             : outcomes.Contains(BelowAnchorRevocation.Unresolved) ? BelowAnchorRevocation.Unresolved : BelowAnchorRevocation.Clean;
     }
 
-    private BelowAnchorRevocation RevocationOf(X509Certificate2 certificate, X509Certificate2 issuer)
+    private BelowAnchorRevocation RevocationOf(X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        var lists = CrlDistributionPointUris(certificate).Select(uri => UsableRevocationList(uri, certificate, issuer)).OfType<CertificateRevocationList>().ToArray();
+        var lists = CrlDistributionPointUris(certificate).Select(uri => UsableRevocationList(uri, certificate, issuer, budget)).OfType<CertificateRevocationList>().ToArray();
         return lists.Length == 0
             ? BelowAnchorRevocation.Unresolved
             : lists.Any(list => list.Revokes(certificate)) ? BelowAnchorRevocation.Revoked : BelowAnchorRevocation.Clean;
     }
 
     // A list is usable when it decodes, is the issuer's, is signed by the issuer and names a next update not yet passed (one naming none fails closed).
-    private CertificateRevocationList? UsableRevocationList(Uri uri, X509Certificate2 certificate, X509Certificate2 issuer)
+    private CertificateRevocationList? UsableRevocationList(Uri uri, X509Certificate2 certificate, X509Certificate2 issuer, CancellationToken budget)
     {
-        var der = FetchRevocationList(uri);
+        var der = TryFetchRevocationList(uri, budget);
         var list = der is null ? null : DecodeOrNothing(der);
         return list is not null && IsCurrentListOf(list, certificate, issuer) ? list : null;
+    }
+
+    private byte[]? TryFetchRevocationList(Uri uri, CancellationToken budget)
+    {
+        try
+        {
+            budget.ThrowIfCancellationRequested();
+            return FetchRevocationList(uri, budget);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or IOException or OperationCanceledException or InvalidOperationException)
+        {
+            if (RevocationDiagnosticLog.IsEnabled(DiagnosticLogLevel.Warning))
+            {
+                RevocationDiagnosticLog.Write(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Tls, $"CRL {uri} could not be fetched: {exception.Message}");
+            }
+
+            return null;
+        }
     }
 
     private bool IsCurrentListOf(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer) =>

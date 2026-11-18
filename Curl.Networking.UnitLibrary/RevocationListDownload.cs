@@ -10,31 +10,39 @@ namespace Curl.Networking;
 [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin HTTP adapter that needs a live server; tests replace ServerCertificateVerification.FetchRevocationList.")]
 internal static class RevocationListDownload
 {
-    private static readonly TimeSpan Limit = TimeSpan.FromSeconds(5);
+    /// <summary>The most a list's body may hold before it counts as unfetchable.</summary>
+    internal const int MaximumBodyBytes = 10 * 1024 * 1024;
 
-    /// <summary>Gets the list at <paramref name="uri" />, or <see langword="null" /> when it cannot be fetched.</summary>
+    /// <summary>Gets the list at <paramref name="uri" />; throws when it cannot be fetched, saying why.</summary>
     /// <param name="uri">The distribution point's http address.</param>
-    /// <returns>The response body, or <see langword="null" />.</returns>
-    internal static byte[]? Fetch(Uri uri)
+    /// <param name="cancellation">Cuts the fetch short, headers and body both.</param>
+    /// <returns>The response body.</returns>
+    /// <exception cref="IOException">The server did not answer with success, or the body passed <see cref="MaximumBodyBytes" />.</exception>
+    internal static byte[] Fetch(Uri uri, CancellationToken cancellation)
     {
-        try
+        using var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        using var response = client.Send(request, HttpCompletionOption.ResponseHeadersRead, cancellation);
+        if (!response.IsSuccessStatusCode)
         {
-            using var client = new HttpClient { Timeout = Limit };
-            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            using var response = client.Send(request);
-            if (!response.IsSuccessStatusCode)
+            throw new IOException($"the server answered {(int)response.StatusCode}");
+        }
+
+        using var body = response.Content.ReadAsStream(cancellation);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[16 * 1024];
+        int read;
+        while ((read = body.Read(chunk, 0, chunk.Length)) > 0)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (buffer.Length + read > MaximumBodyBytes)
             {
-                return null;
+                throw new IOException($"the list is larger than {MaximumBodyBytes} bytes");
             }
 
-            using var body = response.Content.ReadAsStream();
-            using var buffer = new MemoryStream();
-            body.CopyTo(buffer);
-            return buffer.ToArray();
+            buffer.Write(chunk, 0, read);
         }
-        catch (Exception exception) when (exception is HttpRequestException or IOException or TaskCanceledException or InvalidOperationException)
-        {
-            return null;
-        }
+
+        return buffer.ToArray();
     }
 }
