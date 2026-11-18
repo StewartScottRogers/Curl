@@ -44,3 +44,4 @@ Fix sketch: right after `ReadAsStream`, register `cancellation.Register(static s
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 815b0aa2 e8e45fe6 90e2aaa9 3d836d5e.
