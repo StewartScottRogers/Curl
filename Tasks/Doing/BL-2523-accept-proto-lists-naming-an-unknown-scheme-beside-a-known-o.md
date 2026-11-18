@@ -41,3 +41,4 @@ Measured 2026-10-16 during BL-2491 on Windows' curl 8.21.0 (Schannel): `-s -S --
 - 2026-11-02: Blocked -> Doing. Interactive session closes it under the delegated decision rule (which curl build to match). Criteria at claim: 9cafc694 46d4e715 a0b0533f.
 - 2026-11-02: Doing -> Deferred. Closed as obsolete, decided by Claude under Stewart's delegation: the target curl 8.22.0 (Gap/Baselines/target.json) refuses --proto =ipfs,http with exit 2 exactly as Curl does, so meeting these 8.21.0 criteria would break parity. Not to be reopened unless the target moves back.
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 9cafc694 46d4e715 a0b0533f.
