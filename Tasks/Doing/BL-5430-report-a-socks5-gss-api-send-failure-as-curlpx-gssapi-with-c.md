@@ -40,3 +40,4 @@ Fix sketch: catch the send failure in `SendMessageAsync` (or at its two callers)
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 3ed5f69d 319c5395 8882b1fd 3d836d5e.
