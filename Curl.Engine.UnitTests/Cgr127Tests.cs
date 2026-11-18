@@ -50,6 +50,18 @@ public sealed class Cgr127Tests
     }
 
     [TestMethod]
+    [DataRow("X-Mode: chunked")]
+    [DataRow("Transfer-Encoding: gzip")]
+    public async Task PerformAsync_PostWithHeaderThatIsNotChunkedTransferEncoding_ContentLengthUploadIsTheBodySize(string header)
+    {
+        long size = await ContentLengthUploadAfterAsync(
+            new EasyHttpOptions { PostFields = Encoding.ASCII.GetBytes("abc"), HttpHeaders = [header] },
+            Ok);
+
+        Assert.AreEqual(3L, size);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_PostWithContentLength_ContentLengthUploadIsTheBodySize()
     {
         long size = await ContentLengthUploadAfterAsync(new EasyHttpOptions { PostFields = Encoding.ASCII.GetBytes("abc") }, Ok);
