@@ -36,10 +36,10 @@ public sealed class PluginReplyCases
     }
 
     [TestMethod]
-    [DataRow("get\n\n", DisplayName = "Output ends before the reply")]
-    [DataRow("get\n", DisplayName = "Output ends inside the capabilities")]
+    [DataRow("get\n\n", "without a reply", DisplayName = "Output ends before the reply")]
+    [DataRow("get\n", "before ending its capabilities", DisplayName = "Output ends inside the capabilities")]
     [SpecRequirement("Plugin:ADR1142-Reply-3")]
-    public async Task OutputEndsBeforeTheReply_Exit8(string output)
+    public async Task OutputEndsBeforeTheReply_Exit8(string output, string reason)
     {
         PluginReferenceHelper helper = new(Encoding.UTF8.GetBytes(output));
 
@@ -47,7 +47,7 @@ public sealed class PluginReplyCases
 
         Assert.AreEqual(8, result.ExitCode);
         Assert.AreEqual(string.Empty, Text(result.StandardOutput));
-        Assert.AreEqual($"curl: (8) {DemoName} closed its output without a reply" + Environment.NewLine, Text(result.StandardError));
+        Assert.AreEqual($"curl: (8) {DemoName} closed its output {reason}" + Environment.NewLine, Text(result.StandardError));
     }
 
     [TestMethod]
