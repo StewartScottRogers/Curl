@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapFilterEncoder.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5455 — Fix fitness finding STD-136: Windows LDAP bare filter (no parentheses) with leading spaces sends attribute  uid; curl trims and finds the entry
 
@@ -43,3 +43,4 @@ Fixed in LdapFilterEncoder.Encode: WinLDAP bare filters now skip leading spaces 
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-136 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 7023c4cf 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. WinLDAP bare filter trims leading spaces; unit test pins REF bytes
