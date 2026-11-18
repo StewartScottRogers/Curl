@@ -3755,7 +3755,8 @@ public sealed class HttpProtocolHandler(
             {
                 ResponseCode = head.StatusLine.StatusCode,
                 HttpVersion = head.StatusLine.Version,
-                ResponseHeaders = [.. head.Headers.Select(header => KeyValuePair.Create(header.Name, header.Value)), .. streamTrailers],
+                // HTTP/2 and HTTP/3 trailers stay out of the headers, so %header{} and %{header_json} leave them out as curl does (BL-5392); their count is TrailerCount.
+                ResponseHeaders = [.. head.Headers.Select(header => KeyValuePair.Create(header.Name, header.Value))],
                 TrailerCount = streamTrailers.Count,
                 ContentType = head.Headers.LastOrDefault(IsContentType)?.Value,
                 HeaderSize = report.HeaderSize + head.HeadBytes.Length,
