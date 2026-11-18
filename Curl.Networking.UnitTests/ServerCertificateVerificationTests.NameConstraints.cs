@@ -91,8 +91,32 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.IsNull(Verify(Constraints(permittedDirectoryName: true), Host, true));
 
     [TestMethod]
-    public void VerifyPeer_LeafWithoutAlternativeNamesUnderAConstrainedAnchor_Accepts() =>
-        Assert.IsNull(Verify(Constraints(permitted: "example.com"), Host, true, withNames: false));
+    public void VerifyPeer_CnOnlyLeafOutsideThePermittedSubtree_IsSchannelError0x4000() =>
+        Assert.AreEqual("schannel: error 0x00004000", Verify(Constraints(permitted: "example.com"), Host, true, withNames: false)?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_CnOnlyLeafInsideTheExcludedSubtree_IsSchannelError0x8000() =>
+        Assert.AreEqual("schannel: error 0x00008000", Verify(Constraints(excluded: "localhost"), Host, true, withNames: false)?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_IpSanLeafWithAnOutsideCnUnderADnsConstraint_IsSchannelError0x4000() =>
+        Assert.AreEqual("schannel: error 0x00004000", Verify(Constraints(permitted: "example.com"), "127.0.0.1", true, ipAddress: true, subject: "CN=localhost")?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_IpSanLeafWithAPermittedCnUnderADnsConstraint_Accepts() =>
+        Assert.IsNull(Verify(Constraints(permitted: "example.com"), "127.0.0.1", true, ipAddress: true, subject: "CN=www.example.com"));
+
+    [TestMethod]
+    public void VerifyPeer_DnsSanLeafIgnoresItsCn_Accepts() =>
+        Assert.IsNull(Verify(Constraints(permitted: "example.com"), "www.example.com", true, subject: "CN=localhost"));
+
+    [TestMethod]
+    public void VerifyPeer_LeafWithoutACommonName_Accepts() =>
+        Assert.IsNull(Verify(Constraints(permitted: "example.com"), Host, true, withNames: false, subject: "O=Nobody"));
+
+    [TestMethod]
+    public void VerifyPeer_LeafWithAMultiValuedRelativeName_IgnoresIt() =>
+        Assert.IsNull(Verify(Constraints(permitted: "example.com"), Host, true, withNames: false, subject: "CN=localhost+OU=Unit"));
 
     [TestMethod]
     public void VerifyPeer_EmptyPermittedDomain_Accepts() =>
@@ -159,11 +183,11 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     }
 
     private (CurlExitCode ExitCode, string Message)? Verify(
-        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false)
+        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false, string? subject = null)
     {
         using var root = CreateAuthority("CN=Constraint Root", null, null);
         using var intermediate = CreateAuthority("CN=Constraint Intermediate", root, constraints);
-        using var leaf = CreateLeaf(intermediate, host, ipAddress, withNames, malformedNames);
+        using var leaf = CreateLeaf(intermediate, host, ipAddress, withNames, malformedNames, subject);
         var caFile = Path.Combine(_directory, "anchor.pem");
         File.WriteAllText(caFile, intermediate.ExportCertificatePem());
         var verification = new ServerCertificateVerification(
@@ -244,10 +268,10 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         return unkeyed.CopyWithPrivateKey(key);
     }
 
-    private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, string host, bool ipAddress, bool withNames, bool malformedNames)
+    private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, string host, bool ipAddress, bool withNames, bool malformedNames, string? subject = null)
     {
         using var key = RSA.Create(2048);
-        var request = new CertificateRequest($"CN={host}", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var request = new CertificateRequest(subject ?? $"CN={host}", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         if (malformedNames)
         {
             request.CertificateExtensions.Add(new X509Extension(new Oid("2.5.29.17"), new byte[] { 0x04, 0x01, 0xFF }, false));

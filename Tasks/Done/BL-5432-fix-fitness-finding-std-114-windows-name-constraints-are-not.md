@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5432 — Fix fitness finding STD-114: Windows: name constraints are not applied to the subject CN when the leaf has no DNS SAN, so a CN-only certificate escapes permitted and excluded DNS subtrees
 
@@ -39,13 +39,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the first three commands exit 60 with `0x00008000`, `0x00004000`, `0x00004000`; the proxy command exits 60 with `0x00008000`; the IP-SAN-only `CN=www.example.com` control still exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first three commands exit 60 with `0x00008000`, `0x00004000`, `0x00004000`; the proxy command exits 60 with `0x00008000`; the IP-SAN-only `CN=www.example.com` control still exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- ListNames now adds the subject CN(s) as DNS names when the SAN has no dNSName (CryptoAPI behaviour); multi-valued RDNs are skipped. Unit tests pin CN-only (0x4000, 0x8000), IP-SAN with outside CN, and the IP-SAN + CN=www.example.com control. Replaced the old test that expected a SAN-less leaf to be accepted. Quality run clean. Real Windows curl comparison not run; expected codes taken from the finding.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-114 (High).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: cc75741b 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. CN used as DNS name for name constraints

@@ -21,6 +21,8 @@ internal static class CertificateNameConstraints
 
     private const string NameConstraintsOid = "2.5.29.30";
 
+    private const string CommonNameOid = "2.5.4.3";
+
     private static readonly Asn1Tag DnsNameTag = new(TagClass.ContextSpecific, 2);
 
     private static readonly Asn1Tag IpAddressTag = new(TagClass.ContextSpecific, 7);
@@ -70,16 +72,24 @@ internal static class CertificateNameConstraints
     private static List<(Asn1Tag Tag, byte[] Value)> ListNames(X509Certificate2 leaf)
     {
         var names = new List<(Asn1Tag, byte[])>();
-        var extension = leaf.Extensions.OfType<X509SubjectAlternativeNameExtension>().FirstOrDefault();
-        if (extension is null)
-        {
-            return names;
-        }
+        var extensions = leaf.Extensions.OfType<X509SubjectAlternativeNameExtension>().ToList();
+        var dnsNames = extensions.SelectMany(extension => extension.EnumerateDnsNames()).ToList();
 
-        names.AddRange(extension.EnumerateDnsNames().Select(name => (DnsNameTag, System.Text.Encoding.ASCII.GetBytes(name))));
-        names.AddRange(extension.EnumerateIPAddresses().Select(address => (IpAddressTag, address.GetAddressBytes())));
+        // CryptoAPI checks the subject CN as a DNS name when the leaf has no dNSName SAN (BL-5432).
+        names.AddRange(DnsNamesOrCommonNames(leaf, dnsNames).Select(name => (DnsNameTag, System.Text.Encoding.ASCII.GetBytes(name))));
+        names.AddRange(extensions.SelectMany(extension => extension.EnumerateIPAddresses()).Select(address => (IpAddressTag, address.GetAddressBytes())));
         return names;
     }
+
+    private static List<string> DnsNamesOrCommonNames(X509Certificate2 leaf, List<string> dnsNames) =>
+        dnsNames.Count > 0 ? dnsNames : ListCommonNames(leaf);
+
+    private static List<string> ListCommonNames(X509Certificate2 leaf) =>
+        leaf.SubjectName.EnumerateRelativeDistinguishedNames()
+            .Where(rdn => !rdn.HasMultipleElements && rdn.GetSingleElementType().Value == CommonNameOid)
+            .Select(rdn => rdn.GetSingleElementValue())
+            .OfType<string>()
+            .ToList();
 
     private static int FindViolation(X509Extension extension, List<(Asn1Tag Tag, byte[] Value)> names)
     {
