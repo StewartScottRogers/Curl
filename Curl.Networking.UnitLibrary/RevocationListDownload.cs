@@ -13,6 +13,10 @@ internal static class RevocationListDownload
     /// <summary>The most a list's body may hold before it counts as unfetchable.</summary>
     internal const int MaximumBodyBytes = 10 * 1024 * 1024;
 
+    /// <summary>Makes the handler a fetch uses: it never follows the http_proxy or HTTP_PROXY environment variables, as the platform's own certificate verification ignores them (STD-129).</summary>
+    /// <returns>A handler with its proxy use switched off.</returns>
+    internal static SocketsHttpHandler CreateHandler() => new() { UseProxy = false };
+
     /// <summary>Gets the list at <paramref name="uri" />; throws when it cannot be fetched, saying why.</summary>
     /// <param name="uri">The distribution point's http address.</param>
     /// <param name="cancellation">Cuts the fetch short: while waiting for headers, and while a body read waits for bytes (cancelling disposes the response, which aborts the blocked read).</param>
@@ -20,7 +24,8 @@ internal static class RevocationListDownload
     /// <exception cref="IOException">The server did not answer with success, or the body passed <see cref="MaximumBodyBytes" />.</exception>
     internal static byte[] Fetch(Uri uri, CancellationToken cancellation)
     {
-        using var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        using var handler = CreateHandler();
+        using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
         using var response = client.Send(request, HttpCompletionOption.ResponseHeadersRead, cancellation);
         if (!response.IsSuccessStatusCode)

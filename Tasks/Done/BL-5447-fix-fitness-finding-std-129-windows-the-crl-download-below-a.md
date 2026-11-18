@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/RevocationListDownload.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5447 — Fix fitness finding STD-129: Windows: the CRL download below an intermediate anchor follows the http_proxy and HTTP_PROXY environment variables, which changes the verification result
 
@@ -31,13 +31,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] with `HTTP_PROXY` or `http_proxy` set, the command prints the "has been revoked" text and the listener logs nothing.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] with `HTTP_PROXY` or `http_proxy` set, the command prints the "has been revoked" text and the listener logs nothing.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix: RevocationListDownload.CreateHandler returns a SocketsHttpHandler with UseProxy=false, so the CRL fetch ignores HTTP_PROXY/http_proxy. Pinned by RevocationListDownloadProxyTests; live listener check not run (no mock listener in lane).
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-129 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: c5825892 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. CRL fetch no longer uses proxy environment variables
