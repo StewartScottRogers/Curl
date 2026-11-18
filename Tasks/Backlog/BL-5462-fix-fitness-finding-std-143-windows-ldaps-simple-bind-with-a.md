@@ -4,8 +4,8 @@ title: Fix fitness finding STD-143: Windows ldaps:// simple bind with a wrong pa
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapBind.cs]
+depends-on: [BL-5461]
+touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapBind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-11-18
 completed:
@@ -37,7 +37,10 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Notes
 
+- Plan: LdapBind.BindAsync gets a flag for ldaps (context.Url.Scheme == TlsScheme, passed from BindWithCredentialsAsync in LdapProtocolHandler.cs); WinLDAP over ldaps binds LDAPv3 once, no v2 retry, unbinds and fails with the first reply's result text. Handler file is held by BL-5461, so touches widened and depends-on BL-5461.
+
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-143 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 530f7f63 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Backlog. Needs LdapProtocolHandler.cs, held by BL-5461 (Doing); depends-on BL-5461
