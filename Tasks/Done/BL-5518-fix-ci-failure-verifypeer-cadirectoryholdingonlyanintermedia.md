@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests, Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5518 — Fix CI failure VerifyPeer_CaDirectoryHoldingOnlyAnIntermediateThatExcludesTheName_IsExit60 on Linux
 
@@ -36,3 +36,4 @@ Cause: the test CA helper gave the intermediate notAfter = now+30d while the iss
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 802308c8.
+- 2026-11-18: Doing -> Done. Test CA intermediate now ends a day before its issuer
