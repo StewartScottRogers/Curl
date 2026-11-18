@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Kafka.UnitLibrary/Wire/KafkaSasl/KafkaSaslMessages.cs, Curl.Extended.Protocol.Kafka.UnitLibrary/Client/KafkaClientFlow.cs, Curl.Extended.Protocol.Kafka.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5411 — Say SASL is not enabled when a Kafka listener offers no SASL mechanisms
 
@@ -49,3 +49,4 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 723a7f7d 1d2384e6 17dc8832 c1cf21f9 3d40f957 a0b49a29.
+- 2026-11-17: Doing -> Done. Empty SASL mechanism list now says SASL is not enabled on the Kafka listener (exit 67); tests added
