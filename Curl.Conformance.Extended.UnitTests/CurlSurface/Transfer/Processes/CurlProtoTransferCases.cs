@@ -79,7 +79,7 @@ public sealed class CurlProtoTransferCases
         CurlRunResult result = await RunDemoAsync(Refusing(), "-w", WriteOut, Url);
 
         Assert.AreEqual(56, result.ExitCode);
-        Assert.AreEqual($"56|{ErrorMessage}|{Url}|{Url}|demo||-1|0|0.000001", Text(result.StandardOutput));
+        Assert.AreEqual($"56|{ErrorMessage}|{Url}|{Url}|demo||-1|0|0.000000", Text(result.StandardOutput));
         Assert.AreEqual($"curl: (56) {ErrorMessage}" + Environment.NewLine, Text(result.StandardError));
     }
 

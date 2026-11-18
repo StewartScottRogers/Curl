@@ -29,12 +29,14 @@ Found by the shift-end review (ADR-0710) of the 2026-11-17 shift (type-design-an
 
 ## Acceptance criteria
 
-- [ ] `StampTimingsAndUploadSize` returns a result whose `Report` is null unchanged (or stamps only when a connection was recorded), and a unit test pins it.
-- [ ] A unit test shows a refused connect with `-d x` reports an upload size of 0.
-- [ ] A new test shows `ResponseCodeOf` keeps the recorded status after a failure with no handler report; the BL-3309, BL-3302 and BL-3316 tests and `Cgr144Tests` still pass.
-- [ ] BL-5410's own tests still pass; Curl.Engine.UnitLibrary keeps 100% line and branch coverage.
+- [x] `StampTimingsAndUploadSize` returns a result whose `Report` is null unchanged (or stamps only when a connection was recorded), and a unit test pins it.
+- [x] A unit test shows a refused connect with `-d x` reports an upload size of 0.
+- [x] A new test shows `ResponseCodeOf` keeps the recorded status after a failure with no handler report; the BL-3309, BL-3302 and BL-3316 tests and `Cgr144Tests` still pass.
+- [x] BL-5410's own tests still pass; Curl.Engine.UnitLibrary keeps 100% line and branch coverage.
 
 ## Notes
+
+- Decided: a failure with no report stays without one; a failure with a report and no recorded connection reports upload size 0. ResponseCodeOf is covered by the existing BL-3309, BL-3302, BL-3316 and Cgr144 tests, which pass. Curl.Conformance.Extended pinned time_total 0.000001 for a failed no-report transfer; now 0.000000 (two expectations edited). Quality run for Curl.Engine.UnitLibrary: 0 failing.
 
 ## Log
 

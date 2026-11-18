@@ -53,9 +53,14 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
         return StampTimingsAndUploadSize(result, context, started, UploadedBy(context, UploadPosition(context) - uploadStart));
     }
 
-    // Gives a report with no timings the transfer's connect and total times and, when it sent none itself, the bytes the upload stream gave (BL-5410).
+    // Gives a report with no timings the transfer's connect and total times and, when it sent none itself, the bytes the upload stream gave (BL-5410). A failure with no report stays without one (BL-5421), and one that never connected sent nothing.
     private TransferResult StampTimingsAndUploadSize(TransferResult result, ITransferContext context, long started, long uploaded)
     {
+        if (result.Report is null && !result.IsSuccess)
+        {
+            return result;
+        }
+
         TransferReport report = result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };
         if (report.Timings is not null)
         {
@@ -63,7 +68,18 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
         }
 
         TransferTimings timings = new(started, recorder.FirstConnectTimings, null, null, null, context.TimeProvider.GetTimestamp());
-        return result with { Report = report with { Timings = timings, UploadSize = report.UploadSize > 0 ? report.UploadSize : uploaded } };
+        return result with { Report = report with { Timings = timings, UploadSize = UploadSizeOf(report, result.IsSuccess, uploaded) } };
+    }
+
+    // The report's own upload size, else the bytes sent: none when a failure never connected.
+    private long UploadSizeOf(TransferReport report, bool succeeded, long uploaded)
+    {
+        if (report.UploadSize > 0)
+        {
+            return report.UploadSize;
+        }
+
+        return !succeeded && recorder.FirstConnectTimings is null ? 0 : uploaded;
     }
 
     // The bytes the transfer sent as its body: the -d data when given, else what the upload stream gave.

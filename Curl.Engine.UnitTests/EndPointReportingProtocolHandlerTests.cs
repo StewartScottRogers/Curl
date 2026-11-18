@@ -66,7 +66,7 @@ public sealed class EndPointReportingProtocolHandlerTests
         Diagnostics.Act("report", result.Report?.ToString() ?? "null");
 
         Diagnostics.Assert("remote end point", "null", result.Report?.RemoteEndPoint?.ToString() ?? "null");
-        Assert.IsNull(result.Report!.RemoteEndPoint);
+        Assert.IsNull(result.Report?.RemoteEndPoint);
     }
 
     [TestMethod]

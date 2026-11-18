@@ -72,7 +72,7 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_TransferFails_StillReportsTimingsAndBytesSent()
+    public async Task ExecuteAsync_TransferFailsWithNoReport_LeavesNoReport()
     {
         ManualTimeProvider time = new();
         EndPointReportingProtocolHandler handler = new(
@@ -86,8 +86,22 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
         TransferResult result = await handler.ExecuteAsync(ContextOf(time, postData: [1, 2]));
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
-        Assert.AreEqual(7, result.Report!.Timings!.Completed - result.Report.Timings.Started);
-        Assert.AreEqual(2, result.Report.UploadSize);
+        Assert.IsNull(result.Report);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FailureWithReportAndNoConnection_ReportsNoUpload()
+    {
+        ManualTimeProvider time = new();
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("nats", _ => ValueTask.FromResult(
+                TransferResult.Failure(CurlExitCode.CouldntConnect, "x") with { Report = new TransferReport() })),
+            new ConnectionEndPointRecorder());
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(time, postData: [1]));
+
+        Assert.AreEqual(0, result.Report!.UploadSize);
+        Assert.IsNotNull(result.Report.Timings);
     }
 
     [TestMethod]
