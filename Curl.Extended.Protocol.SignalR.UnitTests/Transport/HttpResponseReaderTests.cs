@@ -79,6 +79,17 @@ public sealed class HttpResponseReaderTests
     }
 
     [TestMethod]
+    public async Task ReadLineAsync_UnfinishedLineOfExactlyTheLimit_ThrowsTooLongNotConnectionClosed()
+    {
+        BufferedConnectionReader reader = Reader(new string('a', BufferedConnectionReader.MaxLineLength));
+
+        SignalRTransportException failure = await Assert.ThrowsExactlyAsync<SignalRTransportException>(
+            async () => await reader.ReadLineAsync(CancellationToken.None));
+
+        StringAssert.Contains(failure.Message, "longer than 65536 bytes");
+    }
+
+    [TestMethod]
     public async Task ReadBodyAsync_ContentLength_ReadsThatManyBytesAcrossReads_Rfc9112Section6()
     {
         BufferedConnectionReader reader = Reader("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nab", "cdeEXTRA");
