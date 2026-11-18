@@ -83,8 +83,12 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.AreEqual("schannel: error 0x00008000", Verify(Constraints(excludedIp: [127, 0, 0, 0, 255, 0, 0, 0]), "127.0.0.1", true, ipAddress: true)?.Message);
 
     [TestMethod]
-    public void VerifyPeer_IpConstraintOfAnotherFamily_Accepts() =>
-        Assert.IsNull(Verify(Constraints(permittedIp: [10, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), "127.0.0.1", true, ipAddress: true));
+    public void VerifyPeer_PermittedIpv6OnlyConstraintWithAnIpv4Leaf_IsSchannelError0x4000() =>
+        Assert.AreEqual("schannel: error 0x00004000", Verify(Constraints(permittedIp: new byte[32]), "127.0.0.1", true, ipAddress: true)?.Message);
+
+    [TestMethod]
+    public void VerifyPeer_PermittedIpv4OnlyConstraintWithAnIpv6Leaf_IsSchannelError0x4000() =>
+        Assert.AreEqual("schannel: error 0x00004000", Verify(Constraints(permittedIp: [10, 0, 0, 0, 255, 0, 0, 0]), "::1", true, ipAddress: true)?.Message);
 
     [TestMethod]
     public void VerifyPeer_ConstraintOnAnotherNameKind_Accepts() =>

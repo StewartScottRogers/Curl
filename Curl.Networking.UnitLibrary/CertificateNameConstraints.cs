@@ -125,8 +125,9 @@ internal static class CertificateNameConstraints
     private static bool BreaksPermitted(List<(Asn1Tag Tag, byte[] Value)> permitted, List<(Asn1Tag Tag, byte[] Value)> names) =>
         names.Any(name =>
         {
-            var ofKind = permitted.Where(subtree => Applies(subtree, name)).ToList();
-            return ofKind.Count > 0 && !ofKind.Any(subtree => Matches(subtree.Tag, subtree.Value, name.Value));
+            // Permitted address subtrees of only the other family leave this name not permitted (BL-5433).
+            return permitted.Any(subtree => subtree.Tag == name.Tag)
+                && !permitted.Any(subtree => Applies(subtree, name) && Matches(subtree.Tag, subtree.Value, name.Value));
         });
 
     // A constraint applies to a name of its kind; an address constraint only to its own family.

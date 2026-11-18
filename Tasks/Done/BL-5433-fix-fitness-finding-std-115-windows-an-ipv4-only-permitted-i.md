@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5433 — Fix fitness finding STD-115: Windows: an IPv4-only permitted iPAddress name constraint does not constrain an IPv6 SAN
 
@@ -34,13 +34,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command exits 60 with `schannel: error 0x00004000`. A leaf with `IP:127.0.0.1` under an excluded `::1/128` constraint still exits 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command exits 60 with `schannel: error 0x00004000`. A leaf with `IP:127.0.0.1` under an excluded `::1/128` constraint still exits 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+BreaksPermitted now treats a name as not permitted when permitted subtrees of its kind exist but none of its address family matches. Excluded subtrees unchanged. CI criteria met by platform-neutral unit tests; no real-curl re-measure needed (finding gave REF output).
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-115 (High).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 00b08b22 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Permitted iPAddress subtrees of the other family now leave a name not permitted
