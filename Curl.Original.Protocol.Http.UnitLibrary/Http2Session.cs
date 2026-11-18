@@ -156,13 +156,13 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// The request body's length, 0 when there is none, or <see langword="null" /> when it is
     /// unknown.
     /// </param>
-    /// <param name="ignoresBody">Not used: HTTP/2 fails a reset stream whatever the request wanted.</param>
+    /// <param name="ignoresBody">Whether the request wants no body (<c>-I</c>): the stream then ends at the final head, whatever DATA follows (BL-5391).</param>
     /// <param name="openedLines">Reports curl's <c>-v</c> lines for the stream once its HEADERS are sent, or <see langword="null" /> for none.</param>
     /// <param name="diagnosticLog">The transfer's diagnostic log, which the stream's frames are written to, or <see langword="null" /> for none.</param>
     /// <param name="traceEvents">Where the <c>--trace-config http/2</c> lines go while the stream is the latest opened, or <see langword="null" /> for none.</param>
     /// <returns>The stream.</returns>
     public IHttpStreamConnection CreateStream(string scheme, long? bodyLength, bool ignoresBody, HttpStreamOpenedLines? openedLines = null, IDiagnosticLog? diagnosticLog = null, ITransferEvents? traceEvents = null) =>
-        new Http2StreamConnection(this, scheme, bodyLength, openedLines, HttpFrameLog.For(diagnosticLog, VersionName), traceEvents is null ? null : new Http2FrameTrace(traceEvents));
+        new Http2StreamConnection(this, scheme, bodyLength, openedLines, HttpFrameLog.For(diagnosticLog, VersionName), traceEvents is null ? null : new Http2FrameTrace(traceEvents)) { EndsAtFinalHead = ignoresBody };
 
     /// <summary>
     /// Makes <see cref="ShutDownAsync" /> send nothing, as curl closes a connection it gave up on after five refused streams without a GOAWAY (BL-3838).

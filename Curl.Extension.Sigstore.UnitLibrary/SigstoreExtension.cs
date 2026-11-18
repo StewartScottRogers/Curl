@@ -56,8 +56,12 @@ public static class SigstoreExtension
         var identity = values.ValueOf(IdentityOption);
         var issuer = values.ValueOf(IssuerOption);
         var root = values.ValueOf(RootOption);
-        return bundlePath is null && identity is null && issuer is null && root is null
-            ? null
-            : new SigstoreTransferHook(new SigstoreExpectation(bundlePath, identity, issuer, root));
+        if (bundlePath is not null)
+        {
+            return new SigstoreTransferHook(new SigstoreExpectation(bundlePath, identity, issuer, root));
+        }
+
+        string companions = string.Join(", ", new[] { (identity, "--sigstore-identity"), (root, "--sigstore-root"), (issuer, "--sigstore-issuer") }.Where(option => option.Item1 is not null).Select(option => option.Item2));
+        return companions.Length == 0 ? null : throw new ArgumentException($"{companions} needs --sigstore-bundle", nameof(values));
     }
 }

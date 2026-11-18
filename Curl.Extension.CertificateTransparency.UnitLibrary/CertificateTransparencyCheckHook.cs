@@ -26,7 +26,9 @@ internal sealed class CertificateTransparencyCheckHook(string logListPath, Func<
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or FormatException)
         {
-            return $"Certificate Transparency: the log list {logListPath} could not be read: {exception.Message}";
+            return exception is IOException or UnauthorizedAccessException
+                ? $"--require-sct cannot read the log list '{logListPath}'"
+                : $"--require-sct: '{logListPath}' is not a valid log list";
         }
 
         return SignedCertificateTimestampVerifier.RefusalOf(peerCertificates, keysByLogId, timeProvider.GetUtcNow());

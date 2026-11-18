@@ -89,12 +89,12 @@ public sealed class HttpFileArgumentExpanderTests
     }
 
     [TestMethod]
-    public void ArgumentsFor_UnreadableFile_FailsWithReadError()
+    public void ArgumentsFor_UnreadableFile_FailsWithExit2InTheOptionStyle()
     {
         ArgumentExpansionException failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => new HttpFileArgumentExpander().ArgumentsFor(Claimed("missing.http"), ContextOf(Files())));
 
-        Assert.AreEqual(CurlExitCode.ReadError, failure.ExitCode);
-        Assert.AreEqual("http-file: cannot read missing.http", failure.Message);
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+        Assert.AreEqual("--http-file cannot read 'missing.http'", failure.Message);
     }
 
     [TestMethod]

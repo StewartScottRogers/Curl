@@ -125,25 +125,27 @@ internal static class TlsFailureMessages
     /// <param name="failure">What the read threw.</param>
     /// <param name="matchesSchannelBuild"><see langword="true" /> for curl's Schannel build.</param>
     /// <param name="presentedClientCertificate"><see langword="true" /> when <c>--cert</c> was presented.</param>
+    /// <param name="insideTlsTunnel"><see langword="true" /> for TLS inside an HTTPS proxy's tunnel, where the Schannel build reports the read aborted (BL-5388).</param>
     /// <returns>The message curl prints, or <see langword="null" />.</returns>
-    internal static string? AlertReadFailure(IOException failure, bool matchesSchannelBuild, bool presentedClientCertificate) =>
+    internal static string? AlertReadFailure(IOException failure, bool matchesSchannelBuild, bool presentedClientCertificate, bool insideTlsTunnel = false) =>
         matchesSchannelBuild
-            ? SchannelAlertReadFailure(failure)
+            ? SchannelAlertReadFailure(failure, insideTlsTunnel)
             : OpenSslAlertReadFailure(failure, presentedClientCertificate);
 
     /// <summary>The Schannel build's exit 56 text for a read the hand-built client saw a server alert end (BL-5330).</summary>
     /// <param name="automaticClientCertificate"><see langword="true" /> under <c>--ssl-auto-client-cert</c>, where curl's read is aborted instead.</param>
+    /// <param name="insideTlsTunnel"><see langword="true" /> inside an HTTPS proxy's TLS tunnel, where curl's read is aborted too (BL-5388).</param>
     /// <returns>The message curl prints.</returns>
-    internal static string SchannelHandBuiltAlertReadFailure(bool automaticClientCertificate) =>
-        automaticClientCertificate
+    internal static string SchannelHandBuiltAlertReadFailure(bool automaticClientCertificate, bool insideTlsTunnel = false) =>
+        automaticClientCertificate || insideTlsTunnel
             ? "Recv failure: " + SchannelSocketErrorTexts[SocketError.ConnectionAborted]
             : SchannelFatalAlertReceived.Replace("next InitializeSecurityContext failed", "failed to read data from server", StringComparison.Ordinal);
 
-    private static string? SchannelAlertReadFailure(IOException failure)
+    private static string? SchannelAlertReadFailure(IOException failure, bool insideTlsTunnel)
     {
         var code = FindInnerException<Win32Exception>(failure)?.NativeErrorCode;
         return code == SecEIllegalMessage || code == SecEDecryptFailure
-            ? SchannelFatalAlertReceived.Replace("next InitializeSecurityContext failed", "failed to read data from server", StringComparison.Ordinal)
+            ? SchannelHandBuiltAlertReadFailure(automaticClientCertificate: false, insideTlsTunnel)
             : null;
     }
 
@@ -213,6 +215,7 @@ internal static class TlsFailureMessages
         [OpenSslVerifyResult.CertificateSignatureFailure] = "certificate signature failure",
         [OpenSslVerifyResult.PathLengthExceeded] = "path length constraint exceeded",
         [OpenSslVerifyResult.PermittedSubtreeViolation] = "permitted subtree violation",
+        [OpenSslVerifyResult.ExcludedSubtreeViolation] = "excluded subtree violation",
         [OpenSslVerifyResult.InvalidCaCertificate] = "invalid CA certificate",
     }.ToFrozenDictionary();
 
@@ -289,6 +292,7 @@ internal static class TlsFailureMessages
 
         return maximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11
             ? SchannelAlertBelowTls12(failure.Origin, minimumVersion, maximumVersion)
+            : failure.Origin == TlsHandshakeFailureOrigin.AlertReceived && failure.Alert == TlsAlertDescription.ProtocolVersion ? SchannelUnsupportedFunction
             : SchannelFatalAlertReceived;
     }
 
@@ -507,7 +511,7 @@ internal static class TlsFailureMessages
     /// <param name="maximumVersion">The highest version offered, <c>--tls-max</c>.</param>
     /// <returns>The message curl prints.</returns>
     public static string SchannelSslConnectError(Exception exception, TlsVersion maximumVersion) =>
-        maximumVersion == TlsVersion.Tls12 && IsProtocolVersionRefusal(exception)
+        maximumVersion is not (TlsVersion.Tls10 or TlsVersion.Tls11) && IsProtocolVersionRefusal(exception)
             ? SchannelUnsupportedFunction
             : SchannelSslConnectError(exception, maximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11);
 

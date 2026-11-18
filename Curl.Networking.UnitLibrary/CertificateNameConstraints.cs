@@ -1,4 +1,5 @@
 using System.Formats.Asn1;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 namespace Curl.Networking;
@@ -37,17 +38,25 @@ internal static class CertificateNameConstraints
             return 0;
         }
 
-        var names = ListNames(elements[0].Certificate);
-        for (var index = 1; index < elements.Count; index++)
+        try
         {
-            var violation = FindViolation(elements[index].Certificate, names);
-            if (violation != 0)
+            var names = ListNames(elements[0].Certificate);
+            for (var index = 1; index < elements.Count; index++)
             {
-                return violation;
+                var violation = FindViolation(elements[index].Certificate, names);
+                if (violation != 0)
+                {
+                    return violation;
+                }
             }
-        }
 
-        return 0;
+            return 0;
+        }
+        catch (Exception exception) when (exception is AsnContentException or CryptographicException)
+        {
+            // A server-controlled name or constraint that does not decode is a refused chain (BL-5415).
+            return NotPermitted;
+        }
     }
 
     private static List<(Asn1Tag Tag, byte[] Value)> ListNames(X509Certificate2 leaf)

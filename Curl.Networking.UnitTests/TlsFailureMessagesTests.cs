@@ -106,8 +106,8 @@ public sealed partial class TlsFailureMessagesTests
     [DataRow(TlsVersion.Tls12, "HandshakeFailure", 0x80090326u, SchannelFatalAlertReceived)]
     [DataRow(TlsVersion.Tls12, "ProtocolVersion", 0x80090302u, "schannel: next InitializeSecurityContext failed: SEC_E_UNSUPPORTED_FUNCTION (0x80090302) - The function requested is not supported")]
     [DataRow(TlsVersion.Tls12, "ProtocolVersion", 0x80090327u, "schannel: next InitializeSecurityContext failed: SEC_E_CERT_UNKNOWN (0x80090327) - text")]
-    [DataRow(TlsVersion.SystemDefault, "ProtocolVersion", 0x80090326u, SchannelFatalAlertReceived)]
-    [DataRow(TlsVersion.Tls13, "ProtocolVersion", 0x80090326u, SchannelFatalAlertReceived)]
+    [DataRow(TlsVersion.SystemDefault, "ProtocolVersion", 0x80090326u, SchannelUnsupportedFunction)]
+    [DataRow(TlsVersion.Tls13, "ProtocolVersion", 0x80090326u, SchannelUnsupportedFunction)]
     [DataRow(TlsVersion.Tls11, "ProtocolVersion", 0x80090326u, SchannelHandshakeNotReceived)]
     [DataRow(TlsVersion.Tls10, "HandshakeFailure", 0x80090326u, SchannelHandshakeNotReceived)]
     public void SchannelSslConnectError_ByCeilingAndAlert_IsTheLineSchannelsCurlPrints(TlsVersion maximumVersion, string alert, uint securityStatus, string expected)

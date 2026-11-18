@@ -2578,6 +2578,16 @@ internal sealed class FtpSession(
         ReportRememberedDirectory();
         trace.ClosingDataConnection();
         await CloseDataConnectionAsync().ConfigureAwait(false);
+        if (expectedSize is { } announced && bytesTransferred < announced)
+        {
+            // curl's ftp_done fails a short download before reading the final reply, so the
+            // response code stays 150 and the connection is closed (BL-5404).
+            string message = FtpTransferMessages.ClosedWithBytesRemaining(announced - bytesTransferred);
+            context.Events.ReportInfo(message);
+            context.Events.ReportInfo(FtpTransferMessages.ClosingConnection(controlName.Number));
+            return TransferResult.Failure(CurlExitCode.PartialFile, message, bytesTransferred);
+        }
+
         FtpReply complete;
         try
         {
@@ -2590,11 +2600,6 @@ internal sealed class FtpSession(
         }
 
         trace.TransferReplyRead(complete);
-        if (expectedSize is { } expected && bytesTransferred < expected)
-        {
-            return TransferResult.Failure(CurlExitCode.PartialFile, FtpTransferMessages.ClosedWithBytesRemaining(expected - bytesTransferred), bytesTransferred);
-        }
-
         if (complete.Code is not (226 or 250))
         {
             (CurlExitCode exitCode, string message) = DescribeTransferNotOk(complete.Code);

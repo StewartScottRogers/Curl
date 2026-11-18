@@ -40,8 +40,19 @@ public sealed class SigstoreExtensionTests
     public void Composition_ActivatesTheHookOnlyWhenASigstoreOptionIsGiven()
     {
         Assert.IsTrue(TransferHooks.ActivatedBy(Given(("sigstore-bundle", "a.sigstore.json")), ExtensionTransferHookCatalogue.Entries).Hooks.OfType<SigstoreTransferHook>().Any());
-        Assert.IsTrue(TransferHooks.ActivatedBy(Given(("sigstore-root", "r.pem")), ExtensionTransferHookCatalogue.Entries).Hooks.OfType<SigstoreTransferHook>().Any());
+        Assert.IsTrue(TransferHooks.ActivatedBy(Given(("sigstore-bundle", "a.sigstore.json"), ("sigstore-root", "r.pem")), ExtensionTransferHookCatalogue.Entries).Hooks.OfType<SigstoreTransferHook>().Any());
         Assert.IsFalse(TransferHooks.ActivatedBy(ExtensionOptionValues.None, ExtensionTransferHookCatalogue.Entries).Hooks.OfType<SigstoreTransferHook>().Any());
+    }
+
+    [TestMethod]
+    [DataRow("sigstore-identity", "me", "--sigstore-identity")]
+    [DataRow("sigstore-root", "r.pem", "--sigstore-root")]
+    [DataRow("sigstore-issuer", "https://issuer", "--sigstore-issuer")]
+    public void HookFor_ACompanionWithoutTheBundle_IsRefusedAtActivationNamingTheBundle(string name, string value, string named)
+    {
+        ArgumentException error = Assert.ThrowsExactly<ArgumentException>(() => SigstoreExtension.HookFor(Given((name, value))));
+
+        Assert.AreEqual(named + " needs --sigstore-bundle", error.Message.Replace(" (Parameter 'values')", string.Empty, StringComparison.Ordinal));
     }
 
     [TestMethod]

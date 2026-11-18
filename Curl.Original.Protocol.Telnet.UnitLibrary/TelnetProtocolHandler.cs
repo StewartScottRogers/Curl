@@ -168,8 +168,22 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             log.SessionEnded(result, context.TimeProvider.GetElapsedTime(sessionStarted));
             trace.ConnectionEnded(result, connect.ConnectionNumber);
             outbox.ReportPending();
+            return StampTimings(result, context.TimeProvider, sessionStarted, connect.Timings);
+        }
+    }
+
+    // Adds the timings behind %{time_*} and %{speed_download} to the report the transfer made (BL-5390).
+    // The first byte is stamped with the completion time: the session is read until the server closes.
+    private static TransferResult StampTimings(TransferResult result, TimeProvider timeProvider, long started, ConnectTimings? connect)
+    {
+        if (result.ExitCode != CurlExitCode.Ok)
+        {
             return result;
         }
+
+        long completed = timeProvider.GetTimestamp();
+        var timings = new TransferTimings(started, connect, null, null, completed, completed);
+        return result with { Report = (result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred }) with { Timings = timings } };
     }
 
     /// <summary>

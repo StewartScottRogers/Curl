@@ -397,7 +397,11 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         param([int]$N)
         $hoursLeft = [Math]::Max(0.01, ($shiftEnd - (Get-Date)).TotalHours).ToString([System.Globalization.CultureInfo]::InvariantCulture)
         @('-Lane', $N, '-Branch', $branch, '-Hours', $hoursLeft, '-MaxTasks', $MaxTasks,
-          '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-MaxRunTurns', $MaxRunTurns, '-LogRoot', "`"$LogDir`"", '-ShiftStamp', $Stamp)
+          '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-MaxRunTurns', $MaxRunTurns, '-LogRoot', "`"$LogDir`"", '-ShiftStamp', $Stamp,
+          # Each lane checks the usage stops itself before a claim, so it needs the shift's values,
+          # not its own defaults (85% and 97%) (BL-5418).
+          '-StopAtUsage', $StopAtUsage.ToString([System.Globalization.CultureInfo]::InvariantCulture),
+          '-StopAtWeeklyUsage', $StopAtWeeklyUsage.ToString([System.Globalization.CultureInfo]::InvariantCulture))
     }
     $procs = @()
     $laneTabs = @{}

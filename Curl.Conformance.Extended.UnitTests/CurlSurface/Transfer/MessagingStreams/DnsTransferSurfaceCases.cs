@@ -100,7 +100,7 @@ public sealed class DnsTransferSurfaceCases
                 CurlRunResult result = await RunAsync(server, "-w", WriteOutFormat);
 
                 string answer = server.ExpectedText();
-                AssertRun(result, "CurlSurface:WriteOut-Dns-1", "manual: -w", 0, $"{answer}0||{Url}|{Url}|dns|127.0.0.1|53|{Encoding.UTF8.GetByteCount(answer)}|0.000000", string.Empty);
+                AssertRun(result, "CurlSurface:WriteOut-Dns-1", "manual: -w", 0, $"{answer}0||{Url}|{Url}|dns|127.0.0.1|53|{Encoding.UTF8.GetByteCount(answer)}|0.000001", string.Empty);
             });
 
     [TestMethod]
@@ -120,7 +120,7 @@ public sealed class DnsTransferSurfaceCases
                     "CurlSurface:WriteOut-Dns-2",
                     "manual: -w, --fail; ADR-1140: any response code ends with exit 0",
                     0,
-                    $"{answer}0||{Url}|{Url}|dns|127.0.0.1|53|{Encoding.UTF8.GetByteCount(answer)}|0.000000",
+                    $"{answer}0||{Url}|{Url}|dns|127.0.0.1|53|{Encoding.UTF8.GetByteCount(answer)}|0.000001",
                     string.Empty);
             });
 

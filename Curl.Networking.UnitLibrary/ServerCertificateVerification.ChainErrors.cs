@@ -84,9 +84,9 @@ internal sealed partial class ServerCertificateVerification
         string targetHost)
     {
         var hasCaCertificateFile = HasCaCertificates;
-        if (hasCaCertificateFile && ConstraintViolationOf(errors, chain) is var violation and not 0)
+        if (hasCaCertificateFile && CaCertificateFileChainFailure(errors, chain) is { } failure)
         {
-            return (CurlExitCode.PeerFailedVerification, $"schannel: error 0x{violation:x8}");
+            return failure;
         }
 
         return !hasCaCertificateFile && TlsFailureMessages.IsSchannelCertificateExpired(errors, chain)
@@ -94,6 +94,12 @@ internal sealed partial class ServerCertificateVerification
             : (CurlExitCode.PeerFailedVerification,
                 TlsFailureMessages.SchannelPeerFailedVerification(errors, chain, targetHost, hasCaCertificateFile));
     }
+
+    // With --cacert the Schannel build names a broken name constraint (BL-5375) or a revoked certificate below the anchor (BL-5384).
+    private (CurlExitCode ExitCode, string Message)? CaCertificateFileChainFailure(SslPolicyErrors errors, X509Chain? chain) =>
+        ConstraintViolationOf(errors, chain) is var violation and not 0
+            ? (CurlExitCode.PeerFailedVerification, $"schannel: error 0x{violation:x8}")
+            : RevokesBelowNonSelfSignedAnchor(chain) ? (CurlExitCode.PeerFailedVerification, TlsFailureMessages.SchannelChainRevoked) : null;
 
     // A chain error with a name constraint of a CA in the chain broken by the server certificate
     // is named by Schannel's trust error (BL-5375); 0 for any other failure.
@@ -132,12 +138,22 @@ internal sealed partial class ServerCertificateVerification
 
     // With revocation checking on, a chain ending at a non-self-signed anchor also carries
     // RevocationStatusUnknown / OfflineRevocation, for the anchor has no issuer to ask (BL-5317):
-    // tolerated only when no certificate below the anchor carries it.
+    // tolerated only when the CRLs of the certificates below the anchor leave none unknown or revoked.
     private bool HasOnlyMissingRootOrAnchorRevocationStatus(X509Chain chain) =>
         HasOnlyMissingRootStatus(ReadChainStatus(chain))
         || (HasOnlyMissingRootOrUnavailableRevocationStatus(ReadChainStatus(chain))
             && !IsSelfSigned(chain.ChainElements[^1].Certificate)
-            && ReadCertificatesBelowAnchorStatus(chain).All(status => (status.Status & UnavailableRevocationFlags) == 0));
+            && ReadBelowAnchorRevocation(chain) == BelowAnchorRevocation.Clean);
+
+    // The chain ends at a listed, non-self-signed anchor and a CRL revokes a certificate below it:
+    // Schannel's has been revoked, where the engine's own statuses only say unknown (BL-5384).
+    private bool RevokesBelowNonSelfSignedAnchor(X509Chain? chain) =>
+        chain is not null
+        && chain.ChainElements.Count > 0
+        && HasOnlyMissingRootOrUnavailableRevocationStatus(ReadChainStatus(chain))
+        && !IsSelfSigned(chain.ChainElements[^1].Certificate)
+        && ListsAnAnchorCandidate(chain)
+        && ReadBelowAnchorRevocation(chain) == BelowAnchorRevocation.Revoked;
 
     private static bool IsSelfSigned(X509Certificate2 certificate) =>
         certificate.SubjectName.RawData.AsSpan().SequenceEqual(certificate.IssuerName.RawData);

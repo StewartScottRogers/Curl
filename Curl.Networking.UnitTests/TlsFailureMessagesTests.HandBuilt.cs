@@ -28,8 +28,8 @@ public sealed partial class TlsFailureMessagesTests
     [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.Tls11, TlsVersion.Tls11, SchannelUnsupportedFunction)]
     [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.Tls10, TlsVersion.Tls11, SchannelFatalAlertReceived)]
     [DataRow(TlsHandshakeFailureOrigin.AlertSent, TlsVersion.SystemDefault, TlsVersion.Tls10, SchannelHandshakeNotReceived)]
-    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.SystemDefault, TlsVersion.SystemDefault, SchannelFatalAlertReceived)]
-    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.Tls10, TlsVersion.Tls12, SchannelFatalAlertReceived)]
+    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.SystemDefault, TlsVersion.SystemDefault, SchannelUnsupportedFunction)]
+    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.Tls10, TlsVersion.Tls12, SchannelUnsupportedFunction)]
     [DataRow(TlsHandshakeFailureOrigin.AlertSent, TlsVersion.SystemDefault, TlsVersion.Tls13, SchannelFatalAlertReceived)]
     public void SchannelHandBuiltHandshakeFailure_IsTheLineSchannelsCurlPrints(
         TlsHandshakeFailureOrigin origin,

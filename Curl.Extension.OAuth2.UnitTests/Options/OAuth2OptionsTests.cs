@@ -26,12 +26,11 @@ public sealed class OAuth2OptionsTests
     }
 
     [TestMethod]
-    public void ActivatedBy_WrongOptions_GivesAHookWithTheErrorAndNoConfiguration()
+    public void ActivatedBy_WrongOptions_IsRefusedAtActivationAsABadValue()
     {
-        var hook = OAuth2Options.ActivatedBy(Given(("oauth2-device", "https://server.example.com/token")));
+        var error = Assert.ThrowsExactly<ArgumentException>(() => OAuth2Options.ActivatedBy(Given(("oauth2-device", "https://server.example.com/token"))));
 
-        Assert.IsInstanceOfType<OAuth2TransferHook>(hook);
-        Assert.IsNull(((OAuth2TransferHook)hook).Configuration);
+        Assert.AreEqual("--oauth2-device needs --oauth2-client-id", error.Message.Replace(" (Parameter 'values')", string.Empty, StringComparison.Ordinal));
     }
 
     [TestMethod]

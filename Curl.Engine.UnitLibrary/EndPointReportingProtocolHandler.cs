@@ -37,6 +37,8 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         recorder.Clear(context.Http?.RedirectsFollowed > 0);
+        long started = context.TimeProvider.GetTimestamp();
+        long uploadStart = UploadPosition(context);
         TransferResult result;
         try
         {
@@ -47,6 +49,28 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
             result = TransferResult.Failure(CurlExitCode.CouldntConnect, refused.Message);
         }
 
-        return recorder.ReportOn(result, handlerCountsConnections: result.Report is not null && context.Url.Scheme is "http" or "https");
+        result = recorder.ReportOn(result, handlerCountsConnections: result.Report is not null && context.Url.Scheme is "http" or "https");
+        return StampTimingsAndUploadSize(result, context, started, UploadedBy(context, UploadPosition(context) - uploadStart));
     }
+
+    // Gives a report with no timings the transfer's connect and total times and, when it sent none itself, the bytes the upload stream gave (BL-5410).
+    private TransferResult StampTimingsAndUploadSize(TransferResult result, ITransferContext context, long started, long uploaded)
+    {
+        TransferReport report = result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };
+        if (report.Timings is not null)
+        {
+            return result;
+        }
+
+        TransferTimings timings = new(started, recorder.FirstConnectTimings, null, null, null, context.TimeProvider.GetTimestamp());
+        return result with { Report = report with { Timings = timings, UploadSize = report.UploadSize > 0 ? report.UploadSize : uploaded } };
+    }
+
+    // The bytes the transfer sent as its body: the -d data when given, else what the upload stream gave.
+    private static long UploadedBy(ITransferContext context, long streamBytes) =>
+        context.PostData is { } postData ? postData.Length : streamBytes;
+
+    // The upload stream's position, or 0 when there is no upload or it cannot report one.
+    private static long UploadPosition(ITransferContext context) =>
+        context.Upload is { CanSeek: true } upload ? upload.Position : 0;
 }

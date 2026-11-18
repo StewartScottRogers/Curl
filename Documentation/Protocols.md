@@ -70,3 +70,5 @@ specification to its tests (`Documentation/Conformance/Extended/README.md`).
 Each Extended description is drawn from the `ExtensionDescription` its `*Extension.cs`
 file registers; `curl --extended-help` prints the full text. A new protocol library adds
 its row here and its scheme to the Protocols section of the root `README.md`.
+
+**Proxy for HTTPS-carried extension schemes (ADR-1297).** `oci`, `s3`, `gs`, `az` and `signalrs` always speak HTTPS, so they use `<scheme>_proxy`, else `https_proxy` or `HTTPS_PROXY`, else `ALL_PROXY`, as `wss` does; `http_proxy` is not used for them.

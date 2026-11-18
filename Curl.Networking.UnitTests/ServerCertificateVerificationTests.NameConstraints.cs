@@ -114,12 +114,38 @@ public sealed class ServerCertificateVerificationNameConstraintTests
     public void VerifyPeer_ExcludedDomainOfAnotherHost_Accepts() =>
         Assert.IsNull(Verify(Constraints(excluded: "example.com"), Host, true));
 
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)] // OpenSSL-backed chain building reports the chain incomplete instead (BL-5420).
+    public void VerifyPeer_MalformedNameConstraintsExtension_IsRefusedAsATrustError()
+    {
+        var failure = Verify([0x04, 0x01, 0xFF], Host, true);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("schannel: error 0x00004000", failure?.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)] // OpenSSL-backed chain building never hands the malformed chain over (BL-5420).
+    public void FindViolation_MalformedLeafAlternativeNames_RefusesTheChain()
+    {
+        using var root = CreateAuthority("CN=Constraint Root", null, null);
+        using var intermediate = CreateAuthority("CN=Constraint Intermediate", root, Constraints(permitted: "localhost"));
+        using var leaf = CreateLeaf(intermediate, Host, false, true, true);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(root);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.ExtraStore.Add(intermediate);
+        chain.Build(leaf);
+
+        Assert.AreEqual(CertificateNameConstraints.NotPermitted, CertificateNameConstraints.FindViolation(chain));
+    }
     private (CurlExitCode ExitCode, string Message)? Verify(
-        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true)
+        byte[]? constraints, string host, bool skipRevocationCheck, bool ipAddress = false, bool withNames = true, bool malformedNames = false)
     {
         using var root = CreateAuthority("CN=Constraint Root", null, null);
         using var intermediate = CreateAuthority("CN=Constraint Intermediate", root, constraints);
-        using var leaf = CreateLeaf(intermediate, host, ipAddress, withNames);
+        using var leaf = CreateLeaf(intermediate, host, ipAddress, withNames, malformedNames);
         var caFile = Path.Combine(_directory, "anchor.pem");
         File.WriteAllText(caFile, intermediate.ExportCertificatePem());
         var verification = new ServerCertificateVerification(
@@ -200,11 +226,15 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         return unkeyed.CopyWithPrivateKey(key);
     }
 
-    private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, string host, bool ipAddress, bool withNames)
+    private static X509Certificate2 CreateLeaf(X509Certificate2 issuer, string host, bool ipAddress, bool withNames, bool malformedNames)
     {
         using var key = RSA.Create(2048);
         var request = new CertificateRequest($"CN={host}", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        if (withNames)
+        if (malformedNames)
+        {
+            request.CertificateExtensions.Add(new X509Extension(new Oid("2.5.29.17"), new byte[] { 0x04, 0x01, 0xFF }, false));
+        }
+        else if (withNames)
         {
             var names = new SubjectAlternativeNameBuilder();
             if (ipAddress)

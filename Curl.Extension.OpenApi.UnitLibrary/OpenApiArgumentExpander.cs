@@ -39,7 +39,7 @@ public sealed class OpenApiArgumentExpander : ITrailingArgumentExpander
             throw OpenApiFailure.Of(operations.Length == 0 ? "--operation <id> names the operation to call" : "one --operation per --openapi");
         }
 
-        byte[] bytes = context.ReadFile(claimed.Value) ?? throw new ArgumentExpansionException($"openapi: cannot read {claimed.Value}", CurlExitCode.ReadError);
+        byte[] bytes = context.ReadFile(claimed.Value) ?? throw new ArgumentExpansionException($"--openapi cannot read '{claimed.Value}'", CurlExitCode.FailedInit);
         OpenApiOperation operation = OpenApiDocument.Parse(bytes, claimed.Value).FindOperation(operations[0]);
         return OpenApiRequest.Arguments(operation, CompanionValues(claimed, OpenApiOptions.Server).LastOrDefault(), ValuesByName(claimed.PositionalArguments));
     }

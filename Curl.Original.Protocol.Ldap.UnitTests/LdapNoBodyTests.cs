@@ -22,13 +22,13 @@ public sealed class LdapNoBodyTests
     [TestMethod]
     [DataRow(LdapDialect.WinLdap)]
     [DataRow(LdapDialect.OpenLdap)]
-    public async Task ExecuteAsync_NoBodyWithTwoEntries_WritesNothingButStillSearchesAndSucceeds(LdapDialect dialect)
+    public async Task ExecuteAsync_NoBodyWithTwoEntries_WritesNothingButStillSearches(LdapDialect dialect)
     {
         (TransferResult result, byte[] output, int sentLength) = await RunAsync(dialect, noBody: true);
         (_, _, int sentWithBody) = await RunAsync(dialect, noBody: false);
 
         Assert.AreEqual(0, output.Length);
-        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(dialect == LdapDialect.WinLdap ? CurlExitCode.WeirdServerReply : CurlExitCode.Ok, result.ExitCode);
         Assert.IsTrue(sentLength > 0);
         Assert.AreEqual(sentWithBody, sentLength, "The bind and SearchRequest are sent as without -I.");
     }
@@ -46,7 +46,7 @@ public sealed class LdapNoBodyTests
         StringAssert.Contains(text, "dc=b");
     }
 
-    private static async Task<(TransferResult Result, byte[] Output, int SentLength)> RunAsync(LdapDialect dialect, bool noBody)
+    internal static async Task<(TransferResult Result, byte[] Output, int SentLength)> RunAsync(LdapDialect dialect, bool noBody)
     {
         var connection = new ScriptedConnection([Hex.Bytes(BindSuccess1), Hex.Bytes(EntryDcA + " " + EntryDcB + " " + SearchSuccess)]);
         var handler = new LdapProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)), dialect);

@@ -39,6 +39,28 @@ public sealed class EncryptedDnsExtensionTests
     }
 
     [TestMethod]
+    [DataRow("::bad::")]
+    [DataRow("a b")]
+    [DataRow("-5")]
+    public void ActivateDnsOverTls_AValueThatIsNoHostOrAddress_IsRefusedNamingTheOptionAndTheValue(string value)
+    {
+        ArgumentException error = Assert.ThrowsExactly<ArgumentException>(() => EncryptedDnsExtension.ActivateDnsOverTls(ValuesOf("dns-over-tls", value)));
+
+        Assert.StartsWith($"--dns-over-tls needs a resolver as host[:port], not '{value}'", error.Message);
+    }
+
+    [TestMethod]
+    [DataRow("::bad::")]
+    [DataRow("a b")]
+    [DataRow("-5")]
+    public void ActivateDnsOverQuic_AValueThatIsNoHostOrAddress_IsRefusedNamingTheOptionAndTheValue(string value)
+    {
+        ArgumentException error = Assert.ThrowsExactly<ArgumentException>(() => EncryptedDnsExtension.ActivateDnsOverQuic(ValuesOf("dns-over-quic", value)));
+
+        Assert.StartsWith($"--dns-over-quic needs a resolver as host[:port], not '{value}'", error.Message);
+    }
+
+    [TestMethod]
     public void ActivateDnsOverTls_HostAndPort_UsesThePort() =>
         Assert.AreEqual(8853, ((DnsOverTlsResolverHook)EncryptedDnsExtension.ActivateDnsOverTls(ValuesOf("dns-over-tls", "dot.example:8853"))!).Server.Port);
 

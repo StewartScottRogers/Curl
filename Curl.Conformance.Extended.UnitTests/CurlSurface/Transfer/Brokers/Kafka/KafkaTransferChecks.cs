@@ -88,7 +88,7 @@ internal sealed class KafkaTransferChecks(string scheme, int port, int idNumber)
         });
 
     /// <summary>
-    /// -w: each variable as the manual defines it, after the body; %{time_total} is 0.000000 on a clock that never moves
+    /// -w: each variable as the manual defines it, after the body; %{time_total} is 0.000001 (the least curl reports) on a clock that never moves
     /// and %{size_download} the bytes written.
     /// </summary>
     public Task WriteOutAsync() =>
@@ -97,7 +97,7 @@ internal sealed class KafkaTransferChecks(string scheme, int port, int idNumber)
             CurlRunResult result = await RunAnsweredAsync(["-sS", "-w", WriteOutFormat, Url]);
 
             Assert.AreEqual(0, result.ExitCode, Text(result.StandardError));
-            string expected = $"0||{Url}|{Url}|{scheme}|127.0.0.1|{port}|{Encoding.UTF8.GetByteCount(Body)}|0.000000\n";
+            string expected = $"0||{Url}|{Url}|{scheme}|127.0.0.1|{port}|{Encoding.UTF8.GetByteCount(Body)}|0.000001\n";
             Assert.AreEqual(Body + expected, Text(result.StandardOutput), "manual, -w");
         });
 

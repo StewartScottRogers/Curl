@@ -89,7 +89,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         text = filter;
         position = 0;
         setDepth = 0;
-        return filter.StartsWith('(') ? ParseTopLevel() : EncodeItem(filter);
+        return filter.StartsWith('(') || (isWinLdap && filter.TrimStart(' ').StartsWith('(')) ? ParseTopLevel() : EncodeItem(filter);
     }
 
     private static bool IsBetween(int count, int minimum, int maximum) => count >= minimum && count <= maximum;
@@ -225,15 +225,23 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         return writer.Constructed(tag, [.. items]);
     }
 
-    /// <summary>Whether the character at the position ends a simple item: a <c>)</c>, or for WinLDAP a <c>(</c> too.</summary>
-    private bool EndsSimpleItem() => text[position] == ')' || (isWinLdap && text[position] == '(');
+    /// <summary>Whether the character at the position ends a simple item: a <c>)</c>, or for WinLDAP outside a nested set a <c>(</c> too.</summary>
+    private bool EndsSimpleItem() => text[position] == ')' || (isWinLdap && setDepth == 0 && text[position] == '(');
 
-    /// <summary>Parses a simple item up to its <c>)</c>; a <c>\</c> hides the character after it.</summary>
+    /// <summary>Whether the position is past the text or at the <c>)</c> (or outside a nested set <c>(</c>) that ends the simple item with no <c>(</c> left open in its value.</summary>
+    private bool AtSimpleItemEnd(int open) => position >= text.Length || (open == 0 && EndsSimpleItem());
+
+    /// <summary>How a character changes the count of open parentheses in a value: <c>(</c> opens one, <c>)</c> closes one.</summary>
+    private static int ParenthesisChange(char character) => character == '(' ? 1 : character == ')' ? -1 : 0;
+
+    /// <summary>Parses a simple item up to its <c>)</c>; a <c>\</c> hides the character after it, and inside a nested set WinLDAP keeps balanced <c>(</c> and <c>)</c> in the value (BL-5399).</summary>
     private byte[]? ParseSimple()
     {
         int start = position;
-        while (position < text.Length && !EndsSimpleItem())
+        int open = 0;
+        while (!AtSimpleItemEnd(open))
         {
+            open += ParenthesisChange(text[position]);
             position += text[position] == '\\' ? 2 : 1;
         }
 
@@ -346,7 +354,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         string rest = halves.Length == 2 ? halves[1] : string.Empty;
         bool dnOnly = IsDn(rest);
         bool dnAttributes = dnOnly || rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase);
-        string? rule = rest.Length == 0 || dnOnly ? null : rest;
+        string? rule = rest.Length == 0 || dnOnly || IsNamedRule(rest) ? null : rest;
         return WriteExtensible(new ExtensibleMatch(rule, halves[0], value, dnAttributes), writeFalse: true);
     }
 
@@ -369,6 +377,9 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
             ? WriteExtensible(new ExtensibleMatch(rule, parts[0], value, dnAttributes), writeFalse: false)
             : null;
     }
+
+    /// <summary>Whether WinLDAP loses the rule: a name (not an OID, not after <c>dn:</c>) is left out of the wire form (BL-5400, ADR-1298).</summary>
+    private static bool IsNamedRule(string rest) => !char.IsAsciiDigit(rest[0]) && !rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase);
 
     private bool IsOpenLdapExtensible(string attribute, string? rule) =>
         rule is null ? IsAttribute(attribute) : IsAttribute(rule) && (attribute.Length == 0 || IsAttribute(attribute));

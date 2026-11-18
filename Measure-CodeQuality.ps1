@@ -249,13 +249,26 @@ function Invoke-CoverageTestRun {
         )
         if ($NoBuild) { $testArguments += '--no-build' }
         if (-not $IncludeIntegration) { $testArguments += @('--filter', 'TestCategory!=Integration') }
-        Write-Host "dotnet test $(Split-Path $target -Leaf)" -ForegroundColor DarkCyan
-        & dotnet @testArguments | ForEach-Object {
-            $line = [string]$_
-            $testOutput.Add($line)
-            Write-Host $line
+        # A test host that crashes without any failed test (BL-5416: the HttpFile tests on a
+        # Windows runner) is an infrastructure fault, not a test result: run that project once
+        # more before counting it, and keep only the last attempt's output and exit code.
+        foreach ($attempt in 1..2) {
+            Write-Host "dotnet test $(Split-Path $target -Leaf)" -ForegroundColor DarkCyan
+            $attemptOutput = New-Object System.Collections.Generic.List[string]
+            & dotnet @testArguments | ForEach-Object {
+                $line = [string]$_
+                $attemptOutput.Add($line)
+                Write-Host $line
+            }
+            $attemptExitCode = $LASTEXITCODE
+            $hostCrashed = $attemptExitCode -ne 0 -and
+                @($attemptOutput | Where-Object { $_ -match 'Test host process crashed' }).Count -gt 0 -and
+                @($attemptOutput | Where-Object { $_ -match 'Failed!\s+-\s+Failed:' }).Count -eq 0
+            if (-not $hostCrashed) { break }
+            Write-Warning "The test host crashed running $(Split-Path $target -Leaf); running it once more."
         }
-        if ($LASTEXITCODE -ne 0) { $testExitCode = $LASTEXITCODE }
+        $testOutput.AddRange($attemptOutput)
+        if ($attemptExitCode -ne 0) { $testExitCode = $attemptExitCode }
     }
     if ($testExitCode -ne 0) {
         # A scaffolded .UnitTests project with no tests yet prints "No test matches the
