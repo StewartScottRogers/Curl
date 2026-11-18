@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/IntermediateOnlyCacertRevocationTests.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs, Curl.Networking.UnitTests/IntermediateOnlyCacertRevocationTests.cs]
 requirement: none
 created: 2026-11-17
 completed:
