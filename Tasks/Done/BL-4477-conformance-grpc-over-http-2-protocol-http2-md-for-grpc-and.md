@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/Grpc, Curl.Conformance.Extended.UnitTests/Grpc, Documentation/Conformance/Extended/Grpc.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-18
 ---
 # BL-4477 — Conformance: gRPC over HTTP/2 (PROTOCOL-HTTP2.md) for grpc:// and grpcs:// (Grpc part 1 of 2)
 
@@ -44,23 +44,23 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/Grpc.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
+- [x] `Documentation/Conformance/Extended/Grpc.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
       PROTOCOL-HTTP2.md that binds a client a `Grpc:` ID mapped to a test or to `n/a: <reason>`, links to
       `Grpc-Reflection.md` (BL-4478), and the harness's matrix check passes.
-- [ ] A reference gRPC server in `Curl.Conformance.Extended.UnitLibrary/Grpc/` lets BL-4478 add the reflection service
+- [x] A reference gRPC server in `Curl.Conformance.Extended.UnitLibrary/Grpc/` lets BL-4478 add the reflection service
       in `Grpc/Reflection/` without editing this task's files.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/Grpc/` run curl in process and assert HTTP/2 frames and header
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/Grpc/` run curl in process and assert HTTP/2 frames and header
       lists, stdout, stderr and exit code for at least: a unary call, a server-streaming reply, Trailers-Only, every
       status code's name, a `grpc-message` needing percent-decoding, a non-200 HTTP status mapped to its code, a
       message split across DATA frames, a truncated message, a compressed-flag message the client cannot decode,
       `grpc-timeout` from `-m`, and `grpcs://` with ALPN `h2`.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix Grpc conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/Grpc/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/Grpc/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths or text).
 
 ## Notes
 
@@ -72,6 +72,8 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
   `Curl.Conformance.Extended.UnitLibrary` references no HTTP/2 or HPACK code, so BL-4530's touches include its
   csproj; no task in Doing touches that file.
 
+- 2026-11-18 (lane 5): All work was delivered by the subtasks BL-4530 to BL-4533 (plus BL-4478, BL-4687 follow-ups); verified Grpc.md, reference server, cases present and the 130 Grpc conformance tests green. No code changed in this run. CI criterion met by platform-neutral cases.
+
 ## Log
 
 - 2026-11-02: Created.
@@ -79,3 +81,4 @@ here, but a defect in the extension library is listed in `KnownFailures.txt` wit
 - 2026-11-02: Doing -> Deferred. Split into BL-4530, BL-4531, BL-4532, BL-4533
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 123b988a 102ec5aa a66e083a 2d0dc877 d8e3fb0e 378fd6f7 ef6c9026.
+- 2026-11-18: Doing -> Done. Delivered by BL-4530 to BL-4533
