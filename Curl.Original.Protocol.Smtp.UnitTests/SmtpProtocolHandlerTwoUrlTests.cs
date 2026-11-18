@@ -29,8 +29,8 @@ public sealed class SmtpProtocolHandlerTwoUrlTests
         var connector = new QueuedConnector(ConnectResult.Connected(connection, null), ConnectResult.Connected(connection, null, isReused: true));
         var handler = new SmtpProtocolHandler(connector, new QueuedTlsProvider());
 
-        TransferResult first = await handler.ExecuteAsync(Context());
-        TransferResult second = await handler.ExecuteAsync(Context());
+        TransferResult first = StampedTimings.Without(await handler.ExecuteAsync(Context()));
+        TransferResult second = StampedTimings.Without(await handler.ExecuteAsync(Context()));
         await connection.CloseAsync();
 
         Assert.AreEqual(CurlExitCode.Ok, first.ExitCode);
@@ -46,8 +46,7 @@ public sealed class SmtpProtocolHandlerTwoUrlTests
         var connector = new QueuedConnector(ConnectResult.Connected(connection, null));
         var handler = new SmtpProtocolHandler(connector, new QueuedTlsProvider());
 
-        TransferResult failed = await handler.ExecuteAsync(Context());
-
+        TransferResult failed = StampedTimings.Without(await handler.ExecuteAsync(Context()));
         Assert.AreNotEqual(CurlExitCode.Ok, failed.ExitCode);
         Assert.IsTrue(connection.IsClosed);
         Assert.IsNull(connection.Session);
@@ -62,8 +61,7 @@ public sealed class SmtpProtocolHandlerTwoUrlTests
         var connector = new QueuedConnector(ConnectResult.Connected(connection, null, isReused: true));
         var handler = new SmtpProtocolHandler(connector, new QueuedTlsProvider());
 
-        TransferResult result = await handler.ExecuteAsync(Context());
-
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(Context()));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(Envelope, connection.SentText);
         Assert.IsInstanceOfType<SmtpKeptConnection>(connection.Session);
@@ -79,8 +77,7 @@ public sealed class SmtpProtocolHandlerTwoUrlTests
         var handler = new SmtpProtocolHandler(connector, new QueuedTlsProvider());
 
         await handler.ExecuteAsync(Context());
-        TransferResult failed = await handler.ExecuteAsync(Context());
-
+        TransferResult failed = StampedTimings.Without(await handler.ExecuteAsync(Context()));
         Assert.AreNotEqual(CurlExitCode.Ok, failed.ExitCode);
         Assert.IsTrue(connection.IsClosed);
         Assert.AreEqual(Envelope + "MAIL FROM:<a@x>\r\nQUIT\r\n", connection.SentText);

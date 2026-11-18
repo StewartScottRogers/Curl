@@ -243,7 +243,7 @@ public sealed class SmtpProtocolHandlerEventTests
 
         Diagnostics.ArrangeContext(context, plaintext.Script + " / after STARTTLS: " + secured.Script);
 
-        TransferResult result = await new SmtpProtocolHandler(connector, tls).ExecuteAsync(context);
+        TransferResult result = StampedTimings.Without(await new SmtpProtocolHandler(connector, tls).ExecuteAsync(context));
         Diagnostics.ActEvents(result, events);
 
         string[] expected = [

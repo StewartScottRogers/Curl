@@ -25,8 +25,7 @@ public sealed class Cgr239Tests
         var handler = new SmtpProtocolHandler(connector, new QueuedTlsProvider());
 
         await handler.ExecuteAsync(SmtpProtocolHandlerTwoUrlTests.Context("u"));
-        TransferResult result = await handler.ExecuteAsync(SmtpProtocolHandlerTwoUrlTests.Context("v"));
-
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(SmtpProtocolHandlerTwoUrlTests.Context("v")));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsFalse(first.IsClosed);
         Assert.AreEqual(SmtpProtocolHandlerTwoUrlTests.Envelope, first.SentText);

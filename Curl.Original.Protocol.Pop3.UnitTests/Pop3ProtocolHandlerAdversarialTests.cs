@@ -244,8 +244,7 @@ public sealed class Pop3ProtocolHandlerAdversarialTests
         for (int run = 0; run < connections.Length; run++)
         {
             using var output = new MemoryStream();
-            TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url + "1"), Output = output });
-
+            TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url + "1"), Output = output }));
             Diagnostics.Diff($"run {run} output", Message, Encoding.Latin1.GetString(output.ToArray()));
             Assert.AreEqual(Message, Encoding.Latin1.GetString(output.ToArray()));
             Assert.AreEqual(TransferResult.Success(Message.Length), result);
@@ -264,7 +263,7 @@ public sealed class Pop3ProtocolHandlerAdversarialTests
         (TransferResult Result, string Written)[] runs = await Task.WhenAll(Enumerable.Range(0, Transfers).Select(async _ =>
         {
             using var output = new MemoryStream();
-            TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url + "1"), Output = output });
+            TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url + "1"), Output = output }));
             return (result, Encoding.Latin1.GetString(output.ToArray()));
         }));
 
@@ -295,9 +294,8 @@ public sealed class Pop3ProtocolHandlerAdversarialTests
         var tls = new QueuedTlsProvider();
 
         Diagnostics.ArrangeRun(url, connection.Script);
-        TransferResult result = await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(context);
-
-        var run = new Pop3Run(result, connection, connector, tls, output.ToArray(), progress);
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(context));
+        var run = new Pop3Run(StampedTimings.Without(result), connection, connector, tls, output.ToArray(), progress);
         Diagnostics.ActRun(run);
         return run;
     }

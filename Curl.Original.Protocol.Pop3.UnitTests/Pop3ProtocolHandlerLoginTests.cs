@@ -523,9 +523,8 @@ public sealed class Pop3ProtocolHandlerLoginTests
         Diagnostics.Arrange("mail options", mail is null ? "(none)" : $"login options {Pop3Diagnostics.Show(mail.LoginOptions)}, bearer {Pop3Diagnostics.Show(mail.BearerToken)}, sasl ir {mail.SaslInitialResponse}");
         Diagnostics.Arrange("sasl", sasl is null ? "(no authenticator)" : "scripted");
 
-        TransferResult result = await new Pop3ProtocolHandler(connector, tls, sasl).ExecuteAsync(context);
-
-        var run = new Pop3Run(result, connection, connector, tls, output.ToArray(), progress);
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(connector, tls, sasl).ExecuteAsync(context));
+        var run = new Pop3Run(StampedTimings.Without(result), connection, connector, tls, output.ToArray(), progress);
         Diagnostics.ActRun(run);
         return run;
     }

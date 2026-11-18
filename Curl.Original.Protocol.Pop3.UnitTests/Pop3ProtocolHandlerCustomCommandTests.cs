@@ -257,9 +257,8 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
         Diagnostics.ArrangeRun(url, connection.Script);
         Diagnostics.Arrange("flags", $"custom command {Pop3Diagnostics.Show(flags.Mail?.CustomCommand)}, list only {flags.ListOnly}, no body {flags.NoBody}");
 
-        TransferResult result = await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(context);
-
-        var run = new Pop3Run(result, connection, connector, tls, output.ToArray(), progress);
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(context));
+        var run = new Pop3Run(StampedTimings.Without(result), connection, connector, tls, output.ToArray(), progress);
         Diagnostics.ActRun(run);
         return run;
     }

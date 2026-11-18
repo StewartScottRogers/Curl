@@ -162,11 +162,11 @@ public sealed class SmtpProtocolHandlerDiagnosticLogTests
         ActLog(log);
 
         AssertMessages(DiagnosticLogLevel.Verbose, ["reply 220", "sent EHLO x", "reply 250", "sent HELP", "reply 214", "sent QUIT", "reply 221"], log);
-        Diagnostics.AssertValues("last info message", "transfer done, 10 bytes in 12 ms", log.MessagesAt(DiagnosticLogLevel.Info)[^1]);
+        Diagnostics.AssertValues("last info message", "transfer done, 10 bytes in 48 ms", log.MessagesAt(DiagnosticLogLevel.Info)[^1]);
         CollectionAssert.AreEqual(
             new[] { "reply 220", "sent EHLO x", "reply 250", "sent HELP", "reply 214", "sent QUIT", "reply 221" },
             log.MessagesAt(DiagnosticLogLevel.Verbose));
-        Assert.AreEqual("transfer done, 10 bytes in 12 ms", log.MessagesAt(DiagnosticLogLevel.Info)[^1]);
+        Assert.AreEqual("transfer done, 10 bytes in 48 ms", log.MessagesAt(DiagnosticLogLevel.Info)[^1]);
     }
 
     [TestMethod]

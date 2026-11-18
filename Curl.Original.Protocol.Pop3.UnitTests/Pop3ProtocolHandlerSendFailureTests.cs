@@ -46,8 +46,7 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
     {
         ScriptedConnection connection = Conversation(writesBeforeFailure, Reset());
 
-        TransferResult result = await ExecuteAsync(connection, new RecordingTransferEvents());
-
+        TransferResult result = StampedTimings.Without(await ExecuteAsync(connection, new RecordingTransferEvents()));
         Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), result);
         Diagnostics.AssertValues("Encoding.Latin1.GetString(connection.Sent)", sent, Encoding.Latin1.GetString(connection.Sent));
@@ -65,8 +64,7 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
     {
         ScriptedConnection connection = Conversation(writesBeforeFailure, Reset());
 
-        TransferResult result = await ExecuteAsync(connection, new RecordingTransferEvents());
-
+        TransferResult result = StampedTimings.Without(await ExecuteAsync(connection, new RecordingTransferEvents()));
         Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + ResetMessage()), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + ResetMessage()), result);
         Diagnostics.AssertValues("Encoding.Latin1.GetString(connection.Sent)", sent, Encoding.Latin1.GetString(connection.Sent));
@@ -79,8 +77,7 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
     [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_WriteAbortedOnWindows_FailsWithExit55ConnectionWasAborted()
     {
-        TransferResult result = await ExecuteAsync(Conversation(1, Aborted()), new RecordingTransferEvents());
-
+        TransferResult result = StampedTimings.Without(await ExecuteAsync(Conversation(1, Aborted()), new RecordingTransferEvents()));
         Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was aborted"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was aborted"), result);
     }
@@ -89,8 +86,7 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task ExecuteAsync_WriteAbortedOffWindows_FailsWithExit55TheSocketErrorsOwnMessage()
     {
-        TransferResult result = await ExecuteAsync(Conversation(1, Aborted()), new RecordingTransferEvents());
-
+        TransferResult result = StampedTimings.Without(await ExecuteAsync(Conversation(1, Aborted()), new RecordingTransferEvents()));
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + new SocketException((int)SocketError.ConnectionAborted).Message),
             result);
@@ -104,8 +100,7 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
     {
         ScriptedConnection connection = Conversation(writesBeforeFailure, new IOException("The pipe is broken."));
 
-        TransferResult result = await ExecuteAsync(connection, new RecordingTransferEvents());
-
+        TransferResult result = StampedTimings.Without(await ExecuteAsync(connection, new RecordingTransferEvents()));
         Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
         Diagnostics.AssertValues("Encoding.Latin1.GetString(connection.Sent)", sent, Encoding.Latin1.GetString(connection.Sent));
@@ -162,8 +157,7 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
     {
         ScriptedConnection connection = Conversation(4, Reset());
 
-        TransferResult result = await ExecuteAsync(connection, new RecordingTransferEvents());
-
+        TransferResult result = StampedTimings.Without(await ExecuteAsync(connection, new RecordingTransferEvents()));
         Diagnostics.AssertValues("result", TransferResult.Success(4), result);
         Assert.AreEqual(TransferResult.Success(4), result);
         Diagnostics.AssertValues("Encoding.Latin1.GetString(connection.Sent)", Capa + UserAndPass + "RETR 1\r\n", Encoding.Latin1.GetString(connection.Sent));
@@ -211,7 +205,7 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
         };
         Diagnostics.ArrangeRun(Url, connection.Script);
         Diagnostics.Arrange("writes before failure", $"{connection.WritesBeforeFailure}, then {connection.WriteFailure.GetType().Name}: {connection.WriteFailure.Message} ({connection.WriteFailure.InnerException?.Message ?? "no inner exception"})");
-        TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context);
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context));
         Diagnostics.ActTransfer(result, events, connection.Sent);
         return result;
     }

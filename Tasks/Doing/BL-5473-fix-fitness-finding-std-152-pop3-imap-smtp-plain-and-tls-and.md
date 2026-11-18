@@ -36,11 +36,14 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] all five print non-zero `pre`, `post` and `st` with `c ≤ pre ≤ st ≤ tot`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] all five print non-zero `pre`, `post` and `st` with `c ≤ pre ≤ st ≤ tot`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision: each handler stamps TransferTimings on a successful transfer (pre- and post-transfer = when the connect phase ended, start-transfer = completion), so c <= pre <= st <= tot; it is not curl's exact value (curl's pre/st come after login), measured finding values only guide ordering. A failure keeps its report. Existing tests compare results without the stamps through StampedTimings.Without; three log tests' elapsed ms changed (extra clock reads).
+- Quality run: Pop3, Imap, Smtp, Rtsp libraries 100/100, no failing members. One unrelated failure in the full fast run: Curl.Networking.UnitTests VerifyPeer_CaDirectoryHoldingOnlyAnIntermediate... (not touched here).
 
 ## Log
 

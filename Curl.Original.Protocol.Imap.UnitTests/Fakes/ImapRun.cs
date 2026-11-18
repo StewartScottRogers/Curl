@@ -46,6 +46,6 @@ public sealed record ImapRun(
 
         TransferResult result = await handler.ExecuteAsync(context);
 
-        return new ImapRun(result, connection, connector, tls);
+        return new ImapRun(StampedTimings.Without(result), connection, connector, tls);
     }
 }
