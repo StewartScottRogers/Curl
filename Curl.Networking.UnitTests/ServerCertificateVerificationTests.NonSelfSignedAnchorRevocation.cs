@@ -87,6 +87,16 @@ public sealed class ServerCertificateVerificationNonSelfSignedAnchorRevocationTe
     }
 
     [TestMethod]
+    public void VerifyPeer_LeafWithUnusableRevocationListUnderTheAnchorAndBestEffort_Accepts()
+    {
+        var failure = Verify(
+            Status(X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.RevocationStatusUnknown),
+            Status(X509ChainStatusFlags.RevocationStatusUnknown), listUnrelated: false, noSessionId: false, bestEffort: true);
+
+        Assert.IsNull(failure);
+    }
+
+    [TestMethod]
     public void VerifyPeer_SelfSignedAnchorWithUnavailableRevocationStatus_IsExit60()
     {
         var failure = Verify(

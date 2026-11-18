@@ -143,7 +143,13 @@ internal sealed partial class ServerCertificateVerification
         HasOnlyMissingRootStatus(ReadChainStatus(chain))
         || (HasOnlyMissingRootOrUnavailableRevocationStatus(ReadChainStatus(chain))
             && !IsSelfSigned(chain.ChainElements[^1].Certificate)
-            && ReadBelowAnchorRevocation(chain) == BelowAnchorRevocation.Clean);
+            && NothingBelowAnchorIsRevokedOrUnresolvedUnlessBestEffort(chain));
+
+    // --ssl-revoke-best-effort masks an unknown revocation status, so a certificate below the
+    // anchor with no usable CRL (404, none listed, refused) is tolerated there; a revoked one never is (BL-5437).
+    private bool NothingBelowAnchorIsRevokedOrUnresolvedUnlessBestEffort(X509Chain chain) =>
+        ReadBelowAnchorRevocation(chain) is BelowAnchorRevocation.Clean
+        || (matchesSchannelBuild && options.RevocationCheckBestEffort && ReadBelowAnchorRevocation(chain) is BelowAnchorRevocation.Unresolved);
 
     // The chain ends at a listed, non-self-signed anchor and a CRL revokes a certificate below it:
     // Schannel's has been revoked, where the engine's own statuses only say unknown (BL-5384).
