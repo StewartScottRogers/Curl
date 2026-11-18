@@ -1,4 +1,4 @@
-# ADR-1291: The LDAP DIGEST-MD5 bind negotiates qop=auth-conf with 3des (BL-5376)
+# ADR-1292: The LDAP DIGEST-MD5 bind negotiates qop=auth-conf with 3des (BL-5376)
 
 Status: Accepted. Date: 2026-11-17. Decided by Claude under Stewart's delegation.
 
