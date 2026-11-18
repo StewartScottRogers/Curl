@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Pop3.UnitLibrary/Pop3Session.cs, Curl.Original.Protocol.Pop3.UnitLibrary/Pop3ProtocolHandler.cs, Curl.Original.Protocol.Imap.UnitLibrary/ImapSession.cs, Curl.Original.Protocol.Imap.UnitLibrary/ImapProtocolHandler.cs, Curl.Original.Protocol.Smtp.UnitLibrary/SmtpSession.cs, Curl.Original.Protocol.Smtp.UnitLibrary/SmtpProtocolHandler.cs, Curl.Original.Protocol.Rtsp.UnitLibrary/RtspProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5473 — Fix fitness finding STD-152: POP3, IMAP, SMTP (plain and TLS) and RTSP report %{time_pretransfer}, %{time_posttransfer} and %{time_starttransfer} as 0
 
@@ -49,3 +49,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-152 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: acd26183 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. POP3, IMAP, SMTP and RTSP stamp pre/post/start-transfer timings on success
