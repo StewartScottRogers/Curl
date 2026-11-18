@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/HttpResponseReader.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5509 — Fix AF-0867: Surviving mutant: a SignalR status line of two tokens can be refused
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/HttpResponseReader.cs line 44`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.SignalR.UnitLibrary/Transport/HttpResponseReader.cs line 44`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `HttpResponseReaderTests.ReadHeadAsync_StatusLineWithoutReasonPhrase_ReadsTheStatusCode_Rfc9112Section4` (new, sends `HTTP/1.1 200`). Verified by hand: with `< 2` -> `<= 2` it fails; reverted, all 155 pass. No production change.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 6ef977f0 9742157d.
+- 2026-11-18: Doing -> Done. Test added that kills the mutant

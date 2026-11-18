@@ -19,6 +19,16 @@ public sealed class HttpResponseReaderTests
     }
 
     [TestMethod]
+    public async Task ReadHeadAsync_StatusLineWithoutReasonPhrase_ReadsTheStatusCode_Rfc9112Section4()
+    {
+        BufferedConnectionReader reader = Reader("HTTP/1.1 200\r\nContent-Length: 0\r\n\r\n");
+
+        HttpResponseHead head = await HttpResponseReader.ReadHeadAsync(reader, CancellationToken.None);
+
+        Assert.AreEqual(200, head.StatusCode);
+    }
+
+    [TestMethod]
     [DataRow("HTTP/1.1")]
     [DataRow("HTTP/2 200 OK")]
     [DataRow("HTTP/1.1 20 OK")]
