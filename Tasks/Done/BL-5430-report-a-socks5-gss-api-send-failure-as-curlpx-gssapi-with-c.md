@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/Socks5GssapiNegotiation.cs, Curl.Networking.UnitTests]
+touches: [Curl.Networking.UnitLibrary/Socks5GssapiNegotiation.cs, Curl.Networking.UnitLibrary/Socks5GssapiFailureText.cs, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5430 — Report a SOCKS5 GSS-API send failure as CURLPX_GSSAPI with curl's per-step message
 
@@ -30,14 +30,17 @@ Fix sketch: catch the send failure in `SendMessageAsync` (or at its two callers)
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Networking.UnitTests` resets the connection during the GSS-API authentication send. It gets `CurlProxyCode.Gssapi`, curl's authentication-send message and the verbose lines.
-- [ ] A unit test resets the connection during the protection-level send and gets curl's encryption-send message for that step.
-- [ ] The SSPI-text build's wording is pinned in its own test, measured against real curl.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A unit test in `Curl.Networking.UnitTests` resets the connection during the GSS-API authentication send. It gets `CurlProxyCode.Gssapi`, curl's authentication-send message and the verbose lines.
+- [x] A unit test resets the connection during the protection-level send and gets curl's encryption-send message for that step.
+- [x] The SSPI-text build's wording is pinned in its own test, measured against real curl.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Send failures now return Failed(Gssapi, step text) from SendMessageAsync, so the verbose-lines loop runs. Texts follow upstream socks_gssapi.c and socks_sspi.c ("Failed to send GSS-API|SSPI authentication|encryption request."); no GSS-API proxy was available to measure them, so they are pinned from source. Added Socks5GssapiFailureText.cs to touches (the texts live there). Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 3ed5f69d 319c5395 8882b1fd 3d836d5e.
+- 2026-11-18: Doing -> Done. SOCKS5 GSS-API send failures are CURLPX_GSSAPI with per-step texts and verbose lines

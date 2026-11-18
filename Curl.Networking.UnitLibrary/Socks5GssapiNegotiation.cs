@@ -99,9 +99,10 @@ internal static class Socks5GssapiNegotiation
                 return SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, texts.ContextFailed(step.Status));
             }
 
-            if (step.Token.Length > 0)
+            if (step.Token.Length > 0
+                && await SendMessageAsync(connection, AuthenticationMessage, step.Token, texts.AuthenticationRequestNotSent, cancellationToken).ConfigureAwait(false) is { } sendFailure)
             {
-                await SendMessageAsync(connection, AuthenticationMessage, step.Token, cancellationToken).ConfigureAwait(false);
+                return sendFailure;
             }
 
             if (step.Status == SecurityContextStatus.Completed)
@@ -158,7 +159,11 @@ internal static class Socks5GssapiNegotiation
             return SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, texts.WrapFailed);
         }
 
-        await SendMessageAsync(connection, ProtectionMessage, body, cancellationToken).ConfigureAwait(false);
+        if (await SendMessageAsync(connection, ProtectionMessage, body, texts.EncryptionRequestNotSent, cancellationToken).ConfigureAwait(false) is { } sendFailure)
+        {
+            return sendFailure;
+        }
+
         var (reply, failure) = await ReadMessageAsync(connection, ProtectionMessage, texts.EncryptionResponseLost, texts.InvalidEncryptionResponse, texts.EncryptionTypeLost, cancellationToken).ConfigureAwait(false);
         if (failure is not null)
         {
@@ -177,11 +182,19 @@ internal static class Socks5GssapiNegotiation
         _ => SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, Socks5GssapiFailureText.ProtectionNotImplemented),
     };
 
-    private static ValueTask SendMessageAsync(IConnection connection, byte messageType, byte[] body, CancellationToken cancellationToken) =>
-        SocksProxyTunnel.SendAsync(
-            connection,
-            [SubnegotiationVersion, messageType, (byte)(body.Length >> 8), (byte)body.Length, .. body],
-            CurlProxyCode.SendAuthentication,
-            "Failed to send GSS-API authentication request.",
-            cancellationToken);
+    // A write that fails with a socket error is curl's CURLPX_GSSAPI with the step's own text, as every other failure here.
+    private static async ValueTask<ConnectResult?> SendMessageAsync(IConnection connection, byte messageType, byte[] body, string notSent, CancellationToken cancellationToken)
+    {
+        try
+        {
+            byte[] message = [SubnegotiationVersion, messageType, (byte)(body.Length >> 8), (byte)body.Length, .. body];
+            await connection.WriteAsync(message, cancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+        catch (IOException failure) when (CurlSocketErrorText.SendFailure(failure) is not null)
+        {
+            return SocksProxyTunnel.Failed(CurlProxyCode.Gssapi, notSent);
+        }
+    }
 }
