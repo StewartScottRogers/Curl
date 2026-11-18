@@ -23,11 +23,13 @@ Found by the shift-end review (ADR-0710) of the 2026-11-17 shift (code-reviewer 
 
 ## Acceptance criteria
 
-- [ ] Ending the stream because of `EndsAtFinalHead` skips the promised-length check, or `PromisedBodyLengthOf` treats `EndsAtFinalHead` like a HEAD.
-- [ ] A unit test in `Curl.Original.Protocol.Http.UnitTests`: an HTTP/2 GET stream with `EndsAtFinalHead` and a final head with `content-length: 5` ends successfully with no GOAWAY.
-- [ ] BL-5391's tests still pass; quality gates hold.
+- [x] Ending the stream because of `EndsAtFinalHead` skips the promised-length check, or `PromisedBodyLengthOf` treats `EndsAtFinalHead` like a HEAD.
+- [x] A unit test in `Curl.Original.Protocol.Http.UnitTests`: an HTTP/2 GET stream with `EndsAtFinalHead` and a final head with `content-length: 5` ends successfully with no GOAWAY.
+- [x] BL-5391's tests still pass; quality gates hold.
 
 ## Notes
+
+Fix: `EndResponseAsync` skips the promised-length check when `EndsAtFinalHead` is set (the body is not read then). Test `ReadToEndAsync_GetStreamEndingAtFinalHeadWithContentLength_EndsWithoutGoAway`. Quality run on the library: 0 failing members. CI on Linux and macOS: change is platform-neutral.
 
 ## Log
 
