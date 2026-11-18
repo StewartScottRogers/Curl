@@ -77,3 +77,4 @@ line is removed).
 - 2026-11-02: Backlog -> Doing. Criteria at claim: fd060db8 ba635b0b fe617ef5 be674468 46eaa437 ef6c9026.
 - 2026-11-02: Doing -> Deferred. Split into BL-4619, BL-4612, BL-4613, BL-4614, BL-4615, BL-4616, BL-4617, BL-4618
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: fd060db8 ba635b0b fe617ef5 be674468 46eaa437 ef6c9026.
