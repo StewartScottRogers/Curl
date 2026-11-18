@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http/AzureStorageHttpConnectionReader.cs line 29`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.AzureStorage.UnitLibrary/Http/AzureStorageHttpConnectionReader.cs line 29`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `SendAsync_LineOfExactlyTheLimitWithItsCarriageReturn_IsRead` (verified by hand with `>=`; reverted). The CR before the LF counts toward the limit, so a 65527-byte value gives a line of exactly 65536. `SendAsync_LineOneByteOverTheLimit_FailsLineTooLong` pins the other side. Production code unchanged. Fast tests: 216 pass in the AzureStorage project.
 
 ## Log
 

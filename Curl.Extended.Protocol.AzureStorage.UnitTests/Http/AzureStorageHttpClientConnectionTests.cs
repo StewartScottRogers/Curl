@@ -225,6 +225,21 @@ public sealed class AzureStorageHttpClientConnectionTests
         await AssertFailureAsync(AzureStorageHttpFailure.LineTooLong, () => SendAsync("HTTP/1.1 200 OK\r\nX-Long: " + new string('a', AzureStorageHttpConnectionReader.MaxLineLength) + "\r\n\r\n"));
 
     [TestMethod]
+    public async Task SendAsync_LineOfExactlyTheLimitWithItsCarriageReturn_IsRead()
+    {
+        // "X-Long: " is 8 bytes and the CR before the LF counts, so 65527 value bytes make a line of exactly MaxLineLength.
+        var value = new string('a', AzureStorageHttpConnectionReader.MaxLineLength - 9);
+
+        var response = await SendAsync("HTTP/1.1 200 OK\r\nX-Long: " + value + "\r\n\r\n");
+
+        Assert.AreEqual(value, response.FindHeader("X-Long"));
+    }
+
+    [TestMethod]
+    public async Task SendAsync_LineOneByteOverTheLimit_FailsLineTooLong() =>
+        await AssertFailureAsync(AzureStorageHttpFailure.LineTooLong, () => SendAsync("HTTP/1.1 200 OK\r\nX-Long: " + new string('a', AzureStorageHttpConnectionReader.MaxLineLength - 8) + "\r\n\r\n"));
+
+    [TestMethod]
     public async Task SendAsync_CloseDelimitedBodyEndsWithoutCloseNotify_FailsReceiveFailedWithTheBuildsText()
     {
         // ADR-0221, ADR-1194: a TLS read that ends without close_notify fails, whatever the framing.
