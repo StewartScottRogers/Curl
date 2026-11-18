@@ -8,7 +8,7 @@ depends-on: []
 touches: [Measure-CodeQuality.ps1]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5427 — Make Measure-CodeQuality's test host crash retry match an aborted run's summary
 
@@ -35,3 +35,4 @@ Found by the shift-end review (ADR-0710) of the 2026-11-17 shift (code-reviewer 
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e5924e49 b2fe075a 4f17513b.
+- 2026-11-18: Doing -> Done. Crash check counts only Failed:[1-9] as failure; retry clears first attempt's results
