@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary/IAltSvcStore.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5513 — Fix AF-0871: IAltSvcStore remarks name Curl.Core's AltSvcCache as its implementation and Curl.Console as its setter; neither is true
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Remarks now name AltSvcTransferCache (Curl.Engine, wrapping AltSvcCache) and TransferContextFactory. Doc-only change; Abstractions builds clean, no code changed so the fast tests are unaffected.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-18: Doing -> Done. IAltSvcStore remarks corrected
