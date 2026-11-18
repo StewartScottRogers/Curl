@@ -14,6 +14,8 @@ completed:
 
 ## Goal
 
+An argument expander's refusal (unreadable --http-file or --openapi) prints the try-help line after its message, as curl does for command-line errors.
+
 <!-- One sentence: the observable outcome once this task is done. -->
 
 ## Context
@@ -22,9 +24,11 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] The refusal prints "curl: try 'curl --help' or 'curl --manual' for more information" after its message; pinned in CurlCommandRunnerArgumentExpansionTests.
 
 ## Notes
+
+Decision: every ArgumentExpansionException gets the try-help line (all are command-line refusals). Quality run for Curl.Console: 0 failing members.
 
 ## Log
 

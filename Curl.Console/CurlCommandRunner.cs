@@ -874,8 +874,8 @@ internal sealed class CurlCommandRunner(
         }
         catch (ArgumentExpansionException failure)
         {
-            // An extension could not turn its option into arguments: the run ends before any transfer (ADR-1040).
-            await WriteErrorLinesAsync(["curl: " + failure.Message]).ConfigureAwait(false);
+            // An extension could not turn its option into arguments: the run ends before any transfer (ADR-1040); it is a command-line refusal, so the try-help line follows.
+            await WriteErrorLinesAsync(["curl: " + failure.Message, CommandLineRefusal.TryHelpLine]).ConfigureAwait(false);
             return (int)failure.ExitCode;
         }
 
