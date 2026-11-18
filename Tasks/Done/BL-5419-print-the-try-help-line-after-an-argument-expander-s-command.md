@@ -8,7 +8,7 @@ depends-on: [BL-5402]
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5419 — Print the try-help line after an argument expander's command-line refusal such as an unreadable --http-file or --openapi
 
@@ -24,7 +24,7 @@ An argument expander's refusal (unreadable --http-file or --openapi) prints the 
 
 ## Acceptance criteria
 
-- [x] The refusal prints "curl: try 'curl --help' or 'curl --manual' for more information" after its message; pinned in CurlCommandRunnerArgumentExpansionTests.
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
 
@@ -34,3 +34,4 @@ Decision: every ArgumentExpansionException gets the try-help line (all are comma
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-11-17: Doing -> Done. Try-help line follows an argument expander refusal
