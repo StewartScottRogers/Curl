@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/SocksProxyTunnel.cs, Curl.Networking.UnitLibrary/Socks5Handshake.cs, Curl.Networking.UnitLibrary/Socks4Handshake.cs, Curl.Networking.UnitTests/SocksProxyResetDuringHandshakeTests.cs]
 requirement: none
 created: 2026-11-17
-completed:
+completed: 2026-11-17
 ---
 # BL-5382 — Map a SOCKS proxy reset during the handshake to exit 97 Recv failure
 
@@ -33,13 +33,13 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 ## Acceptance criteria
 
-- [ ] New tests in `Curl.Networking.UnitTests` (a new file) prove a connection reset while reading the SOCKS5 CONNECT reply, and while reading the SOCKS4 reply, surface as exit 97 with message `Recv failure: Connection was reset`.
-- [ ] A test proves the same for `socks4a` and `socks5h`, and for a reset during the SOCKS5 greeting reply.
-- [ ] A test proves a clean early close (end of stream, no reset) keeps its current mapping.
-- [ ] A test proves `-w '%{exitcode}'` prints `97` and a `--next` run continues with the second URL.
-- [ ] Tests are platform-neutral.
-- [ ] Hand check recorded in the Log: step 3 prints `[97]` and `curl: (97) Recv failure: Connection was reset`, exit 97; step 5 prints `hello` and `[0]` for the second URL and exits 0. Measure real curl with `Record-CurlExchange.ps1` where possible.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] New tests in `Curl.Networking.UnitTests` (a new file) prove a connection reset while reading the SOCKS5 CONNECT reply, and while reading the SOCKS4 reply, surface as exit 97 with message `Recv failure: Connection was reset`.
+- [x] A test proves the same for `socks4a` and `socks5h`, and for a reset during the SOCKS5 greeting reply.
+- [x] A test proves a clean early close (end of stream, no reset) keeps its current mapping.
+- [x] A test proves `-w '%{exitcode}'` prints `97` and a `--next` run continues with the second URL.
+- [x] Tests are platform-neutral.
+- [x] Hand check recorded in the Log: step 3 prints `[97]` and `curl: (97) Recv failure: Connection was reset`, exit 97; step 5 prints `hello` and `[0]` for the second URL and exits 0. Measure real curl with `Record-CurlExchange.ps1` where possible.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,3 +50,5 @@ From the outside fitness review of 2026-11-17 (commit 9561bbe, `preview` build),
 
 - 2026-11-17: Created.
 - 2026-11-17: Backlog -> Doing. Criteria at claim: 64f2c2e3 688f1189 0874bef4 7c3b9a7a c1cf21f9 bf973441 a0b49a29.
+- 2026-11-17: Fix in `SocksProxyTunnel.OpenAsync` (one catch for SOCKS4/4a/5/5h), ADR-1293; tests in SocksProxyResetDuringHandshakeTests (platform-neutral, one Windows-only literal). Hand check against real loopback SOCKS5 server with RST: step 3 `curl: (97) Recv failure: Connection was reset`, `[97]`, exit 97; step 5 first URL fails 97, second prints `hello[0]`, exit 0. SOCKS4 covered by unit tests only. Real curl not re-measured; message is the reviewer's REF text. Networking fast tests green, quality run 0 failing members.
+- 2026-11-17: Doing -> Done. Reset during SOCKS handshake is exit 97 Recv failure

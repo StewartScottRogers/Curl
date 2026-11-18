@@ -41,7 +41,7 @@ internal static class SocksProxyTunnel
     /// (<see cref="CurlExitCode.Proxy" />) with curl's message, or exit 6 (43 for bad <c>--dns-servers</c> options) when the host does
     /// not resolve.
     /// </returns>
-    public static ValueTask<ConnectResult?> OpenAsync(
+    public static async ValueTask<ConnectResult?> OpenAsync(
         IConnection connection,
         ProxyEndpoint proxy,
         string host,
@@ -50,10 +50,20 @@ internal static class SocksProxyTunnel
         Socks5AuthenticationOptions socks5Authentication,
         ITransferEvents events,
         ITransferEvents? trace,
-        CancellationToken cancellationToken) =>
-        proxy.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a
-            ? Socks4Handshake.RunAsync(connection, proxy, host, port, resolve, trace, cancellationToken)
-            : Socks5Handshake.RunAsync(connection, proxy, host, port, resolve, socks5Authentication, events, trace, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await (proxy.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a
+                ? Socks4Handshake.RunAsync(connection, proxy, host, port, resolve, trace, cancellationToken)
+                : Socks5Handshake.RunAsync(connection, proxy, host, port, resolve, socks5Authentication, events, trace, cancellationToken)).ConfigureAwait(false);
+        }
+        catch (IOException failure) when (CurlSocketErrorText.ReceiveFailure(failure) is { } receiveFailure)
+        {
+            // A socket error while reading a reply (a reset) is curl's exit 97 "Recv failure: ..." (BL-5382).
+            return Failed(CurlProxyCode.ReceiveConnect, receiveFailure);
+        }
+    }
 
     /// <summary>
     /// Writes <c>[SOCKS] </c> and <paramref name="line" /> to <paramref name="trace" />, when there is one.
