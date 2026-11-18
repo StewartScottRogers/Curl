@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.UnitTests/ManagedEasyTransferTests.ToolProgress.
 
 ## Re-audits
 
+- 2026-11-18 | 2026-11-18_0810.md | reproduces: no | Ran the Select-String: no match for 'Assert.IsNotNull(handler.Contexts.Single().OperationStarted);'. The test (line 165) now asserts Assert.AreEqual(CurlCode.OperationTimedOut, code) after advancing the clock past the 1 s timeout.
+
 ## Log
 
 - 2026-11-17: filed proposed.

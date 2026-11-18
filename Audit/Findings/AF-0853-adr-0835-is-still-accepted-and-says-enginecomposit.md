@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-11-18 | 2026-11-18_0810.md | reproduces: no | Ran the reproduction: ADR-0835 'Status:** Accepted' count 0. Its status line now says it is superseded by ADR-1281 and that the DisabledProtocolHandler and exit 1 no longer hold.
+
 ## Log
 
 - 2026-11-17: filed proposed.
