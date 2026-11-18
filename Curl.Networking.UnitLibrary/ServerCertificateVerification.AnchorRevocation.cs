@@ -1,8 +1,8 @@
 using System.Formats.Asn1;
 using System.Runtime.CompilerServices;
-using Curl.Protocol.Abstractions;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
 
@@ -116,7 +116,7 @@ internal sealed partial class ServerCertificateVerification
     {
         var der = TryFetchRevocationList(uri, budget);
         var list = der is null ? null : DecodeOrNothing(der);
-        return list is not null && IsCurrentListOf(list, certificate, issuer) ? list : null;
+        return list is not null && IsCurrentListOf(list, certificate, issuer, uri) ? list : null;
     }
 
     private byte[]? TryFetchRevocationList(Uri uri, CancellationToken budget)
@@ -137,8 +137,8 @@ internal sealed partial class ServerCertificateVerification
         }
     }
 
-    private bool IsCurrentListOf(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer) =>
-        list.CoversCertificatesIssuedFor(certificate) && list.IsSignedBy(issuer) && list.NextUpdate >= timeProvider.GetUtcNow();
+    private bool IsCurrentListOf(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer, Uri uri) =>
+        list.CoversCertificatesIssuedFor(certificate) && list.IsSignedBy(issuer) && list.NextUpdate >= timeProvider.GetUtcNow() && list.CoversScopeOf(certificate, uri);
 
     private static CertificateRevocationList? DecodeOrNothing(byte[] der)
     {

@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/CertificateRevocationList.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs]
+touches: [Curl.Networking.UnitLibrary/CertificateRevocationList.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.AnchorRevocation.cs, Curl.Networking.UnitLibrary/RevocationListScope.cs, Curl.Networking.UnitTests/CertificateRevocationListScopeTests.cs, Curl.Networking.UnitTests/Fakes/TestRevocationList.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5431 — Fix fitness finding STD-113: Windows: the CRL check below an intermediate-only --cacert / --proxy-cacert anchor ignores the CRL's scope and critical extensions, so a revoked certificate is accepted
 
@@ -41,13 +41,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the five variant commands and the proxy command exit 60 with `schannel: the revocation status is unknown`. A CRL with only non-critical unknown extensions, and one with IDP `onlyContainsUserCerts=TRUE`, still exit 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the five variant commands and the proxy command exit 60 with `schannel: the revocation status is unknown`. A CRL with only non-critical unknown extensions, and one with IDP `onlyContainsUserCerts=TRUE`, still exit 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- New file RevocationListScope.cs (list and entry extension scope) added to touches. Decision: a list is usable for a certificate only when it has no unrecognised critical extension (list or entry), no deltaCRLIndicator, no indirect or onlySomeReasons or attribute-cert IDP, no relative-name IDP, its IDP full name (when present) names the fetched URI, and onlyContainsCACerts or onlyContainsUserCerts agree with the certificate basicConstraints. The --crlfile path (OpenSSL) is unchanged: Decode still accepts such lists, only the Schannel anchor-revocation path calls CoversScopeOf. Not measured against real curl here; the finding gives REF behaviour. Fast tests green (Networking 4317 passed); quality run for the library had one complexity finding, since fixed by extracting IsUnusableEntryExtension.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-113 (High).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e3c4b96a 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. CRL scope and critical extensions now checked below an intermediate-only anchor
