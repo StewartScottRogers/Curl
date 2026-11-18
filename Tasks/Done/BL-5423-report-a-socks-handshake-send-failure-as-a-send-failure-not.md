@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/SocksProxyTunnel.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5423 — Report a SOCKS handshake send failure as a send failure, not Recv failure
 
@@ -23,9 +23,9 @@ Found by the shift-end review (ADR-0710) of the 2026-11-17 shift (silent-failure
 
 ## Acceptance criteria
 
-- [ ] Only a failure while reading a reply maps to `Recv failure` and `ReceiveConnect`; a failure while writing maps to curl's send message and `CURLPX_SEND_*` code for that step.
-- [ ] Unit tests in `Curl.Networking.UnitTests` cover a reset during a SOCKS5 greeting write and a reset during a reply read, pinning message, exit code 97 and proxy code.
-- [ ] BL-5382's tests still pass; quality gates hold.
+- [x] Only a failure while reading a reply maps to `Recv failure` and `ReceiveConnect`; a failure while writing maps to curl's send message and `CURLPX_SEND_*` code for that step.
+- [x] Unit tests in `Curl.Networking.UnitTests` cover a reset during a SOCKS5 greeting write and a reset during a reply read, pinning message, exit code 97 and proxy code.
+- [x] BL-5382's tests still pass; quality gates hold.
 
 ## Notes
 
@@ -33,3 +33,4 @@ Found by the shift-end review (ADR-0710) of the 2026-11-17 shift (silent-failure
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 0bbf5f45 2a78217d e1dec98e.
+- 2026-11-18: Doing -> Done. SOCKS handshake write failures report curl's send message and CURLPX_SEND_* code

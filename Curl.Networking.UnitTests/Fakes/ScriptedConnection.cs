@@ -40,6 +40,12 @@ public sealed class ScriptedConnection(byte[] bytesToRead) : IConnection
     /// </summary>
     public Exception? ExceptionAfterScript { get; init; }
 
+    /// <summary>Gets what a write throws, or <see langword="null" /> to accept it (BL-5423).</summary>
+    public Exception? ExceptionOnWrite { get; init; }
+
+    /// <summary>Gets how many bytes may be written before <see cref="ExceptionOnWrite" /> throws.</summary>
+    public int BytesWrittenBeforeException { get; init; }
+
     /// <summary>
     /// Gets the number of bytes not yet read.
     /// </summary>
@@ -84,6 +90,11 @@ public sealed class ScriptedConnection(byte[] bytesToRead) : IConnection
     /// <inheritdoc />
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
+        if (ExceptionOnWrite is not null && Written.Count >= BytesWrittenBeforeException)
+        {
+            throw ExceptionOnWrite;
+        }
+
         Written.AddRange(buffer.ToArray());
         return ValueTask.CompletedTask;
     }

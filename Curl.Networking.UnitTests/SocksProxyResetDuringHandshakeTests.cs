@@ -69,6 +69,46 @@ public sealed class SocksProxyResetDuringHandshakeTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_Socks5ResetWhileWritingGreeting_IsExit97SendFailure()
+    {
+        var result = await ConnectAsync(ProxyKind.Socks5, new ScriptedConnection([]) { ExceptionOnWrite = Reset() });
+
+        Assert.AreEqual(CurlExitCode.Proxy, result.ExitCode);
+        Assert.AreEqual("Unable to send initial SOCKS5 request.", result.ErrorMessage);
+        Assert.AreEqual(CurlProxyCode.SendRequest, result.ProxyError);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_Socks4ResetWhileWritingRequest_IsExit97SendConnect()
+    {
+        var result = await ConnectAsync(ProxyKind.Socks4, new ScriptedConnection([]) { ExceptionOnWrite = Reset() });
+
+        Assert.AreEqual(CurlExitCode.Proxy, result.ExitCode);
+        Assert.AreEqual("Failed to send SOCKS4 connect request.", result.ErrorMessage);
+        Assert.AreEqual(CurlProxyCode.SendConnect, result.ProxyError);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_Socks5ResetWhileWritingConnectRequest_IsExit97SendConnect()
+    {
+        var result = await ConnectAsync(ProxyKind.Socks5, new ScriptedConnection(GreetingReply) { ExceptionOnWrite = Reset(), BytesWrittenBeforeException = 1 });
+
+        Assert.AreEqual(CurlExitCode.Proxy, result.ExitCode);
+        Assert.AreEqual("Failed to send SOCKS5 connect request.", result.ErrorMessage);
+        Assert.AreEqual(CurlProxyCode.SendConnect, result.ProxyError);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WriteFailsWithoutSocketError_IsNotASendFailure()
+    {
+        var failure = new IOException("disk");
+        var thrown = await Assert.ThrowsExactlyAsync<IOException>(
+            () => ConnectAsync(ProxyKind.Socks5, new ScriptedConnection([]) { ExceptionOnWrite = failure }));
+
+        Assert.AreSame(failure, thrown);
+    }
+
+    [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public async Task ConnectAsync_ResetOnWindows_SaysConnectionWasReset()
     {

@@ -100,7 +100,7 @@ internal static class Socks4Handshake
 
     private static async ValueTask<ConnectResult?> ExchangeAsync(IConnection connection, byte[] request, ITransferEvents? trace, CancellationToken cancellationToken)
     {
-        await SocksProxyTunnel.SendAsync(connection, request, cancellationToken).ConfigureAwait(false);
+        await SocksProxyTunnel.SendAsync(connection, request, CurlProxyCode.SendConnect, "Failed to send SOCKS4 connect request.", cancellationToken).ConfigureAwait(false);
         SocksProxyTunnel.Trace(trace, "adjust pollset in (4)");
         var reply = new byte[8];
         return await SocksProxyTunnel.ReadExactlyAsync(connection, reply, cancellationToken).ConfigureAwait(false)

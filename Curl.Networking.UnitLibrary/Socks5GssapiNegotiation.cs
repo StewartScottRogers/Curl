@@ -181,5 +181,7 @@ internal static class Socks5GssapiNegotiation
         SocksProxyTunnel.SendAsync(
             connection,
             [SubnegotiationVersion, messageType, (byte)(body.Length >> 8), (byte)body.Length, .. body],
+            CurlProxyCode.SendAuthentication,
+            "Failed to send GSS-API authentication request.",
             cancellationToken);
 }
