@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.S3.UnitLibrary/Client/S3ProtocolHandler.cs, Curl.Extended.Protocol.S3.UnitTests/S3RequestMethodTests.cs, Curl.Extended.Protocol.AzureStorage.UnitLibrary, Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary, Curl.Extended.Protocol.OciRegistry.UnitLibrary, Curl.Extended.Protocol.AzureStorage.UnitTests/Client/AzureStorageRequestMethodTests.cs, Curl.Extended.Protocol.GoogleCloudStorage.UnitTests/Client/GcsRequestMethodTests.cs, Curl.Extended.Protocol.OciRegistry.UnitTests/Client/OciRegistryRequestMethodTests.cs, Curl.Extended.Protocol.S3.UnitLibrary/Client/S3RequestMethod.cs, Documentation/Conformance/Extended/S3.md, Documentation/Conformance/Extended/GoogleCloudStorage.md, Documentation/Conformance/Extended/AzureStorage.md, Documentation/Conformance/Extended/OciRegistry.md]
 requirement: none
 created: 2026-11-11
-completed:
+completed: 2026-11-18
 ---
 # BL-4904 — Make s3, gs, az and oci honour -X and -I or refuse them, never GET instead
 
@@ -27,9 +27,9 @@ From the outside fitness review of 2026-11-11 (commit 6ce7cfcf, the `preview` `c
 
 ## Acceptance criteria
 
-- [ ] For s3, gs, az and oci, `-X DELETE` sends DELETE (or exits non-zero without sending a GET), and `-I` sends HEAD (or exits non-zero) and never writes `hello-object`.
-- [ ] Each scheme's conformance document lists the supported methods.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] For s3, gs, az and oci, `-X DELETE` sends DELETE (or exits non-zero without sending a GET), and `-I` sends HEAD (or exits non-zero) and never writes `hello-object`.
+- [x] Each scheme's conformance document lists the supported methods.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -53,6 +53,8 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
   the S3 one by sed; check each library's connector and handler constructors), run the fast tests,
   Measure-CodeQuality for the four libraries, try the repro with the built curl.exe, tick the criteria.
 
+- 2026-11-18 (lane 1): The split subtasks BL-4979 (az), BL-4980 (gs), BL-4981 (oci) and BL-4982 (s3) are Done and carry all the work (ADR-1249, the four `*RequestMethod.cs`, handler calls, tests, a "Request methods" section in each conformance document); the old stash is superseded. Checked here: the four storage `.UnitTests` projects pass (150/147/213/227), and the built curl.exe exits 4 before any connection for `-X DELETE s3://`, `-I s3://` and `-X DELETE gs://`. Criteria met by that landed work; nothing new to commit but this task file.
+
 ## Log
 
 - 2026-11-11: Created.
@@ -62,3 +64,4 @@ Mock servers in the review were Python; build stand-ins in PowerShell, a C# file
 - 2026-11-11: Backlog -> Deferred. Split into BL-4982 (s3), BL-4979 (az), BL-4980 (gs), BL-4981 (oci)
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: da503814 5bc744de a0b49a29.
+- 2026-11-18: Doing -> Done. Done through BL-4979..BL-4982; verified
