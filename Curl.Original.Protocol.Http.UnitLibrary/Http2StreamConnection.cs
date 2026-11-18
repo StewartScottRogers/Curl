@@ -503,6 +503,13 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         if (session.Frames.IsClosedByPeer)
         {
+            if (EndsAtFinalHead && isFinalHeadReceived)
+            {
+                // -I wants no body: a peer that closes after the head, with no trailer, ends the response (BL-5468).
+                isResponseEnded = true;
+                return;
+            }
+
             throw Closed();
         }
     }
@@ -605,13 +612,20 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             : null;
 
     /// <summary>Tells whether a head or trailer frame ends the response: it ends the stream, or the final head came and the request wants no body (<see cref="EndsAtFinalHead" />).</summary>
-    private bool IsEndedBy(Http2StreamFrame frame) => frame.IsEndStream || (EndsAtFinalHead && isFinalHeadReceived);
+    private bool IsEndedBy(Http2StreamFrame frame) => frame.IsEndStream;
 
     private async ValueTask ReceiveDataAsync(Http2StreamFrame frame, CancellationToken cancellationToken)
     {
         if (!isFinalHeadReceived)
         {
             throw await ResetMalformedAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        if (EndsAtFinalHead)
+        {
+            // The body is not wanted (-I): the first DATA ends the response, but a trailer HEADERS right after the head is still read (BL-5468).
+            isResponseEnded = true;
+            return;
         }
 
         bodyBytesReceived += frame.Content.Length;

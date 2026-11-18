@@ -31,11 +31,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] stdout includes `x-t: trailerval` before `[200 1 0]`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] stdout includes `x-t: trailerval` before `[200 1 0]`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- With -I the HTTP/2 stream no longer ends at the final head: it ends at END_STREAM, at the first DATA (body dropped, BL-5391 kept) or at peer close, so a trailer HEADERS right after the head is read. Risk taken: a server that sends the head without END_STREAM and then stays silent now waits. Linux/macOS: change is platform-neutral.
 
 ## Log
 
