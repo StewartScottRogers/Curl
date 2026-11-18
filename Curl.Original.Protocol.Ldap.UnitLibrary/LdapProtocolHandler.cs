@@ -70,6 +70,9 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     private readonly IConnector connector =
         connector ?? throw new ArgumentNullException(nameof(connector));
 
+    /// <summary>The message of the WinLDAP build's exit 8 for <c>-I</c>, which it cannot answer (BL-5397).</summary>
+    private const string WeirdServerReply = "Weird server reply";
+
     private readonly LdapDialect dialect = Enum.IsDefined(dialect)
         ? dialect
         : throw new ArgumentOutOfRangeException(nameof(dialect), dialect, "The LDAP dialect is WinLdap or OpenLdap.");
@@ -300,7 +303,10 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
                 context.Events.ReportInfo(LdapVerboseLines.Url(context.Url));
             }
 
-            return await LdapSearch.RunAsync(dialect, exchange, search, context).ConfigureAwait(false);
+            TransferResult searched = await LdapSearch.RunAsync(dialect, exchange, search, context).ConfigureAwait(false);
+            return dialect == LdapDialect.WinLdap && context.NoBody && searched.ExitCode == CurlExitCode.Ok
+                ? TransferResult.Failure(CurlExitCode.WeirdServerReply, WeirdServerReply)
+                : searched;
         }
     }
 
