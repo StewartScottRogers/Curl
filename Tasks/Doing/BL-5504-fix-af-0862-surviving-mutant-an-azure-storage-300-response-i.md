@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.AzureStorage.UnitLibrary/Client/AzureStorageClient.cs line 60`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.AzureStorage.UnitLibrary/Client/AzureStorageClient.cs line 60`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `AzureStorageProtocolHandlerTests.ExecuteAsync_MultipleChoicesStatus300_FailsWithExit22NamingTheStatus` (new): with `> 300` applied by hand it failed, reverted all 214 pass. Fast tests of the library pass; change is test-only and platform-neutral.
 
 ## Log
 

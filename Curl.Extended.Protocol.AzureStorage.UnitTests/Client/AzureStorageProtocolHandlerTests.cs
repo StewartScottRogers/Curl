@@ -187,6 +187,15 @@ public sealed class AzureStorageProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_MultipleChoicesStatus300_FailsWithExit22NamingTheStatus()
+    {
+        TransferResult result = await Handler(new QueuedAzureStorageConnector(QueuedAzureStorageConnector.Reply("{}", status: "300 Multiple Choices"))).ExecuteAsync(Context("abfss://fs@account/f", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("Azure Storage returned error 300", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ErrorWithoutAnErrorBody_FailsWithExit22NamingTheStatus()
     {
         TransferResult result = await Handler(new QueuedAzureStorageConnector(QueuedAzureStorageConnector.Reply("{}", status: "403 Forbidden"))).ExecuteAsync(Context("abfss://fs@account/f", new MemoryStream()));
