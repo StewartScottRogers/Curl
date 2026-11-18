@@ -291,6 +291,7 @@ internal static class TlsFailureMessages
 
         return maximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11
             ? SchannelAlertBelowTls12(failure.Origin, minimumVersion, maximumVersion)
+            : failure.Origin == TlsHandshakeFailureOrigin.AlertReceived && failure.Alert == TlsAlertDescription.ProtocolVersion ? SchannelUnsupportedFunction
             : SchannelFatalAlertReceived;
     }
 
@@ -509,7 +510,7 @@ internal static class TlsFailureMessages
     /// <param name="maximumVersion">The highest version offered, <c>--tls-max</c>.</param>
     /// <returns>The message curl prints.</returns>
     public static string SchannelSslConnectError(Exception exception, TlsVersion maximumVersion) =>
-        maximumVersion == TlsVersion.Tls12 && IsProtocolVersionRefusal(exception)
+        maximumVersion is not (TlsVersion.Tls10 or TlsVersion.Tls11) && IsProtocolVersionRefusal(exception)
             ? SchannelUnsupportedFunction
             : SchannelSslConnectError(exception, maximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11);
 
