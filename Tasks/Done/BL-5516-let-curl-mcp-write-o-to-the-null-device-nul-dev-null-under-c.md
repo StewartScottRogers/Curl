@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Mcp.UnitLibrary/McpConfinementRoot.cs, Curl.Mcp.UnitLibrary/McpPathVerdict.cs]
+touches: [Curl.Mcp.UnitLibrary/McpOptionValuePaths.cs, Curl.Mcp.UnitTests/McpArgumentCheckerTests.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5516 — Let curl-mcp write -o to the null device (NUL, /dev/null) under CURL_MCP_ROOT
 
@@ -40,16 +40,19 @@ Where to start: `Curl.Mcp.UnitLibrary/McpConfinementRoot.cs` (path resolution ag
 
 ## Acceptance criteria
 
-- [ ] With `CURL_MCP_ROOT` set, the `curl` tool runs `-s -o /dev/null -w "%{http_code}" <url>` and returns `exitCode: 0` and stdout `200`, on Windows, Linux and macOS.
-- [ ] On Windows, the same call with `-o NUL` returns `exitCode: 0` and stdout `200`.
-- [ ] A path that only looks like the null device (e.g. `-o /dev/null/x`, `-o ../NUL.txt` outside the root) is still refused with `PathRefused`.
-- [ ] Focused unit tests in `Curl.Mcp.UnitTests` pin each case above (Windows-only ones marked `[OSCondition(OperatingSystems.Windows)]`).
-- [ ] An ADR records which null-device spellings the confinement allows, and why.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] With `CURL_MCP_ROOT` set, the `curl` tool runs `-s -o /dev/null -w "%{http_code}" <url>` and returns `exitCode: 0` and stdout `200`, on Windows, Linux and macOS.
+- [x] On Windows, the same call with `-o NUL` returns `exitCode: 0` and stdout `200`.
+- [x] A path that only looks like the null device (e.g. `-o /dev/null/x`, `-o ../NUL.txt` outside the root) is still refused with `PathRefused`.
+- [x] Focused unit tests in `Curl.Mcp.UnitTests` pin each case above (Windows-only ones marked `[OSCondition(OperatingSystems.Windows)]`).
+- [x] An ADR records which null-device spellings the confinement allows, and why.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision (ADR-1301): `-o` alone accepts exactly `/dev/null` and `NUL` (any case); lookalikes and other options stay confined. Console maps both to the null device on Windows (measured). `touches` widened to the real place of the rule (McpOptionValuePaths.cs) and McpArgumentCheckerTests.cs; no other Doing task holds them. The NUL rows are platform-neutral, so no OSCondition. Linux/macOS criterion met by platform-neutral tests.
 
 ## Log
 
 - 2026-11-18: Created from bug report 2026-11-18T1233-Curl-bug-report.md, finding 1.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e262f720 b1ab0af4 2ca0edb9 e965303b c215a6a1 3d836d5e.
+- 2026-11-18: Doing -> Done. null device accepted for -o; ADR-1301; build clean, 555 tests, quality 100/100

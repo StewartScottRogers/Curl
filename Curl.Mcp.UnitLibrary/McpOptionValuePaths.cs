@@ -262,8 +262,12 @@ internal static class McpOptionValuePaths
             return [new(value, "names a file with a #<n> glob reference, which curl fills from the URL, so it cannot be checked before curl runs.")];
         }
 
-        return FilePath(value);
+        return longName == "output" && IsNullDevice(value) ? [] : FilePath(value);
     }
+
+    /// <summary>Whether <paramref name="value" /> is a spelling of the null device that <c>-o</c> may discard to: <c>/dev/null</c>, or <c>NUL</c> in any case (ADR-1301).</summary>
+    private static bool IsNullDevice(string value) =>
+        value == "/dev/null" || value.Equals("NUL", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Whether <paramref name="value" /> holds <c>#</c> followed by a digit, curl's <c>#1</c> reference to a URL glob.</summary>
     private static bool HasGlobReference(string value)
