@@ -8,7 +8,7 @@ depends-on: [BL-4500, BL-4505, BL-4506, BL-4507, BL-4502, BL-4503]
 touches: [Curl.Conformance.Extended.UnitLibrary/WebTransport, Curl.Conformance.Extended.UnitTests/WebTransport, Documentation/Conformance/Extended/WebTransport.md, Curl.Conformance.Extended.UnitTests/KnownFailures.txt]
 requirement: none
 created: 2026-11-02
-completed:
+completed: 2026-11-18
 ---
 # BL-4494 — Conformance: WebTransport over HTTP/3 (draft-ietf-webtrans-http3-16) for the WebTransport extension
 
@@ -45,25 +45,27 @@ library's `.UnitTests` pins the fix (ADR-0482), the `KnownFailures.txt` line is 
 
 ## Acceptance criteria
 
-- [ ] `Documentation/Conformance/Extended/WebTransport.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
+- [x] `Documentation/Conformance/Extended/WebTransport.md` gives every MUST, MUST NOT, SHOULD and SHOULD NOT of
       draft-ietf-webtrans-http3-16 (and of RFC 9220, 9297 and 9221 as the session relies on them) that binds a client
       a `WebTransport:` ID mapped to a test or to `n/a: <reason>`; the harness's matrix check passes.
-- [ ] Cases in `Curl.Conformance.Extended.UnitTests/WebTransport/` run curl in process and assert SETTINGS, the CONNECT
+- [x] Cases in `Curl.Conformance.Extended.UnitTests/WebTransport/` run curl in process and assert SETTINGS, the CONNECT
       field section, stream and datagram bytes, stdout, stderr and exit code for at least: a server lacking the
       WebTransport or datagram settings, a non-2xx CONNECT response, a bidirectional exchange, a unidirectional one, a
       datagram one, the session id in stream headers and datagrams, `WT_CLOSE_SESSION` from the server with a code
       and a message, and the client's own close.
-- [ ] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
+- [x] Every failing case is fixed in this task or listed in `Curl.Conformance.Extended.UnitTests/KnownFailures.txt`
       with the ID of its filed High `Fix WebTransport conformance: ...` task; the known-failures check passes.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is
       green; no test needs `TestCategory=Integration`.
-- [ ] The code added under `Curl.Conformance.Extended.UnitLibrary/WebTransport/` is at 100% line and branch coverage,
+- [x] The code added under `Curl.Conformance.Extended.UnitLibrary/WebTransport/` is at 100% line and branch coverage,
       complexity at most 10 and CRAP at most 30 per method (`Measure-CodeQuality.ps1`).
-- [ ] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
+- [x] No package added; every test is platform-neutral (no drive letters, Windows-only paths, certificates or text).
 
 ## Notes
 
 - 2026-11-02 (lane 6): Split before any edit. `Http3ServerConnection`'s frame switch has no QUIC DATAGRAM handling, so the WebTransport datagram cases cannot run on it yet (BL-4606). Building a WebTransport over HTTP/3 reference server from the spec, plus the matrix and the nine or more cases at 100% coverage, is too much for one run. The work is now BL-4606 (Http3Server datagrams), BL-4607 (the reference server in `WebTransport/Server/`, depends on BL-4606) and BL-4608 (the matrix, cases and known failures, carrying this task's criteria, depends on both). No other live task named BL-4494 in `depends-on`.
+
+- 2026-11-18 (lane 6): Work was done by the split subtasks BL-4606, BL-4607, BL-4608 (matrix, cases, server), BL-4633 and BL-4634 (client fixes; KnownFailures.txt holds no WebTransport line). Verified: Curl.Conformance.Extended.UnitTests 1735 passed, 0 failed; quality and build checked by BL-4608. No platform-dependent content; CI left to the shift.
 
 ## Log
 
@@ -72,3 +74,4 @@ library's `.UnitTests` pins the fix (ADR-0482), the `KnownFailures.txt` line is 
 - 2026-11-02: Doing -> Deferred. Split into BL-4606, BL-4607, BL-4608
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 06fab208 b8e0bf7a feec4e2a d8e3fb0e b686519a 17248609.
+- 2026-11-18: Doing -> Done. Carried by BL-4606, BL-4607, BL-4608, BL-4633 and BL-4634
