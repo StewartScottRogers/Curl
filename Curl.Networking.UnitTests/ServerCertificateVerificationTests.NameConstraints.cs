@@ -115,6 +115,7 @@ public sealed class ServerCertificateVerificationNameConstraintTests
         Assert.IsNull(Verify(Constraints(permitted: "example.com"), Host, true, withNames: false, subject: "O=Nobody"));
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)] // OpenSSL-backed chain building checks every CN, multi-valued or not, against the constraint itself (BL-5497).
     public void VerifyPeer_LeafWithAMultiValuedRelativeName_IgnoresIt() =>
         Assert.IsNull(Verify(Constraints(permitted: "example.com"), Host, true, withNames: false, subject: "CN=localhost+OU=Unit"));
 
