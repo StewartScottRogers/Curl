@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Client/AzureStorageClient.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5504 — Fix AF-0862: Surviving mutant: an Azure Storage 300 response is taken as success
 
@@ -43,3 +43,4 @@ Killed by `AzureStorageProtocolHandlerTests.ExecuteAsync_MultipleChoicesStatus30
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 9c87c022 9742157d.
+- 2026-11-18: Doing -> Done. Test pins a 300 reply as exit 22; kills the > 300 mutant
