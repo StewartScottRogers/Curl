@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapSaslSecurityLayer.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5SecurityLayer.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5Bind.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5MaxBufferTests.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5440 — Fix fitness finding STD-122: LDAP DIGEST-MD5 security layer ignores the server's maxbuf; a request larger than maxbuf goes in one oversized SASL buffer and the server drops the connection
 
@@ -46,3 +46,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-122 (Medium).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: bd3d8af0 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. DIGEST-MD5 layer splits sealed writes to the challenge maxbuf; unit tests pin it
