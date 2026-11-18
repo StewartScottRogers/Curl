@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5435 — Fix fitness finding STD-117: Linux LDAP ignores --digest, --ntlm, --negotiate and --login-options AUTH=… and sends the password in a cleartext simple bind
 
@@ -47,3 +47,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-117 (High).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 58fac537 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. OpenLDAP SASL DIGEST-MD5 bind or exit 67, never a cleartext simple bind; committed 794aeb4825
