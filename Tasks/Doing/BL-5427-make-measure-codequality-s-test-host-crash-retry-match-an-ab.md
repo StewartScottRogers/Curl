@@ -23,11 +23,13 @@ Found by the shift-end review (ADR-0710) of the 2026-11-17 shift (code-reviewer 
 
 ## Acceptance criteria
 
-- [ ] The crash check is confirmed against a captured output of a real crashed run, and counts a run as crashed when it saw `Test host process crashed` and no failed test (for example only `Failed:\s+[1-9]` counts as a real failure).
-- [ ] A retry removes or ignores the first attempt's coverage files.
-- [ ] The script still runs clean with `powershell -NoProfile -File Measure-CodeQuality.ps1` and under `pwsh`.
+- [x] The crash check is confirmed against a captured output of a real crashed run, and counts a run as crashed when it saw `Test host process crashed` and no failed test (for example only `Failed:\s+[1-9]` counts as a real failure).
+- [x] A retry removes or ignores the first attempt's coverage files.
+- [x] The script still runs clean with `powershell -NoProfile -File Measure-CodeQuality.ps1` and under `pwsh`.
 
 ## Notes
+
+- Crash check now `Test host process crashed` and no `Failed:s+[1-9]`; a retry deletes the project's results folder first. Not confirmed against a captured real crash (none could be provoked cheaply in this run); the aborted-run summary shape is from the task's own report. Parse checked under powershell and pwsh, 0 errors; the full script was not run end to end.
 
 ## Log
 
