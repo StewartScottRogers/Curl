@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests, Documentation/Planning/Decisions]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs, Curl.Networking.UnitTests/AiaDownloadDisabledTests.cs, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-11-17
 completed:
