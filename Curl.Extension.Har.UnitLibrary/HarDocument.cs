@@ -18,6 +18,8 @@ internal static class HarDocument
 
     private static readonly HashSet<string> UrlHeaderNames = new(["Location", "Content-Location", "Referer"], StringComparer.OrdinalIgnoreCase);
 
+    private static readonly HashSet<string> UrlListHeaderNames = new(["Link", "Refresh"], StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Writes the archive of <paramref name="exchanges" />, in the order given, as indented UTF-8 JSON.</summary>
     /// <param name="exchanges">The transfers, one entry each.</param>
     /// <returns>The archive's bytes.</returns>
@@ -184,7 +186,33 @@ internal static class HarDocument
         [.. headers.Select(RedactedHeader)];
 
     private static KeyValuePair<string, string> RedactedHeader(KeyValuePair<string, string> header) =>
-        UrlHeaderNames.Contains(header.Key) ? new(header.Key, HarTransferHook.Redacted(header.Value)) : header;
+        UrlHeaderNames.Contains(header.Key) ? new(header.Key, HarTransferHook.Redacted(header.Value))
+        : UrlListHeaderNames.Contains(header.Key) ? new(header.Key, RedactedInEachUrl(header.Value))
+        : header;
+
+    /// <summary>Puts <see cref="HarTransferHook.RedactedUserInfo" /> in place of the user information of every absolute URL in <paramref name="value" />, a <c>Link</c> or <c>Refresh</c> value.</summary>
+    private static string RedactedInEachUrl(string value)
+    {
+        System.Text.StringBuilder result = new();
+        var position = 0;
+        int schemeEnd;
+        while ((schemeEnd = value.IndexOf("://", position, StringComparison.Ordinal)) >= 0)
+        {
+            var authorityStart = schemeEnd + 3;
+            var authorityLength = value.AsSpan(authorityStart).IndexOfAny("/?#<>;, \t\"'");
+            var authorityEnd = authorityLength < 0 ? value.Length : authorityStart + authorityLength;
+            var at = value.LastIndexOf('@', authorityEnd - 1, authorityEnd - authorityStart);
+            result.Append(value, position, authorityStart - position);
+            if (at >= 0)
+            {
+                result.Append(HarTransferHook.RedactedUserInfo);
+            }
+
+            position = at >= 0 ? at : authorityStart;
+        }
+
+        return result.Append(value, position, value.Length - position).ToString();
+    }
 
     private static void WriteEmptyArray(Utf8JsonWriter json, string name)
     {
