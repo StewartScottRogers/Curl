@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5424 — Keep the name-constraint decode catch from refusing a chain with no constraints
 
@@ -23,13 +23,16 @@ Found by the shift-end review (ADR-0710) of the 2026-11-17 shift (silent-failure
 
 ## Acceptance criteria
 
-- [ ] The leaf's names are read only once a CA with a NameConstraints extension is found, and the catch still covers a malformed constraint or name in that case.
-- [ ] A unit test: a leaf with a malformed SAN in a chain with no name constraints makes `FindViolation` return 0.
-- [ ] BL-5415's tests still pass; quality gates hold.
+- [x] The leaf's names are read only once a CA with a NameConstraints extension is found, and the catch still covers a malformed constraint or name in that case.
+- [x] A unit test: a leaf with a malformed SAN in a chain with no name constraints makes `FindViolation` return 0.
+- [x] BL-5415's tests still pass; quality gates hold.
 
 ## Notes
+
+- Leaf names are now read lazily, once a CA with NameConstraints is found; the 2-arg overload takes the extension (dead null check removed for coverage). Quality run on Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: c713d78f 17acec10 3f952434.
+- 2026-11-18: Doing -> Done. Leaf names read only once a CA with NameConstraints is found; test added

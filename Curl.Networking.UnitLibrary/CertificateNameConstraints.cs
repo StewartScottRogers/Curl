@@ -40,10 +40,18 @@ internal static class CertificateNameConstraints
 
         try
         {
-            var names = ListNames(elements[0].Certificate);
+            List<(Asn1Tag Tag, byte[] Value)>? names = null;
             for (var index = 1; index < elements.Count; index++)
             {
-                var violation = FindViolation(elements[index].Certificate, names);
+                var extension = elements[index].Certificate.Extensions[NameConstraintsOid];
+                if (extension is null)
+                {
+                    continue;
+                }
+
+                // The leaf's names are read only once some CA carries constraints (BL-5424).
+                names ??= ListNames(elements[0].Certificate);
+                var violation = FindViolation(extension, names);
                 if (violation != 0)
                 {
                     return violation;
@@ -73,14 +81,8 @@ internal static class CertificateNameConstraints
         return names;
     }
 
-    private static int FindViolation(X509Certificate2 authority, List<(Asn1Tag Tag, byte[] Value)> names)
+    private static int FindViolation(X509Extension extension, List<(Asn1Tag Tag, byte[] Value)> names)
     {
-        var extension = authority.Extensions[NameConstraintsOid];
-        if (extension is null)
-        {
-            return 0;
-        }
-
         var constraints = new AsnReader(extension.RawData, AsnEncodingRules.DER).ReadSequence();
         var permitted = new List<(Asn1Tag Tag, byte[] Value)>();
         var excluded = new List<(Asn1Tag Tag, byte[] Value)>();
