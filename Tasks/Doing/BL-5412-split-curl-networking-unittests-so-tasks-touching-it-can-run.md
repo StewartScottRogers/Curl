@@ -33,3 +33,4 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 ## Log
 
 - 2026-11-17: Created.
+- 2026-11-17: Backlog -> Doing. Criteria at claim: 4b32355d 8256450c a0b49a29.
