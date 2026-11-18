@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5474 — Fix fitness finding STD-153: FTP reports %{time_posttransfer} as 0 for downloads, uploads and -I
 
@@ -46,3 +46,4 @@ FtpSession.TimingsAt now passes connectPhaseEnded as RequestSent (posttransfer =
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-153 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 02a0f095 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. posttransfer now equals pretransfer for FTP; unit tests added
