@@ -40,7 +40,8 @@ public static class AzureStorageUrlMapping
 
     private static AzureStorageEndpoint MapDfs(Uri url)
     {
-        var host = AccountHost(url, DfsHostSuffix);
+        // An emulator host (IP address or localhost) is used as given, never given the public suffix (EXT-085).
+        var host = IsPathStyleHost(url) ? url.Host : AccountHost(url, DfsHostSuffix);
         var fileSystem = url.UserInfo;
         if (fileSystem.Length == 0)
         {

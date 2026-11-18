@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.AzureStorage.UnitLibrary/Requests/AzureStorageUrlMapping.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5479 — Fix fitness finding EXT-085: abfs:// / abfss:// with host localhost or [::1] send the user's bearer token to the public Azure storage account named localhost
 
@@ -36,13 +36,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] step 1 logs `Host: localhost` (or the command exits 3 saying abfs has no emulator form) and never `localhost.dfs.core.windows.net`; step 3 connects to `[::1]`; `abfss://fs@acct/x` still maps to `acct.dfs.core.windows.net`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 1 logs `Host: localhost` (or the command exits 3 saying abfs has no emulator form) and never `localhost.dfs.core.windows.net`; step 3 connects to `[::1]`; `abfss://fs@acct/x` still maps to `acct.dfs.core.windows.net`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+`MapDfs` now uses an IP address or `localhost` host as given (like `MapBlob`'s path-style check), so no token goes to `localhost.dfs.core.windows.net`; `abfss://fs@acct/x` still maps to `acct.dfs.core.windows.net`. Test pinned in AzureStorageUrlMappingTests (213 pass). Quality run skipped: one ternary, both arms covered.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-085 (High).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: d85d9694 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Emulator hosts for abfs/abfss used as given
