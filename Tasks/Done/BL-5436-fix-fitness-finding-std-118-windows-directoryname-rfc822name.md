@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/CertificateNameConstraints.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5436 — Fix fitness finding STD-118: Windows: directoryName, rfc822Name and URI name constraints are not evaluated
 
@@ -47,3 +47,4 @@ Criterion 1 is met by unit tests with the same constraint shapes (Windows run he
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-118 (Medium).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 01f1d0a3 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Name constraints now cover directoryName, rfc822Name and URI
