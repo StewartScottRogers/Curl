@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/Http2StreamConnection.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5426 — Skip the HTTP/2 body length check when -I ends the stream at the final head
 
@@ -35,3 +35,4 @@ Fix: `EndResponseAsync` skips the promised-length check when `EndsAtFinalHead` i
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 8563fedd a0d25e08 39a0bcb6.
+- 2026-11-18: Doing -> Done. HTTP/2 -I ends at the final head without the length check; test added
