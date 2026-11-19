@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineWarning.cs, Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/CommandLineFtpActiveModeAndSslOptionTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5561 — Fix AF-0890: --ssl together with --ftp-ssl-control never prints curl's 'Warning: --ssl overrides --ftp-ssl-control' (or the reverse) line
 
@@ -53,3 +53,4 @@ Measured system curl: the override warning follows the insecure line when the op
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-19: Doing -> Done. --ssl/--ftp-ssl and --ftp-ssl-control now print curl's overrides warnings; build and fast tests green
