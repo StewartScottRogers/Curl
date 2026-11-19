@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineWarning.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineWarning.cs, Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/CommandLineFtpActiveModeAndSslOptionTests.cs]
 requirement: none
 created: 2026-11-19
 completed:
@@ -42,10 +42,12 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Measured system curl: the override warning follows the insecure line when the opposite mode is on (--no-ssl / --no-ftp-ssl-control clear it; --ssl-reqd does not); the control line always names --ssl. Touches widened to CommandLineOptions.cs, the option table and its test (no other Doing task holds them). Quality run for Curl.Cli.UnitLibrary: 0 failing members.
 
 ## Log
 

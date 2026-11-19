@@ -289,6 +289,30 @@ public static class CommandLineWarning
     ];
 
     /// <summary>
+    /// The line curl prints when <c>--ssl</c> or <c>--ftp-ssl</c> is given while <c>--ftp-ssl-control</c> is in
+    /// effect: <c>Warning: &lt;option&gt; overrides --ftp-ssl-control</c>, after the insecure-option line.
+    /// Measured with <c>--ftp-ssl-control --ssl</c>, <c>--ftp-ssl-control --ftp-ssl</c> and
+    /// <c>--ftp-ssl-control --ftp-ssl-reqd --ssl</c> against <c>http://127.0.0.1:9/</c> (Windows, 2026-11-19,
+    /// BL-5561); not after <c>--no-ftp-ssl-control</c>.
+    /// </summary>
+    /// <param name="longName">The option's long name with its <c>--</c>: <c>--ssl</c> or <c>--ftp-ssl</c>.</param>
+    /// <returns>The warning's lines.</returns>
+    internal static IReadOnlyList<string> OverridesFtpSslControl(string longName) =>
+    [
+        $"Warning: {longName} overrides --ftp-ssl-control",
+    ];
+
+    /// <summary>
+    /// The line curl prints when <c>--ftp-ssl-control</c> is given while <c>--ssl</c> or <c>--ftp-ssl</c> is
+    /// in effect; it names <c>--ssl</c> whichever of the two was typed. Measured with <c>--ssl --ftp-ssl-control</c>
+    /// and <c>--ftp-ssl --ftp-ssl-control</c> (2026-11-19, BL-5561); not after <c>--no-ssl</c>.
+    /// </summary>
+    public static IReadOnlyList<string> FtpSslControlOverridesSsl { get; } =
+    [
+        "Warning: --ftp-ssl-control overrides --ssl",
+    ];
+
+    /// <summary>
     /// The lines curl's OpenSSL build prints for an option value that starts with a character in
     /// U+2000-U+203F, such as a dash or a smart quote pasted from a document, before it uses the value
     /// as given: <c>Warning: The argument '&lt;value&gt;' starts with a Unicode character. Maybe ASCII was

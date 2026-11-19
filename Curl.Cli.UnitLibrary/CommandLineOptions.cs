@@ -2202,6 +2202,24 @@ public sealed class CommandLineOptions
         if (on)
         {
             AddWarningLinesUnlessSilent(CommandLineWarning.InsecureSsl(longName));
+            if (FtpSslControlOnly)
+            {
+                AddWarningLinesUnlessSilent(CommandLineWarning.OverridesFtpSslControl(longName));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Turns <c>--ftp-ssl-control</c> on or off. Turning it on while <c>--ssl</c> / <c>--ftp-ssl</c> is in
+    /// effect warns, unless silent, as curl does that the earlier option is overridden; neither is cleared.
+    /// </summary>
+    /// <param name="on"><see langword="true"/> for the option, <see langword="false"/> for its <c>--no-</c> spelling.</param>
+    internal void SetFtpSslControl(bool on)
+    {
+        FtpSslControlOnly = on;
+        if (on && SslTry)
+        {
+            AddWarningLinesUnlessSilent(CommandLineWarning.FtpSslControlOverridesSsl);
         }
     }
 
