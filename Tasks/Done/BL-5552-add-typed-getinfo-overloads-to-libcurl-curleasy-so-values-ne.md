@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl/Easy/CurlEasy.cs, Libcurl/Info/EasyInfoDispatch.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5552 — Add typed GetInfo overloads to Libcurl CurlEasy so values need no unboxing
 
@@ -40,3 +40,4 @@ Chose a generic `GetInfo<T>(CurlInfo, out T?)` over per-type overloads: `out var
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 3 (GetInfo).
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 8c661345 6b9b3655 0e5fb46e 283a457a 3d836d5e.
+- 2026-11-19: Doing -> Done. Added CurlEasy.GetInfo<T>; mismatch gives BadFunctionArgument; tests and quality gates pass
