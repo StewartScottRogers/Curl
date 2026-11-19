@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/ServerCertificateVerificationTests.UnsentIntermediate.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5524 — OpenSSL build accepts an intermediate from --cacert or --capath that the server did not send
 
@@ -51,3 +51,4 @@ An element is exempt when it lies at or above AnchorIndexOf(chain), the first el
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: dc90fc2a f4ecab4a 46ff4b1a 6ced534c 3d836d5e.
+- 2026-11-18: Doing -> Done. Unsent-intermediate check now stops at the first trust-anchor-listed element; test added, build and fast tests green
