@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary/ConnectResult.cs, Curl.Console/ParallelRun.cs, Curl.Original.Protocol.Http.UnitLibrary/Http2StreamConnection.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5523 — Doc comments on ConnectResult, ParallelRun and Http2StreamConnection say what the code does
 
@@ -31,16 +31,19 @@ Found by the shift-end review of 2026-11-18 (ADR-0710), pr-review-toolkit type-d
 
 ## Acceptance criteria
 
-- [ ] The docs of `ConnectResult.ConnectReplyHeadersStored` and `ProxyConnectHeaderBytes` state that a refused CONNECT reports its reply's header count and bytes.
-- [ ] `ConnectResult.Failed`'s parameter is named `connectReplyHeadersStored`.
-- [ ] `NoteFatalSetupFailureOfLastHeld`'s doc says it records the failure, with no `<returns>`.
-- [ ] `AbandonFirstBatchOnFatalFailureAsync` carries the doc that describes ending the run.
-- [ ] `Http2StreamConnection.IsEndedBy` and `EndsAtFinalHead` docs match the BL-5468 behaviour.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The docs of `ConnectResult.ConnectReplyHeadersStored` and `ProxyConnectHeaderBytes` state that a refused CONNECT reports its reply's header count and bytes.
+- [x] `ConnectResult.Failed`'s parameter is named `connectReplyHeadersStored`.
+- [x] `NoteFatalSetupFailureOfLastHeld`'s doc says it records the failure, with no `<returns>`.
+- [x] `AbandonFirstBatchOnFatalFailureAsync` carries the doc that describes ending the run.
+- [x] `Http2StreamConnection.IsEndedBy` and `EndsAtFinalHead` docs match the BL-5468 behaviour.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Doc-only change plus the parameter rename (the one caller, TcpConnector, updated); build clean, no test uses the old name.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: b36c7937 e2507838 707efe9c c0b71b45 fd0d28df 3d836d5e.
+- 2026-11-18: Doing -> Done. Doc comments corrected, parameter renamed; build clean

@@ -2200,7 +2200,7 @@ public sealed partial class TcpConnector(
 
         var refused = $"CONNECT tunnel failed, response {reply.StatusCode}";
         events.ReportInfo(refused);
-        return ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? refused, null, 0, reply.StatusCode, proxyConnectHeadersStored: reply.HeaderCount, proxyConnectHeaderBytes: headBytes);
+        return ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? refused, null, 0, reply.StatusCode, connectReplyHeadersStored: reply.HeaderCount, proxyConnectHeaderBytes: headBytes);
     }
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(
