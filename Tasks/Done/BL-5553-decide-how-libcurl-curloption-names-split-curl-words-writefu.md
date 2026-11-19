@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Libcurl/Options/CurlOption.cs]
+touches: [Libcurl/Options/CurlOption.cs, Libcurl/Info/CurlInfo.cs, Libcurl/README.md, Libcurl.UnitTests/Options/CurlOptionsTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5553 — Decide how Libcurl CurlOption names split curl words (Writefunction vs WriteFunction) and make them findable
 
@@ -31,14 +31,17 @@ Whatever is chosen, `CurlInfo` and any other enum built the same way follow the 
 
 ## Acceptance criteria
 
-- [ ] An ADR records the naming rule for `CurlOption` and `CurlInfo`, and why.
-- [ ] Under that rule, a text search of `Libcurl` for `WriteFunction` finds `CURLOPT_WRITEFUNCTION`'s member, by its name or its doc comment, and the same holds for every multi-word option.
-- [ ] Looking up `WRITEFUNCTION` by name through `CurlOptions` behaves as before, pinned by a test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] An ADR records the naming rule for `CurlOption` and `CurlInfo`, and why.
+- [x] Under that rule, a text search of `Libcurl` for `WriteFunction` finds `CURLOPT_WRITEFUNCTION`'s member, by its name or its doc comment, and the same holds for every multi-word option.
+- [x] Looking up `WRITEFUNCTION` by name through `CurlOptions` behaves as before, pinned by a test.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decided in ADR-1306: keep names, add `Word-cased: <c>X</c>.` to each multi-word member's summary (generated with a throwaway word-list script, two hand fixes), README paragraph. CurlInfo follows the same rule. Pinned by a new CurlOptionsTests test. touches widened to CurlInfo.cs, README, CurlOptionsTests.cs. Doc comments only, so no Measure-CodeQuality run (no code or branch changed). Build clean, fast tests 1542 passed.
 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 3 (option names).
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 602c6662 b0022bcc 33aa5314 3d836d5e.
+- 2026-11-19: Doing -> Done. CurlOption/CurlInfo members document their word-cased form (ADR-1306)

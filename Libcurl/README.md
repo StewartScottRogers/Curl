@@ -32,6 +32,12 @@ CurlCode code = easy.Perform();
 `ManagedCurlEngine` is created. `InitMemory` also takes the `malloc`, `free`, `realloc`, `strdup`
 and `calloc` callbacks of `curl_global_init_mem`.
 
+`CurlOption` and `CurlInfo` names are curl's `CURLOPT_*` / `CURLINFO_*` name without the prefix and with
+one capital per underscore-separated word, so `CURLOPT_WRITEFUNCTION` is `CurlOption.Writefunction`. Where
+upstream runs several words together, the member's XML summary gives the word-cased form
+(`Word-cased: WriteFunction`), so a text search for the name known from C finds it (ADR-1306).
+`CurlOptions.ByName` still answers curl's own upper-case names.
+
 ## Which libcurl APIs it covers
 
 | libcurl API | Folder | Main types |
