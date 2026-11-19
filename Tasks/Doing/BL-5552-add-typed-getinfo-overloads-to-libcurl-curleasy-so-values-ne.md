@@ -37,3 +37,4 @@ Add typed overloads (for example `out long`, `out double`, `out string?`, and th
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 3 (GetInfo).
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 8c661345 6b9b3655 0e5fb46e 283a457a 3d836d5e.
