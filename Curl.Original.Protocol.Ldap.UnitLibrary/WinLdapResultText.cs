@@ -19,6 +19,9 @@ internal static class WinLdapResultText
     /// <summary>WinLDAP's <c>LDAP_SERVER_DOWN</c>, reported when the server closes while the logon bind's retry reads the rootDSE.</summary>
     public const int ServerDown = 81;
 
+    /// <summary>WinLDAP's <c>LDAP_OPERATIONS_ERROR</c>, reported when a DIGEST-MD5 challenge offers no <c>auth-conf</c> with a supported cipher.</summary>
+    public const int OperationsError = 1;
+
     /// <summary>WinLDAP's <c>LDAP_PROTOCOL_ERROR</c>, reported when a Sicily server answers <c>sicilyNegotiate</c> with a <c>success</c> that carries no challenge.</summary>
     public const int ProtocolError = 2;
 

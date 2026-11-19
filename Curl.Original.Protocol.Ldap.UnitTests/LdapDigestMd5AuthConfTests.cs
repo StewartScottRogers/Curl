@@ -37,7 +37,7 @@ public sealed class LdapDigestMd5AuthConfTests
     [TestMethod]
     [DataRow("realm=\"r\",nonce=\"n1\",qop=\"auth-conf\",cipher=\"3des\"", true, DisplayName = "Only auth-conf")]
     [DataRow("nonce=\"n1\",qop=\"auth,auth-conf\",cipher=\"rc4\"", true, DisplayName = "auth-conf with only rc4")]
-    [DataRow("nonce=\"n1\",qop=\"auth,auth-conf\",cipher=\"des\"", false, DisplayName = "auth-conf without a supported cipher falls back to auth")]
+    [DataRow("nonce=\"n1\",qop=\"auth,auth-conf\",cipher=\"des\"", false, DisplayName = "auth-conf without a supported cipher cannot answer")]
     [DataRow("nonce=\"n1\",qop=\"auth\",cipher=\"3des\"", false, DisplayName = "Only auth")]
     [DataRow("nonce=\"n1\",qop=\"auth-conf\",cipher=\"3des\",charset=utf-8", true, DisplayName = "UTF-8 charset")]
     [DataRow("qop=\"auth-conf\",cipher=\"3des\"", false, DisplayName = "No nonce")]
@@ -49,14 +49,10 @@ public sealed class LdapDigestMd5AuthConfTests
     }
 
     [TestMethod]
-    public void AnswerRequest_OnlyAuthOffered_KeepsQopAuthWithNoCipher()
+    public void AnswerRequest_OnlyAuthOrNoSupportedCipherOffered_RefusesRatherThanDropTheSecurityLayer()
     {
-        byte[]? request = LdapDigestMd5Bind.AnswerRequest(Writer, 2, "nonce=\"n\",qop=\"auth\",cipher=\"3des\""u8, "u", "p", "ldap/h", "c");
-
-        Assert.IsNotNull(request);
-        string sent = Encoding.ASCII.GetString(request);
-        StringAssert.Contains(sent, ",qop=auth,digest-uri=");
-        Assert.IsFalse(sent.Contains("cipher", StringComparison.Ordinal));
+        Assert.IsNull(LdapDigestMd5Bind.AnswerRequest(Writer, 2, "nonce=\"n\",qop=\"auth\",cipher=\"3des\""u8, "u", "p", "ldap/h", "c"));
+        Assert.IsNull(LdapDigestMd5Bind.AnswerRequest(Writer, 2, "nonce=\"n\",qop=\"auth,auth-conf\",cipher=\"des\""u8, "u", "p", "ldap/h", "c"));
     }
 
     [TestMethod]

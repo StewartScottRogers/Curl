@@ -50,6 +50,15 @@ public sealed class LdapOpenLdapSaslBindTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DigestChallengeWithoutANonce_SendsNoAnswerAndFailsWith38()
+    {
+        (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Digest, null, MechanismsEntry(1), RootDseDone1, Challenge(2, "realm=\"x\",qop=\"auth\""));
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP: cannot bind"), result);
+        Assert.IsFalse(sent.AsSpan().IndexOf("response="u8) >= 0);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_DigestBindRefused_FailsWith67()
     {
         (TransferResult result, _) = await RunAsync(HttpAuthSchemes.Digest, null, MechanismsEntry(1), RootDseDone1, "30 0c 02 01 02 61 07 0a 01 31 04 00 04 00");

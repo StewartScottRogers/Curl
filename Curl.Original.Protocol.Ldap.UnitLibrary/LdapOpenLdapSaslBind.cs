@@ -41,7 +41,7 @@ internal static class LdapOpenLdapSaslBind
             return await LdapBind.OpenLdapLoginDeniedAsync(exchange, cancellationToken).ConfigureAwait(false);
         }
 
-        LdapBindReply reply = await LdapAuthenticatedBind.DigestAsync(exchange, credentials, host, cancellationToken).ConfigureAwait(false);
+        LdapBindReply reply = await LdapAuthenticatedBind.DigestAsync(exchange, credentials, host, cancellationToken, acceptsQopAuth: true).ConfigureAwait(false);
         return reply.IsSuccess ? null : await LdapBind.OpenLdapBindFailedAsync(exchange, reply, cancellationToken).ConfigureAwait(false);
     }
 
