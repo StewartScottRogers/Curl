@@ -65,3 +65,4 @@ independently.
 ## Log
 
 - 2026-11-19: Created.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 438b188c 1762d3d7 9b8d8449 320775f4 6d076fbc.
