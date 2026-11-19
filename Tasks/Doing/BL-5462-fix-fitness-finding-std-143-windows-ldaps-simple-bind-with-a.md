@@ -44,3 +44,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-143 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 530f7f63 69116afe 3d836d5e.
 - 2026-11-18: Doing -> Backlog. Needs LdapProtocolHandler.cs, held by BL-5461 (Doing); depends-on BL-5461
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 530f7f63 69116afe 3d836d5e.
