@@ -1,0 +1,47 @@
+---
+id: AF-0873
+title: DecodeOrNothing_PemArmouredList_DecodesLikeTheDerList only checks both decodes are non-null, never that they match
+auditor: quality
+severity: Medium
+status: proposed
+reason:
+key: quality:Curl.Networking.UnitTests/ServerCertificateVerificationTests.PemRevocationList.cs:DecodeOrNothing_PemArmouredList_DecodesLikeTheDerList:weak-assertion
+reproduction: none
+task: none
+tasks:
+found: 2026-11-19
+found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
+scorecard: 2026-11-19_0134.md
+duplicate-of:
+closed:
+closed-how:
+closed-by:
+---
+# AF-0873 - DecodeOrNothing_PemArmouredList_DecodesLikeTheDerList only checks both decodes are non-null, never that they match
+
+## Summary
+
+Medium finding from the quality auditor at `Curl.Networking.UnitTests/ServerCertificateVerificationTests.PemRevocationList.cs:16`: DecodeOrNothing_PemArmouredList_DecodesLikeTheDerList only checks both decodes are non-null, never that they match.
+
+## Evidence
+
+Location: `Curl.Networking.UnitTests/ServerCertificateVerificationTests.PemRevocationList.cs:16`
+
+The test's only assertions are 'Assert.IsNotNull(ServerCertificateVerification.DecodeOrNothing(pem));' and 'Assert.IsNotNull(ServerCertificateVerification.DecodeOrNothing(der));'. The name promises the PEM-armoured list decodes like the DER list, but the two results are never compared. A PEM path that decoded a different, empty or truncated list would pass. Step 0 candidate kind weak-assertion, only Assert.IsNotNull.
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+Select-String -Path Curl.Networking.UnitTests/ServerCertificateVerificationTests.PemRevocationList.cs -SimpleMatch -Pattern 'Assert.IsNotNull(ServerCertificateVerification.DecodeOrNothing(pem));'
+```
+
+- Expected: No match: the test compares the PEM decode with the DER decode (issuer, entries, next update).
+- Actual: ServerCertificateVerificationTests.PemRevocationList.cs:16:        Assert.IsNotNull(ServerCertificateVerification.DecodeOrNothing(pem));
+
+## Re-audits
+
+## Log
+
+- 2026-11-19: filed proposed.

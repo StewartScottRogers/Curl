@@ -3,8 +3,8 @@ id: AF-0855
 title: RunAsync_UnreadableUploadFileInTheFirstBatch_ReportsEveryTransferWithExit26AndUploadsNothing asserts exit 25, not the 26 its name states
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.
 key: quality:Curl.Console.UnitTests/Cgr170Tests.cs:RunAsync_UnreadableUploadFileInTheFirstBatch_ReportsEveryTransferWithExit26AndUploadsNothing:name-lies
 reproduction: none
 task: BL-5515
@@ -13,9 +13,9 @@ found: 2026-11-18
 found-at: 4f902456d88c3fda856546dbe0c9a7674b1f04c4
 scorecard: 2026-11-18_0810.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: reliable-reaudit
+closed-by: 2026-11-19_0134.md
 ---
 # AF-0855 - RunAsync_UnreadableUploadFileInTheFirstBatch_ReportsEveryTransferWithExit26AndUploadsNothing asserts exit 25, not the 26 its name states
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Console.UnitTests/Cgr170Tests.cs -Pattern 'Exit26AndUpl
 
 ## Re-audits
 
+- 2026-11-19 | 2026-11-19_0134.md | reproduces: no | Only the test name matched (line 46); there is no 'Assert.AreEqual(25, exitCode)'. The test now asserts Assert.AreEqual(26, exitCode) at line 53.
+
 ## Log
 
 - 2026-11-18: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.

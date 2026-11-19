@@ -3,8 +3,8 @@ id: AF-0852
 title: ADR-1263 is still Accepted and says smb/smbs stay disabled in every build, but the engine serves them (superseded by ADR-1281)
 auditor: truthfulness
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1263-smb-and-smbs-stay-disabled-in-every-build-and-the-docs-say-so.md:ADR-1263-Status:stale-adr
 reproduction: none
 task: BL-5372
@@ -13,9 +13,9 @@ found: 2026-11-17
 found-at: 10c240a4859c7868ec16b722cde6234f80cc8fcb
 scorecard: 2026-11-17_0430.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: reliable-reaudit
+closed-by: 2026-11-19_0134.md
 ---
 # AF-0852 - ADR-1263 is still Accepted and says smb/smbs stay disabled in every build, but the engine serves them (superseded by ADR-1281)
 
@@ -43,7 +43,9 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-11-18 | 2026-11-18_0810.md | reproduces: no | Ran the reproduction: ADR-1263 'Status:** Accepted' count 0. Its status line is now '- **Status:** Superseded by ADR-1281'.
+- 2026-11-19 | 2026-11-19_0134.md | reproduces: no | Ran the reproduction: ADR-1263 'Status:** Accepted' count 0 (its status line is now '- **Status:** Superseded by ADR-1281'); EngineComposition.cs 'new SmbProtocolHandler' count 1. The ADR no longer claims to be in force.
 
 ## Log
 
 - 2026-11-17: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.

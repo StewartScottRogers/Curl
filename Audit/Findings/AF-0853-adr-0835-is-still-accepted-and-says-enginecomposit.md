@@ -3,8 +3,8 @@ id: AF-0853
 title: ADR-0835 is still Accepted and says EngineComposition serves smb/smbs with a DisabledProtocolHandler (exit 1); ADR-1281 superseded it and the engine serves SMB
 auditor: truthfulness
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-0835-smb-and-smbs-are-disabled-as-in-the-reference-builds.md:ADR-0835-Status:stale-adr
 reproduction: none
 task: BL-5373
@@ -13,9 +13,9 @@ found: 2026-11-17
 found-at: 10c240a4859c7868ec16b722cde6234f80cc8fcb
 scorecard: 2026-11-17_0430.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: reliable-reaudit
+closed-by: 2026-11-19_0134.md
 ---
 # AF-0853 - ADR-0835 is still Accepted and says EngineComposition serves smb/smbs with a DisabledProtocolHandler (exit 1); ADR-1281 superseded it and the engine serves SMB
 
@@ -43,7 +43,9 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-11-18 | 2026-11-18_0810.md | reproduces: no | Ran the reproduction: ADR-0835 'Status:** Accepted' count 0. Its status line now says it is superseded by ADR-1281 and that the DisabledProtocolHandler and exit 1 no longer hold.
+- 2026-11-19 | 2026-11-19_0134.md | reproduces: no | Ran the reproduction: ADR-0835 'Status:** Accepted' count 0 (status now 'Superseded by ADR-1281 (BL-5286: the engine serves smb and smbs with SmbProtocolHandler, ...)'); EngineComposition.cs 'new SmbProtocolHandler' count 1.
 
 ## Log
 
 - 2026-11-17: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.

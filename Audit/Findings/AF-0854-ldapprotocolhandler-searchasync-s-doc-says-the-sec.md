@@ -3,8 +3,8 @@ id: AF-0854
 title: LdapProtocolHandler.SearchAsync's doc says the second WinLDAP connection is only for the logged-on-user bind; the code uses it for every plaintext ldap:// and every credential-less transfer
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs:SearchAsync:false-doc-comment
 reproduction: none
 task: BL-5374
@@ -13,9 +13,9 @@ found: 2026-11-17
 found-at: 10c240a4859c7868ec16b722cde6234f80cc8fcb
 scorecard: 2026-11-17_0430.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: reliable-reaudit
+closed-by: 2026-11-19_0134.md
 ---
 # AF-0854 - LdapProtocolHandler.SearchAsync's doc says the second WinLDAP connection is only for the logged-on-user bind; the code uses it for every plaintext ldap:// and every credential-less transfer
 
@@ -43,7 +43,9 @@ Select-String -Path Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.
 ## Re-audits
 
 - 2026-11-18 | 2026-11-18_0810.md | reproduces: no | Ran the reproduction: only '182: dialect == LdapDialect.WinLdap && (context.Credentials is null || !target.UseTls)' matches. The old 'bind as the logged-on user, on a second' phrase is gone. SearchAsync's summary (lines 176-179) now says the second WinLDAP connection is used over plaintext ldap:// (with or without -u) or without credentials, which matches the condition.
+- 2026-11-19 | 2026-11-19_0134.md | reproduces: no | Ran the reproduction: the only match is the code line '183: dialect == LdapDialect.WinLdap && (context.Credentials is null || !target.UseTls)'; the doc phrase 'bind as the logged-on user, on a second' no longer appears. SearchAsync's summary now reads 'for the WinLDAP dialect over plaintext ldap:// (with or without -u) or without credentials, on a second connection WinLDAP opens beside it', matching the condition.
 
 ## Log
 
 - 2026-11-17: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.
