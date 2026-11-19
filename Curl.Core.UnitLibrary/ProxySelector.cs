@@ -238,7 +238,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     private string? ReadProxyFor(string scheme) =>
         TryFindProxyVariable(scheme, out _, out string? proxyText) ? proxyText : null;
 
-    private static readonly HashSet<string> HttpsProxySchemes = ["wss", "oci", "s3", "gs", "az", "signalrs"];
+    private static readonly HashSet<string> HttpsProxySchemes = ["wss", "oci", "s3", "gs", "az", "abfs", "abfss", "signalrs"];
 
     /// <summary>
     /// The variables curl reads for <paramref name="scheme" />, in order: <c>&lt;scheme&gt;_proxy</c>, its upper

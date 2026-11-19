@@ -15,6 +15,8 @@ public sealed class ProxySelectorHttpsExtensionSchemeTests
     [DataRow("s3")]
     [DataRow("gs")]
     [DataRow("az")]
+    [DataRow("abfs")]
+    [DataRow("abfss")]
     [DataRow("signalrs")]
     public void TryFindProxyVariable_HttpsCarriedScheme_ReadsVariablesInOrder(string scheme)
     {

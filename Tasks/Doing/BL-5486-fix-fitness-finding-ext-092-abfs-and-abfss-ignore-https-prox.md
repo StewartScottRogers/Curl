@@ -31,11 +31,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command makes the proxy log `CONNECT acct.dfs.core.windows.net:443`; `http_proxy` alone still connects directly.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command makes the proxy log `CONNECT acct.dfs.core.windows.net:443`; `http_proxy` alone still connects directly.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Added abfs and abfss to HttpsProxySchemes; also edited the azure-storage extended-help sentence (AzureStorageExtension.cs, outside touches, one string). Quality run for Curl.Core: 0 failing. Linux/macOS: platform-neutral change.
 
 ## Log
 
