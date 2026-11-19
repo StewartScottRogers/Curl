@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Kafka.UnitLibrary/Client/KafkaClientMessages.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5495 — Fix fitness finding EXT-101: Kafka reports broker error 17 (and other unlisted codes) as UNNAMED, and echoes control characters from the topic
 
@@ -31,13 +31,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the first command prints `… error 17 (INVALID_TOPIC_EXCEPTION) for topic bad topic partition 0`; the second shows no raw CR/LF.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first command prints `… error 17 (INVALID_TOPIC_EXCEPTION) for topic bad topic partition 0`; the second shows no raw CR/LF.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Added error names 4, 9, 13, 17, 18, 20, 21, 22, 36, 58; control characters in the topic print as xNN (decided by default). Unit test BrokerError_NamesTheCodeAndEscapesControlCharactersInTheTopic. Kafka tests 244 pass, quality report 0 failing members. The wire repro against a real broker was not run; the unit test pins the message.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-101 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: dab12433 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Kafka names error 17 and nine more codes; control characters in the topic are escaped
