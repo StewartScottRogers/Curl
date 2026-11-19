@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Mqtt.UnitLibrary/MqttProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5475 — Fix fitness finding STD-154: MQTT write-out: a subscribe that ends in a timeout reports every %{time_*} as 0; a publish reports pretransfer/posttransfer 0 and %{size_upload} = payload length
 
@@ -45,3 +45,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-154 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 2eabf6aa 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. MQTT write-out reports timings on publish and on a timed-out subscribe; size_upload 0.
