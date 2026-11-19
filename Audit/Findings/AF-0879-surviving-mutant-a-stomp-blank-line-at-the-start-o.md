@@ -3,12 +3,12 @@ id: AF-0879
 title: Surviving mutant: a STOMP blank line at the start of a refilled buffer can read buffer[-1]
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Stomp.UnitLibrary/Wire/StompFrameReader.cs:ReadLineAsync-gt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Stomp.UnitLibrary/Wire/StompFrameReader.cs:80:>
-task: none
-tasks:
+task: BL-5543
+tasks: BL-5543
 found: 2026-11-19
 found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
 scorecard: 2026-11-19_0134.md

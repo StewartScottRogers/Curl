@@ -3,12 +3,12 @@ id: AF-0880
 title: Surviving mutant: clearing a URL handle's scheme can leave it marked as guessed
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/UrlPartSetter.cs:Clearers-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartSetter.cs:43:false
-task: none
-tasks:
+task: BL-5544
+tasks: BL-5544
 found: 2026-11-19
 found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
 scorecard: 2026-11-19_0134.md

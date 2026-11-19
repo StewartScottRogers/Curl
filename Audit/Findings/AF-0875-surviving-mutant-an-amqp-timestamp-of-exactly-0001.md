@@ -3,12 +3,12 @@ id: AF-0875
 title: Surviving mutant: an AMQP timestamp of exactly 0001-01-01T00:00:00Z can be refused
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Amqp0.UnitLibrary/Wire/Amqp0Reader.cs:ReadTimestamp-lt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Amqp0.UnitLibrary/Wire/Amqp0Reader.cs:39:<
-task: none
-tasks:
+task: BL-5539
+tasks: BL-5539
 found: 2026-11-19
 found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
 scorecard: 2026-11-19_0134.md

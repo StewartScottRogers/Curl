@@ -3,12 +3,12 @@ id: AF-0883
 title: ProxySelector docs list fewer schemes that read https_proxy/http_proxy than the code uses
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Core.UnitLibrary/ProxySelector.cs:ProxyVariableNames:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-5547
+tasks: BL-5547
 found: 2026-11-19
 found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
 scorecard: 2026-11-19_0134.md

@@ -3,12 +3,12 @@ id: AF-0881
 title: Surviving mutant: the libcurl engine's WebSocket handler can trace WS frames without --trace-config ws
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/EngineComposition.cs:CreateProtocolHandlers-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EngineComposition.cs:144:false
-task: none
-tasks:
+task: BL-5545
+tasks: BL-5545
 found: 2026-11-19
 found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
 scorecard: 2026-11-19_0134.md

@@ -3,12 +3,12 @@ id: AF-0873
 title: DecodeOrNothing_PemArmouredList_DecodesLikeTheDerList only checks both decodes are non-null, never that they match
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/ServerCertificateVerificationTests.PemRevocationList.cs:DecodeOrNothing_PemArmouredList_DecodesLikeTheDerList:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5537
+tasks: BL-5537
 found: 2026-11-19
 found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
 scorecard: 2026-11-19_0134.md

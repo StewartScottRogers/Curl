@@ -3,12 +3,12 @@ id: AF-0882
 title: ADR-1298 says WinLDAP sends a named matching rule that follows dn:, but the encoder drops it
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1298-winldap-drops-a-named-matching-rule-in-an-extensible-match-filter.md:ADR-1298:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-5546
+tasks: BL-5546
 found: 2026-11-19
 found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
 scorecard: 2026-11-19_0134.md

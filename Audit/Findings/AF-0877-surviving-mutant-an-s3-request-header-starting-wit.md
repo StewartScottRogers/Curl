@@ -3,12 +3,12 @@ id: AF-0877
 title: Surviving mutant: an S3 request header starting with CR or LF is sent instead of refused
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpClientConnection.cs:FormatHead-ge:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpClientConnection.cs:54:>=
-task: none
-tasks:
+task: BL-5541
+tasks: BL-5541
 found: 2026-11-19
 found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
 scorecard: 2026-11-19_0134.md
