@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5478 — Fix fitness finding STD-157: FTPS with PROT P in passive mode starts the data-connection TLS handshake only after the 150 reply, so a server that completes the handshake before sending 150 hangs
 
@@ -47,3 +47,4 @@ Passive PROT P now starts the data TLS handshake as a task at connect (DialDataA
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-157 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 8623f133 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Passive FTPS data handshake starts at connect; unit tests pin it
