@@ -50,3 +50,4 @@ Record the choice and why in an ADR (decided by Claude under Stewart's delegatio
 ## Log
 
 - 2026-11-18: Created from bug report 2026-11-18T1734-Curl-bug-report.md, new finding 2.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 7195c7b4 85164bf3 4d64fe9f 3d836d5e.
