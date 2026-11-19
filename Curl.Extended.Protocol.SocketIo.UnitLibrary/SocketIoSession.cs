@@ -19,7 +19,7 @@ namespace Curl.Extended.Protocol.SocketIo;
 /// <param name="output">Where received events are written.</param>
 /// <param name="timeProvider">The transfer's clock, which times the heartbeat.</param>
 /// <param name="progress">Told the bytes written so far after each event, so a <c>-m</c> timeout and <c>%{size_download}</c> count them.</param>
-/// <param name="credentials">The <c>-u</c> user and password sent as the namespace CONNECT packet's <c>auth</c> payload (ADR-1310), or <see langword="null" /> to send none.</param>
+/// <param name="credentials">The <c>-u</c> user and password sent as the namespace CONNECT packet's <c>auth</c> payload (ADR-1311), or <see langword="null" /> to send none.</param>
 internal sealed class SocketIoSession(WebSocketMessageChannel channel, string namespaceName, string? emit, Stream output, TimeProvider timeProvider, ITransferProgress progress, NetworkCredential? credentials = null)
 {
     private const char EngineIoOpen = '0';
@@ -68,7 +68,7 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
         ReadHandshake(handshake, long.MaxValue, root =>
             root.TryGetProperty("maxPayload", out JsonElement maxPayload) && maxPayload.TryGetInt64(out long bytes) && bytes >= 0 ? bytes : long.MaxValue);
 
-    /// <summary>Gives the CONNECT packet's <c>auth</c> payload: <c>{"username":..,"password":..}</c>, or nothing without credentials (ADR-1310).</summary>
+    /// <summary>Gives the CONNECT packet's <c>auth</c> payload: <c>{"username":..,"password":..}</c>, or nothing without credentials (ADR-1311).</summary>
     internal static string AuthPayloadOf(NetworkCredential? credentials)
     {
         if (credentials is null)

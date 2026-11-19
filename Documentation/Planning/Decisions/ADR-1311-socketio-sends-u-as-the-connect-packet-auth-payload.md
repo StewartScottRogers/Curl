@@ -1,4 +1,4 @@
-# ADR-1310: The socketio client sends -u as the CONNECT packet's auth payload
+# ADR-1311: The socketio client sends -u as the CONNECT packet's auth payload
 
 - Status: Accepted
 - Date: 2026-11-19

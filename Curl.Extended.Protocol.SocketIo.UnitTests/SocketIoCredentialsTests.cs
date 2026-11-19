@@ -5,7 +5,7 @@ using Curl.WebSocket;
 
 namespace Curl.Extended.Protocol.SocketIo;
 
-/// <summary>Pins how <c>-u</c> reaches the wire: the namespace CONNECT packet's <c>auth</c> payload (ADR-1310), never the log.</summary>
+/// <summary>Pins how <c>-u</c> reaches the wire: the namespace CONNECT packet's <c>auth</c> payload (ADR-1311), never the log.</summary>
 [TestClass]
 public sealed class SocketIoCredentialsTests
 {
