@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineOptions.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5570 — Fix CI failure job Quality gates (windows-latest) step UNKNOWN STEP on Windows
 
@@ -37,3 +37,4 @@ Linux and macOS: test is platform-neutral.
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 2e720b73.
+- 2026-11-19: Doing -> Done. Added test reading ActsAsQuicBuild getter
