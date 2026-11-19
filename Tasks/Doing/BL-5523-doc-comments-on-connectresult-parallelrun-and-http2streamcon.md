@@ -43,3 +43,4 @@ Found by the shift-end review of 2026-11-18 (ADR-0710), pr-review-toolkit type-d
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: b36c7937 e2507838 707efe9c c0b71b45 fd0d28df 3d836d5e.
