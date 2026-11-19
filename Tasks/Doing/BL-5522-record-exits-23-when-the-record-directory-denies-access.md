@@ -37,3 +37,4 @@ The sibling hooks catch both exception types, for example `CodeGenerationTransfe
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 6a0c954f a2495cd0 3d836d5e.
