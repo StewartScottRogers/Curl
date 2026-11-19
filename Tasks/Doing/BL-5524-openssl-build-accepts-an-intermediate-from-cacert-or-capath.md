@@ -37,13 +37,15 @@ The intent of BL-5449 must stay: an intermediate that only .NET's CurrentUser CA
 
 ## Acceptance criteria
 
-- [ ] `RelyingOnAnIntermediateTheServerDidNotSend` counts an element as available when the server sent it or when `chain.ChainPolicy.CustomTrustStore` lists it.
-- [ ] `RelyingOnAnIntermediateTheServerDidNotSend` checks only the elements below `AnchorIndexOf(chain)`.
-- [ ] A unit test in `ServerCertificateVerificationTests.UnsentIntermediate.cs` covers the OpenSSL build with an unsent intermediate that the custom trust store lists, and the chain is accepted.
-- [ ] The existing test `Judge_IntermediateTheServerDidNotSendInTheOpenSslBuild_IsExit60WithError20` still passes: an unsent intermediate the anchors do not list is still exit 60 with error 20.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `RelyingOnAnIntermediateTheServerDidNotSend` counts an element as available when the server sent it or when `chain.ChainPolicy.CustomTrustStore` lists it.
+- [x] `RelyingOnAnIntermediateTheServerDidNotSend` checks only the elements below `AnchorIndexOf(chain)`.
+- [x] A unit test in `ServerCertificateVerificationTests.UnsentIntermediate.cs` covers the OpenSSL build with an unsent intermediate that the custom trust store lists, and the chain is accepted.
+- [x] The existing test `Judge_IntermediateTheServerDidNotSendInTheOpenSslBuild_IsExit60WithError20` still passes: an unsent intermediate the anchors do not list is still exit 60 with error 20.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+An element is exempt when it lies at or above AnchorIndexOf(chain), the first element the custom trust store lists, so only elements strictly below the anchor are checked. Quality run: 0 failing members.
 
 ## Log
 

@@ -333,7 +333,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
             && !options.Insecure
             && chain is not null
             && peerCertificates.Length > 0
-            && chain.ChainElements.Skip(1).SkipLast(1).Any(element => !WasSent(element.Certificate, peerCertificates));
+            && chain.ChainElements.Skip(1).Take(Math.Max(0, AnchorIndexOf(chain) - 1)).Any(element => !WasSent(element.Certificate, peerCertificates));
     }
 
     private static bool WasSent(X509Certificate2 certificate, ReadOnlyMemory<byte>[] peerCertificates) =>
