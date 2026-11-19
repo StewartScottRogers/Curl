@@ -33,3 +33,4 @@ On 2026-11-18 lane 3 (BL-4496, which changed no Networking code) ran `dotnet tes
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 5e00b497 c792f2bd 44447f62.
