@@ -203,8 +203,7 @@ public sealed partial class TcpConnectorQuicTests
     {
         // curl --http3-only -v --local-port 41000-41005 with 41000-41002 held: "Bind to local port N
         // failed, trying next" for each, then "Local port: 41003" (BL-1025).
-        using var taken = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        taken.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        using var taken = BindUdpSocketWhosePortIsFollowedByAFreeOne();
         var takenPort = ((IPEndPoint)taken.LocalEndPoint!).Port;
         var events = new RecordingTransferEvents();
         Diagnostics.Arrange("port range", "the taken port and the one after it");
@@ -471,8 +470,7 @@ public sealed partial class TcpConnectorQuicTests
     [TestMethod]
     public async Task UdpChannelOpener_OpenFrom_BindsTheFirstFreePortOfTheRange()
     {
-        using var taken = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        taken.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        using var taken = BindUdpSocketWhosePortIsFollowedByAFreeOne();
         var takenPort = ((IPEndPoint)taken.LocalEndPoint!).Port;
         Diagnostics.Arrange("port range", "the taken port and the one after it");
 
@@ -534,6 +532,30 @@ public sealed partial class TcpConnectorQuicTests
 
     private void ActBoundFrom(QuicServerChannelOpener opener) =>
         Diagnostics.Act("bound from", string.Join(", ", opener.BoundFrom));
+
+    // The port after the held one must be free for the range tests to bind it; other tests running in parallel
+    // take ephemeral ports, so look for a pair whose second port is free instead of going inconclusive.
+    private static Socket BindUdpSocketWhosePortIsFollowedByAFreeOne()
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var candidate = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            candidate.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            var nextPort = ((IPEndPoint)candidate.LocalEndPoint!).Port + 1;
+            try
+            {
+                using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                probe.Bind(new IPEndPoint(IPAddress.Loopback, nextPort));
+                return candidate;
+            }
+            catch (SocketException)
+            {
+                candidate.Dispose();
+            }
+        }
+
+        throw new InvalidOperationException("No two adjacent free UDP ports found.");
+    }
 
     private static IDatagramChannel? OpenFromOrNull(IPEndPoint localEndPoint, int localPortCount, ITransferEvents? events = null)
     {
