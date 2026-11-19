@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5562 — Fix AF-0891: ChooseBindKind's summary says OpenLDAP always does a simple bind; it picks SASL for AUTH= options or a mask without Basic
 
@@ -42,12 +42,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Comment-only change to ChooseBindKind's summary; reproduction now matches only the SASL line. Build clean, Ldap unit tests 844 passed.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-19: Doing -> Done. Summary states OpenLDAP SASL choice (ADR-1299)
