@@ -17,6 +17,9 @@ public sealed class ProxySelectorHttpsExtensionSchemeTests
     [DataRow("az")]
     [DataRow("abfs")]
     [DataRow("abfss")]
+    [DataRow("mcps")]
+    [DataRow("grpcs")]
+    [DataRow("socketios")]
     [DataRow("signalrs")]
     public void TryFindProxyVariable_HttpsCarriedScheme_ReadsVariablesInOrder(string scheme)
     {
@@ -44,5 +47,18 @@ public sealed class ProxySelectorHttpsExtensionSchemeTests
     public void TryFindProxyVariable_NonHttpsScheme_DoesNotReadHttpsProxy(string scheme)
     {
         Assert.IsNull(Find(scheme, "https_proxy", "HTTPS_PROXY"));
+    }
+
+    [TestMethod]
+    [DataRow("mcp")]
+    [DataRow("grpc")]
+    [DataRow("socketio")]
+    [DataRow("signalr")]
+    public void TryFindProxyVariable_CleartextExtensionScheme_FallsBackToHttpProxyLikeWs(string scheme)
+    {
+        Assert.AreEqual(scheme + "_proxy", Find(scheme, scheme + "_proxy", "http_proxy"));
+        Assert.AreEqual("http_proxy", Find(scheme, "http_proxy", "all_proxy"));
+        Assert.AreEqual("all_proxy", Find(scheme, "all_proxy"));
+        Assert.IsNull(Find(scheme, "https_proxy"));
     }
 }

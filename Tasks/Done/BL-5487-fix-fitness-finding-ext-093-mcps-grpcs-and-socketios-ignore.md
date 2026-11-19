@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/ProxySelector.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5487 — Fix fitness finding EXT-093: mcps://, grpcs:// and socketios:// ignore HTTPS_PROXY; mcp://, grpc://, socketio:// and signalr:// ignore http_proxy
 
@@ -34,13 +34,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] each command makes the proxy log `CONNECT reg.test:443` (`:80` for cleartext forms), or an ADR plus help text state the narrower rule.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] each command makes the proxy log `CONNECT reg.test:443` (`:80` for cleartext forms), or an ADR plus help text state the narrower rule.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+mcps, grpcs and socketios now join HttpsProxySchemes (https_proxy, HTTPS_PROXY); mcp, grpc, socketio and signalr join ws in the new HttpProxySchemes (http_proxy fallback), following ADR-1297 as the finding expects; no new ADR. Tests in ProxySelectorHttpsExtensionSchemeTests. Measure-CodeQuality for Curl.Core.UnitLibrary: 0 failing. Committed with the task.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-093 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 771cbb2d 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Cleartext and TLS extension schemes read http_proxy / https_proxy
