@@ -3,8 +3,8 @@ id: AF-0881
 title: Surviving mutant: the libcurl engine's WebSocket handler can trace WS frames without --trace-config ws
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_0602.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/EngineComposition.cs:CreateProtocolHandlers-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EngineComposition.cs:144:false
 task: BL-5545
@@ -13,9 +13,9 @@ found: 2026-11-19
 found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
 scorecard: 2026-11-19_0134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: mechanical
+closed-by: 2026-11-19_0602.md
 ---
 # AF-0881 - Surviving mutant: the libcurl engine's WebSocket handler can trace WS frames without --trace-config ws
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-11-19 | 2026-11-19_0602.md | reproduces: no | Ran the -Site command: EngineComposition.cs:144 (resolvedLine 144), bool tracesWs = false -> true, outcome killed (2 baseline-failing AwsSigV4 tests excluded). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-19: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_0602.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
