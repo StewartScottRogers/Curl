@@ -17,6 +17,10 @@ public sealed class ServerCertificateVerificationCaDirectoryNoAiaTests
 {
     private const string Host = "capath-noaia.test";
 
+    // One instant for every certificate of the chain: reading the clock per certificate let an
+    // intermediate outlive its issuer when the second changed between the two reads (BL-5521).
+    private static readonly DateTimeOffset s_certificateEpoch = DateTimeOffset.UtcNow;
+
     [TestMethod]
     public void VerifyPeer_CaDirectoryHoldingOnlyTheRootAndLeafAiaNamesTheIntermediate_IsExit60WithoutDownload()
     {
@@ -56,8 +60,8 @@ public sealed class ServerCertificateVerificationCaDirectoryNoAiaTests
         request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign, true));
         request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
-        var notBefore = DateTimeOffset.UtcNow.AddDays(-2);
-        var notAfter = DateTimeOffset.UtcNow.AddDays(30);
+        var notBefore = s_certificateEpoch.AddDays(-2);
+        var notAfter = s_certificateEpoch.AddDays(30);
         if (issuer is null)
         {
             return request.CreateSelfSigned(notBefore, notAfter);
@@ -77,6 +81,6 @@ public sealed class ServerCertificateVerificationCaDirectoryNoAiaTests
         request.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(issuer, true, false));
         request.CertificateExtensions.Add(new X509AuthorityInformationAccessExtension(
             null, [$"http://127.0.0.1:{aiaPort}/int.der"]));
-        return request.Create(issuer, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(10), RandomNumberGenerator.GetBytes(8));
+        return request.Create(issuer, s_certificateEpoch.AddDays(-1), s_certificateEpoch.AddDays(10), RandomNumberGenerator.GetBytes(8));
     }
 }
