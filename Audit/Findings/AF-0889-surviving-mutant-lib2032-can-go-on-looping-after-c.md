@@ -3,12 +3,12 @@ id: AF-0889
 title: Surviving mutant: lib2032 can go on looping after curl_multi_perform fails
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib2032.cs:AfterPerform-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib2032.cs:193:false
-task: none
-tasks:
+task: BL-5560
+tasks: BL-5560
 found: 2026-11-19
 found-at: 6e68cb60b626d421113f6d7d7f35c2a46bbc3b46
 scorecard: 2026-11-19_0602.md

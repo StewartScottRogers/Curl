@@ -3,12 +3,12 @@ id: AF-0886
 title: Surviving mutant: the multi callback queue can reset its arrival signal while callbacks are still queued
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/MultiCallbackQueue.cs:TryDequeue-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/MultiCallbackQueue.cs:124:&&
-task: none
-tasks:
+task: BL-5557
+tasks: BL-5557
 found: 2026-11-19
 found-at: 6e68cb60b626d421113f6d7d7f35c2a46bbc3b46
 scorecard: 2026-11-19_0602.md

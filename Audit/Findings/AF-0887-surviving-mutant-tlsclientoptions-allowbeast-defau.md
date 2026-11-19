@@ -3,12 +3,12 @@ id: AF-0887
 title: Surviving mutant: TlsClientOptions' AllowBeast default can flip to true without a test noticing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/TlsClientOptions.cs:TlsClientOptions-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TlsClientOptions.cs:232:false
-task: none
-tasks:
+task: BL-5558
+tasks: BL-5558
 found: 2026-11-19
 found-at: 6e68cb60b626d421113f6d7d7f35c2a46bbc3b46
 scorecard: 2026-11-19_0602.md

@@ -3,12 +3,12 @@ id: AF-0884
 title: Surviving mutant: a NATS MSG of exactly max_payload bytes can be refused with exit 8
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Nats.UnitLibrary/NatsMessageLine.cs:TryReadLengths-le:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Nats.UnitLibrary/NatsMessageLine.cs:43:<=
-task: none
-tasks:
+task: BL-5555
+tasks: BL-5555
 found: 2026-11-19
 found-at: 6e68cb60b626d421113f6d7d7f35c2a46bbc3b46
 scorecard: 2026-11-19_0602.md

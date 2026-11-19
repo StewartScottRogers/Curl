@@ -3,12 +3,12 @@ id: AF-0885
 title: Surviving mutant: the STOMP frame reader can double its buffer on every read and stop growing it when full
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Stomp.UnitLibrary/Wire/StompFrameReader.cs:FillAsync-eq:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Stomp.UnitLibrary/Wire/StompFrameReader.cs:137:==
-task: none
-tasks:
+task: BL-5556
+tasks: BL-5556
 found: 2026-11-19
 found-at: 6e68cb60b626d421113f6d7d7f35c2a46bbc3b46
 scorecard: 2026-11-19_0602.md

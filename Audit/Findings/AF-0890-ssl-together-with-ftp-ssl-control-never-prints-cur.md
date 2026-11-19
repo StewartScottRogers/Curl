@@ -3,12 +3,12 @@ id: AF-0890
 title: --ssl together with --ftp-ssl-control never prints curl's 'Warning: --ssl overrides --ftp-ssl-control' (or the reverse) line
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:Curl.Cli.UnitLibrary/CommandLineWarning.cs:--ftp-ssl-control:stderr
 reproduction: none
-task: none
-tasks:
+task: BL-5561
+tasks: BL-5561
 found: 2026-11-19
 found-at: 6e68cb60b626d421113f6d7d7f35c2a46bbc3b46
 scorecard: 2026-11-19_0602.md
