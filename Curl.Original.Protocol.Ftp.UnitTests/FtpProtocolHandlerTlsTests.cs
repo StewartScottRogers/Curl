@@ -406,7 +406,7 @@ public sealed class FtpProtocolHandlerTlsTests
             _ => { },
             ConnectResult.Failed(CurlExitCode.SslConnectError, "schannel: failed to receive handshake"));
 
-        // The handshake waits for RETR (CGR-005, BL-3534).
+        // The handshake starts at connect but its result is read after the transfer command (STD-157, BL-5478).
         var expectedSent = LogInSent + "PBSZ 0\r\nPROT P\r\nPWD\r\nEPSV\r\nTYPE I\r\nSIZE a.txt\r\nRETR a.txt\r\n";
         diagnostics.DiffSent(expectedSent, run.Sent);
         Assert.AreEqual(expectedSent, run.Sent);
@@ -417,7 +417,7 @@ public sealed class FtpProtocolHandlerTlsTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_PassiveProtP_RunsTheDataHandshakeAfterTheTransferCommand()
+    public async Task ExecuteAsync_PassiveProtP_StartsTheDataHandshakeBeforeTheTransferCommand()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl 8.22.0 -v -k --ssl-reqd ftp://127.0.0.1:18021/a.txt sends TYPE I, SIZE and RETR
@@ -444,8 +444,8 @@ public sealed class FtpProtocolHandlerTlsTests
         TransferResult result = await new FtpProtocolHandler(connector, new QueuedListener(), tls).ExecuteAsync(context);
 
         diagnostics.ActResult(result);
-        diagnostics.Assert("header before the second handshake", "< 150 Opening BINARY mode data connection\r\n", headersAtHandshake[1][^1]);
-        Assert.AreEqual("< 150 Opening BINARY mode data connection\r\n", headersAtHandshake[1][^1]);
+        diagnostics.Assert("header before the second handshake", "< 229 Entering Extended Passive Mode (|||64396|)\r\n", headersAtHandshake[1][^1]);
+        Assert.AreEqual("< 229 Entering Extended Passive Mode (|||64396|)\r\n", headersAtHandshake[1][^1]);
         Assert.AreEqual(TransferResult.Success(5), result with { Report = null });
     }
 

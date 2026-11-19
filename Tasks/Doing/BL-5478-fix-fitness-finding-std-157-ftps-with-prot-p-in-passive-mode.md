@@ -35,11 +35,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the `early` command prints `0123456789[226 10]`, exit 0; `late` still passes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the `early` command prints `0123456789[226 10]`, exit 0; `late` still passes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Passive PROT P now starts the data TLS handshake as a task at connect (DialDataAsync), awaited after the transfer command; abandoned handshakes are observed on dispose. The early-server repro was not run against real curl (unit tests pin the order); CGR-005 tests updated to the new order. Quality run for the Ftp library: 0 failing members. Linux and macOS CI: change is platform-neutral.
 
 ## Log
 

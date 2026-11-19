@@ -7,9 +7,10 @@ namespace Curl.Original.Protocol.Ftp;
 
 /// <summary>
 /// Pins third-party gap report issue CGR-005 (BL-3534): over FTPS with <c>PROT P</c> in
-/// passive mode the data connection's TLS handshake waits for the transfer command, as curl
-/// 8.22.0's does, so a server that starts data-connection TLS only after <c>RETR</c> (vsftpd,
-/// proftpd) is not left waiting for a <c>TYPE</c> that never comes. The fake TLS provider
+/// passive mode the data connection's TLS handshake starts as soon as the data connection is
+/// open, without waiting for the transfer command's reply (STD-157, BL-5478): a server that
+/// completes its handshake before <c>150</c> is served, and one that handshakes after
+/// <c>150</c> (vsftpd) still is, as the ClientHello waits in its buffer. The fake TLS provider
 /// records what the control connection had sent when the handshake started.
 /// </summary>
 [TestClass]
@@ -22,23 +23,41 @@ public sealed class Cgr005Tests
     private const string Transfer = "200 Type set\r\n213 5\r\n150 Opening BINARY mode data connection\r\n226 Transfer complete\r\n221 Bye\r\n";
 
     [TestMethod]
-    public async Task ExecuteAsync_FtpsOverEpsv_RunsTheDataHandshakeAfterRetr()
+    public async Task ExecuteAsync_FtpsOverEpsv_StartsTheDataHandshakeBeforeTheTransferCommand()
     {
         string sentAtHandshake = await RunAsync(
             LoggedIn + "229 Entering Extended Passive Mode (|||64396|)\r\n" + Transfer,
             disableEpsv: false);
 
-        Assert.EndsWith("PWD\r\nEPSV\r\nTYPE I\r\nSIZE a.txt\r\nRETR a.txt\r\n", sentAtHandshake);
+        Assert.EndsWith("PWD\r\nEPSV\r\n", sentAtHandshake);
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_FtpsOverPasv_RunsTheDataHandshakeAfterRetr()
+    public async Task ExecuteAsync_FtpsOverPasv_StartsTheDataHandshakeBeforeTheTransferCommand()
     {
         string sentAtHandshake = await RunAsync(
             LoggedIn + "227 Entering Passive Mode (127,0,0,1,251,140)\r\n" + Transfer,
             disableEpsv: true);
 
-        Assert.EndsWith("PWD\r\nPASV\r\nTYPE I\r\nSIZE a.txt\r\nRETR a.txt\r\n", sentAtHandshake);
+        Assert.EndsWith("PWD\r\nPASV\r\n", sentAtHandshake);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FtpsRetrRefused_ObservesTheHandshakeStartedAtConnectAndFails()
+    {
+        const string url = "ftps://127.0.0.1/a.txt";
+        string replies = LoggedIn + "229 Entering Extended Passive Mode (|||64396|)\r\n200 Type set\r\n213 5\r\n550 No such file\r\n221 Bye\r\n";
+        var control = ScriptedConnection.FromReplies(replies);
+        var connector = new QueuedConnector(ConnectResult.Connected(control), ConnectResult.Connected(new ScriptedConnection()));
+        var tls = new QueuedTlsProvider(ConnectResult.Connected(new ScriptedConnection()));
+        int handshakes = 0;
+        tls.BeforeEachHandshake = () => handshakes++;
+        var context = new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream() };
+
+        TransferResult result = await new FtpProtocolHandler(connector, new QueuedListener(), tls).ExecuteAsync(context);
+
+        Assert.AreEqual(1, handshakes);
+        Assert.AreNotEqual(TransferResult.Success(0), result with { Report = null });
     }
 
     /// <summary>
