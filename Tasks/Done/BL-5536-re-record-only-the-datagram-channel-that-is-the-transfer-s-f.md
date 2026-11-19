@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.EndPoints.cs, Curl.Engine.UnitLibrary/EndPointRecordingDatagramConnector.cs, Curl.Engine.UnitTests/EndPointRecordingDatagramConnectorTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5536 — Re-record only the datagram channel that is the transfer's first connection
 
@@ -47,22 +47,25 @@ independently.
 
 ## Acceptance criteria
 
-- [ ] A unit test opens a TCP connection through the recorder (`Record` with an IP remote), then a
+- [x] A unit test opens a TCP connection through the recorder (`Record` with an IP remote), then a
       datagram channel through `EndPointRecordingDatagramConnector`, and receives on it. The
       report's `RemoteEndPoint` is still the TCP peer.
-- [ ] A unit test opens two datagram channels through `EndPointRecordingDatagramConnector`, and the
+- [x] A unit test opens two datagram channels through `EndPointRecordingDatagramConnector`, and the
       second one receives after it moved address. `recorder.DatagramLocalEndPoint` and the report's
       `RemoteEndPoint` still describe the first channel.
-- [ ] `EndPointRecordingDatagramConnectorTests.ReceiveAsync_ChannelMovedToTheNextAddress_ReportsTheEndPointsOfTheSecondAddress`
+- [x] `EndPointRecordingDatagramConnectorTests.ReceiveAsync_ChannelMovedToTheNextAddress_ReportsTheEndPointsOfTheSecondAddress`
       still passes.
-- [ ] The doc comments of `ReRecordDatagramChannel` and `ReRecordingChannel` state the condition the
+- [x] The doc comments of `ReRecordDatagramChannel` and `ReRecordingChannel` state the condition the
       code enforces.
-- [ ] `dotnet build` is clean, the fast tests are green, and `Curl.Engine.UnitLibrary` keeps 100%
+- [x] `dotnet build` is clean, the fast tests are green, and `Curl.Engine.UnitLibrary` keeps 100%
       line and branch coverage.
 
 ## Notes
+
+Record and RecordDatagramChannel now return whether they recorded the first connection / first datagram channel; the connector wraps (re-records) only a channel for which both are true. Quality run for Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 438b188c 1762d3d7 9b8d8449 320775f4 6d076fbc.
+- 2026-11-19: Doing -> Done. Only the first datagram channel that is also the first connection re-records
