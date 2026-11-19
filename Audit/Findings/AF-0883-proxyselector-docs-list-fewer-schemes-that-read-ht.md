@@ -3,8 +3,8 @@ id: AF-0883
 title: ProxySelector docs list fewer schemes that read https_proxy/http_proxy than the code uses
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_0602.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Core.UnitLibrary/ProxySelector.cs:ProxyVariableNames:false-doc-comment
 reproduction: none
 task: BL-5547
@@ -13,9 +13,9 @@ found: 2026-11-19
 found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
 scorecard: 2026-11-19_0134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: reliable-reaudit
+closed-by: 2026-11-19_0602.md
 ---
 # AF-0883 - ProxySelector docs list fewer schemes that read https_proxy/http_proxy than the code uses
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Core.UnitLibrary/ProxySelector.cs -Pattern 'HttpsProxyS
 
 ## Re-audits
 
+- 2026-11-19 | 2026-11-19_0602.md | reproduces: no | Ran the reproduction: only line 244 (HttpsProxySchemes = [wss, mcps, grpcs, socketios, oci, s3, gs, az, abfs, abfss, signalrs]) matches; the old 'that always speak HTTPS: <c>oci</c>' wording is gone. Line 249 now lists mcps, grpcs, socketios, oci, s3, gs, az, abfs, abfss and signalrs with wss, the same set as the code.
+
 ## Log
 
 - 2026-11-19: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_0602.md: the reproduction no longer reproduces.
