@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/RequestBodies/CurlContent.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5527 — Stop a null byte[] Body on a Curl.Api request from throwing at run time without a compile-time warning
 
@@ -40,14 +40,17 @@ Record the choice and why in an ADR (decided by Claude under Stewart's delegatio
 
 ## Acceptance criteria
 
-- [ ] The repro either builds and sends the request with no body (no exception), or draws a nullable warning at compile time; the ADR names which, and why.
-- [ ] Focused unit tests in `Curl.Api.UnitTests` pin the chosen behaviour, including a non-null `byte[]` body still being sent unchanged.
-- [ ] `CurlContent`'s XML doc comments, and `Curl.Api/README.md` if it shows `Body` assignment, describe what a null `byte[]` does.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The repro either builds and sends the request with no body (no exception), or draws a nullable warning at compile time; the ADR names which, and why.
+- [x] Focused unit tests in `Curl.Api.UnitTests` pin the chosen behaviour, including a non-null `byte[]` body still being sent unchanged.
+- [x] `CurlContent`'s XML doc comments, and `Curl.Api/README.md` if it shows `Body` assignment, describe what a null `byte[]` does.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decision: null means no body (ADR-1303); operator now `byte[]?` -> `CurlContent?` with NotNullIfNotNull. Cause of the missing warning: a user-defined conversion parameter is not flow-checked. Quality run for Curl.Api: 0 failing members. Linux/macOS: change is platform-neutral.
 
 ## Log
 
 - 2026-11-18: Created from bug report 2026-11-18T1734-Curl-bug-report.md, new finding 2.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 7195c7b4 85164bf3 4d64fe9f 3d836d5e.
+- 2026-11-18: Doing -> Done. A null byte[] Body now means no body (ADR-1303)

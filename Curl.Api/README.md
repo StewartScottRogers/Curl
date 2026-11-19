@@ -86,7 +86,7 @@ await response.Body.DisposeAsync();
 ## Upload a body
 
 `CurlContent` is the type of `CurlRequest.Body`. A `byte[]` converts to it implicitly
-(`CurlContent.FromBytes`), `CurlContent.FromStream` uploads a stream (give its length when you
+(`CurlContent.FromBytes`; a `null` array is no body), `CurlContent.FromStream` uploads a stream (give its length when you
 know it), and `CurlContent.Empty` is an empty body.
 
 <!-- sample: upload -->

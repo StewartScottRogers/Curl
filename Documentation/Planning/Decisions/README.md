@@ -1344,3 +1344,4 @@ Each option and the specific reason it lost.
 | [1300](ADR-1300-name-constraints-cover-directory-email-and-uri-names.md) | Name constraints cover directoryName, rfc822Name and URI names (BL-5436) | Accepted | 2026-11-18 |
 | [1301](ADR-1301-curl-mcp-lets-o-discard-to-the-null-device.md) | curl-mcp lets -o discard to the null device (BL-5516) | Accepted | 2026-11-18 |
 | [1302](ADR-1302-winldap-digest-md5-refuses-to-bind-without-auth-conf.md) | The WinLDAP DIGEST-MD5 bind refuses to bind without auth-conf (BL-5434) | Accepted | 2026-11-18 |
+| [1303](ADR-1303-null-byte-array-body-means-no-body.md) | A null byte[] Body on a Curl.Api request means no body (BL-5527) | Accepted | 2026-11-18 |
