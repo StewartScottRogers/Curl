@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyWebSocket.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.WebSocket.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5573 — Stop ManagedEasyWebSocket.WaitForDataAsync leaking a cancellation registration on every wait
 
@@ -40,3 +40,4 @@ Decision: `await pendingRead.WaitAsync(cancellationToken)` inside `catch (Except
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: cf34896b 21590eb7 d2fb4523 49aa1c34 459d9b86.
+- 2026-11-19: Doing -> Done. WaitForDataAsync uses WaitAsync; no leaked registration; fault test added
