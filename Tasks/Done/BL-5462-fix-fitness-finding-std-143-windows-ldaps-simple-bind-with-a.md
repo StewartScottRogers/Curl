@@ -8,7 +8,7 @@ depends-on: [BL-5461]
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapBind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Original.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5462 — Fix fitness finding STD-143: Windows ldaps:// simple bind with a wrong password says "Protocol Error"; curl says "Invalid Credentials"
 
@@ -31,13 +31,17 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command prints `… Invalid Credentials`, exit 38; plain `ldap://` still prints `Protocol Error`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command prints `… Invalid Credentials`, exit 38; plain `ldap://` still prints `Protocol Error`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 - Plan: LdapBind.BindAsync gets a flag for ldaps (context.Url.Scheme == TlsScheme, passed from BindWithCredentialsAsync in LdapProtocolHandler.cs); WinLDAP over ldaps binds LDAPv3 once, no v2 retry, unbinds and fails with the first reply's result text. Handler file is held by BL-5461, so touches widened and depends-on BL-5461.
+
+- Done: over ldaps:// the WinLDAP simple bind binds LDAPv3 once (no LDAPv2 retry), unbinds and fails with the first result's text, so a wrong password gives exit 38 `Invalid Credentials`; plain ldap:// keeps the v3-then-v2 sequence (its tests, e.g. Cgr234 and the RetryRefused cases, still pass). ADR-1304 records it. The retry moved to `LdapBind.RetryAsLdapV2Async` to keep `BindAsWinLdapAsync` within the complexity gate (Measure-CodeQuality: 100/100, 0 failing).
+- Criterion 1 checked by `LdapBindOverTlsTests` replaying the exchange through the handler (ldaps URL, result 49 -> exit 38 Invalid Credentials, bytes BindV3 + Unbind); no LDAPS container is reachable from a lane, so the reference text is the finding's (confirmed by 2 users, 2 runs). Platform-neutral: no paths or OS text.
+- Full build clean (0 warnings); fast tests green across 115 test assemblies.
 
 ## Log
 
@@ -45,3 +49,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 530f7f63 69116afe 3d836d5e.
 - 2026-11-18: Doing -> Backlog. Needs LdapProtocolHandler.cs, held by BL-5461 (Doing); depends-on BL-5461
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 530f7f63 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Windows ldaps:// simple bind with a wrong password fails with exit 38 Invalid Credentials, no LDAPv2 retry
