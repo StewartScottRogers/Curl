@@ -85,6 +85,37 @@ CurlResponse response = await client.SendAsync(request, cancellationToken);
 await response.Body.DisposeAsync();
 ```
 
+## Trust a test server
+
+Against a server with a self-signed certificate, `curl -k` is `Tls.Origin.VerifyPeer = false` and
+`Tls.Origin.VerifyHost = false`: `CurlTlsOptions.Origin` holds the settings for the origin server, and
+`CurlTlsOptions.Proxy` holds the same `CurlTlsPeerOptions` for an HTTPS proxy. `VerifyPeer` is the peer
+check (the certificate chain leads to a trusted authority); `VerifyHost` is the host-name check (the
+certificate names the host). Both default to `true`. Switching them off is for testing only: nothing then
+proves who answers. The safer way is to trust the test server's own certificate authority with
+`CertificateAuthorityBlob` (its PEM bytes; `CertificateAuthorityFile` takes a file), which keeps both checks on.
+
+<!-- sample: trust -->
+```csharp
+CurlTlsPeerOptions skipChecks = new() { VerifyPeer = false, VerifyHost = false };
+CurlRequest insecure = new(HttpMethod.Get, "https://localhost:8443/")
+{
+    Tls = new CurlTlsOptions { Origin = skipChecks },
+};
+CurlResponse first = await client.SendAsync(insecure, cancellationToken);
+await first.Body.DisposeAsync();
+
+CurlRequest trusted = new(HttpMethod.Get, "https://localhost:8443/")
+{
+    Tls = new CurlTlsOptions
+    {
+        Origin = new CurlTlsPeerOptions { CertificateAuthorityBlob = testCertificateAuthorityPem },
+    },
+};
+CurlResponse second = await client.SendAsync(trusted, cancellationToken);
+await second.Body.DisposeAsync();
+```
+
 ## Upload a body
 
 `CurlContent` is the type of `CurlRequest.Body`. A `byte[]` converts to it implicitly
