@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl/Options/CurlOptionValues.cs, Libcurl/Options/CurlOptionType.cs, Libcurl.UnitTests/Options/Network/EasyNetworkOptionSettersTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5550 — Accept the ConnectOnly enum for CurlOption.ConnectOnly in Libcurl SetOption
 
@@ -40,3 +40,4 @@ The cause was the type check in `CurlOptionValues`, not the setter: a `Long` opt
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 2.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: b2789787 d96edf94 7fe8efb6 1fbe73a0 3d836d5e.
+- 2026-11-19: Doing -> Done. ConnectOnly enum accepted; build clean, fast tests green
