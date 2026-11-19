@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5467 — Fix fitness finding STD-148: Three 102 heads then close: %{num_headers} is 0; curl reports 1
 
@@ -31,13 +31,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command prints `[102 102 87 1]`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command prints `[102 102 87 1]`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fix: for a 1xx head cut short with no header lines, num_headers takes the last earlier head that has some (HttpProtocolHandler.InformationalHeaderLineCount). Test: ExecuteAsync_Three102HeadsThenClose_ReportsTheMiddleHeadsHeader. Http.UnitTests green (2726 passed); quality run 0 failing members. The acceptance command was pinned by the unit test, not run against a live server.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-148 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 2561fa9a 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. num_headers after three 102 heads then close is 1

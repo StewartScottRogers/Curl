@@ -27,6 +27,12 @@ public sealed partial class HttpProtocolHandlerTests
         await AssertInterimHeadCountAsync("HTTP/1.1 103 Early\r\nLink: </a>\r\n\r\n", 103, 34, 1);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_Three102HeadsThenClose_ReportsTheMiddleHeadsHeader()
+    {
+        await AssertInterimHeadCountAsync("HTTP/1.1 102 Processing\r\n\r\nHTTP/1.1 102 Processing\r\nA: b\r\n\r\nHTTP/1.1 102 Processing\r\n\r\n", 102, 87, 1);
+    }
+
     private async Task AssertInterimHeadCountAsync(string response, int responseCode, int headerSize, int headerCount)
     {
         foreach (int chunkSize in ChunkSizes)
