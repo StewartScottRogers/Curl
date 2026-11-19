@@ -6,8 +6,8 @@ namespace Libcurl.Info;
 /// <c>_SOCKET</c> or <c>_OFF_T</c> base plus the info's own number). Each name is the upstream name
 /// without <c>CURLINFO_</c>, one capital per underscore-separated word, as <see cref="Options.CurlOption"/>
 /// names <c>CURLOPT_*</c>. A name that upstream spells as several words run together has its word-cased
-/// form in its summary, so a text search finds it (ADR-1306).
-/// A name that upstream spells as several words run together has its word-cased form in its summary (ADR-1306).
+/// form in its summary, so a text search finds it (ADR-1307).
+/// A name that upstream spells as several words run together has its word-cased form in its summary (ADR-1307).
 /// </summary>
 /// <remarks>
 /// <see cref="Easy.CurlEasy.GetInfo"/> answers each with the .NET value of its base: a

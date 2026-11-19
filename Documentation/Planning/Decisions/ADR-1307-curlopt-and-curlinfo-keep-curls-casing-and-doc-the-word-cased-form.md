@@ -1,4 +1,4 @@
-# ADR-1306: CurlOption and CurlInfo keep curl's casing and document the word-cased form (BL-5553)
+# ADR-1307: CurlOption and CurlInfo keep curl's casing and document the word-cased form (BL-5553)
 
 - Status: Accepted
 - Date: 2026-11-19

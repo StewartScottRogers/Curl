@@ -38,10 +38,10 @@ Whatever is chosen, `CurlInfo` and any other enum built the same way follow the 
 
 ## Notes
 
-- Decided in ADR-1306: keep names, add `Word-cased: <c>X</c>.` to each multi-word member's summary (generated with a throwaway word-list script, two hand fixes), README paragraph. CurlInfo follows the same rule. Pinned by a new CurlOptionsTests test. touches widened to CurlInfo.cs, README, CurlOptionsTests.cs. Doc comments only, so no Measure-CodeQuality run (no code or branch changed). Build clean, fast tests 1542 passed.
+- Decided in ADR-1307: keep names, add `Word-cased: <c>X</c>.` to each multi-word member's summary (generated with a throwaway word-list script, two hand fixes), README paragraph. CurlInfo follows the same rule. Pinned by a new CurlOptionsTests test. touches widened to CurlInfo.cs, README, CurlOptionsTests.cs. Doc comments only, so no Measure-CodeQuality run (no code or branch changed). Build clean, fast tests 1542 passed.
 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 3 (option names).
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 602c6662 b0022bcc 33aa5314 3d836d5e.
-- 2026-11-19: Doing -> Done. CurlOption/CurlInfo members document their word-cased form (ADR-1306)
+- 2026-11-19: Doing -> Done. CurlOption/CurlInfo members document their word-cased form (ADR-1307)

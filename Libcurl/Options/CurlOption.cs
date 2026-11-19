@@ -6,7 +6,7 @@ namespace Libcurl.Options;
 /// option's own number). Each name is the upstream name without <c>CURLOPT_</c>, one capital per
 /// underscore-separated word, as <see cref="Curl.Api.Codes.CurlCode"/> names <c>CURLE_*</c>.
 /// A name that upstream spells as several words run together (<c>WRITEFUNCTION</c>) is not split, but its
-/// summary gives the word-cased form (<c>WriteFunction</c>), so a text search finds it (ADR-1306).
+/// summary gives the word-cased form (<c>WriteFunction</c>), so a text search finds it (ADR-1307).
 /// </summary>
 /// <remarks>
 /// An alias (<c>CURLOPT_FILE</c>, <c>CURLOPT_WRITEHEADER</c> and the rest flagged
