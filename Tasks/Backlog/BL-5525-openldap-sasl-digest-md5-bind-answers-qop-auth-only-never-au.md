@@ -1,5 +1,5 @@
 ---
-id: BL-5521
+id: BL-5525
 title: OpenLDAP SASL DIGEST-MD5 bind answers qop=auth only, never auth-conf
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-18
 completed:
 ---
-# BL-5521 — OpenLDAP SASL DIGEST-MD5 bind answers qop=auth only, never auth-conf
+# BL-5525 — OpenLDAP SASL DIGEST-MD5 bind answers qop=auth only, never auth-conf
 
 ## Goal
 

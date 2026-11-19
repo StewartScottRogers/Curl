@@ -1,5 +1,5 @@
 ---
-id: BL-5520
+id: BL-5524
 title: OpenSSL build accepts an intermediate from --cacert or --capath that the server did not send
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-18
 completed:
 ---
-# BL-5520 — OpenSSL build accepts an intermediate from --cacert or --capath that the server did not send
+# BL-5524 — OpenSSL build accepts an intermediate from --cacert or --capath that the server did not send
 
 ## Goal
 
