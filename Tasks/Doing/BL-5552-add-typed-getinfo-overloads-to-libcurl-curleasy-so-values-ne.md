@@ -26,13 +26,15 @@ Add typed overloads (for example `out long`, `out double`, `out string?`, and th
 
 ## Acceptance criteria
 
-- [ ] `CurlEasy` has typed `GetInfo` overloads (or `GetInfo<T>`) covering every `CurlInfo` value type, and a port reads `CurlInfo.ResponseCode` into a `long` with no cast.
-- [ ] A typed call whose type does not match the info returns `CurlCode.BadFunctionArgument` and does not throw.
-- [ ] The `object?` overload still works unchanged.
-- [ ] Focused unit tests in `Libcurl.UnitTests` pin each value type and the mismatch case; `Libcurl` stays at the four quality gates.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `CurlEasy` has typed `GetInfo` overloads (or `GetInfo<T>`) covering every `CurlInfo` value type, and a port reads `CurlInfo.ResponseCode` into a `long` with no cast.
+- [x] A typed call whose type does not match the info returns `CurlCode.BadFunctionArgument` and does not throw.
+- [x] The `object?` overload still works unchanged.
+- [x] Focused unit tests in `Libcurl.UnitTests` pin each value type and the mismatch case; `Libcurl` stays at the four quality gates.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Chose a generic `GetInfo<T>(CurlInfo, out T?)` over per-type overloads: `out var` calls on the `object?` overload would turn ambiguous with four sibling overloads, and one generic covers long, double, string, slist, certinfo and session types. A mismatch gives `BadFunctionArgument`. Measure-CodeQuality for Libcurl: 0 failing members.
 
 ## Log
 
