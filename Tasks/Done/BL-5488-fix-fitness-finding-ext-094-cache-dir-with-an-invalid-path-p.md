@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extension.HttpCache.UnitLibrary/CacheDirectory.cs]
+touches: [Curl.Extension.HttpCache.UnitLibrary/CacheDirectory.cs, Curl.Extension.HttpCache.UnitTests/CacheDirectoryTests.cs, Curl.Extension.Sigstore.UnitLibrary/SigstoreExtension.cs, Curl.Extension.Sigstore.UnitTests/SigstoreExtensionTests.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5488 — Fix fitness finding EXT-094: --cache-dir with an invalid path prints .NET exception text and the full local path
 
@@ -31,13 +31,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the first command prints one message naming `--cache-dir` and `'<>:|bad'`, with no `C:\Users` text and no OS sentence; `--sigstore-bundle x.json` alone prints `curl: --sigstore-bundle needs …` plus the try-help line, exit 2.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first command prints one message naming `--cache-dir` and `'<>:|bad'`, with no `C:\Users` text and no OS sentence; `--sigstore-bundle x.json` alone prints `curl: --sigstore-bundle needs …` plus the try-help line, exit 2.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Widened touches to the Sigstore activation check named by the finding (no other Doing task holds it). Decision in ADR-1302. Measured: Curl now prints `curl: --cache-dir cannot use '<>:|bad'` plus try-help, exit 2; Windows-only colon case pinned with OSCondition, platform-neutral test uses a NUL character. Quality run clean for both libraries; fast tests of both test projects and Composition pass.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-094 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e32926b1 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. --cache-dir invalid path and --sigstore-bundle without companions refused at activation (ADR-1302)
