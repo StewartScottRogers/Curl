@@ -61,12 +61,12 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
         {
             // A watchdog's cancellation leaves no result: carry the connected transfer's report on the exception for the caller that ends it (BL-5491).
             TransferResult connected = recorder.ReportOn(TransferResult.Failure(CurlExitCode.OperationTimedOut, cancelled.Message));
-            cancelled.Data[ReportDataKey] = StampTimingsAndUploadSize(connected, context, started, UploadedBy(context, UploadPosition(context) - uploadStart)).Report;
+            cancelled.Data[ReportDataKey] = StampTimingsAndUploadSize(connected, context, started, UploadedBy(context, UploadPosition(context) - uploadStart, true)).Report;
             throw;
         }
 
         result = recorder.ReportOn(result, handlerCountsConnections: result.Report is not null && context.Url.Scheme is "http" or "https");
-        return StampTimingsAndUploadSize(result, context, started, UploadedBy(context, UploadPosition(context) - uploadStart));
+        return StampTimingsAndUploadSize(result, context, started, UploadedBy(context, UploadPosition(context) - uploadStart, result.IsSuccess));
     }
 
     // Gives a report with no timings the transfer's connect and total times and, when it sent none itself, the bytes the upload stream gave (BL-5410). A failure with no report stays without one (BL-5421), and one that never connected sent nothing.
@@ -98,9 +98,12 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
         return !succeeded && recorder.FirstConnectTimings is null ? 0 : uploaded;
     }
 
-    // The bytes the transfer sent as its body: the -d data when given, else what the upload stream gave.
-    private static long UploadedBy(ITransferContext context, long streamBytes) =>
-        context.PostData is { } postData ? postData.Length : streamBytes;
+    // The bytes the transfer sent as its body: the -d data when given, else what the upload stream gave. A failed non-HTTP transfer (a broker refusing the login before the publish) sent none of the -d data (BL-5492).
+    private static long UploadedBy(ITransferContext context, long streamBytes, bool succeeded) =>
+        context.PostData is { } postData && SendsPostDataEvenOnFailure(context, succeeded) ? postData.Length : streamBytes;
+
+    private static bool SendsPostDataEvenOnFailure(ITransferContext context, bool succeeded) =>
+        succeeded || context.Url.Scheme is "http" or "https";
 
     // The upload stream's position, or 0 when there is no upload or it cannot report one.
     private static long UploadPosition(ITransferContext context) =>

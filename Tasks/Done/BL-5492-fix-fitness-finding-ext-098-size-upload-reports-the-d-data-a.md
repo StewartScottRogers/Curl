@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5492 — Fix fitness finding EXT-098: %{size_upload} reports the -d data as uploaded when the broker refused the login before anything was published
 
@@ -33,13 +33,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the redis command prints `[67 up=0]`; with `-u :rpw` it prints `[0 up=9]`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the redis command prints `[67 up=0]`; with `-u :rpw` it prints `[0 up=9]`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decided: a failed non-HTTP transfer reports 0 uploaded of the -d data (a broker refusing the login sent no publish); HTTP keeps -d length. Fixed in EndPointReportingProtocolHandler.UploadedBy; unit tests added; quality run clean.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-098 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 1606b934 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Failed non-HTTP transfer reports 0 uploaded -d data

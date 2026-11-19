@@ -157,9 +157,47 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
         Assert.IsNotNull(result.Report.Timings);
     }
 
-    private static TransferContext ContextOf(TimeProvider time, byte[]? postData = null, Stream? upload = null) => new()
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectedNonHttpTransferFailsWithReport_ReportsNoUploadOfDashDData()
     {
-        Url = CurlUrl.Parse("redis://127.0.0.1/"),
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("redis", _ =>
+            {
+                recorder.Record(null, Remote, false, new ConnectTimings(0, 1, 5, null));
+                return ValueTask.FromResult(
+                    TransferResult.Failure(CurlExitCode.LoginDenied, "x") with { Report = new TransferReport() });
+            }),
+            recorder);
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(time, postData: [1, 2, 3]));
+
+        Assert.AreEqual(0, result.Report!.UploadSize);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectedHttpTransferFailsWithReport_KeepsDashDDataAsUploaded()
+    {
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("http", _ =>
+            {
+                recorder.Record(null, Remote, false, new ConnectTimings(0, 1, 5, null));
+                return ValueTask.FromResult(
+                    TransferResult.Failure(CurlExitCode.OperationTimedOut, "x") with { Report = new TransferReport() });
+            }),
+            recorder);
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(time, postData: [1, 2, 3], url: "http://127.0.0.1/"));
+
+        Assert.AreEqual(3, result.Report!.UploadSize);
+    }
+
+    private static TransferContext ContextOf(TimeProvider time, byte[]? postData = null, Stream? upload = null, string url = "redis://127.0.0.1/") => new()
+    {
+        Url = CurlUrl.Parse(url),
         Output = new MemoryStream(),
         TimeProvider = time,
         PostData = postData is null ? null : (ReadOnlyMemory<byte>?)postData,
