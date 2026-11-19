@@ -41,3 +41,4 @@ From bug report `2026-11-19T0930-Curl-bug-report.md`, finding 1 (Medium), found 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 1.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 18004377 b8384ed5 82e43260 ea7dae41 3d836d5e.
