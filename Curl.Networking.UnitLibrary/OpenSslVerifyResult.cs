@@ -100,14 +100,42 @@ internal static class OpenSslVerifyResult
             return null;
         }
 
+        var status = StatusOf(chain);
+        return OfChainStatus(status, chain.ChainElements.Count, IsAnyNotYetValid(chain, now), ExceedsAPathLength(CertificatesOf(chain)));
+    }
+
+    /// <summary>
+    /// A chain's combined status as OpenSSL's build sees it: .NET stops a chain at a name-constrained
+    /// intermediate the trust store lists (OpenSSL's partial-chain anchor) as partial and never checks
+    /// the constraints, so a broken constraint replaces the partial-chain flag (47 or 48, STD-101).
+    /// </summary>
+    /// <param name="chain">The chain built for the server certificate.</param>
+    /// <returns>Every status flag of the chain, combined.</returns>
+    internal static X509ChainStatusFlags StatusOf(X509Chain chain)
+    {
         var status = X509ChainStatusFlags.NoError;
         foreach (var chainStatus in chain.ChainStatus)
         {
             status |= chainStatus.Status;
         }
 
-        return OfChainStatus(status, chain.ChainElements.Count, IsAnyNotYetValid(chain, now), ExceedsAPathLength(CertificatesOf(chain)));
+        if ((status & (X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.UntrustedRoot)) != X509ChainStatusFlags.PartialChain
+            || !ListsAChainCertificate(chain))
+        {
+            return status;
+        }
+
+        return CertificateNameConstraints.FindViolation(chain) switch
+        {
+            CertificateNameConstraints.NotPermitted => (status & ~X509ChainStatusFlags.PartialChain) | X509ChainStatusFlags.HasNotPermittedNameConstraint,
+            CertificateNameConstraints.Excluded => (status & ~X509ChainStatusFlags.PartialChain) | X509ChainStatusFlags.HasExcludedNameConstraint,
+            _ => status,
+        };
     }
+
+    private static bool ListsAChainCertificate(X509Chain chain) =>
+        chain.ChainElements.Cast<X509ChainElement>().Any(element =>
+            chain.ChainPolicy.CustomTrustStore.Any(listed => listed.RawDataMemory.Span.SequenceEqual(element.Certificate.RawDataMemory.Span)));
 
     /// <summary>
     /// Returns the code for a chain's combined status. OpenSSL reports a chain it cannot trust

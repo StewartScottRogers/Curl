@@ -890,7 +890,7 @@ internal static class TlsFailureMessages
             return "unable to get local issuer certificate (20)";
         }
 
-        var status = ChainStatus(chain);
+        var status = OpenSslVerifyResult.StatusOf(chain);
         if (RefusesPurposeOfATrustedChain(status, chain))
         {
             return "unsuitable certificate purpose (26)";

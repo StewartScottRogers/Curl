@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.ChainErrors.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5451 — Fix fitness finding STD-101: Linux: wrong verify-result text when the name-constrained intermediate is itself the trust anchor (STILL OPEN, narrowed: root-anchored cases now report 47/48 correctly)
 
@@ -36,13 +36,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the 41106, 41108 and proxy commands print `(47)`, the 41107 commands print `(48)`, all exit 60, with `%{ssl_verify_result}` 47 or 48.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the 41106, 41108 and proxy commands print `(47)`, the 41107 commands print `(48)`, all exit 60, with `%{ssl_verify_result}` 47 or 48.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fix lives in OpenSslVerifyResult.StatusOf (touches widened beyond ServerCertificateVerification.ChainErrors.cs to OpenSslVerifyResult.cs and TlsFailureMessages.cs, no other Doing task named them): a partial chain whose trust store lists one of its certificates and whose name constraints are broken now reports 47/48 in both the message and %{ssl_verify_result}, for --cacert, --capath and the proxy path alike. Not measured against live OpenSSL curl (no WSL run); expected texts are from the finding. Pinned by OpenSslVerifyResultTests.NameConstrainedAnchor.cs. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-101 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 05d5d63c 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Chain anchored at a listed name-constrained intermediate now reports OpenSSL verify result 47/48 instead of 20
