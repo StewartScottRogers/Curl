@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/README.md, Curl.Api.UnitTests/Readme/ReadmeSamples.cs, Curl.Api.UnitTests/Readme/ReadmeTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5548 — Show the curl -k equivalent and trusting a test CA in the Curl.Api README
 
@@ -47,3 +47,4 @@ Not a Curl defect, recorded in the report: `curl --negotiate` against a server o
 
 - 2026-11-19: Created from bug report 2026-11-18T2025-Curl-bug-report.md, finding 1.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 5b444aa8 57d2a932 10234ddc a4522cc9 3d836d5e.
+- 2026-11-19: Doing -> Done. README Trust a test server section with checked trust sample
