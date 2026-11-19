@@ -61,6 +61,45 @@ public sealed class SignalRKeepAliveTests
         Assert.AreEqual(CurlExitCode.Ok, (await run).ExitCode);
     }
 
+    [TestMethod]
+    public async Task CompletionWhileAPingWriteIsBlocked_WaitsForTheWholePingFrameThenSendsClose_HubProtocolPing()
+    {
+        var clock = new ManualTimeProvider();
+        var hub = new BlockingConnection(Encoding.Latin1.GetBytes(Upgraded), Frame("{}\u001e"));
+        Task<TransferResult> run = Start(clock, hub);
+        await WaitUntil(() => clock.PendingTimers == 1);
+        hub.HoldNextWrite();
+        clock.Advance(TimeSpan.FromSeconds(15));
+        await WaitUntil(() => hub.IsHoldingAWrite);
+
+        hub.Give(Frame("{\"type\":7}\u001e"));
+        await Task.Delay(50);
+        Assert.IsFalse(run.IsCompleted);
+        hub.ReleaseHeldWrite();
+
+        Assert.AreEqual(CurlExitCode.Ok, (await run).ExitCode);
+        string written = hub.WrittenText;
+        int closeAt = written.Length - 8;
+        Assert.AreEqual("\u0088\u0082", written.Substring(closeAt, 2));
+        Assert.AreEqual("\u0081\u008b", written.Substring(closeAt - 17, 2));
+    }
+
+    [TestMethod]
+    public async Task PingWriteFailsWithAnIoError_FailsTheTransferWithTheReceiveErrorCode_HubProtocolPing()
+    {
+        var clock = new ManualTimeProvider();
+        var hub = new BlockingConnection(Encoding.Latin1.GetBytes(Upgraded), Frame("{}\u001e"));
+        Task<TransferResult> run = Start(clock, hub);
+        await WaitUntil(() => clock.PendingTimers == 1);
+        hub.FailWritesFromNowOn();
+        clock.Advance(TimeSpan.FromSeconds(15));
+        await WaitUntil(() => hub.FailedWrites > 0);
+
+        hub.Give(Frame("{\"type\":7}\u001e"));
+
+        Assert.AreEqual(CurlExitCode.RecvError, (await run).ExitCode);
+    }
+
     private static Task<TransferResult> Start(ManualTimeProvider clock, BlockingConnection hub)
     {
         ScriptedConnection negotiate = ScriptedConnection.FromText($"HTTP/1.1 200 OK\r\nContent-Length: {NegotiateBody.Length}\r\n\r\n{NegotiateBody}");
@@ -140,15 +179,45 @@ public sealed class SignalRKeepAliveTests
             return next.Length;
         }
 
-        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+        public bool IsHoldingAWrite => Volatile.Read(ref holding) == 1;
+
+        public int FailedWrites => Volatile.Read(ref failedWrites);
+
+        public void HoldNextWrite() => Volatile.Write(ref holdNext, 1);
+
+        public void ReleaseHeldWrite() => release.TrySetResult();
+
+        public void FailWritesFromNowOn() => Volatile.Write(ref failing, 1);
+
+        public async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
         {
+            if (Volatile.Read(ref failing) == 1)
+            {
+                Interlocked.Increment(ref failedWrites);
+                throw new IOException("The write failed.");
+            }
+
+            if (Interlocked.Exchange(ref holdNext, 0) == 1)
+            {
+                Volatile.Write(ref holding, 1);
+                await release.Task;
+            }
+
             lock (gate)
             {
                 written.Append(Encoding.Latin1.GetString(buffer.Span));
             }
-
-            return ValueTask.CompletedTask;
         }
+
+        private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private int holdNext;
+
+        private int holding;
+
+        private int failing;
+
+        private int failedWrites;
 
         public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 

@@ -53,7 +53,7 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
         }
 
         using var stopPinging = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _ = PingWhenIdleAsync(stopPinging.Token);
+        Task pinging = PingWhenIdleAsync(stopPinging.Token, cancellationToken);
         try
         {
             while (await session.ReceiveRecordAsync(cancellationToken) is { } record
@@ -63,10 +63,12 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
         }
         finally
         {
-            // The Ping task ends by itself at this cancellation; a Ping it fails to write is the read loop's failure to report.
             stopPinging.Cancel();
         }
 
+        // Awaited before Close, so the cancel never cuts a Ping frame short; a Ping that failed to write throws here.
+        // When the read loop failed instead, that failure is the transfer's and the Ping task ends quietly.
+        await pinging;
         await session.CloseAsync(cancellationToken);
         return bytesWritten;
     }
@@ -75,22 +77,25 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
     private async Task SendAsync(byte[] record, CancellationToken cancellationToken)
     {
         await session.SendTextAsync(record, cancellationToken);
-        lastSentAt = timeProvider.GetTimestamp();
+        Volatile.Write(ref lastSentAt, timeProvider.GetTimestamp());
     }
 
-    // Sends a Ping each time KeepAliveInterval passes with nothing sent (HubProtocol.md, "Ping"); ends when cancelled.
-    private async Task PingWhenIdleAsync(CancellationToken cancellationToken)
+    // Sends a Ping each time KeepAliveInterval passes with nothing sent (HubProtocol.md, "Ping"); ends when stopped.
+    // The stop token is checked only before a Ping starts and never reaches the frame write, so a frame is written whole;
+    // abort is the transfer's own cancellation, which fails the transfer anyway.
+    private async Task PingWhenIdleAsync(CancellationToken stop, CancellationToken abort)
     {
-        while (true)
+        while (!stop.IsCancellationRequested)
         {
-            TimeSpan idle = timeProvider.GetElapsedTime(lastSentAt);
+            TimeSpan idle = timeProvider.GetElapsedTime(Volatile.Read(ref lastSentAt));
             if (idle >= KeepAliveInterval)
             {
-                await SendAsync(HubMessageWriter.WritePing(), cancellationToken);
+                await SendAsync(HubMessageWriter.WritePing(), abort);
             }
             else
             {
-                await Task.Delay(KeepAliveInterval - idle, timeProvider, cancellationToken);
+                // WhenAny does not throw when the stop cancels the delay, so stopping is a normal end of this task.
+                await Task.WhenAny(Task.Delay(KeepAliveInterval - idle, timeProvider, stop));
             }
         }
     }
