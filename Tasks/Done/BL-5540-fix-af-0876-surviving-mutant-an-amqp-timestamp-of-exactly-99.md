@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary/Wire/Amqp0Reader.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5540 — Fix AF-0876: Surviving mutant: an AMQP timestamp of exactly 9999-12-31T23:59:59Z can be refused
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Amqp0.UnitLibrary/Wire/Amqp0Reader.cs line 39`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Amqp0.UnitLibrary/Wire/Amqp0Reader.cs line 39`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The test `Timestamp_AtFirstOrLastSecondOfRange_IsRead` (DataRow 253402300799L), added by commit b4cde3336e under AF-0875, kills the mutant: applied by hand, it failed (1 of 122), reverted, all 122 pass. No code change needed. Fast tests of the Amqp0 project pass; no production code changed.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 6c075cd5 9742157d.
+- 2026-11-19: Doing -> Done. Mutant killed by existing Timestamp_AtFirstOrLastSecondOfRange_IsRead
