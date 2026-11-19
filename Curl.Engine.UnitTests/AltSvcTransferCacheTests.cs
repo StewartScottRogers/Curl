@@ -128,7 +128,7 @@ public sealed class AltSvcTransferCacheTests
     public async Task ApplyTo_EntryForTheSameHostAndPort_GivesNoRoute()
     {
         Diagnostics.Arrange("alt-svc header", "h2=\":443\"");
-        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System, onWindows: false);
         cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), "h2=\":443\"", System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
 
         HttpRequestOptions actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions { AltSvcRoute = new AltSvcRoute("h1", new Curl.Protocol.Abstractions.AltSvcAlternative("h2", "stale.test", 1)) });
@@ -180,8 +180,9 @@ public sealed class AltSvcTransferCacheTests
     }
 
     /// <summary>
-    /// With no version option a transfer may switch to <c>h1</c>, <c>h2</c> and <c>h3</c> on every platform; a
-    /// version option narrows what it may switch to (ADR-1309).
+    /// Off Windows, with no version option a transfer may switch to <c>h1</c>, <c>h2</c> and <c>h3</c> (on Windows to
+    /// <c>h1</c> alone, ADR-1313); a
+    /// version option narrows what it may switch to on every platform.
     /// </summary>
     [TestMethod]
     [DataRow(HttpVersion.None, "H1,H2,H3")]
@@ -193,7 +194,7 @@ public sealed class AltSvcTransferCacheTests
     {
         Diagnostics.Arrange("version", version);
 
-        string actual = string.Join(",", AltSvcTransferCache.LookupOf(version).Allowed.Order());
+        string actual = string.Join(",", AltSvcTransferCache.LookupOf(version, isWindows: false).Allowed.Order());
         Diagnostics.Act("allowed", actual);
 
         Diagnostics.Assert("allowed", expected, actual);

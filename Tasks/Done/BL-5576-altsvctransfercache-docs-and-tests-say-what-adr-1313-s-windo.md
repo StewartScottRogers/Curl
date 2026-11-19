@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/AltSvcTransferCache.cs, Curl.Engine.UnitTests/AltSvcTransferCacheTests.cs, Curl.Engine.UnitTests/AltSvcTransferCacheH3SwitchTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5576 — AltSvcTransferCache docs and tests say what ADR-1313's Windows answer does
 
@@ -28,16 +28,19 @@ Found by the shift-end review of 2026-11-19 (code-reviewer and type-design-analy
 
 ## Acceptance criteria
 
-- [ ] `AltSvcTransferCache`'s class remarks say the no-option `h3` race happens off Windows only (ADR-1313).
-- [ ] The summaries of `AltSvcTransferCacheH3SwitchTests` and `LookupOf_VersionOption_AllowsTheVersionsTheOptionNames` name ADR-1313's Windows answer.
-- [ ] `LookupOf`'s `isWindows` parameter has no default, and every caller passes it.
-- [ ] `ApplyTo_EntryForTheSameHostAndPort_GivesNoRoute` passes `onWindows: false`.
-- [ ] A test without `[OSCondition]` passes `onWindows: true` and shows an `h2` and an `h3` entry give no route with no version option, so the Windows answer is checked on all three CI platforms.
-- [ ] `dotnet build` is clean and `Curl.Engine.UnitTests` fast tests pass; `Curl.Engine.UnitLibrary` keeps 100% line and branch coverage.
+- [x] `AltSvcTransferCache`'s class remarks say the no-option `h3` race happens off Windows only (ADR-1313).
+- [x] The summaries of `AltSvcTransferCacheH3SwitchTests` and `LookupOf_VersionOption_AllowsTheVersionsTheOptionNames` name ADR-1313's Windows answer.
+- [x] `LookupOf`'s `isWindows` parameter has no default, and every caller passes it.
+- [x] `ApplyTo_EntryForTheSameHostAndPort_GivesNoRoute` passes `onWindows: false`.
+- [x] A test without `[OSCondition]` passes `onWindows: true` and shows an `h2` and an `h3` entry give no route with no version option, so the Windows answer is checked on all three CI platforms.
+- [x] `dotnet build` is clean and `Curl.Engine.UnitTests` fast tests pass; `Curl.Engine.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+- Docs, tests and the removed `isWindows` default only; no branch added, so Measure-CodeQuality.ps1 was not run. Fast AltSvc tests pass.
 
 ## Log
 
 - 2026-11-19: Created by the shift-end review (review-20261119-152921).
 - 2026-11-19: Backlog -> Doing. Criteria at claim: e9e9a0a5 e5699396 71a70cb7 51dd886e 13e713cf 9a1dffd3.
+- 2026-11-19: Doing -> Done. Docs and tests now say ADR-1313; isWindows default removed
