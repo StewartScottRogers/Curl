@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary]
+touches: [Curl.Cli.UnitLibrary/CurlOptionAliasTable.cs]
 requirement: none
 created: 2026-11-12
 completed:
