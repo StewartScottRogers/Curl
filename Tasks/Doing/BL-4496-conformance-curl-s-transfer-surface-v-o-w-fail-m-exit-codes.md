@@ -81,3 +81,4 @@ line is removed).
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: fd060db8 ba635b0b fe617ef5 be674468 46eaa437 ef6c9026.
 - 2026-11-18: Doing -> Backlog. Waits on BL-4613 and BL-4614, the two split parts not yet Done (brokers; mqtt5/redis/xmpp/coap/dns)
+- 2026-11-18: Backlog -> Doing. Criteria at claim: fd060db8 ba635b0b fe617ef5 be674468 46eaa437 ef6c9026.
