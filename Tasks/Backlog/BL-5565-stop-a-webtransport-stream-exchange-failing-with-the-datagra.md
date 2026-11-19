@@ -1,0 +1,43 @@
+---
+id: BL-5565
+title: Stop a WebTransport stream exchange failing with "the datagram channel failed" under load
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Quic.UnitLibrary/QuicConnection.cs, Curl.Extended.Protocol.WebTransport.UnitLibrary]
+requirement: none
+created: 2026-11-19
+completed:
+---
+# BL-5565 — Stop a WebTransport stream exchange failing with "the datagram channel failed" under load
+
+## Goal
+
+A WebTransport stream exchange that sends no datagram never fails because of the QUIC datagram channel; under load, it succeeds as reliably as it does run alone.
+
+## Context
+
+From bug report `2026-11-19T0930-Curl-bug-report.md`, finding 2 (Medium). Build tested: commit `82913be53d`, Windows 11; server Surl at `71807f05f`.
+
+**Repro:** `curl --cacert server.pem -d "hello over a stream" webtransport://127.0.0.1:<port>/echo` against `surl --cert ... --key ... webtransport://127.0.0.1:<port>/`, with three such loops running side by side.
+
+**Observed:** about 1 run in 30 exits 56 with `WebTransport session failed: QUIC: the datagram channel failed: The I/O operation has been aborted...`, though the exchange sends no datagram. Run alone it passed 40 of 40.
+
+**Expected:** a stream exchange does not fail because of the datagram channel. It looks like the datagram reader is torn down, or raced, while the session is still in use.
+
+**Where to start:** `Curl.Quic.UnitLibrary/QuicConnection.cs:257`, which turns a datagram-channel error into `MultiplexedConnectionFailedException(CurlExitCode.RecvError, "QUIC: the datagram channel failed: ...")`, and the WebTransport session's start and teardown in `Curl.Extended.Protocol.WebTransport.UnitLibrary`. Find what aborts the datagram read (a cancellation or dispose ordering at session close, or a timer under CPU load) and make an aborted datagram read during normal work or teardown not fail the connection. A real datagram-channel failure while datagrams are in use (`?wt=datagram`) still fails the transfer. Write the reproduction as a test that does not depend on load, for example by forcing the abort ordering through an injected seam, and inject `TimeProvider` for any timing.
+
+## Acceptance criteria
+
+- [ ] A unit test reproduces the failure deterministically (the datagram read aborted while a stream exchange is in progress or closing) and passes after the fix.
+- [ ] The repro, three loops side by side, passes 100 of 100 runs; the Notes record the run.
+- [ ] A real datagram-channel failure during a `?wt=datagram` exchange still exits 56 with the datagram-channel text.
+- [ ] Focused unit tests in `Curl.Quic.UnitTests` or the WebTransport library's `.UnitTests` pin each case.
+- [ ] `dotnet build` is clean and the fast tests pass.
+
+## Notes
+
+## Log
+
+- 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 2.
