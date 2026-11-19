@@ -67,8 +67,8 @@ public sealed class SmbWriteOutReportTests
         Assert.AreEqual(11L, result.Report!.UploadSize);
         Assert.AreEqual(connection.Sent.Length, result.Report.RequestSize);
         Assert.IsNull(result.Report.Timings!.Connect);
-        Assert.IsNotNull(result.Report.Timings.RequestReady);
-        Assert.IsNotNull(result.Report.Timings.FirstByteReceived);
+        Assert.IsNull(result.Report.Timings.FirstByteReceived);
+        Assert.AreEqual(result.Report.Timings.Completed, result.Report.Timings.RequestReady);
         Assert.IsGreaterThan(result.Report.Timings.Started, result.Report.Timings.Completed);
     }
 
@@ -116,8 +116,8 @@ public sealed class SmbWriteOutReportTests
     private static void AssertTimingsReached(TransferTimings timings)
     {
         Assert.AreEqual(new ConnectTimings(1, 2, 3, null), timings.Connect);
-        Assert.IsGreaterThan(timings.Started, timings.RequestReady!.Value);
-        Assert.IsGreaterThan(timings.RequestReady.Value, timings.FirstByteReceived!.Value);
+        Assert.IsGreaterThan(timings.Started, timings.FirstByteReceived!.Value);
+        Assert.AreEqual(timings.Completed, timings.RequestReady);
         Assert.IsGreaterThan(timings.FirstByteReceived.Value, timings.Completed);
     }
 

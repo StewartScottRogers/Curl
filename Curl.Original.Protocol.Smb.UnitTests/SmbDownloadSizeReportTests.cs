@@ -39,7 +39,7 @@ public sealed class SmbDownloadSizeReportTests
         Assert.AreEqual((long)SmbRecordedExchange.FileContent.Length, result.BytesTransferred);
         Assert.AreEqual(result.BytesTransferred, result.Report!.DownloadSize);
         Assert.AreEqual(0L, result.Report.UploadSize);
-        Assert.IsGreaterThan(result.Report.Timings!.RequestReady!.Value, result.Report.Timings.Completed);
+        Assert.IsGreaterThan(result.Report.Timings!.Started, result.Report.Timings.Completed);
     }
 
     [TestMethod]
