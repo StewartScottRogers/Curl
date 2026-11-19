@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/ProxySelector.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5486 — Fix fitness finding EXT-092: abfs:// and abfss:// ignore HTTPS_PROXY, although az:// in the same extension honours it
 
@@ -43,3 +43,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-092 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 5c905248 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. abfs and abfss now read https_proxy like az; unit test and help text updated
