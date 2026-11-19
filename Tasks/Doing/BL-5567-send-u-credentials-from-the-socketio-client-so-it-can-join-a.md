@@ -39,3 +39,4 @@ The client ignores `-u`, so it can join only a server that allows anonymous clie
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 4.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 5593b376 1e2cc757 789553a4 9dfb5f68 3d836d5e.
