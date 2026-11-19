@@ -1354,3 +1354,4 @@ Each option and the specific reason it lost.
 | [1310](ADR-1310-the-curl-mcp-tool-knows-the-extension-options-and-confines-those-naming-a-path.md) | The curl-mcp `curl` tool knows the extension options and confines those that name a path (BL-5564) | Accepted | 2026-11-19 |
 | [1311](ADR-1311-socketio-sends-u-as-the-connect-packet-auth-payload.md) | The socketio client sends -u as the CONNECT packet's auth payload (BL-5567) | Accepted | 2026-11-19 |
 | [1312](ADR-1312-the-amqp-client-picks-plain-anonymous-or-amqplain.md) | The amqp client picks PLAIN, ANONYMOUS or AMQPLAIN from what the server offers (BL-5568) | Accepted | 2026-11-19 |
+| [1313](ADR-1313-alt-svc-with-no-version-option-stays-on-the-origin-for-h2-and-h3-on-windows.md) | With no version option, alt-svc ignores h2 and h3 entries on Windows (BL-5574) | Accepted | 2026-11-19 |

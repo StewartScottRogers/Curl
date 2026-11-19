@@ -18,12 +18,12 @@ namespace Curl.Engine;
 /// <remarks>
 /// <para>
 /// The lookup is libcurl 8.21.0's <c>url_set_conn_peer</c> (ADR-0226, BL-733 Notes), as curl.se's build with
-/// HTTP/2 and HTTP/3 runs it, on every platform, since `curl -V` lists HTTP2 and HTTP3 everywhere (ADR-1309). The version option names the origin versions an entry is
+/// HTTP/2 and HTTP/3 runs it, except that with no version option on Windows only <c>h1</c> may be switched to, as the measured Schannel build allows (ADR-1313, ADR-1238). The version option names the origin versions an entry is
 /// looked up under, in order, and the destination versions it may name:
 /// </para>
 /// <list type="table">
 /// <listheader><term>Option</term><description>Looked up under; may switch to</description></listheader>
-/// <item><term>none</term><description><c>h2</c>, <c>h1</c>; <c>h1</c>, <c>h2</c> and <c>h3</c> (ADR-1309)</description></item>
+/// <item><term>none</term><description><c>h2</c>, <c>h1</c>; <c>h1</c> alone on Windows, <c>h1</c>, <c>h2</c> and <c>h3</c> elsewhere (ADR-1313)</description></item>
 /// <item><term><c>--http1.1</c></term><description><c>h1</c>; <c>h1</c></description></item>
 /// <item><term><c>--http2</c></term><description><c>h2</c>, <c>h1</c>; <c>h1</c>, <c>h2</c></description></item>
 /// <item><term><c>--http3</c></term><description><c>h3</c>, <c>h2</c>, <c>h1</c>; <c>h1</c>, <c>h2</c>, <c>h3</c></description></item>
@@ -66,7 +66,11 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
 
     private static readonly IReadOnlySet<AltSvcAlpn> NoAllowedAlpns = new HashSet<AltSvcAlpn>();
 
+    private static readonly IReadOnlySet<AltSvcAlpn> SchannelBuildAlpns = new HashSet<AltSvcAlpn> { AltSvcAlpn.H1 };
+
     private static readonly IReadOnlySet<AltSvcAlpn> EveryAlpn = new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 };
+
+    private readonly bool isWindows;
 
     private readonly AltSvcCache cache;
 
@@ -78,9 +82,10 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
 
     private readonly bool usesOverHttp;
 
-    private AltSvcTransferCache(AltSvcCache cache, string file, HttpVersion requestedVersion, IReadOnlyList<string> connectToEntries, bool usesOverHttp)
+    private AltSvcTransferCache(AltSvcCache cache, string file, HttpVersion requestedVersion, IReadOnlyList<string> connectToEntries, bool usesOverHttp, bool isWindows)
     {
         this.usesOverHttp = usesOverHttp;
+        this.isWindows = isWindows;
         this.cache = cache;
         this.file = file;
         this.requestedVersion = requestedVersion;
@@ -108,6 +113,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// up as an <c>https</c> one does: the harness's stand-in for curl's debug build under
     /// <c>CURL_ALTSVC_HTTP</c> (ADR-0497, BL-2263); off by default, as in curl's release build.
     /// </param>
+    /// <param name="onWindows">Whether to look alternatives up as the Windows Schannel build does; <see langword="null" /> asks the running system (tests pin either).</param>
     /// <returns>The cache.</returns>
     internal static async Task<AltSvcTransferCache> OpenAsync(
         EasyHttpOptions http,
@@ -115,7 +121,8 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
         IFileSystem fileSystem,
         TimeProvider clock,
         IDiagnosticLog? diagnosticLog = null,
-        bool usesOverHttp = false)
+        bool usesOverHttp = false,
+        bool? onWindows = null)
     {
         string file = http.AltSvc ?? string.Empty;
         HttpVersion requestedVersion = http.HttpVersion;
@@ -125,7 +132,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
             cache.ReadFile(await ReadTextAsync(file, fileSystem).ConfigureAwait(false));
         }
 
-        return new AltSvcTransferCache(cache, file, requestedVersion, connectToEntries, usesOverHttp);
+        return new AltSvcTransferCache(cache, file, requestedVersion, connectToEntries, usesOverHttp, onWindows ?? OperatingSystem.IsWindows());
     }
 
     /// <summary>
@@ -241,7 +248,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
             return null;
         }
 
-        (IReadOnlyList<AltSvcAlpn> lookedUpUnder, IReadOnlySet<AltSvcAlpn> allowed) = LookupOf(requestedVersion);
+        (IReadOnlyList<AltSvcAlpn> lookedUpUnder, IReadOnlySet<AltSvcAlpn> allowed) = LookupOf(requestedVersion, isWindows);
         return cache.FindForOrigin(lookedUpUnder, url.IdnHost, url.Port, allowed);
     }
 
@@ -249,21 +256,30 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// The origin versions an entry is looked up under, in curl's order, and the destination versions the
     /// transfer may switch to, for a version option (curl 8.21.0's <c>Curl_http_neg_init</c> and
     /// <c>url_set_conn_peer</c>): <c>-0</c> and <c>--http2-prior-knowledge</c> look nothing up. With no version
-    /// option the transfer may switch to <c>h1</c>, <c>h2</c> and <c>h3</c> on every platform, as a build with
-    /// HTTP/2 and HTTP/3 does (ADR-1309, superseding ADR-1238 and ADR-1268).
+    /// option the transfer may switch to <c>h1</c> alone on Windows, as the measured curl 8.22.0 Schannel build,
+    /// which lists neither HTTP2 nor HTTP3, does, and to <c>h1</c>, <c>h2</c> and <c>h3</c> elsewhere (ADR-1313,
+    /// restoring ADR-1238's Windows answer that ADR-1309 removed).
     /// </summary>
     /// <param name="version">The version option.</param>
+    /// <param name="isWindows">Whether the running system is Windows.</param>
     /// <returns>The origin versions looked up under and the destination versions allowed.</returns>
-    internal static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(HttpVersion version) =>
+    internal static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(HttpVersion version, bool isWindows = false) =>
         version switch
         {
-            HttpVersion.None => ([AltSvcAlpn.H2, AltSvcAlpn.H1], EveryAlpn),
+            HttpVersion.None => ([AltSvcAlpn.H2, AltSvcAlpn.H1], NoVersionOptionDestinations(isWindows)),
             HttpVersion.Http11 => ([AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1 }),
             HttpVersion.Http2 => ([AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2 }),
             HttpVersion.Http3 => ([AltSvcAlpn.H3, AltSvcAlpn.H2, AltSvcAlpn.H1], new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3 }),
             HttpVersion.Http3Only => ([AltSvcAlpn.H3], new HashSet<AltSvcAlpn> { AltSvcAlpn.H3 }),
             _ => (NoAlpns, NoAllowedAlpns),
         };
+
+    /// <summary>
+    /// The destination versions a transfer with no version option may switch to: <c>h1</c> alone on Windows, as the
+    /// Schannel build, and every version elsewhere (ADR-1313).
+    /// </summary>
+    private static IReadOnlySet<AltSvcAlpn> NoVersionOptionDestinations(bool isWindows) =>
+        isWindows ? SchannelBuildAlpns : EveryAlpn;
 
     /// <summary>
     /// The version a connection to the origin itself uses when its entry names <paramref name="destination" />:

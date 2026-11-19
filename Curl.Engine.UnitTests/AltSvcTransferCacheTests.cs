@@ -86,7 +86,7 @@ public sealed class AltSvcTransferCacheTests
     public async Task ApplyTo_EntryForAnotherHost_RoutesToTheAlternative()
     {
         Diagnostics.Arrange("alt-svc header", "h2=\"other.test:8443\"");
-        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System, onWindows: false);
         cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), "h2=\"other.test:8443\"", System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
 
         AltSvcRoute? actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions()).AltSvcRoute;
@@ -151,7 +151,7 @@ public sealed class AltSvcTransferCacheTests
     {
         string header = $"{alpn}=\":443\"";
         Diagnostics.Arrange("alt-svc header", header);
-        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System, onWindows: false);
         cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), header, System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
 
         HttpVersionPreference actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions()).Version;
