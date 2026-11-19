@@ -37,7 +37,8 @@ the Azure Blob Storage REST API and the Azure Data Lake Storage Gen2 REST API at
 
 ## Left out, and why
 
-- Shared Key signing (BL-4290's Notes): it needs the account key on the command line; SAS and Entra ID
-  cover the same access without it.
+- Shared Key signing was left out here (BL-4290's Notes) and is built by BL-5569: `-u account:base64key` signs each
+  request (verb, standard headers, canonicalized `x-ms-*` headers and resource; HMAC-SHA256), after `--oauth2-bearer`
+  and before the environment variables. Decided by Claude under Stewart's delegation.
 - The DFS JSON error body (`{"error":{...}}`) is not parsed: such a failure names only its status.
 - Recursive listing, ranges and `-I` metadata reads: not part of the task; each can be a later task.

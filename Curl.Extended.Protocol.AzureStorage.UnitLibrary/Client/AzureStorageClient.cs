@@ -41,7 +41,7 @@ internal sealed class AzureStorageClient(IConnector connector, ITransferContext 
         byte[]? body,
         Func<AzureStorageHttpResponse, Task<T>> readResponse)
     {
-        AzureStorageAuthorizedRequest authorized = authorizer.Authorize(endpoint, credential);
+        AzureStorageAuthorizedRequest authorized = authorizer.Authorize(endpoint, credential, method, headers, body?.Length ?? 0);
         List<KeyValuePair<string, string>> fields = [.. authorized.Headers, .. headers];
         AzureStorageHttpRequest request = body is null
             ? new(method, authorized.Target, fields)

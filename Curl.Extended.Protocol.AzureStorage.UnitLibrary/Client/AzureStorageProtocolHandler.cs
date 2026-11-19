@@ -32,7 +32,7 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
         try
         {
             AzureStorageEndpoint endpoint = AzureStorageUrlMapping.Map(new Uri(context.Url.OriginalString));
-            AzureStorageCredential credential = AzureStorageCredential.Choose(context.Http?.BearerToken, environment);
+            AzureStorageCredential credential = AzureStorageCredential.Choose(context.Http?.BearerToken, environment, context.Credentials);
             AzureStorageClient client = new(connector, context, new AzureStorageRequestAuthorizer(context.TimeProvider), credential, headReporter);
             context.Progress.ReportTransferStarted();
             Task<long> transfer = context.Url.Scheme == "az"
@@ -59,7 +59,7 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
         failure == AzureStorageHttpFailure.ReceiveFailed ? CurlExitCode.RecvError : CurlExitCode.WeirdServerReply;
 
     private static CurlExitCode ExitCodeOf(AzureStorageRequestFailure failure) =>
-        failure is AzureStorageRequestFailure.InvalidSasToken or AzureStorageRequestFailure.InvalidBearerToken
+        failure is AzureStorageRequestFailure.InvalidSasToken or AzureStorageRequestFailure.InvalidBearerToken or AzureStorageRequestFailure.InvalidSharedKey
             ? CurlExitCode.LoginDenied
             : CurlExitCode.UrlMalformat;
 }

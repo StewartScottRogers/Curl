@@ -11,4 +11,7 @@ public enum AzureStorageCredentialKind
 
     /// <summary>A Microsoft Entra ID OAuth 2.0 access token sent as <c>Authorization: Bearer</c> ("Authorize with Microsoft Entra ID").</summary>
     Bearer,
+
+    /// <summary>The storage account key, which signs each request (<c>curl -u account:key</c>; "Authorize with Shared Key").</summary>
+    SharedKey,
 }
