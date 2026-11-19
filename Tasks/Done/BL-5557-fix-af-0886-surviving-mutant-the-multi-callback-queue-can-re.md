@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/MultiCallbackQueue.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5557 — Fix AF-0886: Surviving mutant: the multi callback queue can reset its arrival signal while callbacks are still queued
 
@@ -32,12 +32,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/MultiCallbackQueue.cs line 124`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/MultiCallbackQueue.cs line 124`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test `MultiCallbackQueueTests.RunQueued_TakingOneCallbackWhileAnotherIsQueued_KeepsTheArrivedSignalCompleted` (verified failing with the mutant applied by hand, passing reverted). No production change.
+
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: b35db386 9742157d.
+- 2026-11-19: Doing -> Done. Added test killing the mutant; no production change
