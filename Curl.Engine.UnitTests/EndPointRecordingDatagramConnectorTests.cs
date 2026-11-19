@@ -104,6 +104,60 @@ public sealed class EndPointRecordingDatagramConnectorTests
         Assert.AreEqual(local, recorder.DatagramLocalEndPoint);
     }
 
+    [TestMethod]
+    public async Task ReceiveAsync_TcpConnectionRecordedFirst_KeepsTheTcpPeer()
+    {
+        IPEndPoint tcpPeer = new(IPAddress.Loopback, 80);
+        SwitchingChannel channel = new(new IPEndPoint(IPAddress.IPv6Loopback, 69), new IPEndPoint(IPAddress.Loopback, 69), new IPEndPoint(IPAddress.Loopback, 40001));
+        ConnectionEndPointRecorder recorder = new();
+        recorder.Record(null, tcpPeer);
+        EndPointRecordingDatagramConnector connector = new(new SingleChannelConnector(channel), recorder);
+
+        DatagramOpenResult opened = await connector.OpenAsync("localhost", 69, CancellationToken.None);
+        await opened.Channel!.ReceiveAsync(new byte[16], CancellationToken.None);
+        TransferReport report = recorder.ReportOn(TransferResult.Success(0)).Report!;
+
+        Assert.AreEqual(tcpPeer, report.RemoteEndPoint);
+    }
+
+    [TestMethod]
+    public async Task ReceiveAsync_SecondChannelMovedAddress_KeepsTheFirstChannelsEndPoints()
+    {
+        IPEndPoint firstServer = new(IPAddress.Loopback, 69);
+        IPEndPoint firstLocal = new(IPAddress.Loopback, 40000);
+        SwitchingChannel first = new(firstServer, firstServer, firstLocal);
+        SwitchingChannel second = new(new IPEndPoint(IPAddress.IPv6Loopback, 70), new IPEndPoint(IPAddress.Loopback, 70), new IPEndPoint(IPAddress.Loopback, 40001));
+        ConnectionEndPointRecorder recorder = new();
+        EndPointRecordingDatagramConnector connector = new(new QueueConnector(first, second), recorder);
+
+        DatagramOpenResult one = await connector.OpenAsync("localhost", 69, CancellationToken.None);
+        DatagramOpenResult two = await connector.OpenAsync("localhost", 70, CancellationToken.None);
+        await two.Channel!.ReceiveAsync(new byte[16], CancellationToken.None);
+        TransferReport report = recorder.ReportOn(TransferResult.Success(0)).Report!;
+
+        Assert.IsNotNull(one.Channel);
+        Assert.AreEqual(firstServer, report.RemoteEndPoint);
+        Assert.IsNull(recorder.DatagramLocalEndPoint);
+    }
+
+    [TestMethod]
+    public void RecordDatagramChannel_SecondChannel_IsNotRecorded()
+    {
+        ConnectionEndPointRecorder recorder = new();
+
+        Assert.IsTrue(recorder.RecordDatagramChannel(null, 1));
+        Assert.IsFalse(recorder.RecordDatagramChannel(new IPEndPoint(IPAddress.Loopback, 5), 2));
+        Assert.IsNull(recorder.DatagramLocalEndPoint);
+    }
+
+    private sealed class QueueConnector(params IDatagramChannel[] channels) : IDatagramConnector
+    {
+        private int _next;
+
+        public ValueTask<DatagramOpenResult> OpenAsync(string host, int port, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(DatagramOpenResult.Opened(channels[_next++]));
+    }
+
     private sealed class SingleChannelConnector(IDatagramChannel channel) : IDatagramConnector
     {
         public ValueTask<DatagramOpenResult> OpenAsync(string host, int port, CancellationToken cancellationToken) =>

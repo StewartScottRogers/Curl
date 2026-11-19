@@ -26,17 +26,21 @@ internal sealed class EndPointRecordingDatagramConnector(IDatagramConnector conn
     public async ValueTask<DatagramOpenResult> OpenAsync(string host, int port, CancellationToken cancellationToken)
     {
         DatagramOpenResult opened = await connector.OpenAsync(host, port, cancellationToken).ConfigureAwait(false);
-        if (opened.Channel is { } channel)
+        if (opened.Channel is not { } channel)
         {
-            recorder.Record(null, channel.ServerEndPoint as IPEndPoint);
-            recorder.RecordDatagramChannel(channel.LocalEndPoint as IPEndPoint, recorder.TransferClock.GetTimestamp());
+            return opened;
         }
 
-        return opened.Channel is { } open ? DatagramOpenResult.Opened(new ReRecordingChannel(open, recorder)).WithConnectionNumber(opened.ConnectionNumber) : opened;
+        // Only the channel that is both the first datagram channel and the first connection owns the
+        // recorded end points, so only it is wrapped to re-record them (BL-5536). Both recordings run.
+        bool firstConnection = recorder.Record(null, channel.ServerEndPoint as IPEndPoint);
+        bool firstChannel = recorder.RecordDatagramChannel(channel.LocalEndPoint as IPEndPoint, recorder.TransferClock.GetTimestamp());
+        return firstConnection & firstChannel ? DatagramOpenResult.Opened(new ReRecordingChannel(channel, recorder)).WithConnectionNumber(opened.ConnectionNumber) : opened;
     }
 
     /// <summary>
-    /// Forwards to <paramref name="inner" /> and, once a datagram has been received, records its end
+    /// Wrapped only around the transfer's first datagram channel when it is also its first recorded
+    /// connection (BL-5536). Forwards to <paramref name="inner" /> and, once a datagram has been received, records its end
     /// points again: a channel that moved to the next resolved address after a refusal (EXT-100) carries
     /// the transfer from another socket than the one it opened with (BL-5532).
     /// </summary>

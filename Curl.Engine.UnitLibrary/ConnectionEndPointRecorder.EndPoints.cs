@@ -32,19 +32,25 @@ internal sealed partial class ConnectionEndPointRecorder
     /// </summary>
     /// <param name="local">The channel's local end point, or <see langword="null" />.</param>
     /// <param name="openedAt">The timestamp the channel opened at.</param>
-    internal void RecordDatagramChannel(IPEndPoint? local, long openedAt)
+    /// <returns><see langword="true" /> when this channel is the transfer's first datagram channel and was recorded; <see langword="false" /> when an earlier one was.</returns>
+    internal bool RecordDatagramChannel(IPEndPoint? local, long openedAt)
     {
-        if (DatagramOpenedAt is null)
+        if (DatagramOpenedAt is not null)
         {
-            DatagramLocalEndPoint = local;
-            DatagramOpenedAt = openedAt;
+            return false;
         }
+
+        DatagramLocalEndPoint = local;
+        DatagramOpenedAt = openedAt;
+        return true;
     }
 
     /// <summary>
     /// Replaces the end points of the first datagram channel with those of the channel as it now
-    /// carries the transfer, after it moved to the next resolved address (BL-5532). Nothing changes
-    /// when no datagram channel was recorded.
+    /// carries the transfer, after it moved to the next resolved address (BL-5532). Only the channel
+    /// that is the transfer's first datagram channel and its first recorded connection may call it
+    /// (<c>EndPointRecordingDatagramConnector</c> wraps no other, BL-5536). Nothing changes when no
+    /// datagram channel was recorded.
     /// </summary>
     /// <param name="remote">The channel's server end point now.</param>
     /// <param name="local">The channel's local end point now, or <see langword="null" />.</param>
@@ -91,19 +97,23 @@ internal sealed partial class ConnectionEndPointRecorder
     /// count in <c>%{num_connects}</c>.
     /// </param>
     /// <param name="timings">The connect's timings, kept for the first connection: the source of <c>%{time_connect}</c> for a handler that reports none.</param>
-    internal void Record(IPEndPoint? local, EndPoint? remote, bool reused = false, ConnectTimings? timings = null)
+    /// <returns><see langword="true" /> when this connection became the transfer's first recorded connection.</returns>
+    internal bool Record(IPEndPoint? local, EndPoint? remote, bool reused = false, ConnectTimings? timings = null)
     {
         if (remote is not (IPEndPoint or UnixDomainSocketEndPoint))
         {
-            return;
+            return false;
         }
 
         connectionsOpened += reused ? 0 : 1;
-        if (!connectionRecorded)
+        if (connectionRecorded)
         {
-            RecordFirstConnection(local, remote);
-            FirstConnectTimings = timings;
+            return false;
         }
+
+        RecordFirstConnection(local, remote);
+        FirstConnectTimings = timings;
+        return true;
     }
 
     /// <summary>Keeps the end points of the transfer's first connection.</summary>
