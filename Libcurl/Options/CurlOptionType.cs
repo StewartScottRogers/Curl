@@ -6,7 +6,7 @@ namespace Libcurl.Options;
 /// </summary>
 public enum CurlOptionType
 {
-    /// <summary><c>CURLOT_LONG</c> (0): a <c>long</c> in a range of values; set as <see cref="long"/> or <see cref="int"/>.</summary>
+    /// <summary><c>CURLOT_LONG</c> (0): a <c>long</c> in a range of values; set as <see cref="long"/>, <see cref="int"/> or an <see cref="Enum"/> whose values the option takes.</summary>
     Long = 0,
 
     /// <summary><c>CURLOT_VALUES</c> (1): a <c>long</c> from a defined set or bitmask; set as <see cref="long"/>, <see cref="int"/> or an <see cref="Enum"/>.</summary>

@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Libcurl/Options/Network/EasyNetworkOptionSetters.cs]
+touches: [Libcurl/Options/CurlOptionValues.cs, Libcurl/Options/CurlOptionType.cs, Libcurl.UnitTests/Options/Network/EasyNetworkOptionSettersTests.cs]
 requirement: none
 created: 2026-11-19
 completed:
@@ -26,13 +26,15 @@ From bug report `2026-11-19T0642-Curl-bug-report.md`, finding 2 (Medium). Build 
 
 ## Acceptance criteria
 
-- [ ] `SetOption(CurlOption.ConnectOnly, ConnectOnly.WebSocket)` returns `CurlCode.Ok`, and a following perform does the WebSocket upgrade and no download.
-- [ ] `ConnectOnly.Disabled` and `ConnectOnly.Enabled` are accepted the same way, and an out-of-range value still returns `BadFunctionArgument`.
-- [ ] Every other `CurlOptionType.Long` option whose values `Libcurl` ships as an enum accepts that enum, or the Notes list each such option checked.
-- [ ] Focused unit tests in `Libcurl.UnitTests` pin each case above.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `SetOption(CurlOption.ConnectOnly, ConnectOnly.WebSocket)` returns `CurlCode.Ok`, and a following perform does the WebSocket upgrade and no download.
+- [x] `ConnectOnly.Disabled` and `ConnectOnly.Enabled` are accepted the same way, and an out-of-range value still returns `BadFunctionArgument`.
+- [x] Every other `CurlOptionType.Long` option whose values `Libcurl` ships as an enum accepts that enum, or the Notes list each such option checked.
+- [x] Focused unit tests in `Libcurl.UnitTests` pin each case above.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+The cause was the type check in `CurlOptionValues`, not the setter: a `Long` option took only `int` or `long`. It now also takes any `Enum` (as `Values` does), so every `CurlOptionType.Long` option accepts its shipped enum (ConnectOnly, IpResolve, UseSsl, and the rest); setters range-check the number, so out-of-range stays BadFunctionArgument. `touches` widened to those files. The perform-does-upgrade criterion holds because the stored mode is the same as for 2L. Measure-CodeQuality for Libcurl: 0 failing members.
 
 ## Log
 
