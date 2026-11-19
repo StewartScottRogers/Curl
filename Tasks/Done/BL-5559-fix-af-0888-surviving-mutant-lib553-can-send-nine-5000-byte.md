@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary/Lib553.cs]
+touches: [Curl.Conformance.LibTest.UnitLibrary/Lib553.cs, Curl.Conformance.LibTest.UnitTests/Lib539To553Tests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5559 — Fix AF-0888: Surviving mutant: lib553 can send nine 5000-byte headers instead of upstream's eight
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib553.cs line 44`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib553.cs line 44`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by Lib553Tests.RunAsync_SendsEightFiveThousandByteHeadersAndAnEmptyExpect (new, in Curl.Conformance.LibTest.UnitTests/Lib539To553Tests.cs; touches widened to it). Verified by hand: with i <= 8 it fails, reverted it passes (1228 tests green). No production code changed.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: a4b597cb 9742157d.
+- 2026-11-19: Doing -> Done. Added Lib553Tests header-count test; mutant killed
