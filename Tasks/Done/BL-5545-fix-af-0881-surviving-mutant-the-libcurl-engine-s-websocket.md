@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EngineComposition.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5545 — Fix AF-0881: Surviving mutant: the libcurl engine's WebSocket handler can trace WS frames without --trace-config ws
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EngineComposition.cs line 144`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EngineComposition.cs line 144`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test CreateProtocolHandlers_WsTransferWithoutTracesWsArgument_WritesNoWsTraceLines (EngineCompositionWsTraceTests): with the default flipped to true it fails (6 [WS] lines, expected 1); reverted, all 3103 Engine fast tests pass.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: efacbeda 9742157d.
+- 2026-11-19: Doing -> Done. Mutant killed by new test
