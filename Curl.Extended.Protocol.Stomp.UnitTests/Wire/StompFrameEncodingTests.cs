@@ -59,6 +59,10 @@ public sealed class StompFrameEncodingTests
         Assert.ThrowsExactly<FormatException>(() => StompFrameEncoding.ParseHeader("nocolon", escaped: true));
 
     [TestMethod]
+    public void ParseHeader_ColonAtIndexZero_GivesAnEmptyNameAndTheValue() =>
+        Assert.AreEqual(new StompHeader("", "value"), StompFrameEncoding.ParseHeader(":value", escaped: true));
+
+    [TestMethod]
     public void HeaderValue_RepeatedHeader_GivesTheFirstEntry()
     {
         StompFrame frame = new("MESSAGE", [new("foo", "World"), new("foo", "Hello")], []);

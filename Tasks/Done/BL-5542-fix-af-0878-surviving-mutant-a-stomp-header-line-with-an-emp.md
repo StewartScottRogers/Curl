@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Stomp.UnitLibrary/Wire/StompFrameEncoding.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5542 — Fix AF-0878: Surviving mutant: a STOMP header line with an empty name (':value') can be refused as having no colon
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Stomp.UnitLibrary/Wire/StompFrameEncoding.cs line 75`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Stomp.UnitLibrary/Wire/StompFrameEncoding.cs line 75`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `ParseHeader_ColonAtIndexZero_GivesAnEmptyNameAndTheValue` (applied `colon <= 0` by hand: 1 failed; reverted: 77 pass). Production code unchanged.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: e58e57cf 9742157d.
+- 2026-11-19: Doing -> Done. Added test killing the colon <= 0 mutant
