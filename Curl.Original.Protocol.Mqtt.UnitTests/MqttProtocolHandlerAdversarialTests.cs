@@ -301,7 +301,7 @@ public sealed class MqttProtocolHandlerAdversarialTests
         TransferResult secondResult = await handler.ExecuteAsync(Context("mqtt://h/t", new RecordingStream()));
 
         Diagnostics.ActResult(secondResult);
-        Assert.AreEqual(firstResult, secondResult);
+        Assert.AreEqual(firstResult with { Report = null }, secondResult with { Report = null });
         Assert.AreEqual(TransferResult.Success(7), secondResult with { Report = null });
         CollectionAssert.AreEqual(first.Written, second.Written);
     }

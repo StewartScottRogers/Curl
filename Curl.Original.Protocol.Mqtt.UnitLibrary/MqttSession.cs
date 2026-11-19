@@ -129,6 +129,9 @@ internal sealed class MqttSession(
     /// </summary>
     internal long BytesSent { get; private set; }
 
+    /// <summary>Gets the size the last PUBLISH announced, as the progress sink was told; <see langword="null" /> before any.</summary>
+    internal long? ExpectedTotal { get; private set; }
+
     /// <summary>
     /// Runs the session to its end.
     /// </summary>
@@ -522,6 +525,7 @@ internal sealed class MqttSession(
         }
 
         BytesWritten += slice.Length;
+        ExpectedTotal = publishLength;
         progress.ReportDownloaded(BytesWritten, publishLength);
     }
 

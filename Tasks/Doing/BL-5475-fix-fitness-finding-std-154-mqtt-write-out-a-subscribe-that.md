@@ -33,11 +33,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the subscribe prints non-zero `c`, `st` and `tot` (≈ 2) and non-zero speed; the publish prints `up=0` and non-zero `pre`/`post`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the subscribe prints non-zero `c`, `st` and `tot` (≈ 2) and non-zero speed; the publish prints `up=0` and non-zero `pre`/`post`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- MqttProtocolHandler now stamps TransferTimings (connect, pretransfer, posttransfer, starttransfer, total); with a timings-bearing report the engine leaves size_upload at 0, matching curl. A -m timeout (token cancelled while MaxTime is set) returns exit 28 "Operation timed out after N milliseconds with M[ out of T] bytes received" carrying the timings instead of throwing, so the connect times survive. MqttSession.ExpectedTotal feeds the "out of". Existing diagnostic-log tests re-pinned (stepping clock reads two more times). Quality run: Mqtt library 100/100, no failing member.
 
 ## Log
 
