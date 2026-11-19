@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.HttpVersionRows.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5529 — Split Curl.Cli.UnitLibrary/CommandLineOptionTable.HttpVersionRows.cs so tasks touching it can run in parallel
 
@@ -36,3 +36,4 @@ Split into CommandLineOptionTable.Http10Row.cs, Http11Row.cs, Http2Row.cs, Http2
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 557fee83 3a337f27 a0b49a29.
+- 2026-11-18: Doing -> Done. HttpVersionRows split into one file per row; waiting tasks narrowed
