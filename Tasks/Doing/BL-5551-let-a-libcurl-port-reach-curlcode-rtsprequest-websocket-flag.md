@@ -42,3 +42,4 @@ No new package reference may be added.
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 3 (namespaces).
+- 2026-11-19: Backlog -> Doing. Criteria at claim: ad5bb533 693f0239 3a0ecd3a 3d836d5e.
