@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.GoogleCloudStorage.UnitLibrary/Xml/GcsListBucketResultParser.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5490 — Fix fitness finding EXT-096: gs:// listing fails against fake-gcs-server because IsTruncated is treated as required
 
@@ -46,3 +46,4 @@ IsTruncated is now optional (absent = false) via GcsXmlBody.OptionalBoolean; Req
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-096 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: c1caf9b8 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. gs:// listing treats absent IsTruncated as false
