@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/UrlPartSetter.cs line 43`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/UrlPartSetter.cs line 43`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `UrlPartSetterClearTests.Cleared_SchemeOfAGuessedSchemeHandle_ClearsTheSchemeAndTheGuessedMark` (mutant applied by hand: it failed; reverted: all 3103 fast Engine tests pass). The mutant is not visible through `ManagedCurlUrlHandle` (a null scheme reads as NoScheme either way), so the test calls `UrlPartSetter.Cleared` directly. Production code unchanged, so no quality run needed.
 
 ## Log
 
