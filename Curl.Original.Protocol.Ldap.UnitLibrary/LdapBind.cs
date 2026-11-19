@@ -94,11 +94,16 @@ internal static class LdapBind
         CancellationToken cancellationToken)
     {
         LdapBindReply reply = await exchange.BindAsync(LdapVersion3, name, password, cancellationToken).ConfigureAwait(false);
-        if (reply.IsSuccess)
-        {
-            return null;
-        }
+        return reply.IsSuccess ? null : await OpenLdapBindFailedAsync(exchange, reply, cancellationToken).ConfigureAwait(false);
+    }
 
+    /// <summary>
+    /// The OpenLDAP build's failure for a bind <paramref name="reply" /> that is not a success: exit 7 for a
+    /// server that closed, exit 67 <c>Login denied</c> for <c>invalidCredentials</c>, exit 38 otherwise;
+    /// an UnbindRequest goes first unless the server closed.
+    /// </summary>
+    internal static async ValueTask<TransferResult?> OpenLdapBindFailedAsync(LdapExchange exchange, LdapBindReply reply, CancellationToken cancellationToken)
+    {
         if (reply.Status == LdapBindReplyStatus.Closed)
         {
             return TransferResult.Failure(CurlExitCode.CouldntConnect, OpenLdapCannotContactServer);
@@ -109,6 +114,10 @@ internal static class LdapBind
             : TransferResult.Failure(CurlExitCode.LdapCannotBind, OpenLdapCannotBind);
         return await UnbindAndFailAsync(exchange, failure, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>The OpenLDAP build's exit 67 <c>Login denied</c> for a server that offers no SASL mechanism the auth mask allows, after an UnbindRequest.</summary>
+    internal static ValueTask<TransferResult?> OpenLdapLoginDeniedAsync(LdapExchange exchange, CancellationToken cancellationToken) =>
+        UnbindAndFailAsync(exchange, TransferResult.Failure(CurlExitCode.LoginDenied, OpenLdapLoginDenied), cancellationToken);
 
     /// <summary>The failure <c>ldap_win_bind</c> reports for <paramref name="resultCode" />: exit 38 and WinLDAP's text for it.</summary>
     /// <param name="resultCode">The LDAP or WinLDAP result code.</param>

@@ -89,7 +89,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         text = filter;
         position = 0;
         setDepth = 0;
-        return filter.StartsWith('(') || (isWinLdap && filter.TrimStart(' ').StartsWith('(')) ? ParseTopLevel() : EncodeItem(filter);
+        return filter.StartsWith('(') || (isWinLdap && filter.TrimStart(' ').StartsWith('(')) ? ParseTopLevel() : EncodeItem(isWinLdap ? filter.TrimStart(' ') : filter);
     }
 
     private static bool IsBetween(int count, int minimum, int maximum) => count >= minimum && count <= maximum;
@@ -258,7 +258,14 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
     private byte[]? EncodeItem(string item)
     {
         int equals = item.IndexOf('=', StringComparison.Ordinal);
-        return equals > 0 ? EncodeOperator(item[equals - 1], item[..equals], item[(equals + 1)..]) : null;
+        return equals > 0 ? EncodeOperator(item[equals - 1], item[..equals], ValueAfterEquals(item, equals)) : null;
+    }
+
+    /// <summary>The text after the <c>=</c>; WinLDAP drops the spaces that lead it for <c>=</c>, <c>~=</c>, <c>&gt;=</c> and <c>&lt;=</c> (BL-5454).</summary>
+    private string ValueAfterEquals(string item, int equals)
+    {
+        string value = item[(equals + 1)..];
+        return isWinLdap && item[equals - 1] != ':' ? value.TrimStart(' ') : value;
     }
 
     /// <summary>Encodes an item by <paramref name="operatorCharacter" />, the character before its <c>=</c>.</summary>
@@ -315,7 +322,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
             }
         }
 
-        return writer.Constructed(SubstringsTag, OctetString(attribute), writer.Constructed(Asn1Tag.Sequence, [.. substrings]));
+        return substrings.Count == 0 && isWinLdap ? null : writer.Constructed(SubstringsTag, OctetString(attribute), writer.Constructed(Asn1Tag.Sequence, [.. substrings]));
     }
 
     /// <summary>
@@ -378,8 +385,12 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
             : null;
     }
 
-    /// <summary>Whether WinLDAP loses the rule: a name (not an OID, not after <c>dn:</c>) is left out of the wire form (BL-5400, ADR-1298).</summary>
-    private static bool IsNamedRule(string rest) => !char.IsAsciiDigit(rest[0]) && !rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase);
+    /// <summary>Whether WinLDAP loses the rule: a name (not an OID), with or without a leading <c>dn:</c>, is left out of the wire form (BL-5400, ADR-1298, BL-5453).</summary>
+    private static bool IsNamedRule(string rest)
+    {
+        string rule = rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase) ? rest[3..] : rest;
+        return rule.Length == 0 || !char.IsAsciiDigit(rule[0]);
+    }
 
     private bool IsOpenLdapExtensible(string attribute, string? rule) =>
         rule is null ? IsAttribute(attribute) : IsAttribute(rule) && (attribute.Length == 0 || IsAttribute(attribute));
@@ -389,7 +400,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
     /// <param name="writeFalse">Whether to write <c>dnAttributes</c> when it is false, as WinLDAP does.</param>
     private byte[]? WriteExtensible(ExtensibleMatch match, bool writeFalse)
     {
-        byte[]? assertion = DecodeValue(match.Value);
+        byte[]? assertion = match.Value.Length == 0 && isWinLdap ? null : DecodeValue(match.Value);
         if (assertion is null)
         {
             return null;
@@ -471,6 +482,13 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
 
         if (isWinLdap)
         {
+            // WinLDAP also decodes a backslash and one hex digit not followed by another (BL-5457).
+            if (value[index] == '\\' && index + 1 < value.Length && char.IsAsciiHexDigit(value[index + 1]))
+            {
+                bytes.Add((byte)Convert.ToInt32(value[index + 1].ToString(), 16));
+                return 2;
+            }
+
             bytes.AddRange(LdapWireText.Encode(dialect, value[index].ToString()));
             return 1;
         }

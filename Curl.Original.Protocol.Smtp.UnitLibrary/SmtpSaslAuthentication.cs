@@ -373,7 +373,7 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
     /// answered, since RFC 4422 section 3.6 has the mechanism finish before success (BL-5012).
     /// </summary>
     private ExchangeOutcome Outcome(SmtpReply reply, bool messageSent, string mechanism) =>
-        reply.Code == Authenticated && messageSent && (challengesHanded > 0 || !mechanism.Equals("NTLM", StringComparison.OrdinalIgnoreCase))
+        reply.Code == Authenticated && messageSent && (challengesHanded > 0 || !(mechanism.Equals("NTLM", StringComparison.OrdinalIgnoreCase) || mechanism.Equals("LOGIN", StringComparison.OrdinalIgnoreCase) || mechanism.Equals("CRAM-MD5", StringComparison.OrdinalIgnoreCase)))
             ? ExchangeOutcome.Accepted
             : ExchangeOutcome.Refused;
 

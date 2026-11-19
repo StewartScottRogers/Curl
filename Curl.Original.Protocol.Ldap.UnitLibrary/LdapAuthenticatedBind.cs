@@ -147,7 +147,7 @@ internal static class LdapAuthenticatedBind
         flags.HasFlag(NtlmNegotiateFlags.NegotiateSeal | NtlmNegotiateFlags.NegotiateExtendedSessionSecurity | NtlmNegotiateFlags.Negotiate128);
 
     /// <summary>Names DIGEST-MD5, then answers the challenge of the <c>saslBindInProgress</c> reply.</summary>
-    private static async ValueTask<LdapBindReply> DigestAsync(LdapExchange exchange, NetworkCredential credentials, string host, CancellationToken cancellationToken)
+    internal static async ValueTask<LdapBindReply> DigestAsync(LdapExchange exchange, NetworkCredential credentials, string host, CancellationToken cancellationToken)
     {
         LdapBindReply initial = await exchange.BindWithRequestAsync(messageId => LdapDigestMd5Bind.InitialRequest(exchange.Writer, messageId), cancellationToken).ConfigureAwait(false);
         if (initial.Status != LdapBindReplyStatus.Answered || initial.ResultCode != LdapBindReply.SaslBindInProgress)

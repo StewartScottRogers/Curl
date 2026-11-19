@@ -91,7 +91,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Proxy = proxy, Events = events };
 
         Diagnostics.Arrange("url and proxy", $"{Url} via socks5 proxy:1080");
-        TransferResult result = await new Pop3ProtocolHandler(connector, new QueuedTlsProvider()).ExecuteAsync(context);
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(connector, new QueuedTlsProvider()).ExecuteAsync(context));
         Diagnostics.ActResult(result);
 
         Diagnostics.Assert("proxy passed", "socks5 proxy:1080", ReferenceEquals(proxy, connector.Targets.Single().Proxy) ? "socks5 proxy:1080" : "another proxy");
@@ -448,7 +448,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
         var handler = new Pop3ProtocolHandler(connector, new QueuedTlsProvider());
 
         Diagnostics.Arrange("url and connect result", Url + ", refused");
-        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null });
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null }));
         Diagnostics.ActResult(result);
 
         Diagnostics.Assert("exit code and refused", "CouldntConnect, True", $"{result.ExitCode}, {result.IsConnectionRefused}");

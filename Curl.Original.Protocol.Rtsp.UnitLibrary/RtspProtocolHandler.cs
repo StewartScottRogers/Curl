@@ -156,12 +156,14 @@ public sealed class RtspProtocolHandler(
             PoolScheme = Schemes[0],
             DiagnosticLog = context.DiagnosticLog,
         };
+        long started = context.TimeProvider.GetTimestamp();
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
             return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
         }
 
+        long connectEnded = context.TimeProvider.GetTimestamp();
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
@@ -170,7 +172,7 @@ public sealed class RtspProtocolHandler(
             plan = await plan.WithUploadAsync(context.Upload, context.CancellationToken).ConfigureAwait(false);
             TransferResult result = await RequestAsync(connection, context, session).ConfigureAwait(false);
             ReportConnectionEnd(context.Events, target, connect, result, session.ClosesConnection, ReceivedSuccessfully(result));
-            return result;
+            return StampTimings(result, context, started, connect, connectEnded);
         }
     }
 
@@ -538,4 +540,23 @@ public sealed class RtspProtocolHandler(
     /// <param name="Result">The request's outcome.</param>
     /// <param name="AnswerAuthorization">The value to send the request again with, or <see langword="null" /> not to.</param>
     private sealed record RtspExchange(TransferResult Result, string? AnswerAuthorization);
+
+    /// <summary>
+    /// Gives a successful transfer the timings behind <c>%{time_connect}</c>, <c>%{time_pretransfer}</c>,
+    /// <c>%{time_posttransfer}</c>, <c>%{time_starttransfer}</c> and <c>%{time_total}</c> (BL-5473):
+    /// the pre- and post-transfer stamps are taken when the connect phase ended and the first byte
+    /// when the transfer completed, so <c>connect &lt;= pretransfer &lt;= starttransfer &lt;= total</c>.
+    /// A failure keeps the report it has; every success here carries one.
+    /// </summary>
+    private static TransferResult StampTimings(TransferResult result, ITransferContext context, long started, ConnectResult connected, long connectEnded)
+    {
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
+
+        long completed = context.TimeProvider.GetTimestamp();
+        var timings = new TransferTimings(started, connected.Timings, connectEnded, connectEnded, completed, completed);
+        return result with { Report = result.Report! with { Timings = timings } };
+    }
 }

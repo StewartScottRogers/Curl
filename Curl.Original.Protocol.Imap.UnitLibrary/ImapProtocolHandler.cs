@@ -218,6 +218,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             PoolScheme = url.Scheme,
         };
         string loginKey = ImapKeptConnection.LoginKeyOf(context);
+        long started = context.TimeProvider.GetTimestamp();
         ConnectResult connected = await ConnectAsync(target, loginKey, context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
@@ -227,6 +228,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             };
         }
 
+        long connectEnded = context.TimeProvider.GetTimestamp();
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
@@ -242,7 +244,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             }
 
             ReportConnectionEnd(context.Events, result, session.Phase, target, connected.ConnectionNumber);
-            return result;
+            return StampTimings(result, context, started, connected, connectEnded);
         }
     }
 
@@ -302,5 +304,24 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             result.ExitCode == CurlExitCode.Ok || phase == ImapSessionPhase.Completing ? ImapInfoLines.LeftIntact(connectionNumber, target.Host, target.Port)
             : phase == ImapSessionPhase.Performing ? ImapInfoLines.ShuttingDown(connectionNumber)
             : ImapInfoLines.Closing(connectionNumber));
+    }
+
+    /// <summary>
+    /// Gives a successful transfer the timings behind <c>%{time_connect}</c>, <c>%{time_pretransfer}</c>,
+    /// <c>%{time_posttransfer}</c>, <c>%{time_starttransfer}</c> and <c>%{time_total}</c> (BL-5473):
+    /// the pre- and post-transfer stamps are taken when the connect phase ended and the first byte
+    /// when the transfer completed, so <c>connect &lt;= pretransfer &lt;= starttransfer &lt;= total</c>.
+    /// A failure keeps the report it has.
+    /// </summary>
+    private static TransferResult StampTimings(TransferResult result, ITransferContext context, long started, ConnectResult connected, long connectEnded)
+    {
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
+
+        long completed = context.TimeProvider.GetTimestamp();
+        var timings = new TransferTimings(started, connected.Timings, connectEnded, connectEnded, completed, completed);
+        return result with { Report = (result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred }) with { Timings = timings } };
     }
 }

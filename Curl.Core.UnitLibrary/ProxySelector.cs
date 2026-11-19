@@ -112,6 +112,50 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     /// </summary>
     private static string HostName(CurlUrl url) => url.Host.StartsWith('[') ? url.Host[1..^1] : url.Host;
 
+    /// <summary>
+    /// The host an exemption list is matched against: the URL's host, except for the cloud-storage schemes, whose
+    /// URL names a bucket or account and whose connection goes to the endpoint host the scheme handler maps it to
+    /// (the same rule as an oci hop, ADR-1290; BL-5480).
+    /// </summary>
+    private string EffectiveHost(CurlUrl url) => url.Scheme switch
+    {
+        "s3" => S3Host(HostName(url)),
+        "gs" => GcsHost(),
+        "az" => AzureBlobHost(HostName(url)),
+        "abfs" or "abfss" => AccountHost(HostName(url), ".dfs.core.windows.net"),
+        _ => HostName(url),
+    };
+
+    private string GcsHost()
+    {
+        string? emulator = Read("STORAGE_EMULATOR_HOST");
+        string? text = emulator is not null && !emulator.Contains("://", StringComparison.Ordinal) ? "http://" + emulator : emulator;
+        return EndpointHost(text) ?? "storage.googleapis.com";
+    }
+
+    private string S3Host(string bucket)
+    {
+        if (EndpointHost(Read("AWS_ENDPOINT_URL_S3") ?? Read("AWS_ENDPOINT_URL")) is { } endpoint)
+        {
+            return endpoint;
+        }
+
+        string awsHost = $"s3.{Read("AWS_REGION") ?? Read("AWS_DEFAULT_REGION") ?? "us-east-1"}.amazonaws.com";
+        return bucket.Contains('.', StringComparison.Ordinal) ? awsHost : $"{bucket}.{awsHost}";
+    }
+
+    private static string AzureBlobHost(string host) =>
+        System.Net.IPAddress.TryParse(host, out _) || string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+            ? host
+            : AccountHost(host, ".blob.core.windows.net");
+
+    private static string AccountHost(string host, string suffix) => host.Contains('.', StringComparison.Ordinal) ? host : host + suffix;
+
+    private static string? EndpointHost(string? endpoint) =>
+        Uri.TryCreate(endpoint, UriKind.Absolute, out Uri? uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)
+            ? uri.IdnHost.Trim('[', ']')
+            : null;
+
     /// <summary>Whether <paramref name="url" /> is a <c>file</c> URL or its host is exempt from every proxy.</summary>
     private bool IsReachedDirectly(CurlUrl url, string? noProxyOption, ProxyDiagnosticLog log)
     {
@@ -121,7 +165,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
             return true;
         }
 
-        string host = HostName(url);
+        string host = EffectiveHost(url);
         if (NoProxyMatcher.MatchingEntry(host, noProxyOption ?? ReadNoProxy()) is not { } entry)
         {
             return false;

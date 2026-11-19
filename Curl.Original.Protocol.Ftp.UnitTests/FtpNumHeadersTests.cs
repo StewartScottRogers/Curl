@@ -41,6 +41,26 @@ public sealed class FtpNumHeadersTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_PlainDownloadWithColonsInReplies_CountsEveryReplyLineHoldingAColon()
+    {
+        FtpRun run = await FtpRun.ExecuteAsync(
+            FileUrl,
+            "220 hello: ready\r\n331 pass: please\r\n230 login: ok\r\n257 \"/\" is cwd\r\n229 Entering Extended Passive Mode (|||61744|)\r\n200 type: x\r\n213 7\r\n150 opening: data\r\n226 done\r\n221 Bye\r\n",
+            "hello\r\n");
+
+        Assert.AreEqual(5, NumHeaders(run.Report));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HeadWithColonsInReplies_CountsRepliesAndWrittenLines()
+    {
+        FtpRun run = await FtpRun.ExecuteAsync(
+            FileUrl, "220 hello: ready\r\n331 pass: please\r\n230 login: ok\r\n257 \"/\" is cwd\r\n213 20200101000000\r\n200 type: x\r\n213 10\r\n350 rest: 0\r\n221 Bye\r\n", adjust: Head);
+
+        Assert.AreEqual(8, NumHeaders(run.Report));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_HeadWithNoSizeNorMdtm_CountsNoMoreThanTheLinesWritten()
     {
         FtpRun run = await FtpRun.ExecuteAsync(
@@ -67,4 +87,5 @@ public sealed class FtpNumHeadersTests
             adjust: c => new TransferContext { Url = c.Url, Output = c.Output, Upload = new MemoryStream([1, 2, 3]) });
 
         Assert.AreEqual(0, NumHeaders(run.Report));
-    }}
+    }
+}

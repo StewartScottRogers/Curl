@@ -51,8 +51,7 @@ public sealed class Cgr102Tests
         var connector = new QueuedConnector(ConnectResult.Connected(line.Lease(), null, isReused: true));
         var handler = new Pop3ProtocolHandler(connector, new QueuedTlsProvider(), new ScriptedSaslAuthenticator(("PLAIN", ["\0u\0p"])));
 
-        TransferResult result = await handler.ExecuteAsync(Context("1"));
-
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(Context("1")));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("CAPA\r\nAUTH PLAIN\r\nAHUAcA==\r\nRETR 1\r\n", line.SentText);
     }

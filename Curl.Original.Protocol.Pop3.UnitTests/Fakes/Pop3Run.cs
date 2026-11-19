@@ -51,6 +51,6 @@ public sealed record Pop3Run(
 
         TransferResult result = await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(context);
 
-        return new Pop3Run(result, connection, connector, tls, output.ToArray(), progress);
+        return new Pop3Run(StampedTimings.Without(result), connection, connector, tls, output.ToArray(), progress);
     }
 }

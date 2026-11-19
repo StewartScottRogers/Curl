@@ -91,6 +91,75 @@ public sealed class CurlCommandRunnerFatalErrorTests
         Assert.AreEqual($"curl: (43) Session ID cannot be set as a custom header.\n{Aborted}\n", StandardErrorText);
     }
 
+    [TestMethod]
+    [DataRow("rtsp://h.test/m", "Session: 1", 43, "(43) Session ID cannot be set as a custom header.")]
+    [DataRow("telnet://h.test", "x", 48, "(48) An unknown option was passed in to libcurl")]
+    public async Task RunAsync_FatalSetupFailureUnderParallel_StartsNothingAndAbortsTheOthers(string url, string marker, int code, string line)
+    {
+        RecordingProtocolHandler http = Handler(CurlExitCode.Ok);
+        RecordingProtocolHandler other = new(new Uri(url).Scheme, _ => ValueTask.FromResult(TransferResult.Success(0)));
+        string[] first = marker == "x" ? [url, "-t", "BOGUS=1"] : [url, "-H", marker];
+
+        int exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([http, other])),
+                new InMemoryFileSystem(),
+                new InMemoryFileSystem(),
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: true)
+            .RunAsync(["-sS", "-Z", "-w", "[%{exitcode}]\n", .. first, "--next", "-w", "[%{exitcode}]\n", "http://h.test/next"]);
+
+        Assert.AreEqual(code, exitCode);
+        Assert.IsEmpty(http.Contexts);
+        Assert.IsEmpty(other.Contexts);
+        Assert.AreEqual($"curl: {line}\n{Aborted}\n", StandardErrorText);
+        Assert.AreEqual($"[{code}]\n[42]\n", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SetupLooksFineUnderParallel_StartsEveryTransfer()
+    {
+        RecordingProtocolHandler rtsp = new("rtsp", _ => ValueTask.FromResult(TransferResult.Success(0)));
+        RecordingProtocolHandler telnet = new("telnet", _ => ValueTask.FromResult(TransferResult.Success(0)));
+
+        int exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([rtsp, telnet])),
+                new InMemoryFileSystem(),
+                new InMemoryFileSystem(),
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: true)
+            .RunAsync(["-sS", "-Z", "rtsp://h.test/m", "-H", "Foo: 1", "-H", "Session", "--next", "telnet://h.test", "-t", "ttype=x", "-t", "noequals", "-t", "WS=é"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.HasCount(1, rtsp.Contexts);
+        Assert.HasCount(1, telnet.Contexts);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TwoFatalSetupFailuresUnderParallel_ReportsTheFirstWithItsOwnMessage()
+    {
+        RecordingProtocolHandler rtsp = new("rtsp", _ => ValueTask.FromResult(TransferResult.Success(0)));
+        RecordingProtocolHandler telnet = new("telnet", _ => ValueTask.FromResult(TransferResult.Success(0)));
+
+        int exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher([rtsp, telnet])),
+                new InMemoryFileSystem(),
+                new InMemoryFileSystem(),
+                standardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: true)
+            .RunAsync(["-sS", "-Z", "rtsp://h.test/m", "-H", "Session: 1", "--next", "telnet://h.test", "-t", "NOPE=1"]);
+
+        Assert.AreEqual(43, exitCode);
+        Assert.IsEmpty(rtsp.Contexts);
+        Assert.IsEmpty(telnet.Contexts);
+        Assert.AreEqual($"curl: (43) Session ID cannot be set as a custom header.\n{Aborted}\n", StandardErrorText);
+    }
+
     private static RecordingProtocolHandler Handler(CurlExitCode code) =>
         new("http", async context =>
         {

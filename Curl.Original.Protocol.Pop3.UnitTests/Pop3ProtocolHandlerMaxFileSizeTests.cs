@@ -107,7 +107,7 @@ public sealed class Pop3ProtocolHandlerMaxFileSizeTests
 
         Diagnostics.ArrangeRun(url, connection.Script);
         Diagnostics.Arrange("max file size", maxFileSize?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(none)");
-        TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context);
+        TransferResult result = StampedTimings.Without(await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context));
         Diagnostics.ActTransfer(result, events, connection.Sent);
         Diagnostics.Bytes("output", output.ToArray());
 

@@ -425,7 +425,7 @@ public sealed class ImapProtocolHandlerSessionTests
 
         Diagnostics.Arrange("url", Url);
         Diagnostics.Arrange("connector", "refuses the connection");
-        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null });
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null }));
         Diagnostics.Act("result", DiagnosticText.Result(result));
         Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Diagnostics.Assert("error message", "Failed to connect to 127.0.0.1 port 18143", result.ErrorMessage);

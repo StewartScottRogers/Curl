@@ -43,6 +43,14 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     /// <summary>Where reply lines are written: <c>dumpHeaderOutput</c> until <see cref="StopReporting" />, nowhere after.</summary>
     private Stream? dumping = dumpHeaderOutput;
 
+    private bool recordsColonLines = true;
+
+    /// <summary>
+    /// The reply lines read before <see cref="StopReporting" /> that contain a colon, split at
+    /// the first one: curl counts each as a header in <c>%{num_headers}</c> (BL-5470).
+    /// </summary>
+    public List<KeyValuePair<string, string>> ColonReplyLines { get; } = [];
+
     /// <summary>
     /// Reports and writes nothing more: curl sends <c>QUIT</c> as it closes the connection,
     /// where neither <c>-v</c>, its <c>[TCP]</c> trace lines, nor the <c>-D</c> file sees it or its reply.
@@ -52,6 +60,7 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
         reporting = NoTransferEvents.Instance;
         connectEvents.StopInfoLines();
         dumping = null;
+        recordsColonLines = false;
     }
 
     private const int ReadBufferSize = 4096;
@@ -213,6 +222,7 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
 
                 replyByteCount += bytes.Length;
                 reporting.ReportResponseHeader(bytes);
+                RecordColonLine(bytes);
                 await WriteToDumpHeaderOutputAsync(bytes).ConfigureAwait(false);
                 return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1).TrimEnd('\r');
             }
@@ -221,6 +231,16 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
         }
 
         return null;
+    }
+
+    private void RecordColonLine(byte[] line)
+    {
+        int colon = Array.IndexOf(line, (byte)':');
+        if (recordsColonLines && colon >= 0)
+        {
+            string text = Encoding.Latin1.GetString(line);
+            ColonReplyLines.Add(new(text[..colon], text[(colon + 1)..].Trim()));
+        }
     }
 
     private async ValueTask WriteToDumpHeaderOutputAsync(byte[] line)

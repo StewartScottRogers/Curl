@@ -803,11 +803,7 @@ public sealed class HttpProtocolHandler(
             }
 
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.Closing(connect.ConnectionNumber));
-            return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!) with
-            {
-                Report = FailedConnectReport(plan, connect),
-                IsConnectionRefused = connect.IsConnectionRefused,
-            };
+            return FailedConnectResult(plan, connect);
         }
 
         plan.OpenedConnection = true;
@@ -1099,6 +1095,22 @@ public sealed class HttpProtocolHandler(
             && !plan.Options.OverUnixSocket;
 
     /// <summary>
+    /// Gives the failed connect's result: its own exit code, or exit 22 under <c>-f</c> when a proxy refused the CONNECT with 400 or above (STD-125).
+    /// </summary>
+    private static TransferResult FailedConnectResult(HttpRequestPlan plan, ConnectResult connect)
+    {
+        // -f turns a refused CONNECT (status 400 or above) into exit 22, as curl does (STD-125, BL-5443).
+        bool failsOnConnectStatus = plan.Options.Fail == HttpFailMode.Fail && connect.ProxyConnectResponseCode >= 400;
+        return TransferResult.Failure(
+            failsOnConnectStatus ? CurlExitCode.HttpReturnedError : connect.ExitCode,
+            failsOnConnectStatus ? HttpTransferMessages.RequestedUrlReturnedError(connect.ProxyConnectResponseCode) : connect.ErrorMessage!) with
+        {
+            Report = FailedConnectReport(plan, connect),
+            IsConnectionRefused = connect.IsConnectionRefused,
+        };
+    }
+
+    /// <summary>
     /// Reports a connect that failed: whether it went to a forward proxy, and the transfer's
     /// timings with <c>%{time_pretransfer}</c>, <c>%{time_posttransfer}</c> and
     /// <c>%{time_starttransfer}</c> taken when it failed, as curl 8.21.0 takes them after a
@@ -1113,6 +1125,9 @@ public sealed class HttpProtocolHandler(
         {
             UsedProxy = plan.Options.ForwardProxy is not null,
             ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
+            HeaderSize = connect.ProxyConnectHeaderBytes,
+            ResponseHeadersStored = connect.ConnectReplyHeadersStored,
+            RefusedConnectHeaderCount = connect.ConnectReplyHeadersStored,
             Timings = new TransferTimings(plan.Started, connect.Timings, failed, failed, failed, failed),
         };
     }
@@ -1550,7 +1565,7 @@ public sealed class HttpProtocolHandler(
         TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
             with
         {
-            Report = WithHeadBeforeFailure(exchange.Report(body), failure),
+            Report = WithoutFirstByteWhenHttp09Refused(WithHeadBeforeFailure(exchange.Report(body), failure), failure),
             WriteOutErrorMessage = failure.ExitCode == CurlExitCode.HttpReturnedError && plan.Options.Fail == HttpFailMode.FailWithBody
                 ? HttpTransferMessages.HttpResponseCodeSaidError
                 : null,
@@ -1559,6 +1574,15 @@ public sealed class HttpProtocolHandler(
         ReportEmptyReply(plan.Context.Events, failure, outcome);
         return outcome;
     }
+
+    /// <summary>
+    /// Drops the first-byte time of a reply refused as HTTP/0.9: curl 8.22.0 reports <c>%{time_starttransfer}</c> 0 for it,
+    /// as the bytes were never a response (STD-146).
+    /// </summary>
+    private static TransferReport? WithoutFirstByteWhenHttp09Refused(TransferReport? report, HttpTransferException failure) =>
+        report is { Timings: { } timings } && failure.Message == HttpTransferMessages.Http09NotAllowed
+            ? report with { Timings = timings with { FirstByteReceived = null } }
+            : report;
 
     /// <summary>
     /// Echoes <c>-f</c>'s <c>The requested URL returned error: N</c>, <c>--max-redirs</c>'s and <c>--max-filesize</c>'s messages as a <c>-v</c> line, as
@@ -1635,15 +1659,33 @@ public sealed class HttpProtocolHandler(
     private static TransferReport WithStatusLineBeforeFailure(TransferReport report, HttpTransferException failure) =>
         report.ResponseCode != 0 || failure.StatusLineBeforeFailure is not { } statusLine
             ? WithReceiveErrno(report, failure)
-            : WithReceiveErrno(report, failure) with
+            : WithHeadersBeforeFailure(report, failure, statusLine, WithReceiveErrno(report, failure) with
             {
                 ResponseCode = statusLine.StatusCode,
                 HttpVersion = statusLine.Version,
                 HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
                 ResponseHeadersStored = Math.Max(report.ResponseHeadersStored, failure.HeadersStoredBeforeFailure),
-                ResponseHeaders = failure.HeadBytesBeforeFailure.Length == 0 ? report.ResponseHeaders : HeadersBeforeFailure(failure.HeadBytesBeforeFailure),
                 ContentType = failure.ContentTypeBeforeFailure ?? report.ContentType,
-            };
+            });
+
+    /// <summary>
+    /// Gives <paramref name="cut" /> the header lines of the head a failure cut short. When that head is a 1xx
+    /// one they are counted (<see cref="TransferReport.InformationalHeaderCount" />, for <c>%{num_headers}</c>)
+    /// but kept out of <see cref="TransferReport.ResponseHeaders" />, which <c>%{header_json}</c> and
+    /// <c>%header{}</c> read: curl 8.22.0 and 8.18.0 show none of them (STD-147, BL-5466).
+    /// </summary>
+    private static TransferReport WithHeadersBeforeFailure(TransferReport report, HttpTransferException failure, HttpStatusLine statusLine, TransferReport cut)
+    {
+        if (failure.HeadBytesBeforeFailure.Length == 0)
+        {
+            return cut with { ResponseHeaders = report.ResponseHeaders };
+        }
+
+        KeyValuePair<string, string>[] headers = HeadersBeforeFailure(failure.HeadBytesBeforeFailure);
+        return statusLine.IsInformational
+            ? cut with { ResponseHeaders = [], InformationalHeaderCount = headers.Length }
+            : cut with { ResponseHeaders = headers };
+    }
 
     /// <summary>
     /// Gives the whole header lines a failure let through before it cut the head short, from the

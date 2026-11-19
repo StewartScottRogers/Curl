@@ -39,7 +39,7 @@ public sealed class FileDownloadStartAndPostTransferTimingsTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_Upload_KeepsItsConnectAndHasNoStartOrPostTransfer()
+    public async Task ExecuteAsync_Upload_HasNoConnectOrStartTransferButAPostTransfer()
     {
         var context = new TransferContext
         {
@@ -52,9 +52,9 @@ public sealed class FileDownloadStartAndPostTransferTimingsTests
         var result = await new FileProtocolHandler(new FakeFileSystem()).ExecuteAsync(context);
 
         var timings = result.Report!.Timings!;
-        Assert.IsTrue(timings.Connect!.Connected > timings.Started);
+        Assert.IsNull(timings.Connect!.Connected);
         Assert.IsNull(timings.FirstByteReceived);
-        Assert.IsNull(timings.RequestSent);
+        Assert.AreEqual(timings.Completed, timings.RequestSent);
     }
 
     private static async Task<TransferTimings> DownloadTimingsAsync()

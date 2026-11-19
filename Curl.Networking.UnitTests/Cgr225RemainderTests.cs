@@ -29,7 +29,7 @@ public sealed class Cgr225RemainderTests
         detector.ReportTicketRecords(10, events);
 
         diagnostics.Act("lines", string.Join("|", events.Lines));
-        CollectionAssert.AreEqual(new[] { "alert 1,0" }, events.Lines);
+        CollectionAssert.AreEqual(new[] { "alert 1,0 received" }, events.Lines);
         Assert.IsTrue(detector.CloseNotifyFollows);
     }
 
@@ -186,7 +186,7 @@ public sealed class Cgr225RemainderTests
 
         public void ReportTlsMessage(TlsMessageEvent message) => Lines.Add(
             message.ContentType == TlsContentType.Alert
-                ? $"alert {string.Join(',', message.Bytes.ToArray())}"
+                ? $"alert {string.Join(',', message.Bytes.ToArray())} {(message.Sent ? "sent" : "received")}"
                 : $"handshake {message.Bytes.Span[0]} version {message.ProtocolVersion}");
 
         public void ReportRequestHeader(ReadOnlySpan<byte> bytes)

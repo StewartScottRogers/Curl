@@ -34,7 +34,7 @@ internal static class WinLdapLogonBind
 {
     private const string SupportedCapabilities = "supportedCapabilities";
 
-    private const string SupportedSaslMechanisms = "supportedSASLMechanisms";
+    internal const string SupportedSaslMechanisms = "supportedSASLMechanisms";
 
     private const string GssSpnego = "GSS-SPNEGO";
 
@@ -128,7 +128,7 @@ internal static class WinLdapLogonBind
     /// skipped. <see langword="null" /> when the server closed or sent bytes that are not an
     /// LDAPMessage first.
     /// </summary>
-    private static async ValueTask<List<string>?> ReadRootDseAsync(LdapExchange exchange, string attribute, CancellationToken cancellationToken)
+    internal static async ValueTask<List<string>?> ReadRootDseAsync(LdapExchange exchange, string attribute, CancellationToken cancellationToken)
     {
         int messageId = exchange.TakeMessageId();
         await exchange.SendAsync(LdapRequests.RootDseSearch(exchange.Writer, messageId, attribute), cancellationToken).ConfigureAwait(false);

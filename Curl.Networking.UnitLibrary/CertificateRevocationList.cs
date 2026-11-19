@@ -39,6 +39,7 @@ internal sealed class CertificateRevocationList
     private readonly byte[] _signature;
     private readonly byte[] _issuerName;
     private readonly HashSet<BigInteger> _revokedSerialNumbers;
+    private readonly RevocationListScope _scope;
 
     private CertificateRevocationList(
         byte[] signedPart,
@@ -47,8 +48,10 @@ internal sealed class CertificateRevocationList
         byte[] issuerName,
         DateTimeOffset thisUpdate,
         DateTimeOffset? nextUpdate,
-        HashSet<BigInteger> revokedSerialNumbers)
+        HashSet<BigInteger> revokedSerialNumbers,
+        RevocationListScope scope)
     {
+        _scope = scope;
         _signedPart = signedPart;
         _signatureAlgorithm = signatureAlgorithm;
         _signature = signature;
@@ -68,7 +71,7 @@ internal sealed class CertificateRevocationList
     /// Decodes a DER <c>CertificateList</c>: the signed <c>TBSCertList</c> (its optional
     /// version, signature algorithm, issuer, <c>thisUpdate</c>, optional <c>nextUpdate</c>,
     /// optional revoked certificates and extensions), the signature algorithm and the signature.
-    /// Extensions, of the list and of each entry, are read past and not acted on.
+    /// The extensions of the list and of each entry are read into a scope (see <see cref="CoversScopeOf" />); the revoked serial numbers are kept whatever the scope.
     /// </summary>
     /// <param name="der">The list's DER.</param>
     /// <returns>The decoded list.</returns>
@@ -93,9 +96,26 @@ internal sealed class CertificateRevocationList
         var issuerName = signed.ReadEncodedValue().ToArray();
         var thisUpdate = ReadTime(signed);
         var nextUpdate = signed.HasData && IsTime(signed.PeekTag()) ? ReadTime(signed) : (DateTimeOffset?)null;
+        var revokedSerialNumbers = ReadRevokedSerialNumbers(signed, out var entriesUnusable);
+        var scope = RevocationListScope.Read(signed);
+        scope.Unusable |= entriesUnusable;
         return new CertificateRevocationList(
-            signedPart, signatureAlgorithm, signature, issuerName, thisUpdate, nextUpdate, ReadRevokedSerialNumbers(signed));
+            signedPart, signatureAlgorithm, signature, issuerName, thisUpdate, nextUpdate, revokedSerialNumbers, scope);
     }
+
+    /// <summary>
+    /// Returns whether the list can answer for <paramref name="certificate" /> fetched from
+    /// <paramref name="distributionPoint" /> (RFC 5280, 5.2.5): it has no unrecognised critical
+    /// extension (of the list or of an entry), is not a delta list, is not indirect, does not
+    /// cover only some reasons, and its issuing distribution point, when it has one, names that
+    /// address and admits the certificate's kind (CA or not). A list that fails is "unknown",
+    /// never "not revoked" (STD-113).
+    /// </summary>
+    /// <param name="certificate">The certificate whose revocation is checked.</param>
+    /// <param name="distributionPoint">The address the list was fetched from.</param>
+    /// <returns><see langword="true" /> when the list's scope covers the certificate.</returns>
+    public bool CoversScopeOf(X509Certificate2 certificate, Uri distributionPoint) =>
+        _scope.Covers(certificate, distributionPoint);
 
     /// <summary>
     /// Returns whether the list is the one for certificates <paramref name="certificate" />'s
@@ -150,9 +170,11 @@ internal sealed class CertificateRevocationList
         reader.PeekTag().HasSameClassAndValue(Asn1Tag.UtcTime) ? reader.ReadUtcTime() : reader.ReadGeneralizedTime();
 
     // revokedCertificates is present only when something is revoked; whatever follows it is
-    // the [0] extensions, which are not read.
-    private static HashSet<BigInteger> ReadRevokedSerialNumbers(AsnReader signed)
+    // the [0] extensions. An entry with an unrecognised critical extension, or a certificate
+    // issuer one (an indirect list), makes the list unusable.
+    private static HashSet<BigInteger> ReadRevokedSerialNumbers(AsnReader signed, out bool entriesUnusable)
     {
+        entriesUnusable = false;
         var serialNumbers = new HashSet<BigInteger>();
         if (!signed.HasData || !signed.PeekTag().HasSameClassAndValue(Asn1Tag.Sequence))
         {
@@ -162,7 +184,10 @@ internal sealed class CertificateRevocationList
         var revoked = signed.ReadSequence();
         while (revoked.HasData)
         {
-            serialNumbers.Add(revoked.ReadSequence().ReadInteger());
+            var entry = revoked.ReadSequence();
+            serialNumbers.Add(entry.ReadInteger());
+            entry.ReadEncodedValue();
+            entriesUnusable |= entry.HasData && RevocationListScope.EntryExtensionsAreUnusable(entry);
         }
 
         return serialNumbers;

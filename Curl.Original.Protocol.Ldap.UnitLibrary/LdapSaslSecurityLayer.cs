@@ -59,11 +59,19 @@ internal sealed class LdapSaslSecurityLayer(IConnection connection, ILdapLogonAu
     /// <inheritdoc />
     public async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
-        byte[] wrapped = authentication.Wrap(buffer.Span);
-        byte[] framed = new byte[LengthOctets + wrapped.Length];
-        BinaryPrimitives.WriteInt32BigEndian(framed, wrapped.Length);
-        wrapped.CopyTo(framed, LengthOctets);
-        await connection.WriteAsync(framed, cancellationToken).ConfigureAwait(false);
+        // A DIGEST-MD5 peer accepts no sealed buffer longer than its maxbuf, so a longer message goes in several.
+        int chunkLength = authentication is LdapDigestMd5SecurityLayer digest ? digest.MaxPlainLength : int.MaxValue;
+        do
+        {
+            ReadOnlyMemory<byte> chunk = buffer[..Math.Min(buffer.Length, chunkLength)];
+            buffer = buffer[chunk.Length..];
+            byte[] wrapped = authentication.Wrap(chunk.Span);
+            byte[] framed = new byte[LengthOctets + wrapped.Length];
+            BinaryPrimitives.WriteInt32BigEndian(framed, wrapped.Length);
+            wrapped.CopyTo(framed, LengthOctets);
+            await connection.WriteAsync(framed, cancellationToken).ConfigureAwait(false);
+        }
+        while (!buffer.IsEmpty);
     }
 
     /// <inheritdoc />

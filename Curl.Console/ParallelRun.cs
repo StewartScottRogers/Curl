@@ -143,6 +143,12 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     internal async Task<bool> StartHeldAsync()
     {
         setupsLeftInFirstBatch = 0;
+        if (fatalSetupFailure is { } fatal)
+        {
+            await AbandonFirstBatchOnFatalFailureAsync(fatal).ConfigureAwait(false);
+            return true;
+        }
+
         (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] held = [.. heldTransfers];
         heldTransfers.Clear();
         bool hasEnded = false;
@@ -172,6 +178,42 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
 
         heldTransfers.Clear();
     }
+
+    /// <summary>
+    /// Ends the run at a fatal setup failure (exit 43 or 48) of the first batch's last-held transfer, as curl 8.22.0
+    /// finds it while setting the transfers up: nothing starts, the failing transfer is reported first with its own
+    /// message and every other held one as aborted by a critical error in another transfer (STD-074, BL-5469).
+    /// </summary>
+    /// <param name="failure">The fatal setup failure of the last transfer held.</param>
+    /// <returns>A task that completes when the held transfers are reported.</returns>
+    internal void NoteFatalSetupFailureOfLastHeld(TransferResult failure)
+    {
+        if (fatalSetupFailure is null)
+        {
+            fatalSetupFailure = failure;
+            fatalSetupFailureIndex = heldTransfers.Count - 1;
+        }
+    }
+
+    private async Task AbandonFirstBatchOnFatalFailureAsync(TransferResult failure)
+    {
+        RecordSetupFailure(failure, endsTheRun: true);
+        FirstFailure ??= failure;
+        await heldTransfers[fatalSetupFailureIndex].Abandon(failure).ConfigureAwait(false);
+        for (int index = 0; index < heldTransfers.Count; index++)
+        {
+            if (index != fatalSetupFailureIndex)
+            {
+                await heldTransfers[index].Abandon(AbortedResult).ConfigureAwait(false);
+            }
+        }
+
+        heldTransfers.Clear();
+    }
+
+    private TransferResult? fatalSetupFailure;
+
+    private int fatalSetupFailureIndex;
 
     /// <summary>
     /// Records a failure to set a transfer up, whose code becomes the run's (<see cref="SetupFailure" />).

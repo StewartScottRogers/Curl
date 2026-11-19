@@ -98,6 +98,17 @@ public sealed class IntermediateOnlyProxyCacertTests
     }
 
     [TestMethod]
+    public void VerifyPeer_UnknownRevocationWithNoListToBeFetched_NamesTheUnknownRevocationStatus()
+    {
+        using var pki = new Pki(revokeLeaf: false);
+
+        var failure = VerifyStubbed(pki, null);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.AreEqual("schannel: the revocation status is unknown", failure?.Message);
+    }
+
+    [TestMethod]
     public void VerifyPeer_UnknownRevocationWithAListThatDoesNotDecode_IsExit60()
     {
         using var pki = new Pki(revokeLeaf: false);

@@ -99,7 +99,7 @@ internal sealed partial class ServerCertificateVerification
     private (CurlExitCode ExitCode, string Message)? CaCertificateFileChainFailure(SslPolicyErrors errors, X509Chain? chain) =>
         ConstraintViolationOf(errors, chain) is var violation and not 0
             ? (CurlExitCode.PeerFailedVerification, $"schannel: error 0x{violation:x8}")
-            : RevokesBelowNonSelfSignedAnchor(chain) ? (CurlExitCode.PeerFailedVerification, TlsFailureMessages.SchannelChainRevoked) : null;
+            : BelowNonSelfSignedAnchorFailure(chain);
 
     // A chain error with a name constraint of a CA in the chain broken by the server certificate
     // is named by Schannel's trust error (BL-5375); 0 for any other failure.
@@ -142,18 +142,49 @@ internal sealed partial class ServerCertificateVerification
     private bool HasOnlyMissingRootOrAnchorRevocationStatus(X509Chain chain) =>
         HasOnlyMissingRootStatus(ReadChainStatus(chain))
         || (HasOnlyMissingRootOrUnavailableRevocationStatus(ReadChainStatus(chain))
-            && !IsSelfSigned(chain.ChainElements[^1].Certificate)
-            && ReadBelowAnchorRevocation(chain) == BelowAnchorRevocation.Clean);
+            && !IsSelfSigned(chain.ChainElements[AnchorIndexOf(chain)].Certificate)
+            && NothingBelowAnchorIsRevokedOrUnresolvedUnlessBestEffort(chain));
+
+    // --ssl-revoke-best-effort masks an unknown revocation status, so a certificate below the
+    // anchor with no usable CRL (404, none listed, refused) is tolerated there; a revoked one never is (BL-5437).
+    private bool NothingBelowAnchorIsRevokedOrUnresolvedUnlessBestEffort(X509Chain chain) =>
+        ReadBelowAnchorRevocation(chain) is BelowAnchorRevocation.Clean
+        || (matchesSchannelBuild && options.RevocationCheckBestEffort && ReadBelowAnchorRevocation(chain) is BelowAnchorRevocation.Unresolved);
 
     // The chain ends at a listed, non-self-signed anchor and a CRL revokes a certificate below it:
     // Schannel's has been revoked, where the engine's own statuses only say unknown (BL-5384).
-    private bool RevokesBelowNonSelfSignedAnchor(X509Chain? chain) =>
-        chain is not null
-        && chain.ChainElements.Count > 0
+    // A revoking CRL is Schannel's has been revoked (BL-5384), no usable CRL its revocation status is unknown (BL-5446).
+    private (CurlExitCode ExitCode, string Message)? BelowNonSelfSignedAnchorFailure(X509Chain? chain) =>
+        chain is not null && EndsAtListedNonSelfSignedAnchor(chain)
+            ? ReadBelowAnchorRevocation(chain) switch
+            {
+                BelowAnchorRevocation.Revoked => (CurlExitCode.PeerFailedVerification, TlsFailureMessages.SchannelChainRevoked),
+                BelowAnchorRevocation.Unresolved => (CurlExitCode.PeerFailedVerification, TlsFailureMessages.SchannelRevocationStatusUnknown),
+                _ => null,
+            }
+            : null;
+
+    private bool EndsAtListedNonSelfSignedAnchor(X509Chain chain) =>
+        chain.ChainElements.Count > 0
         && HasOnlyMissingRootOrUnavailableRevocationStatus(ReadChainStatus(chain))
-        && !IsSelfSigned(chain.ChainElements[^1].Certificate)
-        && ListsAnAnchorCandidate(chain)
-        && ReadBelowAnchorRevocation(chain) == BelowAnchorRevocation.Revoked;
+        && !IsSelfSigned(chain.ChainElements[AnchorIndexOf(chain)].Certificate)
+        && ListsAnAnchorCandidate(chain);
+
+    // The chain is cut at the first certificate the --cacert file lists, so a root the server
+    // sent beyond it is not the anchor (BL-5438); the last element when none is listed.
+    internal static int AnchorIndexOf(X509Chain chain)
+    {
+        var elements = chain.ChainElements;
+        for (var index = 0; index < elements.Count; index++)
+        {
+            if (ListsCertificate(chain.ChainPolicy.CustomTrustStore, elements[index].Certificate))
+            {
+                return index;
+            }
+        }
+
+        return elements.Count - 1;
+    }
 
     private static bool IsSelfSigned(X509Certificate2 certificate) =>
         certificate.SubjectName.RawData.AsSpan().SequenceEqual(certificate.IssuerName.RawData);

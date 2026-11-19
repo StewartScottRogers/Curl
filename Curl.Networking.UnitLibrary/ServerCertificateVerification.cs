@@ -62,7 +62,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     /// like <see cref="ReadChainStatus" />.
     /// </summary>
     internal Func<X509Chain, X509ChainStatus[]> ReadCertificatesBelowAnchorStatus { get; init; } = chain =>
-        chain.ChainElements.Cast<X509ChainElement>().SkipLast(1).SelectMany(element => element.ChainElementStatus).ToArray();
+        chain.ChainElements.Cast<X509ChainElement>().Take(AnchorIndexOf(chain)).SelectMany(element => element.ChainElementStatus).ToArray();
 
     /// <summary>
     /// The CA bundles curl's <c>configure</c> looks for, in its order, the first that exists
@@ -138,7 +138,7 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     /// revocation endpoint fails with exit 60 as in curl (ADR-0321); the OpenSSL build never
     /// checks it. The OpenSSL build then loads the <c>--crlfile</c> lists, as curl loads them
     /// after the <c>--cacert</c> file (BL-609); the Schannel build ignores <c>--crlfile</c>.
-    /// Under <c>-k</c> nothing is read.
+    /// Under <c>-k</c> no trust anchor is read; the OpenSSL build still gets the policy that disables certificate downloads.
     /// </summary>
     /// <returns>
     /// The chain policy, or <see langword="null" />, the roots trusted beside the system store, and
@@ -154,7 +154,8 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
     {
         if (options.Insecure)
         {
-            return (null, [], null);
+            // The OpenSSL build follows no AIA link even under -k (BL-5450).
+            return (matchesSchannelBuild ? null : SystemStoreChainPolicy(), [], null);
         }
 
         var (chainPolicy, anchorsBesideSystemStore) = ReadChainAnchors();
@@ -293,6 +294,12 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         ReadOnlyMemory<byte>[] peerCertificates,
         byte[]? stapledResponse = null)
     {
+        if (RelyingOnAnIntermediateTheServerDidNotSend(chain, peerCertificates))
+        {
+            return (
+                new PeerVerification(false, OpenSslVerifyResult.UnableToGetIssuerCertificateLocally, peerCertificates),
+                (CurlExitCode.PeerFailedVerification, UnableToGetLocalIssuerRefusal));
+        }
         var stapled = StapledRevocationStatus(stapledResponse, chain, peerCertificates);
         errors = WithoutUnavailableRevocationAGoodStapleAnswers(errors, chain, stapled);
         var anchoredErrors = WithTheNameCheckCurlRuns(
@@ -312,6 +319,25 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         return refusal is null ? JudgePinnedPublicKey(observed, peerCertificates) : (observed, refusal);
     }
 
+    private const string UnableToGetLocalIssuerRefusal = "SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)";
+
+    // curl's OpenSSL build builds the chain from what the server sent and its trust anchors alone.
+    // .NET's Unix X509Chain also reads, and saves AIA-downloaded certificates to, the CurrentUser CA
+    // store (~/.dotnet/corefx/cryptography/x509stores/ca), so a chain whose middle certificate the
+    // server did not send was completed from that store, which OpenSSL never reads: it fails
+    // with "unable to get local issuer certificate (20)" (BL-5449, STD-131). The first
+    // element is the server's own and the last the anchor, neither of which need be sent.
+    private bool RelyingOnAnIntermediateTheServerDidNotSend(X509Chain? chain, ReadOnlyMemory<byte>[] peerCertificates)
+    {
+        return !matchesSchannelBuild
+            && !options.Insecure
+            && chain is not null
+            && peerCertificates.Length > 0
+            && chain.ChainElements.Skip(1).SkipLast(1).Any(element => !WasSent(element.Certificate, peerCertificates));
+    }
+
+    private static bool WasSent(X509Certificate2 certificate, ReadOnlyMemory<byte>[] peerCertificates) =>
+        peerCertificates.Any(sent => sent.Span.SequenceEqual(certificate.RawData));
     // The Schannel build checks revocation with CertGetCertificateChain on the context Schannel
     // attached the server's stapled OCSP response to, so a staple that says good or revoked
     // answers for the server's own certificate before any online check (CGR-014, ADR-0834).

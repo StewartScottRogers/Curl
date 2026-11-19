@@ -58,6 +58,19 @@ public sealed class AzureStorageUrlMappingTests
     }
 
     [TestMethod]
+    [DataRow("abfss://fs@localhost/x", "localhost")]
+    [DataRow("abfss://fs@[::1]/x", "[::1]")]
+    [DataRow("abfs://fs@127.0.0.1/x", "127.0.0.1")]
+    public void Map_AbfsWithEmulatorHost_UsesTheHostAsGivenWithoutThePublicSuffix(string url, string expectedHost)
+    {
+        // EXT-085: a token must never go to localhost.dfs.core.windows.net.
+        var endpoint = AzureStorageUrlMapping.Map(new Uri(url));
+
+        Assert.AreEqual(expectedHost, endpoint.Host);
+        Assert.AreEqual("/fs/x", endpoint.Path);
+    }
+
+    [TestMethod]
     public void Map_AbfsWithoutFileSystem_FailsAsMissingFileSystem()
     {
         var exception = Assert.ThrowsExactly<AzureStorageRequestException>(() => AzureStorageUrlMapping.Map(new Uri("abfs://myaccount.dfs.core.windows.net/dir")));

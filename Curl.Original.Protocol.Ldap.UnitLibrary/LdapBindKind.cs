@@ -18,6 +18,9 @@ public enum LdapBindKind
     /// <summary><c>LDAP_AUTH_DIGEST</c> with <c>-u</c>'s credentials: the SASL bind (tag <c>0xa3</c>) with the mechanism <c>DIGEST-MD5</c>.</summary>
     Digest,
 
+    /// <summary>The OpenLDAP dialect's SASL bind, chosen by the auth mask or <c>AUTH=</c> login options (BL-5435).</summary>
+    Sasl,
+
     /// <summary><c>LDAP_AUTH_NEGOTIATE</c> with no credentials: the bind as the logged-on user.</summary>
     LogonUser,
 }

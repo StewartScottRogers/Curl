@@ -40,10 +40,10 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
         TransferResult result = await RunAsync(new ScriptedConnection(Connack, Suback, PublishHi, Disconnect), log);
 
         Diagnostics.AssertResult(TransferResult.Success(5), result with { Report = null });
-        AssertLog(DiagnosticLogLevel.Info, ["CONNACK return code 0", "SUBSCRIBE t", "SUBSCRIBE done: SUBACK granted QoS 0", "transfer finished: 5 bytes in 250 ms"], log);
+        AssertLog(DiagnosticLogLevel.Info, ["CONNACK return code 0", "SUBSCRIBE t", "SUBSCRIBE done: SUBACK granted QoS 0", "transfer finished: 5 bytes in 750 ms"], log);
         Assert.AreEqual(TransferResult.Success(5), result with { Report = null });
         CollectionAssert.AreEqual(
-            new[] { "CONNACK return code 0", "SUBSCRIBE t", "SUBSCRIBE done: SUBACK granted QoS 0", "transfer finished: 5 bytes in 250 ms" },
+            new[] { "CONNACK return code 0", "SUBSCRIBE t", "SUBSCRIBE done: SUBACK granted QoS 0", "transfer finished: 5 bytes in 750 ms" },
             log.At(DiagnosticLogLevel.Info));
         Assert.HasCount(4, log.Lines);
         Assert.IsTrue(log.Lines.All(line => line.Component == DiagnosticLogComponents.Mqtt));
@@ -57,10 +57,10 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
         TransferResult result = await RunAsync(new ScriptedConnection(Connack), log, "mqtt://h/a%2Fb", "hello"u8.ToArray());
 
         Diagnostics.AssertResult(TransferResult.Success(0), result with { Report = null });
-        AssertLog(DiagnosticLogLevel.Info, ["CONNACK return code 0", "PUBLISH a/b, 5 bytes", "PUBLISH done; DISCONNECT sent", "transfer finished: 0 bytes in 250 ms"], log);
+        AssertLog(DiagnosticLogLevel.Info, ["CONNACK return code 0", "PUBLISH a/b, 5 bytes", "PUBLISH done; DISCONNECT sent", "transfer finished: 0 bytes in 750 ms"], log);
         Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         CollectionAssert.AreEqual(
-            new[] { "CONNACK return code 0", "PUBLISH a/b, 5 bytes", "PUBLISH done; DISCONNECT sent", "transfer finished: 0 bytes in 250 ms" },
+            new[] { "CONNACK return code 0", "PUBLISH a/b, 5 bytes", "PUBLISH done; DISCONNECT sent", "transfer finished: 0 bytes in 750 ms" },
             log.At(DiagnosticLogLevel.Info));
     }
 

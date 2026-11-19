@@ -152,6 +152,10 @@ public sealed class HttpExchangeLogTests
     [DataRow("Location", "/plain", "/plain")]
     [DataRow("Location", "not a url", "not a url")]
     [DataRow("Location", "://u:p@host", "://u:p@host")]
+    [DataRow("Link", "<http://lu:LINKSECRET@host/a>; rel=\"next\", <http://host/b>; rel=\"prev\", <https://x@h:1/c?q=a@b>; rel=\"last\"", "<http://REDACTED:REDACTED@host/a>; rel=\"next\", <http://host/b>; rel=\"prev\", <https://REDACTED:REDACTED@h:1/c?q=a@b>; rel=\"last\"")]
+    [DataRow("refresh", "5; url=http://fu:REFRESHSECRET@host/b", "5; url=http://REDACTED:REDACTED@host/b")]
+    [DataRow("Refresh", "5", "5")]
+    [DataRow("Link", "</rel>; rel=next; u=://a@b", "</rel>; rel=next; u=://REDACTED:REDACTED@b")]
     public void ReplyRead_UrlHeader_LogsItWithUserInfoRedacted(string name, string value, string expected)
     {
         RecordingDiagnosticLog log = new();

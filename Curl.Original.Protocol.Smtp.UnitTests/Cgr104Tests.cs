@@ -28,8 +28,7 @@ public sealed class Cgr104Tests
         var handler = new SmtpProtocolHandler(
             new QueuedConnector(ConnectResult.Connected(connection, null)), new QueuedTlsProvider(), new FakeSaslAuthenticator("PLAIN", [1]));
 
-        TransferResult result = await handler.ExecuteAsync(Context(loginOptions));
-
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(Context(loginOptions)));
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual("URL using bad/illegal format or missing URL", result.ErrorMessage);
         Assert.IsEmpty(connection.Sent);

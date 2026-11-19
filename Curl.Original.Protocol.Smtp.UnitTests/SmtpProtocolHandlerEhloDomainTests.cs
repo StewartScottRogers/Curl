@@ -54,7 +54,7 @@ public sealed class SmtpProtocolHandlerEhloDomainTests
         Diagnostics.ArrangeRun("smtp://127.0.0.1:18025/", Replies);
         var handler = new SmtpProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider());
 
-        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("smtp://127.0.0.1:18025/"), Output = Stream.Null });
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("smtp://127.0.0.1:18025/"), Output = Stream.Null }));
         Diagnostics.ActResult(result);
         Diagnostics.Act("sent", SmtpDiagnostics.Show(Encoding.Latin1.GetString(connection.Sent)));
 

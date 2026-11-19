@@ -35,11 +35,47 @@ public sealed class LdapWinLdapLeadingSpaceFilterTests
     }
 
     [TestMethod]
-    public void Encode_WinLdapLeadingSpacesBeforeBareEquality_KeepsSpacesInAttribute()
+    [DataRow(" uid=alice")]
+    [DataRow("  uid=alice")]
+    public void Encode_WinLdapLeadingSpacesBeforeBareEquality_EqualsUnspacedFilter(string filter)
     {
-        byte[]? actual = Encoder().Encode(" cn=a");
+        byte[]? expected = Encoder().Encode("uid=alice");
+        byte[]? actual = Encoder().Encode(filter);
         Assert.IsNotNull(actual);
-        Assert.IsTrue(Convert.ToHexString(actual).EndsWith("040320636E040161", StringComparison.Ordinal));
+        Assert.AreEqual(Convert.ToHexString(expected!), Convert.ToHexString(actual));
+        Assert.AreEqual("A3840000000C04037569640405616C696365", Convert.ToHexString(actual));
+    }
+
+    [TestMethod]
+    [DataRow("(uid= alice)", "(uid=alice)")]
+    [DataRow("(uid=  alice)", "(uid=alice)")]
+    [DataRow("(cn= Alice*)", "(cn=Alice*)")]
+    [DataRow("(cn~= Alise)", "(cn~=Alise)")]
+    [DataRow("(cn>= user050)", "(cn>=user050)")]
+    [DataRow("(cn<= user050)", "(cn<=user050)")]
+    [DataRow("(&(uid= alice)(sn=Example))", "(&(uid=alice)(sn=Example))")]
+    public void Encode_WinLdapLeadingSpacesInAssertionValue_EqualsUnspacedFilter(string filter, string unspaced)
+    {
+        byte[]? expected = Encoder().Encode(unspaced);
+        byte[]? actual = Encoder().Encode(filter);
+        Assert.IsNotNull(actual);
+        Assert.AreEqual(Convert.ToHexString(expected!), Convert.ToHexString(actual));
+    }
+
+    [TestMethod]
+    public void Encode_WinLdapLeadingSpaceInAssertionValue_EncodesAliceValue()
+    {
+        byte[]? actual = Encoder().Encode("(uid= alice)");
+        Assert.IsNotNull(actual);
+        Assert.AreEqual("A3840000000C04037569640405616C696365", Convert.ToHexString(actual));
+    }
+
+    [TestMethod]
+    public void Encode_OpenLdapLeadingSpaceInAssertionValue_KeepsTheSpace()
+    {
+        byte[]? actual = new LdapFilterEncoder(LdapDialect.OpenLdap, new LdapBerWriter(LdapDialect.OpenLdap)).Encode("(uid= alice)");
+        Assert.IsNotNull(actual);
+        Assert.IsTrue(Convert.ToHexString(actual).EndsWith("040620616C696365", StringComparison.Ordinal));
     }
 
     private static LdapFilterEncoder Encoder() => new(LdapDialect.WinLdap, new LdapBerWriter(LdapDialect.WinLdap));

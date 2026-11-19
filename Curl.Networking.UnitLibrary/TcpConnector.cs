@@ -1877,7 +1877,7 @@ public sealed partial class TcpConnector(
 
             if (!onThisConnection)
             {
-                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure, tunnel.Target.Events).ConfigureAwait(false);
+                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure, tunnel.Target.Events, tunnel.ReplyHeadBytes.Value).ConfigureAwait(false);
             }
 
             proxyAuthorization = answer;
@@ -1911,11 +1911,12 @@ public sealed partial class TcpConnector(
         ExceptionDispatchInfo? exception,
         string? redialAuthorization,
         string? firstSspiFailure,
-        ITransferEvents events)
+        ITransferEvents events,
+        long headBytes)
     {
         await connection.DisposeAsync().ConfigureAwait(false);
         exception?.Throw();
-        return redialAuthorization is null ? (TunnelFailure(reply, firstSspiFailure, events), null) : (null, redialAuthorization);
+        return redialAuthorization is null ? (TunnelFailure(reply, firstSspiFailure, events, headBytes), null) : (null, redialAuthorization);
     }
 
     /// <summary>
@@ -2148,7 +2149,7 @@ public sealed partial class TcpConnector(
         }
     }
 
-    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure, ITransferEvents events)
+    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure, ITransferEvents events, long headBytes)
     {
         if (reply.FailureMessage is { } failureMessage)
         {
@@ -2157,7 +2158,7 @@ public sealed partial class TcpConnector(
 
         var refused = $"CONNECT tunnel failed, response {reply.StatusCode}";
         events.ReportInfo(refused);
-        return ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? refused, null, 0, reply.StatusCode);
+        return ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? refused, null, 0, reply.StatusCode, proxyConnectHeadersStored: reply.HeaderCount, proxyConnectHeaderBytes: headBytes);
     }
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(

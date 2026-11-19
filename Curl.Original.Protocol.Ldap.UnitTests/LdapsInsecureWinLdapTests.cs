@@ -7,7 +7,7 @@ namespace Curl.Original.Protocol.Ldap;
 /// <summary>
 /// Pins BL-5285: over <c>ldaps</c> with <c>-u</c>, WinLDAP checks the certificate against the
 /// Windows store itself, so a connection the system store does not trust ends the bind with
-/// <c>Server Down</c> (exit 38) whatever <c>-k</c> says.
+/// curl's own exit 60 (BL-5461) whatever <c>-k</c> says.
 /// </summary>
 [TestClass]
 public sealed class LdapsInsecureWinLdapTests
@@ -25,11 +25,12 @@ public sealed class LdapsInsecureWinLdapTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_WinLdapLdapsWithCredentialsUntrusted_FailsWithServerDown()
+    public async Task ExecuteAsync_WinLdapLdapsWithCredentialsUntrusted_FailsWithCurlsOwnExit60()
     {
         (TransferResult result, RecordingConnector connector) = await RunAsync(LdapDialect.WinLdap, "ldaps://127.0.0.1:21900/dc=test", ConnectResult.Failed(CurlExitCode.PeerFailedVerification, "untrusted"));
 
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Server Down"), result);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+        Assert.AreEqual("untrusted", result.ErrorMessage);
         Assert.IsTrue(connector.Targets.Single().TrustsSystemStoreOnly);
     }
 

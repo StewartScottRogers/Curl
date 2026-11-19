@@ -117,6 +117,6 @@ public sealed record SmtpRun(
 
         TransferResult result = await new SmtpProtocolHandler(connector, tls, saslAuthenticator, () => LocalHostName, commandLineText).ExecuteAsync(context);
 
-        return new SmtpRun(result, connection, connector, tls);
+        return new SmtpRun(StampedTimings.Without(result), connection, connector, tls);
     }
 }

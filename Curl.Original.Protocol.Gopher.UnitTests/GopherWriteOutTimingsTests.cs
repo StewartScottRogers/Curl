@@ -25,6 +25,19 @@ public sealed class GopherWriteOutTimingsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Transfer_ReportsPretransferAndPosttransferAfterConnectAndStartTransferBeforeTotal()
+    {
+        TransferResult result = await RunAsync();
+
+        TransferTimings timings = result.Report!.Timings!;
+        Assert.IsNotNull(timings.RequestReady);
+        Assert.IsNotNull(timings.RequestSent);
+        Assert.IsGreaterThan(timings.Started, timings.RequestReady.Value);
+        Assert.IsGreaterThanOrEqualTo(timings.RequestReady.Value, timings.RequestSent.Value);
+        Assert.IsLessThan(timings.Completed, timings.FirstByteReceived!.Value);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Transfer_ReportsBytesAndElapsedTimeThatGiveANonZeroSpeed()
     {
         TransferResult result = await RunAsync();

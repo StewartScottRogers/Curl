@@ -105,6 +105,22 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenTheProxyRefusesTheConnect_CarriesTheRepliesHeaderCountAndBytesInTheFailure()
+    {
+        // STD-144: curl prints [7 2 59] for %{exitcode} %{num_headers} %{size_header} after this reply.
+        const string reply = "HTTP/1.1 403 Forbidden\r\nContent-Length: 4\r\nX-Proxy: yes\r\n\r\nnope";
+        var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes(reply));
+        var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
+
+        var result = await ConnectLoggedAsync(connector, PlainTarget);
+
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(2, result.ConnectReplyHeadersStored);
+        Assert.AreEqual(59L, result.ProxyConnectHeaderBytes);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheHandshakeInsideTheTunnelFails_ReturnsTheFailureWithNoHeaderCount()
     {
         const string reply = "HTTP/1.1 200 Connection established\r\nX-A: 1\r\n\r\n";

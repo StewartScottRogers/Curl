@@ -30,8 +30,8 @@ public sealed class ImapKeptConnectionTests
         var handler = new ImapProtocolHandler(Reusing(connection), new QueuedTlsProvider());
         var output = new MemoryStream();
 
-        TransferResult first = await handler.ExecuteAsync(Context("imap://127.0.0.1/804/;MAILINDEX=123/;SECTION=1", output));
-        TransferResult second = await handler.ExecuteAsync(Context("imap://127.0.0.1/804/;MAILINDEX=456/;SECTION=2.3", output));
+        TransferResult first = StampedTimings.Without(await handler.ExecuteAsync(Context("imap://127.0.0.1/804/;MAILINDEX=123/;SECTION=1", output)));
+        TransferResult second = StampedTimings.Without(await handler.ExecuteAsync(Context("imap://127.0.0.1/804/;MAILINDEX=456/;SECTION=2.3", output)));
         await connection.CloseAsync();
 
         Assert.AreEqual(TransferResult.Success(5), first);
@@ -51,8 +51,7 @@ public sealed class ImapKeptConnectionTests
         var handler = new ImapProtocolHandler(Reusing(connection), new QueuedTlsProvider());
 
         await handler.ExecuteAsync(Context("imap://127.0.0.1/815", Stream.Null, "STORE 123 +Flags \\Deleted"));
-        TransferResult second = await handler.ExecuteAsync(Context("imap://127.0.0.1/815", Stream.Null, "CLOSE"));
-
+        TransferResult second = StampedTimings.Without(await handler.ExecuteAsync(Context("imap://127.0.0.1/815", Stream.Null, "CLOSE")));
         Assert.AreEqual(TransferResult.Success(0), second);
         Assert.AreEqual(
             "A001 CAPABILITY\r\nA002 LOGIN user secret\r\nA003 SELECT 815\r\nA004 STORE 123 +Flags \\Deleted\r\nA005 CLOSE\r\n",
@@ -104,7 +103,7 @@ public sealed class ImapKeptConnectionTests
         var handler = new ImapProtocolHandler(Reusing(connection), new QueuedTlsProvider());
 
         await handler.ExecuteAsync(Context("imap://127.0.0.1/1982/;MAILINDEX=1", Stream.Null, user: "user.one"));
-        TransferResult second = await handler.ExecuteAsync(Context("imap://user.one:secret;AUTH=XOAUTH2@127.0.0.1/1982/;UID=2", Stream.Null, user: "user.one"));
+        TransferResult second = StampedTimings.Without(await handler.ExecuteAsync(Context("imap://user.one:secret;AUTH=XOAUTH2@127.0.0.1/1982/;UID=2", Stream.Null, user: "user.one")));
         await connection.CloseAsync();
 
         Assert.AreEqual(TransferResult.Success(1), second);
@@ -217,8 +216,7 @@ public sealed class ImapKeptConnectionTests
             Read("+ Ready\r\n"), Read("A003 OK APPEND completed\r\n"));
         var handler = new ImapProtocolHandler(Reusing(connection), new QueuedTlsProvider());
 
-        TransferResult result = await handler.ExecuteAsync(AppendContext());
-
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(AppendContext()));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsFalse(Encoding.Latin1.GetString(connection.Sent).Contains("LOGOUT", StringComparison.Ordinal));
         Assert.IsFalse(connection.IsClosed);
@@ -232,8 +230,7 @@ public sealed class ImapKeptConnectionTests
             Read("+ Ready\r\n"), Read("A003 NO refused\r\n"), Read("* BYE\r\nA004 OK LOGOUT completed\r\n"));
         var handler = new ImapProtocolHandler(Reusing(connection), new QueuedTlsProvider());
 
-        TransferResult result = await handler.ExecuteAsync(AppendContext());
-
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(AppendContext()));
         Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
         StringAssert.EndsWith(Encoding.Latin1.GetString(connection.Sent), "A004 LOGOUT\r\n", StringComparison.Ordinal);
     }
@@ -249,7 +246,7 @@ public sealed class ImapKeptConnectionTests
         var handler = new ImapProtocolHandler(Reusing(connection), new QueuedTlsProvider());
 
         await handler.ExecuteAsync(Context("imap://127.0.0.1/804/;MAILINDEX=123/;SECTION=1", new MemoryStream()));
-        TransferResult second = await handler.ExecuteAsync(Context("imap://127.0.0.1/804/;MAILINDEX=456/;SECTION=2.3", new MemoryStream()));
+        TransferResult second = StampedTimings.Without(await handler.ExecuteAsync(Context("imap://127.0.0.1/804/;MAILINDEX=456/;SECTION=2.3", new MemoryStream())));
         await connection.CloseAsync();
 
         Assert.AreNotEqual(CurlExitCode.Ok, second.ExitCode);

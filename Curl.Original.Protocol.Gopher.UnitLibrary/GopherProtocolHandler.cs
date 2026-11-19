@@ -132,6 +132,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         }
 
         context.Progress.ReportTransferStarted();
+        long requestStarted = context.TimeProvider.GetTimestamp();
         TransferResult result;
         await using (connection.ConfigureAwait(false))
         {
@@ -139,12 +140,12 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         }
 
         ReportConnectionEnd(context.Events, result, connected.ConnectionNumber);
-        return StampTimings(result, context.TimeProvider, started, connected.Timings);
+        return StampTimings(result, context.TimeProvider, started, connected.Timings, requestStarted);
     }
 
     // Adds the timings behind %{time_*} and %{speed_download} to the report the transfer made (BL-5390).
     // The first byte is stamped with the completion time: the reply is read until the server closes.
-    private static TransferResult StampTimings(TransferResult result, TimeProvider timeProvider, long started, ConnectTimings? connect)
+    private static TransferResult StampTimings(TransferResult result, TimeProvider timeProvider, long started, ConnectTimings? connect, long requestStarted)
     {
         if (result.ExitCode != CurlExitCode.Ok)
         {
@@ -152,7 +153,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
         }
 
         long completed = timeProvider.GetTimestamp();
-        var timings = new TransferTimings(started, connect, null, null, completed, completed);
+        var timings = new TransferTimings(started, connect, requestStarted, requestStarted, requestStarted, completed);
         return result with { Report = result.Report! with { Timings = timings } };
     }
 

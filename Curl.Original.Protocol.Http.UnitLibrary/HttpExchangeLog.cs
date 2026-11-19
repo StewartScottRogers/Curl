@@ -28,6 +28,9 @@ internal sealed class HttpExchangeLog(IDiagnosticLog log, string component)
     /// <summary>The headers whose values are URLs, logged with any user-info replaced by <see cref="RedactedUserInfo" />.</summary>
     private static readonly string[] UrlHeaders = ["Location", "Content-Location", "Referer"];
 
+    /// <summary>The headers that hold URLs among other text (<c>Link</c> lists them in angle brackets, <c>Refresh</c> follows <c>url=</c>), each URL logged with any user-info replaced.</summary>
+    private static readonly string[] UrlListHeaders = ["Link", "Refresh"];
+
     /// <summary>What a URL header's user-info is written as.</summary>
     internal const string RedactedUserInfo = "REDACTED:REDACTED";
 
@@ -233,7 +236,7 @@ internal sealed class HttpExchangeLog(IDiagnosticLog log, string component)
 
     /// <summary>Gives <c>name: value</c>, the value hidden when <paramref name="name" /> is a secret header.</summary>
     private static string Loggable(string name, string value) =>
-        name + ": " + (IsSecret(name) ? ValueNotLogged : IsUrlHeader(name) ? WithoutUserInfo(value) : value);
+        name + ": " + (IsSecret(name) ? ValueNotLogged : IsUrlHeader(name) ? WithoutUserInfo(value) : IsUrlListHeader(name) ? WithoutUserInfoInEachUrl(value) : value);
 
     /// <summary>Tells whether <paramref name="name" /> names a header whose value is a URL that may carry user-info.</summary>
     private static bool IsUrlHeader(string name) =>
@@ -256,6 +259,34 @@ internal sealed class HttpExchangeLog(IDiagnosticLog log, string component)
         authorityEnd = authorityEnd < 0 ? value.Length : authorityStart + authorityEnd;
         int at = value.LastIndexOf('@', authorityEnd - 1, authorityEnd - authorityStart);
         return at < 0 ? value : string.Concat(value.AsSpan(0, authorityStart), RedactedUserInfo, value.AsSpan(at));
+    }
+
+    /// <summary>Tells whether <paramref name="name" /> names a header that holds URLs among other text.</summary>
+    private static bool IsUrlListHeader(string name) =>
+        UrlListHeaders.Contains(name, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Gives <paramref name="value" /> with the user-info of every absolute URL in it replaced by <see cref="RedactedUserInfo" />.</summary>
+    private static string WithoutUserInfoInEachUrl(string value)
+    {
+        StringBuilder result = new();
+        int position = 0;
+        int schemeEnd;
+        while ((schemeEnd = value.IndexOf("://", position, StringComparison.Ordinal)) >= 0)
+        {
+            int authorityStart = schemeEnd + 3;
+            int authorityLength = value.AsSpan(authorityStart).IndexOfAny("/?#<>;, \t\"'");
+            int authorityEnd = authorityLength < 0 ? value.Length : authorityStart + authorityLength;
+            int at = value.LastIndexOf('@', authorityEnd - 1, authorityEnd - authorityStart);
+            result.Append(value, position, authorityStart - position);
+            if (at >= 0)
+            {
+                result.Append(RedactedUserInfo);
+            }
+
+            position = at >= 0 ? at : authorityStart;
+        }
+
+        return result.Append(value, position, value.Length - position).ToString();
     }
 
     /// <summary>Tells whether <paramref name="name" /> names a header whose value carries credentials.</summary>

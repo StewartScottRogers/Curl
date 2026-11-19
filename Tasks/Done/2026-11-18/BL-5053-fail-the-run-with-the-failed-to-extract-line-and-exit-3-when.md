@@ -1,0 +1,37 @@
+---
+id: BL-5053
+title: Fail the run with the Failed-to-extract line and exit 3 when -OJ Content-Disposition names a blank file
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Console/RemoteHeaderNameStream.cs, Curl.Console/ContentDispositionFileName.cs, Curl.Console.UnitTests/RemoteHeaderNameStreamTests.cs]
+requirement: none
+created: 2026-11-12
+completed: 2026-11-18
+---
+# BL-5053 — Fail the run with the Failed-to-extract line and exit 3 when -OJ Content-Disposition names a blank file
+
+## Goal
+
+<!-- One sentence: the observable outcome once this task is done. -->
+
+## Context
+
+<!-- Why this matters, and where to start: requirement IDs, ADRs, projects, files, upstream curl links with the curl version. -->
+
+## Acceptance criteria
+
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
+
+## Notes
+
+No code change: BL-5016 (Done 2026-11-12) already made a -OJ `Content-Disposition: filename=" "` print the Failed-to-extract line, the (3) line and exit 3; CurlCommandRunnerRemoteNameExtractionFailureTests pins it (9 tests pass, rerun in lane 4).
+
+## Log
+
+- 2026-11-12: Created.
+- 2026-11-12: Backlog -> Deferred. Done inside BL-5016
+- 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
+- 2026-11-18: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-11-18: Doing -> Done. Already delivered by BL-5016; its tests pass

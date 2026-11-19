@@ -24,6 +24,29 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_FailAndProxyRefusesConnectWith403_IsExit22()
+    {
+        QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntConnect, "CONNECT tunnel failed, response 403", null, 0, 403));
+        TransferContext context = ProgressContext("http://example.com/", new RecordingTransferProgress(), new HttpRequestOptions { Fail = HttpFailMode.Fail });
+
+        TransferResult result = await Handler(connector).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("The requested URL returned error: 403", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FailWithBodyAndProxyRefusesConnect_StaysExit7()
+    {
+        QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntConnect, "CONNECT tunnel failed, response 403", null, 0, 403));
+        TransferContext context = ProgressContext("http://example.com/", new RecordingTransferProgress(), new HttpRequestOptions { Fail = HttpFailMode.FailWithBody });
+
+        TransferResult result = await Handler(connector).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ConnectFailsBeforeAnyProxyAnswer_ReportsNothing()
     {
         RecordingTransferProgress progress = new();

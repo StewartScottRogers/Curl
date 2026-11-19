@@ -62,11 +62,25 @@ public sealed record TransferReport
     public IReadOnlyList<KeyValuePair<string, string>> PseudoHeaders { get; init; } = [];
 
     /// <summary>
+    /// Gets how many header lines the proxy's reply to a refused CONNECT held; they count towards
+    /// <c>%{num_headers}</c> as curl counts them (STD-144) but are never found by <c>%header{}</c>;
+    /// zero when no CONNECT was refused.
+    /// </summary>
+    public int RefusedConnectHeaderCount { get; init; }
+
+    /// <summary>
     /// Gets how many trailer fields an HTTP/2 response ended with, already in <see cref="ResponseHeaders" />;
     /// zero when there were none. When above zero, <c>%{num_headers}</c> is this count alone, as curl 8.18.0
     /// with nghttp2 1.68 replaces the head's header count with the trailers' (BL-4025).
     /// </summary>
     public int TrailerCount { get; init; }
+
+    /// <summary>
+    /// Gets how many header fields the 1xx head a failed transfer ended in carried; zero otherwise. They are
+    /// not in <see cref="ResponseHeaders" />, so <c>%{header_json}</c> and <c>%header{}</c> show none, but
+    /// <c>%{num_headers}</c> counts them, as curl does (STD-147).
+    /// </summary>
+    public int InformationalHeaderCount { get; init; }
 
     /// <summary>
     /// Gets every header of every response before the last one in a <c>-L</c> chain, hop by

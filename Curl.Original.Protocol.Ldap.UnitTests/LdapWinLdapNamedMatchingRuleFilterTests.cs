@@ -23,6 +23,18 @@ public sealed class LdapWinLdapNamedMatchingRuleFilterTests
     }
 
     [TestMethod]
+    [DataRow("(cn:dn:caseExactMatch:=a)", "8202636E830161")]
+    [DataRow("(cn:DN:caseIgnoreMatch:=a)", "8202636E830161")]
+    [DataRow("(:dn:caseExactMatch:=a)", "830161")]
+    [DataRow("(cn:dn::=a)", "8202636E830161")]
+    public void Encode_WinLdapNamedRuleAfterDn_DropsTheRuleAndKeepsDnAttributes(string filter, string tail)
+    {
+        string hex = HexOf(LdapDialect.WinLdap, filter);
+        Assert.IsTrue(hex.EndsWith(tail + "8401FF", StringComparison.Ordinal));
+        Assert.IsFalse(hex.Contains("81", StringComparison.Ordinal) && hex.Contains(Convert.ToHexString("dn:"u8), StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void Encode_WinLdapOidRule_StillSendsTheRule()
     {
         string hex = HexOf(LdapDialect.WinLdap, "(cn:dn:2.5.13.5:=a)");

@@ -52,11 +52,11 @@ internal static class LdapDigestMd5Bind
 
         bool confidential = qop == QopConfidential;
         string realm = directives.GetValueOrDefault("realm", string.Empty);
-        bool isUtf8 = directives.GetValueOrDefault("charset", string.Empty).Equals("utf-8", StringComparison.OrdinalIgnoreCase);
+        bool isUtf8 = IsUtf8(directives);
         Encoding encoding = isUtf8 ? Encoding.UTF8 : Encoding.Latin1;
         string response = ResponseHex(encoding, user, realm, password, nonce, clientNonce, digestUri, confidential);
         string text = $"username=\"{Quoted(user)}\",realm=\"{Quoted(realm)}\",nonce=\"{Quoted(nonce)}\",cnonce=\"{Quoted(clientNonce)}\",nc={NonceCount},qop={qop}"
-            + (confidential ? ",cipher=3des" : string.Empty)
+            + (confidential ? $",cipher={ChooseCipher(directives)}" : string.Empty)
             + $",digest-uri=\"{Quoted(digestUri)}\",response={response}"
             + (isUtf8 ? ",charset=utf-8" : string.Empty);
         return LdapRequests.SaslBind(writer, messageId, Mechanism, encoding.GetBytes(text));
@@ -79,9 +79,18 @@ internal static class LdapDigestMd5Bind
             return null;
         }
 
-        Encoding encoding = directives.GetValueOrDefault("charset", string.Empty).Equals("utf-8", StringComparison.OrdinalIgnoreCase) ? Encoding.UTF8 : Encoding.Latin1;
-        return LdapDigestMd5SecurityLayer.Create(HashA1(encoding, user, directives.GetValueOrDefault("realm", string.Empty), password, nonce, clientNonce));
+        Encoding encoding = IsUtf8(directives) ? Encoding.UTF8 : Encoding.Latin1;
+        return LdapDigestMd5SecurityLayer.Create(HashA1(encoding, user, directives.GetValueOrDefault("realm", string.Empty), password, nonce, clientNonce), maxBuffer: MaxBufferOf(directives), cipher: ChooseCipher(directives)!);
     }
+
+    private static bool IsUtf8(Dictionary<string, string> directives) =>
+        directives.GetValueOrDefault("charset", string.Empty).Equals("utf-8", StringComparison.OrdinalIgnoreCase);
+
+    // The challenge's maxbuf when it is a positive number, else the RFC 2831 default.
+    private static int MaxBufferOf(Dictionary<string, string> directives) =>
+        int.TryParse(directives.GetValueOrDefault("maxbuf", string.Empty), out int maxBuffer) && maxBuffer > 0
+            ? maxBuffer
+            : LdapDigestMd5SecurityLayer.DefaultMaxBuffer;
 
     /// <summary>
     /// RFC 2831 section 2.1.2.1: HEX(KD(HEX(H(A1)), nonce:nc:cnonce:qop:HEX(H(A2)))) for
@@ -102,12 +111,21 @@ internal static class LdapDigestMd5Bind
         return MD5.HashData([.. secret, .. encoding.GetBytes($":{nonce}:{clientNonce}")]);
     }
 
-    // auth-conf when offered with the 3des cipher, else auth when offered, else null.
+    // The first of the supported ciphers the challenge offers (3des, then the rc4 family from the strongest), else null.
+    private static string? ChooseCipher(Dictionary<string, string> directives)
+    {
+        string[] offered = directives.GetValueOrDefault("cipher", string.Empty).Split(',', StringSplitOptions.TrimEntries);
+        return SupportedCiphers.FirstOrDefault(cipher => offered.Contains(cipher, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static readonly string[] SupportedCiphers = ["3des", "rc4", "rc4-56", "rc4-40"];
+
+    // auth-conf when offered with a supported cipher, else auth when offered, else null.
     private static string? ChooseQop(Dictionary<string, string> directives)
     {
         string[] qops = directives.GetValueOrDefault("qop", "auth").Split(',', StringSplitOptions.TrimEntries);
         bool offersConf = qops.Contains(QopConfidential, StringComparer.OrdinalIgnoreCase)
-            && directives.GetValueOrDefault("cipher", string.Empty).Split(',', StringSplitOptions.TrimEntries).Contains("3des", StringComparer.OrdinalIgnoreCase);
+            && ChooseCipher(directives) is not null;
         return offersConf ? QopConfidential : qops.Contains("auth", StringComparer.OrdinalIgnoreCase) ? "auth" : null;
     }
 

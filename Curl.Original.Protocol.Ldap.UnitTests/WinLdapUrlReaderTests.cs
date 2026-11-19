@@ -127,6 +127,10 @@ public sealed class WinLdapUrlReaderTests
     [DataRow("x%00y", "Bad LDAP URL: No Memory")]
     [DataRow("x?a%00", "Bad LDAP URL: No Memory")]
     [DataRow("x???(cn=a%00)", "Bad LDAP URL: No Memory")]
+    [DataRow("x???%09(uid=alice)", "Bad LDAP URL: No Memory")]
+    [DataRow("x???%0a(uid=alice)", "Bad LDAP URL: No Memory")]
+    [DataRow("x???%0d(uid=alice)", "Bad LDAP URL: No Memory")]
+    [DataRow("x???(uid=alice)%09", "Bad LDAP URL: No Memory")]
     public void Read_UrlTheBuildRefuses_FailsWith3AndItsMessage(string path, string message)
     {
         LdapUrlReading reading = Read(path);

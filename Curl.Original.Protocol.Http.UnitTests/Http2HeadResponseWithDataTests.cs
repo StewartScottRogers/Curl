@@ -56,6 +56,24 @@ public sealed class Http2HeadResponseWithDataTests
         Assert.IsTrue(read > 0);
     }
 
+    [TestMethod]
+    public async Task ReadToEndAsync_TrailerHeadersRightAfterTheHeadAndIgnoresBody_KeepsTheTrailer()
+    {
+        HpackEncoder server = new();
+        List<byte> scripted = [.. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings([]))];
+        scripted.AddRange(Http2FrameCodec.Serialize(Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200"), new("content-length", "5")]), isEndStream: false, isEndHeaders: true)));
+        scripted.AddRange(Http2FrameCodec.Serialize(Http2FrameFactory.CreateHeaders(1, server.Encode([new("x-t", "trailerval")]), isEndStream: true, isEndHeaders: true)));
+        ScriptedConnection connection = new([.. scripted], 65536);
+        Http2StreamConnection stream = (Http2StreamConnection)new Http2Session(connection).CreateStream("http", 0, true);
+        await stream.WriteAsync(Encoding.Latin1.GetBytes(HeadRequest), CancellationToken.None);
+        byte[] buffer = new byte[256];
+
+        _ = await stream.ReadAsync(buffer, CancellationToken.None);
+        await stream.ReadToEndAsync(CancellationToken.None);
+
+        Assert.AreEqual("x-t: trailerval\r\n", Encoding.Latin1.GetString(stream.TrailerBytes.Span));
+    }
+
     private static async Task<(string Head, string Tail)> ExchangeAsync(bool ignoresBody, bool endsOnHeaders)
     {
         HpackEncoder server = new();

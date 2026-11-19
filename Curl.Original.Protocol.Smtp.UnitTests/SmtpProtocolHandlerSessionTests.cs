@@ -77,8 +77,7 @@ public sealed class SmtpProtocolHandlerSessionTests
         Diagnostics.ArrangeContext(context, Greeting + EhloReply + HelpReplyAndBye);
         Diagnostics.Arrange("proxy", "Socks5 proxy:1080");
 
-        TransferResult result = await new SmtpProtocolHandler(connector, new QueuedTlsProvider()).ExecuteAsync(context);
-
+        TransferResult result = StampedTimings.Without(await new SmtpProtocolHandler(connector, new QueuedTlsProvider()).ExecuteAsync(context));
         Diagnostics.ActEvents(result, events);
         Diagnostics.AssertValues("proxy reached the connector", true, ReferenceEquals(proxy, connector.Targets.Single().Proxy));
         Assert.AreSame(proxy, connector.Targets.Single().Proxy);
@@ -447,8 +446,7 @@ public sealed class SmtpProtocolHandlerSessionTests
         Diagnostics.Arrange("url", Url);
         Diagnostics.Arrange("connector", "refuses with: Failed to connect to 127.0.0.1 port 18025");
 
-        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null });
-
+        TransferResult result = StampedTimings.Without(await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null }));
         Diagnostics.ActResult(result);
         Diagnostics.AssertValues("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Diagnostics.AssertValues("error message", "Failed to connect to 127.0.0.1 port 18025", result.ErrorMessage);

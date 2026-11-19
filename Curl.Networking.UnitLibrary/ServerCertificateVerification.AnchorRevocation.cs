@@ -1,8 +1,8 @@
 using System.Formats.Asn1;
 using System.Runtime.CompilerServices;
-using Curl.Protocol.Abstractions;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
 
@@ -94,7 +94,7 @@ internal sealed partial class ServerCertificateVerification
             return BelowAnchorRevocation.Clean;
         }
 
-        var elements = chain.ChainElements.Cast<X509ChainElement>().Select(element => element.Certificate).ToArray();
+        var elements = chain.ChainElements.Cast<X509ChainElement>().Select(element => element.Certificate).Take(AnchorIndexOf(chain) + 1).ToArray();
         using var budget = new CancellationTokenSource(RevocationFetchBudget, timeProvider);
         using var limited = CancellationTokenSource.CreateLinkedTokenSource(budget.Token, RevocationLimit);
         var outcomes = elements.Take(elements.Length - 1).Select((certificate, index) => RevocationOf(certificate, elements[index + 1], limited.Token)).ToArray();
@@ -116,7 +116,7 @@ internal sealed partial class ServerCertificateVerification
     {
         var der = TryFetchRevocationList(uri, budget);
         var list = der is null ? null : DecodeOrNothing(der);
-        return list is not null && IsCurrentListOf(list, certificate, issuer) ? list : null;
+        return list is not null && IsCurrentListOf(list, certificate, issuer, uri) ? list : null;
     }
 
     private byte[]? TryFetchRevocationList(Uri uri, CancellationToken budget)
@@ -137,19 +137,28 @@ internal sealed partial class ServerCertificateVerification
         }
     }
 
-    private bool IsCurrentListOf(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer) =>
-        list.CoversCertificatesIssuedFor(certificate) && list.IsSignedBy(issuer) && list.NextUpdate >= timeProvider.GetUtcNow();
+    private bool IsCurrentListOf(CertificateRevocationList list, X509Certificate2 certificate, X509Certificate2 issuer, Uri uri) =>
+        list.CoversCertificatesIssuedFor(certificate) && list.IsSignedBy(issuer) && list.NextUpdate >= timeProvider.GetUtcNow() && list.CoversScopeOf(certificate, uri);
 
-    private static CertificateRevocationList? DecodeOrNothing(byte[] der)
+    // A list served as DER or as PEM text (curl accepts both); PEM armour is stripped before decoding.
+    internal static CertificateRevocationList? DecodeOrNothing(byte[] body)
     {
         try
         {
-            return CertificateRevocationList.Decode(der);
+            return CertificateRevocationList.Decode(DerOf(body));
         }
-        catch (AsnContentException)
+        catch (Exception exception) when (exception is AsnContentException or FormatException)
         {
             return null;
         }
+    }
+
+    private static byte[] DerOf(byte[] body)
+    {
+        var text = System.Text.Encoding.ASCII.GetString(body);
+        return PemEncoding.TryFind(text, out var fields) && text[fields.Label] == "X509 CRL"
+            ? Convert.FromBase64String(text[fields.Base64Data])
+            : body;
     }
 
     // The http addresses in a certificate's CRL distribution points (RFC 5280, 4.2.1.13); none

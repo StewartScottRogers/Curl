@@ -24,3 +24,7 @@ measured.
 The trusted-`--cacert` repro of CGR-289 matches curl's exit code and stderr. Failures of curl's own first
 connection (an untrusted `--cacert`, a name mismatch, revocation) are unchanged and still exit 60, as
 curl's do.
+
+## Amendment (BL-5461, decided by Claude under Stewart's delegation)
+
+Over `ldaps://` with `-u`, curl's own connection is the one that carries the bind (WinLDAP opens no second one), and a handshake it fails is curl's own failure: exit 60 `SEC_E_UNTRUSTED_ROOT`, as curl 8.22.0 reports (STD-142). Only WinLDAP's second connection (no `-u`) still ends in the bind's `Server Down`.

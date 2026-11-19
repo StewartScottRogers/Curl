@@ -28,6 +28,8 @@ internal static class TestRevocationList
     /// <param name="writeVersion">Whether to write the v2 version number.</param>
     /// <param name="generalizedTimes">Whether to write the dates as GeneralizedTime rather than UTCTime.</param>
     /// <param name="signatureAlgorithm">The algorithm named; the signer's natural one when <see langword="null" />.</param>
+    /// <param name="extensions">DER <c>Extension</c> values (see <see cref="Extension" />) for the list; none when <see langword="null" />.</param>
+    /// <param name="entryExtensions">DER <c>Extension</c> values written on every revoked entry; none when <see langword="null" />.</param>
     /// <returns>The list's DER.</returns>
     internal static byte[] Write(
         X509Certificate2 signer,
@@ -37,7 +39,9 @@ internal static class TestRevocationList
         IReadOnlyList<byte[]>? revokedSerialNumbers = null,
         bool writeVersion = true,
         bool generalizedTimes = false,
-        string? signatureAlgorithm = null)
+        string? signatureAlgorithm = null,
+        IReadOnlyList<byte[]>? extensions = null,
+        IReadOnlyList<byte[]>? entryExtensions = null)
     {
         using var rsa = signer.GetRSAPrivateKey();
         using var ecdsa = signer.GetECDsaPrivateKey();
@@ -69,10 +73,13 @@ internal static class TestRevocationList
                         {
                             signed.WriteIntegerUnsigned(serialNumber);
                             WriteTime(signed, DateTimeOffset.UtcNow.AddHours(-1), generalizedTimes);
+                            WriteExtensions(signed, entryExtensions, explicitTag: false);
                         }
                     }
                 }
             }
+
+            WriteExtensions(signed, extensions, explicitTag: true);
         }
 
         var signedPart = signed.Encode();
@@ -91,10 +98,51 @@ internal static class TestRevocationList
         return list.Encode();
     }
 
+    /// <summary>One DER <c>Extension</c>: its OID, the critical flag when set, and its value.</summary>
+    /// <param name="oid">The extension's OID.</param>
+    /// <param name="critical">Whether the extension is critical.</param>
+    /// <param name="value">The DER written inside the extension's OCTET STRING.</param>
+    /// <returns>The extension's DER.</returns>
+    internal static byte[] Extension(string oid, bool critical, byte[] value)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            writer.WriteObjectIdentifier(oid);
+            if (critical)
+            {
+                writer.WriteBoolean(true);
+            }
+
+            writer.WriteOctetString(value);
+        }
+
+        return writer.Encode();
+    }
+
     /// <summary>The list as a PEM <c>X509 CRL</c> block.</summary>
     /// <param name="der">The list's DER.</param>
     /// <returns>The PEM text.</returns>
     internal static string Pem(byte[] der) => PemEncoding.WriteString("X509 CRL", der) + "\n";
+
+    private static void WriteExtensions(AsnWriter writer, IReadOnlyList<byte[]>? extensions, bool explicitTag)
+    {
+        if (extensions is not { Count: > 0 })
+        {
+            return;
+        }
+
+        using (explicitTag ? writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0)) : default(AsnWriter.Scope))
+        {
+            using (writer.PushSequence())
+            {
+                foreach (var extension in extensions)
+                {
+                    writer.WriteEncodedValue(extension);
+                }
+            }
+        }
+    }
 
     private static void WriteAlgorithm(AsnWriter writer, string algorithm)
     {

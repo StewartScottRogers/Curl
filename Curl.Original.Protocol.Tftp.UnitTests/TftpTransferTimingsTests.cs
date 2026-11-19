@@ -78,11 +78,10 @@ public sealed class TftpTransferTimingsTests
         Assert.IsTrue(timings.Completed > timings.Started);
         Assert.IsNotNull(timings.Connect);
         Assert.IsTrue(timings.Connect.NameResolved > timings.Started);
-        if (isUpload)
-        {
-            Assert.IsTrue(timings.Connect.Connected > timings.Started);
-        }
-        Assert.IsTrue(timings.RequestReady > timings.Started);
+        Assert.IsNull(timings.Connect.Connected);
+        Assert.AreEqual(timings.Completed, timings.RequestReady);
+        Assert.AreEqual(timings.Completed, timings.RequestSent);
+Assert.IsTrue(timings.RequestReady > timings.Started);
     }
 
     private static async Task<TransferResult> RunAsync(IDatagramChannel channel, TimeProvider clock, MemoryStream stream, bool upload) =>

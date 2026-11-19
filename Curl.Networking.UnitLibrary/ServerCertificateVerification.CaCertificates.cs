@@ -148,7 +148,7 @@ internal sealed partial class ServerCertificateVerification
     private static bool BuildAgainstAnchors(X509Chain? chain, X509Certificate2Collection anchors, bool requireServerAuthentication)
     {
         using var anchoredChain = RebuildAgainstAnchors(chain, anchors, requireServerAuthentication, out var built);
-        return built;
+        return built || (anchoredChain is not null && IsPartialChainAtListedAnchor(anchoredChain));
     }
 
     // The server's chain built against the anchors alone, built whether or not it succeeds so its
@@ -161,7 +161,10 @@ internal sealed partial class ServerCertificateVerification
             return null;
         }
 
+        // OpenSSL follows no AIA link, so a missing intermediate is not downloaded here either (BL-5448);
+        // only the OpenSSL build reads --capath anchors, the Schannel build ignores them.
         var anchoredChain = new X509Chain();
+        anchoredChain.ChainPolicy.DisableCertificateDownloads = true;
         anchoredChain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
         anchoredChain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
         if (requireServerAuthentication)
@@ -179,6 +182,15 @@ internal sealed partial class ServerCertificateVerification
         built = anchoredChain.Build(chain.ChainElements[0].Certificate);
         return anchoredChain;
     }
+
+    // OpenSSL curl sets X509_V_FLAG_PARTIAL_CHAIN, so a --capath directory holding only an
+    // intermediate CA anchors a chain through it: .NET finds that chain partial for want of a
+    // self-signed root, and only a broken name constraint or the like makes it a failure (BL-5439).
+    private static bool IsPartialChainAtListedAnchor(X509Chain anchoredChain) =>
+        anchoredChain.ChainElements.Count > 0
+        && HasOnlyMissingRootStatus(anchoredChain.ChainStatus)
+        && ListsAnAnchorCandidate(anchoredChain)
+        && CertificateNameConstraints.FindViolation(anchoredChain) == 0;
 
     // OpenSSL names the reason from the chain it built against the --capath roots, so an expired
     // leaf under one of them is "certificate has expired (10)", not the system store's "unable to

@@ -43,6 +43,18 @@ public sealed class HarHeaderRedactionTests
     }
 
     [TestMethod]
+    public void Write_LinkAndRefreshWithUserInfo_AreWrittenRedactedInEachUrl()
+    {
+        var headers = EntryOf("http://example.com/", ("Link", "<http://lu:LINKSECRET@example.com/a>; rel=\"next\", <http://example.com/b>; rel=y"), ("Refresh", "5; url=http://fu:REFRESHSECRET@example.com/b"), ("refresh", "5"), ("REFRESH", "0; url=http://q@host"))
+            .GetProperty("response").GetProperty("headers");
+
+        Assert.AreEqual("<http://REDACTED:REDACTED@example.com/a>; rel=\"next\", <http://example.com/b>; rel=y", ValueOf(headers, "Link"));
+        Assert.AreEqual("5; url=http://REDACTED:REDACTED@example.com/b", ValueOf(headers, "Refresh"));
+        Assert.AreEqual("5", ValueOf(headers, "refresh"));
+        Assert.AreEqual("0; url=http://REDACTED:REDACTED@host", ValueOf(headers, "REFRESH"));
+    }
+
+    [TestMethod]
     public void Write_RefererWithUserInfo_IsWrittenRedacted()
     {
         var headers = EntryOf("http://r:REFSECRET@example.com/p").GetProperty("request").GetProperty("headers");

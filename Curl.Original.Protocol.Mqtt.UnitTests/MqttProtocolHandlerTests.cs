@@ -842,6 +842,68 @@ public sealed class MqttProtocolHandlerTests
         Assert.IsTrue(connection.IsDisposed);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_MaxTimePassed_ReturnsTimedOutResultThatKeepsTimings()
+    {
+        ScriptedConnection connection = new(Connack);
+        MqttProtocolHandler handler = new(FakeConnector.For(connection), () => FixedSuffix);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("mqtt://h/t"),
+            Output = new RecordingStream(),
+            MaxTime = TimeSpan.FromSeconds(2),
+            CancellationToken = new CancellationToken(canceled: true),
+        };
+
+        TransferResult result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        StringAssert.StartsWith(result.ErrorMessage, "Operation timed out after ");
+        Assert.IsNotNull(result.Report!.Timings);
+        Assert.IsTrue(connection.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MaxTimePassedAfterAPublish_TimeoutMessageNamesTheExpectedSize()
+    {
+        using CancellationTokenSource timeout = new();
+        ScriptedConnection connection = new(Connack, Suback, Publish("t", "HELLO"), Publish("t", "more"));
+        MqttProtocolHandler handler = new(FakeConnector.For(connection), () => FixedSuffix);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("mqtt://h/t"),
+            Output = new RecordingStream(),
+            MaxTime = TimeSpan.FromSeconds(2),
+            CancellationToken = timeout.Token,
+            Progress = new CancellingProgress(timeout),
+        };
+
+        TransferResult result = await handler.ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        StringAssert.EndsWith(result.ErrorMessage, "with 8 out of 8 bytes received");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Publish_ReportsPretransferAndPosttransferAndNoUploadSize()
+    {
+        ScriptedConnection connection = new(Connack);
+        MqttProtocolHandler handler = new(FakeConnector.For(connection), () => FixedSuffix);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("mqtt://h/t"),
+            Output = new RecordingStream(),
+            PostData = Encoding.ASCII.GetBytes("x"),
+        };
+
+        TransferResult result = await handler.ExecuteAsync(context);
+
+        TransferTimings timings = result.Report!.Timings!;
+        Assert.IsNotNull(timings.RequestReady);
+        Assert.IsNotNull(timings.RequestSent);
+        Assert.AreEqual(0, result.Report.UploadSize);
+    }
+
     /// <summary>
     /// Replays <c>curl -d 75 mqtt://h/bedroom/dimmer</c> as measured against curl 8.21.0 on
     /// 2026-09-26, with DISCONNECT pinned as sent to a broker that stays open.
@@ -1229,7 +1291,7 @@ public sealed class MqttProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_Subscribed_ReportsTheTransferStartedAndEachPublishWithItsSizeExpected()
     {
-        // curl 8.21.0 -m 3 against a stalled subscription: "with 5 out of 5 bytes received" (BL-511 Notes).
+        // curl 8.21.0 -m 3 against a stalled subscription: "with 8 out of 8 bytes received" (BL-511 Notes).
         ScriptedConnection connection = new(Connack, Suback, Publish("t", "hi"), Publish("t", "HELLO"), Disconnect);
         RecordingProgress progress = new();
         var context = new TransferContext { Url = CurlUrl.Parse("mqtt://h/t"), Output = new RecordingStream(), Progress = progress };
@@ -1306,6 +1368,19 @@ public sealed class MqttProtocolHandlerTests
 
     private static TransferContext Context(string url, Stream output) =>
         new() { Url = CurlUrl.Parse(url), Output = output };
+
+    private sealed class CancellingProgress(CancellationTokenSource source) : ITransferProgress
+    {
+        public void ReportTransferStarted()
+        {
+        }
+
+        public void ReportDownloaded(long bytesSoFar, long? expectedTotal) => source.Cancel();
+
+        public void ReportUploaded(long bytesSoFar, long? expectedTotal)
+        {
+        }
+    }
 
     private sealed class RecordingProgress : ITransferProgress
     {
