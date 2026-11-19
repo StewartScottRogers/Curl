@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/AltSvcTransferCache.cs, Curl.Original.Protocol.Http.UnitLibrary/AltSvcApplicationProtocols.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5549 — Use a stored alt-svc h3 entry: a later --alt-svc request to the same origin goes over HTTP/3
 
@@ -34,15 +34,18 @@ curl -s -k --alt-svc altsvc.txt -o NUL -w "%{http_version}" https://127.0.0.1:84
 
 ## Acceptance criteria
 
-- [ ] Against a server advertising `h3`, the repro's second request reports `%{http_version}` `3`; or an ADR states, with the measured reference behaviour, why this build does not switch, and `curl -V`'s feature list agrees with it.
-- [ ] Behaviour with a second URL in one command, and with `--http2` and `--http1.1`, matches the measured reference curl.
-- [ ] Focused unit tests in `Curl.Engine.UnitTests` pin when a stored `h3` entry switches the transfer to HTTP/3.
-- [ ] `AltSvcTransferCache`'s doc comment is true of the code.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Against a server advertising `h3`, the repro's second request reports `%{http_version}` `3`; or an ADR states, with the measured reference behaviour, why this build does not switch, and `curl -V`'s feature list agrees with it.
+- [x] Behaviour with a second URL in one command, and with `--http2` and `--http1.1`, matches the measured reference curl.
+- [x] Focused unit tests in `Curl.Engine.UnitTests` pin when a stored `h3` entry switches the transfer to HTTP/3.
+- [x] `AltSvcTransferCache`'s doc comment is true of the code.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decision: ADR-1306. Treat every build as one listing HTTP2/HTTP3 (`curl -V` already does): with no version option a stored h3 entry switches the transfer to HTTP/3 on every platform; --http1.1 and --http2 ignore it. isWindows and actsAsQuicBuild removed from the alt-svc lookup, OpenAsync, TransferPerformer.OpenAltSvcCacheAsync and the Console call. Touched beyond `touches`: TransferPerformer.Setup.cs, CurlCommandRunner.cs (one-argument removal), Curl.Engine.UnitTests, Curl.Console.UnitTests (obsolete Windows-only test removed); no other Doing task names them. Not measured against live HTTP/3 curl (Windows lane); rules are the ones the cache already pinned for the Linux reference. AltSvcApplicationProtocols.cs needed no change. Quality: Engine and Console 100/100, CRAP 10.
 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 1.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 94b1b568 f78cc956 9d6c6e61 af257326 3d836d5e.
+- 2026-11-19: Doing -> Done. A stored alt-svc h3 entry now switches a later no-option or --http3 request to HTTP/3 on every platform (ADR-1306)

@@ -381,30 +381,6 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
         Assert.AreEqual(new AltSvcRoute("h3", new AltSvcAlternative("h3", "localhost", 18444)), secondServer.QuicTargets.Single().AltSvcRoute);
     }
 
-    /// <summary>
-    /// curl 8.22.0's Schannel build allows no <c>h2</c> or <c>h3</c> alternative without a version option, so an
-    /// entry naming either leaves the transfer on the origin over HTTP/1.1 (BL-4912 STD-009 and STD-013, ADR-1238).
-    /// </summary>
-    [TestMethod]
-    [OSCondition(OperatingSystems.Windows)]
-    [DataRow(OtherPortH2Entry)]
-    [DataRow(OtherPortH3Entry)]
-    public async Task RunAsync_H2OrH3EntryForAnotherPortOnWindowsWithoutAVersionOption_StaysOnTheOrigin(string entry)
-    {
-        CacheFileHolds(entry);
-        ScriptedConnector server = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")]);
-
-        int exitCode = await RunAsync(server, ["-sS", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
-
-        Diagnostics.Assert("exit code", 0, exitCode);
-        Diagnostics.Assert("stdout", "ok|1.1", StandardOutputText);
-        Diagnostics.Assert("alt-svc route", "<null>", RouteText(server.Targets.Single().AltSvcRoute));
-        Assert.AreEqual(0, exitCode, StandardErrorText);
-        Assert.AreEqual("ok|1.1", StandardOutputText);
-        Assert.IsNull(server.Targets.Single().AltSvcRoute);
-        Assert.AreEqual(18443, server.Targets.Single().Port);
-    }
-
     [TestMethod]
     public async Task RunAsync_RedirectFromAnH3AlternativeToAnotherOrigin_ConnectsToItOverTcp()
     {
