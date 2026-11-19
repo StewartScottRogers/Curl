@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions/ADR-1298-winldap-drops-a-named-matching-rule-in-an-extensible-match-filter.md]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5546 — Fix AF-0882: ADR-1298 says WinLDAP sends a named matching rule that follows dn:, but the encoder drops it
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+ADR-1298 Decision now says a named rule is dropped with or without dn: (BL-5453). Docs-only change; the EncodeWinLdapExtensible summary in LdapFilterEncoder.cs is outside this task's touches, so left to a follow-up.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-19: Doing -> Done. ADR-1298 now states named rules are dropped with or without dn:

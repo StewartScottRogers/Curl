@@ -16,5 +16,6 @@ task is a drop-in replacement and the server sees the same bytes either way only
 ## Decision
 
 In the WinLDAP dialect the matching rule is sent only when it is an OID (starts with a
-digit) or follows `dn:`; any other name is dropped. The OID form `(cn:dn:2.5.13.5:=a)` is
+digit), with or without a leading `dn:`; any named rule, with or without `dn:` (BL-5453),
+is dropped. The OID form `(cn:dn:2.5.13.5:=a)` is
 unchanged. The libldap (OpenLDAP) dialect keeps sending a named matching rule.
