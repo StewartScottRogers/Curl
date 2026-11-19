@@ -36,3 +36,4 @@ First find out whether a port can already wait: whether `Activesocket` gives som
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 3 (ws_recv Again).
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 0b154ba5 c077b01b 34acfc7c 3d836d5e.
