@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Stomp.UnitLibrary/Wire/StompFrameReader.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5556 — Fix AF-0885: Surviving mutant: the STOMP frame reader can double its buffer on every read and stop growing it when full
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Stomp.UnitLibrary/Wire/StompFrameReader.cs line 137`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Stomp.UnitLibrary/Wire/StompFrameReader.cs line 137`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test `StompFrameReaderTests.ReadAsync_SmallFrameInTinyChunks_NeverGrowsTheBufferWhileThereIsRoom` (records the span size offered to each read; the mutant offers about 8 KiB). Verified by hand: mutant applied, 1 failure; reverted, 79 pass. Production code unchanged. Fast tests of the Stomp project green; platform-neutral.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 19c675ca 9742157d.
+- 2026-11-19: Doing -> Done. Added a test that kills the AF-0885 mutant
