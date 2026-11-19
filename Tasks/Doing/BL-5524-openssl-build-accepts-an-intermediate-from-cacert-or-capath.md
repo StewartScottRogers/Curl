@@ -48,3 +48,4 @@ The intent of BL-5449 must stay: an intermediate that only .NET's CurrentUser CA
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: dc90fc2a f4ecab4a 46ff4b1a 6ced534c 3d836d5e.
