@@ -33,10 +33,10 @@ First find out whether a port can already wait: whether `Activesocket` gives som
 
 ## Notes
 
-Found: Activesocket is a bare number .NET cannot wait on, and waiting on it with CurlMulti.WaitAsync would start a competing read beside the WebSocket receive's own pending read. So a new wait was added (ADR-1307): IEasyWebSocket.WaitForDataAsync (default member), ManagedEasyWebSocket override, CurlEasyWebSocket.WebSocketWaitAsync; README sample is compiled by ReadmeWebSocketWaitSampleTests. WebSocketRecv still answers Again. touches widened to the engine files (no other Doing task holds them). Measure-CodeQuality: 0 failing members for Libcurl, Curl.Api.UnitLibrary, Curl.Engine.UnitLibrary. CI on Linux and macOS: change is platform-neutral, fast tests green here.
+Found: Activesocket is a bare number .NET cannot wait on, and waiting on it with CurlMulti.WaitAsync would start a competing read beside the WebSocket receive's own pending read. So a new wait was added (ADR-1308): IEasyWebSocket.WaitForDataAsync (default member), ManagedEasyWebSocket override, CurlEasyWebSocket.WebSocketWaitAsync; README sample is compiled by ReadmeWebSocketWaitSampleTests. WebSocketRecv still answers Again. touches widened to the engine files (no other Doing task holds them). Measure-CodeQuality: 0 failing members for Libcurl, Curl.Api.UnitLibrary, Curl.Engine.UnitLibrary. CI on Linux and macOS: change is platform-neutral, fast tests green here.
 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 3 (ws_recv Again).
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 0b154ba5 c077b01b 34acfc7c 3d836d5e.
-- 2026-11-19: Doing -> Done. WebSocketWaitAsync added and README sample shows the receive loop (ADR-1307)
+- 2026-11-19: Doing -> Done. WebSocketWaitAsync added and README sample shows the receive loop (ADR-1308)

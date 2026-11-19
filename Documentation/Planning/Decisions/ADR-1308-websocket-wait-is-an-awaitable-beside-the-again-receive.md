@@ -1,4 +1,4 @@
-# ADR-1307 — A Libcurl port waits for a WebSocket frame with WebSocketWaitAsync
+# ADR-1308 — A Libcurl port waits for a WebSocket frame with WebSocketWaitAsync
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-5554).
 
