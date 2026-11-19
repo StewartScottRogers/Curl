@@ -44,3 +44,4 @@ Measured 2026-10-16 during BL-2491 on Windows' curl 8.21.0 (Schannel): `-s -S --
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 9cafc694 46d4e715 a0b0533f.
 - 2026-11-18: Doing -> Blocked. Stewart: curl 8.22.0 (the target) still refuses --proto =ipfs,http with exit 2 exactly as Curl does; close BL-2523 as met by 8.22.0 parity, or reword its 8.21.0 criteria?
+- 2026-11-18: Blocked -> Deferred. Stewart 2026-11-18: closed, matches curl 8.22.0 (the target refuses --proto =ipfs,http with exit 2, as Curl does); do not reopen unless the target version moves

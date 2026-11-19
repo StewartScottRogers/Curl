@@ -53,3 +53,4 @@ Shares `SaslAuthenticator.cs` with BL-5281, so the two run one after the other.
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e7bd11d6 5df6465a 668b5e4d.
 - 2026-11-18: Doing -> Blocked. Stewart: criteria 1 and 2 demand '=' but platform curl 8.22.0 sends an empty line (ADR-1279); approve rewording the criteria to 8.22.0 behaviour or drop the task?
+- 2026-11-18: Blocked -> Deferred. Stewart 2026-11-18: closed as not a defect, curl 8.22.0 sends an empty line for an empty SASL EXTERNAL response (ADR-1279); do not reopen unless the target version moves
