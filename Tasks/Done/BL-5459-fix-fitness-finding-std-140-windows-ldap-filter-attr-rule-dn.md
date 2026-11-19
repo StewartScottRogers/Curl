@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapFilterEncoder.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5459 — Fix fitness finding STD-140: Windows LDAP filter (attr:rule:dn:=v) (dn after the rule) loses dnAttributes; WinLDAP sets it
 
@@ -31,13 +31,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the filter bytes end in `8401ff`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the filter bytes end in `8401ff`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Fixed in EncodeWinLdapExtensible: a trailing `:dn` after the rule sets dnAttributes (and is stripped from the rest, so an OID rule is sent without it; unmeasured for OID, simplest reading). Test added in LdapWinLdapNamedMatchingRuleFilterTests. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-140 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 2745cec0 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. WinLDAP dn after the rule sets dnAttributes
