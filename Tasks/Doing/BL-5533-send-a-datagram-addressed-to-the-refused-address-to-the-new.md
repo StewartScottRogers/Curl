@@ -32,3 +32,4 @@ Found by the shift-end review of 2026-11-18 (code-reviewer, ADR-0710), diff 2a47
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: fd455dbc 959c678a 68cb9cf5.
