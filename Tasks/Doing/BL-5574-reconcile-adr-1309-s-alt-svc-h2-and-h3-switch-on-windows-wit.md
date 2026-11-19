@@ -40,3 +40,4 @@ Found by the shift-end review of 2026-11-19 (code-reviewer) in the diff 74adc46d
 ## Log
 
 - 2026-11-19: Created.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 2b810262 a6d6a214 0266d876 dff2d5bc d559aadd.
