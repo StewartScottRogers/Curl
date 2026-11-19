@@ -90,6 +90,44 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_CancelledAfterConnecting_CarriesTimingsAndEndPointsOnTheCancellation_BL5491()
+    {
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        IPEndPoint remote = new(IPAddress.Loopback, 4222);
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("nats", _ =>
+            {
+                recorder.Record(new IPEndPoint(IPAddress.Loopback, 50000), remote, timings: new ConnectTimings(1, null, 5, null));
+                time.Advance(7);
+                throw new OperationCanceledException();
+            }),
+            recorder);
+
+        OperationCanceledException cancelled = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await handler.ExecuteAsync(ContextOf(time)));
+
+        TransferReport report = EndPointReportingProtocolHandler.ReportCarriedBy(cancelled)!;
+        Assert.AreEqual(remote, report.RemoteEndPoint);
+        Assert.IsNotNull(report.Timings);
+        Assert.AreEqual(1, report.ConnectionCount);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CancelledBeforeConnecting_CarriesNoReport_BL5491()
+    {
+        ManualTimeProvider time = new();
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("nats", _ => throw new OperationCanceledException()),
+            new ConnectionEndPointRecorder());
+
+        OperationCanceledException cancelled = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await handler.ExecuteAsync(ContextOf(time)));
+
+        Assert.IsNull(EndPointReportingProtocolHandler.ReportCarriedBy(cancelled));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_FailureWithReportAndNoConnection_ReportsNoUpload()
     {
         ManualTimeProvider time = new();
@@ -119,9 +157,147 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
         Assert.IsNotNull(result.Report.Timings);
     }
 
-    private static TransferContext ContextOf(TimeProvider time, byte[]? postData = null, Stream? upload = null) => new()
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectedNonHttpTransferFailsWithReport_ReportsNoUploadOfDashDData()
     {
-        Url = CurlUrl.Parse("redis://127.0.0.1/"),
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("redis", _ =>
+            {
+                recorder.Record(null, Remote, false, new ConnectTimings(0, 1, 5, null));
+                return ValueTask.FromResult(
+                    TransferResult.Failure(CurlExitCode.LoginDenied, "x") with { Report = new TransferReport() });
+            }),
+            recorder);
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(time, postData: [1, 2, 3]));
+
+        Assert.AreEqual(0, result.Report!.UploadSize);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectedHttpTransferFailsWithReport_KeepsDashDDataAsUploaded()
+    {
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("http", _ =>
+            {
+                recorder.Record(null, Remote, false, new ConnectTimings(0, 1, 5, null));
+                return ValueTask.FromResult(
+                    TransferResult.Failure(CurlExitCode.OperationTimedOut, "x") with { Report = new TransferReport() });
+            }),
+            recorder);
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(time, postData: [1, 2, 3], url: "http://127.0.0.1/"));
+
+        Assert.AreEqual(3, result.Report!.UploadSize);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectedRedisTransferSucceeds_ReportsPretransferAndStarttransferAtTheEnd_BL5493()
+    {
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("redis", _ =>
+            {
+                recorder.Record(null, Remote, false, new ConnectTimings(0, 1, 5, null));
+                time.Advance(20);
+                return ValueTask.FromResult(TransferResult.Success(4));
+            }),
+            recorder);
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(time));
+
+        TransferTimings timings = result.Report!.Timings!;
+        Assert.AreEqual(timings.Completed, timings.RequestReady);
+        Assert.AreEqual(timings.Completed, timings.FirstByteReceived);
+        Assert.AreEqual(5, timings.Connect!.Connected);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectedTransferFails_ReportsNoStarttransfer_BL5493()
+    {
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("redis", _ =>
+            {
+                recorder.Record(null, Remote, false, new ConnectTimings(0, 1, 5, null));
+                time.Advance(20);
+                return ValueTask.FromResult(TransferResult.Failure(CurlExitCode.CouldntConnect, "x") with { Report = new TransferReport() });
+            }),
+            recorder);
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(time));
+
+        Assert.IsNotNull(result.Report!.Timings!.RequestReady);
+        Assert.IsNull(result.Report.Timings.FirstByteReceived);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UdpChannelOpenedForCoap_ReportsItsLocalEndAndConnectTime_BL5493()
+    {
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        IPEndPoint local = new(IPAddress.Loopback, 50505);
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("coap", _ =>
+            {
+                time.Advance(7);
+                recorder.Record(null, Remote);
+                recorder.RecordDatagramChannel(local, time.GetTimestamp());
+                time.Advance(20);
+                return ValueTask.FromResult(TransferResult.Success(10));
+            }),
+            recorder);
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(time, url: "coap://127.0.0.1/res"));
+
+        Assert.AreEqual(local, result.Report!.LocalEndPoint);
+        Assert.AreEqual(7, result.Report.Timings!.Connect!.Connected - result.Report.Timings.Started);
+        Assert.IsNotNull(result.Report.Timings.FirstByteReceived);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UdpChannelOpenedForTftp_ReportsNoLocalEndAndNoPhases_BL5493()
+    {
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("tftp", _ =>
+            {
+                recorder.Record(null, Remote);
+                recorder.RecordDatagramChannel(new IPEndPoint(IPAddress.Loopback, 50505), time.GetTimestamp());
+                return ValueTask.FromResult(TransferResult.Success(10));
+            }),
+            recorder);
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(time, url: "tftp://127.0.0.1/f"));
+
+        Assert.IsNull(result.Report!.LocalEndPoint);
+        Assert.IsNull(result.Report.Timings!.RequestReady);
+        Assert.IsNull(result.Report.Timings.Connect);
+    }
+
+    [TestMethod]
+    public void RecordDatagramChannel_SecondChannel_KeepsTheFirst()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        IPEndPoint first = new(IPAddress.Loopback, 1);
+
+        recorder.RecordDatagramChannel(first, 5);
+        recorder.RecordDatagramChannel(new IPEndPoint(IPAddress.Loopback, 2), 9);
+
+        Assert.AreEqual(first, recorder.DatagramLocalEndPoint);
+        Assert.AreEqual(5, recorder.DatagramOpenedAt);
+    }
+
+    private static TransferContext ContextOf(TimeProvider time, byte[]? postData = null, Stream? upload = null, string url = "redis://127.0.0.1/") => new()
+    {
+        Url = CurlUrl.Parse(url),
         Output = new MemoryStream(),
         TimeProvider = time,
         PostData = postData is null ? null : (ReadOnlyMemory<byte>?)postData,

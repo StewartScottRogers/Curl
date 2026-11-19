@@ -35,6 +35,14 @@ public sealed class LdapWinLdapNamedMatchingRuleFilterTests
     }
 
     [TestMethod]
+    public void Encode_WinLdapDnAfterNamedRule_SetsDnAttributes()
+    {
+        string hex = HexOf(LdapDialect.WinLdap, "(cn:caseExactMatch:dn:=Alice Example)");
+
+        Assert.IsTrue(hex.EndsWith(Convert.ToHexString("Alice Example"u8) + "8401FF", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void Encode_WinLdapOidRule_StillSendsTheRule()
     {
         string hex = HexOf(LdapDialect.WinLdap, "(cn:dn:2.5.13.5:=a)");

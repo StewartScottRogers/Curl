@@ -267,6 +267,7 @@ internal sealed class FtpSession(
     private IPAddress? announcedAddress;
 
     private IConnection? dataConnection;
+    private Task<ConnectResult>? dataHandshake;
 
     private FtpDownloadWindow window;
 
@@ -448,6 +449,7 @@ internal sealed class FtpSession(
     public async ValueTask DisposeAsync()
     {
         await DisposeIfOpenAsync(dataConnection).ConfigureAwait(false);
+        await ObserveAbandonedHandshakeAsync().ConfigureAwait(false);
         await DisposeIfOpenAsync(acceptedEarly).ConfigureAwait(false);
         await DisposeIfOpenAsync(pendingConnection).ConfigureAwait(false);
         await DisposeIfOpenAsync(securedControl).ConfigureAwait(false);
@@ -1060,6 +1062,7 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> DownloadMatchAsync(string urlPath, FtpFileMethod method, long? size)
     {
         await DisposeIfOpenAsync(dataConnection).ConfigureAwait(false);
+        await ObserveAbandonedHandshakeAsync().ConfigureAwait(false);
         await DisposeIfOpenAsync(acceptedEarly).ConfigureAwait(false);
         await DisposeIfOpenAsync(pendingConnection).ConfigureAwait(false);
         dataConnection = null;
@@ -1998,9 +2001,9 @@ internal sealed class FtpSession(
             return null;
         }
 
-        ConnectResult secured = await connections.TlsProvider
-            .AuthenticateAsClientAsync(dataConnection!, context.Url.IdnHost, context.Events, context.CancellationToken)
-            .ConfigureAwait(false);
+        Task<ConnectResult> handshake = dataHandshake ?? StartDataHandshake(dataConnection!);
+        dataHandshake = null;
+        ConnectResult secured = await handshake.ConfigureAwait(false);
         dataConnection = secured.Connection;
         if (dataConnection is null)
         {
@@ -2167,7 +2170,31 @@ internal sealed class FtpSession(
         }
 
         log.PassiveDataConnected(host, port);
+        if (protectData)
+        {
+            // curl sends its ClientHello as soon as the data TCP connection opens; a server may
+            // finish its handshake before it answers the transfer command (STD-157, BL-5478).
+            dataHandshake = StartDataHandshake(dataConnection);
+        }
+
         return null;
+    }
+
+    private Task<ConnectResult> StartDataHandshake(IConnection data) =>
+        connections.TlsProvider
+            .AuthenticateAsClientAsync(data, context.Url.IdnHost, context.Events, context.CancellationToken)
+            .AsTask();
+
+    /// <summary>Waits for a handshake that no transfer used, so its failure is never left unobserved.</summary>
+    private async ValueTask ObserveAbandonedHandshakeAsync()
+    {
+        Task<ConnectResult>? abandoned = dataHandshake;
+        dataHandshake = null;
+        if (abandoned is not null)
+        {
+            await Task.WhenAny(abandoned).ConfigureAwait(false);
+            _ = abandoned.Exception;
+        }
     }
 
     /// <summary>Sends <c>TYPE A</c> for a listing or an ASCII transfer, <c>TYPE I</c> otherwise.</summary>

@@ -143,10 +143,14 @@ public sealed class UdpDatagramConnector : IDatagramConnector
 
         _log.Resolved(destination.Host, destination.Port, addresses, IsOverridden(destination), _timeProvider.GetElapsedTime(resolveStarted));
         var openStarted = _timeProvider.GetTimestamp();
-        var channel = OpenFirstAvailable(addresses, destination.Port);
-        return channel is null
-            ? OpenFailure(host, port, destination, openStarted)
-            : Opened(new PortUnreachableReportingDatagramChannel(channel, () => FailedToConnectMessage(host, port, destination, openStarted)));
+        var (channel, openedIndex) = OpenFirstAvailable(addresses, destination.Port);
+        if (channel is null)
+        {
+            return OpenFailure(host, port, destination, openStarted);
+        }
+
+        var remaining = addresses.Skip(openedIndex + 1).Select(address => new IPEndPoint(address, destination.Port)).ToList();
+        return Opened(new PortUnreachableReportingDatagramChannel(channel, () => FailedToConnectMessage(host, port, destination, openStarted), remaining, _openChannel));
     }
 
     /// <summary>
@@ -207,13 +211,13 @@ public sealed class UdpDatagramConnector : IDatagramConnector
         return $"Failed to connect to {host}:{port}{via} after {elapsedMilliseconds} ms: Could not connect to server";
     }
 
-    private IDatagramChannel? OpenFirstAvailable(IReadOnlyList<IPAddress> addresses, int port)
+    private (IDatagramChannel? Channel, int Index) OpenFirstAvailable(IReadOnlyList<IPAddress> addresses, int port)
     {
-        foreach (var address in addresses)
+        for (var index = 0; index < addresses.Count; index++)
         {
             try
             {
-                return _openChannel(new IPEndPoint(address, port));
+                return (_openChannel(new IPEndPoint(addresses[index], port)), index);
             }
             catch (SocketException)
             {
@@ -221,6 +225,6 @@ public sealed class UdpDatagramConnector : IDatagramConnector
             }
         }
 
-        return null;
+        return (null, -1);
     }
 }

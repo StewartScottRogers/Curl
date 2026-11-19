@@ -124,6 +124,28 @@ public sealed class StompProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("a\nb", "p", "X: y", "login")]
+    [DataRow("u", "a\rb", "X: y", "passcode")]
+    [DataRow("u", "p", "host: /\nlogin:x", "host")]
+    public async Task ExecuteAsync_LineBreakInConnectValue_EndsBeforeConnectingNamingTheField(string user, string password, string header, string field)
+    {
+        ScriptedStompConnector connector = new(ConnectResult.Refused("x"));
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse("stomp://broker/q"),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential(user, password),
+            Http = new Curl.Protocol.Abstractions.HttpRequestOptions { Headers = [header] },
+        };
+
+        TransferResult result = await new StompProtocolHandler(connector).ExecuteAsync(context);
+
+        Assert.AreNotEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual($"STOMP {field} holds a line break", result.ErrorMessage);
+        Assert.IsNull(connector.Target);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_HostHeader_NamesTheVirtualHostAndKeepsTheRestOfConnect()
     {
         ScriptedStompConnection connection = ScriptedStompConnection.Replaying(Connected);

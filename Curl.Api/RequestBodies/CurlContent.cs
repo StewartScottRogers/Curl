@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 
@@ -69,14 +70,13 @@ public abstract class CurlContent
     /// <param name="bytes">The body.</param>
     public static implicit operator CurlContent(ReadOnlyMemory<byte> bytes) => FromBytes(bytes);
 
-    /// <summary>Bytes content of <paramref name="bytes"/>; the same as <see cref="FromBytes"/>.</summary>
-    /// <param name="bytes">The body.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="bytes"/> is <see langword="null"/>.</exception>
-    public static implicit operator CurlContent(byte[] bytes)
-    {
-        ArgumentNullException.ThrowIfNull(bytes);
-        return FromBytes(bytes);
-    }
+    /// <summary>
+    /// Bytes content of <paramref name="bytes"/>; the same as <see cref="FromBytes"/>, and <see langword="null"/>
+    /// (no body) for a <see langword="null"/> array, so a nullable array assigned to <c>CurlRequest.Body</c> sends no body.
+    /// </summary>
+    /// <param name="bytes">The body, or <see langword="null"/> for no body.</param>
+    [return: NotNullIfNotNull(nameof(bytes))]
+    public static implicit operator CurlContent?(byte[]? bytes) => bytes is null ? null : FromBytes(bytes);
 
     /// <summary>
     /// <paramref name="options"/> with this content set as the body of a posting request: the post

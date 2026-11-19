@@ -144,11 +144,13 @@ public sealed class CurlContentTests
     }
 
     [TestMethod]
-    public void ImplicitConversion_NullArray_Throws()
+    public void ImplicitConversion_NullArray_IsNoBody()
     {
-        byte[] bytes = null!;
+        byte[]? bytes = null;
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => { CurlContent content = bytes; });
+        CurlContent? content = bytes;
+
+        Assert.IsNull(content);
     }
 
     [TestMethod]

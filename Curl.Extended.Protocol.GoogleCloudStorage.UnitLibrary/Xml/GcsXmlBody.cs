@@ -48,8 +48,9 @@ internal static class GcsXmlBody
     public static long RequiredInteger(XElement parent, string localName) =>
         long.Parse(RequiredText(parent, localName), NumberStyles.None, CultureInfo.InvariantCulture);
 
-    /// <summary>Returns the first child named <paramref name="localName"/> read as an <c>xs:boolean</c>.</summary>
-    public static bool RequiredBoolean(XElement parent, string localName) => XmlConvert.ToBoolean(RequiredText(parent, localName));
+    /// <summary>Returns the first child named <paramref name="localName"/> read as an <c>xs:boolean</c>, or <see langword="false"/> when there is none.</summary>
+    public static bool OptionalBoolean(XElement parent, string localName) =>
+        OptionalText(parent, localName) is { } text && XmlConvert.ToBoolean(text);
 
     /// <summary>Returns the first child named <paramref name="localName"/> read as an ISO 8601 time, UTC when it names no offset.</summary>
     public static DateTimeOffset RequiredTime(XElement parent, string localName) =>

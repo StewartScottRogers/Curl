@@ -180,12 +180,10 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     }
 
     /// <summary>
-    /// Ends the run at a fatal setup failure (exit 43 or 48) of the first batch's last-held transfer, as curl 8.22.0
-    /// finds it while setting the transfers up: nothing starts, the failing transfer is reported first with its own
-    /// message and every other held one as aborted by a critical error in another transfer (STD-074, BL-5469).
+    /// Records a fatal setup failure (exit 43 or 48) of the first batch's last-held transfer, the first one only;
+    /// the run is ended later by <see cref="AbandonFirstBatchOnFatalFailureAsync" />.
     /// </summary>
     /// <param name="failure">The fatal setup failure of the last transfer held.</param>
-    /// <returns>A task that completes when the held transfers are reported.</returns>
     internal void NoteFatalSetupFailureOfLastHeld(TransferResult failure)
     {
         if (fatalSetupFailure is null)
@@ -194,6 +192,14 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
             fatalSetupFailureIndex = heldTransfers.Count - 1;
         }
     }
+
+    /// <summary>
+    /// Ends the run at a fatal setup failure (exit 43 or 48) of the first batch's last-held transfer, as curl 8.22.0
+    /// finds it while setting the transfers up: nothing starts, the failing transfer is reported first with its own
+    /// message and every other held one as aborted by a critical error in another transfer (STD-074, BL-5469).
+    /// </summary>
+    /// <param name="failure">The fatal setup failure of the last transfer held.</param>
+    /// <returns>A task that completes when the held transfers are reported.</returns>
 
     private async Task AbandonFirstBatchOnFatalFailureAsync(TransferResult failure)
     {

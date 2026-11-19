@@ -46,7 +46,7 @@ public sealed class LdapAuthenticatedBindNegotiateTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_NegotiateWithCredentialsAndOnlyDigestMd5Offered_BindsWithDigestMd5()
+    public async Task ExecuteAsync_NegotiateWithCredentialsAndOnlyDigestMd5Offered_ChoosesDigestMd5AndRefusesQopAuth()
     {
         var tokens = new FakeLogonTokenSource(1);
 
@@ -61,8 +61,8 @@ public sealed class LdapAuthenticatedBindNegotiateTests
             BindReply(5),
             Done(6));
 
-        Assert.AreEqual(TransferResult.Success(0), result);
-        Assert.AreEqual(2, CountOf(sent, "DIGEST-MD5"u8.ToArray()));
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Operations Error"), result);
+        Assert.AreEqual(1, CountOf(sent, "DIGEST-MD5"u8.ToArray()));
         Assert.AreEqual(0, CountOf(sent, "GSS-SPNEGO"u8.ToArray()));
         Assert.AreEqual(0, CountOf(sent, SicilyNegotiateTag));
         Assert.AreEqual(0, tokens.Starts.Count);

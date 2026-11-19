@@ -30,6 +30,7 @@ internal static class LdapBind
     /// <param name="exchange">The session to bind on.</param>
     /// <param name="name">The DN to bind as; empty for the anonymous bind.</param>
     /// <param name="password">The password; empty for the anonymous bind.</param>
+    /// <param name="overTls">Whether the session is <c>ldaps://</c>, where WinLDAP never retries as LDAPv2.</param>
     /// <param name="cancellationToken">Cancels the bind.</param>
     /// <returns><see langword="null" /> once bound; otherwise the failed transfer's result.</returns>
     public static ValueTask<TransferResult?> BindAsync(
@@ -37,9 +38,10 @@ internal static class LdapBind
         LdapExchange exchange,
         string name,
         string password,
+        bool overTls,
         CancellationToken cancellationToken) =>
         dialect == LdapDialect.WinLdap
-            ? BindAsWinLdapAsync(exchange, name, password, cancellationToken)
+            ? BindAsWinLdapAsync(exchange, name, password, overTls, cancellationToken)
             : BindAsOpenLdapAsync(exchange, name, password, cancellationToken);
 
     /// <summary>
@@ -47,7 +49,9 @@ internal static class LdapBind
     /// is answered with anything but <c>success</c>. A second failure sends an UnbindRequest
     /// and fails with exit 38 and WinLDAP's text for its result code. A first bind that gets
     /// no BindResponse fails with WinLDAP's <c>Timeout</c>, a retry the server closes on with
-    /// <c>Unavailable</c>, and neither sends an UnbindRequest.
+    /// <c>Unavailable</c>, and neither sends an UnbindRequest. Over <c>ldaps://</c> there is no
+    /// LDAPv2 retry: a refused first bind sends an UnbindRequest and fails with WinLDAP's text for
+    /// that first result code (STD-143, BL-5462, ADR-1305).
     /// </summary>
     /// <remarks>
     /// WinLDAP waits 30 seconds for a BindResponse before it reports <c>Timeout</c>; this
@@ -57,6 +61,7 @@ internal static class LdapBind
         LdapExchange exchange,
         string name,
         string password,
+        bool overTls,
         CancellationToken cancellationToken)
     {
         LdapBindReply first = await exchange.BindAsync(LdapVersion3, name, password, cancellationToken).ConfigureAwait(false);
@@ -70,6 +75,22 @@ internal static class LdapBind
             return WinLdapBindFailed(WinLdapResultText.Timeout);
         }
 
+        return overTls
+            ? await UnbindAndFailAsync(exchange, WinLdapBindFailed(first.ResultCode), cancellationToken).ConfigureAwait(false)
+            : await RetryAsLdapV2Async(exchange, name, password, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// <c>ldap_win_bind</c>'s LDAPv2 retry over plain <c>ldap://</c>: a refusal sends an
+    /// UnbindRequest and fails with WinLDAP's text for its result code, a server that closes
+    /// fails with <c>Unavailable</c>, and a reply that is not a BindResponse with <c>Timeout</c>.
+    /// </summary>
+    private static async ValueTask<TransferResult?> RetryAsLdapV2Async(
+        LdapExchange exchange,
+        string name,
+        string password,
+        CancellationToken cancellationToken)
+    {
         LdapBindReply retry = await exchange.BindAsync(LdapVersion2, name, password, cancellationToken).ConfigureAwait(false);
         return retry.Status switch
         {

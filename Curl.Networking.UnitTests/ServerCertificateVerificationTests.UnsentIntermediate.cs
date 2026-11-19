@@ -48,8 +48,16 @@ public sealed class ServerCertificateVerificationUnsentIntermediateTests
         Assert.IsNull(failure);
     }
 
+    [TestMethod]
+    public void Judge_UnsentIntermediateTheAnchorsListInTheOpenSslBuild_Accepts()
+    {
+        var (_, failure) = JudgeSending(sendIntermediate: false, matchesSchannelBuild: false, insecure: false, anchorsListIntermediate: true);
+
+        Assert.IsNull(failure);
+    }
+
     private static (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) JudgeSending(
-        bool sendIntermediate, bool matchesSchannelBuild, bool insecure)
+        bool sendIntermediate, bool matchesSchannelBuild, bool insecure, bool anchorsListIntermediate = false)
     {
         using var rootKey = RSA.Create(2048);
         var rootRequest = new CertificateRequest("CN=Unsent Root", rootKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -71,6 +79,10 @@ public sealed class ServerCertificateVerificationUnsentIntermediateTests
         chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
         chain.ChainPolicy.CustomTrustStore.Add(root);
         chain.ChainPolicy.ExtraStore.Add(intermediate);
+        if (anchorsListIntermediate)
+        {
+            chain.ChainPolicy.CustomTrustStore.Add(intermediate);
+        }
         Assert.IsTrue(chain.Build(leaf));
         Assert.AreEqual(3, chain.ChainElements.Count);
 

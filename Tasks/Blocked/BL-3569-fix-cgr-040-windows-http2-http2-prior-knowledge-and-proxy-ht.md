@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.HttpVersionRows.cs, Curl.Cli.UnitTests/Cgr040Tests.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2Row.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2PriorKnowledgeRow.cs, Curl.Cli.UnitTests/Cgr040Tests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -67,7 +67,7 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
 
 **Suspected location in source**
 
-- **[cli-options CLIO-05]** `Curl.Cli.UnitLibrary/CommandLineOptionTable.HttpVersionRows.cs`.
+- **[cli-options CLIO-05]** `Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2Row.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2PriorKnowledgeRow.cs`.
 - **[upstream-cases UC-16]** Curl.Cli feature set.
 
 **Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows (Expected); repro variants that already matched still match.

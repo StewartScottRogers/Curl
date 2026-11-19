@@ -774,11 +774,11 @@ public sealed partial class TcpConnector(
             target.Events.ReportInfo(message);
             return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
         }
-        catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
+        catch (OperationCanceledException canceled) when (timeProvider.GetElapsedTime(started) >= connectLimit)
         {
             var message = $"Connection timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
             target.Events.ReportInfo(message);
-            return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
+            return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message, (canceled as CanceledAfterResolveException)?.Timings);
         }
     }
 
@@ -981,7 +981,8 @@ public sealed partial class TcpConnector(
 
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
         var named = destination.IsMapped ? dialed with { MappedDestination = destination } : dialed;
-        return await SecureWhenAskedAsync(named, target, timings, 0, cancellationToken, WritesSslFilterAddedFor(target)).ConfigureAwait(false);
+        var secured = await SecureWhenAskedAsync(named, target, timings, 0, cancellationToken, WritesSslFilterAddedFor(target)).ConfigureAwait(false);
+        return WithTimingsWhenFailedWithout(secured, timings);
     }
 
     /// <summary>
@@ -1409,6 +1410,45 @@ public sealed partial class TcpConnector(
         return result;
     }
 
+    /// <summary>
+    /// Gives a failure that came after the TCP connect, such as a refused CONNECT, a failed SOCKS
+    /// handshake or a refused TLS handshake, the timings the connector took before it, so
+    /// <c>%{time_namelookup}</c> and <c>%{time_connect}</c> report them as curl does (STD-145);
+    /// a success, and a failure that already carries timings, as they are.
+    /// </summary>
+    private static ConnectResult WithTimingsWhenFailedWithout(ConnectResult result, ConnectTimings timings) =>
+        result.Connection is not null || result.Timings is not null
+            ? result
+            : ConnectResult.Failed(result.ExitCode, result.ErrorMessage!, timings, result.ConnectionNumber, result.ProxyConnectResponseCode, result.LastSocketError, result.ProxyError, result.ConnectReplyHeadersStored, result.ProxyConnectHeaderBytes);
+
+    /// <summary>
+    /// Awaits <paramref name="dial" />; a cancellation, such as the connect limit passing after
+    /// the proxy resolved, leaves as a <see cref="CanceledAfterResolveException" /> carrying
+    /// <paramref name="timings" />, so the timeout's failure reports <c>%{time_namelookup}</c> (STD-145).
+    /// </summary>
+    private static async ValueTask<(ConnectResult? Result, string? RedialAuthorization)> CarryingTimingsIfCanceledAsync(
+        ValueTask<(ConnectResult? Result, string? RedialAuthorization)> dial,
+        ConnectTimings timings)
+    {
+        try
+        {
+            return await dial.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException canceled)
+        {
+            throw new CanceledAfterResolveException(timings, canceled);
+        }
+    }
+
+    /// <summary>
+    /// A cancellation that came after the name resolved, carrying the timings taken until then.
+    /// </summary>
+    private sealed class CanceledAfterResolveException(ConnectTimings timings, OperationCanceledException canceled)
+        : OperationCanceledException(canceled.Message, canceled, canceled.CancellationToken)
+    {
+        public ConnectTimings Timings { get; } = timings;
+    }
+
     private readonly record struct ProxyRoute(ProxyEndpoint FirstHop, IConnectReplyHeadWritingEvents? HeadOutput, long Started);
 
     private async ValueTask<ConnectResult> ConnectThroughProxyTracedAsync(
@@ -1440,14 +1480,16 @@ public sealed partial class TcpConnector(
         {
             // A 407 answered on a connection the proxy closes is sent again on a new one, as
             // curl 8.21.0 connects again ("Connect me again please", BL-602 Notes).
-            var (result, redialAuthorization) = await DialAndOpenThroughProxyAsync(
-                addresses,
-                new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge, authenticatorEvents) { HeadOutput = headOutput, ReplyHeadBytes = replyHeadBytes },
-                proxyAuthorization,
-                cancellationToken).ConfigureAwait(false);
+            var (result, redialAuthorization) = await CarryingTimingsIfCanceledAsync(
+                DialAndOpenThroughProxyAsync(
+                    addresses,
+                    new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge, authenticatorEvents) { HeadOutput = headOutput, ReplyHeadBytes = replyHeadBytes },
+                    proxyAuthorization,
+                    cancellationToken),
+                new ConnectTimings(started, nameResolved, null, null)).ConfigureAwait(false);
             if (result is not null)
             {
-                return result;
+                return WithTimingsWhenFailedWithout(result, new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null));
             }
 
             target.Events.ReportInfo(ConnectTunnelVerboseLines.ConnectAgain);
@@ -2158,7 +2200,7 @@ public sealed partial class TcpConnector(
 
         var refused = $"CONNECT tunnel failed, response {reply.StatusCode}";
         events.ReportInfo(refused);
-        return ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? refused, null, 0, reply.StatusCode, proxyConnectHeadersStored: reply.HeaderCount, proxyConnectHeaderBytes: headBytes);
+        return ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? refused, null, 0, reply.StatusCode, connectReplyHeadersStored: reply.HeaderCount, proxyConnectHeaderBytes: headBytes);
     }
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(

@@ -19,6 +19,8 @@ public sealed class LdapFilterEncoderTests
     [DataRow("(cn=a(b)")]
     [DataRow(@"(cn=a\2a()")]
     [DataRow("((cn=a))")]
+    [DataRow("(uid=alice) ")]
+    [DataRow("(cn=user0*)  ")]
     public void Encode_OpenLdapUnescapedParenthesisOrDoubleParentheses_ReturnsNull(string filter)
     {
         Diagnostics.Arrange("filter", filter);

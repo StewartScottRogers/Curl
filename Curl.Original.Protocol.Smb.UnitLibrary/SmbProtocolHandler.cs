@@ -129,7 +129,6 @@ public sealed class SmbProtocolHandler : IProtocolHandler
 
         TransferResult result;
         bool closes;
-        long requestReady = context.TimeProvider.GetTimestamp();
         context.Progress.ReportTransferStarted();
         var receiveCount = new SmbReceiveCount();
         var counting = new SmbCountingConnection(connection, context.TimeProvider);
@@ -147,7 +146,7 @@ public sealed class SmbProtocolHandler : IProtocolHandler
         }
 
         ReportConnectionEnd(context.Events, result, closes, connect.ConnectionNumber);
-        return StampReport(result, context.TimeProvider, context.Upload is not null, new TransferTimings(started, connect.Timings, requestReady, null, null, 0), counting);
+        return StampReport(result, context.TimeProvider, context.Upload is not null, new TransferTimings(started, connect.Timings, null, null, null, 0), counting);
     }
 
     // curl's failf writes the -m timeout as a -v line before it closes the connection; the
@@ -164,7 +163,9 @@ public sealed class SmbProtocolHandler : IProtocolHandler
     private static TransferResult StampReport(TransferResult result, TimeProvider timeProvider, bool isUpload, TransferTimings reached, SmbCountingConnection counting)
     {
         long completed = timeProvider.GetTimestamp();
-        TransferTimings timings = reached with { FirstByteReceived = counting.FirstReadAt, Completed = completed };
+        // curl's SMB handler does all its work in the protocol-do step, so %{time_pretransfer} lands
+        // with the end of the transfer, and an upload never starts a transfer (%{time_starttransfer} 0) (BL-5476).
+        TransferTimings timings = reached with { RequestReady = completed, FirstByteReceived = isUpload ? null : counting.FirstReadAt, Completed = completed };
         TransferReport report = (result.Report ?? new TransferReport()) with { Timings = timings, RequestSize = counting.BytesWritten, DownloadSize = isUpload ? 0 : result.BytesTransferred };
         return result with { Report = report };
     }

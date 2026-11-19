@@ -28,6 +28,7 @@ public sealed partial class TransferSurfaceSchemeCoverageTests
     private static readonly string[] LongestFirst = [.. Checks.Append("silentrefused").OrderByDescending(check => check.Length)];
 
     [TestMethod]
+    [SpecRequirement("CurlSurface:scheme-coverage-1")]
     public void EveryRegisteredScheme_HasARowForEveryTransferSurfaceCheck()
     {
         IReadOnlyList<RequirementMatrix> matrices = RequirementMatrix.LoadAll(Path.Combine(AppContext.BaseDirectory, "Conformance", "Extended"));

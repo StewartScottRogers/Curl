@@ -126,6 +126,26 @@ public sealed class RecordReplayTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ARecordDirectoryThatDeniesAccess_FailsWithExit23NamingRecordAndTheDirectory_Bl5522()
+    {
+        var context = Context();
+        var hook = new RecordReplayTransferHook(null, new AccessDeniedDirectory(_directory));
+
+        var result = await hook.ExecuteAsync(context, new FakeServer(Head, "body").Invoke);
+
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        StringAssert.Contains(result.ErrorMessage!, "--record");
+        StringAssert.Contains(result.ErrorMessage!, _directory);
+        Assert.AreEqual("body", Text(context.Output));
+    }
+
+    private sealed class AccessDeniedDirectory(string path) : ExchangeDirectory(path)
+    {
+        public override Task WriteAsync(string key, RecordedExchange exchange, CancellationToken cancellationToken) =>
+            throw new UnauthorizedAccessException("Access to the path is denied.");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ATransferThatIsNotHttp_RunsAsWithoutTheHook_Adr1129Section4()
     {
         var context = new TransferContext { Url = CurlUrl.Parse("ftp://example.com/r"), Output = new MemoryStream() };

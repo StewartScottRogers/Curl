@@ -52,16 +52,22 @@ public static class SigstoreExtension
     public static ITransferHook? HookFor(ExtensionOptionValues values)
     {
         ArgumentNullException.ThrowIfNull(values);
-        var bundlePath = values.ValueOf(BundleOption);
-        var identity = values.ValueOf(IdentityOption);
-        var issuer = values.ValueOf(IssuerOption);
-        var root = values.ValueOf(RootOption);
-        if (bundlePath is not null)
+        SigstoreExpectation expectation = new(values.ValueOf(BundleOption), values.ValueOf(IdentityOption), values.ValueOf(IssuerOption), values.ValueOf(RootOption));
+        var companions = CompanionsGiven(expectation);
+        if (expectation.BundlePath is null)
         {
-            return new SigstoreTransferHook(new SigstoreExpectation(bundlePath, identity, issuer, root));
+            return companions.Length == 0 ? null : throw new ArgumentException($"{companions} needs --sigstore-bundle");
         }
 
-        string companions = string.Join(", ", new[] { (identity, "--sigstore-identity"), (root, "--sigstore-root"), (issuer, "--sigstore-issuer") }.Where(option => option.Item1 is not null).Select(option => option.Item2));
-        return companions.Length == 0 ? null : throw new ArgumentException($"{companions} needs --sigstore-bundle", nameof(values));
+        if (expectation.Identity is null)
+        {
+            throw new ArgumentException(BundleNeedsCompanions);
+        }
+
+        return expectation.RootPath is null ? throw new ArgumentException(BundleNeedsCompanions) : new SigstoreTransferHook(expectation);
     }
+
+    private const string BundleNeedsCompanions = "--sigstore-bundle needs --sigstore-identity and --sigstore-root";
+    private static string CompanionsGiven(SigstoreExpectation expectation) =>
+        string.Join(", ", new[] { (expectation.Identity, "--sigstore-identity"), (expectation.RootPath, "--sigstore-root"), (expectation.Issuer, "--sigstore-issuer") }.Where(option => option.Item1 is not null).Select(option => option.Item2));
 }

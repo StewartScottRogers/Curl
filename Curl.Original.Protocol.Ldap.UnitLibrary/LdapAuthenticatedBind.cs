@@ -146,33 +146,50 @@ internal static class LdapAuthenticatedBind
     private static bool Seals(NtlmNegotiateFlags flags) =>
         flags.HasFlag(NtlmNegotiateFlags.NegotiateSeal | NtlmNegotiateFlags.NegotiateExtendedSessionSecurity | NtlmNegotiateFlags.Negotiate128);
 
-    /// <summary>Names DIGEST-MD5, then answers the challenge of the <c>saslBindInProgress</c> reply.</summary>
-    internal static async ValueTask<LdapBindReply> DigestAsync(LdapExchange exchange, NetworkCredential credentials, string host, CancellationToken cancellationToken)
+    /// <summary>
+    /// Names DIGEST-MD5, then answers the challenge of the <c>saslBindInProgress</c> reply; a challenge it cannot answer
+    /// (no nonce, or no <c>auth-conf</c> with a supported cipher unless <paramref name="acceptsQopAuth" />) sends nothing more
+    /// and fails as WinLDAP's <c>Operations Error</c>, or the OpenLDAP dialect's <c>Local Error</c> (ADR-1302).
+    /// </summary>
+    internal static async ValueTask<LdapBindReply> DigestAsync(LdapExchange exchange, NetworkCredential credentials, string host, CancellationToken cancellationToken, bool acceptsQopAuth = false)
     {
         LdapBindReply initial = await exchange.BindWithRequestAsync(messageId => LdapDigestMd5Bind.InitialRequest(exchange.Writer, messageId), cancellationToken).ConfigureAwait(false);
-        if (initial.Status != LdapBindReplyStatus.Answered || initial.ResultCode != LdapBindReply.SaslBindInProgress)
+        if (FailureWithoutChallenge(initial) is { } failure)
         {
-            // A plain success skipped the mechanism: refuse it as Protocol Error rather than treat it as bound.
-            return initial.IsSuccess ? new LdapBindReply(LdapBindReplyStatus.Answered, WinLdapResultText.ProtocolError) : initial;
+            return failure;
         }
 
         string clientNonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(ClientNonceBytes));
-        byte[]? probe = LdapDigestMd5Bind.AnswerRequest(exchange.Writer, 0, initial.ServerSaslCredentials, credentials.UserName, credentials.Password, "ldap/" + host, clientNonce);
+        byte[]? probe = LdapDigestMd5Bind.AnswerRequest(exchange.Writer, 0, initial.ServerSaslCredentials, credentials.UserName, credentials.Password, "ldap/" + host, clientNonce, acceptsQopAuth);
         if (probe is null)
         {
-            return new LdapBindReply(LdapBindReplyStatus.Answered, WinLdapResultText.LocalError);
+            return UnanswerableChallenge(acceptsQopAuth);
         }
 
         LdapBindReply bound = await exchange.BindWithRequestAsync(
-            messageId => LdapDigestMd5Bind.AnswerRequest(exchange.Writer, messageId, initial.ServerSaslCredentials, credentials.UserName, credentials.Password, "ldap/" + host, clientNonce)!,
+            messageId => LdapDigestMd5Bind.AnswerRequest(exchange.Writer, messageId, initial.ServerSaslCredentials, credentials.UserName, credentials.Password, "ldap/" + host, clientNonce, acceptsQopAuth)!,
             cancellationToken).ConfigureAwait(false);
         if (bound.IsSuccess)
         {
-            StartConfidentialityLayer(exchange, initial.ServerSaslCredentials, credentials, clientNonce);
+            if (!acceptsQopAuth)
+            {
+                StartConfidentialityLayer(exchange, initial.ServerSaslCredentials, credentials, clientNonce);
+            }
         }
 
         return bound;
     }
+
+    // The bind's result when the initial reply is not saslBindInProgress: a plain success skipped the mechanism,
+    // so it is refused as Protocol Error rather than treated as bound; null when a challenge came.
+    private static LdapBindReply? FailureWithoutChallenge(LdapBindReply initial) =>
+        initial.Status == LdapBindReplyStatus.Answered && initial.ResultCode == LdapBindReply.SaslBindInProgress ? null
+            : initial.IsSuccess ? new LdapBindReply(LdapBindReplyStatus.Answered, WinLdapResultText.ProtocolError)
+            : initial;
+
+    // A challenge with no answer: WinLDAP's Operations Error, the OpenLDAP dialect's Local Error (ADR-1302).
+    private static LdapBindReply UnanswerableChallenge(bool acceptsQopAuth) =>
+        new(LdapBindReplyStatus.Answered, acceptsQopAuth ? WinLdapResultText.LocalError : WinLdapResultText.OperationsError);
 
     // Seals the rest of the session when the answer to the challenge chose qop=auth-conf.
     private static void StartConfidentialityLayer(LdapExchange exchange, byte[] challenge, NetworkCredential credentials, string clientNonce)

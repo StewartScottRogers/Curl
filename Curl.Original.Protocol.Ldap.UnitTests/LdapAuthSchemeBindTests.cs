@@ -56,23 +56,23 @@ public sealed class LdapAuthSchemeBindTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_DigestAnswersTheChallenge_SendsTag0xa3TwiceAndNoPassword()
+    public async Task ExecuteAsync_DigestChallengeOffersOnlyAuth_SendsOnlyTheInitialBindAndFailsWith38OperationsError()
     {
         (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Digest, Challenge(1, "nonce=\"abc\",qop=\"auth\""), BindSuccess(2), SearchDone3);
 
-        Assert.AreEqual(TransferResult.Success(0), result);
-        Assert.AreEqual(2, CountOf(sent, Encoding.ASCII.GetBytes("DIGEST-MD5")));
-        Assert.IsTrue(Contains(sent, "response="u8.ToArray()));
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Operations Error"), result);
+        Assert.AreEqual(1, CountOf(sent, Encoding.ASCII.GetBytes("DIGEST-MD5")));
+        Assert.IsFalse(Contains(sent, "response="u8.ToArray()));
         Assert.IsFalse(Contains(sent, "secret"u8.ToArray()));
         Assert.IsFalse(Contains(sent, [0x80, 0x06]));
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_DigestChallengeWithoutANonce_FailsWith38LocalError()
+    public async Task ExecuteAsync_DigestChallengeWithoutANonce_FailsWith38OperationsError()
     {
         (TransferResult result, _) = await RunAsync(HttpAuthSchemes.Digest, Challenge(1, "realm=\"x\""));
 
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Operations Error"), result);
     }
 
     [TestMethod]

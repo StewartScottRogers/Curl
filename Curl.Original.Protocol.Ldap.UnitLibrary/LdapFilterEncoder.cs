@@ -132,7 +132,8 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
     private byte[]? ParseTopLevel()
     {
         List<byte[]> filters = [];
-        while (SkipBlanks())
+        // libldap refuses anything after its one item, blanks included.
+        while (HasMoreTopLevelText(filters.Count))
         {
             byte[]? next = filters.Count == 0 || isWinLdap ? ParseParenthesized() : null;
             if (next is null)
@@ -145,6 +146,9 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
 
         return [.. filters.SelectMany(element => element)];
     }
+
+    /// <summary>Whether text remains at the top level; <c>libldap</c> keeps blanks after its one item, so it refuses them.</summary>
+    private bool HasMoreTopLevelText(int itemCount) => isWinLdap || itemCount == 0 ? SkipBlanks() : position < text.Length;
 
     /// <summary>Skips blanks.</summary>
     /// <returns><see langword="true" /> while text remains.</returns>
@@ -360,7 +364,13 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
         string[] halves = left.Split(':', 2);
         string rest = halves.Length == 2 ? halves[1] : string.Empty;
         bool dnOnly = IsDn(rest);
-        bool dnAttributes = dnOnly || rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase);
+        bool dnAfterRule = rest.EndsWith(":dn", StringComparison.OrdinalIgnoreCase);
+        bool dnAttributes = dnOnly || dnAfterRule || rest.StartsWith("dn:", StringComparison.OrdinalIgnoreCase);
+        if (dnAfterRule)
+        {
+            rest = rest[..^3];
+        }
+
         string? rule = rest.Length == 0 || dnOnly || IsNamedRule(rest) ? null : rest;
         return WriteExtensible(new ExtensibleMatch(rule, halves[0], value, dnAttributes), writeFalse: true);
     }

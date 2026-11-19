@@ -278,6 +278,6 @@ public sealed partial class ReadmeTests
     [TestMethod]
     public void Sample_Usings_AreTheOnesTheSamplesNeed()
     {
-        Assert.AreEqual("using System.Net;\nusing Curl.Api;\nusing Curl.Api.Errors;\nusing Curl.Api.Options.Http;", SourceSample("usings"));
+        Assert.AreEqual("using System.Net;\nusing Curl.Api;\nusing Curl.Api.Codes;\nusing Curl.Api.Errors;\nusing Curl.Api.Options.Authentication;\nusing Curl.Api.Options.Http;", SourceSample("usings"));
     }
 }

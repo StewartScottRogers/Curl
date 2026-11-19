@@ -1683,7 +1683,7 @@ public sealed class HttpProtocolHandler(
 
         KeyValuePair<string, string>[] headers = HeadersBeforeFailure(failure.HeadBytesBeforeFailure);
         return statusLine.IsInformational
-            ? cut with { ResponseHeaders = [], InformationalHeaderCount = headers.Length }
+            ? cut with { ResponseHeaders = [], InformationalHeaderCount = InformationalHeaderLineCount(failure.HeadBytesBeforeFailure, headers.Length) }
             : cut with { ResponseHeaders = headers };
     }
 
@@ -1703,6 +1703,21 @@ public sealed class HttpProtocolHandler(
         }
 
         return [.. lines.Skip(lines.LastIndexOf(string.Empty) + 1).Skip(1).Select(HeaderOfLine)];
+    }
+
+    /// <summary>
+    /// What <c>%{num_headers}</c> counts after 1xx heads cut short: the lines of the last head that has any, so
+    /// <c>102</c>, <c>102</c> with <c>A: b</c>, <c>102</c> counts one as curl does (STD-148, BL-5467);
+    /// <paramref name="lastHeadCount" /> when the last head has some or no head has.
+    /// </summary>
+    private static int InformationalHeaderLineCount(byte[] headBytes, int lastHeadCount)
+    {
+        if (lastHeadCount > 0)
+        {
+            return lastHeadCount;
+        }
+
+        return System.Text.Encoding.Latin1.GetString(headBytes).Split("\r\n\r\n").Select(head => Math.Max(0, head.Split("\r\n").Length - 1)).LastOrDefault(count => count > 0);
     }
 
     private static KeyValuePair<string, string> HeaderOfLine(string line)

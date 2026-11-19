@@ -40,12 +40,15 @@ internal static class LdapDigestMd5Bind
     /// <param name="clientNonce">The client nonce.</param>
     /// <returns>
     /// The LDAPMessage; <see langword="null" /> when the challenge has no <c>nonce</c> or its
-    /// <c>qop</c> does not offer <c>auth</c>, which this answer cannot satisfy.
+    /// <c>qop</c> offers neither <c>auth-conf</c> with a supported cipher nor, when <paramref name="acceptsQopAuth" />,
+    /// <c>auth</c>: WinLDAP refuses to bind without the security layer rather than fall back to <c>qop=auth</c> (ADR-1302).
     /// </returns>
-    internal static byte[]? AnswerRequest(LdapBerWriter writer, int messageId, ReadOnlySpan<byte> challenge, string user, string password, string digestUri, string clientNonce)
+    /// <param name="acceptsQopAuth">Whether <c>qop=auth</c>, with no security layer, may answer a challenge that offers no
+    /// <c>auth-conf</c> with a supported cipher: the OpenLDAP dialect's, never WinLDAP's.</param>
+    internal static byte[]? AnswerRequest(LdapBerWriter writer, int messageId, ReadOnlySpan<byte> challenge, string user, string password, string digestUri, string clientNonce, bool acceptsQopAuth = false)
     {
         Dictionary<string, string> directives = ParseChallenge(Encoding.Latin1.GetString(challenge));
-        if (!directives.TryGetValue("nonce", out string? nonce) || ChooseQop(directives) is not { } qop)
+        if (!directives.TryGetValue("nonce", out string? nonce) || ChooseQop(directives, acceptsQopAuth) is not { } qop)
         {
             return null;
         }
@@ -70,11 +73,11 @@ internal static class LdapDigestMd5Bind
     /// <param name="user">The user name.</param>
     /// <param name="password">The password.</param>
     /// <param name="clientNonce">The client nonce sent in the answer.</param>
-    /// <returns>The layer; <see langword="null" /> when the answer used <c>qop=auth</c> or no answer was possible.</returns>
+    /// <returns>The layer; <see langword="null" /> when no answer was possible.</returns>
     internal static LdapDigestMd5SecurityLayer? SecurityLayerFor(ReadOnlySpan<byte> challenge, string user, string password, string clientNonce)
     {
         Dictionary<string, string> directives = ParseChallenge(Encoding.Latin1.GetString(challenge));
-        if (!directives.TryGetValue("nonce", out string? nonce) || ChooseQop(directives) != QopConfidential)
+        if (!directives.TryGetValue("nonce", out string? nonce) || ChooseQop(directives, acceptsQopAuth: false) is null)
         {
             return null;
         }
@@ -120,13 +123,13 @@ internal static class LdapDigestMd5Bind
 
     private static readonly string[] SupportedCiphers = ["3des", "rc4", "rc4-56", "rc4-40"];
 
-    // auth-conf when offered with a supported cipher, else auth when offered, else null.
-    private static string? ChooseQop(Dictionary<string, string> directives)
+    // The OpenLDAP dialect (acceptsQopAuth) answers qop=auth only, as curl's own vauth digest does (BL-5525); WinLDAP takes auth-conf when offered with a supported cipher, else null (ADR-1302).
+    private static string? ChooseQop(Dictionary<string, string> directives, bool acceptsQopAuth)
     {
         string[] qops = directives.GetValueOrDefault("qop", "auth").Split(',', StringSplitOptions.TrimEntries);
         bool offersConf = qops.Contains(QopConfidential, StringComparer.OrdinalIgnoreCase)
             && ChooseCipher(directives) is not null;
-        return offersConf ? QopConfidential : qops.Contains("auth", StringComparer.OrdinalIgnoreCase) ? "auth" : null;
+        return acceptsQopAuth ? (qops.Contains("auth", StringComparer.OrdinalIgnoreCase) ? "auth" : null) : offersConf ? QopConfidential : null;
     }
 
     // Escapes each backslash and double quote for a quoted-string.

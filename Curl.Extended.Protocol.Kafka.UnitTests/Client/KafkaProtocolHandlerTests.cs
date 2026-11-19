@@ -74,6 +74,13 @@ public sealed class KafkaProtocolHandlerTests
     }
 
     [TestMethod]
+    public void BrokerError_NamesTheCodeAndEscapesControlCharactersInTheTopic()
+    {
+        Assert.AreEqual("Kafka broker answered error 17 (INVALID_TOPIC_EXCEPTION) for topic bad topic partition 0", KafkaClientMessages.BrokerError(17, "bad topic", 0));
+        Assert.AreEqual("Kafka broker answered error 17 (INVALID_TOPIC_EXCEPTION) for topic a\\x0D\\x0Ab partition 0", KafkaClientMessages.BrokerError(17, "a\r\nb", 0));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_CorruptBatch_EndsWithWeirdServerReply()
     {
         byte[] batch = KafkaTestBytes.Batch(0, 0, 1, KafkaTestBytes.Record(0, "a"u8.ToArray()));

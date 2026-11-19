@@ -373,6 +373,6 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     private ValueTask<TransferResult?> BindWithCredentialsAsync(LdapExchange exchange, ITransferContext context)
     {
         NetworkCredential credentials = context.Credentials ?? new NetworkCredential(string.Empty, string.Empty);
-        return LdapBind.BindAsync(dialect, exchange, credentials.UserName, credentials.Password, context.CancellationToken);
+        return LdapBind.BindAsync(dialect, exchange, credentials.UserName, credentials.Password, context.Url.Scheme == TlsScheme, context.CancellationToken);
     }
 }

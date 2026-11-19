@@ -61,7 +61,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     private bool isHeadRequest;
 
-    /// <summary>Gets or sets whether the response ends at its final head, as with <c>-I</c>, where curl stops reading and ignores DATA a HEAD response carries (BL-5391).</summary>
+    /// <summary>Gets or sets whether the body is not wanted, as with <c>-I</c>: the response then ends at the first DATA frame after the final head, or when the peer closes after it, while a trailer HEADERS right after the head is still read (BL-5391, BL-5468).</summary>
     internal bool EndsAtFinalHead { get; init; }
 
     /// <summary>The body length the final head promises (RFC 9113 section 8.1.1), or <see langword="null" /> when it promises none.</summary>
@@ -611,7 +611,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             ? (HeadWithoutEmptyLine(statusCode, fields), HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError))
             : null;
 
-    /// <summary>Tells whether a head or trailer frame ends the response: it ends the stream, or the final head came and the request wants no body (<see cref="EndsAtFinalHead" />).</summary>
+    /// <summary>Tells whether a head or trailer frame ends the response: it carries END_STREAM. The <c>-I</c> ending (<see cref="EndsAtFinalHead" />) is not decided here: it comes at the first DATA frame or when the peer closes (BL-5468).</summary>
     private bool IsEndedBy(Http2StreamFrame frame) => frame.IsEndStream;
 
     private async ValueTask ReceiveDataAsync(Http2StreamFrame frame, CancellationToken cancellationToken)
