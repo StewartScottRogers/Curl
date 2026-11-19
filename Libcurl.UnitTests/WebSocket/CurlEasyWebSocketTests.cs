@@ -211,5 +211,46 @@ public sealed class CurlEasyWebSocketTests
         Assert.AreEqual(new CurlWebSocketReceiveResult(CurlCode.BadFunctionArgument, 0, default), await easy.WebSocketRecvAsync(new byte[1]));
         Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.BadFunctionArgument, 0), await easy.WebSocketSendAsync(new byte[1], 0, CurlWebSocketFlags.Text));
         Assert.AreEqual(CurlCode.BadFunctionArgument, await easy.WebSocketStartFrameAsync(CurlWebSocketFlags.Text, 1));
+        Assert.AreEqual(CurlCode.BadFunctionArgument, await easy.WebSocketWaitAsync());
+    }
+
+    [TestMethod]
+    public async Task WebSocketWaitAsync_WaitsForTheEngineAndAnswersOk()
+    {
+        var (easy, webSocket) = NewHandle();
+        webSocket.WaitGate = new TaskCompletionSource();
+        using var cancellation = new CancellationTokenSource();
+
+        var wait = easy.WebSocketWaitAsync(cancellation.Token).AsTask();
+
+        Assert.IsFalse(wait.IsCompleted);
+        webSocket.WaitGate.SetResult();
+        Assert.AreEqual(CurlCode.Ok, await wait);
+        Assert.AreEqual(cancellation.Token, webSocket.LastToken);
+    }
+
+    [TestMethod]
+    public async Task WebSocketWaitAsync_Cancelled_ThrowsOperationCanceled()
+    {
+        var (easy, webSocket) = NewHandle();
+        webSocket.WaitGate = new TaskCompletionSource();
+        using var cancellation = new CancellationTokenSource();
+        var wait = easy.WebSocketWaitAsync(cancellation.Token).AsTask();
+
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => wait);
+    }
+
+    [TestMethod]
+    public async Task WebSocketRecv_AfterAWait_StillAnswersAgainWhenNoFrameIsReady()
+    {
+        var (easy, webSocket) = NewHandle();
+        webSocket.ReceiveResult = new CurlWebSocketReceiveResult(CurlCode.Again, 0, default);
+
+        Assert.AreEqual(CurlCode.Ok, await easy.WebSocketWaitAsync());
+        Assert.AreEqual(CurlCode.Again, easy.WebSocketRecv(new byte[4], out var received, out var meta));
+        Assert.AreEqual(0, received);
+        Assert.IsNull(meta);
     }
 }

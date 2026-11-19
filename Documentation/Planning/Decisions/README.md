@@ -1349,3 +1349,4 @@ Each option and the specific reason it lost.
 | [1305](ADR-1305-winldap-ldaps-simple-bind-has-no-ldapv2-retry.md) | The WinLDAP simple bind over ldaps:// has no LDAPv2 retry (BL-5462) | Accepted | 2026-11-18 |
 | [1306](ADR-1306-libcurl-package-adds-implicit-usings-for-porting.md) | The Libcurl package adds implicit usings for the Curl.Api namespaces a port needs (BL-5551) | Accepted | 2026-11-19 |
 | [1307](ADR-1307-curlopt-and-curlinfo-keep-curls-casing-and-doc-the-word-cased-form.md) | CurlOption and CurlInfo keep curl's casing and document the word-cased form (BL-5553) | Accepted | 2026-11-19 |
+| [1307](ADR-1307-websocket-wait-is-an-awaitable-beside-the-again-receive.md) | A Libcurl port waits for a WebSocket frame with `WebSocketWaitAsync`; `curl_ws_recv` still answers Again (BL-5554) | Accepted | 2026-11-19 |

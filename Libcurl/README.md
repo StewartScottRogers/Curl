@@ -66,6 +66,33 @@ The package adds these implicit usings (`build/Libcurl.props`, ADR-1306), so `Cu
 - `Curl.Api.EngineContracts.WebSocket`
 - `Curl.Api.Options.Protocols`
 
+## Waiting for a WebSocket frame
+
+`curl_ws_recv` answers `CurlCode.Again` when no frame is ready, as upstream does. A C program then waits on the socket
+from `CURLINFO_ACTIVESOCKET` with `select` or `poll`; a .NET socket number is not something .NET can wait on, so
+`WebSocketWaitAsync` is that wait: it completes when a receive has something to answer and receives nothing itself
+(ADR-1307). Await it instead of sleeping:
+
+```csharp
+var buffer = new byte[4096];
+while (true)
+{
+    var code = easy.WebSocketRecv(buffer, out var received, out var meta);
+    if (code == CurlCode.Again)
+    {
+        await easy.WebSocketWaitAsync(cancellationToken);
+        continue;
+    }
+
+    if (code != CurlCode.Ok)
+    {
+        break;
+    }
+
+    Console.WriteLine($"{received} bytes, flags {meta?.Flags}");
+}
+```
+
 ## Folder map
 
 - `Global`: library initialisation and cleanup, and the allocation callbacks (`EasyAllocations`

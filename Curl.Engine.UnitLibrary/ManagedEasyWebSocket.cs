@@ -129,6 +129,20 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         return usable == CurlCode.Ok ? await DeliverWholeFrameAsync(live!, buffer).ConfigureAwait(false) : new CurlWebSocketReceiveResult(usable, 0, default);
     }
 
+    /// <inheritdoc />
+    public async ValueTask WaitForDataAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (runs.Count > 0 || streamFailure is not null || UsableConnection(out IConnection? live) != CurlCode.Ok)
+        {
+            return;
+        }
+
+        pendingRead ??= StartRead(live!);
+        await Task.WhenAny(pendingRead, Task.Delay(Timeout.Infinite, cancellationToken)).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
     /// <summary>
     /// Hands over the first waiting run as <see cref="Deliver" /> does, then keeps handing over the runs that continue
     /// its frame, as many as are already received and <paramref name="buffer" /> holds, so a buffer that holds a

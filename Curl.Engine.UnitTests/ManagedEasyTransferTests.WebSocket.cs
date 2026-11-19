@@ -63,6 +63,89 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task WebSocket_WaitForDataAsync_CompletesWhenTheServerSendsAndLeavesTheReceiveToAnswerOk()
+    {
+        (ManagedEasyTransfer easy, _, QueuedConnection peer) = CreateWebSocketEasy(Ascii(SwitchingProtocolsHead));
+        await using IEasyTransfer handle = easy;
+        easy.Options = WebSocketConnectOnlyTo("wss://h/");
+        await easy.PerformAsync(CancellationToken.None);
+        byte[] buffer = new byte[8];
+        Assert.AreEqual(CurlCode.Again, (await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None)).Result);
+
+        Task wait = easy.WebSocket.WaitForDataAsync(CancellationToken.None).AsTask();
+        Assert.IsFalse(wait.IsCompleted);
+        peer.Enqueue(ManagedEasyWebSocketTests.ServerFrame(WsOpcode.Text, true, "hi"));
+        await wait;
+        await easy.WebSocket.WaitForDataAsync(CancellationToken.None);
+
+        CurlWebSocketReceiveResult received = await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None);
+        Assert.AreEqual(CurlCode.Ok, received.Result);
+        Assert.AreEqual(2, received.BytesReceived);
+    }
+
+    [TestMethod]
+    public async Task WebSocket_WaitForDataAsync_Cancelled_ThrowsAndLeavesTheReceiveAnsweringAgain()
+    {
+        (ManagedEasyTransfer easy, _, _) = CreateWebSocketEasy(Ascii(SwitchingProtocolsHead));
+        await using IEasyTransfer handle = easy;
+        easy.Options = WebSocketConnectOnlyTo("wss://h/");
+        await easy.PerformAsync(CancellationToken.None);
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () => await easy.WebSocket.WaitForDataAsync(cancellation.Token));
+        using CancellationTokenSource later = new();
+        Task wait = easy.WebSocket.WaitForDataAsync(later.Token).AsTask();
+        await later.CancelAsync();
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => wait);
+
+        Assert.AreEqual(CurlCode.Again, (await easy.WebSocket.ReceiveAsync(new byte[8], CancellationToken.None)).Result);
+    }
+
+    [TestMethod]
+    public async Task WebSocket_WaitForDataAsync_WithAFrameAlreadyReceived_CompletesAtOnce()
+    {
+        (ManagedEasyTransfer easy, _, QueuedConnection peer) = CreateWebSocketEasy(Ascii(SwitchingProtocolsHead));
+        await using IEasyTransfer handle = easy;
+        easy.Options = WebSocketConnectOnlyTo("wss://h/");
+        await easy.PerformAsync(CancellationToken.None);
+        peer.Enqueue(
+            ManagedEasyWebSocketTests.ServerFrame(WsOpcode.Text, true, "ab"),
+            ManagedEasyWebSocketTests.ServerFrame(WsOpcode.Text, true, "cd"));
+        byte[] buffer = new byte[8];
+        await easy.WebSocket.WaitForDataAsync(CancellationToken.None);
+        Assert.AreEqual(CurlCode.Ok, (await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None)).Result);
+
+        await easy.WebSocket.WaitForDataAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, (await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None)).Result);
+    }
+
+    [TestMethod]
+    public async Task WebSocket_WaitForDataAsync_AfterTheStreamFailed_CompletesAtOnce()
+    {
+        (ManagedEasyTransfer easy, _, QueuedConnection peer) = CreateWebSocketEasy(Ascii(SwitchingProtocolsHead));
+        await using IEasyTransfer handle = easy;
+        easy.Options = WebSocketConnectOnlyTo("wss://h/");
+        await easy.PerformAsync(CancellationToken.None);
+        peer.Enqueue([0x83, 0x00]);
+        byte[] buffer = new byte[8];
+        await easy.WebSocket.WaitForDataAsync(CancellationToken.None);
+        Assert.AreEqual(CurlCode.RecvError, (await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None)).Result);
+
+        await easy.WebSocket.WaitForDataAsync(CancellationToken.None);
+    }
+
+    [TestMethod]
+    public async Task WebSocket_WaitForDataAsync_WithoutAnOpenConnection_CompletesAtOnce()
+    {
+        (ManagedEasyTransfer easy, _, _) = CreateWebSocketEasy();
+        await using IEasyTransfer handle = easy;
+
+        await easy.WebSocket.WaitForDataAsync(CancellationToken.None);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_WebSocketConnectOnly_ReceivesFragmentsAndAnswersAPingBetweenThem()
     {
         (ManagedEasyTransfer easy, _, QueuedConnection peer) = CreateWebSocketEasy(Ascii(SwitchingProtocolsHead));

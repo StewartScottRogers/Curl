@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-5551]
-touches: [Libcurl/WebSocket, Libcurl/README.md]
+touches: [Libcurl/WebSocket, Libcurl/README.md, Curl.Api.UnitLibrary/EngineContracts/WebSocket/IEasyWebSocket.cs, Curl.Engine.UnitLibrary/ManagedEasyWebSocket.cs, Libcurl.UnitTests/WebSocket, Curl.Engine.UnitTests/ManagedEasyTransferTests.WebSocket.cs, Curl.Api.UnitTests/WebSockets]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5554 — Show a Libcurl port how to wait for a WebSocket socket after curl_ws_recv returns Again
 
@@ -26,14 +26,17 @@ First find out whether a port can already wait: whether `Activesocket` gives som
 
 ## Acceptance criteria
 
-- [ ] `Libcurl/README.md` shows a WebSocket receive loop that waits for data after `Again` without a sleep or busy loop, and the sample compiles.
-- [ ] If a new wait API was added, focused unit tests in `Libcurl.UnitTests` pin it, including cancellation.
-- [ ] The `curl_ws_recv` equivalent still returns `Again` when no frame is ready.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `Libcurl/README.md` shows a WebSocket receive loop that waits for data after `Again` without a sleep or busy loop, and the sample compiles.
+- [x] If a new wait API was added, focused unit tests in `Libcurl.UnitTests` pin it, including cancellation.
+- [x] The `curl_ws_recv` equivalent still returns `Again` when no frame is ready.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Found: Activesocket is a bare number .NET cannot wait on, and waiting on it with CurlMulti.WaitAsync would start a competing read beside the WebSocket receive's own pending read. So a new wait was added (ADR-1307): IEasyWebSocket.WaitForDataAsync (default member), ManagedEasyWebSocket override, CurlEasyWebSocket.WebSocketWaitAsync; README sample is compiled by ReadmeWebSocketWaitSampleTests. WebSocketRecv still answers Again. touches widened to the engine files (no other Doing task holds them). Measure-CodeQuality: 0 failing members for Libcurl, Curl.Api.UnitLibrary, Curl.Engine.UnitLibrary. CI on Linux and macOS: change is platform-neutral, fast tests green here.
 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 3 (ws_recv Again).
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 0b154ba5 c077b01b 34acfc7c 3d836d5e.
+- 2026-11-19: Doing -> Done. WebSocketWaitAsync added and README sample shows the receive loop (ADR-1307)
