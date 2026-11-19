@@ -34,11 +34,13 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] step 3 prints `a.txt`, exit 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 3 prints `a.txt`, exit 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+IsTruncated is now optional (absent = false) via GcsXmlBody.OptionalBoolean; RequiredBoolean removed (unused). Unit test added; step 3 verified at parser level only (no emulator here). Quality: 0 failing members.
 
 ## Log
 

@@ -20,7 +20,7 @@ public static class GcsListBucketResultParser
         GcsXmlBody.OptionalText(root, "Delimiter"),
         [.. GcsXmlBody.Children(root, "Contents").Select(ReadObject)],
         [.. GcsXmlBody.Children(root, "CommonPrefixes").Select(prefixes => GcsXmlBody.RequiredText(prefixes, "Prefix"))],
-        GcsXmlBody.RequiredBoolean(root, "IsTruncated"),
+        GcsXmlBody.OptionalBoolean(root, "IsTruncated"),
         GcsXmlBody.OptionalText(root, "NextContinuationToken") ?? GcsXmlBody.OptionalText(root, "NextMarker"));
 
     private static GcsListedObject ReadObject(XElement contents) => new(
