@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Stomp.UnitLibrary/Client/StompProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5496 — Fix fitness finding EXT-102: STOMP CONNECT copies a line feed from --user or -H host: into the frame, adding headers that override login
 
@@ -34,13 +34,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] both mock commands exit non-zero before connecting with a message such as `STOMP login holds a line break`, and the mock logs no frame.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] both mock commands exit non-zero before connecting with a message such as `STOMP login holds a line break`, and the mock logs no frame.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Line feed or carriage return in login, passcode or host is refused before connecting with exit 3 (UrlMalformat, as for URL user info), message "STOMP <field> holds a line break". Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-102 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 16f12f57 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Refuse line breaks in CONNECT login, passcode, host

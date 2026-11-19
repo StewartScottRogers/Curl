@@ -36,7 +36,37 @@ internal sealed class StompProtocolHandler(IConnector connector) : IProtocolHand
             return TransferResult.Failure(CurlExitCode.UrlMalformat, StompClientMessages.NoDestination);
         }
 
+        string? field = LineBreakField(VirtualHostOf(context.Http?.Headers), context.Credentials);
+        if (field is not null)
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, $"STOMP {field} holds a line break");
+        }
+
         return await TransferAsync(context, Uri.UnescapeDataString(path)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gives the name of the first <c>CONNECT</c> header value holding a line feed or carriage return (STOMP 1.2 does not
+    /// escape <c>CONNECT</c> headers, so such a value would add headers to the frame), or null when none does.
+    /// </summary>
+    internal static string? LineBreakField(string host, System.Net.NetworkCredential? credentials)
+    {
+        if (host.AsSpan().ContainsAny('\r', '\n'))
+        {
+            return "host";
+        }
+
+        if (credentials is null)
+        {
+            return null;
+        }
+
+        if (credentials.UserName.AsSpan().ContainsAny('\r', '\n'))
+        {
+            return "login";
+        }
+
+        return credentials.Password.AsSpan().ContainsAny('\r', '\n') ? "passcode" : null;
     }
 
     /// <summary>Gives where to connect: the URL's host, its port or the scheme's default, and TLS for <c>stomps</c>.</summary>
