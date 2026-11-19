@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapOpenLdapSaslBind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5Bind.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapOpenLdapSaslBindTests.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5525 — OpenLDAP SASL DIGEST-MD5 bind answers qop=auth only, never auth-conf
 
@@ -46,3 +46,4 @@ Decision: in `LdapDigestMd5Bind.ChooseQop` the OpenLDAP dialect (`acceptsQopAuth
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 5903f6ba 9a6e97a7 da26f43c 9bda3123 3d836d5e.
+- 2026-11-18: Doing -> Done. OpenLDAP DIGEST-MD5 answers qop=auth only, no layer; WinLDAP unchanged
