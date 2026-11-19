@@ -132,7 +132,8 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
     private byte[]? ParseTopLevel()
     {
         List<byte[]> filters = [];
-        while (SkipBlanks())
+        // libldap refuses anything after its one item, blanks included.
+        while (HasMoreTopLevelText(filters.Count))
         {
             byte[]? next = filters.Count == 0 || isWinLdap ? ParseParenthesized() : null;
             if (next is null)
@@ -145,6 +146,9 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
 
         return [.. filters.SelectMany(element => element)];
     }
+
+    /// <summary>Whether text remains at the top level; <c>libldap</c> keeps blanks after its one item, so it refuses them.</summary>
+    private bool HasMoreTopLevelText(int itemCount) => isWinLdap || itemCount == 0 ? SkipBlanks() : position < text.Length;
 
     /// <summary>Skips blanks.</summary>
     /// <returns><see langword="true" /> while text remains.</returns>

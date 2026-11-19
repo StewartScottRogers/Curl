@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapFilterEncoder.cs, Curl.Original.Protocol.Ldap.UnitLibrary/OpenLdapUrlReader.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5460 — Fix fitness finding STD-141: Linux LDAP filter with whitespace after the closing parenthesis is accepted; libldap rejects it
 
@@ -31,13 +31,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the command exits 39 with `curl: (39) LDAP local: ldap_search_ext Bad search filter`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the command exits 39 with `curl: (39) LDAP local: ldap_search_ext Bad search filter`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+libldap takes no text after its one top-level item, blanks included; `ParseTopLevel` no longer skips trailing blanks for OpenLDAP (WinLDAP still does). Pinned in LdapFilterEncoderTests. Linux/macOS CI: change is platform-neutral.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-141 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: d3b2b661 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Linux LDAP filter with trailing blanks now refused
