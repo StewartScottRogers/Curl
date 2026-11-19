@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Smb.UnitLibrary/SmbProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5476 — Fix fitness finding STD-155: SMB timings: an upload reports a non-zero %{time_starttransfer}, and %{time_pretransfer} is stamped right after connect instead of near the end
 
@@ -45,3 +45,4 @@ StampReport now stamps RequestReady (time_pretransfer) with Completed and leaves
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-155 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e9e8eca4 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. SMB upload reports time_starttransfer 0 and both directions stamp time_pretransfer at the end; unit tests pin it
