@@ -1,4 +1,4 @@
-# ADR-1302: --cache-dir with an invalid path and --sigstore-bundle without its companions are refused at activation (BL-5488)
+# ADR-1304: --cache-dir with an invalid path and --sigstore-bundle without its companions are refused at activation (BL-5488)
 
 Decided by Claude under Stewart's delegation.
 

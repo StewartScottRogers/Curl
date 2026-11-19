@@ -37,10 +37,10 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Notes
 
-- Widened touches to the Sigstore activation check named by the finding (no other Doing task holds it). Decision in ADR-1302. Measured: Curl now prints `curl: --cache-dir cannot use '<>:|bad'` plus try-help, exit 2; Windows-only colon case pinned with OSCondition, platform-neutral test uses a NUL character. Quality run clean for both libraries; fast tests of both test projects and Composition pass.
+- Widened touches to the Sigstore activation check named by the finding (no other Doing task holds it). Decision in ADR-1304. Measured: Curl now prints `curl: --cache-dir cannot use '<>:|bad'` plus try-help, exit 2; Windows-only colon case pinned with OSCondition, platform-neutral test uses a NUL character. Quality run clean for both libraries; fast tests of both test projects and Composition pass.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-094 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: e32926b1 69116afe 3d836d5e.
-- 2026-11-18: Doing -> Done. --cache-dir invalid path and --sigstore-bundle without companions refused at activation (ADR-1302)
+- 2026-11-18: Doing -> Done. --cache-dir invalid path and --sigstore-bundle without companions refused at activation (ADR-1304)
