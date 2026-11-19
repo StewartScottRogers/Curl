@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ClientFlow.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ClientMessages.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0Mechanism.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5568 — Let the amqp client log in with ANONYMOUS, AMQPLAIN or other offered SASL mechanisms, not only PLAIN
 
@@ -42,3 +42,4 @@ The client logs in only with PLAIN, so against a server that does not offer PLAI
 
 - 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 5.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 153b29b7 da459af3 76972af5 5a1767f3 3d836d5e.
+- 2026-11-19: Doing -> Done. amqp client picks PLAIN, ANONYMOUS or AMQPLAIN (ADR-1310)
