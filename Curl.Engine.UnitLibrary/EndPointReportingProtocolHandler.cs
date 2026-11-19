@@ -46,6 +46,7 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
         recorder.Clear(context.Http?.RedirectsFollowed > 0);
+        recorder.TransferClock = context.TimeProvider;
         long started = context.TimeProvider.GetTimestamp();
         long uploadStart = UploadPosition(context);
         TransferResult result;

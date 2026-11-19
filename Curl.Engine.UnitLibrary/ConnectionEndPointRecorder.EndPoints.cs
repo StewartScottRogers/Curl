@@ -41,6 +41,24 @@ internal sealed partial class ConnectionEndPointRecorder
         }
     }
 
+    /// <summary>
+    /// Replaces the end points of the first datagram channel with those of the channel as it now
+    /// carries the transfer, after it moved to the next resolved address (BL-5532). Nothing changes
+    /// when no datagram channel was recorded.
+    /// </summary>
+    /// <param name="remote">The channel's server end point now.</param>
+    /// <param name="local">The channel's local end point now, or <see langword="null" />.</param>
+    internal void ReRecordDatagramChannel(IPEndPoint? remote, IPEndPoint? local)
+    {
+        if (DatagramOpenedAt is null || remote is null)
+        {
+            return;
+        }
+
+        DatagramLocalEndPoint = local;
+        remoteEndPoint = remote;
+    }
+
     /// <summary>Whether the transfer''s first connection has been recorded.</summary>
     private bool connectionRecorded;
 

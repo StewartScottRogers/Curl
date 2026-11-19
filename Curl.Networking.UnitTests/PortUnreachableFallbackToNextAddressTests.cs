@@ -97,6 +97,36 @@ public sealed class PortUnreachableFallbackToNextAddressTests
         Assert.AreEqual(1, first.Sent.Count);
     }
 
+    [TestMethod]
+    public async Task SendAsync_AfterASwitch_AddressedToTheRefusedEndPoint_GoesToTheNewOne()
+    {
+        var first = new ScriptedChannel(IPAddress.IPv6Loopback) { SendFailure = Refused() };
+        var next = new ScriptedChannel(IPAddress.Loopback);
+        await using var channel = Channel(first, [Second], _ => next);
+        var refusedEndPoint = channel.ServerEndPoint;
+        await channel.SendAsync(new byte[] { 1 }, refusedEndPoint, CancellationToken.None);
+
+        await channel.SendAsync(new byte[] { 2 }, refusedEndPoint, CancellationToken.None);
+        await channel.SendAsync(new byte[] { 3 }, Third, CancellationToken.None);
+
+        Assert.AreEqual(3, next.Sent.Count);
+        Assert.AreEqual(next.ServerEndPoint, next.Destinations[1]);
+        Assert.AreEqual(Third, next.Destinations[2]);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_ResendCancelled_DisposesTheOpenedChannelAndPropagates()
+    {
+        var first = new ScriptedChannel(IPAddress.IPv6Loopback) { SendFailure = Refused() };
+        var next = new ScriptedChannel(IPAddress.Loopback) { SendFailure = new OperationCanceledException() };
+        await using var channel = Channel(first, [Second], _ => next);
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await channel.SendAsync(new byte[] { 1 }, channel.ServerEndPoint, CancellationToken.None));
+
+        Assert.IsTrue(next.Disposed);
+    }
+
     private static SocketException Refused() => new((int)SocketError.ConnectionRefused);
 
     private static PortUnreachableReportingDatagramChannel Channel(
@@ -111,13 +141,15 @@ public sealed class PortUnreachableFallbackToNextAddressTests
 
         public EndPoint? LocalEndPoint => null;
 
-        public SocketException? SendFailure { get; set; }
+        public Exception? SendFailure { get; set; }
 
         public SocketException? ReceiveFailure { get; set; }
 
         public int ReceiveLength { get; set; }
 
         public List<byte[]> Sent { get; } = [];
+
+        public List<EndPoint> Destinations { get; } = [];
 
         public bool Disposed { get; private set; }
 
@@ -129,6 +161,7 @@ public sealed class PortUnreachableFallbackToNextAddressTests
             }
 
             Sent.Add(datagram.ToArray());
+            Destinations.Add(destination);
             return ValueTask.CompletedTask;
         }
 
