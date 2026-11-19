@@ -44,3 +44,4 @@ Not a Curl defect, recorded in the report: `curl --negotiate` against a server o
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-18T2025-Curl-bug-report.md, finding 1.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 5b444aa8 57d2a932 10234ddc a4522cc9 3d836d5e.
