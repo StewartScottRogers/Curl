@@ -50,6 +50,34 @@ public sealed class LdapOpenLdapSaslBindTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ServerOffersAuthConfWithRc4_AnswersQopAuthAndSendsLaterPdusUnwrapped()
+    {
+        (TransferResult result, byte[] sent) = await RunAsync(
+            HttpAuthSchemes.Digest,
+            null,
+            MechanismsEntry(1),
+            RootDseDone1,
+            Challenge(2, "nonce=\"abc\",qop=\"auth,auth-conf\",cipher=\"rc4\""),
+            "30 0c 02 01 03 61 07 0a 01 00 04 00 04 00",
+            "30 0c 02 01 04 65 07 0a 01 00 04 00 04 00");
+
+        Assert.AreEqual(TransferResult.Success(0), result, result.ToString());
+        Assert.IsTrue(sent.AsSpan().IndexOf(",qop=auth,digest-uri="u8) >= 0);
+        Assert.IsFalse(sent.AsSpan().IndexOf("auth-conf"u8) >= 0);
+        Assert.IsFalse(sent.AsSpan().IndexOf("cipher="u8) >= 0);
+        Assert.IsTrue(sent.AsSpan().IndexOf("dc=example"u8) >= 0);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ServerOffersOnlyAuthConf_SendsNoAnswerAndFailsWith38()
+    {
+        (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Digest, null, MechanismsEntry(1), RootDseDone1, Challenge(2, "nonce=\"abc\",qop=\"auth-conf\",cipher=\"rc4\""));
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP: cannot bind"), result);
+        Assert.IsFalse(sent.AsSpan().IndexOf("response="u8) >= 0);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_DigestChallengeWithoutANonce_SendsNoAnswerAndFailsWith38()
     {
         (TransferResult result, byte[] sent) = await RunAsync(HttpAuthSchemes.Digest, null, MechanismsEntry(1), RootDseDone1, Challenge(2, "realm=\"x\",qop=\"auth\""));

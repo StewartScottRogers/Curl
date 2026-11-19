@@ -32,13 +32,15 @@ Measure real curl (OpenLDAP build) with `Record-CurlExchange.ps1` if the qop it 
 
 ## Acceptance criteria
 
-- [ ] The OpenLDAP dialect's DIGEST-MD5 response carries `qop=auth`, never `auth-conf`, even when the server offers `auth-conf` with a supported cipher.
-- [ ] After an OpenLDAP-dialect DIGEST-MD5 bind, later PDUs are sent unwrapped.
-- [ ] The WinLDAP dialect still negotiates `auth-conf`, and its existing tests (`LdapDigestMd5AuthConfTests`) pass unchanged.
-- [ ] A unit test in `LdapOpenLdapSaslBindTests.cs` pins `qop=auth` against a challenge offering `auth,auth-conf` with `cipher="rc4"`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The OpenLDAP dialect's DIGEST-MD5 response carries `qop=auth`, never `auth-conf`, even when the server offers `auth-conf` with a supported cipher.
+- [x] After an OpenLDAP-dialect DIGEST-MD5 bind, later PDUs are sent unwrapped.
+- [x] The WinLDAP dialect still negotiates `auth-conf`, and its existing tests (`LdapDigestMd5AuthConfTests`) pass unchanged.
+- [x] A unit test in `LdapOpenLdapSaslBindTests.cs` pins `qop=auth` against a challenge offering `auth,auth-conf` with `cipher="rc4"`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decision: in `LdapDigestMd5Bind.ChooseQop` the OpenLDAP dialect (`acceptsQopAuth`) answers `qop=auth` only, as curl's own vauth digest does, and `LdapAuthenticatedBind.DigestAsync` starts no security layer for it; WinLDAP is unchanged. A challenge offering only auth-conf fails with exit 38. Quality run for the Ldap library: 100% line and branch. CI on Linux and macOS: the tests are platform-neutral.
 
 ## Log
 

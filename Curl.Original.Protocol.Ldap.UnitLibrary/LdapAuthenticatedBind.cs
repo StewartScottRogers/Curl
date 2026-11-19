@@ -171,7 +171,10 @@ internal static class LdapAuthenticatedBind
             cancellationToken).ConfigureAwait(false);
         if (bound.IsSuccess)
         {
-            StartConfidentialityLayer(exchange, initial.ServerSaslCredentials, credentials, clientNonce);
+            if (!acceptsQopAuth)
+            {
+                StartConfidentialityLayer(exchange, initial.ServerSaslCredentials, credentials, clientNonce);
+            }
         }
 
         return bound;

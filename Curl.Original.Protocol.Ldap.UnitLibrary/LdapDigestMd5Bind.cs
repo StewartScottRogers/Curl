@@ -123,13 +123,13 @@ internal static class LdapDigestMd5Bind
 
     private static readonly string[] SupportedCiphers = ["3des", "rc4", "rc4-56", "rc4-40"];
 
-    // auth-conf when offered with a supported cipher, else auth when offered and accepted, else null (ADR-1302).
+    // The OpenLDAP dialect (acceptsQopAuth) answers qop=auth only, as curl's own vauth digest does (BL-5525); WinLDAP takes auth-conf when offered with a supported cipher, else null (ADR-1302).
     private static string? ChooseQop(Dictionary<string, string> directives, bool acceptsQopAuth)
     {
         string[] qops = directives.GetValueOrDefault("qop", "auth").Split(',', StringSplitOptions.TrimEntries);
         bool offersConf = qops.Contains(QopConfidential, StringComparer.OrdinalIgnoreCase)
             && ChooseCipher(directives) is not null;
-        return offersConf ? QopConfidential : acceptsQopAuth && qops.Contains("auth", StringComparer.OrdinalIgnoreCase) ? "auth" : null;
+        return acceptsQopAuth ? (qops.Contains("auth", StringComparer.OrdinalIgnoreCase) ? "auth" : null) : offersConf ? QopConfidential : null;
     }
 
     // Escapes each backslash and double quote for a quoted-string.
