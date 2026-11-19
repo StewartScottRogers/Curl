@@ -24,11 +24,13 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 ## Acceptance criteria
 
-- [ ] The per-case or per-stand-in content of `Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2PriorKnowledgeRow.cs` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
-- [ ] After the waiting tasks' `touches` (BL-3358, BL-3431, BL-3432, BL-3569, BL-5006) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2PriorKnowledgeRow.cs`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The per-case or per-stand-in content of `Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2PriorKnowledgeRow.cs` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
+- [x] After the waiting tasks' `touches` (BL-3358, BL-3431, BL-3432, BL-3569, BL-5006) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2PriorKnowledgeRow.cs`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The file already holds exactly one unit (the `--http2-prior-knowledge` row, split out by BL-5529) and registers itself through `HttpVersionRows`; there is nothing left to split. The waiting tasks overlapped only through their `touches`, so BL-3358, BL-3431 and BL-3432 (Blocked on Stewart, no code change planned per their Notes) now name only `CommandLineOptionTable.Http2Row.cs` (and tests); a lane that does need the prior-knowledge row widens `touches` then. Decided by Claude under Stewart's delegation; no ADR needed (no behaviour change).
 
 ## Log
 
