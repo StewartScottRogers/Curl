@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EndPointRecordingDatagramConnector.cs, Curl.Engine.UnitLibrary/ConnectionEndPointRecorder.EndPoints.cs, Curl.Networking.UnitLibrary/PortUnreachableReportingDatagramChannel.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5532 — Re-record the UDP channel's end points after PortUnreachableReportingDatagramChannel moves to the next address
 
@@ -36,3 +36,4 @@ Chosen: `EndPointRecordingDatagramConnector` wraps each opened channel so its fi
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 17639dd5 d97db41e eee9499a e06af265.
+- 2026-11-18: Doing -> Done. Datagram channel re-records its end points after the first received datagram; tests and quality run green
