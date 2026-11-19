@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2PriorKnowledgeRow.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5530 — Split Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2PriorKnowledgeRow.cs so tasks touching it can run in parallel
 
@@ -36,3 +36,4 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 19cd7f4e 395c591d a0b49a29.
+- 2026-11-18: Doing -> Done. File already held one unit; narrowed touches of BL-3358, BL-3431, BL-3432 so hotspots no longer lists it
