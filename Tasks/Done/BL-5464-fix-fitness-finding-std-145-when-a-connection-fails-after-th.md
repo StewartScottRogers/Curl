@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpConnector.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5464 — Fix fitness finding STD-145: When a connection fails after the TCP connect (proxy handshake, refused CONNECT, TLS verify failure, timeout through SOCKS), %{time_namelookup} and %{time_connect} are 0, and for TLS/timeout %{num_connects} is 0
 
@@ -35,13 +35,15 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] (1) and (2) print non-zero namelookup and connect and num_connects `1`; (3) prints non-zero namelookup and `1`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] (1) and (2) print non-zero namelookup and connect and num_connects `1`; (3) prints non-zero namelookup and `1`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+nTcpConnector now stamps Started/NameResolved/Connected on a failure after the TCP connect (SOCKS or CONNECT refusal, TLS refusal) and carries NameResolved on a timeout through a proxy (CanceledAfterResolveException). Pinned by TcpConnectorTests.FailureTimings.cs. Criterion 1 verified by those unit tests, not live mocks; num_connects is the engine counting failures, which already carry ConnectionNumber. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members. One unrelated flaky test (ServerCertificateVerificationCaDirectoryNoAiaTests, one-second notAfter rounding) failed once and passed on rerun.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-145 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 72375694 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Failures after the TCP connect keep namelookup and connect timings
