@@ -40,3 +40,4 @@ The `az` client does no Shared Key signing: `-u` sends no credentials, and the r
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 6.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 07e22df8 46f4cff0 984b340d 748ddad5 e3b0da79 3d836d5e.
