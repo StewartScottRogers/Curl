@@ -1,5 +1,5 @@
 ---
-id: BL-5520
+id: BL-5521
 title: Fix flaky CI test: one Curl.Networking.UnitTests case fails in the full fast run and passes alone
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-18
 completed:
 ---
-# BL-5520 — Fix flaky CI test: one Curl.Networking.UnitTests case fails in the full fast run and passes alone
+# BL-5521 — Fix flaky CI test: one Curl.Networking.UnitTests case fails in the full fast run and passes alone
 
 ## Goal
 
