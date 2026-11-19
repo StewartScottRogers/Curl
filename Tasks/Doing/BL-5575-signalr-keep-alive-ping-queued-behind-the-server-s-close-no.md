@@ -38,3 +38,4 @@ Found by the shift-end review of 2026-11-19 (silent-failure-hunter, confirmed by
 ## Log
 
 - 2026-11-19: Created by the shift-end review (review-20261119-152921).
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 32d41de2 9c122d8b 8165c082 c566fbe6 5e0b4a42 ae19c8cf.
