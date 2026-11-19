@@ -23,12 +23,14 @@ Found by the shift-end review of 2026-11-18 (type-design-analyzer, ADR-0710), di
 
 ## Acceptance criteria
 
-- [ ] The end points are read from the channel once it carries the transfer (for example when the first datagram is received, or through a notification when the channel switches), not only at open.
-- [ ] A unit test with a stand-in datagram connector whose first address refuses shows %{remote_ip} and %{local_port} of the second address.
-- [ ] A transfer with no switch reports the same end points as before.
-- [ ] `dotnet build` is clean, the fast tests pass, and Curl.Engine.UnitLibrary and Curl.Networking.UnitLibrary keep 100% line and branch coverage.
+- [x] The end points are read from the channel once it carries the transfer (for example when the first datagram is received, or through a notification when the channel switches), not only at open.
+- [x] A unit test with a stand-in datagram connector whose first address refuses shows %{remote_ip} and %{local_port} of the second address.
+- [x] A transfer with no switch reports the same end points as before.
+- [x] `dotnet build` is clean, the fast tests pass, and Curl.Engine.UnitLibrary and Curl.Networking.UnitLibrary keep 100% line and branch coverage.
 
 ## Notes
+
+Chosen: `EndPointRecordingDatagramConnector` wraps each opened channel so its first received datagram re-records the channel's server and local end points (`ConnectionEndPointRecorder.ReRecordDatagramChannel`); no change was needed in Curl.Networking (the channel already exposes the swapped inner end points). The open result keeps its connection number. Tests: `EndPointRecordingDatagramConnectorTests`. Quality run for Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
 

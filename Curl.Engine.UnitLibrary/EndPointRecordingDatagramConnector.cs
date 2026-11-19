@@ -32,6 +32,37 @@ internal sealed class EndPointRecordingDatagramConnector(IDatagramConnector conn
             recorder.RecordDatagramChannel(channel.LocalEndPoint as IPEndPoint, (timeProvider ?? TimeProvider.System).GetTimestamp());
         }
 
-        return opened;
+        return opened.Channel is { } open ? DatagramOpenResult.Opened(new ReRecordingChannel(open, recorder)).WithConnectionNumber(opened.ConnectionNumber) : opened;
+    }
+
+    /// <summary>
+    /// Forwards to <paramref name="inner" /> and, once a datagram has been received, records its end
+    /// points again: a channel that moved to the next resolved address after a refusal (EXT-100) carries
+    /// the transfer from another socket than the one it opened with (BL-5532).
+    /// </summary>
+    private sealed class ReRecordingChannel(IDatagramChannel inner, ConnectionEndPointRecorder recorder) : IDatagramChannel
+    {
+        private bool _recorded;
+
+        public EndPoint ServerEndPoint => inner.ServerEndPoint;
+
+        public EndPoint? LocalEndPoint => inner.LocalEndPoint;
+
+        public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken) =>
+            inner.SendAsync(datagram, destination, cancellationToken);
+
+        public async ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            DatagramReceived received = await inner.ReceiveAsync(buffer, cancellationToken).ConfigureAwait(false);
+            if (!_recorded)
+            {
+                _recorded = true;
+                recorder.ReRecordDatagramChannel(inner.ServerEndPoint as IPEndPoint, inner.LocalEndPoint as IPEndPoint);
+            }
+
+            return received;
+        }
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
     }
 }
