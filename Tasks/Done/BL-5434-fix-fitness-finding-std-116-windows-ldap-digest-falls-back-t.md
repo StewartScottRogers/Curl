@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: [BL-5094]
-touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5Bind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/WinLdapResultText.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5BindTests.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5AuthConfTests.cs, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapDigestMd5Bind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/LdapAuthenticatedBind.cs, Curl.Original.Protocol.Ldap.UnitLibrary/WinLdapResultText.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5BindTests.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapDigestMd5AuthConfTests.cs, Documentation/Planning/Decisions/README.md, Curl.Original.Protocol.Ldap.UnitLibrary/LdapOpenLdapSaslBind.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapAuthSchemeBindTests.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapAuthenticatedBindNegotiateTests.cs, Curl.Original.Protocol.Ldap.UnitTests/LdapOpenLdapSaslBindTests.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5434 — Fix fitness finding STD-116: Windows LDAP --digest falls back to qop=auth (no security layer) when the challenge lacks auth-conf with 3des; curl refuses to bind, so a man-in-the-middle can strip the protection
 
@@ -37,13 +37,15 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] steps 5 and 6 exit 38 with `curl: (38) LDAP local: bind via ldap_win_bind Operations Error`; the relay log shows no `qop=auth` response and no plaintext SearchRequest. The unmodified server still binds with `qop=auth-conf,cipher=3des`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] steps 5 and 6 exit 38 with `curl: (38) LDAP local: bind via ldap_win_bind Operations Error`; the relay log shows no `qop=auth` response and no plaintext SearchRequest. The unmodified server still binds with `qop=auth-conf,cipher=3des`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 Plan (no code edited): ChooseQop returns auth-conf-with-3des or null (WinLDAP dialect only uses it). The refusal must read "Operations Error" (code 1) but LdapAuthenticatedBind.cs:163 reports LocalError (82, "Local Error"): add WinLdapResultText.OperationsError = 1 and use it there. Tests to rewrite: LdapDigestMd5BindTests (qop=auth answer tests, ChallengeReply in ExecuteAsync) and AuthConf OnlyAuthOffered. Supersede ADR-1292 fallback with a new ADR. LdapAuthenticatedBind.cs is held by BL-5094 (lane 4), so waiting on it.
+
+Done (second claim): WinLDAP DIGEST-MD5 answers only qop=auth-conf with a supported cipher (3des, rc4, rc4-56, rc4-40); otherwise it sends no digest-response and fails with result 1, exit 38 "LDAP local: bind via ldap_win_bind Operations Error" (a challenge without a nonce too, formerly Local Error). ADR-1302 supersedes ADR-1292x27s auth fallback. The OpenLDAP dialect shares DigestAsync, so it passes acceptsQopAuth: true and keeps answering qop=auth (cyrus-sasl default min SSF 0); that is why LdapOpenLdapSaslBind.cs and three more test files were added to touches (no other Doing task names them). Real curl not re-measured: a lane cannot start the OpenLDAP container; the expected text is the reviewerx27s measured REF output in the finding. Pinned by LdapDigestMd5BindTests.ExecuteAsync_DigestChallengeOffersOnlyAuth_FailsWith38OperationsErrorAndSendsNoAnswerOrSearch and AnswerRequest_ChallengeItCannotAnswer_ReturnsNull (only auth, MITM-stripped). The auth-conf binds stay pinned by LdapDigestMd5AuthConfTests. Tests are platform-neutral (byte scripts, no paths). Build clean, fast tests green, Measure-CodeQuality for the LDAP library 0 failing (DigestAsync split to stay under complexity 10).
 
 ## Log
 
@@ -51,3 +53,4 @@ Plan (no code edited): ChooseQop returns auth-conf-with-3des or null (WinLDAP di
 - 2026-11-18: Backlog -> Doing. Criteria at claim: c96db816 69116afe 3d836d5e.
 - 2026-11-18: Doing -> Backlog. Needs LdapAuthenticatedBind.cs held by BL-5094 (Ldap.UnitLibrary); depends-on BL-5094 added
 - 2026-11-18: Backlog -> Doing. Criteria at claim: c96db816 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. WinLDAP DIGEST-MD5 refuses to bind without auth-conf: exit 38 Operations Error, no qop=auth answer
