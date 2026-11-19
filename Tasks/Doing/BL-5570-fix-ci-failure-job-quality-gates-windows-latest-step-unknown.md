@@ -26,9 +26,12 @@ Lanes test only on Windows, so reproduce with `gh run view 44586512674 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `job Quality gates (windows-latest) step UNKNOWN STEP` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `job Quality gates (windows-latest) step UNKNOWN STEP` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+The getter of `CommandLineOptions.ActsAsQuicBuild` had no reader in the fast tests (line coverage gate). Added `Curl.Cli.UnitTests/ActsAsQuicBuildTests.cs` (test file only; no production change).
+Linux and macOS: test is platform-neutral.
 
 ## Log
 
