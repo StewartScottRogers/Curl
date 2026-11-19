@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TlsClientOptions.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5558 — Fix AF-0887: Surviving mutant: TlsClientOptions' AllowBeast default can flip to true without a test noticing
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/TlsClientOptions.cs line 232`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/TlsClientOptions.cs line 232`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test `TlsClientOptionsTests.Constructor_WithNoArguments_DoesNotAllowBeastSoTheEmptyFragmentMitigationStaysOn` (mutant applied by hand failed it; reverted, all 4383 Networking fast tests pass). Test-only change, no production code touched.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: bd9f742a 9742157d.
+- 2026-11-19: Doing -> Done. Default test added; mutant killed
