@@ -3,6 +3,7 @@ using System.Net;
 using Curl.Api;
 using Curl.Api.Codes;
 using Curl.Api.Errors;
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Http;
 // </sample>
 

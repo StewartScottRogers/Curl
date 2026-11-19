@@ -18,6 +18,7 @@ using System.Net;
 using Curl.Api;
 using Curl.Api.Codes;
 using Curl.Api.Errors;
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Http;
 ```
 
@@ -69,7 +70,8 @@ transport groups `CurlNetworkOptions`, `CurlTlsOptions` (with `CurlTlsPeerOption
 `CurlProxyOptions`, and the protocol groups `CurlHttpOptions`, `CurlAuthenticationOptions`,
 `CurlFtpOptions`, `CurlSshOptions`, `CurlMailOptions`, `CurlTftpOptions`, `CurlTelnetOptions` and
 `CurlRtspOptions`. A group set on a request replaces the client's whole group. Each value is
-checked as it is set.
+checked as it is set. Choose HTTP authentication methods (Digest, for a plain-HTTP server that refuses
+Basic) with `HttpAuthenticationMethods` from `Curl.Api.Options.Authentication`.
 
 <!-- sample: options -->
 ```csharp

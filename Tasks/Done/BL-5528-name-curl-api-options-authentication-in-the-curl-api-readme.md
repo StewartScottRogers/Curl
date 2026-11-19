@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: docs
 depends-on: [BL-5517]
-touches: [Curl.Api/README.md]
+touches: [Curl.Api/README.md, Curl.Api.UnitTests/Readme/ReadmeSamples.cs, Curl.Api.UnitTests/Readme/ReadmeTests.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5528 — Name Curl.Api.Options.Authentication in the Curl.Api README so HttpAuthenticationMethods samples compile
 
@@ -26,14 +26,17 @@ This is the same kind of gap as BL-5517 (`Curl.Api.Codes` for `CurlCode`), which
 
 ## Acceptance criteria
 
-- [ ] The `<!-- sample: usings -->` block in `Curl.Api/README.md` includes `using Curl.Api.Options.Authentication;`, or the README names that namespace where `HttpAuthenticationMethods` is first used or recommended.
-- [ ] Every other public `Curl.Api` type the README's samples use is in a namespace the usings sample or the text names.
-- [ ] `Curl.Api.UnitTests/Readme/ReadmeTests.cs` passes.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The `<!-- sample: usings -->` block in `Curl.Api/README.md` includes `using Curl.Api.Options.Authentication;`, or the README names that namespace where `HttpAuthenticationMethods` is first used or recommended.
+- [x] Every other public `Curl.Api` type the README's samples use is in a namespace the usings sample or the text names.
+- [x] `Curl.Api.UnitTests/Readme/ReadmeTests.cs` passes.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Added `using Curl.Api.Options.Authentication;` to the usings sample, its tested source (ReadmeSamples.cs) and the test assertion (ReadmeTests.cs, added to touches), plus a sentence naming `HttpAuthenticationMethods` and its namespace. The other namespaces the samples use were already in the usings.
 
 ## Log
 
 - 2026-11-18: Created from bug report 2026-11-18T1734-Curl-bug-report.md, new finding 1.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 6173266f d74f6b84 161fdff2 3d836d5e.
+- 2026-11-18: Doing -> Done. README usings sample names Curl.Api.Options.Authentication; build clean, fast tests green
