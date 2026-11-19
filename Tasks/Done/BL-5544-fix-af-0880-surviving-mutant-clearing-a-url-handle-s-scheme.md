@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/UrlPartSetter.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5544 — Fix AF-0880: Surviving mutant: clearing a URL handle's scheme can leave it marked as guessed
 
@@ -43,3 +43,4 @@ Killed by `UrlPartSetterClearTests.Cleared_SchemeOfAGuessedSchemeHandle_ClearsTh
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 4777333f 9742157d.
+- 2026-11-19: Doing -> Done. UrlPartSetterClearTests kills the mutant
