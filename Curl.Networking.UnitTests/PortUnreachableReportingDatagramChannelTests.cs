@@ -73,7 +73,7 @@ public sealed class PortUnreachableReportingDatagramChannelTests
     {
         Diagnostics.Arrange("socket error", SocketError.MessageSize);
         var failure = new SocketException((int)SocketError.MessageSize);
-        await using var channel = new PortUnreachableReportingDatagramChannel(new FailingChannel(failure), () => "unused");
+        await using var channel = new PortUnreachableReportingDatagramChannel(new FailingChannel(failure), () => "unused", [], _ => throw new InvalidOperationException());
 
         var received = await Assert.ThrowsExactlyAsync<SocketException>(async () => await channel.ReceiveAsync(new byte[1], CancellationToken.None));
         var sent = await Assert.ThrowsExactlyAsync<SocketException>(async () => await channel.SendAsync(new byte[1], Server, CancellationToken.None));
@@ -89,7 +89,7 @@ public sealed class PortUnreachableReportingDatagramChannelTests
     {
         var failure = new DatagramPortUnreachableException(SocketError.ConnectionReset, "inner text");
         Diagnostics.Arrange("inner failure", failure.Message);
-        await using var channel = new PortUnreachableReportingDatagramChannel(new FailingChannel(failure), () => "outer text");
+        await using var channel = new PortUnreachableReportingDatagramChannel(new FailingChannel(failure), () => "outer text", [], _ => throw new InvalidOperationException());
 
         var refused = await Assert.ThrowsExactlyAsync<DatagramPortUnreachableException>(
             async () => await channel.ReceiveAsync(new byte[1], CancellationToken.None));
@@ -104,7 +104,7 @@ public sealed class PortUnreachableReportingDatagramChannelTests
     {
         var inner = new AnsweringChannel();
         Diagnostics.Arrange("inner server", Server);
-        var channel = new PortUnreachableReportingDatagramChannel(inner, () => "unused");
+        var channel = new PortUnreachableReportingDatagramChannel(inner, () => "unused", [], _ => throw new InvalidOperationException());
 
         await channel.SendAsync(new byte[] { 1, 2 }, Server, CancellationToken.None);
         var received = await channel.ReceiveAsync(new byte[16], CancellationToken.None);
