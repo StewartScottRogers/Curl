@@ -557,6 +557,20 @@ public sealed class Lib1978To2306Tests
     }
 
     [TestMethod]
+    public async Task Lib2032_WhenMultiPerformFails_StopsBeforeWritingTheRunningLine()
+    {
+        var engine = new FakeCurlEngine();
+        engine.Multi.PerformResult = (CurlMultiCode.BadHandle, 0);
+        var run = new PortRun(engine, 2032, "http://x/2032");
+
+        LibTestResult result = await new Lib2032(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreNotEqual(0, result.ExitCode);
+        Assert.DoesNotContain("lib2032.c:156", run.Error.ToString());
+        Assert.DoesNotContain("lib2032.c:181", run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task Lib2032_WhenTheTestRunsTooLong_Aborts()
     {
         foreach (bool inWait in new[] { false, true })

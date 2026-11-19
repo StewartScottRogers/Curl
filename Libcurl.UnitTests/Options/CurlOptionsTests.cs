@@ -14,6 +14,16 @@ public sealed class CurlOptionsTests
     }
 
     [TestMethod]
+    public void ByName_AnUpperCaseUpstreamName_AnswersThatSameUpperCaseNameForTheWordCasedMember()
+    {
+        var row = CurlOptions.ByName("WRITEFUNCTION");
+
+        Assert.IsNotNull(row);
+        Assert.AreEqual("WRITEFUNCTION", row.Name);
+        Assert.AreEqual(CurlOption.Writefunction, row.Id);
+    }
+
+    [TestMethod]
     public void All_IsInUpstreamsAlphabeticalOrderWithUniqueNames()
     {
         var names = CurlOptions.All.Select(row => row.Name).ToArray();

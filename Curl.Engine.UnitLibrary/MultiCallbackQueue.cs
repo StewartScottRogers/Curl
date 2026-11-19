@@ -18,13 +18,16 @@ internal sealed class MultiCallbackQueue
     private int performingThread;
 
     /// <summary>Gets whether a callback waits for the next perform.</summary>
-    public bool HasQueued
+    public bool HasQueued => QueuedCount > 0;
+
+    /// <summary>Gets how many callbacks wait for the next perform.</summary>
+    public int QueuedCount
     {
         get
         {
             lock (gate)
             {
-                return queued.Count > 0;
+                return queued.Count;
             }
         }
     }

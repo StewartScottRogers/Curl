@@ -97,11 +97,11 @@ public sealed class Amqp0ConnectionTests
 
     [TestMethod]
     [SpecRequirement("Amqp0:AMQP091-1.4.2.2-2")]
-    public async Task Start_WithoutPlain_FailsLoginWithoutAnswering()
+    public async Task Start_WithoutUsableMechanism_FailsLoginWithoutAnswering()
     {
-        Amqp0ReferenceBroker broker = new(new Amqp0BrokerSettings { Mechanisms = "AMQPLAIN" }, Amqp0MethodTable.Standard);
+        Amqp0ReferenceBroker broker = new(new Amqp0BrokerSettings { Mechanisms = "EXTERNAL" }, Amqp0MethodTable.Standard);
 
-        AssertExit(await RunAsync(broker, "amqp://localhost/vh/q"), 67, "curl: (67) AMQP server offers no PLAIN mechanism (it offers \"AMQPLAIN\")\n");
+        AssertExit(await RunAsync(broker, "amqp://localhost/vh/q"), 67, "curl: (67) AMQP server offers no mechanism this client can use (it offers \"EXTERNAL\")\n");
         Assert.AreEqual(0, broker.ClientFrames.Count);
     }
 

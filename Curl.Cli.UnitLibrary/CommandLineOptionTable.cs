@@ -186,7 +186,7 @@ public static partial class CommandLineOptionTable
         CommandLineOption.NegatableFlag("ftp-ssl", null, (options, on) => options.SetSslTry(on, "--ftp-ssl")),
         CommandLineOption.NegatableFlag("ssl-reqd", null, (options, on) => options.SslRequired = on),
         CommandLineOption.NegatableFlag("ftp-ssl-reqd", null, (options, on) => options.SslRequired = on),
-        CommandLineOption.NegatableFlag("ftp-ssl-control", null, (options, on) => options.FtpSslControlOnly = on),
+        CommandLineOption.NegatableFlag("ftp-ssl-control", null, (options, on) => options.SetFtpSslControl(on)),
         CommandLineOption.NegatableFlag("ftp-ssl-ccc", null, (options, on) => options.FtpSslCccRequested = on),
         CommandLineOption.Value("ftp-ssl-ccc-mode", null, AcceptingEmpty(SetFtpSslCccMode)),
         CommandLineOption.Text("ftp-account", null, (options, account) => options.FtpAccount = account),

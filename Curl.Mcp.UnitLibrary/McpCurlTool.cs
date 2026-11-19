@@ -13,9 +13,10 @@ namespace Curl.Mcp;
 /// <param name="runner">Runs curl in-process.</param>
 /// <param name="root">The folder every path must lie in; <see cref="McpConfinementRoot.NotConfigured" /> refuses every path but still allows transfers that touch no file.</param>
 /// <param name="cap">The most bytes of standard output, and of standard error, the tool returns.</param>
-public sealed class McpCurlTool(ICurlCommandRunner runner, McpConfinementRoot root, McpResponseCap cap)
+/// <param name="extensionOptions">The long options the extensions register, which the tool accepts as the console does (BL-5564); <see langword="null" />, the default, knows none.</param>
+public sealed class McpCurlTool(ICurlCommandRunner runner, McpConfinementRoot root, McpResponseCap cap, IReadOnlyList<McpExtensionOption>? extensionOptions = null)
 {
-    private readonly McpArgumentChecker checker = new(root);
+    private readonly McpArgumentChecker checker = new(root, extensionOptions);
 
     /// <summary>
     /// Runs <paramref name="arguments" /> as curl would run them, unless a path they name lies outside

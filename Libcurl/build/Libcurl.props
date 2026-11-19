@@ -1,0 +1,9 @@
+<Project>
+  <!-- A port from C needs these Curl.Api namespaces beside Libcurl.*; the package adds them as implicit usings (ADR-1306). -->
+  <ItemGroup>
+    <Using Include="Curl.Api.Callbacks" />
+    <Using Include="Curl.Api.Codes" />
+    <Using Include="Curl.Api.EngineContracts.WebSocket" />
+    <Using Include="Curl.Api.Options.Protocols" />
+  </ItemGroup>
+</Project>

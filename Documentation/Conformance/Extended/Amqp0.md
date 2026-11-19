@@ -24,7 +24,7 @@ class's method section of the XML specification's documentation.
 | Amqp0:AMQP091-2.2.4-1 | MUST | The client closes the connection with connection.close on channel 0 (reply-success 200) and waits for close-ok. | Amqp0ConnectionTests.Publish_OpensWithTheProtocolHeaderAndClosesTheConnection |
 | Amqp0:AMQP091-1.4.2.1-1 | MUST | The client answers connection.start with start-ok before any other method. | Amqp0ConnectionTests.StartOk_ChoosesPlainAndAnOfferedLocaleInAWellFormedTable |
 | Amqp0:AMQP091-1.4.2.2-1 | MUST | start-ok's mechanism and locale are ones connection.start offered. | Amqp0ConnectionTests.StartOk_ChoosesPlainAndAnOfferedLocaleInAWellFormedTable |
-| Amqp0:AMQP091-1.4.2.2-2 | MUST | A client that supports none of the offered mechanisms does not answer with another mechanism. | Amqp0ConnectionTests.Start_WithoutPlain_FailsLoginWithoutAnswering |
+| Amqp0:AMQP091-1.4.2.2-2 | MUST | A client that supports none of the offered mechanisms does not answer with another mechanism. | Amqp0ConnectionTests.Start_WithoutUsableMechanism_FailsLoginWithoutAnswering |
 | Amqp0:AMQP091-1.4.2.3-1 | MUST | The client answers connection.secure with secure-ok. | n/a: the client chooses PLAIN, whose credentials travel in start-ok's response and which has no challenge, so no broker sends connection.secure to it |
 | Amqp0:AMQP091-1.4.2.6-1 | MUST | tune-ok's channel-max does not exceed the server's proposal. | Amqp0ConnectionTests.Tune_ClientAcceptsLowerLimitsAndSplitsContentAtFrameMax |
 | Amqp0:AMQP091-1.4.2.6-2 | MUST | tune-ok's frame-max does not exceed the server's proposal. | Amqp0ConnectionTests.Tune_ClientAcceptsLowerLimitsAndSplitsContentAtFrameMax |

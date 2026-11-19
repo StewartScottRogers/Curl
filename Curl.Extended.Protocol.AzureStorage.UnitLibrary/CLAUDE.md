@@ -30,8 +30,8 @@ or another extension. It is registered in `ExtensionCatalogue.cs` and `Extension
 - `Requests/AzureStorageUrlMapping` maps `az://account/container/blob` to the Blob endpoint and
   `abfs[s]://filesystem@account.dfs.core.windows.net/path` to the DFS endpoint (a bare account name gets
   `.blob.core.windows.net` or `.dfs.core.windows.net`). `AzureStorageCredential.Choose` takes
-  `--oauth2-bearer`, then `AZURE_STORAGE_BEARER_TOKEN`, then `AZURE_STORAGE_SAS_TOKEN`, else anonymous.
-  `AzureStorageRequestAuthorizer` appends a SAS token to the query or sends `Authorization: Bearer`, and
+  `--oauth2-bearer`, then `-u account:key` (a Shared Key), then `AZURE_STORAGE_BEARER_TOKEN`, then `AZURE_STORAGE_SAS_TOKEN`, else anonymous.
+  `AzureStorageRequestAuthorizer` appends a SAS token to the query, sends `Authorization: Bearer`, or signs with Shared Key (`AzureStorageSharedKeyStringToSign`, `AzureStorageSharedKeySigner`; BL-5569), and
   always sends `Host`, `x-ms-version` (`2025-01-05`) and `x-ms-date` from its `TimeProvider`. Every failure
-  is an `AzureStorageRequestException` naming an `AzureStorageRequestFailure`. Shared Key signing is not
-  done (BL-4290's Notes).
+  is an `AzureStorageRequestException` naming an `AzureStorageRequestFailure`. A bad account key is
+  `InvalidSharedKey`, exit 67.

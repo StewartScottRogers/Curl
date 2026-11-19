@@ -38,4 +38,16 @@ public interface IEasyWebSocket
     /// <param name="cancellationToken">Stops the call.</param>
     /// <returns>The call's result.</returns>
     ValueTask<CurlCode> StartFrameAsync(CurlWebSocketFlags flags, long frameLength, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Completes once <see cref="ReceiveAsync"/> has something other than <see cref="CurlCode.Again"/> to answer
+    /// (a run of payload, the server closing, or a failure), the awaitable form of the <c>select</c> or <c>poll</c>
+    /// a C program runs on <c>CURLINFO_ACTIVESOCKET</c> after <c>curl_ws_recv</c> answers <c>CURLE_AGAIN</c>. It
+    /// receives nothing itself and never changes what <see cref="ReceiveAsync"/> answers. An engine that cannot wait
+    /// completes at once, which is the default.
+    /// </summary>
+    /// <param name="cancellationToken">Stops the wait.</param>
+    /// <returns>A task that completes when a receive would not answer <see cref="CurlCode.Again"/>.</returns>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
+    ValueTask WaitForDataAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }

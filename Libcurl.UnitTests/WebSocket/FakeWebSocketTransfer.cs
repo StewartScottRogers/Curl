@@ -80,6 +80,15 @@ internal sealed class FakeEasyWebSocket : IEasyWebSocket
         return ValueTask.FromResult(ReceiveResult);
     }
 
+    public TaskCompletionSource? WaitGate { get; set; }
+
+    public ValueTask WaitForDataAsync(CancellationToken cancellationToken)
+    {
+        CallCount++;
+        LastToken = cancellationToken;
+        return WaitGate is null ? ValueTask.CompletedTask : new ValueTask(WaitGate.Task.WaitAsync(cancellationToken));
+    }
+
     public ValueTask<CurlWebSocketSendResult> SendAsync(ReadOnlyMemory<byte> buffer, long fragmentSize, CurlWebSocketFlags flags, CancellationToken cancellationToken)
     {
         CallCount++;

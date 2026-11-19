@@ -20,12 +20,18 @@ namespace Curl.Extended.Protocol.SignalR.Client;
 /// <param name="callRecord">The Invocation or StreamInvocation record <see cref="SignalRCall"/> gave, or <see langword="null"/>.</param>
 /// <param name="output">Where the lines go.</param>
 /// <param name="progress">Told the running byte total after each line, so a timeout message can count it.</param>
-internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]? callRecord, Stream output, ITransferProgress progress)
+/// <param name="timeProvider">The clock of the keep-alive Ping, sent whenever nothing else was sent for <see cref="KeepAliveInterval"/>.</param>
+internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]? callRecord, Stream output, ITransferProgress progress, TimeProvider timeProvider)
 {
+    /// <summary>How long the client may send nothing before it sends a Ping: the .NET client's default KeepAliveInterval, half the server's 30 s client timeout (HubProtocol.md, "Ping").</summary>
+    internal static readonly TimeSpan KeepAliveInterval = TimeSpan.FromSeconds(15);
+
     /// <summary>The error of the Completion curl sends for a hub call that expects a client result: the .NET client's text.</summary>
     internal const string NoClientResultError = "Client didn't provide a result.";
 
     private long bytesWritten;
+
+    private long lastSentAt;
 
     /// <summary>Runs the session and gives the number of bytes written to the output.</summary>
     /// <exception cref="SignalRHubException">The hub refused the handshake, failed the call or closed with an error (exit 22).</exception>
@@ -33,7 +39,7 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
     /// <exception cref="SignalRWireFormatException">The hub sent a record that is not a hub protocol message.</exception>
     public async Task<long> RunAsync(CancellationToken cancellationToken)
     {
-        await session.SendTextAsync(HubMessageWriter.WriteHandshakeRequest(), cancellationToken);
+        await SendAsync(HubMessageWriter.WriteHandshakeRequest(), cancellationToken);
         byte[] handshake = await session.ReceiveRecordAsync(cancellationToken)
             ?? throw new SignalRTransportException("The hub closed the WebSocket before answering the handshake.");
         if (HubMessageReader.ReadHandshakeResponse(handshake).Error is { } refusal)
@@ -43,16 +49,50 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
 
         if (callRecord is not null)
         {
-            await session.SendTextAsync(callRecord, cancellationToken);
+            await SendAsync(callRecord, cancellationToken);
         }
 
-        while (await session.ReceiveRecordAsync(cancellationToken) is { } record
-            && !await AcceptAsync(HubMessageReader.ReadMessage(record), cancellationToken))
+        using var stopPinging = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _ = PingWhenIdleAsync(stopPinging.Token);
+        try
         {
+            while (await session.ReceiveRecordAsync(cancellationToken) is { } record
+                && !await AcceptAsync(HubMessageReader.ReadMessage(record), cancellationToken))
+            {
+            }
+        }
+        finally
+        {
+            // The Ping task ends by itself at this cancellation; a Ping it fails to write is the read loop's failure to report.
+            stopPinging.Cancel();
         }
 
         await session.CloseAsync(cancellationToken);
         return bytesWritten;
+    }
+
+    // Sends a record and notes the time, so the keep-alive Ping waits a full interval after any send.
+    private async Task SendAsync(byte[] record, CancellationToken cancellationToken)
+    {
+        await session.SendTextAsync(record, cancellationToken);
+        lastSentAt = timeProvider.GetTimestamp();
+    }
+
+    // Sends a Ping each time KeepAliveInterval passes with nothing sent (HubProtocol.md, "Ping"); ends when cancelled.
+    private async Task PingWhenIdleAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            TimeSpan idle = timeProvider.GetElapsedTime(lastSentAt);
+            if (idle >= KeepAliveInterval)
+            {
+                await SendAsync(HubMessageWriter.WritePing(), cancellationToken);
+            }
+            else
+            {
+                await Task.Delay(KeepAliveInterval - idle, timeProvider, cancellationToken);
+            }
+        }
     }
 
     private static string CallArray(InvocationMessage invocation)
@@ -122,7 +162,7 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
 
         if (message is InvocationMessage { InvocationId: { } invocationId })
         {
-            await session.SendTextAsync(RefusalOf(invocationId), cancellationToken);
+            await SendAsync(RefusalOf(invocationId), cancellationToken);
         }
 
         return Ends(message);

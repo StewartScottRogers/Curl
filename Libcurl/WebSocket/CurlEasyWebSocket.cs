@@ -48,6 +48,28 @@ public static class CurlEasyWebSocket
     }
 
     /// <summary>
+    /// Waits until <see cref="WebSocketRecv"/> would not answer <see cref="CurlCode.Again"/>: the awaitable form of
+    /// the <c>select</c> or <c>poll</c> on <c>CURLINFO_ACTIVESOCKET</c> that a C program runs after <c>curl_ws_recv</c>
+    /// answers <c>CURLE_AGAIN</c>. A .NET port awaits it instead of sleeping. It receives nothing: call
+    /// <see cref="WebSocketRecvAsync"/> afterwards, which still answers <see cref="CurlCode.Again"/> when no frame is ready.
+    /// </summary>
+    /// <param name="easy">The handle, after a <c>CURLOPT_CONNECT_ONLY</c> 2 perform.</param>
+    /// <param name="cancellationToken">Stops the wait.</param>
+    /// <returns><see cref="CurlCode.Ok"/> once a receive has something to answer, or <see cref="CurlCode.BadFunctionArgument"/> for a <see langword="null"/> or cleaned-up handle.</returns>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
+    public static async ValueTask<CurlCode> WebSocketWaitAsync(this CurlEasy? easy, CancellationToken cancellationToken = default)
+    {
+        var webSocket = LiveWebSocket(easy);
+        if (webSocket is null)
+        {
+            return CurlCode.BadFunctionArgument;
+        }
+
+        await webSocket.WaitForDataAsync(cancellationToken).ConfigureAwait(false);
+        return CurlCode.Ok;
+    }
+
+    /// <summary>
     /// <c>curl_ws_send</c>: sends <paramref name="buffer"/> as a WebSocket frame, or part of one, blocking on
     /// <see cref="WebSocketSendAsync"/>.
     /// </summary>

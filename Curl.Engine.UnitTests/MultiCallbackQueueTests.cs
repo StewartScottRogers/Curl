@@ -50,6 +50,32 @@ public sealed class MultiCallbackQueueTests
     }
 
     [TestMethod]
+    public async Task RunQueued_TakingOneCallbackWhileAnotherIsQueued_KeepsTheArrivedSignalCompleted()
+    {
+        MultiCallbackQueue queue = new();
+        bool? arrivedWhileFirstRuns = null;
+        Task[] callers =
+        [
+            Task.Run(() => queue.Run(() => arrivedWhileFirstRuns ??= queue.Arrived.IsCompleted, CancellationToken.None)),
+            Task.Run(() => queue.Run(() => arrivedWhileFirstRuns ??= queue.Arrived.IsCompleted, CancellationToken.None)),
+        ];
+        DateTime deadline = DateTime.UtcNow + Limit;
+        while (queue.QueuedCount < 2 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(1);
+        }
+
+        Assert.AreEqual(2, queue.QueuedCount);
+
+        while (!Task.WhenAll(callers).IsCompleted)
+        {
+            queue.RunQueued();
+        }
+
+        Assert.IsTrue(arrivedWhileFirstRuns);
+    }
+
+    [TestMethod]
     public async Task Run_CallbackThrows_ThrowsOnTheCallingThread()
     {
         MultiCallbackQueue queue = new();

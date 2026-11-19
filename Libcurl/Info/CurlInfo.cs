@@ -5,7 +5,9 @@ namespace Libcurl.Info;
 /// with its number (the <c>CURLINFO_STRING</c>, <c>_LONG</c>, <c>_DOUBLE</c>, <c>_SLIST</c>/<c>_PTR</c>,
 /// <c>_SOCKET</c> or <c>_OFF_T</c> base plus the info's own number). Each name is the upstream name
 /// without <c>CURLINFO_</c>, one capital per underscore-separated word, as <see cref="Options.CurlOption"/>
-/// names <c>CURLOPT_*</c>.
+/// names <c>CURLOPT_*</c>. A name that upstream spells as several words run together has its word-cased
+/// form in its summary, so a text search finds it (ADR-1307).
+/// A name that upstream spells as several words run together has its word-cased form in its summary (ADR-1307).
 /// </summary>
 /// <remarks>
 /// <see cref="Easy.CurlEasy.GetInfo"/> answers each with the .NET value of its base: a
@@ -30,13 +32,13 @@ public enum CurlInfo
     /// <summary><c>CURLINFO_TOTAL_TIME</c> (0x300003), a double.</summary>
     TotalTime = 0x300003,
 
-    /// <summary><c>CURLINFO_NAMELOOKUP_TIME</c> (0x300004), a double.</summary>
+    /// <summary><c>CURLINFO_NAMELOOKUP_TIME</c> (0x300004), a double. Word-cased: <c>NameLookupTime</c>.</summary>
     NamelookupTime = 0x300004,
 
     /// <summary><c>CURLINFO_CONNECT_TIME</c> (0x300005), a double.</summary>
     ConnectTime = 0x300005,
 
-    /// <summary><c>CURLINFO_PRETRANSFER_TIME</c> (0x300006), a double.</summary>
+    /// <summary><c>CURLINFO_PRETRANSFER_TIME</c> (0x300006), a double. Word-cased: <c>PreTransferTime</c>.</summary>
     PretransferTime = 0x300006,
 
     /// <summary><c>CURLINFO_SIZE_UPLOAD</c> (0x300007), a double; deprecated upstream for <see cref="SizeUploadT"/>.</summary>
@@ -72,7 +74,7 @@ public enum CurlInfo
     /// <summary><c>CURLINFO_REQUEST_SIZE</c> (0x20000C), a long.</summary>
     RequestSize = 0x20000C,
 
-    /// <summary><c>CURLINFO_SSL_VERIFYRESULT</c> (0x20000D), a long.</summary>
+    /// <summary><c>CURLINFO_SSL_VERIFYRESULT</c> (0x20000D), a long. Word-cased: <c>SslVerifyResult</c>.</summary>
     SslVerifyresult = 0x20000D,
 
     /// <summary><c>CURLINFO_FILETIME</c> (0x20000E), a long.</summary>
@@ -93,7 +95,7 @@ public enum CurlInfo
     /// <summary><c>CURLINFO_CONTENT_LENGTH_UPLOAD_T</c> (0x600010), an off_t.</summary>
     ContentLengthUploadT = 0x600010,
 
-    /// <summary><c>CURLINFO_STARTTRANSFER_TIME</c> (0x300011), a double.</summary>
+    /// <summary><c>CURLINFO_STARTTRANSFER_TIME</c> (0x300011), a double. Word-cased: <c>StartTransferTime</c>.</summary>
     StarttransferTime = 0x300011,
 
     /// <summary><c>CURLINFO_CONTENT_TYPE</c> (0x100012), a string.</summary>
@@ -108,13 +110,13 @@ public enum CurlInfo
     /// <summary><c>CURLINFO_PRIVATE</c> (0x100015): the <c>CURLOPT_PRIVATE</c> value, a pointer upstream.</summary>
     Private = 0x100015,
 
-    /// <summary><c>CURLINFO_HTTP_CONNECTCODE</c> (0x200016), a long.</summary>
+    /// <summary><c>CURLINFO_HTTP_CONNECTCODE</c> (0x200016), a long. Word-cased: <c>HttpConnectCode</c>.</summary>
     HttpConnectcode = 0x200016,
 
-    /// <summary><c>CURLINFO_HTTPAUTH_AVAIL</c> (0x200017), a long.</summary>
+    /// <summary><c>CURLINFO_HTTPAUTH_AVAIL</c> (0x200017), a long. Word-cased: <c>HttpAuthAvail</c>.</summary>
     HttpauthAvail = 0x200017,
 
-    /// <summary><c>CURLINFO_PROXYAUTH_AVAIL</c> (0x200018), a long.</summary>
+    /// <summary><c>CURLINFO_PROXYAUTH_AVAIL</c> (0x200018), a long. Word-cased: <c>ProxyAuthAvail</c>.</summary>
     ProxyauthAvail = 0x200018,
 
     /// <summary><c>CURLINFO_OS_ERRNO</c> (0x200019), a long.</summary>
@@ -126,10 +128,10 @@ public enum CurlInfo
     /// <summary><c>CURLINFO_SSL_ENGINES</c> (0x40001B), a string list.</summary>
     SslEngines = 0x40001B,
 
-    /// <summary><c>CURLINFO_COOKIELIST</c> (0x40001C), a string list.</summary>
+    /// <summary><c>CURLINFO_COOKIELIST</c> (0x40001C), a string list. Word-cased: <c>CookieList</c>.</summary>
     Cookielist = 0x40001C,
 
-    /// <summary><c>CURLINFO_LASTSOCKET</c> (0x20001D), a long; deprecated upstream for <see cref="Activesocket"/>.</summary>
+    /// <summary><c>CURLINFO_LASTSOCKET</c> (0x20001D), a long; deprecated upstream for <see cref="Activesocket"/>. Word-cased: <c>LastSocket</c>.</summary>
     Lastsocket = 0x20001D,
 
     /// <summary><c>CURLINFO_FTP_ENTRY_PATH</c> (0x10001E), a string.</summary>
@@ -141,7 +143,7 @@ public enum CurlInfo
     /// <summary><c>CURLINFO_PRIMARY_IP</c> (0x100020), a string.</summary>
     PrimaryIp = 0x100020,
 
-    /// <summary><c>CURLINFO_APPCONNECT_TIME</c> (0x300021), a double.</summary>
+    /// <summary><c>CURLINFO_APPCONNECT_TIME</c> (0x300021), a double. Word-cased: <c>AppConnectTime</c>.</summary>
     AppconnectTime = 0x300021,
 
     /// <summary><c>CURLINFO_CERTINFO</c> (0x400022), a <c>struct curl_certinfo</c>: one string list per certificate.</summary>
@@ -174,7 +176,7 @@ public enum CurlInfo
     /// <summary><c>CURLINFO_TLS_SESSION</c> (0x40002B), a <c>struct curl_tlssessioninfo</c>; deprecated upstream for <see cref="TlsSslPtr"/>.</summary>
     TlsSession = 0x40002B,
 
-    /// <summary><c>CURLINFO_ACTIVESOCKET</c> (0x50002C), a socket.</summary>
+    /// <summary><c>CURLINFO_ACTIVESOCKET</c> (0x50002C), a socket. Word-cased: <c>ActiveSocket</c>.</summary>
     Activesocket = 0x50002C,
 
     /// <summary><c>CURLINFO_TLS_SSL_PTR</c> (0x40002D), a <c>struct curl_tlssessioninfo</c>.</summary>
@@ -183,7 +185,7 @@ public enum CurlInfo
     /// <summary><c>CURLINFO_HTTP_VERSION</c> (0x20002E), a long.</summary>
     HttpVersion = 0x20002E,
 
-    /// <summary><c>CURLINFO_PROXY_SSL_VERIFYRESULT</c> (0x20002F), a long.</summary>
+    /// <summary><c>CURLINFO_PROXY_SSL_VERIFYRESULT</c> (0x20002F), a long. Word-cased: <c>ProxySslVerifyResult</c>.</summary>
     ProxySslVerifyresult = 0x20002F,
 
     /// <summary><c>CURLINFO_PROTOCOL</c> (0x200030), a long; deprecated upstream for <see cref="Scheme"/>.</summary>
@@ -195,22 +197,22 @@ public enum CurlInfo
     /// <summary><c>CURLINFO_TOTAL_TIME_T</c> (0x600032), an off_t in microseconds.</summary>
     TotalTimeT = 0x600032,
 
-    /// <summary><c>CURLINFO_NAMELOOKUP_TIME_T</c> (0x600033), an off_t in microseconds.</summary>
+    /// <summary><c>CURLINFO_NAMELOOKUP_TIME_T</c> (0x600033), an off_t in microseconds. Word-cased: <c>NameLookupTimeT</c>.</summary>
     NamelookupTimeT = 0x600033,
 
     /// <summary><c>CURLINFO_CONNECT_TIME_T</c> (0x600034), an off_t in microseconds.</summary>
     ConnectTimeT = 0x600034,
 
-    /// <summary><c>CURLINFO_PRETRANSFER_TIME_T</c> (0x600035), an off_t in microseconds.</summary>
+    /// <summary><c>CURLINFO_PRETRANSFER_TIME_T</c> (0x600035), an off_t in microseconds. Word-cased: <c>PreTransferTimeT</c>.</summary>
     PretransferTimeT = 0x600035,
 
-    /// <summary><c>CURLINFO_STARTTRANSFER_TIME_T</c> (0x600036), an off_t in microseconds.</summary>
+    /// <summary><c>CURLINFO_STARTTRANSFER_TIME_T</c> (0x600036), an off_t in microseconds. Word-cased: <c>StartTransferTimeT</c>.</summary>
     StarttransferTimeT = 0x600036,
 
     /// <summary><c>CURLINFO_REDIRECT_TIME_T</c> (0x600037), an off_t in microseconds.</summary>
     RedirectTimeT = 0x600037,
 
-    /// <summary><c>CURLINFO_APPCONNECT_TIME_T</c> (0x600038), an off_t in microseconds.</summary>
+    /// <summary><c>CURLINFO_APPCONNECT_TIME_T</c> (0x600038), an off_t in microseconds. Word-cased: <c>AppConnectTimeT</c>.</summary>
     AppconnectTimeT = 0x600038,
 
     /// <summary><c>CURLINFO_RETRY_AFTER</c> (0x600039), an off_t in seconds.</summary>
@@ -243,15 +245,15 @@ public enum CurlInfo
     /// <summary><c>CURLINFO_USED_PROXY</c> (0x200042), a long.</summary>
     UsedProxy = 0x200042,
 
-    /// <summary><c>CURLINFO_POSTTRANSFER_TIME_T</c> (0x600043), an off_t in microseconds.</summary>
+    /// <summary><c>CURLINFO_POSTTRANSFER_TIME_T</c> (0x600043), an off_t in microseconds. Word-cased: <c>PostTransferTimeT</c>.</summary>
     PosttransferTimeT = 0x600043,
 
-    /// <summary><c>CURLINFO_EARLYDATA_SENT_T</c> (0x600044), an off_t.</summary>
+    /// <summary><c>CURLINFO_EARLYDATA_SENT_T</c> (0x600044), an off_t. Word-cased: <c>EarlyDataSentT</c>.</summary>
     EarlydataSentT = 0x600044,
 
-    /// <summary><c>CURLINFO_HTTPAUTH_USED</c> (0x200045), a long.</summary>
+    /// <summary><c>CURLINFO_HTTPAUTH_USED</c> (0x200045), a long. Word-cased: <c>HttpAuthUsed</c>.</summary>
     HttpauthUsed = 0x200045,
 
-    /// <summary><c>CURLINFO_PROXYAUTH_USED</c> (0x200046), a long.</summary>
+    /// <summary><c>CURLINFO_PROXYAUTH_USED</c> (0x200046), a long. Word-cased: <c>ProxyAuthUsed</c>.</summary>
     ProxyauthUsed = 0x200046,
 }

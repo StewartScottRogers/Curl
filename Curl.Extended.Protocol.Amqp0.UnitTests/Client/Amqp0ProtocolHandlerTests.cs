@@ -200,14 +200,14 @@ public sealed class Amqp0ProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_NoPlainMechanism_EndsWithLoginDenied()
+    public async Task ExecuteAsync_NoUsableMechanism_EndsWithLoginDenied()
     {
-        ScriptedAmqp0Connection connection = new(Frame(Start("AMQPLAIN EXTERNAL")));
+        ScriptedAmqp0Connection connection = new(Frame(Start("EXTERNAL CRAM-MD5")));
 
         TransferResult result = await ExecuteAsync(connection, "amqp://broker/v/q", new MemoryStream());
 
         Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
-        Assert.AreEqual("AMQP server offers no PLAIN mechanism (it offers \"AMQPLAIN EXTERNAL\")", result.ErrorMessage);
+        Assert.AreEqual("AMQP server offers no mechanism this client can use (it offers \"EXTERNAL CRAM-MD5\")", result.ErrorMessage);
     }
 
     [TestMethod]

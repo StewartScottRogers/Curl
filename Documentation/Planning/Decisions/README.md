@@ -1347,3 +1347,10 @@ Each option and the specific reason it lost.
 | [1303](ADR-1303-null-byte-array-body-means-no-body.md) | A null byte[] Body on a Curl.Api request means no body (BL-5527) | Accepted | 2026-11-18 |
 | [1304](ADR-1304-cache-dir-and-sigstore-bundle-refuse-bad-options-at-activation.md) | --cache-dir with an invalid path and --sigstore-bundle without its companions are refused at activation (BL-5488) | Accepted | 2026-11-18 |
 | [1305](ADR-1305-winldap-ldaps-simple-bind-has-no-ldapv2-retry.md) | The WinLDAP simple bind over ldaps:// has no LDAPv2 retry (BL-5462) | Accepted | 2026-11-18 |
+| [1306](ADR-1306-libcurl-package-adds-implicit-usings-for-porting.md) | The Libcurl package adds implicit usings for the Curl.Api namespaces a port needs (BL-5551) | Accepted | 2026-11-19 |
+| [1307](ADR-1307-curlopt-and-curlinfo-keep-curls-casing-and-doc-the-word-cased-form.md) | CurlOption and CurlInfo keep curl's casing and document the word-cased form (BL-5553) | Accepted | 2026-11-19 |
+| [1308](ADR-1308-websocket-wait-is-an-awaitable-beside-the-again-receive.md) | A Libcurl port waits for a WebSocket frame with `WebSocketWaitAsync`; `curl_ws_recv` still answers Again (BL-5554) | Accepted | 2026-11-19 |
+| [1309](ADR-1309-a-stored-alt-svc-h3-entry-switches-a-transfer-to-http3-on-every-platform.md) | A stored alt-svc h3 entry switches a transfer to HTTP/3 on every platform (BL-5549) | Accepted | 2026-11-19 |
+| [1310](ADR-1310-the-curl-mcp-tool-knows-the-extension-options-and-confines-those-naming-a-path.md) | The curl-mcp `curl` tool knows the extension options and confines those that name a path (BL-5564) | Accepted | 2026-11-19 |
+| [1311](ADR-1311-socketio-sends-u-as-the-connect-packet-auth-payload.md) | The socketio client sends -u as the CONNECT packet's auth payload (BL-5567) | Accepted | 2026-11-19 |
+| [1312](ADR-1312-the-amqp-client-picks-plain-anonymous-or-amqplain.md) | The amqp client picks PLAIN, ANONYMOUS or AMQPLAIN from what the server offers (BL-5568) | Accepted | 2026-11-19 |

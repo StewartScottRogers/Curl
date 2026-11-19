@@ -6,7 +6,7 @@ internal static class CurlOptionValues
     /// <summary>One test per <see cref="CurlOptionType"/>, indexed by the enum's number, so the order must follow that enum.</summary>
     private static readonly Func<object?, bool>[] Accepters =
     [
-        IsInteger,
+        value => IsInteger(value) || value is Enum,
         value => IsInteger(value) || value is Enum,
         IsInteger,
         IsNotDelegate,
