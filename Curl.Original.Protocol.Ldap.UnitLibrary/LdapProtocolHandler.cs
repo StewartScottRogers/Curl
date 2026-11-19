@@ -341,7 +341,8 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     }
 
     /// <summary>
-    /// How the transfer binds: on OpenLDAP a simple bind; on WinLDAP what <see cref="LdapBindKindChoice" />
+    /// How the transfer binds: on OpenLDAP SASL with credentials when <c>AUTH=</c> login options are given or the auth mask lacks Basic,
+    /// otherwise a simple bind (ADR-1299); on WinLDAP what <see cref="LdapBindKindChoice" />
     /// picks from <c>-u</c> and the auth mask, so <c>--ntlm</c>, <c>--digest</c> and <c>--negotiate</c> never send a simple bind.
     /// </summary>
     private LdapBindKind ChooseBindKind(ITransferContext context) =>
