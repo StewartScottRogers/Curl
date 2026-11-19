@@ -54,6 +54,10 @@ public sealed class S3HttpClientConnectionTests
     [TestMethod]
     [DataRow("X-Bad\r\nInjected", "v")]
     [DataRow("X-Bad", "v\nInjected: 1")]
+    [DataRow("\rX-Bad", "v")]
+    [DataRow("\nX-Bad", "v")]
+    [DataRow("X-Bad", "\rv")]
+    [DataRow("X-Bad", "\nInjected: 1")]
     public async Task SendAsync_FieldHoldsCrOrLf_ThrowsArgumentException(string name, string value)
     {
         var request = new S3HttpRequest("GET", "/", [new(name, value)]);

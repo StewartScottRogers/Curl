@@ -60,6 +60,16 @@ public sealed class StompFrameReaderTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_BlankLineArrivesAsTheFirstByteOfARead_EndsTheHeadersWithoutReadingBeforeTheBuffer()
+    {
+        StompFrameReader reader = new(ScriptedStompConnection.Replaying("MESSAGE\n", "\nhi\0"), CancellationToken.None);
+
+        StompFrame? frame = await reader.ReadAsync();
+
+        Assert.AreEqual("hi", Encoding.UTF8.GetString(frame!.Body));
+    }
+
+    [TestMethod]
     public async Task ReadAsync_BodyLargerThanTheBuffer_GrowsTheBuffer()
     {
         string body = new('x', 10_000);

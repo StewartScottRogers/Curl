@@ -13,8 +13,14 @@ public sealed class ServerCertificateVerificationPemRevocationListTests
         var der = BuildList();
         var pem = Encoding.ASCII.GetBytes(PemEncoding.WriteString("X509 CRL", der));
 
-        Assert.IsNotNull(ServerCertificateVerification.DecodeOrNothing(pem));
-        Assert.IsNotNull(ServerCertificateVerification.DecodeOrNothing(der));
+        var fromPem = ServerCertificateVerification.DecodeOrNothing(pem);
+        var fromDer = ServerCertificateVerification.DecodeOrNothing(der);
+
+        Assert.IsNotNull(fromPem);
+        Assert.IsNotNull(fromDer);
+        Assert.AreEqual(fromDer.ThisUpdate, fromPem.ThisUpdate);
+        Assert.IsNotNull(fromDer.NextUpdate);
+        Assert.AreEqual(fromDer.NextUpdate, fromPem.NextUpdate);
     }
 
     [TestMethod]

@@ -15,8 +15,9 @@ namespace Curl.Core;
 /// host it exempts (<see cref="NoProxyMatcher" />) is reached directly, whichever proxy was
 /// named. Then the proxy is <c>-x</c> when given, else <c>&lt;scheme&gt;_proxy</c>, then
 /// <c>&lt;SCHEME&gt;_PROXY</c> except for <c>http</c>, whose upper-case name curl never
-/// reads; then for <c>ws</c> <c>http_proxy</c>, for <c>wss</c> <c>https_proxy</c> and
-/// <c>HTTPS_PROXY</c>; then <c>all_proxy</c>, then <c>ALL_PROXY</c>. Empty proxy text,
+/// reads; then for <c>ws</c> and the cleartext extension schemes <c>http_proxy</c>, for <c>wss</c>
+/// and the extension schemes that always speak HTTPS <c>https_proxy</c> and
+/// <c>HTTPS_PROXY</c> (<c>ProxyVariableNames</c> lists them); then <c>all_proxy</c>, then <c>ALL_PROXY</c>. Empty proxy text,
 /// including <c>-x ""</c>, means a direct connection.
 /// </para>
 /// <para>
@@ -245,7 +246,7 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
     /// <summary>
     /// The variables curl reads for <paramref name="scheme" />, in order: <c>&lt;scheme&gt;_proxy</c>, its upper
     /// case form (not for <c>http</c>), the HTTP proxy variable curl falls back to for a WebSocket URL
-    /// (<c>http_proxy</c> for <c>ws</c> and the cleartext extension schemes <c>mcp</c>, <c>grpc</c>, <c>socketio</c> and <c>signalr</c>, <c>https_proxy</c> then <c>HTTPS_PROXY</c> for <c>wss</c> and for the extension schemes that always speak HTTPS: <c>oci</c>, <c>s3</c>, <c>gs</c>, <c>az</c> and <c>signalrs</c>, ADR-1297), then
+    /// (<c>http_proxy</c> for <c>ws</c> and the cleartext extension schemes <c>mcp</c>, <c>grpc</c>, <c>socketio</c> and <c>signalr</c>, <c>https_proxy</c> then <c>HTTPS_PROXY</c> for <c>wss</c> and for the extension schemes that always speak HTTPS: <c>mcps</c>, <c>grpcs</c>, <c>socketios</c>, <c>oci</c>, <c>s3</c>, <c>gs</c>, <c>az</c>, <c>abfs</c>, <c>abfss</c> and <c>signalrs</c>, ADR-1297), then
     /// <c>all_proxy</c> and <c>ALL_PROXY</c>.
     /// </summary>
     private static IEnumerable<string> ProxyVariableNames(string scheme)

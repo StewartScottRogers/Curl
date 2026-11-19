@@ -108,6 +108,19 @@ public sealed class Amqp0DataTypeTests
     }
 
     [TestMethod]
+    [DataRow(-62135596800L)]
+    [DataRow(253402300799L)]
+    public void Timestamp_AtFirstOrLastSecondOfRange_IsRead(long seconds)
+    {
+        var bytes = new byte[8];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt64BigEndian(bytes, seconds);
+
+        var timestamp = new Amqp0Reader(bytes).ReadTimestamp();
+
+        Assert.AreEqual(seconds, timestamp.ToUnixTimeSeconds());
+    }
+
+    [TestMethod]
     public void EnsureAtEnd_BytesLeft_IsSyntaxError()
     {
         var exception = Assert.ThrowsExactly<Amqp0WireFormatException>(() => new Amqp0Reader(new byte[] { 1 }).EnsureAtEnd("The test"));
