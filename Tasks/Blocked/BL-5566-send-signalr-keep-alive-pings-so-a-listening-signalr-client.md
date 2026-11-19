@@ -28,14 +28,19 @@ The client sends no keep-alive, so a listener with no `-d` is closed by the hub 
 
 ## Acceptance criteria
 
-- [ ] With a fake `TimeProvider`, a listening client with nothing to send writes a Ping message (`{"type":6}` plus the record separator) each keep-alive interval, and none while it is sending other messages within the interval.
+- [x] With a fake `TimeProvider`, a listening client with nothing to send writes a Ping message (`{"type":6}` plus the record separator) each keep-alive interval, and none while it is sending other messages within the interval.
 - [ ] Against Surl's SignalR hub, a listener with no `-d` stays connected for at least 90 seconds and receives a message sent after 60 seconds; the Notes record the run.
-- [ ] Focused unit tests in `Curl.Extended.Protocol.SignalR.UnitTests` pin the ping timing.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Focused unit tests in `Curl.Extended.Protocol.SignalR.UnitTests` pin the ping timing.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Done: `SignalRHubSession` runs a keep-alive loop beside the read loop: a Ping (`{"type":6}` + 0x1E) whenever nothing was sent for 15 s (the .NET client default; the handshake does not carry the server values, and the 30 s server timeout is twice it). Any send (handshake, call, refusal, Ping) resets the idle clock. `SignalRProtocolHandler` takes an optional `TimeProvider`; `SignalRWebSocketSession` serialises frame writes with a semaphore. No option changes the interval, so no ADR.
+- Tests: `SignalRKeepAliveTests` (manual clock). Measure-CodeQuality for the library: 100% line, 100% branch, worst CRAP 10. Fast tests 161 pass.
+- Not done: criterion 2 (90 s run against Surl's hub) needs a Surl server, which no lane has. Run `curl signalr://<surl-host>/<hub>` with no `-d` for 90+ s, send a message at 60 s, then tick the box and move to Done.
 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 3.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 90934fec 32ee91d2 a766e51a 3d836d5e.
+- 2026-11-19: Doing -> Blocked. Stewart: run a 90 s signalr:// listener against Surl's SignalR hub (message at 60 s) and tick criterion 2; code, tests and gates are done and committed

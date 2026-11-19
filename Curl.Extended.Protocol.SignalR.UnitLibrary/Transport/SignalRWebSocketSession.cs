@@ -25,6 +25,9 @@ internal sealed class SignalRWebSocketSession(IConnection connection, BufferedCo
 
     private readonly List<byte> closePayload = [];
 
+    // One frame at a time: the keep-alive Ping is sent while the read loop may be answering the hub.
+    private readonly SemaphoreSlim sending = new(1, 1);
+
     /// <summary>Whether the server sent a Close frame, which this session has answered.</summary>
     public bool IsClosed { get; private set; }
 
@@ -111,7 +114,15 @@ internal sealed class SignalRWebSocketSession(IConnection connection, BufferedCo
 
     private async Task SendFrameAsync(WsOpcode opcode, byte[] payload, CancellationToken cancellationToken)
     {
-        await connection.WriteAsync(WsFrameEncoder.Encode(opcode, payload, randomSource), cancellationToken);
-        await connection.FlushAsync(cancellationToken);
+        await sending.WaitAsync(cancellationToken);
+        try
+        {
+            await connection.WriteAsync(WsFrameEncoder.Encode(opcode, payload, randomSource), cancellationToken);
+            await connection.FlushAsync(cancellationToken);
+        }
+        finally
+        {
+            sending.Release();
+        }
     }
 }
