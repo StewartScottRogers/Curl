@@ -35,3 +35,4 @@ Fix: add `using Curl.Api.Codes;` to the usings sample (preferred), or name the n
 ## Log
 
 - 2026-11-18: Created from bug report 2026-11-18T1233-Curl-bug-report.md, finding 2.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: ae945e49 03b9e920 3d836d5e.
