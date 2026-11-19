@@ -3,8 +3,8 @@ id: AF-0837
 title: StartsTheMaxTimeWatchdog test asserts only that OperationStarted is not null
 auditor: quality
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.
 key: quality:Curl.Engine.UnitTests/ManagedEasyTransferTests.ToolProgress.cs:PerformAsync_NoToolProgressAndATimeout_StartsTheMaxTimeWatchdogAsLibcurlsTimeoutDoes:weak-assertion
 reproduction: none
 task: BL-5357
@@ -13,9 +13,9 @@ found: 2026-11-17
 found-at: 10c240a4859c7868ec16b722cde6234f80cc8fcb
 scorecard: 2026-11-17_0430.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: reliable-reaudit
+closed-by: 2026-11-19_0134.md
 ---
 # AF-0837 - StartsTheMaxTimeWatchdog test asserts only that OperationStarted is not null
 
@@ -43,7 +43,9 @@ Select-String -Path Curl.Engine.UnitTests/ManagedEasyTransferTests.ToolProgress.
 ## Re-audits
 
 - 2026-11-18 | 2026-11-18_0810.md | reproduces: no | Ran the Select-String: no match for 'Assert.IsNotNull(handler.Contexts.Single().OperationStarted);'. The test (line 165) now asserts Assert.AreEqual(CurlCode.OperationTimedOut, code) after advancing the clock past the 1 s timeout.
+- 2026-11-19 | 2026-11-19_0134.md | reproduces: no | Select-String for 'Assert.IsNotNull(handler.Contexts.Single().OperationStarted);' in ManagedEasyTransferTests.ToolProgress.cs finds no match.
 
 ## Log
 
 - 2026-11-17: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.

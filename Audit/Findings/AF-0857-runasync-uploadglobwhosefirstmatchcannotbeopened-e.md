@@ -3,8 +3,8 @@ id: AF-0857
 title: RunAsync_UploadGlobWhoseFirstMatchCannotBeOpened_Exits26AndUploadsNoOtherMatch asserts UploadFailed (25), not 26
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.
 key: quality:Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs:RunAsync_UploadGlobWhoseFirstMatchCannotBeOpened_Exits26AndUploadsNoOtherMatch:name-lies
 reproduction: none
 task: BL-5499
@@ -13,9 +13,9 @@ found: 2026-11-18
 found-at: 4f902456d88c3fda856546dbe0c9a7674b1f04c4
 scorecard: 2026-11-18_0810.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: reliable-reaudit
+closed-by: 2026-11-19_0134.md
 ---
 # AF-0857 - RunAsync_UploadGlobWhoseFirstMatchCannotBeOpened_Exits26AndUploadsNoOtherMatch asserts UploadFailed (25), not 26
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs -Patt
 
 ## Re-audits
 
+- 2026-11-19 | 2026-11-19_0134.md | reproduces: no | Only the test name matched (line 425); there is no 'CurlExitCode.UploadFailed, exitCode'. The test asserts Assert.AreEqual((int)CurlExitCode.ReadError, exitCode) (26) at line 430.
+
 ## Log
 
 - 2026-11-18: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0871
 title: IAltSvcStore remarks name Curl.Core's AltSvcCache as its implementation and Curl.Console as its setter; neither is true
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Protocol.Abstractions.UnitLibrary/IAltSvcStore.cs:IAltSvcStore:false-doc-comment
 reproduction: none
 task: BL-5513
@@ -13,9 +13,9 @@ found: 2026-11-18
 found-at: 4f902456d88c3fda856546dbe0c9a7674b1f04c4
 scorecard: 2026-11-18_0810.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: reliable-reaudit
+closed-by: 2026-11-19_0134.md
 ---
 # AF-0871 - IAltSvcStore remarks name Curl.Core's AltSvcCache as its implementation and Curl.Console as its setter; neither is true
 
@@ -42,6 +42,9 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-11-19 | 2026-11-19_0134.md | reproduces: no | Ran the reproduction: 0 / 0 / 1. IAltSvcStore remarks now say 'Implemented in Curl.Engine.UnitLibrary by AltSvcTransferCache, which wraps Curl.Core.UnitLibrary's AltSvcCache ... set on HttpRequestOptions.AltSvcStore by TransferContextFactory in Curl.Engine.UnitLibrary', matching 'class AltSvcTransferCache : IAltSvcStore'.
+
 ## Log
 
 - 2026-11-18: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces.

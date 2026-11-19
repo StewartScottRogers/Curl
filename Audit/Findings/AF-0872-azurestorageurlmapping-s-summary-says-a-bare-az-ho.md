@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-11-19 | 2026-11-19_0134.md | not re-audited | Ran the reproduction: 1 and 2, presumably the same counts as when filed, because the reproduction only counts a sentence that is still present and the IsPathStyleHost calls. The summary is fixed all the same: AzureStorageUrlMapping.cs lines 7-8 now add 'An IPv4 or IPv6 address or localhost is a path-style emulator host (ADR-1291): the host is kept as it is and the first path segment is the account, not the host.', which matches MapBlob/MapDfs. Because the counts cannot show this, the verdict is not re-audited rather than yes or no.
+
 ## Log
 
 - 2026-11-18: filed proposed.

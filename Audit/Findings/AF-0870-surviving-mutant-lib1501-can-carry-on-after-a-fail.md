@@ -3,8 +3,8 @@ id: AF-0870
 title: Surviving mutant: lib1501 can carry on after a failed first multi perform
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1501.cs:LoopAsync-and:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1501.cs:79:&&
 task: BL-5512
@@ -13,9 +13,9 @@ found: 2026-11-18
 found-at: 4f902456d88c3fda856546dbe0c9a7674b1f04c4
 scorecard: 2026-11-18_0810.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: mechanical
+closed-by: 2026-11-19_0134.md
 ---
 # AF-0870 - Surviving mutant: lib1501 can carry on after a failed first multi perform
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-19 | 2026-11-19_0134.md | reproduces: no | Targeted run Curl.Conformance.LibTest.UnitLibrary/Lib1501.cs:79:&& (resolvedLine 79) gave outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-18: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_0134.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
