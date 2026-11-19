@@ -1,6 +1,6 @@
 # ADR-1309: A stored alt-svc h3 entry switches a transfer to HTTP/3 on every platform
 
-- Status: Accepted
+- Status: Accepted; on Windows superseded by ADR-1313 (no version option: h1 alone)
 - Date: 2026-11-19
 - Task: BL-5549
 - Decided by Claude under Stewart's delegation.

@@ -137,6 +137,20 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task WebSocket_WaitForDataAsync_ReadFaults_EndsTheWaitAndTheReceiveAnswersRecvError()
+    {
+        (ManagedEasyTransfer easy, _, QueuedConnection peer) = CreateWebSocketEasy(Ascii(SwitchingProtocolsHead));
+        await using IEasyTransfer handle = easy;
+        easy.Options = WebSocketConnectOnlyTo("wss://h/");
+        await easy.PerformAsync(CancellationToken.None);
+        byte[] buffer = new byte[8];
+        Task wait = easy.WebSocket.WaitForDataAsync(CancellationToken.None).AsTask();
+        peer.FailReads();
+        await wait;
+        Assert.AreEqual(CurlCode.RecvError, (await easy.WebSocket.ReceiveAsync(buffer, CancellationToken.None)).Result);
+    }
+
+    [TestMethod]
     public async Task WebSocket_WaitForDataAsync_WithoutAnOpenConnection_CompletesAtOnce()
     {
         (ManagedEasyTransfer easy, _, _) = CreateWebSocketEasy();
