@@ -36,12 +36,16 @@ public sealed class McpArgumentChecker
 
     private readonly McpConfinementRoot root;
 
+    private readonly FrozenDictionary<string, McpExtensionOption> extensionOptionsByName;
+
     /// <summary>Creates the checker for <paramref name="root" />.</summary>
     /// <param name="root">The folder every path must lie in; <see cref="McpConfinementRoot.NotConfigured" /> refuses every path.</param>
-    public McpArgumentChecker(McpConfinementRoot root)
+    /// <param name="extensionOptions">The long options the extensions register, which the console's parser reads where curl has no option of that name (BL-5564); <see langword="null" />, the default, knows none, so each is refused as unknown. A value option <see cref="McpExtensionOptionPathTable" /> does not call pathless is confined like <c>-o</c>.</param>
+    public McpArgumentChecker(McpConfinementRoot root, IReadOnlyList<McpExtensionOption>? extensionOptions = null)
     {
         ArgumentNullException.ThrowIfNull(root);
         this.root = root;
+        extensionOptionsByName = (extensionOptions ?? []).ToFrozenDictionary(option => option.Name, StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -123,9 +127,29 @@ public sealed class McpArgumentChecker
             return CheckLongRow(written, expandedRow, attachedValue, cursor, configDepth, expanded: true);
         }
 
-        return longName.StartsWith(NegationPrefix, StringComparison.Ordinal) && RowsByLongName.ContainsKey(longName[NegationPrefix.Length..])
+        if (extensionOptionsByName.TryGetValue(longName, out McpExtensionOption? extensionOption))
+        {
+            return CheckExtensionOption(written, extensionOption, attachedValue, cursor);
+        }
+
+        return longName.StartsWith(NegationPrefix, StringComparison.Ordinal) && IsNegatable(longName[NegationPrefix.Length..])
             ? McpArgumentCheck.Allowed
             : Unknown(written);
+    }
+
+    /// <summary>Whether <c>--no-&lt;name&gt;</c> is a spelling: for an option of curl's table, or an extension option.</summary>
+    private bool IsNegatable(string name) => RowsByLongName.ContainsKey(name) || extensionOptionsByName.ContainsKey(name);
+
+    /// <summary>An extension's flag names no path; its value option takes the attached value or else the next argument, and the value's paths are checked as <see cref="McpExtensionOptionPathTable" /> says. A missing value is allowed: curl itself rejects it.</summary>
+    private McpArgumentCheck CheckExtensionOption(string written, McpExtensionOption option, string? attachedValue, ArgumentCursor cursor)
+    {
+        if (!option.TakesValue)
+        {
+            return McpArgumentCheck.Allowed;
+        }
+
+        string? value = attachedValue ?? cursor.TakeOrNull();
+        return value is null ? McpArgumentCheck.Allowed : CheckPaths(written, McpExtensionOptionPathTable.PathsIn(option.Name, value));
     }
 
     /// <summary>

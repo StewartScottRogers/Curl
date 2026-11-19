@@ -1351,3 +1351,4 @@ Each option and the specific reason it lost.
 | [1307](ADR-1307-curlopt-and-curlinfo-keep-curls-casing-and-doc-the-word-cased-form.md) | CurlOption and CurlInfo keep curl's casing and document the word-cased form (BL-5553) | Accepted | 2026-11-19 |
 | [1308](ADR-1308-websocket-wait-is-an-awaitable-beside-the-again-receive.md) | A Libcurl port waits for a WebSocket frame with `WebSocketWaitAsync`; `curl_ws_recv` still answers Again (BL-5554) | Accepted | 2026-11-19 |
 | [1309](ADR-1309-a-stored-alt-svc-h3-entry-switches-a-transfer-to-http3-on-every-platform.md) | A stored alt-svc h3 entry switches a transfer to HTTP/3 on every platform (BL-5549) | Accepted | 2026-11-19 |
+| [1310](ADR-1310-the-curl-mcp-tool-knows-the-extension-options-and-confines-those-naming-a-path.md) | The curl-mcp `curl` tool knows the extension options and confines those that name a path (BL-5564) | Accepted | 2026-11-19 |
