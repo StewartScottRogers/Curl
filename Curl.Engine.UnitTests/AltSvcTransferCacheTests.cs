@@ -181,7 +181,7 @@ public sealed class AltSvcTransferCacheTests
 
     /// <summary>
     /// With no version option a transfer may switch to <c>h1</c>, <c>h2</c> and <c>h3</c> on every platform; a
-    /// version option narrows what it may switch to (ADR-1306).
+    /// version option narrows what it may switch to (ADR-1309).
     /// </summary>
     [TestMethod]
     [DataRow(HttpVersion.None, "H1,H2,H3")]

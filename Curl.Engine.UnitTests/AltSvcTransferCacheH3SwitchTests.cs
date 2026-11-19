@@ -8,7 +8,7 @@ using HttpVersion = Curl.Api.Options.Http.HttpVersion;
 namespace Curl.Engine;
 
 /// <summary>
-/// Pins when a stored <c>h3</c> alt-svc entry switches a transfer to HTTP/3 (BL-5549, ADR-1306): with no
+/// Pins when a stored <c>h3</c> alt-svc entry switches a transfer to HTTP/3 (BL-5549, ADR-1309): with no
 /// version option, <c>--http3</c> and <c>--http3-only</c>, but not with <c>--http1.1</c> or <c>--http2</c>.
 /// </summary>
 [TestClass]

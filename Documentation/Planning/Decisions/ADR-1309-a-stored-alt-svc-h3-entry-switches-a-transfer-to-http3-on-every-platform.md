@@ -1,4 +1,4 @@
-# ADR-1306: A stored alt-svc h3 entry switches a transfer to HTTP/3 on every platform
+# ADR-1309: A stored alt-svc h3 entry switches a transfer to HTTP/3 on every platform
 
 - Status: Accepted
 - Date: 2026-11-19

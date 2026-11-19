@@ -42,10 +42,10 @@ curl -s -k --alt-svc altsvc.txt -o NUL -w "%{http_version}" https://127.0.0.1:84
 
 ## Notes
 
-Decision: ADR-1306. Treat every build as one listing HTTP2/HTTP3 (`curl -V` already does): with no version option a stored h3 entry switches the transfer to HTTP/3 on every platform; --http1.1 and --http2 ignore it. isWindows and actsAsQuicBuild removed from the alt-svc lookup, OpenAsync, TransferPerformer.OpenAltSvcCacheAsync and the Console call. Touched beyond `touches`: TransferPerformer.Setup.cs, CurlCommandRunner.cs (one-argument removal), Curl.Engine.UnitTests, Curl.Console.UnitTests (obsolete Windows-only test removed); no other Doing task names them. Not measured against live HTTP/3 curl (Windows lane); rules are the ones the cache already pinned for the Linux reference. AltSvcApplicationProtocols.cs needed no change. Quality: Engine and Console 100/100, CRAP 10.
+Decision: ADR-1309. Treat every build as one listing HTTP2/HTTP3 (`curl -V` already does): with no version option a stored h3 entry switches the transfer to HTTP/3 on every platform; --http1.1 and --http2 ignore it. isWindows and actsAsQuicBuild removed from the alt-svc lookup, OpenAsync, TransferPerformer.OpenAltSvcCacheAsync and the Console call. Touched beyond `touches`: TransferPerformer.Setup.cs, CurlCommandRunner.cs (one-argument removal), Curl.Engine.UnitTests, Curl.Console.UnitTests (obsolete Windows-only test removed); no other Doing task names them. Not measured against live HTTP/3 curl (Windows lane); rules are the ones the cache already pinned for the Linux reference. AltSvcApplicationProtocols.cs needed no change. Quality: Engine and Console 100/100, CRAP 10.
 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 1.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 94b1b568 f78cc956 9d6c6e61 af257326 3d836d5e.
-- 2026-11-19: Doing -> Done. A stored alt-svc h3 entry now switches a later no-option or --http3 request to HTTP/3 on every platform (ADR-1306)
+- 2026-11-19: Doing -> Done. A stored alt-svc h3 entry now switches a later no-option or --http3 request to HTTP/3 on every platform (ADR-1309)
