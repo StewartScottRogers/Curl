@@ -94,23 +94,9 @@ internal sealed class PortUnreachableReportingDatagramChannel(
 
         while (_nextAlternative < alternatives.Count)
         {
-            var next = alternatives[_nextAlternative++];
-            IDatagramChannel? opened = null;
-            try
+            var opened = await OpenAndResendAsync(alternatives[_nextAlternative++], cancellationToken).ConfigureAwait(false);
+            if (opened is null)
             {
-                opened = openChannel(next);
-                foreach (var datagram in _sent)
-                {
-                    await opened.SendAsync(datagram, opened.ServerEndPoint, cancellationToken).ConfigureAwait(false);
-                }
-            }
-            catch (SocketException)
-            {
-                if (opened is not null)
-                {
-                    await opened.DisposeAsync().ConfigureAwait(false);
-                }
-
                 continue;
             }
 
@@ -121,6 +107,38 @@ internal sealed class PortUnreachableReportingDatagramChannel(
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Opens a channel to <paramref name="next" /> and sends it every datagram sent so far. Returns
+    /// <see langword="null" /> when that fails with a <see cref="SocketException" />; any other failure
+    /// propagates. Either way the opened channel is disposed when the resend fails.
+    /// </summary>
+    private async ValueTask<IDatagramChannel?> OpenAndResendAsync(IPEndPoint next, CancellationToken cancellationToken)
+    {
+        IDatagramChannel? opened = null;
+        Exception failure;
+        try
+        {
+            opened = openChannel(next);
+            foreach (var datagram in _sent)
+            {
+                await opened.SendAsync(datagram, opened.ServerEndPoint, cancellationToken).ConfigureAwait(false);
+            }
+
+            return opened;
+        }
+        catch (Exception resendFailure)
+        {
+            failure = resendFailure;
+        }
+
+        if (opened is not null)
+        {
+            await opened.DisposeAsync().ConfigureAwait(false);
+        }
+
+        return failure is SocketException ? null : throw failure;
     }
 
     /// <summary>

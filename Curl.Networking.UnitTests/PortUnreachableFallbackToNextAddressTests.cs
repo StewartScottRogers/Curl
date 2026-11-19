@@ -114,6 +114,19 @@ public sealed class PortUnreachableFallbackToNextAddressTests
         Assert.AreEqual(Third, next.Destinations[2]);
     }
 
+    [TestMethod]
+    public async Task SendAsync_ResendCancelled_DisposesTheOpenedChannelAndPropagates()
+    {
+        var first = new ScriptedChannel(IPAddress.IPv6Loopback) { SendFailure = Refused() };
+        var next = new ScriptedChannel(IPAddress.Loopback) { SendFailure = new OperationCanceledException() };
+        await using var channel = Channel(first, [Second], _ => next);
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await channel.SendAsync(new byte[] { 1 }, channel.ServerEndPoint, CancellationToken.None));
+
+        Assert.IsTrue(next.Disposed);
+    }
+
     private static SocketException Refused() => new((int)SocketError.ConnectionRefused);
 
     private static PortUnreachableReportingDatagramChannel Channel(
@@ -128,7 +141,7 @@ public sealed class PortUnreachableFallbackToNextAddressTests
 
         public EndPoint? LocalEndPoint => null;
 
-        public SocketException? SendFailure { get; set; }
+        public Exception? SendFailure { get; set; }
 
         public SocketException? ReceiveFailure { get; set; }
 
