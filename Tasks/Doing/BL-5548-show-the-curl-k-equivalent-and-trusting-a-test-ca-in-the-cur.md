@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [Curl.Api/README.md]
+touches: [Curl.Api/README.md, Curl.Api.UnitTests/Readme/ReadmeSamples.cs, Curl.Api.UnitTests/Readme/ReadmeTests.cs]
 requirement: none
 created: 2026-11-19
 completed:
@@ -33,13 +33,15 @@ Not a Curl defect, recorded in the report: `curl --negotiate` against a server o
 
 ## Acceptance criteria
 
-- [ ] `Curl.Api/README.md` has a sample beside the other option samples that sets `Tls.Origin.VerifyPeer = false` and `Tls.Origin.VerifyHost = false`, says it is the `curl -k` equivalent, and says it is for testing only.
-- [ ] The same section shows trusting a test CA with `CertificateAuthorityBlob`, as the safer option.
-- [ ] The README says which of `VerifyPeer` and `VerifyHost` is the peer check and which is the host-name check, and names `Origin` (and the proxy counterpart, if one exists).
-- [ ] `Curl.Api.UnitTests/Readme/ReadmeTests.cs` passes and covers the new sample.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `Curl.Api/README.md` has a sample beside the other option samples that sets `Tls.Origin.VerifyPeer = false` and `Tls.Origin.VerifyHost = false`, says it is the `curl -k` equivalent, and says it is for testing only.
+- [x] The same section shows trusting a test CA with `CertificateAuthorityBlob`, as the safer option.
+- [x] The README says which of `VerifyPeer` and `VerifyHost` is the peer check and which is the host-name check, and names `Origin` (and the proxy counterpart, if one exists).
+- [x] `Curl.Api.UnitTests/Readme/ReadmeTests.cs` passes and covers the new sample.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Added the "Trust a test server" README section and `trust` sample; touches widened to the sample source and test files (ReadmeSamples.cs, ReadmeTests.cs), which the README sample check requires. No proxy-only property: `Tls.Proxy` is the counterpart.
 
 ## Log
 
