@@ -83,8 +83,36 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
             return result;
         }
 
-        TransferTimings timings = new(started, recorder.FirstConnectTimings, null, null, null, context.TimeProvider.GetTimestamp());
-        return result with { Report = report with { Timings = timings, UploadSize = UploadSizeOf(report, result.IsSuccess, uploaded) } };
+        return result with { Report = TimedReport(report, result.IsSuccess, context, started, UploadSizeOf(report, result.IsSuccess, uploaded)) };
+    }
+
+    // The report with its timings and upload size, and a UDP channel's local end when the scheme reports one (BL-5493).
+    private TransferReport TimedReport(TransferReport report, bool succeeded, ITransferContext context, long started, long uploadSize)
+    {
+        long completed = context.TimeProvider.GetTimestamp();
+        if (!ReportsPhases(context))
+        {
+            return report with { Timings = new TransferTimings(started, recorder.FirstConnectTimings, null, null, null, completed), UploadSize = uploadSize };
+        }
+
+        TransferTimings timings = new(started, ConnectTimingsOf(started, completed), completed, null, succeeded ? completed : null, completed);
+        return report with { Timings = timings, UploadSize = uploadSize, LocalEndPoint = report.LocalEndPoint ?? recorder.DatagramLocalEndPoint };
+    }
+
+    // A scheme whose handler times nothing itself reports the transfer's phases, as curl does for every scheme: pretransfer and starttransfer are the end of the transfer, which reads its first byte as it goes. HTTP times itself, and TFTP's unconnected socket reports no local end and no phases (measured, BL-515, BL-5493).
+    private bool ReportsPhases(ITransferContext context) =>
+        context.Url.Scheme is not ("http" or "https" or "tftp") && (recorder.FirstConnectTimings is not null || recorder.DatagramOpenedAt is not null);
+
+    // The first connection's timings, else a UDP channel's: connected when it opened, within the transfer.
+    private ConnectTimings? ConnectTimingsOf(long started, long completed)
+    {
+        if (recorder.FirstConnectTimings is not null || recorder.DatagramOpenedAt is null)
+        {
+            return recorder.FirstConnectTimings;
+        }
+
+        long opened = Math.Clamp(recorder.DatagramOpenedAt.Value, started, completed);
+        return new ConnectTimings(started, opened, opened, null);
     }
 
     // The report's own upload size, else the bytes sent: none when a failure never connected.

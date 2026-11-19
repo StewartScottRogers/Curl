@@ -20,7 +20,28 @@ internal sealed partial class ConnectionEndPointRecorder
     /// <summary>Gets the connect timings of the transfer's first connection, or <see langword="null" /> when none was given.</summary>
     internal ConnectTimings? FirstConnectTimings { get; private set; }
 
-    /// <summary>Whether the transfer's first connection has been recorded.</summary>
+    /// <summary>Gets the local end of the first datagram channel the transfer opened, or <see langword="null" /> when none was opened or it has none to report.</summary>
+    internal IPEndPoint? DatagramLocalEndPoint { get; private set; }
+
+    /// <summary>Gets the timestamp at which the first datagram channel opened, or <see langword="null" /> when none was opened.</summary>
+    internal long? DatagramOpenedAt { get; private set; }
+
+    /// <summary>
+    /// Remembers the local end and the open time of the first datagram channel, which only the
+    /// schemes that report them (not TFTP, whose unconnected socket curl reports as none) put on their report (BL-5493).
+    /// </summary>
+    /// <param name="local">The channel's local end point, or <see langword="null" />.</param>
+    /// <param name="openedAt">The timestamp the channel opened at.</param>
+    internal void RecordDatagramChannel(IPEndPoint? local, long openedAt)
+    {
+        if (DatagramOpenedAt is null)
+        {
+            DatagramLocalEndPoint = local;
+            DatagramOpenedAt = openedAt;
+        }
+    }
+
+    /// <summary>Whether the transfer''s first connection has been recorded.</summary>
     private bool connectionRecorded;
 
     /// <summary>The local end of the first connection, or <see langword="null" /> when unknown.</summary>

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Networking.UnitLibrary/UdpDatagramConnector.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5493 — Fix fitness finding EXT-099: %{time_pretransfer} and %{time_starttransfer} are always 0 for extension schemes; UDP schemes report %{local_port} 0, an empty %{local_ip} and %{time_connect} 0
 
@@ -33,13 +33,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] the redis command prints pt > 0 and st > 0 with st ≤ t; the coap command prints `lp=<non-zero> li=127.0.0.1`.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the redis command prints pt > 0 and st > 0 with st ≤ t; the coap command prints `lp=<non-zero> li=127.0.0.1`.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Fixed in Curl.Engine.UnitLibrary alone: UdpDatagramConnector already forwards LocalEndPoint (PortUnreachableReportingDatagramChannel), so the recording datagram connector now keeps the channel local end and open time (ConnectionEndPointRecorder.RecordDatagramChannel), and EndPointReportingProtocolHandler reports them, pretransfer/starttransfer (the end of the transfer, on success) and time_connect for every scheme that times nothing itself. Decision: http/https and tftp are left as they were (tftp: curl prints an empty local_ip and 0, BL-515). Pretransfer = starttransfer = total is the simplest honest figure since handlers do not time phases. Quality gate for Curl.Engine.UnitLibrary clean; Engine and Console fast tests green. Linux/macOS: tests are platform-neutral.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-099 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 18d9c271 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. Fixed: extension schemes report pretransfer/starttransfer/connect times and UDP local end

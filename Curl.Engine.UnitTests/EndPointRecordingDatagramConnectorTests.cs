@@ -33,6 +33,7 @@ public sealed class EndPointRecordingDatagramConnectorTests
         Diagnostics.Assert("reported remote end point", server.ToString(), report.RemoteEndPoint?.ToString() ?? "null");
         Assert.IsNull(report.LocalEndPoint);
         Assert.AreEqual(server, report.RemoteEndPoint);
+        Assert.IsNotNull(recorder.DatagramOpenedAt);
     }
 
     [TestMethod]

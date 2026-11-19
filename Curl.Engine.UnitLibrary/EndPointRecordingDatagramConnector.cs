@@ -12,7 +12,8 @@ namespace Curl.Engine;
 /// </summary>
 /// <param name="connector">Opens the channels.</param>
 /// <param name="recorder">Remembers the first connection the transfer opens.</param>
-internal sealed class EndPointRecordingDatagramConnector(IDatagramConnector connector, ConnectionEndPointRecorder recorder) : IDatagramConnector
+/// <param name="timeProvider">Stamps when a channel opened; <see cref="TimeProvider.System" /> when not given.</param>
+internal sealed class EndPointRecordingDatagramConnector(IDatagramConnector connector, ConnectionEndPointRecorder recorder, TimeProvider? timeProvider = null) : IDatagramConnector
 {
     /// <summary>
     /// Opens a channel as the wrapped connector does and records it; a failed open
@@ -28,6 +29,7 @@ internal sealed class EndPointRecordingDatagramConnector(IDatagramConnector conn
         if (opened.Channel is { } channel)
         {
             recorder.Record(null, channel.ServerEndPoint as IPEndPoint);
+            recorder.RecordDatagramChannel(channel.LocalEndPoint as IPEndPoint, (timeProvider ?? TimeProvider.System).GetTimestamp());
         }
 
         return opened;
