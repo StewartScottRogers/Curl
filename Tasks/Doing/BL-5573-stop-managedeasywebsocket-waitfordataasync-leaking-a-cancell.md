@@ -26,13 +26,15 @@ Found by the shift-end review of 2026-11-19 (code-reviewer and silent-failure-hu
 
 ## Acceptance criteria
 
-- [ ] `WaitForDataAsync` waits with `pendingRead.WaitAsync(cancellationToken)`, or with a linked source it disposes, and creates no `Task.Delay(Timeout.Infinite, ...)`.
-- [ ] A fault in the pending read does not escape from the wait. `ReceiveAsync` still reports it as `RecvError`, as it does today.
-- [ ] Cancellation still ends the wait with `OperationCanceledException`, as today.
-- [ ] A test in `Curl.Engine.UnitTests/ManagedEasyTransferTests.WebSocket.cs` pins that a faulted read ends the wait without throwing and that the following receive answers `RecvError`.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Curl.Engine.UnitLibrary` keeps 100% line and branch coverage.
+- [x] `WaitForDataAsync` waits with `pendingRead.WaitAsync(cancellationToken)`, or with a linked source it disposes, and creates no `Task.Delay(Timeout.Infinite, ...)`.
+- [x] A fault in the pending read does not escape from the wait. `ReceiveAsync` still reports it as `RecvError`, as it does today.
+- [x] Cancellation still ends the wait with `OperationCanceledException`, as today.
+- [x] A test in `Curl.Engine.UnitTests/ManagedEasyTransferTests.WebSocket.cs` pins that a faulted read ends the wait without throwing and that the following receive answers `RecvError`.
+- [x] `dotnet build` is clean, the fast tests pass, and `Curl.Engine.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+Decision: `await pendingRead.WaitAsync(cancellationToken)` inside `catch (Exception)`: a fault or a cancellation ends the wait, and the existing `ThrowIfCancellationRequested` throws the exact `OperationCanceledException` (WaitAsync alone throws the `TaskCanceledException` subtype, which an existing test pins against). Engine quality run: 0 failing members.
 
 ## Log
 

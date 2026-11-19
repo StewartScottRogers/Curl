@@ -139,7 +139,14 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         }
 
         pendingRead ??= StartRead(live!);
-        await Task.WhenAny(pendingRead, Task.Delay(Timeout.Infinite, cancellationToken)).ConfigureAwait(false);
+        try
+        {
+            await pendingRead.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // A failed read ends the wait and a cancellation ends it too; the check below throws for the latter and the next receive answers RecvError for the former.
+        }
         cancellationToken.ThrowIfCancellationRequested();
     }
 
