@@ -59,8 +59,13 @@ public sealed class MultiCallbackQueueTests
             Task.Run(() => queue.Run(() => arrivedWhileFirstRuns ??= queue.Arrived.IsCompleted, CancellationToken.None)),
             Task.Run(() => queue.Run(() => arrivedWhileFirstRuns ??= queue.Arrived.IsCompleted, CancellationToken.None)),
         ];
-        await WaitUntilQueuedAsync(queue);
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        DateTime deadline = DateTime.UtcNow + Limit;
+        while (queue.QueuedCount < 2 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(1);
+        }
+
+        Assert.AreEqual(2, queue.QueuedCount);
 
         while (!Task.WhenAll(callers).IsCompleted)
         {
