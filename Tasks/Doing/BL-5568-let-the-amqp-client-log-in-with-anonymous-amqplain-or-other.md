@@ -39,3 +39,4 @@ The client logs in only with PLAIN, so against a server that does not offer PLAI
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 5.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 153b29b7 da459af3 76972af5 5a1767f3 3d836d5e.
