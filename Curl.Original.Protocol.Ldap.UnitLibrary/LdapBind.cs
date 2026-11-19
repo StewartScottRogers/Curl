@@ -51,7 +51,7 @@ internal static class LdapBind
     /// no BindResponse fails with WinLDAP's <c>Timeout</c>, a retry the server closes on with
     /// <c>Unavailable</c>, and neither sends an UnbindRequest. Over <c>ldaps://</c> there is no
     /// LDAPv2 retry: a refused first bind sends an UnbindRequest and fails with WinLDAP's text for
-    /// that first result code (STD-143, BL-5462, ADR-1304).
+    /// that first result code (STD-143, BL-5462, ADR-1305).
     /// </summary>
     /// <remarks>
     /// WinLDAP waits 30 seconds for a BindResponse before it reports <c>Timeout</c>; this

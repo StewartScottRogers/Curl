@@ -39,7 +39,7 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 - Plan: LdapBind.BindAsync gets a flag for ldaps (context.Url.Scheme == TlsScheme, passed from BindWithCredentialsAsync in LdapProtocolHandler.cs); WinLDAP over ldaps binds LDAPv3 once, no v2 retry, unbinds and fails with the first reply's result text. Handler file is held by BL-5461, so touches widened and depends-on BL-5461.
 
-- Done: over ldaps:// the WinLDAP simple bind binds LDAPv3 once (no LDAPv2 retry), unbinds and fails with the first result's text, so a wrong password gives exit 38 `Invalid Credentials`; plain ldap:// keeps the v3-then-v2 sequence (its tests, e.g. Cgr234 and the RetryRefused cases, still pass). ADR-1304 records it. The retry moved to `LdapBind.RetryAsLdapV2Async` to keep `BindAsWinLdapAsync` within the complexity gate (Measure-CodeQuality: 100/100, 0 failing).
+- Done: over ldaps:// the WinLDAP simple bind binds LDAPv3 once (no LDAPv2 retry), unbinds and fails with the first result's text, so a wrong password gives exit 38 `Invalid Credentials`; plain ldap:// keeps the v3-then-v2 sequence (its tests, e.g. Cgr234 and the RetryRefused cases, still pass). ADR-1305 records it. The retry moved to `LdapBind.RetryAsLdapV2Async` to keep `BindAsWinLdapAsync` within the complexity gate (Measure-CodeQuality: 100/100, 0 failing).
 - Criterion 1 checked by `LdapBindOverTlsTests` replaying the exchange through the handler (ldaps URL, result 49 -> exit 38 Invalid Credentials, bytes BindV3 + Unbind); no LDAPS container is reachable from a lane, so the reference text is the finding's (confirmed by 2 users, 2 runs). Platform-neutral: no paths or OS text.
 - Full build clean (0 warnings); fast tests green across 115 test assemblies.
 

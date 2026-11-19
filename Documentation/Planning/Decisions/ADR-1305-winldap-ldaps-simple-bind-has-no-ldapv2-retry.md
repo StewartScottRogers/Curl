@@ -1,4 +1,4 @@
-# ADR-1304: The WinLDAP simple bind over ldaps:// has no LDAPv2 retry (BL-5462)
+# ADR-1305: The WinLDAP simple bind over ldaps:// has no LDAPv2 retry (BL-5462)
 
 Status: Accepted. Date: 2026-11-18. Decided by Claude under Stewart's delegation.
 
