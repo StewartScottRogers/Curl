@@ -50,3 +50,4 @@ Plan (no code edited): ChooseQop returns auth-conf-with-3des or null (WinLDAP di
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding STD-116 (High).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: c96db816 69116afe 3d836d5e.
 - 2026-11-18: Doing -> Backlog. Needs LdapAuthenticatedBind.cs held by BL-5094 (Ldap.UnitLibrary); depends-on BL-5094 added
+- 2026-11-18: Backlog -> Doing. Criteria at claim: c96db816 69116afe 3d836d5e.
