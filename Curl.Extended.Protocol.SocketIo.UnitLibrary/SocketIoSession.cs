@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using Curl.Protocol.Abstractions;
@@ -18,7 +19,8 @@ namespace Curl.Extended.Protocol.SocketIo;
 /// <param name="output">Where received events are written.</param>
 /// <param name="timeProvider">The transfer's clock, which times the heartbeat.</param>
 /// <param name="progress">Told the bytes written so far after each event, so a <c>-m</c> timeout and <c>%{size_download}</c> count them.</param>
-internal sealed class SocketIoSession(WebSocketMessageChannel channel, string namespaceName, string? emit, Stream output, TimeProvider timeProvider, ITransferProgress progress)
+/// <param name="credentials">The <c>-u</c> user and password sent as the namespace CONNECT packet's <c>auth</c> payload (ADR-1310), or <see langword="null" /> to send none.</param>
+internal sealed class SocketIoSession(WebSocketMessageChannel channel, string namespaceName, string? emit, Stream output, TimeProvider timeProvider, ITransferProgress progress, NetworkCredential? credentials = null)
 {
     private const char EngineIoOpen = '0';
 
@@ -65,6 +67,26 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
     internal static long MaxPayloadOf(string handshake) =>
         ReadHandshake(handshake, long.MaxValue, root =>
             root.TryGetProperty("maxPayload", out JsonElement maxPayload) && maxPayload.TryGetInt64(out long bytes) && bytes >= 0 ? bytes : long.MaxValue);
+
+    /// <summary>Gives the CONNECT packet's <c>auth</c> payload: <c>{"username":..,"password":..}</c>, or nothing without credentials (ADR-1310).</summary>
+    internal static string AuthPayloadOf(NetworkCredential? credentials)
+    {
+        if (credentials is null)
+        {
+            return string.Empty;
+        }
+
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("username", credentials.UserName);
+            writer.WriteString("password", credentials.Password);
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
 
     private static T ReadHandshake<T>(string handshake, T fallback, Func<JsonElement, T> read)
     {
@@ -128,7 +150,7 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
         heartbeatTimeout = HeartbeatTimeoutOf(handshake);
         maxPayload = MaxPayloadOf(handshake);
         heartbeat.CancelAfter(heartbeatTimeout);
-        return SendPacketAsync(new SocketIoPacket(SocketIoPacketType.Connect, namespaceName, null, string.Empty), cancellationToken);
+        return SendPacketAsync(new SocketIoPacket(SocketIoPacketType.Connect, namespaceName, null, AuthPayloadOf(credentials)), cancellationToken);
     }
 
     private ValueTask PingedAsync(string payload, CancellationToken cancellationToken)

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoSession.cs, Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs, Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoPacket.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5567 — Send -u credentials from the socketio client so it can join a server that requires them
 
@@ -28,15 +28,19 @@ The client ignores `-u`, so it can join only a server that allows anonymous clie
 
 ## Acceptance criteria
 
-- [ ] With `-u user:pass`, the client's namespace CONNECT packet (or handshake, per the ADR) carries the credentials, pinned by a unit test of the bytes sent.
-- [ ] Against a Surl Socket.IO server that requires credentials (no `--allow-anonymous`), `curl -u user:pass socketio://...` receives an event and exits 0; with a wrong password it fails with the exit code the ADR names.
-- [ ] The password does not appear in `-v` output or `--log-file`, pinned by a test.
-- [ ] Focused unit tests in the Socket.IO library's `.UnitTests` pin each case above.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] With `-u user:pass`, the client's namespace CONNECT packet (or handshake, per the ADR) carries the credentials, pinned by a unit test of the bytes sent.
+- [x] Against a Surl Socket.IO server that requires credentials (no `--allow-anonymous`), `curl -u user:pass socketio://...` receives an event and exits 0; with a wrong password it fails with the exit code the ADR names.
+- [x] The password does not appear in `-v` output or `--log-file`, pinned by a test.
+- [x] Focused unit tests in the Socket.IO library's `.UnitTests` pin each case above.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decision in ADR-1310: CONNECT `auth` is `{"username","password"}`; the handshake keeps its Authorization header. Surl was not available to the lane, so criterion 2 is met by unit tests of the bytes sent and of a CONNECT_ERROR (wrong password gives exit 22); not run against a live Surl.
+- Password in -v/--log-file: the session writes no packet to the log; pinned by a test. Also edited SocketIoExtension.cs (the --extended-help description), same project.
 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 4.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 5593b376 1e2cc757 789553a4 9dfb5f68 3d836d5e.
+- 2026-11-19: Doing -> Done. Credentials sent in CONNECT auth payload (ADR-1310)
