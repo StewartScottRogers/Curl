@@ -101,7 +101,7 @@ public sealed class SignalRWebSocketSessionTests
         SignalRTransportException failure = await Assert.ThrowsExactlyAsync<SignalRTransportException>(
             () => session.ReceiveRecordAsync(CancellationToken.None));
 
-        Assert.IsFalse(string.IsNullOrEmpty(failure.Message));
+        Assert.AreEqual("[WS] masked input frame", failure.Message);
     }
 
     [TestMethod]
