@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib2032.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5560 — Fix AF-0889: Surviving mutant: lib2032 can go on looping after curl_multi_perform fails
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib2032.cs line 193`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib2032.cs line 193`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by the new test `Lib2032_WhenMultiPerformFails_StopsBeforeWritingTheRunningLine` (Lib1978To2306Tests.cs): with the mutant the loop went on into multi_fdset and wrote the `lib2032.c:181 new state` line; verified by hand, then reverted. Build clean, 1228 LibTest fast tests pass. Test-only change, no production code changed.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: e086ef68 9742157d.
+- 2026-11-19: Doing -> Done. Added a test that kills the AF-0889 mutant
