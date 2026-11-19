@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests/ServerCertificateVerificationTests.PemRevocationList.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5537 — Fix AF-0873: DecodeOrNothing_PemArmouredList_DecodesLikeTheDerList only checks both decodes are non-null, never that they match
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Test now compares the PEM decode with the DER decode on ThisUpdate and NextUpdate (the issuer name is private to CertificateRevocationList, so only the public dates are compared). The three PemRevocationList tests pass; the change is test-only and platform-neutral.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-19: Doing -> Done. Test compares PEM and DER decodes
