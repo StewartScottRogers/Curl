@@ -32,3 +32,4 @@ In `SwitchToNextAddressAsync` (`Curl.Networking.UnitLibrary/PortUnreachableRepor
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: bb176189 843896d4 68cb9cf5.
