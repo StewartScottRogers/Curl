@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/README.md]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5517 — Add using Curl.Api.Codes to the Curl.Api README usings sample
 
@@ -26,13 +26,16 @@ Fix: add `using Curl.Api.Codes;` to the usings sample (preferred), or name the n
 
 ## Acceptance criteria
 
-- [ ] The `<!-- sample: usings -->` block in `Curl.Api/README.md` includes `using Curl.Api.Codes;`, or the README names `Curl.Api.Codes` where `CurlCode` is first used.
-- [ ] `Curl.Api.UnitTests/Readme/ReadmeTests.cs` passes, and fails if `using Curl.Api.Codes;` is removed while a sample uses `CurlCode`, or the Notes say why that check is not possible.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The `<!-- sample: usings -->` block in `Curl.Api/README.md` includes `using Curl.Api.Codes;`, or the README names `Curl.Api.Codes` where `CurlCode` is first used.
+- [x] `Curl.Api.UnitTests/Readme/ReadmeTests.cs` passes, and fails if `using Curl.Api.Codes;` is removed while a sample uses `CurlCode`, or the Notes say why that check is not possible.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+The README and ReadmeSamples.cs usings sample now list `using Curl.Api.Codes;`, and the cancel sample reads `CurlCode code = failure.Code;` so the using is needed: removing it breaks the Curl.Api.UnitTests build, and Sample_Usings_AreTheOnesTheSamplesNeed pins the list. Fast tests green.
 
 ## Log
 
 - 2026-11-18: Created from bug report 2026-11-18T1233-Curl-bug-report.md, finding 2.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: ae945e49 03b9e920 3d836d5e.
+- 2026-11-18: Doing -> Done. Usings sample lists Curl.Api.Codes; test pins it

@@ -16,6 +16,7 @@ and a `destination` stream:
 ```csharp
 using System.Net;
 using Curl.Api;
+using Curl.Api.Codes;
 using Curl.Api.Errors;
 using Curl.Api.Options.Http;
 ```
@@ -148,7 +149,8 @@ catch (OperationCanceledException)
 }
 catch (CurlException failure)
 {
-    Console.WriteLine($"curl error {(int)failure.Code}: {failure.Message}");
+    CurlCode code = failure.Code;
+    Console.WriteLine($"curl error {(int)code}: {failure.Message}");
 }
 ```
 
