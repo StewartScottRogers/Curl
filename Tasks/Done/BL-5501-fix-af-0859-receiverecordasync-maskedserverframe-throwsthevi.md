@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SignalR.UnitTests/Transport/SignalRWebSocketSessionTests.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5501 — Fix AF-0859: ReceiveRecordAsync_MaskedServerFrame_ThrowsTheViolation checks only that the message is not empty
 
@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-18: Doing -> Done. Test pins the exact masked-frame message; SignalR fast tests green.
