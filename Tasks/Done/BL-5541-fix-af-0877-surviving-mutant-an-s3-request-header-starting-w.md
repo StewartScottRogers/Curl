@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpClientConnection.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5541 — Fix AF-0877: Surviving mutant: an S3 request header starting with CR or LF is sent instead of refused
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpClientConnection.cs line 54`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.S3.UnitLibrary/Http/S3HttpClientConnection.cs line 54`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added four data rows (CR or LF at index 0 of name and value) to SendAsync_FieldHoldsCrOrLf_ThrowsArgumentException in S3HttpClientConnectionTests. With line 54 mutated to `> 0` 4 of those rows failed; reverted, all 154 S3 fast tests pass. Build clean (test project built). Test-only change, no production code touched.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: c3663800 9742157d.
+- 2026-11-19: Doing -> Done. Added CR/LF-at-index-0 data rows; mutant at line 54 now killed
