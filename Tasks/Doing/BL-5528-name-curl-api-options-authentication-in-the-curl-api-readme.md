@@ -36,3 +36,4 @@ This is the same kind of gap as BL-5517 (`Curl.Api.Codes` for `CurlCode`), which
 ## Log
 
 - 2026-11-18: Created from bug report 2026-11-18T1734-Curl-bug-report.md, new finding 1.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 6173266f d74f6b84 161fdff2 3d836d5e.
