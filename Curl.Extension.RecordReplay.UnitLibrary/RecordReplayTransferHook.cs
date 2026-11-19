@@ -153,7 +153,7 @@ internal sealed class RecordReplayTransferHook(ExchangeDirectory? replay, Exchan
             await directory.WriteAsync(key, exchange, cancellationToken);
             return null;
         }
-        catch (IOException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             return TransferResult.Failure(CurlExitCode.WriteError, $"Failed writing the --record directory {directory.Path}");
         }
