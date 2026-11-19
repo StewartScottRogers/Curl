@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ClientFlow.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ClientMessages.cs]
+touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ClientFlow.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ClientMessages.cs, Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0Mechanism.cs]
 requirement: none
 created: 2026-11-19
 completed:
@@ -28,13 +28,15 @@ The client logs in only with PLAIN, so against a server that does not offer PLAI
 
 ## Acceptance criteria
 
-- [ ] An ADR records the mechanisms supported and the preference order.
-- [ ] Against a server offering only ANONYMOUS, the client without `-u` connects and exits 0; against one offering only AMQPLAIN, the client with `-u` logs in and exits 0.
-- [ ] Against a server offering only mechanisms the client cannot do, it exits 67 as now, without sending credentials.
-- [ ] Focused unit tests in the AMQP 0-9-1 library's `.UnitTests` pin each mechanism's `StartOk` bytes and the choice between offered mechanisms.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] An ADR records the mechanisms supported and the preference order.
+- [x] Against a server offering only ANONYMOUS, the client without `-u` connects and exits 0; against one offering only AMQPLAIN, the client with `-u` logs in and exits 0.
+- [x] Against a server offering only mechanisms the client cannot do, it exits 67 as now, without sending credentials.
+- [x] Focused unit tests in the AMQP 0-9-1 library's `.UnitTests` pin each mechanism's `StartOk` bytes and the choice between offered mechanisms.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- ADR-1310. New file Amqp0Mechanism.cs holds the order (PLAIN, ANONYMOUS without -u, AMQPLAIN); EXTERNAL and CRAM-MD5 left out (no client cert reaches the handler; no challenge round). Mechanism choice/bytes pinned in Amqp0ClientFlowTests, no-usable-mechanism exit 67 in the handler test; quality gate passes for the library. Committed with the task.
 
 ## Log
 

@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extended.Protocol.Amqp0.Client;
 
 /// <summary>
-/// The AMQP 0-9-1 client flow over any byte transport (ADR-1060): the protocol header, connection.start-ok with PLAIN,
+/// The AMQP 0-9-1 client flow over any byte transport (ADR-1060): the protocol header, connection.start-ok with the first of PLAIN, ANONYMOUS and AMQPLAIN the server offers (ADR-1310),
 /// tune-ok, connection.open of the virtual host, channel 1, a passive queue.declare (a 404 reopens the channel and declares the queue durable), then with a body basic.publish to the
 /// default exchange and otherwise one basic.get with no-ack, and channel.close and connection.close at the end. A
 /// connection.close or channel.close from the server ends the transfer naming its reply code and text. A basic.return
@@ -74,13 +74,6 @@ internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITra
         }
     }
 
-    /// <summary>The PLAIN response (RFC 4616): a zero octet, the user name, a zero octet and the password.</summary>
-    internal static byte[] PlainResponse(NetworkCredential? credentials)
-    {
-        NetworkCredential login = credentials is { UserName.Length: > 0 } ? credentials : new NetworkCredential(DefaultCredential, DefaultCredential);
-        return System.Text.Encoding.UTF8.GetBytes($"\0{login.UserName}\0{login.Password}");
-    }
-
     /// <summary>The smaller of the server's and the client's limit, where the server's 0 means it sets none.</summary>
     internal static uint Negotiate(uint server, uint client) => server == 0 ? client : Math.Min(server, client);
 
@@ -88,12 +81,10 @@ internal sealed class Amqp0ClientFlow(IConnection transport, Stream output, ITra
     {
         await channel.SendProtocolHeaderAsync().ConfigureAwait(false);
         var start = await ReceiveMethodAsync<Amqp0ConnectionStart>().ConfigureAwait(false);
-        if (!start.Mechanisms.Split(' ').Contains(PlainMechanism))
-        {
-            throw new Amqp0ClientException(CurlExitCode.LoginDenied, Amqp0ClientMessages.NoPlainMechanism(start.Mechanisms));
-        }
+        var mechanism = Amqp0Mechanism.Choose(start.Mechanisms, credentials)
+            ?? throw new Amqp0ClientException(CurlExitCode.LoginDenied, Amqp0ClientMessages.NoUsableMechanism(start.Mechanisms));
 
-        var tune = await CallAsync<Amqp0ConnectionTune>(new Amqp0ConnectionStartOk(ClientProperties, PlainMechanism, PlainResponse(credentials), Locale), 0).ConfigureAwait(false);
+        var tune = await CallAsync<Amqp0ConnectionTune>(new Amqp0ConnectionStartOk(ClientProperties, mechanism.Name, mechanism.Response, Locale), 0).ConfigureAwait(false);
         uint frameMax = Negotiate(tune.FrameMax, ClientFrameMax);
         await channel.SendAsync(new Amqp0ConnectionTuneOk((ushort)Negotiate(tune.ChannelMax, ClientChannelMax), frameMax, 0).ToFrame(0)).ConfigureAwait(false);
         channel.FrameMax = frameMax;
