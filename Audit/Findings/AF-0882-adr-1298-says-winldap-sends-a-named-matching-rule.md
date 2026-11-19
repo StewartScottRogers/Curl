@@ -3,8 +3,8 @@ id: AF-0882
 title: ADR-1298 says WinLDAP sends a named matching rule that follows dn:, but the encoder drops it
 auditor: truthfulness
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_0602.md: the reproduction no longer reproduces.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1298-winldap-drops-a-named-matching-rule-in-an-extensible-match-filter.md:ADR-1298:stale-adr
 reproduction: none
 task: BL-5546
@@ -13,9 +13,9 @@ found: 2026-11-19
 found-at: 20e558729f39eda4a4d373ccd10b22dd4ea46b2c
 scorecard: 2026-11-19_0134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: reliable-reaudit
+closed-by: 2026-11-19_0602.md
 ---
 # AF-0882 - ADR-1298 says WinLDAP sends a named matching rule that follows dn:, but the encoder drops it
 
@@ -42,6 +42,9 @@ Select-String -Path Documentation/Planning/Decisions/ADR-1298-*.md,Curl.Original
 
 ## Re-audits
 
+- 2026-11-19 | 2026-11-19_0602.md | reproduces: no | Ran the reproduction: only LdapFilterEncoder.cs:398 matches; ADR-1298 no longer says a rule following dn: is sent. Its Decision now reads 'any named rule, with or without dn: (BL-5453), is dropped', which agrees with IsNamedRule stripping dn: and dropping any non-OID rule.
+
 ## Log
 
 - 2026-11-19: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_0602.md: the reproduction no longer reproduces.
