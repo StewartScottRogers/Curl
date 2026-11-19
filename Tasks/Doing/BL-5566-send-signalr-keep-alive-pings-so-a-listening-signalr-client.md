@@ -44,3 +44,4 @@ The client sends no keep-alive, so a listener with no `-d` is closed by the hub 
 - 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 3.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 90934fec 32ee91d2 a766e51a 3d836d5e.
 - 2026-11-19: Doing -> Blocked. Stewart: run a 90 s signalr:// listener against Surl's SignalR hub (message at 60 s) and tick criterion 2; code, tests and gates are done and committed
+- 2026-11-19: Blocked -> Doing. Criteria at claim: 90934fec 32ee91d2 a766e51a 3d836d5e.
