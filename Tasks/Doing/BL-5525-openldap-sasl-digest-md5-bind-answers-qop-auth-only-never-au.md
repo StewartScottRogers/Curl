@@ -43,3 +43,4 @@ Measure real curl (OpenLDAP build) with `Record-CurlExchange.ps1` if the qop it 
 ## Log
 
 - 2026-11-18: Created.
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 5903f6ba 9a6e97a7 da26f43c 9bda3123 3d836d5e.
