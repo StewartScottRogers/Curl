@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary/Wire/Amqp0ContentHeader.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5538 — Fix AF-0874: Surviving mutant: an AMQP content header with reserved property flag bit 1 set can crash the reader
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Amqp0.UnitLibrary/Wire/Amqp0ContentHeader.cs line 66`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Amqp0.UnitLibrary/Wire/Amqp0ContentHeader.cs line 66`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killed by `ContentHeader_Read_ReservedFlagBitOneSet_IsIgnored` (Amqp0ContentTests): with `<=` at line 66 it fails; with the original all 120 Amqp0 tests pass. Test-only change, production code untouched.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 10c869d4 9742157d.
+- 2026-11-19: Doing -> Done. Test added that kills the mutant

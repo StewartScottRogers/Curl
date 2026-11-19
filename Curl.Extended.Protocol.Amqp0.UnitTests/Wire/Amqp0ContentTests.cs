@@ -53,6 +53,14 @@ public sealed class Amqp0ContentTests
     }
 
     [TestMethod]
+    public void ContentHeader_Read_ReservedFlagBitOneSet_IsIgnored()
+    {
+        Amqp0ContentHeader header = Amqp0ContentHeader.Read(Convert.FromHexString("003C000000000000000000000002"));
+
+        Assert.AreEqual(new Amqp0ContentHeader(60, 0, Amqp0BasicProperties.None), header);
+    }
+
+    [TestMethod]
     [DataRow("003C000000000000000000000001")]
     [DataRow("003C00000000000000000000000000")]
     [DataRow("003C0000000000000000000080")]
