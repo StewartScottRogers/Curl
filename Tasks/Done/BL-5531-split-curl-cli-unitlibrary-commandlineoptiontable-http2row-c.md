@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2Row.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5531 — Split Curl.Cli.UnitLibrary/CommandLineOptionTable.Http2Row.cs so tasks touching it can run in parallel
 
@@ -36,3 +36,4 @@ The file already held one unit (the `--http2` row, split by BL-5529), so there w
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 478ec796 684cb54e a0b49a29.
+- 2026-11-18: Doing -> Done. File already one unit; narrowed BL-5006 touches off it
