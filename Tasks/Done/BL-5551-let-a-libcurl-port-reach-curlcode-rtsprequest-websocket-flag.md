@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl/Libcurl.csproj, Libcurl/README.md]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5551 — Let a Libcurl port reach CurlCode, RtspRequest, WebSocket flags and callback delegates without extra Curl.Api usings
 
@@ -32,14 +32,17 @@ No new package reference may be added.
 
 ## Acceptance criteria
 
-- [ ] An ADR records the chosen approach and why.
-- [ ] A project referencing the packed `Libcurl` package and using `CurlCode`, `CurlWebSocketFlags`, `RtspRequest` and a callback delegate compiles with only the usings the ADR says a port needs, and `Libcurl/README.md` lists them.
-- [ ] A test pins that list (the README sample test, if `Libcurl` has one).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] An ADR records the chosen approach and why.
+- [x] A project referencing the packed `Libcurl` package and using `CurlCode`, `CurlWebSocketFlags`, `RtspRequest` and a callback delegate compiles with only the usings the ADR says a port needs, and `Libcurl/README.md` lists them.
+- [x] A test pins that list (the README sample test, if `Libcurl` has one).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Chose implicit usings via `Libcurl/build/Libcurl.props` (ADR-1306); packed under `build/` (verified with dotnet pack). Test `PortingUsingsTests` pins README list to the props and compiles without the usings. Production code unchanged, so no quality run.
 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 3 (namespaces).
 - 2026-11-19: Backlog -> Doing. Criteria at claim: ad5bb533 693f0239 3a0ecd3a 3d836d5e.
+- 2026-11-19: Doing -> Done. Libcurl package ships implicit usings for the Curl.Api namespaces a port needs (ADR-1306)

@@ -50,6 +50,16 @@ and `calloc` callbacks of `curl_global_init_mem`.
 | version (`curl_version_info`) | `Misc/Version` | `CurlVersion`, `CurlVersionFeatures` |
 | strings, dates, lists, error text | `Misc/Strings`, `Misc/DatesAndLists`, `Misc/ErrorText` | `CurlStrings` (`curl_easy_escape`), `CurlDate`, `CurlSlist`, `CurlErrorText` (`*_strerror`) |
 
+## Porting from C
+
+The package adds these implicit usings (`build/Libcurl.props`, ADR-1306), so `CurlCode`, `CurlWebSocketFlags`,
+`RtspRequest` and the callback delegates need no `using` of their own:
+
+- `Curl.Api.Callbacks`
+- `Curl.Api.Codes`
+- `Curl.Api.EngineContracts.WebSocket`
+- `Curl.Api.Options.Protocols`
+
 ## Folder map
 
 - `Global`: library initialisation and cleanup, and the allocation callbacks (`EasyAllocations`
