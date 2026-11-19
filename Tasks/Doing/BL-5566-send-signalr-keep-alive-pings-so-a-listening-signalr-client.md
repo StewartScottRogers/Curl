@@ -38,3 +38,4 @@ The client sends no keep-alive, so a listener with no `-d` is closed by the hub 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 3.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 90934fec 32ee91d2 a766e51a 3d836d5e.
