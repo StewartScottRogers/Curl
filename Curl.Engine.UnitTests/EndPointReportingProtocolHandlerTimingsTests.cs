@@ -238,6 +238,27 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_UdpChannelOpenedThroughTheRecordingConnector_StampsTheOpenOnTheTransfersClock_BL5535()
+    {
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        EndPointRecordingDatagramConnector connector = new(new ScriptedDatagramConnector(Remote, Remote), recorder);
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("coap", async _ =>
+            {
+                time.Advance(7);
+                await connector.OpenAsync("h", 5683, CancellationToken.None);
+                time.Advance(20);
+                return TransferResult.Success(10);
+            }),
+            recorder);
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(time, url: "coap://127.0.0.1/res"));
+
+        Assert.AreEqual(7, result.Report!.Timings!.Connect!.Connected - result.Report.Timings.Started);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_UdpChannelOpenedForCoap_ReportsItsLocalEndAndConnectTime_BL5493()
     {
         ManualTimeProvider time = new();

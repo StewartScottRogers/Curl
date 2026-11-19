@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EndPointRecordingDatagramConnector.cs, Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5535 — Stamp the UDP channel's open time with the transfer's TimeProvider in EndPointRecordingDatagramConnector
 
@@ -23,13 +23,16 @@ Found by the shift-end review of 2026-11-18 (code-reviewer, ADR-0710), diff 2a47
 
 ## Acceptance criteria
 
-- [ ] The open time is taken from the transfer's own TimeProvider (`context.TimeProvider`, or one passed in by composition). EndPointRecordingDatagramConnector no longer falls back to TimeProvider.System on its own.
-- [ ] A unit test with a manual TimeProvider advanced between start, channel open and end shows %{time_connect} equals the open offset, not a clamped value.
-- [ ] `dotnet build` is clean, the fast tests pass, and Curl.Engine.UnitLibrary keeps 100% line and branch coverage.
+- [x] The open time is taken from the transfer's own TimeProvider (`context.TimeProvider`, or one passed in by composition). EndPointRecordingDatagramConnector no longer falls back to TimeProvider.System on its own.
+- [x] A unit test with a manual TimeProvider advanced between start, channel open and end shows %{time_connect} equals the open offset, not a clamped value.
+- [x] `dotnet build` is clean, the fast tests pass, and Curl.Engine.UnitLibrary keeps 100% line and branch coverage.
 
 ## Notes
+
+The recorder now carries the transfer clock (`ConnectionEndPointRecorder.TransferClock`), set by `EndPointReportingProtocolHandler.ExecuteAsync` from `context.TimeProvider`; the datagram connector stamps with it and has no TimeProvider fallback. No composition change was needed (decision: recorder-held clock, as the connector has no context). Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: b86054c2 152de20d 2a61abee.
+- 2026-11-18: Doing -> Done. Open time stamped on the transfer's clock

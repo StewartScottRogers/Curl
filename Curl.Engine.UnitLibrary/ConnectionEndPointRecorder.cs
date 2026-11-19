@@ -21,6 +21,12 @@ namespace Curl.Engine;
 internal sealed partial class ConnectionEndPointRecorder
 {
     /// <summary>
+    /// Gets the clock of the transfer now running, which stamps when a datagram channel opened so the stamp is on the
+    /// same clock as the transfer's start and end (BL-5535); <see cref="EndPointReportingProtocolHandler" /> sets it from the transfer's context.
+    /// </summary>
+    internal TimeProvider TransferClock { get; set; } = TimeProvider.System;
+
+    /// <summary>
     /// Forgets what the previous transfer recorded, or - for a redirect's next hop - sets it aside as the earlier hop's,
     /// which a hop that fails before it connects reports in its place as libcurl 8.22.0 keeps them (BL-3314).
     /// </summary>
