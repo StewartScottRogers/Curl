@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SignalR.UnitLibrary/Client/SignalRHubSession.cs, Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRKeepAliveTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5575 — SignalR keep-alive Ping queued behind the server's Close no longer fails a finished transfer
 
@@ -26,16 +26,20 @@ Found by the shift-end review of 2026-11-19 (silent-failure-hunter, confirmed by
 
 ## Acceptance criteria
 
-- [ ] After the server's Close has been answered (`SignalRWebSocketSession.IsClosed`), the keep-alive loop writes no Ping frame; a Ping that was queued behind the Close answer is dropped, not written.
-- [ ] A Ping write that fails after the server's Close does not change the transfer's exit code (exit 0 when every record was read).
-- [ ] A Ping write that fails while the hub is still open still fails the transfer with `RecvError`, as `PingWriteFailsWithAnIoError_FailsTheTransferWithTheReceiveErrorCode_HubProtocolPing` pins.
-- [ ] When the read loop throws, the Ping task is awaited (its own failure discarded) before the method returns, so the connection is never disposed under a Ping write, and the read loop's exception is the one reported.
-- [ ] The comments in `SignalRHubSession.cs` describe each path as the code now behaves.
-- [ ] New tests in `Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRKeepAliveTests.cs` pin the first, second and fourth criteria, pass on Windows, Linux and macOS, and the library keeps 100% line and branch coverage.
+- [x] After the server's Close has been answered (`SignalRWebSocketSession.IsClosed`), the keep-alive loop writes no Ping frame; a Ping that was queued behind the Close answer is dropped, not written.
+- [x] A Ping write that fails after the server's Close does not change the transfer's exit code (exit 0 when every record was read).
+- [x] A Ping write that fails while the hub is still open still fails the transfer with `RecvError`, as `PingWriteFailsWithAnIoError_FailsTheTransferWithTheReceiveErrorCode_HubProtocolPing` pins.
+- [x] When the read loop throws, the Ping task is awaited (its own failure discarded) before the method returns, so the connection is never disposed under a Ping write, and the read loop's exception is the one reported.
+- [x] The comments in `SignalRHubSession.cs` describe each path as the code now behaves.
+- [x] New tests in `Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRKeepAliveTests.cs` pin the first, second and fourth criteria, pass on Windows, Linux and macOS, and the library keeps 100% line and branch coverage.
 
 ## Notes
+
+- Decision: a Ping write failure is ignored once the server's Close frame has fully arrived (`CloseReceived`, set before the answer is sent), not once it was answered, so a Ping failing while the answer waits on the send lock is also ignored. The Ping is dropped under the send lock once any Close frame has been written. Read loop now runs as its own task so no try/finally sits in the async RunAsync (that left a branch uncovered). Quality run: 100/100, 0 failing. Platform-neutral tests.
+
 
 ## Log
 
 - 2026-11-19: Created by the shift-end review (review-20261119-152921).
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 32d41de2 9c122d8b 8165c082 c566fbe6 5e0b4a42 ae19c8cf.
+- 2026-11-19: Doing -> Done. Ping dropped after Close, post-Close Ping failure ignored, Ping awaited on read failure

@@ -28,12 +28,31 @@ internal sealed class SignalRWebSocketSession(IConnection connection, BufferedCo
     // One frame at a time: the keep-alive Ping is sent while the read loop may be answering the hub.
     private readonly SemaphoreSlim sending = new(1, 1);
 
+    // Whether a Close frame has been written; read and set only under the sending semaphore.
+    private bool closeFrameSent;
+
+    private bool closeReceived;
+
+    /// <summary>Whether the whole of the server's Close frame has arrived, before this session answers it; readable from the keep-alive task.</summary>
+    public bool CloseReceived
+    {
+        get => Volatile.Read(ref closeReceived);
+        private set => Volatile.Write(ref closeReceived, value);
+    }
+
     /// <summary>Whether the server sent a Close frame, which this session has answered.</summary>
     public bool IsClosed { get; private set; }
 
     /// <summary>Sends <paramref name="message"/>, one or more hub protocol records, as one masked text frame.</summary>
     public Task SendTextAsync(ReadOnlyMemory<byte> message, CancellationToken cancellationToken) =>
         SendFrameAsync(WsOpcode.Text, message.Span.ToArray(), cancellationToken);
+
+    /// <summary>
+    /// Sends <paramref name="message"/> like <see cref="SendTextAsync"/>, unless a Close frame has been written already,
+    /// when nothing is written (RFC 6455 section 5.5.1: no data after a Close); gives whether it was written.
+    /// </summary>
+    public Task<bool> SendTextUnlessClosingAsync(ReadOnlyMemory<byte> message, CancellationToken cancellationToken) =>
+        SendFrameAsync(WsOpcode.Text, message.Span.ToArray(), cancellationToken, dropOnceClosing: true);
 
     /// <summary>
     /// Starts the WebSocket closing handshake with a Close frame carrying status 1000, normal closure (RFC 6455
@@ -104,6 +123,7 @@ internal sealed class SignalRWebSocketSession(IConnection connection, BufferedCo
                 closePayload.AddRange(run.Payload.Span);
                 if (run.BytesLeft == 0)
                 {
+                    CloseReceived = true;
                     await SendFrameAsync(WsOpcode.Close, [.. closePayload.Take(StatusCodeLength)], cancellationToken);
                     IsClosed = true;
                 }
@@ -112,13 +132,20 @@ internal sealed class SignalRWebSocketSession(IConnection connection, BufferedCo
         }
     }
 
-    private async Task SendFrameAsync(WsOpcode opcode, byte[] payload, CancellationToken cancellationToken)
+    private async Task<bool> SendFrameAsync(WsOpcode opcode, byte[] payload, CancellationToken cancellationToken, bool dropOnceClosing = false)
     {
         await sending.WaitAsync(cancellationToken);
         try
         {
+            if (dropOnceClosing && closeFrameSent)
+            {
+                return false;
+            }
+
             await connection.WriteAsync(WsFrameEncoder.Encode(opcode, payload, randomSource), cancellationToken);
             await connection.FlushAsync(cancellationToken);
+            closeFrameSent |= opcode == WsOpcode.Close;
+            return true;
         }
         finally
         {

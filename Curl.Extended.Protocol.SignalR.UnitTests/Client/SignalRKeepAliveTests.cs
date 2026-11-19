@@ -100,6 +100,60 @@ public sealed class SignalRKeepAliveTests
         Assert.AreEqual(CurlExitCode.RecvError, (await run).ExitCode);
     }
 
+    [TestMethod]
+    public async Task PingQueuedBehindTheServersCloseAnswer_IsDroppedNotWrittenAfterTheClose_HubProtocolPing()
+    {
+        var clock = new ManualTimeProvider();
+        var hub = new BlockingConnection(Encoding.Latin1.GetBytes(Upgraded), Frame("{}\u001e"));
+        Task<TransferResult> run = Start(clock, hub);
+        await WaitUntil(() => clock.PendingTimers == 1);
+        hub.HoldNextWrite();
+        hub.Give([0x88, 0x02, 0x03, 0xE8]);
+        await WaitUntil(() => hub.IsHoldingAWrite);
+        clock.Advance(TimeSpan.FromSeconds(15));
+        await Task.Delay(50);
+        hub.ReleaseHeldWrite();
+
+        Assert.AreEqual(CurlExitCode.Ok, (await run).ExitCode);
+        Assert.AreEqual(0, CountPings(hub));
+    }
+
+    [TestMethod]
+    public async Task PingWriteFailsAfterTheServersCloseArrived_DoesNotChangeTheExitCode_HubProtocolPing()
+    {
+        var clock = new ManualTimeProvider();
+        var hub = new BlockingConnection(Encoding.Latin1.GetBytes(Upgraded), Frame("{}\u001e"));
+        Task<TransferResult> run = Start(clock, hub);
+        await WaitUntil(() => clock.PendingTimers == 1);
+        hub.HoldNextWrite();
+        clock.Advance(TimeSpan.FromSeconds(15));
+        await WaitUntil(() => hub.IsHoldingAWrite);
+        hub.Give([0x88, 0x02, 0x03, 0xE8]);
+        await Task.Delay(50);
+        hub.ReleaseHeldWriteWithFailure();
+
+        Assert.AreEqual(CurlExitCode.Ok, (await run).ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ReadLoopFailsWhileAPingWriteIsBlocked_WaitsForThePingThenReportsTheReadFailure_HubProtocolPing()
+    {
+        var clock = new ManualTimeProvider();
+        var hub = new BlockingConnection(Encoding.Latin1.GetBytes(Upgraded), Frame("{}\u001e"));
+        Task<TransferResult> run = Start(clock, hub);
+        await WaitUntil(() => clock.PendingTimers == 1);
+        hub.HoldNextWrite();
+        clock.Advance(TimeSpan.FromSeconds(15));
+        await WaitUntil(() => hub.IsHoldingAWrite);
+
+        hub.Give(Frame("not json\u001e"));
+        await Task.Delay(50);
+        Assert.IsFalse(run.IsCompleted);
+        hub.ReleaseHeldWriteWithFailure();
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, (await run).ExitCode);
+    }
+
     private static Task<TransferResult> Start(ManualTimeProvider clock, BlockingConnection hub)
     {
         ScriptedConnection negotiate = ScriptedConnection.FromText($"HTTP/1.1 200 OK\r\nContent-Length: {NegotiateBody.Length}\r\n\r\n{NegotiateBody}");
@@ -186,6 +240,8 @@ public sealed class SignalRKeepAliveTests
         public void HoldNextWrite() => Volatile.Write(ref holdNext, 1);
 
         public void ReleaseHeldWrite() => release.TrySetResult();
+
+        public void ReleaseHeldWriteWithFailure() => release.TrySetException(new IOException("The held write failed."));
 
         public void FailWritesFromNowOn() => Volatile.Write(ref failing, 1);
 

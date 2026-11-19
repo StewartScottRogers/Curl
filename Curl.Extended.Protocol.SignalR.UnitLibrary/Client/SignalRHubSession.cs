@@ -54,20 +54,13 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
 
         using var stopPinging = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task pinging = PingWhenIdleAsync(stopPinging.Token, cancellationToken);
-        try
-        {
-            while (await session.ReceiveRecordAsync(cancellationToken) is { } record
-                && !await AcceptAsync(HubMessageReader.ReadMessage(record), cancellationToken))
-            {
-            }
-        }
-        finally
-        {
-            stopPinging.Cancel();
-        }
+        Task reading = ReadUntilEndAsync(cancellationToken);
+        await Task.WhenAny(reading);
+        await StopPingingAsync(stopPinging, pinging);
 
-        // Awaited before Close, so the cancel never cuts a Ping frame short; a Ping that failed to write throws here.
-        // When the read loop failed instead, that failure is the transfer's and the Ping task ends quietly.
+        // Rethrows the read loop's failure, which is then the transfer's; otherwise a Ping that failed to write while
+        // the hub was open fails the transfer here.
+        await reading;
         await pinging;
         await session.CloseAsync(cancellationToken);
         return bytesWritten;
@@ -90,13 +83,50 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
             TimeSpan idle = timeProvider.GetElapsedTime(Volatile.Read(ref lastSentAt));
             if (idle >= KeepAliveInterval)
             {
-                await SendAsync(HubMessageWriter.WritePing(), abort);
+                if (!await TrySendPingAsync(abort))
+                {
+                    return;
+                }
             }
             else
             {
                 // WhenAny does not throw when the stop cancels the delay, so stopping is a normal end of this task.
                 await Task.WhenAny(Task.Delay(KeepAliveInterval - idle, timeProvider, stop));
             }
+        }
+    }
+
+    // Reads and accepts records until the session ends.
+    private async Task ReadUntilEndAsync(CancellationToken cancellationToken)
+    {
+        while (await session.ReceiveRecordAsync(cancellationToken) is { } record
+            && !await AcceptAsync(HubMessageReader.ReadMessage(record), cancellationToken))
+        {
+        }
+    }
+
+    // Waited for on every path, so the connection is never disposed under a Ping write and a cancel never cuts a Ping
+    // frame short; WhenAny does not rethrow, so when the read loop failed its exception is the one reported and the
+    // Ping task's own failure is dropped.
+    private static async Task StopPingingAsync(CancellationTokenSource stopPinging, Task pinging)
+    {
+        await stopPinging.CancelAsync();
+        await Task.WhenAny(pinging);
+    }
+
+    // Writes a Ping unless the Close handshake has begun; gives false when the keep-alive loop should end. A write that
+    // fails once the server's Close has arrived is the hub going away after a finished transfer, so it is not an error.
+    private async Task<bool> TrySendPingAsync(CancellationToken abort)
+    {
+        try
+        {
+            bool written = await session.SendTextUnlessClosingAsync(HubMessageWriter.WritePing(), abort);
+            Volatile.Write(ref lastSentAt, timeProvider.GetTimestamp());
+            return written;
+        }
+        catch (IOException) when (session.CloseReceived)
+        {
+            return false;
         }
     }
 
