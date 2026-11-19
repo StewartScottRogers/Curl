@@ -25,6 +25,7 @@ internal sealed class PortUnreachableReportingDatagramChannel(
 {
     private readonly List<ReadOnlyMemory<byte>> _sent = [];
     private IDatagramChannel _inner = inner;
+    private readonly List<EndPoint> _refused = [];
     private int _nextAlternative;
     private volatile bool _hasReceived;
 
@@ -44,7 +45,7 @@ internal sealed class PortUnreachableReportingDatagramChannel(
 
         try
         {
-            await _inner.SendAsync(datagram, destination, cancellationToken).ConfigureAwait(false);
+            await _inner.SendAsync(datagram, _refused.Contains(destination) ? _inner.ServerEndPoint : destination, cancellationToken).ConfigureAwait(false);
         }
         catch (SocketException refused)
         {
@@ -113,6 +114,7 @@ internal sealed class PortUnreachableReportingDatagramChannel(
                 continue;
             }
 
+            _refused.Add(_inner.ServerEndPoint);
             await _inner.DisposeAsync().ConfigureAwait(false);
             _inner = opened;
             return true;

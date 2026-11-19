@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/PortUnreachableReportingDatagramChannel.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5533 — Send a datagram addressed to the refused address to the new address after PortUnreachableReportingDatagramChannel switches
 
@@ -23,13 +23,17 @@ Found by the shift-end review of 2026-11-18 (code-reviewer, ADR-0710), diff 2a47
 
 ## Acceptance criteria
 
-- [ ] After a switch, `SendAsync` sends a datagram addressed to any refused channel's ServerEndPoint to the current channel's ServerEndPoint. Other destinations are unchanged.
-- [ ] A unit test switches from a refusing first address and then sends to the original ServerEndPoint, and shows the datagram reaches the second address.
-- [ ] `dotnet build` is clean, the fast tests pass, and Curl.Networking.UnitLibrary keeps 100% line and branch coverage.
+- [x] After a switch, `SendAsync` sends a datagram addressed to any refused channel's ServerEndPoint to the current channel's ServerEndPoint. Other destinations are unchanged.
+- [x] A unit test switches from a refusing first address and then sends to the original ServerEndPoint, and shows the datagram reaches the second address.
+- [x] `dotnet build` is clean, the fast tests pass, and Curl.Networking.UnitLibrary keeps 100% line and branch coverage.
 
 ## Notes
+
+The channel records each refused ServerEndPoint; SendAsync redirects a destination equal to one to the current ServerEndPoint. Quality run: 0 failing members.
+
 
 ## Log
 
 - 2026-11-18: Created.
 - 2026-11-18: Backlog -> Doing. Criteria at claim: fd455dbc 959c678a 68cb9cf5.
+- 2026-11-18: Doing -> Done. A send addressed to a refused address goes to the channel's current address after a switch
