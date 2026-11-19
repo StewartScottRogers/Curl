@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extended.Protocol.Amqp0.Client;
 
 /// <summary>
-/// The AMQP 0-9-1 client flow over any byte transport (ADR-1060): the protocol header, connection.start-ok with the first of PLAIN, ANONYMOUS and AMQPLAIN the server offers (ADR-1310),
+/// The AMQP 0-9-1 client flow over any byte transport (ADR-1060): the protocol header, connection.start-ok with the first of PLAIN, ANONYMOUS and AMQPLAIN the server offers (ADR-1312),
 /// tune-ok, connection.open of the virtual host, channel 1, a passive queue.declare (a 404 reopens the channel and declares the queue durable), then with a body basic.publish to the
 /// default exchange and otherwise one basic.get with no-ack, and channel.close and connection.close at the end. A
 /// connection.close or channel.close from the server ends the transfer naming its reply code and text. A basic.return

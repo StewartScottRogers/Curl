@@ -1,4 +1,4 @@
-﻿# ADR-1310: The amqp client picks PLAIN, ANONYMOUS or AMQPLAIN from what the server offers
+# ADR-1312: The amqp client picks PLAIN, ANONYMOUS or AMQPLAIN from what the server offers
 
 - Status: Accepted
 - Date: 2026-11-19

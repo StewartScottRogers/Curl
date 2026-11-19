@@ -36,10 +36,10 @@ The client logs in only with PLAIN, so against a server that does not offer PLAI
 
 ## Notes
 
-- ADR-1310. New file Amqp0Mechanism.cs holds the order (PLAIN, ANONYMOUS without -u, AMQPLAIN); EXTERNAL and CRAM-MD5 left out (no client cert reaches the handler; no challenge round). Mechanism choice/bytes pinned in Amqp0ClientFlowTests, no-usable-mechanism exit 67 in the handler test; quality gate passes for the library. Committed with the task.
+- ADR-1312. New file Amqp0Mechanism.cs holds the order (PLAIN, ANONYMOUS without -u, AMQPLAIN); EXTERNAL and CRAM-MD5 left out (no client cert reaches the handler; no challenge round). Mechanism choice/bytes pinned in Amqp0ClientFlowTests, no-usable-mechanism exit 67 in the handler test; quality gate passes for the library. Committed with the task.
 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 5.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 153b29b7 da459af3 76972af5 5a1767f3 3d836d5e.
-- 2026-11-19: Doing -> Done. amqp client picks PLAIN, ANONYMOUS or AMQPLAIN (ADR-1310)
+- 2026-11-19: Doing -> Done. amqp client picks PLAIN, ANONYMOUS or AMQPLAIN (ADR-1312)

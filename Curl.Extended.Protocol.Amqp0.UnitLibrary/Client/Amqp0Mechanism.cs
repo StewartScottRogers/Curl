@@ -3,7 +3,7 @@ using Curl.Extended.Protocol.Amqp0.Wire;
 
 namespace Curl.Extended.Protocol.Amqp0.Client;
 
-/// <summary>A SASL mechanism the client answers connection.start with, and its connection.start-ok response (ADR-1310).</summary>
+/// <summary>A SASL mechanism the client answers connection.start with, and its connection.start-ok response (ADR-1312).</summary>
 /// <param name="Name">The mechanism name as the server lists it.</param>
 /// <param name="Response">The connection.start-ok response bytes.</param>
 internal sealed record Amqp0Mechanism(string Name, byte[] Response)
