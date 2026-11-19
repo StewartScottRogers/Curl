@@ -41,3 +41,4 @@ Whatever is chosen, `CurlInfo` and any other enum built the same way follow the 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 3 (option names).
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 602c6662 b0022bcc 33aa5314 3d836d5e.
