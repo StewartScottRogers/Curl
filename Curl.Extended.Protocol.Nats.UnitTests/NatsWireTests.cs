@@ -35,6 +35,7 @@ public sealed class NatsWireTests
     [TestMethod]
     [DataRow("MSG a.b 1 5", "a.b", "1", null, 5)]
     [DataRow("msg\ta.b  9 _INBOX.r 0", "a.b", "9", "_INBOX.r", 0)]
+    [DataRow("MSG a.b 1 10", "a.b", "1", null, 10)]
     public void MessageLineParse_FourOrFiveFields_ReadsThem(string line, string subject, string sid, string? replyTo, int length) =>
         Assert.AreEqual(new NatsMessageLine(subject, sid, replyTo, length), NatsMessageLine.Parse(line, 10));
 
