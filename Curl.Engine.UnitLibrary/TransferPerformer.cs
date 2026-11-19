@@ -187,13 +187,13 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
         {
             result = await follower.FollowWithoutNotifyingAsync(context, redirectPolicy).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (HasStoppedTheTransfer(watchdog))
+        catch (OperationCanceledException cancelled) when (HasStoppedTheTransfer(watchdog))
         {
-            return await FinishedByWatchdogAsync(follower, context, watchdog!.Failure).ConfigureAwait(false);
+            return await FinishedByWatchdogAsync(follower, context, WithReportOf(cancelled, watchdog!.Failure)).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (HasStoppedTheTransfer(maxTimeWatchdog))
+        catch (OperationCanceledException cancelled) when (HasStoppedTheTransfer(maxTimeWatchdog))
         {
-            return await FinishedByWatchdogAsync(follower, context, maxTimeWatchdog!.Failure).ConfigureAwait(false);
+            return await FinishedByWatchdogAsync(follower, context, WithReportOf(cancelled, maxTimeWatchdog!.Failure)).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -210,6 +210,12 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
         await follower.NotifyChainFinishedAsync(context, result).ConfigureAwait(false);
         return result;
     }
+
+    // A watchdog's failure with the report of the connection the cancelled transfer had made, so -w still knows its times and end points (BL-5491).
+    private static TransferResult WithReportOf(OperationCanceledException cancelled, TransferResult failure) =>
+        EndPointReportingProtocolHandler.ReportCarriedBy(cancelled) is { } report
+            ? failure with { Report = report with { DownloadSize = failure.BytesTransferred } }
+            : failure;
 
     private static bool HasStoppedTheTransfer(LowSpeedWatchdog? watchdog) => watchdog is { IsTooSlow: true };
 

@@ -90,6 +90,44 @@ public sealed class EndPointReportingProtocolHandlerTimingsTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_CancelledAfterConnecting_CarriesTimingsAndEndPointsOnTheCancellation_BL5491()
+    {
+        ManualTimeProvider time = new();
+        ConnectionEndPointRecorder recorder = new();
+        IPEndPoint remote = new(IPAddress.Loopback, 4222);
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("nats", _ =>
+            {
+                recorder.Record(new IPEndPoint(IPAddress.Loopback, 50000), remote, timings: new ConnectTimings(1, null, 5, null));
+                time.Advance(7);
+                throw new OperationCanceledException();
+            }),
+            recorder);
+
+        OperationCanceledException cancelled = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await handler.ExecuteAsync(ContextOf(time)));
+
+        TransferReport report = EndPointReportingProtocolHandler.ReportCarriedBy(cancelled)!;
+        Assert.AreEqual(remote, report.RemoteEndPoint);
+        Assert.IsNotNull(report.Timings);
+        Assert.AreEqual(1, report.ConnectionCount);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CancelledBeforeConnecting_CarriesNoReport_BL5491()
+    {
+        ManualTimeProvider time = new();
+        EndPointReportingProtocolHandler handler = new(
+            new RecordingProtocolHandler("nats", _ => throw new OperationCanceledException()),
+            new ConnectionEndPointRecorder());
+
+        OperationCanceledException cancelled = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            async () => await handler.ExecuteAsync(ContextOf(time)));
+
+        Assert.IsNull(EndPointReportingProtocolHandler.ReportCarriedBy(cancelled));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_FailureWithReportAndNoConnection_ReportsNoUpload()
     {
         ManualTimeProvider time = new();

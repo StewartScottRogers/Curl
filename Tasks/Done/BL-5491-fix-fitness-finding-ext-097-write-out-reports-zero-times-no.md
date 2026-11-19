@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs]
+touches: [Curl.Engine.UnitLibrary/EndPointReportingProtocolHandler.cs, Curl.Engine.UnitLibrary/TransferPerformer.cs]
 requirement: none
 created: 2026-11-18
-completed:
+completed: 2026-11-18
 ---
 # BL-5491 — Fix fitness finding EXT-097: Write-out reports zero times, no remote address and num_connects 0 when -m ends a messaging transfer that was connected and receiving
 
@@ -35,13 +35,16 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 
 ## Acceptance criteria
 
-- [ ] step 2 prints `[28 c=0.00… t=3.0… down=6 ip=127.0.0.1:46222 nc=1]` with c > 0 and t ≥ 3.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 2 prints `[28 c=0.00… t=3.0… down=6 ip=127.0.0.1:46222 nc=1]` with c > 0 and t ≥ 3.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: `-m` cancels the handler, so no result carries the connected transfer's report; `TransferPerformer` replaced it with the watchdog failure. Fix: `EndPointReportingProtocolHandler` puts the stamped report (timings, end points, count) on the cancellation's `Data`; `TransferPerformer.WithReportOf` copies it onto the watchdog failure. Added `TransferPerformer.cs` to touches (no other Doing task holds it). Not run against live NATS (no docker); pinned by unit tests. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-097 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 49e32469 69116afe 3d836d5e.
+- 2026-11-18: Doing -> Done. EXT-097 fixed: timed-out connected messaging transfers keep timings and end points

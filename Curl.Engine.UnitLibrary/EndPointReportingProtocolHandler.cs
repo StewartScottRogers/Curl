@@ -24,6 +24,15 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
     /// <summary>Gets the handler as given, a <see cref="LazyProtocolHandler" /> left unbuilt.</summary>
     internal IProtocolHandler GivenHandler => handler;
 
+    /// <summary>The <see cref="Exception.Data" /> key under which a cancelled transfer's <see cref="TransferReport" /> travels.</summary>
+    internal const string ReportDataKey = "Curl.Engine.TransferReport";
+
+    /// <summary>Gets the report <paramref name="cancelled" /> carries, or <see langword="null" /> when the transfer never connected.</summary>
+    /// <param name="cancelled">The cancellation that left a handler.</param>
+    /// <returns>The report put on it.</returns>
+    internal static TransferReport? ReportCarriedBy(OperationCanceledException cancelled) =>
+        cancelled.Data[ReportDataKey] as TransferReport;
+
     /// <inheritdoc />
     public ValueTask TransferChainFinishedAsync(ITransferContext first, TransferResult result) =>
         handler.TransferChainFinishedAsync(first, result);
@@ -47,6 +56,13 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
         catch (DatagramPortUnreachableException refused)
         {
             result = TransferResult.Failure(CurlExitCode.CouldntConnect, refused.Message);
+        }
+        catch (OperationCanceledException cancelled) when (recorder.FirstConnectTimings is not null)
+        {
+            // A watchdog's cancellation leaves no result: carry the connected transfer's report on the exception for the caller that ends it (BL-5491).
+            TransferResult connected = recorder.ReportOn(TransferResult.Failure(CurlExitCode.OperationTimedOut, cancelled.Message));
+            cancelled.Data[ReportDataKey] = StampTimingsAndUploadSize(connected, context, started, UploadedBy(context, UploadPosition(context) - uploadStart)).Report;
+            throw;
         }
 
         result = recorder.ReportOn(result, handlerCountsConnections: result.Report is not null && context.Url.Scheme is "http" or "https");
