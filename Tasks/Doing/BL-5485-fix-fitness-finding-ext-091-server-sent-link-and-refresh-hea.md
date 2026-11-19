@@ -47,3 +47,4 @@ From the outside fitness review `Curl-Fitness-Review-2026-11-18T0633` (commit `e
 - 2026-11-18: Created from fitness review Curl-Fitness-Review-2026-11-18T0633, finding EXT-091 (Low).
 - 2026-11-18: Backlog -> Doing. Criteria at claim: 81e4bf08 69116afe 3d836d5e.
 - 2026-11-18: Doing -> Backlog. Waits on BL-5484 (holds RecordReplay): --record redaction of Link and Refresh is left; Http and Har parts committed
+- 2026-11-18: Backlog -> Doing. Criteria at claim: 81e4bf08 69116afe 3d836d5e.
