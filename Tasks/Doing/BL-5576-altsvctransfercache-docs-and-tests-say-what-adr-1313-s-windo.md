@@ -40,3 +40,4 @@ Found by the shift-end review of 2026-11-19 (code-reviewer and type-design-analy
 ## Log
 
 - 2026-11-19: Created by the shift-end review (review-20261119-152921).
+- 2026-11-19: Backlog -> Doing. Criteria at claim: e9e9a0a5 e5699396 71a70cb7 51dd886e 13e713cf 9a1dffd3.
