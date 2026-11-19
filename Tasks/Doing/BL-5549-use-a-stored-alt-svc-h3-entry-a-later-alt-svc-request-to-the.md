@@ -45,3 +45,4 @@ curl -s -k --alt-svc altsvc.txt -o NUL -w "%{http_version}" https://127.0.0.1:84
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0642-Curl-bug-report.md, finding 1.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 94b1b568 f78cc956 9d6c6e61 af257326 3d836d5e.
