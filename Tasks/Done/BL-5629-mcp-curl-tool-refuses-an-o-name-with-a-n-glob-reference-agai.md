@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Mcp.UnitLibrary/McpOptionValuePaths.cs, Curl.Mcp.UnitTests/McpArgumentCheckerTests.cs]
+touches: [Curl.Mcp.UnitLibrary/McpOptionValuePaths.cs, Curl.Mcp.UnitLibrary/McpArgumentChecker.cs, Curl.Mcp.UnitTests/McpArgumentCheckerTests.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5629 — MCP curl tool refuses an -o name with a #N glob reference again unless every URL glob alternative stays inside CURL_MCP_ROOT
 
@@ -26,14 +26,18 @@ Failure: `["-o", "#1", "http://h/{../../../home/u/.bashrc,x}"]` is checked as `_
 
 ## Acceptance criteria
 
-- [ ] An `-o` name with `#<n>` is refused unless every `{}` and `[]` alternative of every URL argument makes a name that stays inside `CURL_MCP_ROOT`. Checking means expanding the URL globs, or refusing any alternative holding `/`, `\` or `..`.
-- [ ] `McpArgumentCheckerTests` has a row where a `{..}` alternative escapes the root, `-o "#1" "http://h/{../../x,y}"`, and is refused. It also has a row where `--output-dir` plus `#1` escapes, and is refused.
-- [ ] The existing harmless `{a,b}` rows are still allowed.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] An `-o` name with `#<n>` is refused unless every `{}` and `[]` alternative of every URL argument makes a name that stays inside `CURL_MCP_ROOT`. Checking means expanding the URL globs, or refusing any alternative holding `/`, `\` or `..`.
+- [x] `McpArgumentCheckerTests` has a row where a `{..}` alternative escapes the root, `-o "#1" "http://h/{../../x,y}"`, and is refused. It also has a row where `--output-dir` plus `#1` escapes, and is refused.
+- [x] The existing harmless `{a,b}` rows are still allowed.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Added McpArgumentChecker.cs to touches: the check needs every argument, which only the checker sees; no other Doing task touches it.
+- Decision: with an -o name holding #<n>, any argument holding a {} or [] alternative with /,  or .. refuses the -o (over-cautious for non-URL arguments such as -d JSON, chosen as the simplest safe rule). Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 28e141b7 666c5cea bbaf80af 3d836d5e.
+- 2026-11-20: Doing -> Done. Refuses -o #<n> when a URL glob alternative escapes the root

@@ -38,6 +38,8 @@ public sealed class McpArgumentChecker
 
     private readonly string? outputDirectory;
 
+    private readonly bool globAlternativesEscape;
+
     private readonly FrozenDictionary<string, McpExtensionOption> extensionOptionsByName;
 
     /// <summary>Creates the checker for <paramref name="root" />.</summary>
@@ -51,8 +53,9 @@ public sealed class McpArgumentChecker
     }
 
     /// <summary>The checker for one argument array that names <c>--output-dir</c>.</summary>
-    private McpArgumentChecker(McpConfinementRoot root, FrozenDictionary<string, McpExtensionOption> extensionOptionsByName, string outputDirectory)
+    private McpArgumentChecker(McpConfinementRoot root, FrozenDictionary<string, McpExtensionOption> extensionOptionsByName, string? outputDirectory, bool globAlternativesEscape)
     {
+        this.globAlternativesEscape = globAlternativesEscape;
         this.root = root;
         this.extensionOptionsByName = extensionOptionsByName;
         this.outputDirectory = outputDirectory;
@@ -70,7 +73,8 @@ public sealed class McpArgumentChecker
     {
         ArgumentNullException.ThrowIfNull(arguments);
         string? directory = OutputDirectoryIn(arguments);
-        McpArgumentChecker checker = directory is null ? this : new(root, extensionOptionsByName, directory);
+        bool escape = McpOptionValuePaths.AnyAlternativeEscapes(arguments);
+        McpArgumentChecker checker = directory is null && !escape ? this : new(root, extensionOptionsByName, directory, escape);
         return checker.CheckArguments(new ArgumentCursor(arguments), 0);
     }
 
@@ -302,7 +306,7 @@ public sealed class McpArgumentChecker
         {
             "config" => CheckConfig(written, value, configDepth),
             "write-out" when value.StartsWith('@') => CheckWriteOutTemplate(written, value[1..]),
-            _ => CheckPaths(written, McpOptionValuePaths.PathsIn(longName, use, value, outputDirectory)),
+            _ => CheckPaths(written, McpOptionValuePaths.PathsIn(longName, use, value, outputDirectory, globAlternativesEscape)),
         };
     }
 
