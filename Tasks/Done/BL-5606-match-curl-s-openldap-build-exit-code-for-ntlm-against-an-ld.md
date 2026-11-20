@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5606 — Match curl's OpenLDAP-build exit code for --ntlm against an LDAP server that accepts NTLM
 
@@ -24,13 +24,16 @@ With the OpenLDAP backend, `--ntlm` exits 67 even against a server that accepts 
 
 ## Acceptance criteria
 
-- [ ] The Notes record the reference curl's result on Linux for `--ntlm` against a server offering NTLM.
-- [ ] The port's exit code and stderr on Linux match the reference for that case, pinned by a test that runs off Windows.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The Notes record the reference curl's result on Linux for `--ntlm` against a server offering NTLM.
+- [x] The port's exit code and stderr on Linux match the reference for that case, pinned by a test that runs off Windows.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Reference (WSL Ubuntu curl 8.18.0, OpenLDAP 2.6.10) against a fake LDAP server whose rootDSE lists supportedSASLMechanisms NTLM: `curl: (67) Login denied`, exit 67. curl's OpenLDAP backend does no NTLM bind, so the port already matched (exit 67, same stderr); no production change, only the pinning test ExecuteAsync_ServerOffersNtlm_FailsWith67LikeCurlsOpenLdapBuild (platform-neutral, fake connection).
 
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (2203 #9).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 45e53432 f2d4d00f 3d836d5e.
+- 2026-11-20: Doing -> Done. Reference curl exits 67 Login denied for NTLM offered; port already matches, pinned by test
