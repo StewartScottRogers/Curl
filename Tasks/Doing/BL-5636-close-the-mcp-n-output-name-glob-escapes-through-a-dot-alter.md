@@ -53,3 +53,4 @@ BL-5630 (commit 92a346f416).
 ## Log
 
 - 2026-11-20: Created.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: d54c9933 34cd879e 9dead49d d5a635d7 54a455d2.
