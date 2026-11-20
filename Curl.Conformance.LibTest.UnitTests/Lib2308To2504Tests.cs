@@ -539,6 +539,20 @@ public sealed class Lib2308To2504Tests
     }
 
     [TestMethod]
+    public async Task Lib2412_TraceCallback_StartsEachLineWithTheTime()
+    {
+        var engine = new FakeCurlEngine();
+        var run = new PortRun(engine, 2412, "http://x/2412");
+        var time = new ManualTimeProvider(DateTimeOffset.UnixEpoch);
+        _ = await new Lib2412(time).RunAsync(run.Context, CancellationToken.None);
+
+        int answer = engine.Multi.Added!.Options.Callbacks.Debug!(CurlInfoType.Text, "hi\n"u8);
+
+        Assert.AreEqual(0, answer);
+        StringAssert.EndsWith(run.Error.ToString(), "00:00:00.000000 == Info: hi\n");
+    }
+
+    [TestMethod]
     public async Task Lib2412_WithADescriptor_Fails()
     {
         var engine = new FakeCurlEngine();
