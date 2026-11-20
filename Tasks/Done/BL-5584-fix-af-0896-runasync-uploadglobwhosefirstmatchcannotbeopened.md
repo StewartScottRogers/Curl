@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5584 — Fix AF-0896: RunAsync_UploadGlobWhoseFirstMatchCannotBeOpened_Exits26AndUploadsNoOtherMatch asserts UploadFailed (25)
 
@@ -52,3 +52,4 @@ Already fixed in the tree: the test asserts CurlExitCode.ReadError (26) and "nos
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-19: Doing -> Done. Test already asserts 26
