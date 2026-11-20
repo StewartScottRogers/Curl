@@ -36,3 +36,4 @@ Once the FTP handler sets it, the `Curl.Api` fallback becomes dead for FTP; deci
 ## Log
 
 - 2026-11-20: Created.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 6cd003a7 1cf44c34 6f576b33 3d836d5e.
