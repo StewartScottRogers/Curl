@@ -45,6 +45,7 @@ Select-String -Path Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs -Patt
 - 2026-11-04 | 2026-11-04_0643.md | reproduces: yes | still reported
 - 2026-11-13 | 2026-11-13_2321.md | reproduces: yes | still reported
 - 2026-11-18 | 2026-11-18_0810.md | reproduces: yes | still reported
+- 2026-11-19 | 2026-11-19_1633.md | reproduces: yes | still reported
 
 ## Log
 

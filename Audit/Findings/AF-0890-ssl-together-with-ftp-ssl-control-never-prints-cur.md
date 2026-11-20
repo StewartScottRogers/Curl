@@ -3,8 +3,8 @@ id: AF-0890
 title: --ssl together with --ftp-ssl-control never prints curl's 'Warning: --ssl overrides --ftp-ssl-control' (or the reverse) line
 auditor: conformance
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_1633.md: the reproduction no longer reproduces.
 key: conformance:Curl.Cli.UnitLibrary/CommandLineWarning.cs:--ftp-ssl-control:stderr
 reproduction: none
 task: BL-5561
@@ -13,9 +13,9 @@ found: 2026-11-19
 found-at: 6e68cb60b626d421113f6d7d7f35c2a46bbc3b46
 scorecard: 2026-11-19_0602.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: reliable-reaudit
+closed-by: 2026-11-19_1633.md
 ---
 # AF-0890 - --ssl together with --ftp-ssl-control never prints curl's 'Warning: --ssl overrides --ftp-ssl-control' (or the reverse) line
 
@@ -43,6 +43,9 @@ Warning: --ssl overrides --ftp-ssl-control
 
 ## Re-audits
 
+- 2026-11-19 | 2026-11-19_1633.md | reproduces: no | Ran the reproduction against Curl.Console/bin/Release/net10.0/curl.exe built from this commit (working directory the scratch folder). '--ftp-ssl-control --ssl http://127.0.0.1:9/' printed 'Warning: --ssl is an insecure option, consider --ssl-reqd instead' and 'Warning: --ssl overrides --ftp-ssl-control'; the reverse order printed 'Warning: --ftp-ssl-control overrides --ssl'. Both match curl 8.22.0 (x86_64-w64-mingw32) Schannel byte for byte.
+
 ## Log
 
 - 2026-11-19: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_1633.md: the reproduction no longer reproduces.
