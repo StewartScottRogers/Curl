@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib2412.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5624 — Fix AF-0909: Surviving mutant: the lib2412 port can trace without the time prefix
 
@@ -43,3 +43,4 @@ Killed by `Lib2308To2504Tests.Lib2412_TraceCallback_StartsEachLineWithTheTime` (
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 79c482fc 9742157d.
+- 2026-11-20: Doing -> Done. Killed by Lib2412_TraceCallback_StartsEachLineWithTheTime
