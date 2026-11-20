@@ -21,27 +21,42 @@ internal static class CurlRequestOptions
     /// <returns>The options to perform the request with.</returns>
     public static EasyOptions Apply(EasyOptions options, CurlRequest request, HeaderCallback header, WriteCallback write, ICurlEngine engine, ICollection<IDisposable> owned)
     {
-        bool post = request.Body is not null || request.Method == HttpMethod.Post;
+        bool upload = request.Body is not null && UploadSchemes.UploadsWithBody(request.Url);
+        bool post = !upload && (request.Body is not null || request.Method == HttpMethod.Post);
         EasyOptions applied = options with
         {
             Network = options.Network with { Url = request.Url },
-            Transfer = ApplyMethod(options.Transfer, request.Method, post),
-            Http = options.Http with { HttpHeaders = [.. request.Headers.Select(HeaderLine), .. request.RemovedHeaders.Select(name => $"{name}:")], Post = post },
+            Transfer = ApplyMethod(options.Transfer, request.Method, post, upload),
+            Http = options.Http with { HttpHeaders = HeaderLines(request), Post = post },
             Callbacks = options.Callbacks with { Header = header, Write = write },
         };
-        return post ? (request.Body ?? CurlContent.Empty).ApplyTo(applied, engine, owned) : applied;
+        return ApplyBody(applied, BodyToApply(request, post, upload), upload, engine, owned);
     }
+
+    /// <summary>The <c>CURLOPT_HTTPHEADER</c> lines of the request: its fields, then an empty line for each removed header.</summary>
+    private static string[] HeaderLines(CurlRequest request) =>
+        [.. request.Headers.Select(HeaderLine), .. request.RemovedHeaders.Select(name => $"{name}:")];
+
+    /// <summary>The body to apply: the request's, an empty one for a post with none, or <see langword="null"/> for none.</summary>
+    private static CurlContent? BodyToApply(CurlRequest request, bool post, bool upload) =>
+        upload ? request.Body : post ? request.Body ?? CurlContent.Empty : null;
+
+    /// <summary><paramref name="options"/> with <paramref name="body"/> applied as an upload or as a post body, or unchanged for no body.</summary>
+    private static EasyOptions ApplyBody(EasyOptions options, CurlContent? body, bool upload, ICurlEngine engine, ICollection<IDisposable> owned) =>
+        body is null ? options : upload ? body.ApplyAsUpload(options, engine, owned) : body.ApplyTo(options, engine, owned);
 
     /// <summary>Sets <c>CURLOPT_NOBODY</c> for <c>HEAD</c> and <c>CURLOPT_CUSTOMREQUEST</c> only for a method libcurl would not send on its own.</summary>
     /// <param name="transfer">The transfer options to change.</param>
     /// <param name="method">The request method.</param>
     /// <param name="post">Whether the request posts.</param>
+    /// <param name="upload">Whether the request uploads its body (ADR-1314).</param>
     /// <returns>The changed options.</returns>
-    private static EasyTransferOptions ApplyMethod(EasyTransferOptions transfer, HttpMethod method, bool post) =>
+    private static EasyTransferOptions ApplyMethod(EasyTransferOptions transfer, HttpMethod method, bool post, bool upload) =>
         transfer with
         {
             NoBody = method == HttpMethod.Head,
-            CustomRequest = IsImpliedBy(method, post) ? null : method.Method,
+            Upload = upload || transfer.Upload,
+            CustomRequest = upload || IsImpliedBy(method, post) ? null : method.Method,
         };
 
     /// <summary>

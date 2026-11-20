@@ -1357,3 +1357,4 @@ Each option and the specific reason it lost.
 | [1313](ADR-1313-alt-svc-with-no-version-option-stays-on-the-origin-for-h2-and-h3-on-windows.md) | With no version option, alt-svc ignores h2 and h3 entries on Windows (BL-5574) | Accepted | 2026-11-19 |
 | [1314](ADR-1314-ldaps-cacert-on-windows-follows-curl-winldap-no-change.md) | ldaps:// --cacert on Windows already follows curl's WinLDAP, so nothing changes (BL-5595) | Accepted | 2026-11-20 |
 | [1315](ADR-1315-an-s3-url-sends-its-query-string-and-a-prefix-parameter-extends-the-path-prefix.md) | An s3:// URL sends its query string, and a prefix parameter extends the path prefix (BL-5607) | Accepted | 2026-11-20 |
+| [1314](ADR-1314-a-curl-api-body-on-a-non-http-upload-scheme-uploads-as-curl-t-does.md) | A Curl.Api body on a non-HTTP upload scheme uploads, as `curl -T` does (BL-5594) | Accepted | 2026-11-20 |

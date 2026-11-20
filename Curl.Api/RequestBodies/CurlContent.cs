@@ -87,4 +87,24 @@ public abstract class CurlContent
     /// <param name="owned">Takes every handle the body creates, to dispose when the request ends.</param>
     /// <returns>The options to perform the request with.</returns>
     internal abstract EasyOptions ApplyTo(EasyOptions options, ICurlEngine engine, ICollection<IDisposable> owned);
+
+    /// <summary>
+    /// <paramref name="options"/> with this content set as the source of an upload (<c>CURLOPT_UPLOAD</c>,
+    /// ADR-1314), as <c>curl -T</c> does for a non-HTTP scheme. Content that cannot be read as a plain
+    /// upload (a multipart body) is sent as it is for a posting request.
+    /// </summary>
+    /// <param name="options">The options, with <c>CURLOPT_UPLOAD</c> already set.</param>
+    /// <param name="engine">The engine performing the request, whose handles a body may create.</param>
+    /// <param name="owned">Takes every handle the body creates, to dispose when the request ends.</param>
+    /// <returns>The options to perform the request with.</returns>
+    internal virtual EasyOptions ApplyAsUpload(EasyOptions options, ICurlEngine engine, ICollection<IDisposable> owned) =>
+        ApplyTo(options with { Transfer = options.Transfer with { Upload = false }, Http = options.Http with { Post = true } }, engine, owned);
+
+    /// <summary>The options with the read and seek callbacks of <paramref name="upload"/> and its <paramref name="size"/> as the upload size.</summary>
+    private protected static EasyOptions WithUpload(EasyOptions options, StreamUpload upload, long size) =>
+        options with
+        {
+            Transfer = options.Transfer with { Upload = true, InFileSize = size, CustomRequest = null },
+            Callbacks = options.Callbacks with { Read = upload.Read, Seek = upload.Seek },
+        };
 }

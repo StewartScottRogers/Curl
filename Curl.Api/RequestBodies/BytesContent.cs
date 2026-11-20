@@ -12,4 +12,10 @@ internal sealed class BytesContent(ReadOnlyMemory<byte> bytes) : CurlContent
 
     internal override EasyOptions ApplyTo(EasyOptions options, ICurlEngine engine, ICollection<IDisposable> owned) =>
         options with { Http = options.Http with { PostFields = bytes, PostFieldSize = bytes.Length } };
+
+    internal override EasyOptions ApplyAsUpload(EasyOptions options, ICurlEngine engine, ICollection<IDisposable> owned)
+    {
+        (StreamUpload upload, long size) = StreamUpload.FromPosition(new MemoryStream(bytes.ToArray(), writable: false), null);
+        return WithUpload(options, upload, size);
+    }
 }
