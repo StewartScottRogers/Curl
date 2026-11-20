@@ -85,7 +85,18 @@ public sealed class Cgr145Tests
         ConnectResult result = await connector.ConnectAsync(TargetOf(listener), CancellationToken.None);
 
         Assert.AreEqual(CurlExitCode.AbortedByCallback, result.ExitCode);
-        Assert.IsFalse(listener.Poll(100_000, SelectMode.SelectRead), "the listener has a connection waiting");
+        using CancellationTokenSource acceptWindow = new(TimeSpan.FromMilliseconds(100));
+        bool connectionWaiting = true;
+        try
+        {
+            using Socket accepted = await listener.AcceptAsync(acceptWindow.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            connectionWaiting = false;
+        }
+
+        Assert.IsFalse(connectionWaiting, "the listener has a connection waiting");
         CollectionAssert.AreEqual(seen, closed);
         Assert.AreNotEqual((nint)1, seen.Single());
     }
