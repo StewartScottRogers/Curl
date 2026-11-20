@@ -4,8 +4,8 @@ title: Drop a header from the curl-mcp transfer tool when its value is empty, as
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Mcp.UnitLibrary/McpTransferHeader.cs]
+depends-on: [BL-5596]
+touches: [Curl.Mcp.UnitLibrary/McpTransferHeader.cs, Curl.Mcp.UnitLibrary/McpTransferOptions.cs, Curl.Mcp.UnitTests/McpTransferOptionsTests.cs, Curl.Mcp/Tools/TransferMcpTool.cs, Curl.Mcp.UnitTests/Tools/TransferMcpToolTests.cs, Curl.Mcp.Protocol.UnitTests/Tools/GoldenToolsResponses.cs]
 requirement: none
 created: 2026-11-20
 completed:
@@ -30,7 +30,10 @@ An empty `Accept` value in the `transfer` tool sends `Accept:` with an empty val
 
 ## Notes
 
+Reproduced by reading: McpTransferOptions.HeaderLine (line 71) turns an empty value into "Name;" (sent empty). Plan: empty value -> "Name:" (removes); add optional bool SendEmpty on McpTransferHeader (default false) -> "Name;"; update the tool description in TransferMcpTool.cs, its two golden copies (GoldenToolsResponses.cs, TransferMcpToolTests.cs) and the test Build_HeaderValues_AreTrimmedAndAnEmptyOneUsesTheSemicolonForm; add a request-bytes test. Needs McpTransferOptions.cs, which BL-5596 (Doing) holds, so requeued with depends-on BL-5596; touches widened accordingly.
+
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (2203 #7).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: b0a4577d 9756089e 3d836d5e.
+- 2026-11-20: Doing -> Backlog. Needs McpTransferOptions.cs held by BL-5596 (Doing); depends-on BL-5596
