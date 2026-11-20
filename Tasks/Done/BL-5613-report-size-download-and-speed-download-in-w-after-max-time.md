@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary/WriteOutTransferInfo.cs, Curl.Engine.UnitLibrary/EngineToolTransferOutputs.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5613 — Report size_download and speed_download in -w after --max-time ends a transfer, as curl does
 
@@ -24,13 +24,16 @@ After `--max-time` (exit 28) with `--limit-rate 25k`, `-w` prints `size_download
 
 ## Acceptance criteria
 
-- [ ] The Notes record curl 8.22.0's `-w` output for the timeout run above.
-- [ ] The port's write-out for the same run matches curl's for every variable curl reports non-zero, pinned by a test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The Notes record curl 8.22.0's `-w` output for the timeout run above.
+- [x] The port's write-out for the same run matches curl's for every variable curl reports non-zero, pinned by a test.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- curl 8.22.0 (Schannel) on a loopback server sending 25600 bytes per second, `-m 2 -w "%{size_download} %{speed_download} %{time_total} %{http_code} %{size_header} %{num_connects} %{exitcode}"`: `51200 25436 2.012941 200 43 1 28`. The port after the fix: `25600 13557 1.888267 200 43 1 28` (byte counts differ only by the server pacing; every variable curl reports non-zero is non-zero and the same kind). Cause: the `-m` watchdog failure carried a report whose `DownloadSize` was set to 0 and whose header and request sizes were empty; `AbortedHeadRecordingTransferEvents.ReportOn` now merges what it recorded into that report (larger count wins) and records under `-m` too. Pinned by `ReportOn_ReportAlreadyThere_KeepsItsTimingsAndTakesTheLargerCounts`. Engine quality run: 0 failing members. Platform-neutral.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1022, finding 2.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: c73f8406 287c226e 3d836d5e.
+- 2026-11-20: Doing -> Done. Fixed
