@@ -136,6 +136,23 @@ public sealed class SignalRKeepAliveTests
     }
 
     [TestMethod]
+    public async Task PingWriteFailsBeforeTheServersCloseIsDecoded_DoesNotChangeTheExitCode_HubProtocolPing()
+    {
+        var clock = new ManualTimeProvider();
+        var hub = new BlockingConnection(Encoding.Latin1.GetBytes(Upgraded), Frame("{}\u001e"));
+        Task<TransferResult> run = Start(clock, hub);
+        await WaitUntil(() => clock.PendingTimers == 1);
+        hub.HoldNextWrite();
+        clock.Advance(TimeSpan.FromSeconds(15));
+        await WaitUntil(() => hub.IsHoldingAWrite);
+        hub.ReleaseHeldWriteWithFailure();
+        await Task.Delay(50);
+        hub.Give([0x88, 0x02, 0x03, 0xE8]);
+
+        Assert.AreEqual(CurlExitCode.Ok, (await run).ExitCode);
+    }
+
+    [TestMethod]
     public async Task ReadLoopFailsWhileAPingWriteIsBlocked_WaitsForThePingThenReportsTheReadFailure_HubProtocolPing()
     {
         var clock = new ManualTimeProvider();

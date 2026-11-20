@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SignalR.UnitLibrary/Client/SignalRHubSession.cs, Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRKeepAliveTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5577 — SignalR keep-alive Ping that fails before the server's Close is decoded must not fail a finished transfer
 
@@ -28,14 +28,17 @@ Fix direction: decide the Ping failure's fate after the read loop ends. When `re
 
 ## Acceptance criteria
 
-- [ ] A new test in `Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRKeepAliveTests.cs` fails a held Ping write with an `IOException` *before* giving the server's Close frame, then gives the Close, and asserts exit code `Ok`; it fails on the code before the fix.
-- [ ] A Ping write that fails while the hub stays open, with the read loop then ending without a server Close, still fails the transfer (the existing `RecvError` keep-alive test still passes).
-- [ ] The comments in `RunAsync` and `TrySendPingAsync` say when a Ping failure is ignored.
-- [ ] `dotnet build` is clean and the fast tests pass; `Curl.Extended.Protocol.SignalR.UnitLibrary` keeps 100% line and branch coverage.
+- [x] A new test in `Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRKeepAliveTests.cs` fails a held Ping write with an `IOException` *before* giving the server's Close frame, then gives the Close, and asserts exit code `Ok`; it fails on the code before the fix.
+- [x] A Ping write that fails while the hub stays open, with the read loop then ending without a server Close, still fails the transfer (the existing `RecvError` keep-alive test still passes).
+- [x] The comments in `RunAsync` and `TrySendPingAsync` say when a Ping failure is ignored.
+- [x] `dotnet build` is clean and the fast tests pass; `Curl.Extended.Protocol.SignalR.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+Ping failure fate is now decided in RunAsync after the read loop ends (AwaitPingingAsync); TrySendPingAsync no longer catches. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 3d5183df 5a0fff3c 4e85d062 cd3374e2.
+- 2026-11-19: Doing -> Done. Ping failure decided after read loop
