@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/TransferCallbackMarshal.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5589 — Fix AF-0901: Surviving mutant: a marshalled read callback that fills the whole buffer can upload nothing
 
@@ -43,3 +43,4 @@ Production code was already right (`count <= filled.Length`); the mutant survive
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: cce9bcd4 9742157d.
+- 2026-11-19: Doing -> Done. Added full-buffer read test in TransferCallbackMarshalTests; production code already correct
