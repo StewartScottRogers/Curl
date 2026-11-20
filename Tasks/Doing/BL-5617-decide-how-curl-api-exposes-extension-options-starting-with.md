@@ -34,3 +34,4 @@ From Surly cookbook bug report `2026-11-20T1022-Curl-bug-report.md` (batch 4 of 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1022, finding 6.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 7aea9493 06b41d08 e874a8d3 06f9b39f.
