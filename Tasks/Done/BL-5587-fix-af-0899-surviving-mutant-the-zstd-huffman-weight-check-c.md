@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Zstandard.UnitLibrary/ZstandardHuffmanTable.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5587 — Fix AF-0899: Surviving mutant: the zstd Huffman weight check can accept trees libzstd refuses as corrupt
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] A fast test fails on the code as the evidence above describes it and passes after the fix; Notes name the test.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A fast test fails on the code as the evidence above describes it and passes after the fix; Notes name the test.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Tests (ZstandardHuffmanTableTests): Read_SingleWeightTwoCompletedToTwoTwo_IsRefusedForWantingTwoWeightOneSymbols fails under the mutant (accepts [2,2]); Read_SingleWeightOneCompletedToOneOne_IsAcceptedAsATwoSymbolTree fails under the mutant (refuses [1,1]). No production change was needed: the code already was correct, only untested. Zstandard fast tests: 341 pass.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: cce9bcd4 9742157d.
+- 2026-11-19: Doing -> Done. Mutant-killing tests added

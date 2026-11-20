@@ -71,6 +71,25 @@ public sealed class ZstandardHuffmanTableTests
     }
 
     [TestMethod]
+    public void Read_SingleWeightTwoCompletedToTwoTwo_IsRefusedForWantingTwoWeightOneSymbols()
+    {
+        // Header 128: one direct weight, 2; the implied last weight is 2, so no symbol has weight 1.
+        var table = ZstandardHuffmanTable.Read([0x80, 0x20], out _);
+
+        Assert.IsNull(table);
+    }
+
+    [TestMethod]
+    public void Read_SingleWeightOneCompletedToOneOne_IsAcceptedAsATwoSymbolTree()
+    {
+        // Header 128: one direct weight, 1; the implied last weight is 1: two weight-1 symbols.
+        var table = ZstandardHuffmanTable.Read([0x80, 0x10], out _);
+
+        Assert.IsNotNull(table);
+        Assert.AreEqual(1, table.MaxNumberOfBits);
+    }
+
+    [TestMethod]
     public void Read_EmptySource_IsNull()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
