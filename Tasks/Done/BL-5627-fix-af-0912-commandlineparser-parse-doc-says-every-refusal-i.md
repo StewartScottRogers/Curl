@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineParser.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5627 — Fix AF-0912: CommandLineParser.Parse doc says every refusal is exit 2 except -d @file, but --proto-default refuses with 1 and --url @file and -K with 26
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Doc-only fix: all three Parse overloads now name the ReadError (-d @file, --url @file, -K) and UnsupportedProtocol (--proto-default) refusals. Build clean, Cli tests green.
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-20: Doing -> Done. Parse docs name every refusal exit code
