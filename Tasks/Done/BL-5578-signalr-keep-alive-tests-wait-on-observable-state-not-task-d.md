@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRKeepAliveTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5578 — SignalR keep-alive tests wait on observable state, not Task.Delay(50)
 
@@ -26,14 +26,17 @@ Found by the shift-end review of 2026-11-19 (code-reviewer) on the BL-5575 chang
 
 ## Acceptance criteria
 
-- [ ] None of the three tests above uses `Task.Delay` for ordering; each waits (e.g. with the file's `WaitUntil`) on an observable fact - the Close frame consumed, a second write pending at the semaphore, the read failure observed.
-- [ ] `PingQueuedBehindTheServersCloseAnswer_...` provably reaches the drop branch: it fails if `SendTextUnlessClosingAsync` writes instead of dropping (check by temporarily removing the `dropOnceClosing` guard).
-- [ ] The three tests pass 50 runs in a row (`dotnet test --filter "FullyQualifiedName~SignalRKeepAliveTests"` in a loop).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] None of the three tests above uses `Task.Delay` for ordering; each waits (e.g. with the file's `WaitUntil`) on an observable fact - the Close frame consumed, a second write pending at the semaphore, the read failure observed.
+- [x] `PingQueuedBehindTheServersCloseAnswer_...` provably reaches the drop branch: it fails if `SendTextUnlessClosingAsync` writes instead of dropping (check by temporarily removing the `dropOnceClosing` guard).
+- [x] The three tests pass 50 runs in a row (`dotnet test --filter "FullyQualifiedName~SignalRKeepAliveTests"` in a loop).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Ordering now waits on facts the fakes expose: `ReadsConsumed` (the frame was taken by the read loop) and `TimestampReads` (the Ping loop woke and goes straight to the send semaphore). Removing the `dropOnceClosing` guard makes the queued-Ping test fail (measured). 50 consecutive runs of SignalRKeepAliveTests passed; fast tests of the project green. The consumed-read wait is a few synchronous instructions short of CloseReceived being set, which BL-5577 makes outcome-neutral.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 86b1b245 d9972899 bdbfa6df 3d836d5e.
+- 2026-11-19: Doing -> Done. Keep-alive tests wait on observable state; guard-removal mutation fails the queued-Ping test; 50 runs green
