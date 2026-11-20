@@ -61,9 +61,22 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
         // Rethrows the read loop's failure, which is then the transfer's; otherwise a Ping that failed to write while
         // the hub was open fails the transfer here.
         await reading;
-        await pinging;
+        await AwaitPingingAsync(pinging);
         await session.CloseAsync(cancellationToken);
         return bytesWritten;
+    }
+
+    // A Ping write that failed is ignored only when the read loop ended through the server's Close: the hub finished the
+    // transfer and went away, possibly while its Close was still unread when the write failed. Otherwise it is an error.
+    private async Task AwaitPingingAsync(Task pinging)
+    {
+        try
+        {
+            await pinging;
+        }
+        catch (IOException) when (session.CloseReceived)
+        {
+        }
     }
 
     // Sends a record and notes the time, so the keep-alive Ping waits a full interval after any send.
@@ -114,20 +127,13 @@ internal sealed class SignalRHubSession(SignalRWebSocketSession session, byte[]?
         await Task.WhenAny(pinging);
     }
 
-    // Writes a Ping unless the Close handshake has begun; gives false when the keep-alive loop should end. A write that
-    // fails once the server's Close has arrived is the hub going away after a finished transfer, so it is not an error.
+    // Writes a Ping unless the Close handshake has begun; gives false when the keep-alive loop should end. A failed write
+    // faults the Ping task; RunAsync decides after the read loop ends whether that is an error (AwaitPingingAsync).
     private async Task<bool> TrySendPingAsync(CancellationToken abort)
     {
-        try
-        {
-            bool written = await session.SendTextUnlessClosingAsync(HubMessageWriter.WritePing(), abort);
-            Volatile.Write(ref lastSentAt, timeProvider.GetTimestamp());
-            return written;
-        }
-        catch (IOException) when (session.CloseReceived)
-        {
-            return false;
-        }
+        bool written = await session.SendTextUnlessClosingAsync(HubMessageWriter.WritePing(), abort);
+        Volatile.Write(ref lastSentAt, timeProvider.GetTimestamp());
+        return written;
     }
 
     private static string CallArray(InvocationMessage invocation)

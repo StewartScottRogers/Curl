@@ -110,8 +110,11 @@ public sealed class SignalRKeepAliveTests
         hub.HoldNextWrite();
         hub.Give([0x88, 0x02, 0x03, 0xE8]);
         await WaitUntil(() => hub.IsHoldingAWrite);
+        int timestampReadsBefore = clock.TimestampReads;
         clock.Advance(TimeSpan.FromSeconds(15));
-        await Task.Delay(50);
+
+        // The Ping loop reads the clock when its idle wait ends, then goes straight to the send semaphore without yielding.
+        await WaitUntil(() => clock.TimestampReads > timestampReadsBefore);
         hub.ReleaseHeldWrite();
 
         Assert.AreEqual(CurlExitCode.Ok, (await run).ExitCode);
@@ -128,9 +131,27 @@ public sealed class SignalRKeepAliveTests
         hub.HoldNextWrite();
         clock.Advance(TimeSpan.FromSeconds(15));
         await WaitUntil(() => hub.IsHoldingAWrite);
+        int readsBefore = hub.ReadsConsumed;
         hub.Give([0x88, 0x02, 0x03, 0xE8]);
-        await Task.Delay(50);
+        await WaitUntil(() => hub.ReadsConsumed > readsBefore);
         hub.ReleaseHeldWriteWithFailure();
+
+        Assert.AreEqual(CurlExitCode.Ok, (await run).ExitCode);
+    }
+
+    [TestMethod]
+    public async Task PingWriteFailsBeforeTheServersCloseIsDecoded_DoesNotChangeTheExitCode_HubProtocolPing()
+    {
+        var clock = new ManualTimeProvider();
+        var hub = new BlockingConnection(Encoding.Latin1.GetBytes(Upgraded), Frame("{}\u001e"));
+        Task<TransferResult> run = Start(clock, hub);
+        await WaitUntil(() => clock.PendingTimers == 1);
+        hub.HoldNextWrite();
+        clock.Advance(TimeSpan.FromSeconds(15));
+        await WaitUntil(() => hub.IsHoldingAWrite);
+        hub.ReleaseHeldWriteWithFailure();
+        await Task.Delay(50);
+        hub.Give([0x88, 0x02, 0x03, 0xE8]);
 
         Assert.AreEqual(CurlExitCode.Ok, (await run).ExitCode);
     }
@@ -146,8 +167,9 @@ public sealed class SignalRKeepAliveTests
         clock.Advance(TimeSpan.FromSeconds(15));
         await WaitUntil(() => hub.IsHoldingAWrite);
 
+        int readsBefore = hub.ReadsConsumed;
         hub.Give(Frame("not json\u001e"));
-        await Task.Delay(50);
+        await WaitUntil(() => hub.ReadsConsumed > readsBefore);
         Assert.IsFalse(run.IsCompleted);
         hub.ReleaseHeldWriteWithFailure();
 
@@ -230,10 +252,13 @@ public sealed class SignalRKeepAliveTests
             }
 
             next.CopyTo(buffer);
+            Interlocked.Increment(ref readsConsumed);
             return next.Length;
         }
 
         public bool IsHoldingAWrite => Volatile.Read(ref holding) == 1;
+
+        public int ReadsConsumed => Volatile.Read(ref readsConsumed);
 
         public int FailedWrites => Volatile.Read(ref failedWrites);
 
@@ -275,6 +300,8 @@ public sealed class SignalRKeepAliveTests
 
         private int failedWrites;
 
+        private int readsConsumed;
+
         public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -286,6 +313,8 @@ public sealed class SignalRKeepAliveTests
         private readonly List<ManualTimer> timers = [];
 
         private long now;
+
+        private int timestampReads;
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
@@ -300,7 +329,13 @@ public sealed class SignalRKeepAliveTests
             }
         }
 
-        public override long GetTimestamp() => Interlocked.Read(ref now);
+        public int TimestampReads => Volatile.Read(ref timestampReads);
+
+        public override long GetTimestamp()
+        {
+            Interlocked.Increment(ref timestampReads);
+            return Interlocked.Read(ref now);
+        }
 
         public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
