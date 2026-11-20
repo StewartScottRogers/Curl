@@ -459,10 +459,10 @@ public sealed class CurlCommandRunnerRetryTests
 
         Diagnostics.Assert("exit code", 0, exitCode);
         Diagnostics.Diff("stdout", "hello", StandardOutputText);
-        Diagnostics.Assert("waits (ms)", "1000, 1000", WaitsText);
+        Diagnostics.Assert("waits (ms)", "1000, 1000, 500", WaitsText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hello", StandardOutputText);
-        CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1) }, clock.Waits.ToArray());
+        CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(500) }, clock.Waits.ToArray());
     }
 
     [TestMethod]
