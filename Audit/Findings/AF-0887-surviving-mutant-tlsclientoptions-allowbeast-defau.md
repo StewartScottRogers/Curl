@@ -3,8 +3,8 @@ id: AF-0887
 title: Surviving mutant: TlsClientOptions' AllowBeast default can flip to true without a test noticing
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_1633.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/TlsClientOptions.cs:TlsClientOptions-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TlsClientOptions.cs:232:false
 task: BL-5558
@@ -13,9 +13,9 @@ found: 2026-11-19
 found-at: 6e68cb60b626d421113f6d7d7f35c2a46bbc3b46
 scorecard: 2026-11-19_0602.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: mechanical
+closed-by: 2026-11-19_1633.md
 ---
 # AF-0887 - Surviving mutant: TlsClientOptions' AllowBeast default can flip to true without a test noticing
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-19 | 2026-11-19_1633.md | reproduces: no | Ran the -Site command: TlsClientOptions.cs:232 'bool AllowBeast = false,' -> 'true' at resolvedLine 232, outcome killed (killed=1, survived=0). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-19: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_1633.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
