@@ -66,11 +66,20 @@ public static class McpTransferOptions
     }
 
     /// <summary>
-    /// The <c>CURLOPT_HTTPHEADER</c> line for <paramref name="header" />: <c>Name: value</c>, or
-    /// <c>Name;</c> for an empty value, which libcurl sends as an empty header rather than removing it.
+    /// The <c>CURLOPT_HTTPHEADER</c> line for <paramref name="header" />: <c>Name: value</c>; for an empty
+    /// value <c>Name:</c>, which libcurl reads as removing the header, as <c>curl -H "Name:"</c> does, or
+    /// <c>Name;</c> when <see cref="McpTransferHeader.SendEmpty" /> asks for it sent empty.
     /// </summary>
-    private static string HeaderLine(McpTransferHeader header) =>
-        header.Value.Trim().Length == 0 ? $"{header.Name};" : $"{header.Name}: {header.Value.Trim()}";
+    private static string HeaderLine(McpTransferHeader header)
+    {
+        string value = header.Value.Trim();
+        if (value.Length != 0)
+        {
+            return $"{header.Name}: {value}";
+        }
+
+        return header.SendEmpty ? $"{header.Name};" : $"{header.Name}:";
+    }
 
     /// <summary>
     /// Turns off peer and host verification for an insecure request, as <c>curl -k</c> does, sets the
