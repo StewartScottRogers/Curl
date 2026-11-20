@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SignalR.UnitTests/Client/SignalRKeepAliveTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5580 — SignalR keep-alive test waits for the Ping write to fail before giving the server's Close, not Task.Delay(50)
 
@@ -24,13 +24,16 @@ The held write in `BlockingConnection` fails through `release.TrySetException`, 
 
 ## Acceptance criteria
 
-- [ ] The test has no `Task.Delay` and waits through `WaitUntil` on observable fake state showing that the held Ping write has thrown before `hub.Give` sends the Close frame.
-- [ ] Reverting `SignalRHubSession.AwaitPingingAsync` to a plain `await pinging` makes the test fail every run (check locally, then restore).
-- [ ] `dotnet test Curl.Extended.Protocol.SignalR.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The test has no `Task.Delay` and waits through `WaitUntil` on observable fake state showing that the held Ping write has thrown before `hub.Give` sends the Close frame.
+- [x] Reverting `SignalRHubSession.AwaitPingingAsync` to a plain `await pinging` makes the test fail every run (check locally, then restore).
+- [x] `dotnet test Curl.Extended.Protocol.SignalR.UnitTests --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- `BlockingConnection` counts held writes that threw (`HeldWritesThatThrew`); the test waits on it with `WaitUntil` before `hub.Give`. Checked: with `AwaitPingingAsync`'s filter disabled the test failed on 2 of 2 runs; restored. Fast tests: 167 passed. No production code changed.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 7550eea5 10d68653 cf3158a8.
+- 2026-11-19: Doing -> Done. Test waits on HeldWritesThatThrew, no Task.Delay
