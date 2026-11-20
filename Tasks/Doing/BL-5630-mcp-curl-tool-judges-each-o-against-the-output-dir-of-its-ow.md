@@ -38,3 +38,4 @@ Failures:
 ## Log
 
 - 2026-11-20: Created.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: b109abfd 1365623a f8e567c5 3d836d5e.
