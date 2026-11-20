@@ -3,12 +3,12 @@ id: AF-0901
 title: Surviving mutant: a marshalled read callback that fills the whole buffer can upload nothing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/TransferCallbackMarshal.cs:ReadThrough-le:surviving-mutant
 reproduction: none
-task: none
-tasks:
+task: BL-5589
+tasks: BL-5589
 found: 2026-11-19
 found-at: 8469990748da6c83b0388ea33dec77d81d9255ae
 scorecard: 2026-11-19_1633.md

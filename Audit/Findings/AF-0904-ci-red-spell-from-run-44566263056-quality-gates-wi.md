@@ -3,12 +3,12 @@ id: AF-0904
 title: CI red spell from run 44566263056 (Quality gates, Windows) was first traced 3h27m after the run ended; no coordinator ran in between
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: process:logs:ci-spell-44566263056:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-5592
+tasks: BL-5592
 found: 2026-11-19
 found-at: 8469990748da6c83b0388ea33dec77d81d9255ae
 scorecard: 2026-11-19_1633.md

@@ -3,12 +3,12 @@ id: AF-0895
 title: RunAsync_FormFileThatCannotBeOpened_Exits26WithoutConnecting asserts exit 25
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Console.UnitTests/CurlCommandRunnerFormTests.cs:RunAsync_FormFileThatCannotBeOpened_Exits26WithoutConnecting:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-5583
+tasks: BL-5583
 found: 2026-11-19
 found-at: 8469990748da6c83b0388ea33dec77d81d9255ae
 scorecard: 2026-11-19_1633.md

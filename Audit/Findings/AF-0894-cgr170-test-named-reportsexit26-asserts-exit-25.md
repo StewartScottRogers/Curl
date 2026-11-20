@@ -3,12 +3,12 @@ id: AF-0894
 title: Cgr170 test named ReportsExit26 asserts exit 25
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Console.UnitTests/Cgr170Tests.cs:RunAsync_UnreadableUploadFilePastTheFirstBatch_ReportsExit26WhateverFailedBeforeAndStartsNothingMore:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-5582
+tasks: BL-5582
 found: 2026-11-19
 found-at: 8469990748da6c83b0388ea33dec77d81d9255ae
 scorecard: 2026-11-19_1633.md

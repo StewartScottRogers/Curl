@@ -3,12 +3,12 @@ id: AF-0900
 title: Surviving mutant: the Huffman table build can skip the top weight's rank start
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Zstandard.UnitLibrary/ZstandardHuffmanTable.cs:Build-le:surviving-mutant
 reproduction: none
-task: none
-tasks:
+task: BL-5588
+tasks: BL-5588
 found: 2026-11-19
 found-at: 8469990748da6c83b0388ea33dec77d81d9255ae
 scorecard: 2026-11-19_1633.md

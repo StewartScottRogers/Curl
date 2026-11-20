@@ -3,12 +3,12 @@ id: AF-0903
 title: Surviving mutant: the differential WebSocket frame builder can encode a 126-byte payload in the short form
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.Differential.UnitLibrary/Libcurl/WebSocket/LibcurlWebSocketFrames.cs:Frame-lt:surviving-mutant
 reproduction: none
-task: none
-tasks:
+task: BL-5591
+tasks: BL-5591
 found: 2026-11-19
 found-at: 8469990748da6c83b0388ea33dec77d81d9255ae
 scorecard: 2026-11-19_1633.md

@@ -3,12 +3,12 @@ id: AF-0898
 title: ApplyTo_NoVersionOptionOffWindows_UsesAnH2Entry checks only that some route exists
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitTests/AltSvcTransferCacheH3SwitchTests.cs:ApplyTo_NoVersionOptionOffWindows_UsesAnH2Entry:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5586
+tasks: BL-5586
 found: 2026-11-19
 found-at: 8469990748da6c83b0388ea33dec77d81d9255ae
 scorecard: 2026-11-19_1633.md

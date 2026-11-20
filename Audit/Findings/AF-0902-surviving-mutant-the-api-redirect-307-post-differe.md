@@ -3,12 +3,12 @@ id: AF-0902
 title: Surviving mutant: the api-redirect-307-post differential case can stop following redirects
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.Differential.UnitLibrary/Api/ApiDifferentialCases.cs:All-true:surviving-mutant
 reproduction: none
-task: none
-tasks:
+task: BL-5590
+tasks: BL-5590
 found: 2026-11-19
 found-at: 8469990748da6c83b0388ea33dec77d81d9255ae
 scorecard: 2026-11-19_1633.md
