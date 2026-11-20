@@ -40,3 +40,4 @@ This is an audit path (ADR-0267): it changes only through the `audit` branch, by
 ## Log
 
 - 2026-11-20: Created from audits 20261119-163306 and 20261120-045659, where a mutant run that outlived its timeout crashed or hung the quality auditor.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 8f9cdfac 8f64067d 794478e6 55152244.
