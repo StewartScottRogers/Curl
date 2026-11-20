@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] A fast test fails on the code as the evidence above describes it and passes after the fix; Notes name the test.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A fast test fails on the code as the evidence above describes it and passes after the fix; Notes name the test.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Production code was already right (`count <= filled.Length`); the mutant survived for want of a test. Added `TransferCallbackMarshalTests.Over_ReadFillsTheWholeBuffer_CopiesEveryByteIntoTheTransfersBuffer`: a callback filling the whole buffer returns its length, and the test asserts every byte reached the transfer buffer, which fails under `count < filled.Length`. No production change, so no quality run.
 
 ## Log
 
