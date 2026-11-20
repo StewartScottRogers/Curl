@@ -1,4 +1,4 @@
-# ADR-1314: CoAP connects its UDP socket so an unbound port fails at once on every platform
+# ADR-1318: CoAP connects its UDP socket so an unbound port fails at once on every platform
 
 - Status: Accepted
 - Date: 2026-11-20

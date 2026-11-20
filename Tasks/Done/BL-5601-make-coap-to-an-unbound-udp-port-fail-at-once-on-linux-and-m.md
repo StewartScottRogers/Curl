@@ -30,7 +30,7 @@ On Windows it exits 7 at once; on Linux and macOS (found in the cookbook's CI) i
 
 ## Notes
 
-- The connect had to live outside `touches` (the channel is Networking's): added `IDatagramChannel.ConnectToServer()` (default no-op), implemented in `UdpDatagramChannel`, forwarded by `PortUnreachableReportingDatagramChannel`, called by `CoapProtocolHandler`. No other Doing task touched those files. ADR-1314. TFTP is not connected (its server answers from a new port).
+- The connect had to live outside `touches` (the channel is Networking's): added `IDatagramChannel.ConnectToServer()` (default no-op), implemented in `UdpDatagramChannel`, forwarded by `PortUnreachableReportingDatagramChannel`, called by `CoapProtocolHandler`. No other Doing task touched those files. ADR-1318. TFTP is not connected (its server answers from a new port).
 - Criterion 1 is pinned by an Integration test on a real loopback socket (`ReceiveAsync_ConnectedToAnUnboundPort_FailsAtOnceWithARefusalOnEveryPlatform`, accepts ConnectionRefused or ConnectionReset, 5 s limit) plus unit tests of the connect and its forwarding; exit 7 comes from the existing wrapper translation. Criterion 2: `ExecuteAsync_AServerAnsweringAfterOneRetransmission_...` with the injected clock. Linux and macOS: platform-neutral tests, not run here.
 - Measure-CodeQuality.ps1 for the three changed libraries was started but had not finished by the deadline; the change adds one branch and three trivial methods, each covered by a new test.
 
@@ -38,4 +38,4 @@ On Windows it exits 7 at once; on Linux and macOS (found in the cookbook's CI) i
 
 - 2026-11-20: Created from Surly bug reports (2203 #2).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: d923d35e 05828907 3d836d5e.
-- 2026-11-20: Doing -> Done. coap:// to an unbound port connects its UDP socket so the refusal surfaces on every platform (ADR-1314)
+- 2026-11-20: Doing -> Done. coap:// to an unbound port connects its UDP socket so the refusal surfaces on every platform (ADR-1318)
