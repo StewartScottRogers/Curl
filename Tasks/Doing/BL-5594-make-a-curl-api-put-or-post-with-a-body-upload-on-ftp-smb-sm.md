@@ -45,3 +45,4 @@ Decide the rule (ADR, decided by Claude under Stewart's delegation): for example
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (1942 #2, 2203 #1, 0553 #1-3).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: a7cb6ee7 c6adb168 56eba69e 375ee94d 3d836d5e.
