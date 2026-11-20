@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Kafka.Client;
 
-/// <summary>Checks the SCRAM-SHA-256 and SCRAM-SHA-512 logins against a scripted broker (ADR-1315).</summary>
+/// <summary>Checks the SCRAM-SHA-256 and SCRAM-SHA-512 logins against a scripted broker (ADR-1317).</summary>
 [TestClass]
 public sealed class KafkaScramHandlerTests
 {

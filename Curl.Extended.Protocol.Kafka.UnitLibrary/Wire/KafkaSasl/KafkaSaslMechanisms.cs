@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 
 namespace Curl.Extended.Protocol.Kafka.Wire.KafkaSasl;
 
-/// <summary>The SASL mechanisms the Kafka client speaks and how it picks one from what a broker offers (ADR-1315).</summary>
+/// <summary>The SASL mechanisms the Kafka client speaks and how it picks one from what a broker offers (ADR-1317).</summary>
 internal static class KafkaSaslMechanisms
 {
     /// <summary>RFC 4616 PLAIN, the mechanism the client tries first.</summary>

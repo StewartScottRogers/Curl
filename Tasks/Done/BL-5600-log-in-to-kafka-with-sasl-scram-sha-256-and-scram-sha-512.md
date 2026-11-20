@@ -31,7 +31,7 @@ The cookbook asked for SCRAM logins for mail and Kafka. Upstream curl has no SCR
 
 ## Notes
 
-- Decision (ADR-1315): the client names PLAIN first; when the broker refuses it and offers SCRAM, it reconnects with the strongest (SHA-512, then SHA-256). `--login-options` is not carried to extensions, so no flag. Wrong password: exit 67, `Kafka SASL SCRAM-SHA-256 authentication failed: ...`.
+- Decision (ADR-1317): the client names PLAIN first; when the broker refuses it and offers SCRAM, it reconnects with the strongest (SHA-512, then SHA-256). `--login-options` is not carried to extensions, so no flag. Wrong password: exit 67, `Kafka SASL SCRAM-SHA-256 authentication failed: ...`.
 - Vectors: RFC 7677 SHA-256 pinned; SHA-512 vector worked out by an independent PowerShell script over the same BCL primitives. Brokers are scripted doubles (SaslHandshake + SaslAuthenticate); no live broker.
 - `touches` widened to the Kafka test project, the Kafka library (client flow, handler, extension description) and one line pair in Conformance.Extended KafkaSaslTests (its refusal case offered SCRAM-SHA-256, now GSSAPI); no other Doing task names them. `--extended-help` carries the extension description, which now describes the logins; `--ai-help` has no Kafka text. The password is only hashed; no `-v` or log line carries it.
 - Quality run: Kafka library 100% line and branch, complexity max 10. Fast tests green for Kafka, Conformance.Extended and Composition.

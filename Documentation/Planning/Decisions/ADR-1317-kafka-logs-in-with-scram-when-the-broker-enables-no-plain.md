@@ -1,4 +1,4 @@
-# ADR-1315: Kafka logs in with SCRAM-SHA-512 or SCRAM-SHA-256 when the broker enables no PLAIN
+# ADR-1317: Kafka logs in with SCRAM-SHA-512 or SCRAM-SHA-256 when the broker enables no PLAIN
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-5600, Surly report 2026-11-19T1942 finding 5). Builds on ADR-1082.
 

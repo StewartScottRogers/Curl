@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 
 namespace Curl.Extended.Protocol.Kafka.Wire.KafkaSasl;
 
-/// <summary>Checks the choice of SCRAM mechanism, the SCRAM request and response bytes and the failure message (ADR-1315).</summary>
+/// <summary>Checks the choice of SCRAM mechanism, the SCRAM request and response bytes and the failure message (ADR-1317).</summary>
 [TestClass]
 public sealed class KafkaSaslMechanismTests
 {

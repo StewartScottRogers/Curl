@@ -26,7 +26,7 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
     internal long BytesWritten { get; private set; }
 
     /// <summary>
-    /// Authenticates with <paramref name="mechanism"/> (ADR-1082, ADR-1315): SaslHandshake v1 naming it, then SaslAuthenticate
+    /// Authenticates with <paramref name="mechanism"/> (ADR-1082, ADR-1317): SaslHandshake v1 naming it, then SaslAuthenticate
     /// v0 carrying the RFC 4616 PLAIN message, or the three SCRAM messages of RFC 5802 for SCRAM-SHA-256 and SCRAM-SHA-512. When
     /// the broker does not enable PLAIN but offers a SCRAM mechanism this gives the strongest one, for the caller to reconnect and
     /// try; it gives <see langword="null"/> once authenticated. Any other refusal ends with exit 67 and the broker's message.
