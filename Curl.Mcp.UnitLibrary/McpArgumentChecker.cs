@@ -36,9 +36,9 @@ public sealed class McpArgumentChecker
 
     private readonly McpConfinementRoot root;
 
-    private readonly string? outputDirectory;
-
     private readonly bool globAlternativesEscape;
+
+    private readonly bool recordsOnly;
 
     private readonly FrozenDictionary<string, McpExtensionOption> extensionOptionsByName;
 
@@ -52,13 +52,13 @@ public sealed class McpArgumentChecker
         extensionOptionsByName = (extensionOptions ?? []).ToFrozenDictionary(option => option.Name, StringComparer.Ordinal);
     }
 
-    /// <summary>The checker for one argument array that names <c>--output-dir</c>.</summary>
-    private McpArgumentChecker(McpConfinementRoot root, FrozenDictionary<string, McpExtensionOption> extensionOptionsByName, string? outputDirectory, bool globAlternativesEscape)
+    /// <summary>The checker for one argument array; <paramref name="recordsOnly" /> makes it only walk the arguments and record each <c>--next</c> group's <c>--output-dir</c>, judging no path.</summary>
+    private McpArgumentChecker(McpConfinementRoot root, FrozenDictionary<string, McpExtensionOption> extensionOptionsByName, bool globAlternativesEscape, bool recordsOnly)
     {
         this.globAlternativesEscape = globAlternativesEscape;
+        this.recordsOnly = recordsOnly;
         this.root = root;
         this.extensionOptionsByName = extensionOptionsByName;
-        this.outputDirectory = outputDirectory;
     }
 
     /// <summary>
@@ -72,35 +72,16 @@ public sealed class McpArgumentChecker
     public McpArgumentCheck Check(IReadOnlyList<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
-        string? directory = OutputDirectoryIn(arguments);
         bool escape = McpOptionValuePaths.AnyAlternativeEscapes(arguments);
-        McpArgumentChecker checker = directory is null && !escape ? this : new(root, extensionOptionsByName, directory, escape);
-        return checker.CheckArguments(new ArgumentCursor(arguments), 0);
-    }
-
-    /// <summary>The value of the last <c>--output-dir</c> in <paramref name="arguments" />, which curl joins before every <c>-o</c> name wherever it stands; <see langword="null" /> when none.</summary>
-    private static string? OutputDirectoryIn(IReadOnlyList<string> arguments)
-    {
-        string? directory = null;
-        for (int index = 0; index < arguments.Count && arguments[index] != EndOfOptions; index++)
+        ArgumentCursor recording = new(arguments, null);
+        McpArgumentCheck walked = new McpArgumentChecker(root, extensionOptionsByName, escape, recordsOnly: true).CheckArguments(recording, 0);
+        if (!walked.IsAllowed)
         {
-            directory = OutputDirectoryAt(arguments, ref index) ?? directory;
+            return walked;
         }
 
-        return directory;
-    }
-
-    /// <summary>The <c>--output-dir</c> value the argument at <paramref name="index" /> gives, moving <paramref name="index" /> past a separate value; <see langword="null" /> for any other argument.</summary>
-    private static string? OutputDirectoryAt(IReadOnlyList<string> arguments, ref int index)
-    {
-        const string Option = "--output-dir";
-        string argument = arguments[index] ?? string.Empty;
-        if (argument.StartsWith(Option + "=", StringComparison.Ordinal))
-        {
-            return argument[(Option.Length + 1)..];
-        }
-
-        return argument == Option && index + 1 < arguments.Count ? arguments[++index] : null;
+        McpArgumentChecker checker = new(root, extensionOptionsByName, escape, recordsOnly: false);
+        return checker.CheckArguments(new ArgumentCursor(arguments, recording.DirectoriesByGroup), 0);
     }
 
     /// <summary>Checks every argument the cursor still holds; <paramref name="configDepth" /> is how many <c>-K</c> files deep this array is (0 for the tool's own).</summary>
@@ -208,11 +189,11 @@ public sealed class McpArgumentChecker
 
         if (!row.TakesValue)
         {
-            return CheckFlag(written, row);
+            return CheckFlag(written, row, cursor);
         }
 
         string? value = attachedValue ?? cursor.TakeOrNull();
-        return value is null ? McpArgumentCheck.Allowed : CheckValue(written, row.LongName, value, configDepth, expanded);
+        return value is null ? McpArgumentCheck.Allowed : CheckValue(written, row.LongName, value, cursor, configDepth, expanded);
     }
 
     private McpArgumentCheck CheckShortBundle(string argument, ArgumentCursor cursor, int configDepth)
@@ -247,7 +228,7 @@ public sealed class McpArgumentChecker
             return CheckShortValue(written, row, argument[(letter + 1)..], cursor, configDepth);
         }
 
-        McpArgumentCheck flag = CheckFlag(written, row);
+        McpArgumentCheck flag = CheckFlag(written, row, cursor);
         return !flag.IsAllowed || row.EndsBundle ? flag : null;
     }
 
@@ -264,7 +245,7 @@ public sealed class McpArgumentChecker
         }
 
         string? value = restOfBundle.Length > 0 ? restOfBundle : cursor.TakeOrNull();
-        return value is null ? McpArgumentCheck.Allowed : CheckValue(written, row.LongName, value, configDepth, expanded: false);
+        return value is null ? McpArgumentCheck.Allowed : CheckValue(written, row.LongName, value, cursor, configDepth, expanded: false);
     }
 
     /// <summary>
@@ -272,8 +253,13 @@ public sealed class McpArgumentChecker
     /// (<c>-n</c> reads the home folder's <c>.netrc</c>), which lies outside the root's reach.
     /// <c>-O</c> and <c>-J</c> write into the working folder, which the <c>curl</c> tool sets to the root.
     /// </summary>
-    private static McpArgumentCheck CheckFlag(string written, CommandLineOption row)
+    private static McpArgumentCheck CheckFlag(string written, CommandLineOption row, ArgumentCursor cursor)
     {
+        if (row.LongName == "next")
+        {
+            cursor.StartNextGroup();
+        }
+
         return McpOptionPathTable.Classifications[row.LongName] == McpOptionPathUse.ReadsFile
             ? McpArgumentCheck.Refused(written, written, $"{written} reads a file it implies rather than names, outside {McpConfinementRoot.VariableName}.")
             : McpArgumentCheck.Allowed;
@@ -283,8 +269,18 @@ public sealed class McpArgumentChecker
     /// Checks the value of an option. <paramref name="expanded" /> is set for <c>--expand-</c>, whose
     /// <c>{{variable}}</c> references curl substitutes before use, so a path holding one is refused.
     /// </summary>
-    private McpArgumentCheck CheckValue(string written, string longName, string value, int configDepth, bool expanded)
+    private McpArgumentCheck CheckValue(string written, string longName, string value, ArgumentCursor cursor, int configDepth, bool expanded)
     {
+        if (longName == "output-dir")
+        {
+            cursor.RecordOutputDirectory(value);
+        }
+
+        if (recordsOnly)
+        {
+            return McpArgumentCheck.Allowed;
+        }
+
         McpOptionPathUse use = McpOptionPathTable.Classifications[longName];
         if (use == McpOptionPathUse.None)
         {
@@ -296,15 +292,15 @@ public sealed class McpArgumentChecker
             return McpArgumentCheck.Refused(written, value, $"{written} takes a value with {{{{variables}}}}, whose expanded path cannot be checked before curl runs.");
         }
 
-        return CheckPathValue(written, longName, use, value, configDepth);
+        return CheckPathValue(written, longName, use, value, cursor.OutputDirectory, configDepth);
     }
 
     /// <summary>A <c>-K</c> file and a <c>-w @file</c> template are read and checked; any other value's paths are checked as named.</summary>
-    private McpArgumentCheck CheckPathValue(string written, string longName, McpOptionPathUse use, string value, int configDepth)
+    private McpArgumentCheck CheckPathValue(string written, string longName, McpOptionPathUse use, string value, string? outputDirectory, int configDepth)
     {
         return longName switch
         {
-            "config" => CheckConfig(written, value, configDepth),
+            "config" => CheckConfig(written, value, outputDirectory, configDepth),
             "write-out" when value.StartsWith('@') => CheckWriteOutTemplate(written, value[1..]),
             _ => CheckPaths(written, McpOptionValuePaths.PathsIn(longName, use, value, outputDirectory, globAlternativesEscape)),
         };
@@ -375,7 +371,7 @@ public sealed class McpArgumentChecker
     /// A <c>-K</c> file must lie inside the root and be readable; its lines are then checked as
     /// options, a refusal naming the file and line. <c>-K -</c> reads standard input, which is not checked.
     /// </summary>
-    private McpArgumentCheck CheckConfig(string written, string value, int configDepth)
+    private McpArgumentCheck CheckConfig(string written, string value, string? outputDirectory, int configDepth)
     {
         if (value == "-")
         {
@@ -396,7 +392,7 @@ public sealed class McpArgumentChecker
         string? text = ReadCheckedFile(check.ResolvedPath!, out string failure);
         return text is null
             ? McpArgumentCheck.Refused(written, value, $"{written} '{value}' cannot be read: {failure}")
-            : CheckConfigLines(value, McpConfigFileSyntax.ReadLines(text), configDepth + 1);
+            : CheckConfigLines(value, McpConfigFileSyntax.ReadLines(text), outputDirectory, configDepth + 1);
     }
 
     /// <summary>Reads a file the root already allowed; <see langword="null" /> with the reason in <paramref name="failure" /> when it cannot be read.</summary>
@@ -415,11 +411,11 @@ public sealed class McpArgumentChecker
     }
 
     /// <summary>Checks each line of a <c>-K</c> file in order; a refusal's reason is prefixed with the file and the 1-based line.</summary>
-    private McpArgumentCheck CheckConfigLines(string file, IReadOnlyList<KeyValuePair<string, string?>> lines, int configDepth)
+    private McpArgumentCheck CheckConfigLines(string file, IReadOnlyList<KeyValuePair<string, string?>> lines, string? outputDirectory, int configDepth)
     {
         for (int line = 0; line < lines.Count; line++)
         {
-            McpArgumentCheck check = CheckConfigLine(lines[line].Key, lines[line].Value, configDepth);
+            McpArgumentCheck check = CheckConfigLine(lines[line].Key, lines[line].Value, outputDirectory, configDepth);
             if (!check.IsAllowed)
             {
                 return check with { Reason = $"In config file '{file}', line {line + 1}: {check.Reason}" };
@@ -433,9 +429,9 @@ public sealed class McpArgumentChecker
     /// A config line's option starting with one <c>-</c> is a bundle of short letters; any other is a
     /// long name with or without its <c>--</c>. The line's parameter is the one argument that may follow.
     /// </summary>
-    private McpArgumentCheck CheckConfigLine(string option, string? parameter, int configDepth)
+    private McpArgumentCheck CheckConfigLine(string option, string? parameter, string? outputDirectory, int configDepth)
     {
-        ArgumentCursor cursor = new(parameter is null ? [] : [parameter]);
+        ArgumentCursor cursor = new(parameter is null ? [] : [parameter], null, outputDirectory);
         if (option.StartsWith(EndOfOptions, StringComparison.Ordinal))
         {
             return CheckLong(option, cursor, configDepth);
@@ -449,9 +445,27 @@ public sealed class McpArgumentChecker
         McpArgumentCheck.Refused(written, written, $"{written} is not an option this server knows, so it cannot tell whether it uses a local path.");
 
     /// <summary>Walks the arguments in order and remembers whether <c>--</c> has ended the options.</summary>
-    private sealed class ArgumentCursor(IReadOnlyList<string> arguments)
+    private sealed class ArgumentCursor(IReadOnlyList<string> arguments, IReadOnlyList<string?>? knownDirectoriesByGroup, string? inheritedDirectory = null)
     {
         private int next;
+
+        private int group;
+
+        /// <summary>The <c>--output-dir</c> each <c>--next</c> group gave, in group order, as this walk has seen so far; <see langword="null" /> for a group that gave none.</summary>
+        public List<string?> DirectoriesByGroup { get; } = [null];
+
+        /// <summary>The <c>--output-dir</c> curl joins before this group's <c>-o</c> names: the one the recording walk found for the group, or else the one a <c>-K</c> file inherits.</summary>
+        public string? OutputDirectory => knownDirectoriesByGroup is null ? inheritedDirectory : knownDirectoriesByGroup[group];
+
+        /// <summary>Notes that <c>--next</c> began a fresh option group, which has no <c>--output-dir</c> yet.</summary>
+        public void StartNextGroup()
+        {
+            group++;
+            DirectoriesByGroup.Add(null);
+        }
+
+        /// <summary>Notes the <c>--output-dir</c> value of the current group; the last one wins.</summary>
+        public void RecordOutputDirectory(string value) => DirectoriesByGroup[group] = value;
 
         /// <summary>Whether a <c>--</c> argument has been seen, so every later argument is a URL.</summary>
         public bool OptionsEnded { get; set; }

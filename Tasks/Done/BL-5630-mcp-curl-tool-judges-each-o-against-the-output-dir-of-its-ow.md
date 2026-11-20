@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Mcp.UnitLibrary/McpArgumentChecker.cs, Curl.Mcp.UnitTests/McpArgumentCheckerTests.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5630 — MCP curl tool judges each -o against the --output-dir of its own --next group
 
@@ -28,14 +28,17 @@ Failures:
 
 ## Acceptance criteria
 
-- [ ] The output directory is worked out per `--next` group while the arguments are walked, and an `-o` in a group with no `--output-dir` is judged on its own.
-- [ ] `McpArgumentCheckerTests` has a row for each failure above, and each is refused.
-- [ ] Existing `--output-dir` rows still pass.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The output directory is worked out per `--next` group while the arguments are walked, and an `-o` in a group with no `--output-dir` is judged on its own.
+- [x] `McpArgumentCheckerTests` has a row for each failure above, and each is refused.
+- [x] Existing `--output-dir` rows still pass.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+The checker now walks the arguments twice: a recording walk (judges no path) notes each --next group's --output-dir, then the judging walk joins each -o only to its own group's directory. A -K file inherits the directory of the group that names it. Group boundaries are counted where the real walk consumes --next (also bundled -:), so a "--next" taken as an option value cannot misalign them. Rows added to McpArgumentCheckerTests for both failures plus an allowed one. Measure-CodeQuality for Curl.Mcp.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: b109abfd 1365623a f8e567c5 3d836d5e.
+- 2026-11-20: Doing -> Done. Per-group --output-dir implemented, tests green, quality clean
