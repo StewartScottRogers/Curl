@@ -33,3 +33,4 @@ An empty `Accept` value in the `transfer` tool sends `Accept:` with an empty val
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (2203 #7).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: b0a4577d 9756089e 3d836d5e.
