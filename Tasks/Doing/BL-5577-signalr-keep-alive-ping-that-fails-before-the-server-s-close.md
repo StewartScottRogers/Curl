@@ -38,3 +38,4 @@ Fix direction: decide the Ping failure's fate after the read loop ends. When `re
 ## Log
 
 - 2026-11-19: Created.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 3d5183df 5a0fff3c 4e85d062 cd3374e2.
