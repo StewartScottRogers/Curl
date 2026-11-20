@@ -37,3 +37,4 @@ Find how the extensions read the console's `-d` data (the transfer context's pos
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1022, finding widening BL-5594 (Kafka, gRPC, SignalR).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: c24813d3 3173a705 3d836d5e.
