@@ -82,6 +82,7 @@ public sealed class Amqp1ProtocolHeaderAndFrameTests
     }
 
     [TestMethod]
+    [DataRow("00000007", DisplayName = "SIZE below 8 with only the 4 SIZE bytes buffered")]
     [DataRow("00000007020000", DisplayName = "SIZE below 8")]
     [DataRow("0000000801000000", DisplayName = "DOFF below 2")]
     [DataRow("0000000803000000", DisplayName = "DOFF past SIZE")]

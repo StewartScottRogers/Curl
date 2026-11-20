@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Amqp1.UnitLibrary/Frames/Amqp1FrameCodec.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5626 — Fix AF-0911: Surviving mutant: an AMQP 1.0 frame read can wait on a bare 4-byte SIZE instead of refusing a malformed one
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Amqp1.UnitLibrary/Frames/Amqp1FrameCodec.cs line 37`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Amqp1.UnitLibrary/Frames/Amqp1FrameCodec.cs line 37`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by TryRead_MalformedFrame_Throws row "SIZE below 8 with only the 4 SIZE bytes buffered" (mutant <= 4 failed it; reverted, 241 pass). No production change.
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 864d02a6 9742157d.
+- 2026-11-20: Doing -> Done. Added a 4-byte-buffer row to TryRead_MalformedFrame_Throws that kills the mutant
