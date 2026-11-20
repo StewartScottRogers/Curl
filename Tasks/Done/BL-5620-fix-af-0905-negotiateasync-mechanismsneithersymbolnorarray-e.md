@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Amqp1.UnitTests/Client/Amqp1SaslNegotiationTests.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5620 — Fix AF-0905: NegotiateAsync_MechanismsNeitherSymbolNorArray_EndsWithLoginDenied never checks the LoginDenied exit code its name promises
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added the LoginDenied exit-code assertion to the test; Amqp1 fast tests pass (240).
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-20: Doing -> Done. Added the LoginDenied exit-code assertion; Amqp1 fast tests pass
