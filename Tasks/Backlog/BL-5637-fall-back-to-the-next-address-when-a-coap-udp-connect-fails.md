@@ -1,5 +1,5 @@
 ---
-id: BL-5635
+id: BL-5637
 title: Fall back to the next address when a CoAP UDP connect fails, and connect before reporting the connection opened
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-20
 completed:
 ---
-# BL-5635 — Fall back to the next address when a CoAP UDP connect fails, and connect before reporting the connection opened
+# BL-5637 — Fall back to the next address when a CoAP UDP connect fails, and connect before reporting the connection opened
 
 ## Goal
 

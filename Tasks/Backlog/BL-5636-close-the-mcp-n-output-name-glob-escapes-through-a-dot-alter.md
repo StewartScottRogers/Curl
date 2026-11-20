@@ -1,5 +1,5 @@
 ---
-id: BL-5634
+id: BL-5636
 title: Close the MCP #n output-name glob escapes through a dot alternative and -K file URLs
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-20
 completed:
 ---
-# BL-5634 — Close the MCP #n output-name glob escapes through a dot alternative and -K file URLs
+# BL-5636 — Close the MCP #n output-name glob escapes through a dot alternative and -K file URLs
 
 ## Goal
 
