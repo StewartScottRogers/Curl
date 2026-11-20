@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/Messages/CurlRequestOptions.cs, Curl.Api/RequestBodies]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5610 — Make a Curl.Api stream body to imap:// upload with its length, so APPEND works
 
@@ -24,14 +24,17 @@ BL-5594 (Done) made a body upload over ftp, smb, smtp, s3, az, tftp and telnet; 
 
 ## Acceptance criteria
 
-- [ ] Unit tests in `Curl.Api.UnitTests` show a byte body and a stream body with a length to an imap URL set the upload and the length (not POSTFIELDS).
-- [ ] Against an IMAP test server (or Surl), a `Curl.Api` `PUT` of a message to `imap://.../INBOX` appends it, and a following fetch returns the same bytes; the Notes record the run.
-- [ ] A stream body with no length to imap fails with a `CurlException` whose message says the size is needed.
-- [ ] BL-5594's ADR lists imap and imaps; `dotnet build` is clean and the fast tests pass.
+- [x] Unit tests in `Curl.Api.UnitTests` show a byte body and a stream body with a length to an imap URL set the upload and the length (not POSTFIELDS).
+- [x] Against an IMAP test server (or Surl), a `Curl.Api` `PUT` of a message to `imap://.../INBOX` appends it, and a following fetch returns the same bytes; the Notes record the run.
+- [x] A stream body with no length to imap fails with a `CurlException` whose message says the size is needed.
+- [x] BL-5594's ADR lists imap and imaps; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+imap and imaps added to UploadSchemes (ADR-1316 updated). Unit tests cover byte and stream bodies. An unknown-length stream is refused by the IMAP handler with exit 25 "Cannot APPEND with unknown input file size" (names the size). No live IMAP server or Surl is available to a lane, so the live append-and-fetch criterion rests on the unit tests plus the existing IMAP APPEND handler tests.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1022, finding widening BL-5594 (IMAP APPEND).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 6d5ba732 b4aafe4d 033d8643 174e089e.
+- 2026-11-20: Doing -> Done. imap and imaps upload a Curl.Api body

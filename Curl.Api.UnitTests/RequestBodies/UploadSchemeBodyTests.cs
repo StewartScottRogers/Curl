@@ -26,6 +26,8 @@ public sealed class UploadSchemeBodyTests
     [DataRow("smbs://h/s/f")]
     [DataRow("smtp://h/")]
     [DataRow("smtps://h/")]
+    [DataRow("imap://h/INBOX")]
+    [DataRow("imaps://h/INBOX")]
     [DataRow("tftp://h/f")]
     [DataRow("telnet://h/")]
     [DataRow("s3://b/k")]
@@ -47,6 +49,7 @@ public sealed class UploadSchemeBodyTests
     [DataRow("ftp://h/f", "POST")]
     [DataRow("smtp://h/", "GET")]
     [DataRow("telnet://h/", "PUT")]
+    [DataRow("imap://h/INBOX", "PUT")]
     public async Task SendAsync_StreamBodyToAnUploadScheme_UploadsIgnoringTheMethod(string url, string method)
     {
         using ScriptedStream stream = new(Hello) { Position = 6 };
