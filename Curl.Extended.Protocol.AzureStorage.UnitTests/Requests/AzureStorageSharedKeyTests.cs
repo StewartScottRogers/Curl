@@ -25,6 +25,16 @@ public sealed class AzureStorageSharedKeyTests
     }
 
     [TestMethod]
+    public void Build_ListBlobsWithPrefix_CanonicalizesEveryQueryParameterSorted()
+    {
+        // The documentation's List Blobs example: query parameters are lowercased, sorted and each on its own line.
+        var headers = new KeyValuePair<string, string>[] { new("x-ms-version", "2015-02-21") };
+
+        var text = AzureStorageSharedKeyStringToSign.Build("GET", "myaccount", "/mycontainer", "restype=container&comp=list&delimiter=%2F&prefix=logs%2F", headers, 0);
+
+        Assert.EndsWith("/myaccount/mycontainer\ncomp:list\ndelimiter:/\nprefix:logs/\nrestype:container", text);
+    }
+    [TestMethod]
     public void Build_PutWithBodyAndStandardHeaders_SignsLengthTypeAndRepeatedQueryValues()
     {
         var headers = new KeyValuePair<string, string>[] { new("content-type", "text/plain"), new("x-ms-blob-type", " BlockBlob "), new("Range", "bytes=0-1") };
