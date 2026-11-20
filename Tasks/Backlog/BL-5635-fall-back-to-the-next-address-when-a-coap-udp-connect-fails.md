@@ -1,0 +1,51 @@
+---
+id: BL-5635
+title: Fall back to the next address when a CoAP UDP connect fails, and connect before reporting the connection opened
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: []
+touches: [Curl.Extended.Protocol.Coap.UnitLibrary/Client/CoapProtocolHandler.cs, Curl.Networking.UnitLibrary/PortUnreachableReportingDatagramChannel.cs, Curl.Extended.Protocol.Coap.UnitTests, Curl.Networking.UnitTests]
+requirement: none
+created: 2026-11-20
+completed:
+---
+# BL-5635 — Fall back to the next address when a CoAP UDP connect fails, and connect before reporting the connection opened
+
+## Goal
+
+A CoAP transfer whose first resolved address refuses the UDP connect tries the next address, as
+the send and receive paths already do, and `-v` writes `Established connection` only once the
+connect has succeeded.
+
+## Context
+
+Found by the dark factory's shift-end review of 2026-11-20 (ADR-0710; pr-review-toolkit
+silent-failure-hunter, verified against the code) in the shift that merged BL-5633
+(commit bc3205761a).
+
+- BL-5633 made `EndPointRecordingDatagramConnector`'s channel forward `ConnectToServer`, so the
+  connect now really reaches the socket, and `CoapProtocolHandler.ConnectFailure`
+  (`Curl.Extended.Protocol.Coap.UnitLibrary/Client/CoapProtocolHandler.cs`) maps a
+  `SocketException` from it to exit 55 at once.
+- `Curl.Networking.UnitLibrary/PortUnreachableReportingDatagramChannel.cs`, `ConnectToServer`, is a
+  bare pass-through: unlike `SendAsync` and `ReceiveAsync` it never calls
+  `SwitchToNextAddressAsync`, though `OpenAndResendAsync` already connects the next channel when
+  `_connectsToServer` is set. So `coap://localhost/x` on a host where the UDP `connect()` to `::1`
+  fails (IPv6 off: `ENETUNREACH`/`EADDRNOTAVAIL`) ends with exit 55 without trying `127.0.0.1`.
+- `CoapProtocolHandler` calls `ReportConnectionOpened` before the connect, so `-v` prints
+  `Established connection` just before the failure; the failure text says `CoAP send failed` for a
+  connect.
+
+## Acceptance criteria
+
+- [ ] A connect that throws `SocketException` on the first address with alternatives left opens and connects the next address, pinned by a `Curl.Networking.UnitTests` test with fake channels.
+- [ ] A connect that fails on every address still ends a CoAP transfer with exit 55 (the existing `CoapProtocolHandlerTests` case stays green).
+- [ ] `CoapProtocolHandler` reports the connection opened only after the connect succeeds, and a failed connect's message says connect, not send; pinned by a `CoapProtocolHandlerTests` test.
+- [ ] `dotnet build` is clean and the fast tests pass; both libraries keep 100% line and branch coverage.
+
+## Notes
+
+## Log
+
+- 2026-11-20: Created.
