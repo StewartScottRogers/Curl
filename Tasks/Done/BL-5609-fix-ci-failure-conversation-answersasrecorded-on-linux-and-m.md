@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Mcp.IntegrationTests, Curl.Mcp.UnitLibrary, Curl.Mcp]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5609 — Fix CI failure Conversation_AnswersAsRecorded on Linux and macOS
 
@@ -28,11 +28,14 @@ Lanes test only on Windows, so reproduce with `gh run view 44773274042 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `Conversation_AnswersAsRecorded` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `Conversation_AnswersAsRecorded` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Cause: adadcb5959 added minTlsVersion and caFile to the transfer tool, so tools/list gained schema; the tools-list and request-before-initialize goldens were stale (failed on Windows too). Re-recorded the Golden folder with CURL_MCP_RECORD_GOLDEN=1; other files differ only in property order (compared order-insensitively). Platform-neutral; CI criterion met by that.
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: e70e753a.
+- 2026-11-20: Doing -> Done. Re-recorded stale tools-list and request-before-initialize goldens; Golden tests pass.
