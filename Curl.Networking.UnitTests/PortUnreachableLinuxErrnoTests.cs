@@ -35,6 +35,16 @@ public sealed class PortUnreachableLinuxErrnoTests
     }
 
     [TestMethod]
+    public async Task ConnectToServer_AfterOpening_LeavesTheSocketOnTheRouteToTheServer()
+    {
+        await using var channel = new UdpDatagramChannel(NothingListening);
+
+        channel.ConnectToServer();
+
+        Assert.AreEqual(IPAddress.Loopback, ((IPEndPoint)channel.LocalEndPoint!).Address);
+    }
+
+    [TestMethod]
     public async Task Constructor_WithLocalAddressAndPort_BindsThatAddressOnAnEphemeralPort()
     {
         Diagnostics.Arrange("local address", IPAddress.Loopback);

@@ -131,6 +131,12 @@ public sealed class UdpDatagramChannel : IDatagramChannel
     /// <inheritdoc />
     public EndPoint ServerEndPoint { get; }
 
+    /// <inheritdoc />
+    public void ConnectToServer()
+    {
+        ConnectIf(true);
+    }
+
     /// <summary>
     /// Gets the local endpoint the socket's datagrams to <see cref="ServerEndPoint" /> leave
     /// from, the client's transfer identifier: the bound endpoint, except that a socket bound to

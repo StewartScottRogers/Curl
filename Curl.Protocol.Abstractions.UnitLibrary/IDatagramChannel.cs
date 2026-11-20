@@ -34,6 +34,15 @@ public interface IDatagramChannel : IAsyncDisposable
     EndPoint? LocalEndPoint => null;
 
     /// <summary>
+    /// Connects the channel's socket to <see cref="ServerEndPoint" />, so the kernel reports an ICMP port
+    /// unreachable on the next receive on Linux and macOS as it does on Windows (BL-5601). A channel whose
+    /// server may answer from another port (TFTP) is never connected; the default does nothing.
+    /// </summary>
+    void ConnectToServer()
+    {
+    }
+
+    /// <summary>
     /// Sends <paramref name="datagram" /> as one datagram to <paramref name="destination" />.
     /// </summary>
     /// <param name="datagram">The whole datagram to send.</param>

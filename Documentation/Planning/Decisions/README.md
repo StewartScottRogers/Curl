@@ -1359,3 +1359,4 @@ Each option and the specific reason it lost.
 | [1315](ADR-1315-an-s3-url-sends-its-query-string-and-a-prefix-parameter-extends-the-path-prefix.md) | An s3:// URL sends its query string, and a prefix parameter extends the path prefix (BL-5607) | Accepted | 2026-11-20 |
 | [1316](ADR-1316-a-curl-api-body-on-a-non-http-upload-scheme-uploads-as-curl-t-does.md) | A Curl.Api body on a non-HTTP upload scheme uploads, as `curl -T` does (BL-5594) | Accepted | 2026-11-20 |
 | [1317](ADR-1317-kafka-logs-in-with-scram-when-the-broker-enables-no-plain.md) | Kafka logs in with SCRAM-SHA-512 or SCRAM-SHA-256 when the broker enables no PLAIN (BL-5600) | Accepted | 2026-11-20 |
+| [1314](ADR-1314-coap-connects-its-udp-socket-so-an-unbound-port-fails-at-once-everywhere.md) | CoAP connects its UDP socket so an unbound port fails at once on every platform (BL-5601) | Accepted | 2026-11-20 |
