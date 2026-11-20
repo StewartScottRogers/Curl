@@ -67,6 +67,14 @@ public sealed class McpArgumentCheckerTests
     [DataRow("--output-dir|{in}/downloads|-o|../../x-#1|http://h/{a,b}", "-o")]
     [DataRow("-o|#1|http://h/{../../x,y}", "-o")]
     [DataRow("-o|#1|http://h/[a/b]", "-o")]
+    [DataRow("-o|#1./evil|http://h/{.,a}", "-o")]
+    [DataRow("-o|#1#2/x|http://h/{.}{.}", "-o")]
+    [DataRow("-o|#1x|http://h/{a.,b}", "-o")]
+    [DataRow("-o|#1|http://h/{C:evil,b}", "-o")]
+    [DataRow("-o|#1|http://h/[+-a]", "-o")]
+    [DataRow("-o|{in}/#1|http://h/{a.b,c}", "")]
+    [DataRow("-o|{in}/#1|http://h/[a-c]", "")]
+    [DataRow("-o|{in}/#1|http://[::1]/", "")]
     [DataRow("-o|#1|http://h/{a/b", "-o")]
     [DataRow("--output-dir|{in}/downloads|-o|#1|http://h/{../../x,y}", "-o")]
     [DataRow("-o|{in}/x|http://h/{../../x,y}", "")]
@@ -300,6 +308,23 @@ public sealed class McpArgumentCheckerTests
         {
             StringAssert.StartsWith(check.Reason, $"In config file '{config}', line ");
         }
+    }
+
+    [TestMethod]
+    [DataRow("url = \"http://h/{../../x,y}\"", "-K|{cfg}|-o|{in}/#1", "-o")]
+    [DataRow("url = \"http://h/{a,b}\"", "-K|{cfg}|-o|{in}/#1", "")]
+    [DataRow("next", "--output-dir|{in}/sub|-K|{cfg}|-o|../x|http://h/", "-o")]
+    [DataRow("output-dir = .", "--output-dir|{in}/a/b|-K|{cfg}|-o|../x|http://h/", "-o")]
+    [DataRow("output-dir = .", "--output-dir|{in}/a/b|-K|{cfg}|-o|x|http://h/", "")]
+    [DataRow("output-dir = \"{in}/d\"", "-K|{cfg}|-o|../g|http://h/", "")]
+    public void Check_ConfigFileGroupsAndGlobs_JudgeTheOutputNameAsCurlDoes(string content, string arguments, string refusedOption)
+    {
+        string config = Path.Combine(root, "cfg.txt");
+        File.WriteAllText(config, Expand(content));
+
+        McpArgumentCheck check = checker.Check(Arguments(arguments.Replace("{cfg}", config, StringComparison.Ordinal)));
+
+        Assert.AreEqual(refusedOption, check.Option ?? string.Empty, check.Reason);
     }
 
     [TestMethod]
