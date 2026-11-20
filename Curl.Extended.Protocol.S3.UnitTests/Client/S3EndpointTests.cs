@@ -50,4 +50,13 @@ public sealed class S3EndpointTests
     [DataRow("not a url")]
     public void For_EndpointThatIsNotHttp_IsNull(string endpointUrl) =>
         Assert.IsNull(S3Endpoint.For("bucket", "us-east-1", endpointUrl));
+
+    [TestMethod]
+    public void QueryOf_Parameters_AreSplitAndDecoded()
+    {
+        CollectionAssert.AreEqual(
+            new[] { new KeyValuePair<string, string>("prefix", "a b/"), new KeyValuePair<string, string>("flag", string.Empty), new KeyValuePair<string, string>("k", "%") },
+            S3Endpoint.QueryOf("prefix=a+b%2F&&flag&k=%25"));
+        Assert.AreEqual(0, S3Endpoint.QueryOf(null).Count);
+    }
 }

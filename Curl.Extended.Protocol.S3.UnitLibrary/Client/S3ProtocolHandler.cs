@@ -61,8 +61,8 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
         context.Progress.ReportTransferStarted();
         return context.Upload switch
         {
-            null when namesPrefix => operations.ListAsync(key, context.Output),
-            null => operations.DownloadAsync(key, context.Output),
+            null when namesPrefix => operations.ListAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output),
+            null => operations.DownloadAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output),
             _ when namesPrefix => throw new S3TransferException(CurlExitCode.UrlMalformat, "An S3 upload needs an object key in the URL"),
             { } upload => operations.UploadAsync(key, upload),
         };
