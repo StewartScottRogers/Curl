@@ -150,7 +150,7 @@ public sealed class SignalRKeepAliveTests
         clock.Advance(TimeSpan.FromSeconds(15));
         await WaitUntil(() => hub.IsHoldingAWrite);
         hub.ReleaseHeldWriteWithFailure();
-        await Task.Delay(50);
+        await WaitUntil(() => hub.HeldWritesThatThrew == 1);
         hub.Give([0x88, 0x02, 0x03, 0xE8]);
 
         Assert.AreEqual(CurlExitCode.Ok, (await run).ExitCode);
@@ -262,6 +262,8 @@ public sealed class SignalRKeepAliveTests
 
         public int FailedWrites => Volatile.Read(ref failedWrites);
 
+        public int HeldWritesThatThrew => Volatile.Read(ref heldWritesThatThrew);
+
         public void HoldNextWrite() => Volatile.Write(ref holdNext, 1);
 
         public void ReleaseHeldWrite() => release.TrySetResult();
@@ -281,7 +283,15 @@ public sealed class SignalRKeepAliveTests
             if (Interlocked.Exchange(ref holdNext, 0) == 1)
             {
                 Volatile.Write(ref holding, 1);
-                await release.Task;
+                try
+                {
+                    await release.Task;
+                }
+                catch (IOException)
+                {
+                    Interlocked.Increment(ref heldWritesThatThrew);
+                    throw;
+                }
             }
 
             lock (gate)
@@ -299,6 +309,8 @@ public sealed class SignalRKeepAliveTests
         private int failing;
 
         private int failedWrites;
+
+        private int heldWritesThatThrew;
 
         private int readsConsumed;
 
