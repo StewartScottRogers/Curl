@@ -24,7 +24,9 @@ public sealed class TransferMcpToolTests
         "timeoutSeconds":{"description":"The longest the whole transfer may take, in seconds; omit or 0 for no limit.","type":["number","null"],"default":null},
         "insecure":{"description":"Whether the server's certificate goes unverified, as curl -k leaves it.","type":"boolean","default":false},
         "proxy":{"description":"The proxy to use, as curl -x takes it; the environment's when omitted.","type":["string","null"],"default":null},
-        "userAgent":{"description":"The User-Agent header; none is sent when omitted.","type":["string","null"],"default":null}},
+        "userAgent":{"description":"The User-Agent header; none is sent when omitted.","type":["string","null"],"default":null},
+        "minTlsVersion":{"description":"The lowest TLS version to accept, as curl --tlsv1.2 sets it: 1.0, 1.1, 1.2 or 1.3; the default when omitted.","type":["string","null"],"enum":["1.0","1.1","1.2","1.3",null],"default":null},
+        "caFile":{"description":"A CA certificate file to verify the server with, as curl --cacert takes it, e.g. for a self-signed server; it must lie inside CURL_MCP_ROOT, else the call is refused with PathRefused.","type":["string","null"],"default":null}},
         "required":["url"]}
         """;
 

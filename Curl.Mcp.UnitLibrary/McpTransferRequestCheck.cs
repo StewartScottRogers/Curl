@@ -32,7 +32,7 @@ public sealed record McpTransferRequestCheck(McpToolFailure? Failure, byte[]? Bo
             ?? CheckMethod(request.Method)
             ?? CheckHeaders(request.Headers)
             ?? CheckTimeout(request.TimeoutSeconds)
-            ?? CheckBodyAllowed(request);
+            ?? CheckBodyAndTls(request);
         return failure is null ? DecodeBody(request) : new McpTransferRequestCheck(failure, null);
     }
 
@@ -69,6 +69,8 @@ public sealed record McpTransferRequestCheck(McpToolFailure? Failure, byte[]? Bo
         ["insecure"] = new("a boolean", IsBoolean),
         ["proxy"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
         ["userAgent"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
+        ["minTlsVersion"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
+        ["caFile"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static bool IsKindOrNull(JsonElement value, JsonValueKind kind) =>
@@ -159,6 +161,16 @@ public sealed record McpTransferRequestCheck(McpToolFailure? Failure, byte[]? Bo
         timeoutSeconds is not double seconds || seconds is >= 0 and <= MaxTimeoutSeconds
             ? null
             : McpToolFailure.InvalidRequest("timeoutSeconds", $"it must be from 0 to {MaxTimeoutSeconds} seconds.");
+
+    private static McpToolFailure? CheckBodyAndTls(McpTransferRequest request) =>
+        CheckBodyAllowed(request) ?? CheckMinTlsVersion(request.MinTlsVersion);
+
+    private static readonly string[] TlsVersions = ["1.0", "1.1", "1.2", "1.3"];
+
+    private static McpToolFailure? CheckMinTlsVersion(string? version) =>
+        version is null || TlsVersions.Contains(version, StringComparer.Ordinal)
+            ? null
+            : McpToolFailure.InvalidRequest("minTlsVersion", $"'{version}' is not one of 1.0, 1.1, 1.2 or 1.3.");
 
     private static McpToolFailure? CheckBodyAllowed(McpTransferRequest request) =>
         request.Body is not null && request.Method == "HEAD"
