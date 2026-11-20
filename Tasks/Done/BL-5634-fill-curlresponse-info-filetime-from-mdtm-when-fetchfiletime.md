@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/Messages/CurlClient.SendAsync.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5634 — Fill CurlResponse.Info.FileTime from MDTM when FetchFileTime is set on an ftp:// HEAD
 
@@ -24,14 +24,17 @@ BL-5603 (Done, `d1addaf8c8`) added `CurlClientOptions.FetchFileTime`, which sets
 
 ## Acceptance criteria
 
-- [ ] Against an FTP test server, a `Curl.Api` `HEAD` with `FetchFileTime = true` reports `Info.FileTime` equal to the file's `MDTM` time (seconds since the epoch), pinned by a test.
-- [ ] The same option on an HTTP request reports `Info.FileTime` from `Last-Modified`, pinned by a test.
-- [ ] Without `FetchFileTime`, `Info.FileTime` stays -1 on both, as libcurl does.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Against an FTP test server, a `Curl.Api` `HEAD` with `FetchFileTime = true` reports `Info.FileTime` equal to the file's `MDTM` time (seconds since the epoch), pinned by a test.
+- [x] The same option on an HTTP request reports `Info.FileTime` from `Last-Modified`, pinned by a test.
+- [x] Without `FetchFileTime`, `Info.FileTime` stays -1 on both, as libcurl does.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decision: the engine leaves FileTime -1 for FTP (no SourceLastWriteUnixSeconds), so CurlClient.SendAsync falls back to the synthesized Last-Modified header (RFC1123) when FetchFileTime is set and FileTime is -1. HTTP already filled it from the engine (kept if set). Pinned by CurlClientFileTimeTests. Quality run for Curl.Api: 0 failing members. Without FetchFileTime it stays -1.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1331, finding 1.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 97812ebe f83af33d f4cf65f3 3d836d5e.
+- 2026-11-20: Doing -> Done. FileTime falls back to Last-Modified
