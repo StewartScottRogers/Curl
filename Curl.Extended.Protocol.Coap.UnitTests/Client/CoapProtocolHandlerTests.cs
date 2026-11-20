@@ -426,7 +426,19 @@ public sealed class CoapProtocolHandlerTests
         TransferResult result = await Handler(connector).ExecuteAsync(Context("coap://h/r", new MemoryStream()));
 
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
-        Assert.StartsWith("CoAP send failed: ", result.ErrorMessage);
+        Assert.StartsWith("CoAP connect failed: ", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectToServerRefused_ReportsNoConnectionOpened()
+    {
+        var connector = new ScriptedDatagramConnector(DatagramOpenResult.Opened(new RefusingConnectChannel()));
+        var events = new RecordingTransferEvents();
+        var context = new TransferContext { Url = CurlUrl.Parse("coap://h/r"), Output = new MemoryStream(), Events = events, TimeProvider = new ImmediateTimeProvider() };
+
+        await Handler(connector).ExecuteAsync(context);
+
+        Assert.IsEmpty(events.OpenedConnections);
     }
 
     private sealed class RefusingConnectChannel : IDatagramChannel

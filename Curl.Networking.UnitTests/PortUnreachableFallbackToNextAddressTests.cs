@@ -127,6 +127,43 @@ public sealed class PortUnreachableFallbackToNextAddressTests
         Assert.IsTrue(next.Disposed);
     }
 
+    [TestMethod]
+    public async Task ConnectToServer_FirstAddressFails_ConnectsTheNextAndSwitchesToIt()
+    {
+        var first = new ScriptedChannel(IPAddress.IPv6Loopback) { ConnectFailure = new SocketException((int)SocketError.NetworkUnreachable) };
+        var broken = new ScriptedChannel(IPAddress.Loopback) { ConnectFailure = new SocketException((int)SocketError.AddressNotAvailable) };
+        var good = new ScriptedChannel(IPAddress.Loopback);
+        await using var channel = Channel(
+            first,
+            [Second, Third, new IPEndPoint(IPAddress.Loopback, 9)],
+            endPoint => endPoint.Port switch { 7 => throw new SocketException((int)SocketError.AddressFamilyNotSupported), 8 => broken, _ => good });
+
+        channel.ConnectToServer();
+        await channel.SendAsync(new byte[] { 1 }, first.ServerEndPoint, CancellationToken.None);
+
+        Assert.AreEqual(good.ServerEndPoint, channel.ServerEndPoint);
+        Assert.IsTrue(good.Connected);
+        Assert.AreEqual(1, good.Sent.Count);
+        Assert.AreEqual(good.ServerEndPoint, good.Destinations[0]);
+
+        await channel.DisposeAsync();
+
+        Assert.IsTrue(first.Disposed);
+        Assert.IsTrue(broken.Disposed);
+        Assert.IsTrue(good.Disposed);
+    }
+
+    [TestMethod]
+    public async Task ConnectToServer_EveryAddressFails_ThrowsTheFirstFailureUntranslated()
+    {
+        var first = new ScriptedChannel(IPAddress.IPv6Loopback) { ConnectFailure = new SocketException((int)SocketError.NetworkUnreachable) };
+        await using var channel = Channel(first, [Second], _ => new ScriptedChannel(IPAddress.Loopback) { ConnectFailure = new SocketException((int)SocketError.ConnectionRefused) });
+
+        var failure = Assert.ThrowsExactly<SocketException>(channel.ConnectToServer);
+
+        Assert.AreEqual(SocketError.NetworkUnreachable, failure.SocketErrorCode);
+    }
+
     private static SocketException Refused() => new((int)SocketError.ConnectionRefused);
 
     private static PortUnreachableReportingDatagramChannel Channel(
@@ -152,6 +189,20 @@ public sealed class PortUnreachableFallbackToNextAddressTests
         public List<EndPoint> Destinations { get; } = [];
 
         public bool Disposed { get; private set; }
+
+        public SocketException? ConnectFailure { get; set; }
+
+        public bool Connected { get; private set; }
+
+        public void ConnectToServer()
+        {
+            if (ConnectFailure is not null)
+            {
+                throw ConnectFailure;
+            }
+
+            Connected = true;
+        }
 
         public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken)
         {

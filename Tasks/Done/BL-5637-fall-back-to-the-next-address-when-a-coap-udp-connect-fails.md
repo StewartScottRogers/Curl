@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Coap.UnitLibrary/Client/CoapProtocolHandler.cs, Curl.Networking.UnitLibrary/PortUnreachableReportingDatagramChannel.cs, Curl.Extended.Protocol.Coap.UnitTests, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5637 — Fall back to the next address when a CoAP UDP connect fails, and connect before reporting the connection opened
 
@@ -39,14 +39,17 @@ silent-failure-hunter, verified against the code) in the shift that merged BL-56
 
 ## Acceptance criteria
 
-- [ ] A connect that throws `SocketException` on the first address with alternatives left opens and connects the next address, pinned by a `Curl.Networking.UnitTests` test with fake channels.
-- [ ] A connect that fails on every address still ends a CoAP transfer with exit 55 (the existing `CoapProtocolHandlerTests` case stays green).
-- [ ] `CoapProtocolHandler` reports the connection opened only after the connect succeeds, and a failed connect's message says connect, not send; pinned by a `CoapProtocolHandlerTests` test.
-- [ ] `dotnet build` is clean and the fast tests pass; both libraries keep 100% line and branch coverage.
+- [x] A connect that throws `SocketException` on the first address with alternatives left opens and connects the next address, pinned by a `Curl.Networking.UnitTests` test with fake channels.
+- [x] A connect that fails on every address still ends a CoAP transfer with exit 55 (the existing `CoapProtocolHandlerTests` case stays green).
+- [x] `CoapProtocolHandler` reports the connection opened only after the connect succeeds, and a failed connect's message says connect, not send; pinned by a `CoapProtocolHandlerTests` test.
+- [x] `dotnet build` is clean and the fast tests pass; both libraries keep 100% line and branch coverage.
 
 ## Notes
+
+- ConnectToServer now falls back to the next resolved address on any SocketException (not only refusals, since the connect failure is ENETUNREACH or EADDRNOTAVAIL); failed channels are disposed with the channel. Handler connects first, reports opened after, message says "CoAP connect failed". Decided by default, no ADR needed. CI on Linux and macOS: tests are platform-neutral.
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: a524b3a0 acc6b9ed 02d69108 069dd186.
+- 2026-11-20: Doing -> Done. Connect falls back to the next address; connection reported opened after the connect
