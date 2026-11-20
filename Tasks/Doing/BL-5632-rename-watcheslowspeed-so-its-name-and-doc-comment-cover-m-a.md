@@ -35,3 +35,4 @@ CLAUDE.md's "Say what it does, do what it says" counts this as a defect. A reade
 ## Log
 
 - 2026-11-20: Created.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 1f481113 75fc6f99 3d836d5e.
