@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EndPointRecordingDatagramConnector.cs, Curl.Engine.UnitTests, Curl.Extended.Protocol.Coap.UnitLibrary/Client/CoapProtocolHandler.cs, Curl.Extended.Protocol.Coap.UnitTests/Client/CoapProtocolHandlerTests.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5633 — CoAP's ConnectToServer reaches the UDP socket through the engine's recording wrapper and a failed connect keeps a curl exit code
 
@@ -44,3 +44,4 @@ Found by the shift-end review of 2026-11-20 in the diff b73256235592..071c3980c0
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 29999200 f82a7011 2aa4168e 3d836d5e.
+- 2026-11-20: Doing -> Done. ReRecordingChannel forwards ConnectToServer; a SocketException from it ends CoAP with exit 55; tests added, build and fast tests green, quality gate clean.
