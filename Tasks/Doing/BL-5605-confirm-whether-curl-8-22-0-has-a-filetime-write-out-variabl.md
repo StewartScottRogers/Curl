@@ -33,3 +33,4 @@ The cookbook reports `curl -w '%{filetime}'` refused with `unknown --write-out v
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (2203 #4).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 51919ce1 189e5f61 3d836d5e.
