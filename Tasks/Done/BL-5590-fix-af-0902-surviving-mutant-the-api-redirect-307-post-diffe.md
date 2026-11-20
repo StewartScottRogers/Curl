@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Differential.UnitLibrary/Api/ApiDifferentialCases.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5590 — Fix AF-0902: Surviving mutant: the api-redirect-307-post differential case can stop following redirects
 
@@ -43,3 +43,4 @@ Production code was already correct; the gap was a missing pin. Added `All_Every
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: cce9bcd4 9742157d.
+- 2026-11-19: Doing -> Done. Added tests pinning every API differential case's FollowsRedirects to its command line's -L; fast tests green.
