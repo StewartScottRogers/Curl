@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/Messages/CurlRequestOptions.cs, Curl.Api/RequestBodies]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5611 — Make a Curl.Api body reach the kafka, grpc and signalr extensions as -d does
 
@@ -40,3 +40,4 @@ Cause: the extension handlers read `context.PostData` (-d) else `context.Upload`
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1022, finding widening BL-5594 (Kafka, gRPC, SignalR).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: c24813d3 3173a705 3d836d5e.
+- 2026-11-20: Doing -> Done. Curl.Api body to kafka, grpc, signalr uploads as -T so handlers read it
