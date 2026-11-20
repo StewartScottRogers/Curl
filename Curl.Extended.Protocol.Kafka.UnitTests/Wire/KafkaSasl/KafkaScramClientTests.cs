@@ -49,6 +49,8 @@ public sealed class KafkaScramClientTests
     [DataRow("r=rOprNGfwEbeRWgbNEkqOx,s=W22ZaJ0SNY7soEsUEjb6gQ==")]
     [DataRow("r=rOprNGfwEbeRWgbNEkqOx,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=many")]
     [DataRow("r=rOprNGfwEbeRWgbNEkqOx,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=0")]
+    [DataRow("r=rOprNGfwEbeRWgbNEkqOx,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=100001")]
+    [DataRow("r=rOprNGfwEbeRWgbNEkqOx,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=2147483647")]
     [DataRow("garbage")]
     public void ClientFinal_MalformedServerFirst_IsAFormatException(string serverFirst)
     {
@@ -56,6 +58,17 @@ public sealed class KafkaScramClientTests
         client.ClientFirst();
 
         Assert.Throws<FormatException>(() => client.ClientFinal(Bytes(serverFirst)));
+    }
+
+    [TestMethod]
+    public void ClientFinal_IterationCountAtTheLimit_IsAccepted()
+    {
+        KafkaScramClient client = new(HashAlgorithmName.SHA256, "user", "pencil", ClientNonce);
+        client.ClientFirst();
+
+        string clientFinal = Text(client.ClientFinal(Bytes($"r=rOprNGfwEbeRWgbNEkqOx,s=W22ZaJ0SNY7soEsUEjb6gQ==,i={KafkaScramClient.MaximumIterations}")));
+
+        StringAssert.StartsWith(clientFinal, "c=biws,r=rOprNGfwEbeRWgbNEkqOx,p=");
     }
 
     [TestMethod]
