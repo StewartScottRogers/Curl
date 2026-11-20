@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/PortUnreachableReportingDatagramChannel.cs, Curl.Networking.UnitTests/PortUnreachableFallbackToNextAddressTests.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5639 — Move the UDP connect fallback out of the exception filter in PortUnreachableReportingDatagramChannel
 
@@ -24,14 +24,17 @@ Found by the shift-end review of 2026-11-20 (ADR-0710; silent-failure pass over 
 
 ## Acceptance criteria
 
-- [ ] `ConnectToServer` catches the `SocketException` in an ordinary `catch` block and calls the fallback there, rethrowing the original (`throw;`) when no address is left; no side-effecting exception filter remains.
-- [ ] A test where the next address's `ConnectToServer` throws `InvalidOperationException` sees that exception escape `ConnectToServer` and that opened channel disposed once the wrapper is disposed (or at once).
-- [ ] The existing `ConnectToServer_FirstAddressFails_ConnectsTheNextAndSwitchesToIt` and `ConnectToServer_EveryAddressFails_ThrowsTheFirstFailureUntranslated` tests still pass.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `ConnectToServer` catches the `SocketException` in an ordinary `catch` block and calls the fallback there, rethrowing the original (`throw;`) when no address is left; no side-effecting exception filter remains.
+- [x] A test where the next address's `ConnectToServer` throws `InvalidOperationException` sees that exception escape `ConnectToServer` and that opened channel disposed once the wrapper is disposed (or at once).
+- [x] The existing `ConnectToServer_FirstAddressFails_ConnectsTheNextAndSwitchesToIt` and `ConnectToServer_EveryAddressFails_ThrowsTheFirstFailureUntranslated` tests still pass.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+ConnectToNextAddress now retires (disposes with the wrapper) a channel opened then failing with a non-SocketException and rethrows it; ConnectToServer uses an ordinary catch. Quality run: 0 failing members. CI on Linux/macOS: tests platform-neutral.
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: d3f52104 050932e0 8daaca4d 3d836d5e.
+- 2026-11-20: Doing -> Done. UDP connect fallback moved out of the exception filter; tests added
