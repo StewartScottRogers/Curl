@@ -33,3 +33,4 @@ On Windows it exits 7 at once; on Linux and macOS (found in the cookbook's CI) i
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (2203 #2).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: d923d35e 05828907 3d836d5e.
