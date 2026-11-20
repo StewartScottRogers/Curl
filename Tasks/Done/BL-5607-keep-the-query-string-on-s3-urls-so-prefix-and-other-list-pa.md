@@ -30,7 +30,7 @@ From Surly cookbook bug report `2026-11-20T0553-Curl-bug-report.md` (batch 3), f
 
 ## Notes
 
-- Decided ADR-1314: query sent on GET and list; list `prefix` param appends to path prefix; `delimiter` replaces default. touches widened to the handler, tests and docs. Criterion 1 is met by handler tests with a stand-in server (no real S3 server in a lane); criterion 2 by the existing S3RequestSignerTests List Objects example (`max-keys=2&prefix=J`) plus new handler requests. Quality run: 0 failing members.
+- Decided ADR-1315: query sent on GET and list; list `prefix` param appends to path prefix; `delimiter` replaces default. touches widened to the handler, tests and docs. Criterion 1 is met by handler tests with a stand-in server (no real S3 server in a lane); criterion 2 by the existing S3RequestSignerTests List Objects example (`max-keys=2&prefix=J`) plus new handler requests. Quality run: 0 failing members.
 
 ## Log
 

@@ -28,7 +28,7 @@ internal sealed class S3Operations(S3Client client, S3Endpoint endpoint, string 
 
     /// <summary>Writes, one per line, the common prefixes and then the keys of each page of the listing under <paramref name="prefix"/> (ListObjectsV2).</summary>
     /// <param name="prefix">The prefix the keys start with, empty for the whole bucket.</param>
-    /// <param name="query">The URL's own query parameters; each replaces curl's default of the same name (<c>delimiter</c>), except <c>prefix</c>, which is appended to <paramref name="prefix"/>, and <c>list-type</c> and <c>continuation-token</c>, which curl owns (ADR-1314).</param>
+    /// <param name="query">The URL's own query parameters; each replaces curl's default of the same name (<c>delimiter</c>), except <c>prefix</c>, which is appended to <paramref name="prefix"/>, and <c>list-type</c> and <c>continuation-token</c>, which curl owns (ADR-1315).</param>
     /// <param name="output">Where the lines go.</param>
     /// <returns>The number of bytes written.</returns>
     internal async Task<long> ListAsync(string prefix, IReadOnlyList<KeyValuePair<string, string>> query, Stream output)

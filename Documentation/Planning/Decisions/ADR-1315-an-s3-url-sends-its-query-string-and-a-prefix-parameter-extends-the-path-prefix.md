@@ -1,4 +1,4 @@
-# ADR-1314: An s3:// URL sends its query string, and a prefix parameter extends the path prefix
+# ADR-1315: An s3:// URL sends its query string, and a prefix parameter extends the path prefix
 
 Status: Accepted. Date: 2026-11-20. Task: BL-5607.
 
