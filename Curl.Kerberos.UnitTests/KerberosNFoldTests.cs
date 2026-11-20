@@ -26,4 +26,14 @@ public sealed class KerberosNFoldTests
 
         CollectionAssert.AreEqual(Hex.Bytes(expected), output);
     }
+
+    [TestMethod]
+    public void Fold_CarryReachesFirstByte_WrapsCarryIntoFirstByte()
+    {
+        byte[] output = new byte[1];
+
+        KerberosNFold.Fold([0xff, 0xff], output);
+
+        CollectionAssert.AreEqual(new byte[] { 0xff }, output);
+    }
 }

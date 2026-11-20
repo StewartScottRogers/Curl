@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Kerberos.UnitLibrary/KerberosNFold.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5622 — Fix AF-0907: Surviving mutant: n-fold can drop the end-around carry into its first byte
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Kerberos.UnitLibrary/KerberosNFold.cs line 33`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Kerberos.UnitLibrary/KerberosNFold.cs line 33`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `KerberosNFoldTests.Fold_CarryReachesFirstByte_WrapsCarryIntoFirstByte` (fold of FF FF to one byte must be FF; the mutant gives FE). Verified by hand: with `index > 0` it fails, reverted it passes. Test-only change; the library fast tests pass (782).
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 40d60ca7 9742157d.
+- 2026-11-20: Doing -> Done. Test added that kills the mutant
