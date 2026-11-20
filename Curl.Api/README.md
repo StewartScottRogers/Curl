@@ -63,6 +63,17 @@ await using Stream body = response.Body;
 await body.CopyToAsync(destination, cancellationToken);
 ```
 
+## The first request in a process
+
+`CurlClient.Create()` takes about 20 ms: it builds no protocol handler. The first `SendAsync` in a fresh process does the one-time work: it loads the engine's and the extensions' assemblies and JIT-compiles the transfer path. Measured on Windows 11 (Release build, loopback `http://` and `https://example.com/`, second request in the same process for comparison):
+
+| Request | First | Second |
+| --- | --- | --- |
+| `http://127.0.0.1` | about 0.5 s | about 40 ms |
+| `https://` (adds the HTTP/2 library, TLS set-up and DNS) | about 0.7 to 0.9 s | about 75 ms |
+
+The first run after a rebuild, or on a machine that scans freshly written DLLs, can take several seconds more, because each assembly is read from a cold disk cache and scanned on first load. A recipe with a short timeout should make one untimed warm-up request first, or set `CURL_EXTENSIONS=0` to skip loading the extension libraries (the first plain-HTTP request then takes about 0.3 s).
+
 ## Set options
 
 A request carries its headers, a body and optional option groups that override the client's: the

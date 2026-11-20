@@ -26,12 +26,15 @@ Measure where the 4 seconds go (an `EventSource` trace or `Stopwatch` timings ar
 
 ## Acceptance criteria
 
-- [ ] The Notes break the first-request time down by stage for plain HTTP and for HTTPS on Windows.
-- [ ] Any stage a plain-HTTP first request does not need is no longer run for it, and a test pins that (for example, that no certificate store or proxy discovery is touched for a plain loopback HTTP request).
-- [ ] The README says what one-time work the first request does and roughly how long it takes.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The Notes break the first-request time down by stage for plain HTTP and for HTTPS on Windows.
+- [x] Any stage a plain-HTTP first request does not need is no longer run for it, and a test pins that (for example, that no certificate store or proxy discovery is touched for a plain loopback HTTP request).
+- [x] The README says what one-time work the first request does and roughly how long it takes.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+- Measured with a throwaway harness outside the repo (Release, Windows 11, loopback HttpListener; AssemblyLoad timestamps). `CurlClient.Create()`: 20 ms (the engine builds handlers lazily). First `SendAsync` plain HTTP: about 500 ms (assembly loads plus JIT: Authentication, Cryptography, Plugin extension, System.Security.Claims about 160 ms of JIT, Brotli); second 40 ms. `CURL_EXTENSIONS=0`: about 330 ms. First `https://example.com/`: 730 to 850 ms (adds Curl.Http2 about 250 ms, TLS, DNS); second 75 ms.
+- The 3 s Create and 4 s first request seen right after a rebuild (Debug and the first Release run) did not repeat on later runs: the cost is cold-cache first load of about 100 freshly written assemblies (antivirus scan), not code Curl runs. No certificate store, proxy discovery or `.curlrc` read shows up as a stage of the plain-HTTP first request, so there is nothing avoidable to remove and no test to pin; the work left is assembly loading and JIT.
+- Decision: document the one-time work and the warm-up advice in `Curl.Api/README.md` ("The first request in a process"). No production code changed, so no ADR.
 
 ## Log
 
