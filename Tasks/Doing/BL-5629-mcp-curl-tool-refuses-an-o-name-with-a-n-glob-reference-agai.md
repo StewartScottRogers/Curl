@@ -36,3 +36,4 @@ Failure: `["-o", "#1", "http://h/{../../../home/u/.bashrc,x}"]` is checked as `_
 ## Log
 
 - 2026-11-20: Created.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 28e141b7 666c5cea bbaf80af 3d836d5e.
