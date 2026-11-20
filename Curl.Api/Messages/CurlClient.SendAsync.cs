@@ -2,6 +2,7 @@ using System.Runtime.ExceptionServices;
 using Curl.Api.EngineContracts;
 using Curl.Api.Errors;
 using Curl.Api.Info;
+using Curl.Api.Options;
 
 namespace Curl.Api;
 
@@ -70,6 +71,10 @@ public sealed partial class CurlClient
         };
     }
 
+    /// <summary><paramref name="options"/> with the request's <see cref="CurlRequest.CustomRequest"/> as <c>CURLOPT_CUSTOMREQUEST</c>, unchanged; the options as they are when it has none.</summary>
+    private static EasyOptions ApplyCustomRequest(EasyOptions options, CurlRequest request) =>
+        request.CustomRequest is null ? options : options with { Transfer = options.Transfer with { CustomRequest = request.CustomRequest } };
+
     /// <summary>
     /// Puts <paramref name="request"/>'s transport options, method, URL, headers, body and callbacks on
     /// <paramref name="easy"/>, catching a failure (a multipart body's failing setter) so the caller can
@@ -87,6 +92,7 @@ public sealed partial class CurlClient
             easy.Options = CurlTransportOptions.Apply(easy.Options, request.Network, request.Tls, request.Proxy);
             easy.Options = CurlProtocolOptions.Apply(easy.Options, request.ProtocolRecords);
             easy.Options = CurlRequestOptions.Apply(easy.Options, request, collector.Take, body.TakeBody, _engine, body.Owned);
+            easy.Options = ApplyCustomRequest(easy.Options, request);
             return null;
         }
         catch (Exception exception)

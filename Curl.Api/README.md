@@ -139,6 +139,19 @@ await (await client.SendAsync(large, cancellationToken)).Body.DisposeAsync();
 
 (This sample also assumes a `file` stream.)
 
+## Send a custom request
+
+`CurlRequest.CustomRequest` is `CURLOPT_CUSTOMREQUEST` (`curl -X`): the text is sent unchanged, spaces and all, and wins over
+the `HttpMethod`, which .NET restricts to a token. Use it for IMAP `STORE` and `MOVE`, and for FTP and POP3 commands.
+
+```csharp
+CurlRequest markSeen = new(HttpMethod.Get, "imap://example.com/INBOX")
+{
+    CustomRequest = @"STORE 1 +Flags \Seen",
+};
+CurlRequest move = new(HttpMethod.Get, "imap://example.com/INBOX") { CustomRequest = "MOVE 1 Archive" };
+```
+
 ## Upload multipart
 
 `CurlMultipartContent` is a `CurlContent` made of immutable `CurlMimePart`s: text, bytes, a file

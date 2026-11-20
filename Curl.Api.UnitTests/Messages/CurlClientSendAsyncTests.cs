@@ -63,6 +63,26 @@ public sealed class CurlClientSendAsyncTests
     }
 
     [TestMethod]
+    public async Task SendAsync_CustomRequestWithSpaces_IsSetUnchangedAndWinsOverTheMethod()
+    {
+        CurlRequest request = new(HttpMethod.Get, "imap://example/INBOX") { CustomRequest = @"STORE 1 +Flags \Seen" };
+
+        (_, ScriptedEasyTransfer easy) = await SendAsync(request);
+
+        Assert.AreEqual(@"STORE 1 +Flags \Seen", Performed(easy).Transfer.CustomRequest);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_MoveCustomRequestOnAPost_WinsOverTheMethod()
+    {
+        CurlRequest request = new(HttpMethod.Post, "imap://example/INBOX") { CustomRequest = "MOVE 1 Archive" };
+
+        (_, ScriptedEasyTransfer easy) = await SendAsync(request);
+
+        Assert.AreEqual("MOVE 1 Archive", Performed(easy).Transfer.CustomRequest);
+    }
+
+    [TestMethod]
     public async Task SendAsync_Head_SetsNoBody()
     {
         (_, ScriptedEasyTransfer easy) = await SendAsync(new(HttpMethod.Head, "http://example/"));

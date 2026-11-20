@@ -26,6 +26,13 @@ public sealed partial record CurlRequest
     /// <summary>The RTSP settings for this request alone, replacing the client's <see cref="CurlClientOptions.Rtsp"/>; <see langword="null"/> (the default) keeps the client's.</summary>
     public CurlRtspOptions? Rtsp { get; init; }
 
+    /// <summary>
+    /// <c>CURLOPT_CUSTOMREQUEST</c> for this request alone, sent unchanged, spaces and all, and winning over <see cref="Method"/>
+    /// (which .NET restricts to a token): IMAP <c>STORE 1 +Flags \Seen</c> or <c>MOVE 1 Archive</c>, an FTP or POP3 command.
+    /// Default <see langword="null"/>: the method decides.
+    /// </summary>
+    public string? CustomRequest { get; init; }
+
     /// <summary>The HTTP, authentication and protocol records above, for <see cref="CurlProtocolOptions.Apply"/>.</summary>
     internal CurlProtocolRecords ProtocolRecords => new(Http, Authentication, Ftp, Ssh, Mail, Tftp, Telnet, Rtsp);
 }
