@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5632 — Rename WatchesLowSpeed so its name and doc comment cover -m as well as -Y and -y
 
@@ -26,13 +26,16 @@ CLAUDE.md's "Say what it does, do what it says" counts this as a defect. A reade
 
 ## Acceptance criteria
 
-- [ ] The method is renamed to say it covers both watchdogs (for example `WatchdogMayEndTransfer`), and every caller is updated.
-- [ ] Its summary and returns text name `-m` as well as `-Y` and `-y`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The method is renamed to say it covers both watchdogs (for example `WatchdogMayEndTransfer`), and every caller is updated.
+- [x] Its summary and returns text name `-m` as well as `-Y` and `-y`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Renamed to `WatchdogMayEndTransfer` (single caller). Pure rename plus doc text, no branch added, so no quality run.
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 1f481113 75fc6f99 3d836d5e.
+- 2026-11-20: Doing -> Done. Renamed to WatchdogMayEndTransfer, docs cover -m

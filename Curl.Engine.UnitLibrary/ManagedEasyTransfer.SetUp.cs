@@ -239,7 +239,7 @@ internal sealed partial class ManagedEasyTransfer
     {
         if (toolEvents is not null)
         {
-            AbortedHeadRecordingTransferEvents? toolAbortedHead = WatchesLowSpeed(options.Transfer) ? new(toolEvents.Events) : null;
+            AbortedHeadRecordingTransferEvents? toolAbortedHead = WatchdogMayEndTransfer(options.Transfer) ? new(toolEvents.Events) : null;
             return (toolEvents.State, toolAbortedHead ?? toolEvents.Events, null, null, toolAbortedHead);
         }
 
@@ -250,10 +250,10 @@ internal sealed partial class ManagedEasyTransfer
         return (state, recorder, recorder, negotiateFailure, abortedHead);
     }
 
-    /// <summary>Tells whether <c>-Y</c> or <c>-y</c> is set, so a <c>-Y</c>/<c>-y</c> watchdog may end the transfer.</summary>
+    /// <summary>Tells whether <c>-m</c>, <c>-Y</c> or <c>-y</c> is set, so the max-time or low-speed watchdog may end the transfer.</summary>
     /// <param name="transfer">The transfer's options.</param>
-    /// <returns><see langword="true" /> when the low-speed limit or time is above zero.</returns>
-    private static bool WatchesLowSpeed(EasyTransferOptions transfer) =>
+    /// <returns><see langword="true" /> when the max time (<c>-m</c>), the low-speed limit (<c>-Y</c>) or the low-speed time (<c>-y</c>) is above zero.</returns>
+    private static bool WatchdogMayEndTransfer(EasyTransferOptions transfer) =>
         transfer.LowSpeedLimit > 0 || transfer.LowSpeedTime > TimeSpan.Zero || transfer.Timeout > TimeSpan.Zero;
 
     /// <summary>
