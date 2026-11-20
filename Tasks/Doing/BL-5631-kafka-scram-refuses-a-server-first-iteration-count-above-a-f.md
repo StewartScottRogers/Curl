@@ -37,3 +37,4 @@ Failure: a hostile or misconfigured broker sends `i=2147483647`. The transfer th
 ## Log
 
 - 2026-11-20: Created.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 979e392e 09e22103 3d836d5e.
