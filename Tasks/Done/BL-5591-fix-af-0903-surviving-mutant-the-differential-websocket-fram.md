@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Differential.UnitLibrary/Libcurl/WebSocket/LibcurlWebSocketFrames.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5591 — Fix AF-0903: Surviving mutant: the differential WebSocket frame builder can encode a 126-byte payload in the short form
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] A fast test fails on the code as the evidence above describes it and passes after the fix; Notes name the test.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A fast test fails on the code as the evidence above describes it and passes after the fix; Notes name the test.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added `Frame_PayloadOfExactly126Bytes_WritesTheExtendedLengthMarkerAndLength` (and `Frame_PayloadOf125Bytes_WritesOneLengthByte`) in LibcurlWebSocketFramesTests. With `<` mutated to `<=`, the 126-byte test fails (frame would be 0x82,126,payload with length 128 bytes, not 130). Production code was already correct, so no change there. Build and Differential fast tests green (623).
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: cce9bcd4 9742157d.
+- 2026-11-19: Doing -> Done. 126-byte boundary test added for the differential WebSocket frame builder

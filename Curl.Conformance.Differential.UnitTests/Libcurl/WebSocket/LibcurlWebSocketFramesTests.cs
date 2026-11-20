@@ -23,6 +23,24 @@ public sealed class LibcurlWebSocketFramesTests
     }
 
     [TestMethod]
+    public void Frame_PayloadOfExactly126Bytes_WritesTheExtendedLengthMarkerAndLength()
+    {
+        var frame = LibcurlWebSocketFrames.Frame(LibcurlWebSocketFrames.Binary, new byte[126]);
+
+        CollectionAssert.AreEqual(new byte[] { 0x82, 126, 0, 126 }, frame[..4]);
+        Assert.HasCount(130, frame);
+    }
+
+    [TestMethod]
+    public void Frame_PayloadOf125Bytes_WritesOneLengthByte()
+    {
+        var frame = LibcurlWebSocketFrames.Frame(LibcurlWebSocketFrames.Binary, new byte[125]);
+
+        CollectionAssert.AreEqual(new byte[] { 0x82, 125 }, frame[..2]);
+        Assert.HasCount(127, frame);
+    }
+
+    [TestMethod]
     public void Frame_NullPayload_Throws() =>
         Assert.ThrowsExactly<ArgumentNullException>(() => LibcurlWebSocketFrames.Frame(LibcurlWebSocketFrames.Ping, null!));
 }
