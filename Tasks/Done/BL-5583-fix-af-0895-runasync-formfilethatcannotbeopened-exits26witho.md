@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests/CurlCommandRunnerFormTests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5583 — Fix AF-0895: RunAsync_FormFileThatCannotBeOpened_Exits26WithoutConnecting asserts exit 25
 
@@ -52,3 +52,4 @@ Already fixed in the tree: the test asserts 26 (exit code and stderr), the repro
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-19: Doing -> Done. Test already asserts exit 26; reproduction clean, test passes.
