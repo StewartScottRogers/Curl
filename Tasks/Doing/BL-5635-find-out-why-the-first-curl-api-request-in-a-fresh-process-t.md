@@ -36,3 +36,4 @@ Measure where the 4 seconds go (an `EventSource` trace or `Stopwatch` timings ar
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1331, finding 2 (check).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 75e5104d a479cbec 57571814 3d836d5e.
