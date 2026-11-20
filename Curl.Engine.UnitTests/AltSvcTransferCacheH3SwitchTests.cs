@@ -52,13 +52,18 @@ public sealed class AltSvcTransferCacheH3SwitchTests
 
     /// <summary>Other platforms (the OpenSSL build): with no version option an <c>h2</c> entry for another port is used.</summary>
     [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task ApplyTo_NoVersionOptionOffWindows_UsesAnH2Entry()
     {
-        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new NoFileSystem(), TimeProvider.System);
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new NoFileSystem(), TimeProvider.System, onWindows: false);
         cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), "h2=\":8443\"", System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
 
-        Assert.IsNotNull(cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions()).AltSvcRoute);
+        AltSvcRoute? actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions()).AltSvcRoute;
+        Diagnostics.Act("route", actual);
+
+        Assert.IsNotNull(actual);
+        Assert.AreEqual("h2", actual.Alternative.Alpn);
+        Assert.AreEqual("h.test", actual.Alternative.Host);
+        Assert.AreEqual(8443, actual.Alternative.Port);
     }
 
     [TestMethod]

@@ -19,6 +19,28 @@ public sealed class ApiDifferentialCasesTests
     }
 
     [TestMethod]
+    public void All_EveryCase_FollowsRedirectsExactlyWhenItsCommandPassesTheLocationOption()
+    {
+        foreach (var differentialCase in ApiDifferentialCases.All)
+        {
+            var commandFollows = differentialCase.Command.Split(' ')
+                .Any(token => token.StartsWith('-') && !token.StartsWith("--", StringComparison.Ordinal) && token.Contains('L'));
+
+            Assert.AreEqual(commandFollows, differentialCase.Request.FollowsRedirects, differentialCase.Name);
+        }
+    }
+
+    [TestMethod]
+    public void All_Redirect307PostCase_FollowsTheRedirectWithItsPostBody()
+    {
+        var request = ApiDifferentialCases.All.Single(candidate => candidate.Name == "api-redirect-307-post").Request;
+
+        Assert.AreEqual("POST", request.Method);
+        Assert.AreEqual("x=1", request.Body);
+        Assert.IsTrue(request.FollowsRedirects);
+    }
+
+    [TestMethod]
     public void All_CookieEngineRedirectCase_DescribesTheRequestItsCommandMakes()
     {
         var request = ApiDifferentialCases.All.Single(candidate => candidate.Name == "api-cookie-engine-redirect").Request;

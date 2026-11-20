@@ -158,6 +158,27 @@ public sealed class TransferCallbackMarshalTests
         Assert.AreEqual(0, buffer[0]);
     }
 
+    [TestMethod]
+    public void Over_ReadFillsTheWholeBuffer_CopiesEveryByteIntoTheTransfersBuffer()
+    {
+        TransferCallbackMarshal marshal = new(new MultiCallbackQueue(), CancellationToken.None);
+        marshal.Stop();
+        ReadCallback read = marshal.Over(new EasyCallbackOptions
+        {
+            Read = buffer =>
+            {
+                buffer.Fill(0x42);
+                return buffer.Length;
+            },
+        }).Read!;
+        byte[] buffer = new byte[4];
+
+        long answer = read(buffer);
+
+        Assert.AreEqual(4, answer);
+        CollectionAssert.AreEqual(new byte[] { 0x42, 0x42, 0x42, 0x42 }, buffer);
+    }
+
     private static long Record(List<string> calls, string call, long answer)
     {
         calls.Add(call);
