@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests/Cgr170Tests.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5581 — Fix AF-0893: Cgr170 test named Exit26 asserts exit 25
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Already fixed in the tree: Cgr170Tests.cs line 46 names Exit26 and asserts 26 (no AreEqual(25 remains). Reproduction gives the expected result; no code change needed.
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-19: Doing -> Done. Already fixed in tree; test names and asserts exit 26; Cgr170Tests pass
