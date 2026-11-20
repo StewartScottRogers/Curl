@@ -33,3 +33,4 @@ The cookbook asked for "a way to choose Digest SHA-256". In curl there is no opt
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (1942 #5).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 43e9a120 6d4018d1 450dcad2.
