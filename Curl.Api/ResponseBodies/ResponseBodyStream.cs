@@ -112,6 +112,9 @@ internal sealed class ResponseBodyStream : Stream
         }
     }
 
+    /// <summary>Completes when the transfer has ended or its body has filled the buffer and paused it.</summary>
+    public Task EndedOrPaused => _buffer.EndedOrPaused;
+
     /// <summary>
     /// Disposes the easy handle and every handle in <see cref="Owned"/> for a transfer that will never
     /// start, as when setting up the request failed.

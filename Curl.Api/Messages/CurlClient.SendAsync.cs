@@ -58,11 +58,12 @@ public sealed partial class CurlClient
         setUpFailure?.Throw();
 
         await body.StartAsync().ConfigureAwait(false);
+        await WaitForMailReplyCodeAsync(request.Url, body).ConfigureAwait(false);
         long httpVersion = collector.HttpVersion != 0 ? collector.HttpVersion : easy.Info.HttpVersion;
         TransferInfo info = easy.Info.HttpVersion == httpVersion ? easy.Info : easy.Info with { HttpVersion = httpVersion };
         return new CurlResponse
         {
-            StatusCode = collector.StatusCode != 0 ? collector.StatusCode : (int)info.ResponseCode,
+            StatusCode = StatusCodeOf(collector, info),
             ReasonPhrase = collector.ReasonPhrase,
             Version = VersionOf(httpVersion),
             Headers = collector.Headers,
@@ -71,6 +72,18 @@ public sealed partial class CurlClient
             Body = body,
         };
     }
+
+    /// <summary>Waits, for a mail URL, until the transfer ends or its body pauses it: a mail reply is body bytes delivered before the end, and only the end puts the reply code on the handle's info.</summary>
+    private static Task WaitForMailReplyCodeAsync(string url, ResponseBodyStream body) =>
+        IsMailUrl(url) ? body.EndedOrPaused : Task.CompletedTask;
+
+    /// <summary>The status line's code, else the transfer info's response code (a mail protocol's reply code).</summary>
+    private static int StatusCodeOf(ResponseHeaderCollector collector, TransferInfo info) =>
+        collector.StatusCode != 0 ? collector.StatusCode : (int)info.ResponseCode;
+
+    /// <summary>Whether <paramref name="url"/> is an SMTP, IMAP or POP3 URL, whose reply code is known only when the transfer ends.</summary>
+    private static bool IsMailUrl(string url) =>
+        url.StartsWith("smtp", StringComparison.OrdinalIgnoreCase) || url.StartsWith("imap", StringComparison.OrdinalIgnoreCase) || url.StartsWith("pop3", StringComparison.OrdinalIgnoreCase);
 
     /// <summary><paramref name="options"/> with the request's <see cref="CurlRequest.CustomRequest"/> as <c>CURLOPT_CUSTOMREQUEST</c>, unchanged; the options as they are when it has none.</summary>
     private static EasyOptions ApplyCustomRequest(EasyOptions options, CurlRequest request) =>

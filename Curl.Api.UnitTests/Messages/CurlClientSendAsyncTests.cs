@@ -161,6 +161,32 @@ public sealed class CurlClientSendAsyncTests
     }
 
     [TestMethod]
+    [DataRow("smtp://mail/", 250L)]
+    [DataRow("smtps://mail/", 250L)]
+    [DataRow("imap://mail/INBOX", 200L)]
+    [DataRow("POP3://mail/", 200L)]
+    public async Task SendAsync_MailUrlWhoseReplyBodyComesBeforeTheEnd_ReportsTheReplyCodeAsStatusCode(string url, long code)
+    {
+        ScriptedEasyTransfer easy = new() { BodyBytes = [1], InfoAtEnd = new() { ResponseCode = code } };
+
+        (CurlResponse response, _) = await SendAsync(new(HttpMethod.Get, url) { CustomRequest = "NOOP" }, easy);
+
+        Assert.AreEqual((int)code, response.StatusCode);
+        Assert.AreEqual(code, response.Info.ResponseCode);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_MailUrlWhoseBodyFillsTheBuffer_ReturnsOnceTheBufferPausesTheTransfer()
+    {
+        ScriptedEasyTransfer easy = new() { BodyBytes = [1, 2, 3, 4], BodyWrites = 2 };
+        await using CurlClient client = new(new ScriptedCurlEngine(easy), new CurlClientOptions(), ownsEngine: true);
+
+        CurlResponse response = await client.SendWithBodyCapacityAsync(new(HttpMethod.Get, "imap://mail/INBOX"), 4, CancellationToken.None);
+
+        Assert.AreEqual(0, response.StatusCode);
+    }
+
+    [TestMethod]
     public async Task SendAsync_StatusLineDisagreesWithTransferInfo_TakesTheStatusLine()
     {
         ScriptedEasyTransfer easy = new() { Info = new() { ResponseCode = 0, HttpVersion = 0 } };

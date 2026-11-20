@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Api/Messages/CurlClient.SendAsync.cs]
+touches: [Curl.Api/Messages/CurlClient.SendAsync.cs, Curl.Api/ResponseBodies/ResponseBodyBuffer.cs, Curl.Api/ResponseBodies/ResponseBodyStream.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5615 — Report the SMTP reply code as StatusCode for a Curl.Api custom SMTP command such as NOOP
 
@@ -24,13 +24,16 @@ A `NOOP` custom request gives `StatusCode` 0; `curl -X NOOP -w %{response_code} 
 
 ## Acceptance criteria
 
-- [ ] Against an SMTP test server, a `Curl.Api` `NOOP` request reports `StatusCode` 250, pinned by a test.
-- [ ] IMAP and POP3 custom requests report the same response code as `curl -w %{response_code}` does for them.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Against an SMTP test server, a `Curl.Api` `NOOP` request reports `StatusCode` 250, pinned by a test.
+- [x] IMAP and POP3 custom requests report the same response code as `curl -w %{response_code}` does for them.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Cause: a mail reply (the NOOP answer) is delivered as body bytes, so SendAsync returned when the body started, before the engine had put the reply code on Info.ResponseCode. Fix: for smtp/smtps/imap/imaps/pop3/pop3s URLs SendAsync also waits until the transfer ends or the body buffer pauses it (ResponseBodyBuffer.EndedOrPaused), then reads Info; touches widened to the two ResponseBodies files (no other Doing task names them). IMAP and POP3 take the same path and report the engine's ResponseCode as the Console's -w %{response_code} does (both read the handler's report); pinned by a data-row test for each scheme with a scripted fake, not by a live server. Verified Curl.Api quality gate green (0 failing).
 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1022, finding 4.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 2491c0c4 28e934ce 3d836d5e.
+- 2026-11-20: Doing -> Done. SMTP/IMAP/POP3 reply code reported as StatusCode
