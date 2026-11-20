@@ -1,4 +1,6 @@
+using System.Runtime.CompilerServices;
 using Curl.Extended.Protocol.Kafka.Wire;
+using Curl.Extended.Protocol.Kafka.Wire.KafkaSasl;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extended.Protocol.Kafka.Client;
@@ -8,11 +10,12 @@ namespace Curl.Extended.Protocol.Kafka.Client;
 /// from the connector) with the Kafka protocol (ADR-1076): with a body (<c>-d</c>) it produces one record whose value
 /// is the body, otherwise it consumes the partition from the offset to its end. It asks the URL's broker for Metadata
 /// first and, when another broker leads the partition, connects to that leader instead (ADR-1080). With
-/// <c>--user</c> it authenticates every connection with SASL PLAIN before its first request (ADR-1082). The exchange
+/// <c>--user</c> it authenticates every connection with SASL before its first request: PLAIN, or SCRAM-SHA-512 or SCRAM-SHA-256 on a new connection when the broker does not enable PLAIN but offers one (ADR-1082, ADR-1315). The exchange
 /// itself is <see cref="KafkaClientFlow"/>.
 /// </summary>
 /// <param name="connector">Opens the connection to the broker.</param>
-internal sealed class KafkaProtocolHandler(IConnector connector) : IProtocolHandler
+/// <param name="nonceSource">Gives the SCRAM client nonce; <see langword="null"/> for a random one.</param>
+internal sealed class KafkaProtocolHandler(IConnector connector, Func<string>? nonceSource = null) : IProtocolHandler
 {
     /// <summary>The port <c>kafka://</c> connects to when the URL names none.</summary>
     internal const int DefaultPort = 9092;
@@ -95,7 +98,8 @@ internal sealed class KafkaProtocolHandler(IConnector connector) : IProtocolHand
         ReadOnlyMemory<byte>? body = await RequestBodyAsync(context).ConfigureAwait(false);
         ConnectTarget target = TargetOf(context);
         ConnectTarget? leader = null;
-        TransferResult result = await TransferOverAsync(context, target, async flow =>
+        StrongBox<string> mechanism = new(KafkaSaslMechanisms.Plain);
+        TransferResult result = await TransferOverAsync(context, target, mechanism, async flow =>
         {
             leader = RedirectOf(context, target, await flow.FindLeaderAsync(address).ConfigureAwait(false));
             if (leader is null)
@@ -103,10 +107,17 @@ internal sealed class KafkaProtocolHandler(IConnector connector) : IProtocolHand
                 await RunAsync(flow, context, address, body).ConfigureAwait(false);
             }
         }).ConfigureAwait(false);
-        return leader is null ? result : await TransferOverAsync(context, leader, flow => RunAsync(flow, context, address, body)).ConfigureAwait(false);
+        return leader is null ? result : await TransferOverAsync(context, leader, mechanism, flow => RunAsync(flow, context, address, body)).ConfigureAwait(false);
     }
 
-    private async ValueTask<TransferResult> TransferOverAsync(ITransferContext context, ConnectTarget target, Func<KafkaClientFlow, ValueTask> exchange)
+    private async ValueTask<TransferResult> TransferOverAsync(ITransferContext context, ConnectTarget target, StrongBox<string> mechanism, Func<KafkaClientFlow, ValueTask> exchange)
+    {
+        string tried = mechanism.Value!;
+        TransferResult result = await TransferOnceAsync(context, target, mechanism, exchange).ConfigureAwait(false);
+        return mechanism.Value == tried ? result : await TransferOnceAsync(context, target, mechanism, exchange).ConfigureAwait(false);
+    }
+
+    private async ValueTask<TransferResult> TransferOnceAsync(ITransferContext context, ConnectTarget target, StrongBox<string> mechanism, Func<KafkaClientFlow, ValueTask> exchange)
     {
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
@@ -117,12 +128,16 @@ internal sealed class KafkaProtocolHandler(IConnector connector) : IProtocolHand
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            var flow = new KafkaClientFlow(connection, context.Output, context.Progress, context.TimeProvider, context.CancellationToken);
+            var flow = new KafkaClientFlow(connection, context.Output, context.Progress, context.TimeProvider, context.CancellationToken, nonceSource);
             try
             {
                 if (context.Credentials is { } credentials)
                 {
-                    await flow.AuthenticateAsync(credentials).ConfigureAwait(false);
+                    if (await flow.AuthenticateAsync(credentials, mechanism.Value!).ConfigureAwait(false) is { } offered)
+                    {
+                        mechanism.Value = offered;
+                        return TransferResult.Success(0);
+                    }
                 }
 
                 await exchange(flow).ConfigureAwait(false);
