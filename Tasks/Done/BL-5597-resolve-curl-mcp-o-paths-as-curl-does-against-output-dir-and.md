@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Mcp.UnitLibrary/McpOptionValuePaths.cs, Curl.Mcp.UnitLibrary/McpPathCheck.cs]
+touches: [Curl.Mcp.UnitLibrary/McpOptionValuePaths.cs, Curl.Mcp.UnitLibrary/McpPathCheck.cs, Curl.Mcp.UnitLibrary/McpArgumentChecker.cs, Curl.Mcp.UnitTests/McpArgumentCheckerTests.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5597 — Resolve curl-mcp -o paths as curl does: against --output-dir, and with #1 glob references
 
@@ -27,13 +27,16 @@ Combine `--output-dir` with `-o` as curl does (including `--create-dirs`), and t
 
 ## Acceptance criteria
 
-- [ ] `--output-dir downloads -o ../guide.txt` inside the root runs and writes `guide.txt` in the root; `--output-dir downloads -o ../../x` that leaves the root is refused.
-- [ ] `-o "reports/report-#1.csv"` with a URL glob runs and writes inside `reports/`; `-o "../x-#1"` that leaves the root is refused.
-- [ ] Focused unit tests in `Curl.Mcp.UnitTests` pin each case; `dotnet build` is clean and the fast tests pass.
+- [x] `--output-dir downloads -o ../guide.txt` inside the root runs and writes `guide.txt` in the root; `--output-dir downloads -o ../../x` that leaves the root is refused.
+- [x] `-o "reports/report-#1.csv"` with a URL glob runs and writes inside `reports/`; `-o "../x-#1"` that leaves the root is refused.
+- [x] Focused unit tests in `Curl.Mcp.UnitTests` pin each case; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- touches widened to McpArgumentChecker.cs (where the checker threads --output-dir) and its tests; no other Doing task named them. The checker pre-scans the arguments for the last --output-dir (curl applies it to every -o wherever it stands) and joins it before the -o name; #N becomes a file-name character (the literal directory part is judged). --output-dir set only inside a -K file is not joined: that stays the stricter root-relative check. Measured: Curl.Mcp.UnitLibrary 100% line and branch, worst CRAP 10.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (1942 #4, 2203 #6).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 0a81666f a5bbb262 c5fa87fb.
+- 2026-11-20: Doing -> Done. curl-mcp -o is judged below --output-dir and with #N as file-name characters

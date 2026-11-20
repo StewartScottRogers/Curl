@@ -24,12 +24,13 @@ internal static class McpOptionValuePaths
     /// <param name="longName">The option's long name without <c>--</c>.</param>
     /// <param name="use">How the option uses a path; never <see cref="McpOptionPathUse.None" />.</param>
     /// <param name="value">The option's value.</param>
+    /// <param name="outputDirectory">The <c>--output-dir</c> value curl joins before an <c>-o</c> name, or <see langword="null" /> when none is given.</param>
     /// <returns>The paths to check, in the order the value names them.</returns>
-    internal static IReadOnlyList<McpValuePath> PathsIn(string longName, McpOptionPathUse use, string value) => use switch
+    internal static IReadOnlyList<McpValuePath> PathsIn(string longName, McpOptionPathUse use, string value, string? outputDirectory = null) => use switch
     {
         McpOptionPathUse.ValueEmbedded => EmbeddedPaths(longName, value),
         McpOptionPathUse.ReadsFileOrLiteral => FileOrLiteralPaths(longName, value),
-        McpOptionPathUse.WritesFile => WrittenFilePaths(longName, value),
+        McpOptionPathUse.WritesFile => WrittenFilePaths(longName, value, outputDirectory),
         McpOptionPathUse.UnixSocketPath => SocketPaths(longName, value),
         _ => longName == "upload-file" ? UploadPaths(value) : [new(value)],
     };
@@ -252,36 +253,44 @@ internal static class McpOptionValuePaths
     };
 
     /// <summary>
-    /// A written file: <c>-</c> is standard output. <c>-o</c> replaces <c>#1</c> and the like with
-    /// text from the URL's glob, so such a name cannot be checked before curl runs.
+    /// A written file: <c>-</c> is standard output. <c>-o</c> is judged where curl writes it: below
+    /// <paramref name="outputDirectory" /> when one is given, and a <c>#1</c> glob reference counts as
+    /// file-name characters, so the name is judged on its literal directory part.
     /// </summary>
-    private static IReadOnlyList<McpValuePath> WrittenFilePaths(string longName, string value)
+    private static IReadOnlyList<McpValuePath> WrittenFilePaths(string longName, string value, string? outputDirectory)
     {
-        if (longName == "output" && HasGlobReference(value))
+        if (longName != "output")
         {
-            return [new(value, "names a file with a #<n> glob reference, which curl fills from the URL, so it cannot be checked before curl runs.")];
+            return FilePath(value);
         }
 
-        return longName == "output" && IsNullDevice(value) ? [] : FilePath(value);
+        if (value == StandardStream || IsNullDevice(value))
+        {
+            return [];
+        }
+
+        string name = WithoutGlobReferences(value);
+        return [new(string.IsNullOrEmpty(outputDirectory) ? name : outputDirectory + "/" + name)];
+    }
+
+    /// <summary>Replaces each <c>#</c> followed by a digit, curl's <c>#1</c> reference to a URL glob, with a file-name character.</summary>
+    private static string WithoutGlobReferences(string value)
+    {
+        System.Text.StringBuilder name = new(value);
+        for (int index = 0; index + 1 < name.Length; index++)
+        {
+            if (name[index] == '#' && char.IsAsciiDigit(name[index + 1]))
+            {
+                name.Remove(index, 2).Insert(index, "_");
+            }
+        }
+
+        return name.ToString();
     }
 
     /// <summary>Whether <paramref name="value" /> is a spelling of the null device that <c>-o</c> may discard to: <c>/dev/null</c>, or <c>NUL</c> in any case (ADR-1301).</summary>
     private static bool IsNullDevice(string value) =>
         value == "/dev/null" || value.Equals("NUL", StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>Whether <paramref name="value" /> holds <c>#</c> followed by a digit, curl's <c>#1</c> reference to a URL glob.</summary>
-    private static bool HasGlobReference(string value)
-    {
-        for (int index = value.IndexOf('#', StringComparison.Ordinal); index >= 0; index = value.IndexOf('#', index + 1))
-        {
-            if (index + 1 < value.Length && char.IsAsciiDigit(value[index + 1]))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
 
     /// <summary><c>-T -</c> and <c>-T .</c> read standard input; a globbed <c>-T</c> name cannot be checked before curl expands it.</summary>
     private static IReadOnlyList<McpValuePath> UploadPaths(string value)
