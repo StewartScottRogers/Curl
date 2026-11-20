@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Amqp1.UnitLibrary/Client/Amqp1ClientFlow.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5625 — Fix AF-0910: Surviving mutant: an AMQP 1.0 upload whose message fills whole frames can send an extra empty transfer frame
 
@@ -43,3 +43,4 @@ Killed by `RunAsync_MessageFillsWholeFrames_SendsNoExtraEmptyTransfer_Part2Secti
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: b49da2cb 9742157d.
+- 2026-11-20: Doing -> Done. Added test killing the offset <= mutant
