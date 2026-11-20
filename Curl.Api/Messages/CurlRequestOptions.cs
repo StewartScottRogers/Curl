@@ -49,7 +49,7 @@ internal static class CurlRequestOptions
     /// <param name="transfer">The transfer options to change.</param>
     /// <param name="method">The request method.</param>
     /// <param name="post">Whether the request posts.</param>
-    /// <param name="upload">Whether the request uploads its body (ADR-1314).</param>
+    /// <param name="upload">Whether the request uploads its body (ADR-1316).</param>
     /// <returns>The changed options.</returns>
     private static EasyTransferOptions ApplyMethod(EasyTransferOptions transfer, HttpMethod method, bool post, bool upload) =>
         transfer with

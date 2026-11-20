@@ -1,4 +1,4 @@
-# ADR-1314: A Curl.Api body on a non-HTTP upload scheme uploads, as `curl -T` does
+# ADR-1316: A Curl.Api body on a non-HTTP upload scheme uploads, as `curl -T` does
 
 - Status: Accepted
 - Date: 2026-11-20

@@ -90,7 +90,7 @@ public abstract class CurlContent
 
     /// <summary>
     /// <paramref name="options"/> with this content set as the source of an upload (<c>CURLOPT_UPLOAD</c>,
-    /// ADR-1314), as <c>curl -T</c> does for a non-HTTP scheme. Content that cannot be read as a plain
+    /// ADR-1316), as <c>curl -T</c> does for a non-HTTP scheme. Content that cannot be read as a plain
     /// upload (a multipart body) is sent as it is for a posting request.
     /// </summary>
     /// <param name="options">The options, with <c>CURLOPT_UPLOAD</c> already set.</param>

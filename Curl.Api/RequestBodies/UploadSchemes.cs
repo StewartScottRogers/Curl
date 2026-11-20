@@ -1,6 +1,6 @@
 namespace Curl.Api;
 
-/// <summary>The URL schemes to which a request body is uploaded as <c>curl -T</c> uploads it (ADR-1314).</summary>
+/// <summary>The URL schemes to which a request body is uploaded as <c>curl -T</c> uploads it (ADR-1316).</summary>
 internal static class UploadSchemes
 {
     private static readonly string[] Schemes = ["ftp", "ftps", "sftp", "scp", "smb", "smbs", "smtp", "smtps", "tftp", "telnet", "s3", "az"];

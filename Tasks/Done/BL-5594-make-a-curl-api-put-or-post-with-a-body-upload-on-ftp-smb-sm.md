@@ -42,7 +42,7 @@ Decide the rule (ADR, decided by Claude under Stewart's delegation): for example
 
 ## Notes
 
-Decision: ADR-1314. A body on ftp, ftps, sftp, scp, smb, smbs, smtp, smtps, tftp, telnet, s3 or az sets CURLOPT_UPLOAD with read/seek callbacks and the length as INFILESIZE; the method is ignored there; multipart keeps MIMEPOST; HTTP unchanged (existing tests pass).
+Decision: ADR-1316. A body on ftp, ftps, sftp, scp, smb, smbs, smtp, smtps, tftp, telnet, s3 or az sets CURLOPT_UPLOAD with read/seek callbacks and the length as INFILESIZE; the method is ignored there; multipart keeps MIMEPOST; HTTP unchanged (existing tests pass).
 Done: `UploadSchemes`, `CurlContent.ApplyAsUpload`, `CurlRequestOptions.Apply` split to stay under complexity 10. Measure-CodeQuality -Library Curl.Api: 0 failing. Fast Curl.Api.UnitTests 928 pass.
 Not measured: criterion 3 (loopback/Surl runs per protocol) is ticked on the strength of the unit tests showing the exact handle options `curl -T` sets (Upload, InFileSize, read callback); no live server run was made in this lane. Each engine's -T path is covered by the CLI's own tests.
 
@@ -52,4 +52,4 @@ Not measured: criterion 3 (loopback/Surl runs per protocol) is ticked on the str
 
 - 2026-11-20: Created from Surly bug reports (1942 #2, 2203 #1, 0553 #1-3).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: a7cb6ee7 c6adb168 56eba69e 375ee94d 3d836d5e.
-- 2026-11-20: Doing -> Done. Body uploads on non-HTTP upload schemes (ADR-1314)
+- 2026-11-20: Doing -> Done. Body uploads on non-HTTP upload schemes (ADR-1316)
