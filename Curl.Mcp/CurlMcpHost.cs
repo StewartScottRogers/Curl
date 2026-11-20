@@ -101,7 +101,7 @@ internal static class CurlMcpHost
         McpServerRegistry registry = new();
         // tools/list answers in registration order; this is the order the SDK host listed them in (the golden tools-list).
         registry.Add(new ParseUrlMcpTool(urlTool));
-        registry.Add(new TransferMcpTool(new McpTransferTool(engine, cap)));
+        registry.Add(new TransferMcpTool(new McpTransferTool(engine, cap, root)));
         registry.Add(new CurlCommandMcpTool(new McpCurlTool(new InProcessCurlCommandRunner(), root, cap, ExtensionOptionsFor(readEnvironmentVariable))));
         registry.Add(new BuildUrlMcpTool(urlTool));
         registry.Add(new VersionMcpTool(new McpVersionTool(engine, extendedSchemes)));

@@ -231,12 +231,12 @@ public sealed class KafkaProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_PlainNotEnabled_EndsWithLoginDeniedNamingTheEnabledMechanisms()
     {
-        ScriptedKafkaConnection connection = new(KafkaSaslTestBytes.HandshakeResponse(1, 33, "SCRAM-SHA-512"));
+        ScriptedKafkaConnection connection = new(KafkaSaslTestBytes.HandshakeResponse(1, 33, "GSSAPI"));
 
         TransferResult result = await new KafkaProtocolHandler(new ScriptedKafkaConnector(ConnectResult.Connected(connection))).ExecuteAsync(Context("kafka://broker/orders", new MemoryStream(), credentials: new NetworkCredential("alice", "s3cret")));
 
         Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
-        Assert.AreEqual("Kafka broker does not enable SASL PLAIN, it enables: SCRAM-SHA-512", result.ErrorMessage);
+        Assert.AreEqual("Kafka broker does not enable SASL PLAIN, it enables: GSSAPI", result.ErrorMessage);
         Assert.HasCount(1, connection.Writes);
     }
 

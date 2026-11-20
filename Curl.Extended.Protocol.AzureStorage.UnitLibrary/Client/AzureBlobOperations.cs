@@ -78,10 +78,12 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
     {
         long written = 0;
         string? marker = null;
+        (string urlPrefix, string delimiter, string rest) = SplitListQuery(endpoint.Query);
+        AzureStorageEndpoint listEndpoint = endpoint with { Query = rest };
         do
         {
-            string query = $"restype=container&comp=list&delimiter=%2F&prefix={Uri.EscapeDataString(prefix)}" + (marker is null ? string.Empty : $"&marker={Uri.EscapeDataString(marker)}");
-            AzureBlobListing listing = await client.ExchangeAsync("GET", AzureStorageClient.Operation(endpoint, accountPath + "/" + Uri.EscapeDataString(container), query), [], null, ReadListingAsync);
+            string query = $"restype=container&comp=list&delimiter={delimiter}&prefix={Uri.EscapeDataString(prefix + urlPrefix)}" + (marker is null ? string.Empty : $"&marker={Uri.EscapeDataString(marker)}");
+            AzureBlobListing listing = await client.ExchangeAsync("GET", AzureStorageClient.Operation(listEndpoint, accountPath + "/" + Uri.EscapeDataString(container), query), [], null, ReadListingAsync);
             written += await client.WriteLinesAsync(listing.BlobPrefixes.Concat(listing.Blobs.Select(blob => blob.Name)), output);
             marker = listing.NextMarker;
         }
@@ -89,6 +91,37 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
         return written;
     }
 
+    /// <summary>Takes the list parameters the operation owns out of the URL's query so each is sent once: the URL's <c>prefix</c> extends the path's, its <c>delimiter</c> replaces <c>/</c>, and <c>restype</c>, <c>comp</c> and <c>marker</c> are dropped.</summary>
+    /// <param name="query">The URL's query, percent-encoded, without a <c>?</c>.</param>
+    /// <returns>The decoded URL prefix, the percent-encoded delimiter, and the query left to send as it is.</returns>
+    internal static (string Prefix, string Delimiter, string Remainder) SplitListQuery(string query)
+    {
+        string prefix = string.Empty;
+        string delimiter = "%2F";
+        List<string> rest = [];
+        foreach (string pair in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int at = pair.IndexOf('=', StringComparison.Ordinal);
+            string name = Uri.UnescapeDataString(at < 0 ? pair : pair[..at]);
+            string value = at < 0 ? string.Empty : pair[(at + 1)..];
+            switch (name)
+            {
+                case "prefix":
+                    prefix = Uri.UnescapeDataString(value);
+                    break;
+                case "delimiter":
+                    delimiter = value;
+                    break;
+                case "restype" or "comp" or "marker":
+                    break;
+                default:
+                    rest.Add(pair);
+                    break;
+            }
+        }
+
+        return (prefix, delimiter, string.Join('&', rest));
+    }
     private async Task<long> UploadAsync(AzureStorageEndpoint endpoint, Stream upload)
     {
         int size = upload.CanSeek ? BlockSizeFor(upload.Length - upload.Position, blockSize, maxBlockCount) : blockSize;

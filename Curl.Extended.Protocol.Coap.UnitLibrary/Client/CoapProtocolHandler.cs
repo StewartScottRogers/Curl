@@ -65,6 +65,7 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
         await using (transport.ConfigureAwait(false))
         {
             ReportConnectionOpened(context, transport, open.ConnectionNumber);
+            transport.ConnectToServer();
             return CoapRequest.IsSecure(context.Url)
                 ? await SecureExchangeAsync(context, transport, request).ConfigureAwait(false)
                 : await ExchangeAsync(context, transport, request).ConfigureAwait(false);

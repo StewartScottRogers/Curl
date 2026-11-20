@@ -254,7 +254,7 @@ internal sealed partial class ManagedEasyTransfer
     /// <param name="transfer">The transfer's options.</param>
     /// <returns><see langword="true" /> when the low-speed limit or time is above zero.</returns>
     private static bool WatchesLowSpeed(EasyTransferOptions transfer) =>
-        transfer.LowSpeedLimit > 0 || transfer.LowSpeedTime > TimeSpan.Zero;
+        transfer.LowSpeedLimit > 0 || transfer.LowSpeedTime > TimeSpan.Zero || transfer.Timeout > TimeSpan.Zero;
 
     /// <summary>
     /// The token the context stops on: the runner's abort token as it is when the runner gave <paramref name="toolProgress" />

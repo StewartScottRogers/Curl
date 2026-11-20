@@ -63,6 +63,26 @@ public sealed class CurlClientSendAsyncTests
     }
 
     [TestMethod]
+    public async Task SendAsync_CustomRequestWithSpaces_IsSetUnchangedAndWinsOverTheMethod()
+    {
+        CurlRequest request = new(HttpMethod.Get, "imap://example/INBOX") { CustomRequest = @"STORE 1 +Flags \Seen" };
+
+        (_, ScriptedEasyTransfer easy) = await SendAsync(request);
+
+        Assert.AreEqual(@"STORE 1 +Flags \Seen", Performed(easy).Transfer.CustomRequest);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_MoveCustomRequestOnAPost_WinsOverTheMethod()
+    {
+        CurlRequest request = new(HttpMethod.Post, "imap://example/INBOX") { CustomRequest = "MOVE 1 Archive" };
+
+        (_, ScriptedEasyTransfer easy) = await SendAsync(request);
+
+        Assert.AreEqual("MOVE 1 Archive", Performed(easy).Transfer.CustomRequest);
+    }
+
+    [TestMethod]
     public async Task SendAsync_Head_SetsNoBody()
     {
         (_, ScriptedEasyTransfer easy) = await SendAsync(new(HttpMethod.Head, "http://example/"));
@@ -141,6 +161,32 @@ public sealed class CurlClientSendAsyncTests
     }
 
     [TestMethod]
+    [DataRow("smtp://mail/", 250L)]
+    [DataRow("smtps://mail/", 250L)]
+    [DataRow("imap://mail/INBOX", 200L)]
+    [DataRow("POP3://mail/", 200L)]
+    public async Task SendAsync_MailUrlWhoseReplyBodyComesBeforeTheEnd_ReportsTheReplyCodeAsStatusCode(string url, long code)
+    {
+        ScriptedEasyTransfer easy = new() { BodyBytes = [1], InfoAtEnd = new() { ResponseCode = code } };
+
+        (CurlResponse response, _) = await SendAsync(new(HttpMethod.Get, url) { CustomRequest = "NOOP" }, easy);
+
+        Assert.AreEqual((int)code, response.StatusCode);
+        Assert.AreEqual(code, response.Info.ResponseCode);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_MailUrlWhoseBodyFillsTheBuffer_ReturnsOnceTheBufferPausesTheTransfer()
+    {
+        ScriptedEasyTransfer easy = new() { BodyBytes = [1, 2, 3, 4], BodyWrites = 2 };
+        await using CurlClient client = new(new ScriptedCurlEngine(easy), new CurlClientOptions(), ownsEngine: true);
+
+        CurlResponse response = await client.SendWithBodyCapacityAsync(new(HttpMethod.Get, "imap://mail/INBOX"), 4, CancellationToken.None);
+
+        Assert.AreEqual(0, response.StatusCode);
+    }
+
+    [TestMethod]
     public async Task SendAsync_StatusLineDisagreesWithTransferInfo_TakesTheStatusLine()
     {
         ScriptedEasyTransfer easy = new() { Info = new() { ResponseCode = 0, HttpVersion = 0 } };
@@ -150,6 +196,21 @@ public sealed class CurlClientSendAsyncTests
 
         Assert.AreEqual(404, response.StatusCode);
         Assert.AreEqual(System.Net.HttpVersion.Version20, response.Version);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\n", 2L)]
+    [DataRow("HTTP/2 200\r\n", 3L)]
+    [DataRow("HTTP/3 200\r\n", 30L)]
+    public async Task SendAsync_StatusLineNamesVersion_InfoHttpVersionHoldsItBeforeTheTransferEnds(string statusLine, long expected)
+    {
+        ScriptedEasyTransfer easy = new() { Info = new() { ResponseCode = 0, HttpVersion = 0 } };
+        easy.HeaderLines.AddRange([statusLine, "\r\n"]);
+
+        (CurlResponse response, _) = await SendAsync(new(HttpMethod.Get, "http://example/"), easy);
+
+        Assert.AreEqual(expected, response.Info.HttpVersion);
+        Assert.AreEqual(Curl.Api.CurlClient.VersionOf(expected), response.Version);
     }
 
     [TestMethod]

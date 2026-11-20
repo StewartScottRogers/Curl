@@ -14,7 +14,8 @@ namespace Curl.Mcp;
 /// </summary>
 /// <param name="engine">The transfer engine whose easy handle runs the request.</param>
 /// <param name="cap">The most bytes of response body the tool returns.</param>
-public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap)
+/// <param name="root">The folder a CA file must lie in; <see langword="null" /> means none is configured, so a CA file is refused.</param>
+public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap, McpConfinementRoot? root = null)
 {
     /// <summary>
     /// Runs <paramref name="request" />, unless a field is invalid or
@@ -32,6 +33,18 @@ public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap)
             return McpTransferToolResult.Failed(check.Failure!);
         }
 
+        string? caFilePath = null;
+        if (request.CaFile is not null)
+        {
+            McpPathCheck path = (root ?? McpConfinementRoot.NotConfigured).Check(request.CaFile);
+            if (!path.IsAllowed)
+            {
+                return McpTransferToolResult.Failed(McpToolFailure.PathRefused("caFile", path.Reason));
+            }
+
+            caFilePath = path.ResolvedPath;
+        }
+
         if (cancellationToken.IsCancellationRequested)
         {
             return McpTransferToolResult.Failed(McpToolFailure.Cancelled);
@@ -40,7 +53,7 @@ public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap)
         await using IEasyTransfer transfer = engine.CreateEasy();
         using McpCappedCaptureStream body = new(cap);
         McpResponseHeaderCollector headers = new();
-        transfer.Options = McpTransferOptions.Build(request, check.Body) with
+        transfer.Options = McpTransferOptions.Build(request, check.Body, caFilePath) with
         {
             Callbacks = new EasyCallbackOptions { Write = data => WriteBody(body, data), Header = headers.Collect },
         };

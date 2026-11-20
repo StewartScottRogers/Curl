@@ -2,6 +2,7 @@ using System.Runtime.ExceptionServices;
 using Curl.Api.EngineContracts;
 using Curl.Api.Errors;
 using Curl.Api.Info;
+using Curl.Api.Options;
 
 namespace Curl.Api;
 
@@ -57,18 +58,36 @@ public sealed partial class CurlClient
         setUpFailure?.Throw();
 
         await body.StartAsync().ConfigureAwait(false);
-        TransferInfo info = easy.Info;
+        await WaitForMailReplyCodeAsync(request.Url, body).ConfigureAwait(false);
+        long httpVersion = collector.HttpVersion != 0 ? collector.HttpVersion : easy.Info.HttpVersion;
+        TransferInfo info = easy.Info.HttpVersion == httpVersion ? easy.Info : easy.Info with { HttpVersion = httpVersion };
         return new CurlResponse
         {
-            StatusCode = collector.StatusCode != 0 ? collector.StatusCode : (int)info.ResponseCode,
+            StatusCode = StatusCodeOf(collector, info),
             ReasonPhrase = collector.ReasonPhrase,
-            Version = VersionOf(collector.HttpVersion != 0 ? collector.HttpVersion : info.HttpVersion),
+            Version = VersionOf(httpVersion),
             Headers = collector.Headers,
             Trailers = collector.Trailers,
             Info = info,
             Body = body,
         };
     }
+
+    /// <summary>Waits, for a mail URL, until the transfer ends or its body pauses it: a mail reply is body bytes delivered before the end, and only the end puts the reply code on the handle's info.</summary>
+    private static Task WaitForMailReplyCodeAsync(string url, ResponseBodyStream body) =>
+        IsMailUrl(url) ? body.EndedOrPaused : Task.CompletedTask;
+
+    /// <summary>The status line's code, else the transfer info's response code (a mail protocol's reply code).</summary>
+    private static int StatusCodeOf(ResponseHeaderCollector collector, TransferInfo info) =>
+        collector.StatusCode != 0 ? collector.StatusCode : (int)info.ResponseCode;
+
+    /// <summary>Whether <paramref name="url"/> is an SMTP, IMAP or POP3 URL, whose reply code is known only when the transfer ends.</summary>
+    private static bool IsMailUrl(string url) =>
+        url.StartsWith("smtp", StringComparison.OrdinalIgnoreCase) || url.StartsWith("imap", StringComparison.OrdinalIgnoreCase) || url.StartsWith("pop3", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary><paramref name="options"/> with the request's <see cref="CurlRequest.CustomRequest"/> as <c>CURLOPT_CUSTOMREQUEST</c>, unchanged; the options as they are when it has none.</summary>
+    private static EasyOptions ApplyCustomRequest(EasyOptions options, CurlRequest request) =>
+        request.CustomRequest is null ? options : options with { Transfer = options.Transfer with { CustomRequest = request.CustomRequest } };
 
     /// <summary>
     /// Puts <paramref name="request"/>'s transport options, method, URL, headers, body and callbacks on
@@ -86,7 +105,9 @@ public sealed partial class CurlClient
         {
             easy.Options = CurlTransportOptions.Apply(easy.Options, request.Network, request.Tls, request.Proxy);
             easy.Options = CurlProtocolOptions.Apply(easy.Options, request.ProtocolRecords);
+            easy.Options = ApplyExtensionOptions(easy.Options, request);
             easy.Options = CurlRequestOptions.Apply(easy.Options, request, collector.Take, body.TakeBody, _engine, body.Owned);
+            easy.Options = ApplyCustomRequest(easy.Options, request);
             return null;
         }
         catch (Exception exception)

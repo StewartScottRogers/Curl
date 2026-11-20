@@ -4,6 +4,8 @@
     {
       "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"golden\",\"version\":\"1.0\"}}}",
       "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
         "result": {
           "protocolVersion": "2025-06-18",
           "capabilities": {
@@ -17,9 +19,7 @@
             "name": "Curl.Mcp",
             "version": "0.1.0.0"
           }
-        },
-        "id": 1,
-        "jsonrpc": "2.0"
+        }
       }
     },
     {
@@ -29,12 +29,12 @@
     {
       "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"resources/read\",\"params\":{\"uri\":\"curl://no-such-resource\"}}",
       "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
         "error": {
           "code": -32002,
           "message": "Resource not found: 'curl://no-such-resource'."
-        },
-        "id": 2,
-        "jsonrpc": "2.0"
+        }
       }
     }
   ]

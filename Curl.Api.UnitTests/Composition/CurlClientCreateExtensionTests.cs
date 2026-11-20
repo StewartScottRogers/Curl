@@ -38,6 +38,63 @@ public sealed class CurlClientCreateExtensionTests
         Assert.AreEqual(0, handler.Transfers);
     }
 
+    [TestMethod]
+    public async Task SendAsync_WithDnsOptionsAndExtensionsOn_RunsTheTransfer()
+    {
+        ReachedExtensionHandler handler = new();
+        await using CurlClient client = CurlClient.Create(new CurlClientOptions(), _ => null, _ => [handler]);
+
+        CurlResponse response = await client.SendAsync(
+            new CurlRequest(HttpMethod.Get, ExtensionUrl) { Dns = new CurlDnsOptions { Json = true, Transport = "tcp" } },
+            CancellationToken.None);
+        await response.Body.DisposeAsync();
+
+        Assert.AreEqual(1, handler.Transfers);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_WithDnsOptionsAndCurlExtensionsZero_FailsAsAnUnknownOption()
+    {
+        ReachedExtensionHandler handler = new();
+        await using CurlClient client = CurlClient.Create(
+            new CurlClientOptions(),
+            name => name == "CURL_EXTENSIONS" ? "0" : null,
+            _ => [handler]);
+
+        CurlException failure = await Assert.ThrowsExactlyAsync<CurlException>(
+            () => client.SendAsync(new CurlRequest(HttpMethod.Get, ExtensionUrl) { Dns = new CurlDnsOptions { Json = true } }, CancellationToken.None));
+
+        Assert.AreEqual(CurlCode.UnknownOption, failure.Code);
+        Assert.AreEqual(0, handler.Transfers);
+    }
+
+    [TestMethod]
+    public void ExtensionTransferHooksFor_DnsJson_ActivatesTheDnsHook()
+    {
+        Assert.IsNotNull(CurlClient.ExtensionTransferHooksFor(new Dictionary<string, string> { ["dns-json"] = string.Empty }));
+    }
+
+    [TestMethod]
+    public void ExtensionTransferHooksFor_NoOptions_ActivatesNone()
+    {
+        Assert.IsNull(CurlClient.ExtensionTransferHooksFor(new Dictionary<string, string>()));
+    }
+
+    [TestMethod]
+    public void ToExtensionOptions_TransportAndJson_NameBoth()
+    {
+        IReadOnlyDictionary<string, string> values = new CurlDnsOptions { Transport = "tcp", Json = true }.ToExtensionOptions();
+
+        Assert.AreEqual("tcp", values["dns-transport"]);
+        Assert.AreEqual(string.Empty, values["dns-json"]);
+    }
+
+    [TestMethod]
+    public void ToExtensionOptions_Default_IsEmpty()
+    {
+        Assert.AreEqual(0, new CurlDnsOptions().ToExtensionOptions().Count);
+    }
+
     private sealed class ReachedExtensionHandler : IProtocolHandler
     {
         public int Transfers { get; private set; }

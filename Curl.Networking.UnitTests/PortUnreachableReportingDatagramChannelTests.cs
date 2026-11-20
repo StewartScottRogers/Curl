@@ -119,6 +119,38 @@ public sealed class PortUnreachableReportingDatagramChannelTests
         Assert.IsTrue(inner.Disposed);
     }
 
+    [TestMethod]
+    public async Task ConnectToServer_ForwardsToTheInnerChannelAndToEveryAlternativeItSwitchesTo()
+    {
+        var first = new ConnectRecordingChannel(new SocketException((int)SocketError.ConnectionRefused));
+        var second = new ConnectRecordingChannel(null);
+        var channel = new PortUnreachableReportingDatagramChannel(first, () => "unused", [new IPEndPoint(IPAddress.Loopback, 2)], _ => second);
+        Diagnostics.Arrange("channel", "connected, first answers a refusal");
+
+        channel.ConnectToServer();
+        await channel.SendAsync(new byte[] { 1 }, Server, CancellationToken.None);
+        await channel.ReceiveAsync(new byte[16], CancellationToken.None);
+
+        Assert.IsTrue(first.Connected);
+        Assert.IsTrue(second.Connected);
+    }
+
+    private sealed class ConnectRecordingChannel(SocketException? receiveFailure) : IDatagramChannel
+    {
+        public bool Connected { get; private set; }
+
+        public EndPoint ServerEndPoint => Server;
+
+        public void ConnectToServer() => Connected = true;
+
+        public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            receiveFailure is null ? ValueTask.FromResult(new DatagramReceived(1, Server)) : throw receiveFailure;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     private sealed class AnsweringChannel : IDatagramChannel
     {
         public static readonly IPEndPoint Local = new(IPAddress.Loopback, 50000);

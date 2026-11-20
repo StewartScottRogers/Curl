@@ -2,8 +2,8 @@ namespace Curl.Mcp;
 
 /// <summary>
 /// What the <c>transfer</c> tool is asked to do (ADR-0548, ADR-0593): one request, described by
-/// fields rather than a curl command line. No field names a local path, so nothing here needs
-/// confining to <c>CURL_MCP_ROOT</c>; a <c>file:</c> URL is refused for the same reason.
+/// fields rather than a curl command line. Only <see cref="CaFile" /> names a local path, and
+/// <see cref="McpTransferTool" /> confines it to <c>CURL_MCP_ROOT</c>; a <c>file:</c> URL is refused because it would reach local files.
 /// </summary>
 /// <param name="Url">The URL to transfer: absolute, with a scheme other than <c>file</c>.</param>
 public sealed record McpTransferRequest(string Url)
@@ -31,4 +31,10 @@ public sealed record McpTransferRequest(string Url)
 
     /// <summary>The <c>User-Agent</c> header. Default <see langword="null" />: none is sent.</summary>
     public string? UserAgent { get; init; }
+
+    /// <summary>The lowest TLS version to accept, as <c>curl --tlsv1.2</c> sets it: <c>1.0</c>, <c>1.1</c>, <c>1.2</c> or <c>1.3</c>. Default <see langword="null" />: libcurl's default.</summary>
+    public string? MinTlsVersion { get; init; }
+
+    /// <summary>The CA certificate file to verify the server with, as <c>curl --cacert</c> takes it; <see cref="McpTransferTool" /> confines it to <c>CURL_MCP_ROOT</c>. Default <see langword="null" />: the build's default store.</summary>
+    public string? CaFile { get; init; }
 }

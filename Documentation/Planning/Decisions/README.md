@@ -1355,3 +1355,9 @@ Each option and the specific reason it lost.
 | [1311](ADR-1311-socketio-sends-u-as-the-connect-packet-auth-payload.md) | The socketio client sends -u as the CONNECT packet's auth payload (BL-5567) | Accepted | 2026-11-19 |
 | [1312](ADR-1312-the-amqp-client-picks-plain-anonymous-or-amqplain.md) | The amqp client picks PLAIN, ANONYMOUS or AMQPLAIN from what the server offers (BL-5568) | Accepted | 2026-11-19 |
 | [1313](ADR-1313-alt-svc-with-no-version-option-stays-on-the-origin-for-h2-and-h3-on-windows.md) | With no version option, alt-svc ignores h2 and h3 entries on Windows (BL-5574) | Accepted | 2026-11-19 |
+| [1314](ADR-1314-ldaps-cacert-on-windows-follows-curl-winldap-no-change.md) | ldaps:// --cacert on Windows already follows curl's WinLDAP, so nothing changes (BL-5595) | Accepted | 2026-11-20 |
+| [1315](ADR-1315-an-s3-url-sends-its-query-string-and-a-prefix-parameter-extends-the-path-prefix.md) | An s3:// URL sends its query string, and a prefix parameter extends the path prefix (BL-5607) | Accepted | 2026-11-20 |
+| [1316](ADR-1316-a-curl-api-body-on-a-non-http-upload-scheme-uploads-as-curl-t-does.md) | A Curl.Api body on a non-HTTP upload scheme uploads, as `curl -T` does (BL-5594) | Accepted | 2026-11-20 |
+| [1317](ADR-1317-kafka-logs-in-with-scram-when-the-broker-enables-no-plain.md) | Kafka logs in with SCRAM-SHA-512 or SCRAM-SHA-256 when the broker enables no PLAIN (BL-5600) | Accepted | 2026-11-20 |
+| [1318](ADR-1318-coap-connects-its-udp-socket-so-an-unbound-port-fails-at-once-everywhere.md) | CoAP connects its UDP socket so an unbound port fails at once on every platform (BL-5601) | Accepted | 2026-11-20 |
+| [1319](ADR-1319-curl-api-sets-extension-options-through-typed-option-records.md) | Curl.Api sets extension options through typed option records (BL-5617) | Accepted | 2026-11-20 |

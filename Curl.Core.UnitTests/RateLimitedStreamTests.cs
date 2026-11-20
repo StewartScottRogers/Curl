@@ -47,7 +47,7 @@ public sealed class RateLimitedStreamTests
     }
 
     [TestMethod]
-    public async Task WriteAsync_TenKiBAtOneKiBPerSecond_WritesOneSecondPiecesOverNineSimulatedSeconds()
+    public async Task WriteAsync_TenKiBAtOneKiBPerSecond_WritesOneSecondPiecesOverTenSimulatedSeconds()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         byte[] body = Bytes(10 * KiB);
@@ -67,10 +67,33 @@ public sealed class RateLimitedStreamTests
         diagnostics.Act("sent length", sentBytes.Length);
         diagnostics.Act("simulated time taken", taken);
         diagnostics.Diff("sent body", body, sentBytes);
-        diagnostics.Assert("simulated time taken", TimeSpan.FromSeconds(9), taken);
+        diagnostics.Assert("simulated time taken", TimeSpan.FromSeconds(10), taken);
         CollectionAssert.AreEqual(body, sentBytes);
-        Assert.AreEqual(TimeSpan.FromSeconds(9), clock.GetUtcNow() - Start);
-        Assert.HasCount(9, clock.Waits);
+        Assert.AreEqual(TimeSpan.FromSeconds(10), clock.GetUtcNow() - Start);
+        Assert.HasCount(10, clock.Waits);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HundredThousandBytesAtTwentyFiveThousand_AveragesTheLimitWithinTenPercent()
+    {
+        FakeTimeProvider clock = new(Start);
+        using RateLimitedStream limited = new(Stream.Null, 25_000, clock);
+
+        await limited.WriteAsync(Bytes(100_000).AsMemory());
+
+        double average = 100_000 / (clock.GetUtcNow() - Start).TotalSeconds;
+        Assert.IsTrue(average >= 22_500 && average <= 27_500, $"average {average} bytes per second");
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HundredThousandBytesAtTheirOwnLength_TakesOneSecondNotNone()
+    {
+        FakeTimeProvider clock = new(Start);
+        using RateLimitedStream limited = new(Stream.Null, 100_000, clock);
+
+        await limited.WriteAsync(Bytes(100_000).AsMemory());
+
+        Assert.AreEqual(TimeSpan.FromSeconds(1), clock.GetUtcNow() - Start);
     }
 
     [TestMethod]

@@ -154,7 +154,7 @@ internal sealed partial class ManagedEasyTransfer
     /// <param name="url">The URL to transfer.</param>
     /// <returns>The declared length, or <see langword="null" />.</returns>
     internal static long? DeclaredUploadLengthOf(EasyOptions options, CurlUrl url) =>
-        options.Transfer.InFileSize >= 0 && (IsScheme(url, "http") || IsScheme(url, "https")) ? options.Transfer.InFileSize : null;
+        options.Transfer.InFileSize >= 0 && (IsScheme(url, "http") || IsScheme(url, "https") || IsScheme(url, "smb") || IsScheme(url, "smbs")) ? options.Transfer.InFileSize : null;
 
     /// <summary>Whether <paramref name="url" />'s scheme is <paramref name="scheme" />, in any case.</summary>
     /// <param name="url">The URL.</param>

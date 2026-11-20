@@ -95,6 +95,19 @@ public sealed class LdapOpenLdapSaslBindTests
     }
 
     [TestMethod]
+    [DataRow(HttpAuthSchemes.Ntlm, null)]
+    [DataRow(HttpAuthSchemes.Basic, "AUTH=NTLM")]
+    public async Task ExecuteAsync_ServerOffersNtlm_FailsWith67LikeCurlsOpenLdapBuild(HttpAuthSchemes schemes, string? loginOptions)
+    {
+        // Measured with curl 8.18.0 (OpenLDAP 2.6.10, Linux) against a server whose supportedSASLMechanisms is NTLM:
+        // "curl: (67) Login denied". Its OpenLDAP backend never does an NTLM bind.
+        (TransferResult result, byte[] sent) = await RunAsync(schemes, loginOptions, MechanismsEntry(1, "NTLM"), RootDseDone1);
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+        Assert.IsFalse(sent.AsSpan().IndexOf("secret"u8) >= 0);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ServerClosesReadingTheMechanisms_FailsWith7()
     {
         (TransferResult result, _) = await RunAsync(HttpAuthSchemes.Digest, null);
@@ -119,10 +132,10 @@ public sealed class LdapOpenLdapSaslBindTests
     }
 
     /// <summary>A SearchResultEntry for the rootDSE with <c>supportedSASLMechanisms: DIGEST-MD5</c>.</summary>
-    private static string MechanismsEntry(int id)
+    private static string MechanismsEntry(int id, string mechanism = "DIGEST-MD5")
     {
         byte[] name = "supportedSASLMechanisms"u8.ToArray();
-        byte[] value = "DIGEST-MD5"u8.ToArray();
+        byte[] value = Encoding.ASCII.GetBytes(mechanism);
         byte[] set = [0x31, (byte)(value.Length + 2), 0x04, (byte)value.Length, .. value];
         byte[] partial = [0x04, (byte)name.Length, .. name, .. set];
         byte[] attribute = [0x30, (byte)partial.Length, .. partial];

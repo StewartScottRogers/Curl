@@ -37,13 +37,13 @@ public sealed class KafkaSaslTests
     public Task Sasl_PlainNotOffered_FailsWithLoginDenied() =>
         Known.RunCaseAsync(["Kafka:Guide-Sasl-2"], async () =>
         {
-            KafkaReferenceBroker broker = Broker("SCRAM-SHA-256");
+            KafkaReferenceBroker broker = Broker("GSSAPI");
 
             CurlRunResult result = await ExtendedConformanceHarness.RunAsync(CurlRunner, [ReferenceRoute.Tcp(Port, broker)], Arguments);
 
             Assert.AreEqual(67, result.ExitCode);
             Assert.HasCount(1, broker.Requests);
-            Assert.AreEqual("curl: (67) Kafka broker does not enable SASL PLAIN, it enables: SCRAM-SHA-256" + Environment.NewLine, Text(result.StandardError));
+            Assert.AreEqual("curl: (67) Kafka broker does not enable SASL PLAIN, it enables: GSSAPI" + Environment.NewLine, Text(result.StandardError));
         });
 
     [TestMethod]

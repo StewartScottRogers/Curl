@@ -15,11 +15,11 @@ internal static class KafkaSaslTestBytes
         return KafkaTestBytes.Framed(body);
     }
 
-    /// <summary>Gives a framed SaslAuthenticate v0 response with an empty <c>auth_bytes</c>.</summary>
-    public static byte[] AuthenticateResponse(int correlationId, short errorCode, string? errorMessage = null)
+    /// <summary>Gives a framed SaslAuthenticate v0 response with <paramref name="authBytes"/> (none by default).</summary>
+    public static byte[] AuthenticateResponse(int correlationId, short errorCode, string? errorMessage = null, byte[]? authBytes = null)
     {
         KafkaWriter body = new KafkaWriter().Int32(correlationId).Int16(errorCode);
         body = errorMessage is null ? body.NullString() : body.String(errorMessage);
-        return KafkaTestBytes.Framed(body.Bytes([]));
+        return KafkaTestBytes.Framed(body.Bytes(authBytes ?? []));
     }
 }

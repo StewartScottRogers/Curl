@@ -133,6 +133,31 @@ public sealed class S3ProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("s3://bucket/?prefix=logs/", "GET /bucket?list-type=2&delimiter=%2F&prefix=logs%2F HTTP/1.1\r\n")]
+    [DataRow("s3://bucket/?max-keys=1", "GET /bucket?list-type=2&delimiter=%2F&prefix=&max-keys=1 HTTP/1.1\r\n")]
+    [DataRow("s3://bucket/dir/?prefix=a+b&delimiter=&list-type=1", "GET /bucket?list-type=2&delimiter=&prefix=dir%2Fa%20b HTTP/1.1\r\n")]
+    public async Task ExecuteAsync_ListingWithAQuery_SendsItWithTheListParameters(string url, string expectedRequestLine)
+    {
+        QueuedS3Connector connector = new(QueuedS3Connector.Ok(Listing(string.Empty, "false", string.Empty)));
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(Context(url, new MemoryStream(), new NetworkCredential("AKID", "secret")));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.StartsWith(expectedRequestLine, connector.Connections[0].Written);
+        Assert.Contains("Authorization: AWS4-HMAC-SHA256", connector.Connections[0].Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_KeyWithAQuery_SendsTheQueryWithTheGetObject()
+    {
+        QueuedS3Connector connector = new(QueuedS3Connector.Ok("x"));
+
+        await Handler(connector, Minio).ExecuteAsync(Context("s3://bucket/k?versionId=v%201", new MemoryStream()));
+
+        Assert.StartsWith("GET /bucket/k?versionId=v%201 HTTP/1.1\r\n", connector.Connections[0].Written);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TrailingSlash_ListsEveryPageWithTheDelimiter()
     {
         QueuedS3Connector connector = new(

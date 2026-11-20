@@ -173,37 +173,105 @@ function Stop-ShiftStart {
     & $Notify -Reasons @("SHIFT REFUSED  $Why", 'No shift runs until this is cleared and a shift is started again.')
 }
 
-function Wait-ForCleanTree {
-    # Returns the main checkout's dirty paths, or nothing once it is clean. A shift started by
-    # a -Continuous hand-over ($ShiftBranch set) traces the dirty paths once and polls every
-    # $PollMinutes for up to $WindowMinutes, since an interactive session's commit leaves the
-    # tree dirty only briefly (BL-3093); any other start returns at once. It only reads
-    # git status: the user's changes are never touched. The caller refuses on a dirty result.
+function Wait-ForHandOverReady {
+    # The wait both start checks share (BL-3093, BL-5592). Returns what $Check returns once it
+    # returns nothing, which the caller reads as ready. A start not by hand-over returns the
+    # first result at once, so a person who started a shift hears about the trouble at once.
+    # A -Continuous hand-over has nobody watching: it traces the first result once and polls
+    # every $PollMinutes, running $WhileWaiting on every poll (the coordinator's CI watch, so a
+    # failing CI run is still traced and filed while the shift waits, AF-0904). After
+    # $WindowMinutes it flags its tab once and goes on waiting; only after $GiveUpMinutes does
+    # it return the last result, when the caller refuses with the alarm. Before BL-5592 the
+    # hand-over refused at $WindowMinutes and exited, and no shift ran until a person came.
     param(
-        [bool]$HandOver = [bool]$ShiftBranch,
-        [scriptblock]$GetDirty = { Get-Dirty },
+        [bool]$HandOver,
+        [scriptblock]$Check,
+        [string]$What,
+        [scriptblock]$TraceFirst = { param([object[]]$Found) },
+        [scriptblock]$WhileWaiting = { },
+        [scriptblock]$Flag = { Set-OwnTabLabel 'WAITING, read' },
         [scriptblock]$Sleep = { param([int]$Seconds) Start-Sleep -Seconds $Seconds },
         [scriptblock]$Now = { Get-Date },
         [scriptblock]$Trace = { param([string]$Verb, [string]$Detail) Write-Trace '-' $Verb $Detail 'Yellow' },
         [int]$PollMinutes = 2,
-        [int]$WindowMinutes = 30)
+        [int]$WindowMinutes = 30,
+        [int]$GiveUpMinutes = 480)
     $start = & $Now
     $traced = $false
+    $flagged = $false
     while ($true) {
-        $dirty = @(& $GetDirty | Where-Object { $_ })
-        if (-not $dirty.Count -or -not $HandOver) { return $dirty }
+        $found = @(& $Check | Where-Object { $_ })
+        if (-not $found.Count -or -not $HandOver) { return $found }
         if (-not $traced) {
-            $dirty | Select-Object -First 10 | ForEach-Object { & $Trace 'dirty' $_ }
-            if ($dirty.Count -gt 10) { & $Trace 'dirty' "and $($dirty.Count - 10) more" }
-            & $Trace 'wait' "working tree not clean at hand-over; checking every $PollMinutes minutes for up to $WindowMinutes"
+            & $TraceFirst $found
+            & $Trace 'wait' "$What at hand-over; checking every $PollMinutes minutes and watching CI, for up to $GiveUpMinutes minutes"
             $traced = $true
         }
-        if (((& $Now) - $start).TotalMinutes -ge $WindowMinutes) {
-            & $Trace 'wait' "working tree still not clean after $WindowMinutes minutes"
-            return $dirty
+        $waited = ((& $Now) - $start).TotalMinutes
+        if ($waited -ge $GiveUpMinutes) {
+            & $Trace 'wait' "$What after $GiveUpMinutes minutes; giving up"
+            return $found
         }
+        if (-not $flagged -and $waited -ge $WindowMinutes) {
+            & $Trace 'wait' "$What after $WindowMinutes minutes; still waiting and watching CI"
+            & $Flag
+            $flagged = $true
+        }
+        & $WhileWaiting
         & $Sleep ($PollMinutes * 60)
     }
+}
+
+function Wait-ForCleanTree {
+    # Returns the main checkout's dirty paths, or nothing once it is clean. A shift started by
+    # a -Continuous hand-over ($ShiftBranch set) traces the dirty paths once and waits for an
+    # interactive session to commit (Wait-ForHandOverReady), for up to the shift's own -Hours;
+    # any other start returns at once. It only reads git status: the user's changes are never
+    # touched. The caller refuses on a dirty result.
+    param(
+        [bool]$HandOver = [bool]$ShiftBranch,
+        [scriptblock]$GetDirty = { Get-Dirty },
+        [scriptblock]$WhileWaiting = { },
+        [scriptblock]$Flag = { Set-OwnTabLabel 'WAITING, read' },
+        [scriptblock]$Sleep = { param([int]$Seconds) Start-Sleep -Seconds $Seconds },
+        [scriptblock]$Now = { Get-Date },
+        [scriptblock]$Trace = { param([string]$Verb, [string]$Detail) Write-Trace '-' $Verb $Detail 'Yellow' },
+        [int]$PollMinutes = 2,
+        [int]$WindowMinutes = 30,
+        [int]$GiveUpMinutes = [int]([double]$Hours * 60))
+    $traceDirty = {
+        param([object[]]$Found)
+        $Found | Select-Object -First 10 | ForEach-Object { & $Trace 'dirty' $_ }
+        if ($Found.Count -gt 10) { & $Trace 'dirty' "and $($Found.Count - 10) more" }
+    }
+    return Wait-ForHandOverReady -HandOver $HandOver -Check $GetDirty -What 'working tree not clean' -TraceFirst $traceDirty `
+        -WhileWaiting $WhileWaiting -Flag $Flag -Sleep $Sleep -Now $Now -Trace $Trace `
+        -PollMinutes $PollMinutes -WindowMinutes $WindowMinutes -GiveUpMinutes $GiveUpMinutes
+}
+
+function Wait-ForSyncedCheckout {
+    # Returns the start sync's result (Invoke-ShiftStartSync) once it has no refusal. A
+    # -Continuous hand-over whose checkout is ahead of or has diverged from origin - an
+    # interactive session committed and had not yet pushed (the 2026-11-19 05:10 shift) -
+    # waits for the push the same way as for a dirty tree; any other start returns at once.
+    param(
+        [bool]$HandOver = [bool]$ShiftBranch,
+        [scriptblock]$Sync,
+        [scriptblock]$WhileWaiting = { },
+        [scriptblock]$Flag = { Set-OwnTabLabel 'WAITING, read' },
+        [scriptblock]$Sleep = { param([int]$Seconds) Start-Sleep -Seconds $Seconds },
+        [scriptblock]$Now = { Get-Date },
+        [scriptblock]$Trace = { param([string]$Verb, [string]$Detail) Write-Trace '-' $Verb $Detail 'Yellow' },
+        [int]$PollMinutes = 2,
+        [int]$WindowMinutes = 30,
+        [int]$GiveUpMinutes = [int]([double]$Hours * 60))
+    $last = @{ Result = $null }
+    $check = { $last.Result = & $Sync; if ($last.Result -and $last.Result.Refusal) { $last.Result.Refusal } }
+    $traceRefusal = { param([object[]]$Found) & $Trace 'sync' "$($Found[0])" }
+    $null = Wait-ForHandOverReady -HandOver $HandOver -Check $check -What 'checkout not level with origin' -TraceFirst $traceRefusal `
+        -WhileWaiting $WhileWaiting -Flag $Flag -Sleep $Sleep -Now $Now -Trace $Trace `
+        -PollMinutes $PollMinutes -WindowMinutes $WindowMinutes -GiveUpMinutes $GiveUpMinutes
+    return $last.Result
 }
 
 if ($TestPark) {
@@ -323,32 +391,63 @@ if ($TestPark) {
         ,@('a hand-over tree dirty for 3 polls is waited for and returns clean after 3 sleeps of 2 minutes', 'clean 3 sleeps 360s', {
             $clock = @{ T = [datetime]'2026-10-22'; Polls = 0; Slept = @() }
             $r = @(Wait-ForCleanTree -HandOver $true -GetDirty { $clock.Polls++; if ($clock.Polls -le 3) { ' M Curl.slnx' } } `
-                -Sleep { param($Seconds) $clock.Slept += $Seconds; $clock.T = $clock.T.AddSeconds($Seconds) } -Now { $clock.T } -Trace { })
+                -Sleep { param($Seconds) $clock.Slept += $Seconds; $clock.T = $clock.T.AddSeconds($Seconds) } -Now { $clock.T } -Trace { } -Flag { })
             "$(if ($r.Count) { 'dirty' } else { 'clean' }) $($clock.Slept.Count) sleeps $(($clock.Slept | Measure-Object -Sum).Sum)s" })
-        ,@('a hand-over tree always dirty returns its paths after exactly 30 minutes (15 polls) and the caller alarms', 'dirty 2 paths 15 sleeps 30 minutes SHIFT REFUSED  working tree not clean', {
-            $clock = @{ T = [datetime]'2026-10-22'; Slept = 0 }
-            $r = @(Wait-ForCleanTree -HandOver $true -GetDirty { ' M a.cs'; '?? b.cs' } `
-                -Sleep { param($Seconds) $clock.Slept++; $clock.T = $clock.T.AddSeconds($Seconds) } -Now { $clock.T } -Trace { })
+        ,@('a hand-over tree dirty for 94 minutes is waited for past 30 minutes, flagged once, and starts clean (BL-5592)', 'clean 47 sleeps 1 flag 47 CI watches', {
+            # The 2026-11-19 09:40 hand-over: an interactive session's task files stayed uncommitted
+            # until 11:14. Before BL-5592 the shift refused at 30 minutes and nothing ran until 13:40.
+            $clock = @{ T = [datetime]'2026-11-19T09:40'; Slept = 0; Flags = 0; Watches = 0 }
+            $r = @(Wait-ForCleanTree -HandOver $true -GetDirty { if ($clock.T -lt [datetime]'2026-11-19T11:14') { '?? Tasks/Backlog/BL-5555-x.md' } } `
+                -Sleep { param($Seconds) $clock.Slept++; $clock.T = $clock.T.AddSeconds($Seconds) } -Now { $clock.T } -Trace { } `
+                -Flag { $clock.Flags++ } -WhileWaiting { $clock.Watches++ } -GiveUpMinutes 480)
+            "$(if ($r.Count) { 'dirty' } else { 'clean' }) $($clock.Slept) sleeps $($clock.Flags) flag $($clock.Watches) CI watches" })
+        ,@('a hand-over tree always dirty returns its paths only after -GiveUpMinutes, and the caller alarms', 'dirty 2 paths 240 sleeps 480 minutes 1 flag SHIFT REFUSED  working tree not clean', {
+            $clock = @{ T = [datetime]'2026-10-22'; Slept = 0; Flags = 0 }
+            $r = @(Wait-ForCleanTree -HandOver $true -GetDirty { ' M a.cs'; '?? b.cs' } -GiveUpMinutes 480 `
+                -Sleep { param($Seconds) $clock.Slept++; $clock.T = $clock.T.AddSeconds($Seconds) } -Now { $clock.T } -Trace { } -Flag { $clock.Flags++ })
             $script:Alarmed = @()
             if ($r) { Stop-ShiftStart -Why 'working tree not clean; commit or stash first' -Notify $quiet }
-            "dirty $($r.Count) paths $($clock.Slept) sleeps $(($clock.T - [datetime]'2026-10-22').TotalMinutes) minutes $(@($script:Alarmed)[0] -replace ';.*')" })
-        ,@('a hand-over tree clean at once does not sleep', 'clean 0 sleeps', {
-            $clock = @{ Slept = 0 }
-            $r = @(Wait-ForCleanTree -HandOver $true -GetDirty { } -Sleep { param($Seconds) $clock.Slept++ } -Trace { })
-            "$(if ($r.Count) { 'dirty' } else { 'clean' }) $($clock.Slept) sleeps" })
+            "dirty $($r.Count) paths $($clock.Slept) sleeps $(($clock.T - [datetime]'2026-10-22').TotalMinutes) minutes $($clock.Flags) flag $(@($script:Alarmed)[0] -replace ';.*')" })
+        ,@('the hand-over give-up defaults to the shift''s -Hours', 'dirty 30 sleeps 60 minutes', {
+            $Hours = 1
+            $clock = @{ T = [datetime]'2026-10-22'; Slept = 0 }
+            $r = @(Wait-ForCleanTree -HandOver $true -GetDirty { ' M a.cs' } `
+                -Sleep { param($Seconds) $clock.Slept++; $clock.T = $clock.T.AddSeconds($Seconds) } -Now { $clock.T } -Trace { } -Flag { })
+            "$(if ($r.Count) { 'dirty' } else { 'clean' }) $($clock.Slept) sleeps $(($clock.T - [datetime]'2026-10-22').TotalMinutes) minutes" })
+        ,@('a hand-over tree clean at once does not sleep, flag or watch CI', 'clean 0 sleeps 0 flags 0 watches', {
+            $clock = @{ Slept = 0; Flags = 0; Watches = 0 }
+            $r = @(Wait-ForCleanTree -HandOver $true -GetDirty { } -Sleep { param($Seconds) $clock.Slept++ } -Trace { } -Flag { $clock.Flags++ } -WhileWaiting { $clock.Watches++ })
+            "$(if ($r.Count) { 'dirty' } else { 'clean' }) $($clock.Slept) sleeps $($clock.Flags) flags $($clock.Watches) watches" })
+        ,@('a hand-over checkout ahead of origin waits for the push, watching CI, then returns the clean sync (BL-5592)', 'refusal none restart no 3 polls 2 watches', {
+            $clock = @{ T = [datetime]'2026-11-19T05:10'; Polls = 0; Watches = 0 }
+            $sync = Wait-ForSyncedCheckout -HandOver $true -Sync {
+                $clock.Polls++
+                $refusal = if ($clock.Polls -le 2) { 'work/dark-factory is ahead of origin/work/dark-factory; push or reconcile first' } else { $null }
+                [pscustomobject]@{ Refusal = $refusal; Restart = $null }
+            } -Sleep { param($Seconds) $clock.T = $clock.T.AddSeconds($Seconds) } -Now { $clock.T } -Trace { } -Flag { } -WhileWaiting { $clock.Watches++ }
+            "refusal $(if ($sync.Refusal) { $sync.Refusal } else { 'none' }) restart $(if ($sync.Restart) { 'yes' } else { 'no' }) $($clock.Polls) polls $($clock.Watches) watches" })
+        ,@('a checkout ahead of origin not at hand-over is refused at once, without waiting', 'refused 1 polls 0 sleeps', {
+            $clock = @{ Polls = 0; Slept = 0 }
+            $sync = Wait-ForSyncedCheckout -HandOver $false -Sync { $clock.Polls++; [pscustomobject]@{ Refusal = 'x is ahead of origin/x; push or reconcile first'; Restart = $null } } `
+                -Sleep { param($Seconds) $clock.Slept++ } -Trace { } -Flag { }
+            "$(if ($sync.Refusal) { 'refused' } else { 'started' }) $($clock.Polls) polls $($clock.Slept) sleeps" })
+        ,@('a sync that asks for a restart is returned at once with its restart', 'restart factory code changed', {
+            $sync = Wait-ForSyncedCheckout -HandOver $true -Sync { [pscustomobject]@{ Refusal = $null; Restart = 'factory code changed' } } -Sleep { } -Trace { } -Flag { }
+            "restart $($sync.Restart)" })
         ,@('a start not by hand-over refuses a dirty tree at once without sleeping or tracing', 'dirty 0 sleeps 0 traced', {
             $clock = @{ Slept = 0; Traced = 0 }
             $r = @(Wait-ForCleanTree -HandOver $false -GetDirty { ' M a.cs' } -Sleep { param($Seconds) $clock.Slept++ } -Trace { $clock.Traced++ })
             "$(if ($r.Count) { 'dirty' } else { 'clean' }) $($clock.Slept) sleeps $($clock.Traced) traced" })
-        ,@('the dirty paths are traced once, the first 10 then the rest counted, not on every poll', '10 paths, and 2 more, 1 wait, 1 give-up', {
+        ,@('the dirty paths are traced once, the first 10 then the rest counted, not on every poll', '10 paths, and 2 more, 1 wait, 1 waiting on, 1 give-up', {
             $clock = @{ T = [datetime]'2026-10-22'; Lines = [System.Collections.Generic.List[string]]::new() }
-            $null = Wait-ForCleanTree -HandOver $true -GetDirty { 1..12 | ForEach-Object { " M f$_.cs" } } `
+            $null = Wait-ForCleanTree -HandOver $true -GetDirty { 1..12 | ForEach-Object { " M f$_.cs" } } -GiveUpMinutes 60 -Flag { } `
                 -Sleep { param($Seconds) $clock.T = $clock.T.AddSeconds($Seconds) } -Now { $clock.T } -Trace { param($Verb, $Detail) $clock.Lines.Add("$Verb|$Detail") }
             $paths = @($clock.Lines | Where-Object { $_ -match '^dirty\| M f\d+\.cs$' }).Count
             $more = @($clock.Lines | Where-Object { $_ -eq 'dirty|and 2 more' }).Count
-            $waits = @($clock.Lines | Where-Object { $_ -match '^wait\|.*checking every 2 minutes' }).Count
-            $gaveUp = @($clock.Lines | Where-Object { $_ -match '^wait\|.*still not clean after 30 minutes' }).Count
-            "$paths paths, and 2 more$(if ($more -ne 1) { " x$more" }), $waits wait, $gaveUp give-up" }))
+            $waits = @($clock.Lines | Where-Object { $_ -match '^wait\|.*checking every 2 minutes and watching CI' }).Count
+            $waitingOn = @($clock.Lines | Where-Object { $_ -match '^wait\|working tree not clean after 30 minutes; still waiting and watching CI$' }).Count
+            $gaveUp = @($clock.Lines | Where-Object { $_ -match '^wait\|working tree not clean after 60 minutes; giving up$' }).Count
+            "$paths paths, and 2 more$(if ($more -ne 1) { " x$more" }), $waits wait, $waitingOn waiting on, $gaveUp give-up" }))
     foreach ($case in $cases) {
         $got = & $case[2]
         if ($case[1] -ceq $got) { Write-Host "PASS $($case[0]): $got" -ForegroundColor Green }

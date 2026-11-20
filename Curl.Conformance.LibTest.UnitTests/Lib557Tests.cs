@@ -54,6 +54,17 @@ public sealed class Lib557Tests
     }
 
     [TestMethod]
+    [DataRow("unsigned short", 18)]
+    [DataRow("unsigned int", 34)]
+    public void Groups_UnsignedWidth_HoldsEachNibbleAtEveryPositionIncludingTheLowest(string name, int expectedCount)
+    {
+        IReadOnlyList<Lib557Check> checks = Lib557.Groups(true).Single(group => group.Name == name).Checks;
+
+        Assert.HasCount(expectedCount, checks);
+        CollectionAssert.IsSubsetOf(new[] { "15", "14", "12", "1", "0" }, checks.Select(check => check.Expected).ToArray());
+    }
+
+    [TestMethod]
     public void Groups_SignedShort_HoldsTheMaximumAndTheMinimumLessNothing()
     {
         IReadOnlyList<Lib557Check> checks = Lib557.Groups(true).Single(group => group.Name == "signed short").Checks;

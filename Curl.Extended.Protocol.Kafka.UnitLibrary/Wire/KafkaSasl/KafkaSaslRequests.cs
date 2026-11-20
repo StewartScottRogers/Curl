@@ -21,12 +21,13 @@ internal static class KafkaSaslRequests
     /// <summary>The SaslAuthenticate version sent.</summary>
     internal const short AuthenticateVersion = 0;
 
-    /// <summary>The one mechanism the extension offers.</summary>
-    internal const string PlainMechanism = "PLAIN";
+    /// <summary>Gives SaslHandshake v1 naming <paramref name="mechanism"/>.</summary>
+    internal static byte[] Handshake(int correlationId, string mechanism = KafkaSaslMechanisms.Plain) =>
+        Framed(Header(HandshakeApiKey, HandshakeVersion, correlationId).String(mechanism));
 
-    /// <summary>Gives SaslHandshake v1 naming <see cref="PlainMechanism"/>.</summary>
-    internal static byte[] Handshake(int correlationId) =>
-        Framed(Header(HandshakeApiKey, HandshakeVersion, correlationId).String(PlainMechanism));
+    /// <summary>Gives SaslAuthenticate v0 carrying <paramref name="authBytes"/>, a SCRAM message.</summary>
+    internal static byte[] Authenticate(int correlationId, byte[] authBytes) =>
+        Framed(Header(AuthenticateApiKey, AuthenticateVersion, correlationId).Bytes(authBytes));
 
     /// <summary>Gives SaslAuthenticate v0 carrying <see cref="PlainMessage"/> for <paramref name="userName"/> and <paramref name="password"/>.</summary>
     internal static byte[] Authenticate(int correlationId, string userName, string password) =>

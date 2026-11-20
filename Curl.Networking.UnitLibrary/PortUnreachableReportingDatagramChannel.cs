@@ -28,12 +28,20 @@ internal sealed class PortUnreachableReportingDatagramChannel(
     private readonly List<EndPoint> _refused = [];
     private int _nextAlternative;
     private volatile bool _hasReceived;
+    private bool _connectsToServer;
 
     /// <inheritdoc />
     public EndPoint ServerEndPoint => _inner.ServerEndPoint;
 
     /// <inheritdoc />
     public EndPoint? LocalEndPoint => _inner.LocalEndPoint;
+
+    /// <inheritdoc />
+    public void ConnectToServer()
+    {
+        _connectsToServer = true;
+        _inner.ConnectToServer();
+    }
 
     /// <inheritdoc />
     public async ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken)
@@ -121,6 +129,11 @@ internal sealed class PortUnreachableReportingDatagramChannel(
         try
         {
             opened = openChannel(next);
+            if (_connectsToServer)
+            {
+                opened.ConnectToServer();
+            }
+
             foreach (var datagram in _sent)
             {
                 await opened.SendAsync(datagram, opened.ServerEndPoint, cancellationToken).ConfigureAwait(false);

@@ -1,3 +1,5 @@
+using Curl.Api.Codes;
+using Curl.Api.Errors;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 
@@ -39,6 +41,28 @@ public sealed partial class CurlClient : IAsyncDisposable
     /// <summary>The defaults applied to every easy handle the client creates.</summary>
     public CurlClientOptions Options { get; }
 
+    /// <summary>Whether the engine runs Curl's extensions: <see cref="Create(CurlClientOptions)"/> with <c>CURL_EXTENSIONS</c> not <c>0</c> (ADR-1319). A request's extension options fail with <see cref="CurlCode.UnknownOption"/> otherwise.</summary>
+    internal bool AcceptsExtensionOptions { get; init; }
+
+    /// <summary>
+    /// <paramref name="options"/> with the extension options <paramref name="request"/> sets (<see cref="CurlRequest.Dns"/>).
+    /// </summary>
+    /// <param name="options">The handle's options so far.</param>
+    /// <param name="request">The request.</param>
+    /// <returns>The options with the extension options set; <paramref name="options"/> itself when the request sets none.</returns>
+    /// <exception cref="CurlException">The request sets an extension option and the client's extensions are off.</exception>
+    private EasyOptions ApplyExtensionOptions(EasyOptions options, CurlRequest request)
+    {
+        if (request.Dns is null)
+        {
+            return options;
+        }
+
+        return AcceptsExtensionOptions
+            ? options with { ExtensionOptions = request.Dns.ToExtensionOptions() }
+            : throw new CurlException(CurlCode.UnknownOption, "unknown option: --dns-json / --dns-transport (extensions are off)");
+    }
+
     /// <summary>Whether <see cref="DisposeAsync"/> also disposes the engine.</summary>
     public bool OwnsEngine => _ownsEngine;
 
@@ -56,7 +80,7 @@ public sealed partial class CurlClient : IAsyncDisposable
         easy.Options = defaults with
         {
             Http = defaults.Http with { UserAgent = Options.UserAgent },
-            Transfer = defaults.Transfer with { Timeout = Options.Timeout },
+            Transfer = defaults.Transfer with { Timeout = Options.Timeout, FileTime = Options.FetchFileTime },
             Network = defaults.Network with { ConnectTimeout = Options.ConnectTimeout },
         };
         easy.Options = CurlTransportOptions.Apply(easy.Options, Options.Network, Options.Tls, Options.Proxy);

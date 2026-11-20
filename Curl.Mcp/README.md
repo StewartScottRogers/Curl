@@ -23,7 +23,7 @@ The server speaks MCP on standard input and output; its log lines go to standard
 | Tool | Does |
 | --- | --- |
 | `curl` | Runs curl in-process with an argument array (`args`, optional `stdin`), exactly as the command line would; returns standard output, standard error and the exit code. A nonzero exit is a tool error. |
-| `transfer` | Makes one request described by fields (`url` required; `method`, `headers`, `body`, `followRedirects`, `timeoutSeconds`, `insecure`, `proxy`, `userAgent`); returns the status, headers, body (text, or base64 when not UTF-8) and transfer information. `file:` URLs are refused. |
+| `transfer` | Makes one request described by fields (`url` required; `method`, `headers`, `body`, `followRedirects`, `timeoutSeconds`, `insecure`, `proxy`, `userAgent`, `minTlsVersion` as `1.0` to `1.3`, `caFile` inside `CURL_MCP_ROOT`); returns the status, headers, body (text, or base64 when not UTF-8) and transfer information. `file:` URLs are refused. |
 | `parse_url` | Parses a URL with libcurl's URL API; returns the rebuilt URL and its parts (scheme, user, password, options, host, port, path, query, fragment, zoneId). |
 | `build_url` | Builds a URL from its parts with libcurl's URL API; returns the whole URL. |
 | `version` | Reports what `curl -V` reports: the version, protocols, features and TLS backend. |

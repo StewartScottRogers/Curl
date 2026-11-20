@@ -36,6 +36,8 @@ public sealed class McpArgumentChecker
 
     private readonly McpConfinementRoot root;
 
+    private readonly string? outputDirectory;
+
     private readonly FrozenDictionary<string, McpExtensionOption> extensionOptionsByName;
 
     /// <summary>Creates the checker for <paramref name="root" />.</summary>
@@ -46,6 +48,14 @@ public sealed class McpArgumentChecker
         ArgumentNullException.ThrowIfNull(root);
         this.root = root;
         extensionOptionsByName = (extensionOptions ?? []).ToFrozenDictionary(option => option.Name, StringComparer.Ordinal);
+    }
+
+    /// <summary>The checker for one argument array that names <c>--output-dir</c>.</summary>
+    private McpArgumentChecker(McpConfinementRoot root, FrozenDictionary<string, McpExtensionOption> extensionOptionsByName, string outputDirectory)
+    {
+        this.root = root;
+        this.extensionOptionsByName = extensionOptionsByName;
+        this.outputDirectory = outputDirectory;
     }
 
     /// <summary>
@@ -59,7 +69,34 @@ public sealed class McpArgumentChecker
     public McpArgumentCheck Check(IReadOnlyList<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
-        return CheckArguments(new ArgumentCursor(arguments), 0);
+        string? directory = OutputDirectoryIn(arguments);
+        McpArgumentChecker checker = directory is null ? this : new(root, extensionOptionsByName, directory);
+        return checker.CheckArguments(new ArgumentCursor(arguments), 0);
+    }
+
+    /// <summary>The value of the last <c>--output-dir</c> in <paramref name="arguments" />, which curl joins before every <c>-o</c> name wherever it stands; <see langword="null" /> when none.</summary>
+    private static string? OutputDirectoryIn(IReadOnlyList<string> arguments)
+    {
+        string? directory = null;
+        for (int index = 0; index < arguments.Count && arguments[index] != EndOfOptions; index++)
+        {
+            directory = OutputDirectoryAt(arguments, ref index) ?? directory;
+        }
+
+        return directory;
+    }
+
+    /// <summary>The <c>--output-dir</c> value the argument at <paramref name="index" /> gives, moving <paramref name="index" /> past a separate value; <see langword="null" /> for any other argument.</summary>
+    private static string? OutputDirectoryAt(IReadOnlyList<string> arguments, ref int index)
+    {
+        const string Option = "--output-dir";
+        string argument = arguments[index] ?? string.Empty;
+        if (argument.StartsWith(Option + "=", StringComparison.Ordinal))
+        {
+            return argument[(Option.Length + 1)..];
+        }
+
+        return argument == Option && index + 1 < arguments.Count ? arguments[++index] : null;
     }
 
     /// <summary>Checks every argument the cursor still holds; <paramref name="configDepth" /> is how many <c>-K</c> files deep this array is (0 for the tool's own).</summary>
@@ -265,7 +302,7 @@ public sealed class McpArgumentChecker
         {
             "config" => CheckConfig(written, value, configDepth),
             "write-out" when value.StartsWith('@') => CheckWriteOutTemplate(written, value[1..]),
-            _ => CheckPaths(written, McpOptionValuePaths.PathsIn(longName, use, value)),
+            _ => CheckPaths(written, McpOptionValuePaths.PathsIn(longName, use, value, outputDirectory)),
         };
     }
 

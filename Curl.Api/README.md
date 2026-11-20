@@ -26,7 +26,7 @@ using Curl.Api.Options.Http;
 
 `CurlClient` is the entry point. `CurlClient.Create()` builds one over a new managed engine that
 the client owns and disposes; `CurlClientOptions` holds the defaults applied to every transfer
-(`UserAgent`, `Timeout`, `ConnectTimeout`, plus the option groups below, `MaxConnections` and
+(`UserAgent`, `Timeout`, `ConnectTimeout`, `FetchFileTime` (`CURLOPT_FILETIME`: a `HEAD` on an FTP URL sends `MDTM`, an HTTP response reports `Last-Modified`, and `CurlResponse.Info.FileTime` holds the time), plus the option groups below, `MaxConnections` and
 `MaxConnectionsPerHost` for concurrent transfers, and `Stores`). A value left unset is libcurl's
 own default. Make one client and share it: it is built for concurrent use.
 
@@ -72,6 +72,11 @@ transport groups `CurlNetworkOptions`, `CurlTlsOptions` (with `CurlTlsPeerOption
 `CurlRtspOptions`. A group set on a request replaces the client's whole group. Each value is
 checked as it is set. Choose HTTP authentication methods (Digest, for a plain-HTTP server that refuses
 Basic) with `HttpAuthenticationMethods` from `Curl.Api.Options.Authentication`.
+
+Curl's extensions have typed records of their own. `CurlRequest.Dns` takes a `CurlDnsOptions`: `Json = true`
+is `--dns-json` and `Transport = "tcp"` is `--dns-transport tcp`, for a `dns://` request. They work only while
+extensions are on; with `CURL_EXTENSIONS=0` the request fails with `CurlCode.UnknownOption`, as the `curl`
+tool refuses an unknown option (ADR-1319).
 
 <!-- sample: options -->
 ```csharp
@@ -138,6 +143,19 @@ await (await client.SendAsync(large, cancellationToken)).Body.DisposeAsync();
 ```
 
 (This sample also assumes a `file` stream.)
+
+## Send a custom request
+
+`CurlRequest.CustomRequest` is `CURLOPT_CUSTOMREQUEST` (`curl -X`): the text is sent unchanged, spaces and all, and wins over
+the `HttpMethod`, which .NET restricts to a token. Use it for IMAP `STORE` and `MOVE`, and for FTP and POP3 commands.
+
+```csharp
+CurlRequest markSeen = new(HttpMethod.Get, "imap://example.com/INBOX")
+{
+    CustomRequest = @"STORE 1 +Flags \Seen",
+};
+CurlRequest move = new(HttpMethod.Get, "imap://example.com/INBOX") { CustomRequest = "MOVE 1 Archive" };
+```
 
 ## Upload multipart
 
@@ -311,6 +329,7 @@ format. Give clients one `CurlStores` through `CurlClientOptions.Stores` to shar
 | `CurlAltSvcEntry` | One alt-svc cache line. |
 | `CurlNetworkOptions`, `CurlTlsOptions`, `CurlTlsPeerOptions`, `CurlProxyOptions` | The transport option groups. |
 | `CurlHttpOptions`, `CurlAuthenticationOptions`, `CurlFtpOptions`, `CurlSshOptions`, `CurlMailOptions`, `CurlTftpOptions`, `CurlTelnetOptions`, `CurlRtspOptions` | The protocol option groups. |
+| `CurlDnsOptions` | The `dns://` extension's `--dns-json` and `--dns-transport`, set on `CurlRequest.Dns` (ADR-1319). |
 
 ## Folder map
 

@@ -20,7 +20,7 @@ public sealed class TransferMcpTool(McpTransferTool tool) : IMcpTool
         "Makes one request, described by fields rather than a command line, through Curl's transfer engine, and returns a structured result: "
         + "the status code, the response headers, the body (text, or base64 when it is not UTF-8) and timing and size information. "
         + "Prefer it to the `curl` tool for a single HTTP request whose response you want to read; use `curl` for anything else, "
-        + "such as files, other protocols or any curl option this tool has no field for. A URL of one of Curl's extended protocols (the version tool's extendedProtocols) runs through its extension, as curl's own schemes run through theirs. A failed transfer is a tool error carrying "
+        + "such as files, other protocols or any curl option this tool has no field for. Its minTlsVersion and caFile fields set the lowest TLS version and a CA file (inside CURL_MCP_ROOT) for a self-signed server. A URL of one of Curl's extended protocols (the version tool's extendedProtocols) runs through its extension, as curl's own schemes run through theirs. A failed transfer is a tool error carrying "
         + "libcurl's error code.";
 
     /// <inheritdoc />
@@ -51,7 +51,9 @@ public sealed class TransferMcpTool(McpTransferTool tool) : IMcpTool
             "timeoutSeconds": { "description": "The longest the whole transfer may take, in seconds; omit or 0 for no limit.", "type": ["number", "null"], "default": null },
             "insecure": { "description": "Whether the server's certificate goes unverified, as curl -k leaves it.", "type": "boolean", "default": false },
             "proxy": { "description": "The proxy to use, as curl -x takes it; the environment's when omitted.", "type": ["string", "null"], "default": null },
-            "userAgent": { "description": "The User-Agent header; none is sent when omitted.", "type": ["string", "null"], "default": null }
+            "userAgent": { "description": "The User-Agent header; none is sent when omitted.", "type": ["string", "null"], "default": null },
+            "minTlsVersion": { "description": "The lowest TLS version to accept, as curl --tlsv1.2 sets it: 1.0, 1.1, 1.2 or 1.3; the default when omitted.", "type": ["string", "null"], "enum": ["1.0", "1.1", "1.2", "1.3", null], "default": null },
+            "caFile": { "description": "A CA certificate file to verify the server with, as curl --cacert takes it, e.g. for a self-signed server; it must lie inside CURL_MCP_ROOT, else the call is refused with PathRefused.", "type": ["string", "null"], "default": null }
           },
           "required": ["url"]
         }
@@ -97,6 +99,8 @@ public sealed class TransferMcpTool(McpTransferTool tool) : IMcpTool
             Insecure = Flag(fields, "insecure"),
             Proxy = Text(fields, "proxy"),
             UserAgent = Text(fields, "userAgent"),
+            MinTlsVersion = Text(fields, "minTlsVersion"),
+            CaFile = Text(fields, "caFile"),
         };
 
     private static string? Text(Dictionary<string, JsonElement> fields, string name) =>

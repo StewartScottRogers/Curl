@@ -18,10 +18,12 @@ public sealed class ServerCertificateVerificationUnsentIntermediateTests
     [TestMethod]
     public void Judge_IntermediateTheServerDidNotSendInTheOpenSslBuild_IsExit60WithError20()
     {
-        var (_, failure) = JudgeSending(sendIntermediate: false, matchesSchannelBuild: false, insecure: false);
+        var (observed, failure) = JudgeSending(sendIntermediate: false, matchesSchannelBuild: false, insecure: false);
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual(UnableToGetLocalIssuer, failure?.Message);
+        Assert.IsFalse(observed.Verified);
+        Assert.AreEqual(OpenSslVerifyResult.UnableToGetIssuerCertificateLocally, observed.VerifyResult);
     }
 
     [TestMethod]

@@ -59,6 +59,28 @@ public sealed class AzureStorageProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ListBlobsWithPrefixInTheUrlQuery_SendsItOnceAndKeepsTheOtherParameters()
+    {
+        QueuedAzureStorageConnector connector = new(QueuedAzureStorageConnector.Reply(Listing(Blob("logs/a"), "<NextMarker/>")));
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Context("az://account/container?prefix=logs/&maxresults=5&marker=x&comp=blobs", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.StartsWith("GET /container?restype=container&comp=list&delimiter=%2F&prefix=logs%2F&maxresults=5 HTTP/1.1", connector.Connections[0].Written);
+    }
+
+    [TestMethod]
+    public void SplitListQuery_PrefixDelimiterAndOthers_SplitsThemApart()
+    {
+        (string prefix, string delimiter, string rest) = AzureBlobOperations.SplitListQuery("prefix=a%2Fb&delimiter=%7C&flag&sv=1&restype=x");
+
+        Assert.AreEqual("a/b", prefix);
+        Assert.AreEqual("%7C", delimiter);
+        Assert.AreEqual("flag&sv=1", rest);
+        Assert.AreEqual(("p", "%2F", string.Empty), AzureBlobOperations.SplitListQuery("prefix=p"));
+        Assert.AreEqual(string.Empty, AzureBlobOperations.SplitListQuery("prefix").Prefix);
+    }
+    [TestMethod]
     public async Task ExecuteAsync_ListBlobsOfABadBody_FailsWithExit8()
     {
         TransferResult result = await Handler(new QueuedAzureStorageConnector(QueuedAzureStorageConnector.Reply("<Other/>"))).ExecuteAsync(Context("az://account/container", new MemoryStream()));

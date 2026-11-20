@@ -128,6 +128,21 @@ public sealed class CoapProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_AServerAnsweringAfterOneRetransmission_IsWaitedForAndTheChannelWasConnected()
+    {
+        var clock = new ImmediateTimeProvider();
+        var channel = new ScriptedDatagramChannel((count, sent) => count == 2 ? [Piggybacked(sent, CoapCode.Content, Hello)] : []);
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(channel).ExecuteAsync(Context("coap://h/", output, clock: clock));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(2, channel.Sent);
+        Assert.IsTrue(channel.IsConnected);
+        CollectionAssert.AreEqual(Hello, output.ToArray());
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NoAnswerAtAll_GivesUpAfterFourRetransmissionsWithExit28()
     {
         var clock = new ImmediateTimeProvider();

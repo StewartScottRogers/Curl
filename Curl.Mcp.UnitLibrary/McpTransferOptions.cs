@@ -21,7 +21,8 @@ public static class McpTransferOptions
     /// <param name="request">A request <see cref="McpTransferRequestCheck" /> found valid.</param>
     /// <param name="body">The body's bytes, as the check decoded them; <see langword="null" /> for none.</param>
     /// <returns>The handle's options.</returns>
-    public static EasyOptions Build(McpTransferRequest request, byte[]? body)
+    /// <param name="caFilePath">The resolved CA file inside <c>CURL_MCP_ROOT</c>; <see langword="null" /> for none.</param>
+    public static EasyOptions Build(McpTransferRequest request, byte[]? body, string? caFilePath = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         EasyOptions defaults = new();
@@ -30,7 +31,7 @@ public static class McpTransferOptions
             Network = defaults.Network with { Url = request.Url },
             Transfer = Transfer(defaults.Transfer, request, body),
             Http = Http(defaults.Http, request, body),
-            Tls = Tls(defaults.Tls, request.Insecure),
+            Tls = Tls(defaults.Tls, request, caFilePath),
             Proxy = defaults.Proxy with { Proxy = request.Proxy },
         };
     }
@@ -71,9 +72,27 @@ public static class McpTransferOptions
     private static string HeaderLine(McpTransferHeader header) =>
         header.Value.Trim().Length == 0 ? $"{header.Name};" : $"{header.Name}: {header.Value.Trim()}";
 
-    /// <summary>Turns off peer and host verification for an insecure request, as <c>curl -k</c> does; otherwise leaves libcurl's defaults.</summary>
-    private static EasyTlsOptions Tls(EasyTlsOptions defaults, bool insecure) =>
-        insecure
-            ? defaults with { Origin = defaults.Origin with { VerifyPeer = false, VerifyHost = false } }
-            : defaults;
+    /// <summary>
+    /// Turns off peer and host verification for an insecure request, as <c>curl -k</c> does, sets the
+    /// lowest TLS version as <c>--tlsv1.x</c> does and the CA file as <c>--cacert</c> does; otherwise leaves libcurl's defaults.
+    /// </summary>
+    private static EasyTlsOptions Tls(EasyTlsOptions defaults, McpTransferRequest request, string? caFilePath)
+    {
+        TlsPeerOptions origin = defaults.Origin with
+        {
+            SslVersion = request.MinTlsVersion switch
+            {
+                "1.0" => SslVersion.Tls10,
+                "1.1" => SslVersion.Tls11,
+                "1.2" => SslVersion.Tls12,
+                "1.3" => SslVersion.Tls13,
+                _ => SslVersion.Default,
+            },
+            CertificateAuthorityFile = caFilePath,
+        };
+        return defaults with
+        {
+            Origin = request.Insecure ? origin with { VerifyPeer = false, VerifyHost = false } : origin,
+        };
+    }
 }
