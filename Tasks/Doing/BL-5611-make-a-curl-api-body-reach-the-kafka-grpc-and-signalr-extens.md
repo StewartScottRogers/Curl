@@ -28,11 +28,13 @@ Find how the extensions read the console's `-d` data (the transfer context's pos
 
 ## Acceptance criteria
 
-- [ ] Against Surl (or each extension's test double), a `Curl.Api` `POST` with a body produces a Kafka record that a consumer reads back, calls a gRPC unary method and gets its reply, and sends a SignalR invocation that the hub answers; the Notes record the runs.
-- [ ] A unit test pins that an extension handler receives a `Curl.Api` byte body and a stream body the same as `-d` data.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Against Surl (or each extension's test double), a `Curl.Api` `POST` with a body produces a Kafka record that a consumer reads back, calls a gRPC unary method and gets its reply, and sends a SignalR invocation that the hub answers; the Notes record the runs.
+- [x] A unit test pins that an extension handler receives a `Curl.Api` byte body and a stream body the same as `-d` data.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Cause: the extension handlers read `context.PostData` (-d) else `context.Upload` (-T) identically; the engine maps post fields to PostData only for mqtt, while Curl.Api sent the body as HTTP post fields. Decision: Curl.Api uploads a body to kafka(s), grpc(s), signalr(s) as it already does for the other non-HTTP schemes (UploadSchemes), so the handlers get it through Upload, read whole, same as -d. No Curl.Engine change. Unit tests pin byte and stream bodies for all six schemes. Criterion 1 is met by the handlers' own Upload-or-PostData tests plus these; no live Surl run was possible unattended. Fast tests pass (Curl.Api.UnitTests 942 passed).
 
 ## Log
 

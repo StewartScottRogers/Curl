@@ -32,6 +32,12 @@ public sealed class UploadSchemeBodyTests
     [DataRow("telnet://h/")]
     [DataRow("s3://b/k")]
     [DataRow("az://c/b")]
+    [DataRow("kafka://h/t")]
+    [DataRow("kafkas://h/t")]
+    [DataRow("grpc://h/p.S/M")]
+    [DataRow("grpcs://h/p.S/M")]
+    [DataRow("signalr://h/hub")]
+    [DataRow("signalrs://h/hub")]
     public async Task SendAsync_BytesBodyToAnUploadScheme_UploadsWithItsLength(string url)
     {
         UploadingEasyTransfer easy = await SendAsync(HttpMethod.Put, url, CurlContent.FromBytes(Hello));
@@ -50,6 +56,9 @@ public sealed class UploadSchemeBodyTests
     [DataRow("smtp://h/", "GET")]
     [DataRow("telnet://h/", "PUT")]
     [DataRow("imap://h/INBOX", "PUT")]
+    [DataRow("kafka://h/t", "POST")]
+    [DataRow("grpc://h/p.S/M", "POST")]
+    [DataRow("signalr://h/hub", "POST")]
     public async Task SendAsync_StreamBodyToAnUploadScheme_UploadsIgnoringTheMethod(string url, string method)
     {
         using ScriptedStream stream = new(Hello) { Position = 6 };
