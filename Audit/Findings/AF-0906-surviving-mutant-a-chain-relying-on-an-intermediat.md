@@ -1,0 +1,47 @@
+---
+id: AF-0906
+title: Surviving mutant: a chain relying on an intermediate the server did not send can be observed as verified
+auditor: quality
+severity: Medium
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
+key: quality:Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:PeerVerification-false:surviving-mutant
+reproduction: mutation Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:300:false
+task: BL-5621
+tasks: BL-5621
+found: 2026-11-20
+found-at: 1ce730765b795e99d4d034faf03432b41b5ec6a4
+scorecard: 2026-11-20_0456.md
+duplicate-of:
+closed:
+closed-how:
+closed-by:
+---
+# AF-0906 - Surviving mutant: a chain relying on an intermediate the server did not send can be observed as verified
+
+## Summary
+
+Medium finding from the quality auditor at `Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:300`: Surviving mutant: a chain relying on an intermediate the server did not send can be observed as verified.
+
+## Evidence
+
+Location: `Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:300`
+
+Invoke-MutationTest -Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 912464: 'new PeerVerification(false, OpenSslVerifyResult.UnableToGetIssuerCertificateLocally, peerCertificates)' mutated to true survived. Judge returns this observation with the PeerFailedVerification refusal when RelyingOnAnIntermediateTheServerDidNotSend. Its Verified flag becomes the handshake event's CertificateVerified (SslStreamTlsProvider.cs:634/696), which NetworkDiagnosticLog.cs:294 writes as 'verified' or 'not verified'. With the mutant, a refused certificate is logged as verified, and no test notices. The refusal and exit 60 are unchanged, so this is a recorded decision, not exit-code output.
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:300:false -Member PeerVerification -ExcludeBaselineFailures -TimeoutSeconds 600
+```
+
+- Expected: outcome killed
+- Actual: outcome survived
+
+## Re-audits
+
+## Log
+
+- 2026-11-20: filed proposed.

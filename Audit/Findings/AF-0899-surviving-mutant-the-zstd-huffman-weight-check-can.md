@@ -3,8 +3,8 @@ id: AF-0899
 title: Surviving mutant: the zstd Huffman weight check can accept trees libzstd refuses as corrupt
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-20_0456.md: the reproduction no longer reproduces.
 key: quality:Curl.Zstandard.UnitLibrary/ZstandardHuffmanTable.cs:HasPairedLongestCodes-eq:surviving-mutant
 reproduction: none
 task: BL-5587
@@ -13,9 +13,9 @@ found: 2026-11-19
 found-at: 8469990748da6c83b0388ea33dec77d81d9255ae
 scorecard: 2026-11-19_1633.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-20
+closed-how: reliable-reaudit
+closed-by: 2026-11-20_0456.md
 ---
 # AF-0899 - Surviving mutant: the zstd Huffman weight check can accept trees libzstd refuses as corrupt
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Zstan
 
 ## Re-audits
 
+- 2026-11-20 | 2026-11-20_0456.md | reproduces: no | Ran the -Site command: ZstandardHuffmanTable.cs:165 '==' (weight == 1 -> weight != 1) in HasPairedLongestCodes, resolvedLine 165, outcome killed.
+
 ## Log
 
 - 2026-11-19: filed proposed.
+- 2026-11-20: accepted -> closed. Re-audit 2026-11-20_0456.md: the reproduction no longer reproduces.
