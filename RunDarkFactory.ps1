@@ -152,7 +152,11 @@
     refusing the shift (BL-4715). Any other trouble refuses to start, and every refusal raises the alarm, so the
     factory never stops without saying why. A coordinator whose clean checkout is only
     behind origin/<branch> fast-forwards it and starts (BL-1141); one that is ahead of it
-    or has diverged from it refuses. A run that dies on
+    or has diverged from it refuses. A shift started by a -Continuous hand-over, which nobody
+    is watching, does not refuse a dirty checkout or one ahead of origin at once: it checks
+    every 2 minutes for an interactive session's commit and push, watching CI meanwhile, labels
+    its tab "WAITING, read" after 30 minutes, and refuses with the alarm only after its own
+    -Hours (BL-5592). A run that dies on
     the API without naming the limit waits until a one-word probe is answered, then runs
     again (three times at most).
 

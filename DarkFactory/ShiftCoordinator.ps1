@@ -236,9 +236,14 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     if ($ShiftBranch) { $moved = Restore-ShiftBranch -Branch $ShiftBranch; if ($moved) { Write-Trace '-' 'branch' $moved 'Red' } }
     $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
     if ($branch -in 'master', 'main') { Stop-ShiftStart "on $branch; switch to a feature branch"; exit 1 }
-    if (Wait-ForCleanTree) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
-    git -C $Root fetch -q origin $branch
-    $sync = Invoke-ShiftStartSync -Repo $Root -Branch $branch
+    # A hand-over that waits for an interactive session's commit or push goes on watching CI
+    # meanwhile, filing from its own ci-watch worktree, so a red run is traced on time (BL-5592).
+    $watchCiWhileWaiting = { Invoke-CiWatch -Branch $branch }
+    if (Wait-ForCleanTree -WhileWaiting $watchCiWhileWaiting) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
+    $sync = Wait-ForSyncedCheckout -WhileWaiting $watchCiWhileWaiting -Sync {
+        git -C $Root fetch -q origin $branch
+        Invoke-ShiftStartSync -Repo $Root -Branch $branch
+    }
     if ($sync.Refusal) { Stop-ShiftStart $sync.Refusal; exit 1 }
     if ($sync.Restart) {
         # Before anything is claimed, merged or watched, this same process and console run
