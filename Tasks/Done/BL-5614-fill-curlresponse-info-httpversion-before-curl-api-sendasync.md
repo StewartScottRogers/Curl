@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Api/Messages/CurlClient.SendAsync.cs]
+touches: [Curl.Api/Messages/CurlClient.SendAsync.cs, Curl.Api/Messages/CurlResponse.cs, Curl.Api.UnitTests/Messages/CurlClientSendAsyncTests.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5614 — Fill CurlResponse.Info.HttpVersion before Curl.Api SendAsync returns
 
@@ -24,13 +24,16 @@ From Surly cookbook bug report `2026-11-20T1022-Curl-bug-report.md` (batch 4 of 
 
 ## Acceptance criteria
 
-- [ ] Right after `SendAsync` returns, `Info.HttpVersion` is the version of the response (1.1, 2 or 3) against test servers for each, pinned by tests in `Curl.Api.UnitTests`.
-- [ ] `CurlResponse.Info`'s doc comments say which values are final when `SendAsync` returns and which only after the body is read.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Right after `SendAsync` returns, `Info.HttpVersion` is the version of the response (1.1, 2 or 3) against test servers for each, pinned by tests in `Curl.Api.UnitTests`.
+- [x] `CurlResponse.Info`'s doc comments say which values are final when `SendAsync` returns and which only after the body is read.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Reproduced: Info came from the pre-head snapshot (HttpVersion 0). SendAsync now copies Info with HttpVersion from the status line when it differs. Widened touches to CurlResponse.cs (docs) and CurlClientSendAsyncTests.cs (tests). HTTP/1.1, 2 and 3 pinned by scripted tests; quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1022, finding 3.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: f8014d1b 80b3c43e 3d836d5e.
+- 2026-11-20: Doing -> Done. Info.HttpVersion filled from the status line; tests and docs added

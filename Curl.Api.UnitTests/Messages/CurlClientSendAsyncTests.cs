@@ -173,6 +173,21 @@ public sealed class CurlClientSendAsyncTests
     }
 
     [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\n", 2L)]
+    [DataRow("HTTP/2 200\r\n", 3L)]
+    [DataRow("HTTP/3 200\r\n", 30L)]
+    public async Task SendAsync_StatusLineNamesVersion_InfoHttpVersionHoldsItBeforeTheTransferEnds(string statusLine, long expected)
+    {
+        ScriptedEasyTransfer easy = new() { Info = new() { ResponseCode = 0, HttpVersion = 0 } };
+        easy.HeaderLines.AddRange([statusLine, "\r\n"]);
+
+        (CurlResponse response, _) = await SendAsync(new(HttpMethod.Get, "http://example/"), easy);
+
+        Assert.AreEqual(expected, response.Info.HttpVersion);
+        Assert.AreEqual(Curl.Api.CurlClient.VersionOf(expected), response.Version);
+    }
+
+    [TestMethod]
     public async Task SendAsync_NoStatusLine_TakesStatusAndVersionFromTransferInfo()
     {
         ScriptedEasyTransfer easy = new() { Info = new() { ResponseCode = 226, HttpVersion = 0 } };

@@ -35,7 +35,9 @@ public sealed record CurlResponse
 
     /// <summary>
     /// What the transfer reported (<c>curl_easy_getinfo</c>) when <see cref="CurlClient.SendAsync"/>
-    /// returned; final only when the transfer had already ended by then.
+    /// returned. <see cref="TransferInfo.HttpVersion"/> is final then (the response head names it, so it agrees with
+    /// <see cref="Version"/>); every other value is final only when the transfer had already ended by then, so the
+    /// byte counts, timings and the like are complete only once <see cref="Body"/> has been read to its end.
     /// </summary>
     public TransferInfo Info { get; init; } = new();
 

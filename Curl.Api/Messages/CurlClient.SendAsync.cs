@@ -58,12 +58,13 @@ public sealed partial class CurlClient
         setUpFailure?.Throw();
 
         await body.StartAsync().ConfigureAwait(false);
-        TransferInfo info = easy.Info;
+        long httpVersion = collector.HttpVersion != 0 ? collector.HttpVersion : easy.Info.HttpVersion;
+        TransferInfo info = easy.Info.HttpVersion == httpVersion ? easy.Info : easy.Info with { HttpVersion = httpVersion };
         return new CurlResponse
         {
             StatusCode = collector.StatusCode != 0 ? collector.StatusCode : (int)info.ResponseCode,
             ReasonPhrase = collector.ReasonPhrase,
-            Version = VersionOf(collector.HttpVersion != 0 ? collector.HttpVersion : info.HttpVersion),
+            Version = VersionOf(httpVersion),
             Headers = collector.Headers,
             Trailers = collector.Trailers,
             Info = info,
