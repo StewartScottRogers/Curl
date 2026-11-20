@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Zstandard.UnitLibrary/ZstandardHuffmanTable.cs]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5588 — Fix AF-0900: Surviving mutant: the Huffman table build can skip the top weight's rank start
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] A fast test fails on the code as the evidence above describes it and passes after the fix; Notes name the test.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A fast test fails on the code as the evidence above describes it and passes after the fix; Notes name the test.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test: `TryDecodeStream_OneBitTree_DecodesEachLiteral` in ZstandardHuffmanTableTests. Under the mutant rankStarts[1] stays 2, so Fill starts at index 2 of a 2-entry table and throws. No production change. (Mutant not re-run in the lane; reasoned from the code.)
 
 ## Log
 
 - 2026-11-19: Created.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: cce9bcd4 9742157d.
+- 2026-11-19: Doing -> Done. One-bit tree decode test added

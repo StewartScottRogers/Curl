@@ -90,6 +90,20 @@ public sealed class ZstandardHuffmanTableTests
     }
 
     [TestMethod]
+    public void TryDecodeStream_OneBitTree_DecodesEachLiteral()
+    {
+        // BL-5588: weights [1, 1] give two one-bit codes; the top weight's rank start must be 0.
+        var table = ZstandardHuffmanTable.Read([0x80, 0x10], out _)!;
+        var stream = BackwardStream([(0b0, 1), (0b1, 1), (0b1, 1), (0b0, 1)]);
+        var destination = new byte[4];
+
+        var decoded = table.TryDecodeStream(stream, destination);
+
+        Assert.IsTrue(decoded);
+        CollectionAssert.AreEqual(new byte[] { 0, 1, 1, 0 }, destination);
+    }
+
+    [TestMethod]
     public void Read_EmptySource_IsNull()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
