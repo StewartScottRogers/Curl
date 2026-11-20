@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests, Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5619 — Fix CI failure ConnectAsync_SockoptReturnsErrorWithoutOpenSocket_ClosesTheSocketItSawAndMakesNoConnection on Windows
 
@@ -36,3 +36,4 @@ CI failure was a Windows WSAEINTR (WSACancelBlockingCall) thrown by listener.Pol
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: d2d3c3d3.
+- 2026-11-20: Doing -> Done. Replaced racy Socket.Poll with cancellable AcceptAsync in test
