@@ -33,3 +33,4 @@ With the OpenLDAP backend, `--ntlm` exits 67 even against a server that accepts 
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (2203 #9).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 45e53432 f2d4d00f 3d836d5e.
