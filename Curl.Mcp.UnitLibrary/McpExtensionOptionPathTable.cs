@@ -3,7 +3,7 @@ using System.Collections.Frozen;
 namespace Curl.Mcp;
 
 /// <summary>
-/// How the options the extensions register use a local path (BL-5564, ADR-1311): the extension
+/// How the options the extensions register use a local path (BL-5564, ADR-1310): the extension
 /// counterpart of <see cref="McpOptionPathTable" />. An option in <see cref="PathOptionNames" /> names a
 /// file or folder the server confines to <c>CURL_MCP_ROOT</c> as <c>-o</c> is; one in
 /// <see cref="NoPathOptionNames" /> names none. A value option in neither is confined as a path, so a
