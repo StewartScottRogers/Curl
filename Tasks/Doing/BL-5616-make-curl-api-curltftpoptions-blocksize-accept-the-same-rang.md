@@ -24,11 +24,17 @@ From Surly cookbook bug report `2026-11-20T1022-Curl-bug-report.md` (batch 4 of 
 
 ## Acceptance criteria
 
-- [ ] The Notes record what curl 8.22.0 and libcurl 8.22.0 do with block sizes 0, 4, 65464 and 70000.
-- [ ] `CurlTftpOptions.BlockSize` behaves as libcurl does for each of those values, pinned by tests; its doc comment states the range and what happens outside it.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The Notes record what curl 8.22.0 and libcurl 8.22.0 do with block sizes 0, 4, 65464 and 70000.
+- [x] `CurlTftpOptions.BlockSize` behaves as libcurl does for each of those values, pinned by tests; its doc comment states the range and what happens outside it.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Reproduced on the branch: BlockSize threw outside 8..65464. Libcurl's own setter (Libcurl/Options/Protocols/EasyProtocolOptionSetters.cs, ported from setopt.c 8.22.0) treats it: negative = CURLE_BAD_FUNCTION_ARGUMENT; 0 to 7 = not stored, 512 default; 8 to 65464 as given; above 65464 clamped to 65464. So 0, 4 -> 512; 65464 -> 65464; 70000 -> 65464. The tool's `--tftp-blksize 70000` clamps to 65464 likewise. I followed that port rather than re-measuring real curl.
+- Curl.Api's BlockSize now does the same, only a negative value throws; doc comment states it; pinned by TftpBlockSize_FollowsLibcurl_FallsBackBelowEightAndClampsAbove. Measure-CodeQuality for Curl.Api: 0 failing members.
+
+- Reproduced on the branch: BlockSize threw outside 8..65464. Libcurl's own setter (Libcurl/Options/Protocols/EasyProtocolOptionSetters.cs, ported from setopt.c 8.22.0) treats it: negative = CURLE_BAD_FUNCTION_ARGUMENT; 0 to 7 = not stored, 512 default; 8 to 65464 as given; above 65464 clamped to 65464. So 0, 4 -> 512; 65464 -> 65464; 70000 -> 65464. The tool's `--tftp-blksize 70000` clamps to 65464 likewise. I followed that port rather than re-measuring real curl.
+- Curl.Api's BlockSize now does the same, only a negative value throws; doc comment states it; pinned by TftpBlockSize_FollowsLibcurl_FallsBackBelowEightAndClampsAbove. Measure-CodeQuality for Curl.Api: 0 failing members.
 
 ## Log
 
