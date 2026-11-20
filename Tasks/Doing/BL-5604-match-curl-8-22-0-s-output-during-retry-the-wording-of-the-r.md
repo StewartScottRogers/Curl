@@ -36,3 +36,4 @@ Measure with `Record-CurlExchange.ps1` against a loopback server that drops the 
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (2203 #8, 0553 #5).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: bc15ccae 0fcf63cb 3d836d5e.
