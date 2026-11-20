@@ -8,8 +8,9 @@ using HttpVersion = Curl.Api.Options.Http.HttpVersion;
 namespace Curl.Engine;
 
 /// <summary>
-/// Pins when a stored <c>h3</c> alt-svc entry switches a transfer to HTTP/3 (BL-5549, ADR-1309): with no
-/// version option, <c>--http3</c> and <c>--http3-only</c>, but not with <c>--http1.1</c> or <c>--http2</c>.
+/// Pins when a stored <c>h3</c> alt-svc entry switches a transfer to HTTP/3 (BL-5549, ADR-1309): off Windows, with no
+/// version option, and with <c>--http3</c> and <c>--http3-only</c>, but not with <c>--http1.1</c> or <c>--http2</c>;
+/// on Windows, with no version option, <c>h2</c> and <c>h3</c> entries are ignored (ADR-1313).
 /// </summary>
 [TestClass]
 public sealed class AltSvcTransferCacheH3SwitchTests
@@ -33,6 +34,21 @@ public sealed class AltSvcTransferCacheH3SwitchTests
 
         Assert.IsNull(actual.AltSvcRoute);
     }
+    /// <summary>With <c>onWindows: true</c> (ADR-1313) an <c>h2</c> or <c>h3</c> entry gives no route with no version option, on every platform.</summary>
+    [TestMethod]
+    [DataRow("h3=\":8443\"")]
+    [DataRow("h2=\":8443\"")]
+    public async Task ApplyTo_NoVersionOptionWithOnWindowsTrue_GivesNoRouteForH2AndH3Entries(string header)
+    {
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new NoFileSystem(), TimeProvider.System, onWindows: true);
+        cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), header, System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
+
+        HttpRequestOptions actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions());
+        Diagnostics.Act("route", actual.AltSvcRoute);
+
+        Assert.IsNull(actual.AltSvcRoute);
+    }
+
 
     /// <summary>Other platforms (the OpenSSL build): with no version option an <c>h2</c> entry for another port is used.</summary>
     [TestMethod]

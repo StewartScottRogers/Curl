@@ -36,8 +36,8 @@ namespace Curl.Engine;
 /// fallback (<see cref="HttpVersionPreference.Http3Only" />), and <c>h1</c> or <c>h2</c> to TCP, whose handshake
 /// offers that version alone through ALPN (<see cref="HttpVersionPreference.Http11" />, with the HTTP handler
 /// setting the offer, BL-948). An entry naming the origin itself is
-/// no route; one naming <c>h3</c> makes a transfer without a version option race HTTP/3 against TCP as
-/// <c>--http3</c> does (ADR-1309), falling back to TCP when QUIC fails (measured), and one naming <c>h2</c> or <c>h1</c>
+/// no route; off Windows one naming <c>h3</c> makes a transfer without a version option race HTTP/3 against TCP as
+/// <c>--http3</c> does (ADR-1309; on Windows that entry is ignored, ADR-1313), falling back to TCP when QUIC fails (measured), and one naming <c>h2</c> or <c>h1</c>
 /// makes TCP the first attempt of <c>--http3</c>'s race (<see cref="HttpRequestOptions.TriesTcpBeforeQuic" />,
 /// BL-948). None is used for plain <c>http</c> or
 /// for an origin a <c>--connect-to</c> mapping matches, and no header received over plain <c>http</c>
@@ -263,7 +263,7 @@ internal sealed class AltSvcTransferCache : IAltSvcStore
     /// <param name="version">The version option.</param>
     /// <param name="isWindows">Whether the running system is Windows.</param>
     /// <returns>The origin versions looked up under and the destination versions allowed.</returns>
-    internal static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(HttpVersion version, bool isWindows = false) =>
+    internal static (IReadOnlyList<AltSvcAlpn> LookedUpUnder, IReadOnlySet<AltSvcAlpn> Allowed) LookupOf(HttpVersion version, bool isWindows) =>
         version switch
         {
             HttpVersion.None => ([AltSvcAlpn.H2, AltSvcAlpn.H1], NoVersionOptionDestinations(isWindows)),

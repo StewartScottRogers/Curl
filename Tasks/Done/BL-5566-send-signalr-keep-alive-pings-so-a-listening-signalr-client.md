@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SignalR.UnitLibrary/Client]
 requirement: none
 created: 2026-11-19
-completed:
+completed: 2026-11-19
 ---
 # BL-5566 — Send SignalR keep-alive pings so a listening signalr client is not closed by the hub after 30 s
 
@@ -29,7 +29,7 @@ The client sends no keep-alive, so a listener with no `-d` is closed by the hub 
 ## Acceptance criteria
 
 - [x] With a fake `TimeProvider`, a listening client with nothing to send writes a Ping message (`{"type":6}` plus the record separator) each keep-alive interval, and none while it is sending other messages within the interval.
-- [ ] Against Surl's SignalR hub, a listener with no `-d` stays connected for at least 90 seconds and receives a message sent after 60 seconds; the Notes record the run.
+- [x] Against Surl's SignalR hub, a listener with no `-d` stays connected for at least 90 seconds and receives a message sent after 60 seconds; the Notes record the run.
 - [x] Focused unit tests in `Curl.Extended.Protocol.SignalR.UnitTests` pin the ping timing.
 - [x] `dotnet build` is clean and the fast tests pass.
 
@@ -38,9 +38,12 @@ The client sends no keep-alive, so a listener with no `-d` is closed by the hub 
 - Done: `SignalRHubSession` runs a keep-alive loop beside the read loop: a Ping (`{"type":6}` + 0x1E) whenever nothing was sent for 15 s (the .NET client default; the handshake does not carry the server values, and the 30 s server timeout is twice it). Any send (handshake, call, refusal, Ping) resets the idle clock. `SignalRProtocolHandler` takes an optional `TimeProvider`; `SignalRWebSocketSession` serialises frame writes with a semaphore. No option changes the interval, so no ADR.
 - Tests: `SignalRKeepAliveTests` (manual clock). Measure-CodeQuality for the library: 100% line, 100% branch, worst CRAP 10. Fast tests 161 pass.
 - Not done: criterion 2 (90 s run against Surl's hub) needs a Surl server, which no lane has. Run `curl signalr://<surl-host>/<hub>` with no `-d` for 90+ s, send a message at 60 s, then tick the box and move to Done.
+- Run (interactive session, 2026-11-19 16:35 Arizona): Curl.Console Release at `b9ca725077` against Surl's Debug `surl.exe` (2026-11-17 build), `surl --allow-anonymous signalr://127.0.0.1:18081/`. Listener `curl -s -S -m 100 signalr://127.0.0.1:18081/` with no `-d`; at 60 s a second curl sent `{"type":1,"target":"Broadcast","arguments":["sent at 60 s"]}` (exit 0). The listener printed `["Broadcast","sent at 60 s"]` and stayed connected until `-m 100` ended it at 99.998 s (exit 28, 29 bytes received); the hub never closed it. Before the fix the hub closed a listener at about 30 s with exit 22.
 
 ## Log
 
 - 2026-11-19: Created from bug report 2026-11-19T0930-Curl-bug-report.md, finding 3.
 - 2026-11-19: Backlog -> Doing. Criteria at claim: 90934fec 32ee91d2 a766e51a 3d836d5e.
 - 2026-11-19: Doing -> Blocked. Stewart: run a 90 s signalr:// listener against Surl's SignalR hub (message at 60 s) and tick criterion 2; code, tests and gates are done and committed
+- 2026-11-19: Blocked -> Doing. Criteria at claim: 90934fec 32ee91d2 a766e51a 3d836d5e.
+- 2026-11-19: Doing -> Done. A signalr:// listener now sends keep-alive pings; it stayed connected 100 s against Surl and received a broadcast sent at 60 s
