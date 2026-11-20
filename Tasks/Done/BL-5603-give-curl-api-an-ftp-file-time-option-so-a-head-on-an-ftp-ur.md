@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Api/Options/Protocol/CurlFtpOptions.cs]
+touches: [Curl.Api/Options/Protocol/CurlFtpOptions.cs, Curl.Api/Client/CurlClient.cs, Curl.Api/Client/CurlClientOptions.cs, Curl.Api/README.md, Curl.Api.UnitTests/Client/CurlClientTests.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5603 — Give Curl.Api an FTP file-time option, so a HEAD on an ftp URL asks MDTM and reports the time
 
@@ -24,13 +24,16 @@ From Surly cookbook bug report `2026-11-19T2203-Curl-bug-report.md` (batch 2), f
 
 ## Acceptance criteria
 
-- [ ] A `Curl.Api` `HEAD` to an FTP test server with the new option sends `MDTM` and the response carries the file's time; without it only `SIZE` is sent, as now.
-- [ ] The same option on an HTTP request reports `Last-Modified` as the file time, as libcurl does.
-- [ ] Focused unit tests in `Curl.Api.UnitTests` pin each case; the README names the option; `dotnet build` is clean and the fast tests pass.
+- [x] A `Curl.Api` `HEAD` to an FTP test server with the new option sends `MDTM` and the response carries the file's time; without it only `SIZE` is sent, as now.
+- [x] The same option on an HTTP request reports `Last-Modified` as the file time, as libcurl does.
+- [x] Focused unit tests in `Curl.Api.UnitTests` pin each case; the README names the option; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decision: the option is transfer-wide, `CurlClientOptions.FetchFileTime` (CURLOPT_FILETIME applies to HTTP and FTP alike), applied in `CurlClient.CreateEasy`; not on CurlFtpOptions, and not per request because another task holds CurlRequestOptions.cs. touches widened (none held by another Doing task). The engine already sends MDTM under RemoteTime (FtpSession, upstream test542) and reports TransferInfo.FileTime from Last-Modified for HTTP, each with its own engine tests; Curl.Api tests pin that the option reaches Transfer.FileTime. Measure-CodeQuality for Curl.Api: 0 failing.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (2203 #5).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 03bec8a6 020748a8 80781fb3.
+- 2026-11-20: Doing -> Done. FetchFileTime on CurlClientOptions asks MDTM/Last-Modified file time

@@ -26,7 +26,7 @@ using Curl.Api.Options.Http;
 
 `CurlClient` is the entry point. `CurlClient.Create()` builds one over a new managed engine that
 the client owns and disposes; `CurlClientOptions` holds the defaults applied to every transfer
-(`UserAgent`, `Timeout`, `ConnectTimeout`, plus the option groups below, `MaxConnections` and
+(`UserAgent`, `Timeout`, `ConnectTimeout`, `FetchFileTime` (`CURLOPT_FILETIME`: a `HEAD` on an FTP URL sends `MDTM`, an HTTP response reports `Last-Modified`, and `CurlResponse.Info.FileTime` holds the time), plus the option groups below, `MaxConnections` and
 `MaxConnectionsPerHost` for concurrent transfers, and `Stores`). A value left unset is libcurl's
 own default. Make one client and share it: it is built for concurrent use.
 
