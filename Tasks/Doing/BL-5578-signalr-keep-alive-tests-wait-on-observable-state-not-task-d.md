@@ -36,3 +36,4 @@ Found by the shift-end review of 2026-11-19 (code-reviewer) on the BL-5575 chang
 ## Log
 
 - 2026-11-19: Created.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 86b1b245 d9972899 bdbfa6df 3d836d5e.
