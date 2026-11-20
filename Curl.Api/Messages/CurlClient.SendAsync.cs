@@ -61,6 +61,7 @@ public sealed partial class CurlClient
         await WaitForMailReplyCodeAsync(request.Url, body).ConfigureAwait(false);
         long httpVersion = collector.HttpVersion != 0 ? collector.HttpVersion : easy.Info.HttpVersion;
         TransferInfo info = easy.Info.HttpVersion == httpVersion ? easy.Info : easy.Info with { HttpVersion = httpVersion };
+        info = WithFileTimeFromLastModified(info, collector.Headers);
         return new CurlResponse
         {
             StatusCode = StatusCodeOf(collector, info),
@@ -71,6 +72,30 @@ public sealed partial class CurlClient
             Info = info,
             Body = body,
         };
+    }
+
+    /// <summary>
+    /// <paramref name="info"/> with <see cref="TransferInfo.FileTime"/> taken from the <c>Last-Modified</c> header when
+    /// <see cref="CurlClientOptions.FetchFileTime"/> is set and the engine left it unknown (an FTP <c>HEAD</c>'s <c>MDTM</c>
+    /// reaches the response as that synthesized header); unchanged otherwise.
+    /// </summary>
+    private TransferInfo WithFileTimeFromLastModified(TransferInfo info, IReadOnlyList<KeyValuePair<string, string>> headers)
+    {
+        if (!Options.FetchFileTime || info.FileTime != -1)
+        {
+            return info;
+        }
+
+        foreach (KeyValuePair<string, string> header in headers)
+        {
+            if (string.Equals(header.Key, "Last-Modified", StringComparison.OrdinalIgnoreCase)
+                && DateTimeOffset.TryParseExact(header.Value.Trim(), "r", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTimeOffset time))
+            {
+                return info with { FileTime = time.ToUnixTimeSeconds() };
+            }
+        }
+
+        return info;
     }
 
     /// <summary>Waits, for a mail URL, until the transfer ends or its body pauses it: a mail reply is body bytes delivered before the end, and only the end puts the reply code on the handle's info.</summary>

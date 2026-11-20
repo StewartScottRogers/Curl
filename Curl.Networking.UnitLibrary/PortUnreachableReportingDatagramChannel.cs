@@ -26,6 +26,7 @@ internal sealed class PortUnreachableReportingDatagramChannel(
     private readonly List<ReadOnlyMemory<byte>> _sent = [];
     private IDatagramChannel _inner = inner;
     private readonly List<EndPoint> _refused = [];
+    private readonly List<IDatagramChannel> _retired = [];
     private int _nextAlternative;
     private volatile bool _hasReceived;
     private bool _connectsToServer;
@@ -40,7 +41,47 @@ internal sealed class PortUnreachableReportingDatagramChannel(
     public void ConnectToServer()
     {
         _connectsToServer = true;
-        _inner.ConnectToServer();
+        try
+        {
+            _inner.ConnectToServer();
+        }
+        catch (SocketException) when (ConnectToNextAddress())
+        {
+        }
+    }
+
+    /// <summary>
+    /// After the connect to the current address failed, opens and connects the next resolved address that
+    /// accepts it and makes it the current channel; the failed channel is disposed with this one. Returns
+    /// <see langword="false" /> when no address is left, so the connect failure propagates.
+    /// </summary>
+    private bool ConnectToNextAddress()
+    {
+        while (_nextAlternative < alternatives.Count)
+        {
+            IDatagramChannel? opened = null;
+            try
+            {
+                opened = openChannel(alternatives[_nextAlternative++]);
+                opened.ConnectToServer();
+            }
+            catch (SocketException)
+            {
+                if (opened is not null)
+                {
+                    _retired.Add(opened);
+                }
+
+                continue;
+            }
+
+            _refused.Add(_inner.ServerEndPoint);
+            _retired.Add(_inner);
+            _inner = opened;
+            return true;
+        }
+
+        return false;
     }
 
     /// <inheritdoc />
@@ -86,7 +127,15 @@ internal sealed class PortUnreachableReportingDatagramChannel(
     }
 
     /// <inheritdoc />
-    public ValueTask DisposeAsync() => _inner.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var retired in _retired)
+        {
+            await retired.DisposeAsync().ConfigureAwait(false);
+        }
+
+        await _inner.DisposeAsync().ConfigureAwait(false);
+    }
 
     /// <summary>
     /// After a refusal before any datagram has been received, moves to the next resolved address as curl

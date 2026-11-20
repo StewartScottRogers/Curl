@@ -65,11 +65,12 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
 
         await using (transport.ConfigureAwait(false))
         {
-            ReportConnectionOpened(context, transport, open.ConnectionNumber);
             if (ConnectFailure(transport) is { } refused)
             {
                 return refused;
             }
+
+            ReportConnectionOpened(context, transport, open.ConnectionNumber);
 
             return CoapRequest.IsSecure(context.Url)
                 ? await SecureExchangeAsync(context, transport, request).ConfigureAwait(false)
@@ -77,7 +78,7 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
         }
     }
 
-    /// <summary>Connects the channel's socket to the server; a socket error ends with exit 55, as the send path does.</summary>
+    /// <summary>Connects the channel's socket to the server; a socket error ends with exit 55, as the send path does, before any connection is reported opened.</summary>
     private static TransferResult? ConnectFailure(IDatagramChannel transport)
     {
         try
@@ -87,7 +88,7 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
         }
         catch (SocketException exception) when (exception.GetType() == typeof(SocketException))
         {
-            return TransferResult.Failure(CurlExitCode.SendError, $"CoAP send failed: {exception.Message}");
+            return TransferResult.Failure(CurlExitCode.SendError, $"CoAP connect failed: {exception.Message}");
         }
     }
 

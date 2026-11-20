@@ -25,7 +25,7 @@ internal static class McpOptionValuePaths
     /// <param name="use">How the option uses a path; never <see cref="McpOptionPathUse.None" />.</param>
     /// <param name="value">The option's value.</param>
     /// <param name="outputDirectory">The <c>--output-dir</c> value curl joins before an <c>-o</c> name, or <see langword="null" /> when none is given.</param>
-    /// <param name="globAlternativesEscape">Whether an argument has a URL glob alternative holding <c>/</c>, <c>\</c> or <c>..</c>, so an <c>-o</c> name with <c>#&lt;n&gt;</c> is refused.</param>
+    /// <param name="globAlternativesEscape">Whether an argument has a URL glob alternative that could carry a path out of the root (<see cref="AnyAlternativeEscapes" />), so an <c>-o</c> name with <c>#&lt;n&gt;</c> is refused.</param>
     /// <returns>The paths to check, in the order the value names them.</returns>
     internal static IReadOnlyList<McpValuePath> PathsIn(string longName, McpOptionPathUse use, string value, string? outputDirectory = null, bool globAlternativesEscape = false) => use switch
     {
@@ -294,13 +294,19 @@ internal static class McpOptionValuePaths
         return false;
     }
 
+    /// <summary>
+    /// Whether the <paramref name="open" />...<paramref name="close" /> alternatives in <paramref name="text" /> could carry a path
+    /// out of the root into an <c>-o</c> name: a <c>{}</c> alternative holding <c>/</c>, <c>\</c>, <c>:</c> or <c>..</c>, or starting
+    /// or ending with <c>.</c> (curl copies it verbatim, so a lone <c>.</c> beside a literal <c>.</c> makes <c>..</c>); a <c>[]</c>
+    /// range holding anything but letters, digits, <c>-</c> and <c>:</c>.
+    /// </summary>
     private static bool AlternativeEscapes(string text, char open, char close)
     {
         for (int start = text.IndexOf(open); start >= 0; start = text.IndexOf(open, start + 1))
         {
             int end = text.IndexOf(close, start + 1);
             string alternatives = end < 0 ? text[(start + 1)..] : text[(start + 1)..end];
-            if (alternatives.AsSpan().IndexOfAny('/', '\\') >= 0 || alternatives.Contains("..", StringComparison.Ordinal))
+            if (open == '{' ? BraceAlternativesEscape(alternatives) : RangeEscapes(alternatives))
             {
                 return true;
             }
@@ -309,6 +315,13 @@ internal static class McpOptionValuePaths
         return false;
     }
 
+    private static bool BraceAlternativesEscape(string alternatives) =>
+        alternatives.AsSpan().IndexOfAny('/', '\\', ':') >= 0
+        || alternatives.Contains("..", StringComparison.Ordinal)
+        || alternatives.Split(',').Any(alternative => alternative.StartsWith('.') || alternative.EndsWith('.'));
+
+    private static bool RangeEscapes(string range) =>
+        range.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not ('-' or ':'));
     /// <summary>Replaces each <c>#</c> followed by a digit, curl's <c>#1</c> reference to a URL glob, with a file-name character.</summary>
     private static string WithoutGlobReferences(string value)
     {
