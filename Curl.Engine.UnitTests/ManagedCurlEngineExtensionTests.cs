@@ -41,6 +41,53 @@ public sealed class ManagedCurlEngineExtensionTests
         Assert.AreEqual(CurlCode.UnsupportedProtocol, code);
     }
 
+    [TestMethod]
+    public async Task PerformAsync_WithTransferHooks_GivesThemTheTransfersExtensionOptionsAndRunsWhatTheyWrap()
+    {
+        ReachedExtensionHandler handler = new();
+        IReadOnlyDictionary<string, string>? seen = null;
+        int wrapped = 0;
+        await using ManagedCurlEngine engine = new(
+            _ => [handler],
+            values =>
+            {
+                seen = values;
+                return inner =>
+                {
+                    wrapped++;
+                    return inner;
+                };
+            });
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = ExtensionUrl },
+            ExtensionOptions = new Dictionary<string, string> { ["dns-json"] = string.Empty },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.IsNotNull(seen);
+        Assert.IsTrue(seen.ContainsKey("dns-json"));
+        Assert.IsGreaterThan(0, wrapped);
+        Assert.AreEqual(1, handler.Transfers);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_WithTransferHooksThatActivateNone_RunsTheHandlerUnwrapped()
+    {
+        ReachedExtensionHandler handler = new();
+        await using ManagedCurlEngine engine = new(_ => [handler], _ => null);
+        await using IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = ExtensionUrl } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        Assert.AreEqual(1, handler.Transfers);
+    }
+
     private sealed class ReachedExtensionHandler : IProtocolHandler
     {
         public int Transfers { get; private set; }

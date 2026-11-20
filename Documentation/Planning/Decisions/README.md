@@ -1360,3 +1360,4 @@ Each option and the specific reason it lost.
 | [1316](ADR-1316-a-curl-api-body-on-a-non-http-upload-scheme-uploads-as-curl-t-does.md) | A Curl.Api body on a non-HTTP upload scheme uploads, as `curl -T` does (BL-5594) | Accepted | 2026-11-20 |
 | [1317](ADR-1317-kafka-logs-in-with-scram-when-the-broker-enables-no-plain.md) | Kafka logs in with SCRAM-SHA-512 or SCRAM-SHA-256 when the broker enables no PLAIN (BL-5600) | Accepted | 2026-11-20 |
 | [1318](ADR-1318-coap-connects-its-udp-socket-so-an-unbound-port-fails-at-once-everywhere.md) | CoAP connects its UDP socket so an unbound port fails at once on every platform (BL-5601) | Accepted | 2026-11-20 |
+| [1319](ADR-1319-curl-api-sets-extension-options-through-typed-option-records.md) | Curl.Api sets extension options through typed option records (BL-5617) | Accepted | 2026-11-20 |

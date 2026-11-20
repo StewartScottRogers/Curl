@@ -105,6 +105,7 @@ public sealed partial class CurlClient
         {
             easy.Options = CurlTransportOptions.Apply(easy.Options, request.Network, request.Tls, request.Proxy);
             easy.Options = CurlProtocolOptions.Apply(easy.Options, request.ProtocolRecords);
+            easy.Options = ApplyExtensionOptions(easy.Options, request);
             easy.Options = CurlRequestOptions.Apply(easy.Options, request, collector.Take, body.TakeBody, _engine, body.Owned);
             easy.Options = ApplyCustomRequest(easy.Options, request);
             return null;

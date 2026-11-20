@@ -73,6 +73,11 @@ transport groups `CurlNetworkOptions`, `CurlTlsOptions` (with `CurlTlsPeerOption
 checked as it is set. Choose HTTP authentication methods (Digest, for a plain-HTTP server that refuses
 Basic) with `HttpAuthenticationMethods` from `Curl.Api.Options.Authentication`.
 
+Curl's extensions have typed records of their own. `CurlRequest.Dns` takes a `CurlDnsOptions`: `Json = true`
+is `--dns-json` and `Transport = "tcp"` is `--dns-transport tcp`, for a `dns://` request. They work only while
+extensions are on; with `CURL_EXTENSIONS=0` the request fails with `CurlCode.UnknownOption`, as the `curl`
+tool refuses an unknown option (ADR-1319).
+
 <!-- sample: options -->
 ```csharp
 CurlRequest request = new(HttpMethod.Get, "https://example.com/redirected")
@@ -324,6 +329,7 @@ format. Give clients one `CurlStores` through `CurlClientOptions.Stores` to shar
 | `CurlAltSvcEntry` | One alt-svc cache line. |
 | `CurlNetworkOptions`, `CurlTlsOptions`, `CurlTlsPeerOptions`, `CurlProxyOptions` | The transport option groups. |
 | `CurlHttpOptions`, `CurlAuthenticationOptions`, `CurlFtpOptions`, `CurlSshOptions`, `CurlMailOptions`, `CurlTftpOptions`, `CurlTelnetOptions`, `CurlRtspOptions` | The protocol option groups. |
+| `CurlDnsOptions` | The `dns://` extension's `--dns-json` and `--dns-transport`, set on `CurlRequest.Dns` (ADR-1319). |
 
 ## Folder map
 

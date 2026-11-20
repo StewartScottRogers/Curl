@@ -1,3 +1,5 @@
+using Curl.Api.Codes;
+
 namespace Curl.Api;
 
 public sealed partial record CurlRequest
@@ -25,6 +27,9 @@ public sealed partial record CurlRequest
 
     /// <summary>The RTSP settings for this request alone, replacing the client's <see cref="CurlClientOptions.Rtsp"/>; <see langword="null"/> (the default) keeps the client's.</summary>
     public CurlRtspOptions? Rtsp { get; init; }
+
+    /// <summary>The <c>dns://</c> extension settings for this request: <c>--dns-json</c> and <c>--dns-transport</c> (ADR-1319); <see langword="null"/> (the default) sets neither. Fails with <see cref="CurlCode.UnknownOption"/> when <c>CURL_EXTENSIONS</c> is <c>0</c>.</summary>
+    public CurlDnsOptions? Dns { get; init; }
 
     /// <summary>
     /// <c>CURLOPT_CUSTOMREQUEST</c> for this request alone, sent unchanged, spaces and all, and winning over <see cref="Method"/>
