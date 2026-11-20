@@ -57,6 +57,23 @@ public sealed class Amqp1ClientFlowTests
     }
 
     [TestMethod]
+    public async Task RunAsync_MessageFillsWholeFrames_SendsNoExtraEmptyTransfer_Part2Section2_6_14()
+    {
+        ScriptedAmqp1Connection probe = new([.. Authenticated, .. Opened(true, 512), .. Flow(1), .. Disposition(State(Amqp1CompositeType.Accepted)), .. Closed]);
+        Assert.IsNull(await RunAsync(probe, new MemoryStream(), new string('x', 1200)));
+        int perFrame = Written(probe).First(entry => entry.Performative?.Type == Amqp1CompositeType.Transfer).Payload.Length;
+        const int sectionOverhead = 8; // descriptor (3 bytes) + vbin32 constructor and length (5 bytes)
+        ScriptedAmqp1Connection connection = new([.. Authenticated, .. Opened(true, 512), .. Flow(1), .. Disposition(State(Amqp1CompositeType.Accepted)), .. Closed]);
+
+        Assert.IsNull(await RunAsync(connection, new MemoryStream(), new string('y', (2 * perFrame) - sectionOverhead)));
+
+        var transfers = Written(connection).Where(entry => entry.Performative?.Type == Amqp1CompositeType.Transfer).ToList();
+        Assert.HasCount(2, transfers);
+        CollectionAssert.AreEqual(new object?[] { true, false }, transfers.Select(entry => entry.Performative!["more"]).ToArray());
+        Assert.IsTrue(transfers.All(entry => entry.Payload.Length == perFrame));
+    }
+
+    [TestMethod]
     public async Task RunAsync_NoBody_GrantsOneCreditReadsMultiFrameTransferSettlesAcceptedAndWritesData_Part2Section2_7_4()
     {
         var message = DataMessage("hello");
