@@ -34,3 +34,4 @@ The cookbook asked for SCRAM logins for mail and Kafka. Upstream curl has no SCR
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (1942 #5).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: f6501668 5a0f3215 e63f3e90 3d836d5e.
