@@ -798,6 +798,48 @@ public sealed class CurlCommandRunnerRetryTests
 
     private static readonly string AllErrorsRetryWarningLine =
         "Warning: Problem (retrying all errors). Retrying in 1 second. 1 retry left." + NewLine;
+    private static readonly string EmptyReplyLine = "curl: (52) Empty reply from server" + NewLine;
+
+    // curl 8.22.0 (BL-5604): -sS prints the retried attempt's error and no Warning, and exits 0 on success.
+    [TestMethod]
+    public async Task RunAsync_RetryAllErrorsUnderShowErrorAfterEmptyReply_PrintsTheFirstAttemptsErrorAndSucceeds()
+    {
+        int exitCode = await RunAsync([string.Empty, OkOk], "-sS", "--retry", "1", "--retry-all-errors", Url);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(EmptyReplyLine, StandardErrorText);
+    }
+
+    // curl 8.22.0: plain --retry does not retry an empty reply, so -s prints nothing and exits 52.
+    [TestMethod]
+    public async Task RunAsync_RetryWithoutAllErrorsUnderSilentAfterEmptyReply_ExitsFiftyTwoSilently()
+    {
+        int exitCode = await RunAsync([string.Empty, OkOk], "-s", "--retry", "1", Url);
+
+        Assert.AreEqual(52, exitCode);
+        Assert.AreEqual(string.Empty, StandardErrorText);
+    }
+
+    // curl 8.22.0: each failed attempt's error, the Warning between them, and exit 52 at the end.
+    [TestMethod]
+    public async Task RunAsync_RetryAllErrorsWithoutSilentWhenEveryAttemptGetsAnEmptyReply_PrintsErrorWarningError()
+    {
+        int exitCode = await RunAsync([string.Empty, string.Empty], "--no-progress-meter", "--retry", "1", "--retry-all-errors", Url);
+
+        Assert.AreEqual(52, exitCode);
+        Assert.AreEqual(EmptyReplyLine + AllErrorsRetryWarningLine + EmptyReplyLine, StandardErrorText);
+    }
+
+    // curl 8.22.0: -sS keeps both errors and hides the Warning when the retries run out.
+    [TestMethod]
+    public async Task RunAsync_RetryAllErrorsUnderShowErrorWhenEveryAttemptGetsAnEmptyReply_PrintsBothErrorsAndNoWarning()
+    {
+        int exitCode = await RunAsync([string.Empty, string.Empty], "-sS", "--retry", "1", "--retry-all-errors", Url);
+
+        Assert.AreEqual(52, exitCode);
+        Assert.AreEqual(EmptyReplyLine + EmptyReplyLine, StandardErrorText);
+    }
+
 
     private static readonly TransferReport AcceptingRangesReport = new()
     {
