@@ -52,6 +52,8 @@ internal sealed class EndPointRecordingDatagramConnector(IDatagramConnector conn
 
         public EndPoint? LocalEndPoint => inner.LocalEndPoint;
 
+        public void ConnectToServer() => inner.ConnectToServer();
+
         public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken) =>
             inner.SendAsync(datagram, destination, cancellationToken);
 

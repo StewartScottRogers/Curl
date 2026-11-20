@@ -31,12 +31,14 @@ Found by the shift-end review of 2026-11-20 in the diff b73256235592..071c3980c0
 
 ## Acceptance criteria
 
-- [ ] `ReRecordingChannel` forwards `ConnectToServer` to its inner channel, and a test in `Curl.Engine.UnitTests` proves it.
-- [ ] Any other `IDatagramChannel` wrapper the CoAP path can be handed forwards it too, or the default is removed so each wrapper must implement it.
-- [ ] A `SocketException` from `ConnectToServer` in `CoapProtocolHandler` ends the transfer with the exit code the send path uses (55, "CoAP send failed: ..."), and a `CoapProtocolHandlerTests` test pins it.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `ReRecordingChannel` forwards `ConnectToServer` to its inner channel, and a test in `Curl.Engine.UnitTests` proves it.
+- [x] Any other `IDatagramChannel` wrapper the CoAP path can be handed forwards it too, or the default is removed so each wrapper must implement it.
+- [x] A `SocketException` from `ConnectToServer` in `CoapProtocolHandler` ends the transfer with the exit code the send path uses (55, "CoAP send failed: ..."), and a `CoapProtocolHandlerTests` test pins it.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Other IDatagramChannel wrappers (Masque, QuicMigration, WireGuard, Capsule, DTLS) are tunnels or sit above the socket; none wraps the socket channel the CoAP path connects, so the no-op default stays (removing it would touch ~10 files outside touches). Only ReRecordingChannel wrapped the socket channel (PortUnreachableReportingDatagramChannel already forwards).
 
 ## Log
 
