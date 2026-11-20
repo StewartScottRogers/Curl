@@ -34,3 +34,4 @@ BL-5603 (Done, `d1addaf8c8`) added `CurlClientOptions.FetchFileTime`, which sets
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1331, finding 1.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 97812ebe f83af33d f4cf65f3 3d836d5e.
