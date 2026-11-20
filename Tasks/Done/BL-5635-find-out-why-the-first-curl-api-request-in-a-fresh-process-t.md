@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/Messages/CurlClient.SendAsync.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5635 — Find out why the first Curl.Api request in a fresh process takes about 4 seconds, and remove any avoidable part
 
@@ -40,3 +40,4 @@ Measure where the 4 seconds go (an `EventSource` trace or `Stopwatch` timings ar
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1331, finding 2 (check).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 75e5104d a479cbec 57571814 3d836d5e.
+- 2026-11-20: Doing -> Done. Measured: first request about 0.5 s plain HTTP, 0.7-0.9 s HTTPS; nothing avoidable; README documents it
