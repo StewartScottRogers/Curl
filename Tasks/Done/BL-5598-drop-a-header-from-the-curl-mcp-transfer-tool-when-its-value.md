@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-5596]
-touches: [Curl.Mcp.UnitLibrary/McpTransferHeader.cs, Curl.Mcp.UnitLibrary/McpTransferOptions.cs, Curl.Mcp.UnitTests/McpTransferOptionsTests.cs, Curl.Mcp/Tools/TransferMcpTool.cs, Curl.Mcp.UnitTests/Tools/TransferMcpToolTests.cs, Curl.Mcp.Protocol.UnitTests/Tools/GoldenToolsResponses.cs]
+touches: [Curl.Mcp.UnitLibrary/McpTransferHeader.cs, Curl.Mcp.UnitLibrary/McpTransferOptions.cs, Curl.Mcp.UnitTests/McpTransferOptionsTests.cs, Curl.Mcp/Tools/TransferMcpTool.cs, Curl.Mcp.UnitTests/Tools/TransferMcpToolTests.cs, Curl.Mcp.Protocol.UnitTests/Tools/GoldenToolsResponses.cs, Curl.Mcp.UnitTests/McpTransferToolTests.cs, Curl.Mcp.IntegrationTests/CurlTransferToolIntegrationTests.cs, Curl.Mcp.IntegrationTests/Golden/tools-list.json, Curl.Mcp.IntegrationTests/Golden/request-before-initialize.json]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5598 — Drop a header from the curl-mcp transfer tool when its value is empty, as curl -H "Name:" does
 
@@ -24,13 +24,15 @@ An empty `Accept` value in the `transfer` tool sends `Accept:` with an empty val
 
 ## Acceptance criteria
 
-- [ ] A transfer with header `Accept` set to an empty value sends no `Accept` header, pinned by a test of the request bytes.
-- [ ] The tool description says how to remove a default header and how (if at all) to send an empty one.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A transfer with header `Accept` set to an empty value sends no `Accept` header, pinned by a test of the request bytes.
+- [x] The tool description says how to remove a default header and how (if at all) to send an empty one.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 Reproduced by reading: McpTransferOptions.HeaderLine (line 71) turns an empty value into "Name;" (sent empty). Plan: empty value -> "Name:" (removes); add optional bool SendEmpty on McpTransferHeader (default false) -> "Name;"; update the tool description in TransferMcpTool.cs, its two golden copies (GoldenToolsResponses.cs, TransferMcpToolTests.cs) and the test Build_HeaderValues_AreTrimmedAndAnEmptyOneUsesTheSemicolonForm; add a request-bytes test. Needs McpTransferOptions.cs, which BL-5596 (Doing) holds, so requeued with depends-on BL-5596; touches widened accordingly.
+
+Done: empty value -> "Name:" (removed, as curl -H "Accept:"); optional sendEmpty:true -> "Name;" (sent empty, as curl -H "Accept;"); non-empty value sent as given. Flag over a sentinel value, recorded in ADR-1320. SendEmpty is ignored when written while false, so response headers serialise unchanged. Request bytes pinned by CurlTransferToolIntegrationTests.TransferAsync_EmptyAcceptValue_SendsNoAcceptHeaderAndSendEmptySendsItEmpty (an Integration test, since the bytes cross a loopback socket), plus unit tests of the header lines. Touches widened (no task in Doing on work/dark-factory named them): McpTransferToolTests.cs pinned the old X-Empty; line; the integration test file for the request-bytes test; the two Golden conversations carry the tools/list description. Measure-CodeQuality for Curl.Mcp.UnitLibrary,Curl.Mcp: 0 failing members. Build clean, fast tests green; Curl.Mcp integration transfer and golden tests pass.
 
 ## Log
 
@@ -38,3 +40,4 @@ Reproduced by reading: McpTransferOptions.HeaderLine (line 71) turns an empty va
 - 2026-11-20: Backlog -> Doing. Criteria at claim: b0a4577d 9756089e 3d836d5e.
 - 2026-11-20: Doing -> Backlog. Needs McpTransferOptions.cs held by BL-5596 (Doing); depends-on BL-5596
 - 2026-11-20: Backlog -> Doing. Criteria at claim: b0a4577d 9756089e 3d836d5e.
+- 2026-11-20: Doing -> Done. An empty transfer header value removes the header as curl -H 'Accept:' does; sendEmpty:true sends it empty as -H 'Accept;'
