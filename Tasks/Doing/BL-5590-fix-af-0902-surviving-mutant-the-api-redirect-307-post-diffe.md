@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] A fast test fails on the code as the evidence above describes it and passes after the fix; Notes name the test.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A fast test fails on the code as the evidence above describes it and passes after the fix; Notes name the test.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Production code was already correct; the gap was a missing pin. Added `All_EveryCase_FollowsRedirectsExactlyWhenItsCommandPassesTheLocationOption` and `All_Redirect307PostCase_FollowsTheRedirectWithItsPostBody` in `Curl.Conformance.Differential.UnitTests/Api/ApiDifferentialCasesTests.cs`; mutating FollowsRedirects to false on api-redirect-307-post fails both. The test project was added outside `touches` (tests only). Fast tests: 623 pass.
 
 ## Log
 
