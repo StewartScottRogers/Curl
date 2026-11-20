@@ -34,3 +34,4 @@ BL-5594 (Done) made a body upload over ftp, smb, smtp, s3, az, tftp and telnet; 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1022, finding widening BL-5594 (IMAP APPEND).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 6d5ba732 b4aafe4d 033d8643 174e089e.
