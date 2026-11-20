@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Curl.Extended.Protocol.Coap.Blockwise;
 using Curl.Extended.Protocol.Coap.Observe;
@@ -65,10 +66,28 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
         await using (transport.ConfigureAwait(false))
         {
             ReportConnectionOpened(context, transport, open.ConnectionNumber);
-            transport.ConnectToServer();
+            if (ConnectFailure(transport) is { } refused)
+            {
+                return refused;
+            }
+
             return CoapRequest.IsSecure(context.Url)
                 ? await SecureExchangeAsync(context, transport, request).ConfigureAwait(false)
                 : await ExchangeAsync(context, transport, request).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Connects the channel's socket to the server; a socket error ends with exit 55, as the send path does.</summary>
+    private static TransferResult? ConnectFailure(IDatagramChannel transport)
+    {
+        try
+        {
+            transport.ConnectToServer();
+            return null;
+        }
+        catch (SocketException exception) when (exception.GetType() == typeof(SocketException))
+        {
+            return TransferResult.Failure(CurlExitCode.SendError, $"CoAP send failed: {exception.Message}");
         }
     }
 

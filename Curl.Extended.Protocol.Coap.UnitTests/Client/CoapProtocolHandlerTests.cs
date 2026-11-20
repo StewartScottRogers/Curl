@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Curl.Extended.Protocol.Coap.Wire;
 using Curl.Protocol.Abstractions;
@@ -416,6 +417,31 @@ public sealed class CoapProtocolHandlerTests
     [DataRow("%e2%82%ac", "€")]
     public void PercentDecoded_AComponent_DecodesOnlyValidEscapes(string component, string expected) =>
         Assert.AreEqual(expected, Encoding.UTF8.GetString(CoapRequest.PercentDecoded(component)));
+
+    [TestMethod]
+    public async Task ExecuteAsync_ConnectToServerRefused_EndsWithTheSendExitCode()
+    {
+        var connector = new ScriptedDatagramConnector(DatagramOpenResult.Opened(new RefusingConnectChannel()));
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Context("coap://h/r", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.StartsWith("CoAP send failed: ", result.ErrorMessage);
+    }
+
+    private sealed class RefusingConnectChannel : IDatagramChannel
+    {
+        public EndPoint ServerEndPoint { get; } = new IPEndPoint(IPAddress.Loopback, 5683);
+
+        public void ConnectToServer() => throw new SocketException((int)SocketError.NetworkUnreachable);
+
+        public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            ValueTask.FromException<DatagramReceived>(new InvalidOperationException());
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 
     private static CoapProtocolHandler Handler(ScriptedDatagramChannel channel) =>
         Handler(new ScriptedDatagramConnector(DatagramOpenResult.Opened(channel)));

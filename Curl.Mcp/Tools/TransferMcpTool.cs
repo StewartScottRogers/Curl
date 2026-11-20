@@ -31,11 +31,11 @@ public sealed class TransferMcpTool(McpTransferTool tool) : IMcpTool
             "url": { "description": "The absolute URL to transfer, e.g. https://example.com/; file: URLs are refused.", "type": "string" },
             "method": { "description": "The request method, sent as given; GET when omitted.", "type": "string", "default": "GET" },
             "headers": {
-              "description": "Extra request headers, in the order sent; an empty value sends the header empty.",
+              "description": "Extra request headers, in the order sent. An empty value removes the header, including a default one such as Accept, as curl -H 'Accept:' does; an empty value with sendEmpty true sends the header empty, as curl -H 'Accept;' does.",
               "type": ["array", "null"],
               "items": {
                 "type": ["object", "null"],
-                "properties": { "name": { "type": ["string", "null"] }, "value": { "type": ["string", "null"] } },
+                "properties": { "name": { "type": ["string", "null"] }, "value": { "type": ["string", "null"] }, "sendEmpty": { "type": "boolean", "default": false } },
                 "required": ["name", "value"]
               },
               "default": null

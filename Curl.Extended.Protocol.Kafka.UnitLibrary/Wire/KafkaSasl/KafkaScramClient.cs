@@ -13,6 +13,9 @@ internal sealed class KafkaScramClient(HashAlgorithmName hash, string userName, 
     private const string Gs2Header = "n,,";
     private const string ChannelBinding = "c=biws";
 
+    /// <summary>The most PBKDF2 iterations a server-first message may ask for; key derivation is synchronous, so a larger count would hang the transfer (Kafka brokers cap it at 16384).</summary>
+    internal const int MaximumIterations = 100000;
+
     private string clientFirstBare = string.Empty;
     private string authMessage = string.Empty;
     private byte[] serverKey = [];
@@ -64,13 +67,16 @@ internal sealed class KafkaScramClient(HashAlgorithmName hash, string userName, 
         string? nonce = attributes.GetValueOrDefault('r');
         string? saltText = attributes.GetValueOrDefault('s');
         if (nonce is null || saltText is null || !nonce.StartsWith(clientNonce, StringComparison.Ordinal)
-            || !int.TryParse(attributes.GetValueOrDefault('i'), out int iterations) || iterations < 1)
+            || !TryParseIterations(attributes.GetValueOrDefault('i'), out int iterations))
         {
             throw new FormatException("The Kafka broker's SCRAM server-first message is malformed");
         }
 
         return (nonce, Convert.FromBase64String(saltText), iterations);
     }
+
+    private static bool TryParseIterations(string? text, out int iterations) =>
+        int.TryParse(text, out iterations) && iterations >= 1 && iterations <= MaximumIterations;
 
     private static Dictionary<char, string> Attributes(string message)
     {

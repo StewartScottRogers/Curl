@@ -36,4 +36,22 @@ public sealed class CurlTransferToolIntegrationTests
         Assert.AreEqual("hello", json.RootElement.GetProperty("body").GetProperty("content").GetString());
         Assert.AreEqual("text/plain", json.RootElement.GetProperty("info").GetProperty("contentType").GetString());
     }
+
+    [TestMethod]
+    public async Task TransferAsync_EmptyAcceptValue_SendsNoAcceptHeaderAndSendEmptySendsItEmpty()
+    {
+        using TcpListener listener = new(IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        Task<string> served = LoopbackHttpResponder.ServeOneResponseAsync(listener, "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        IMcpTool tool = CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, new McpResponseCap(McpResponseCap.DefaultMaxBytes), _ => null, _ => []).FindTool("transfer")!;
+
+        using JsonDocument arguments = JsonDocument.Parse($$"""{"url":"http://127.0.0.1:{{port}}/","headers":[{"name":"Accept","value":""},{"name":"X-Empty","value":"","sendEmpty":true}]}""");
+        McpToolCallResult result = await tool.CallAsync(arguments.RootElement, CancellationToken.None);
+
+        string request = await served;
+        Assert.IsFalse(result.IsError, result.Content.Single().Text);
+        Assert.DoesNotContain("\r\nAccept:", request);
+        StringAssert.Contains(request, "\r\nX-Empty:\r\n");
+    }
 }

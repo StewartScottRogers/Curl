@@ -39,7 +39,7 @@ public sealed class McpTransferToolTests
         Assert.AreEqual(defaults.Proxy with { Proxy = "http://proxy.test:3128" }, set.Proxy);
         Assert.AreEqual(defaults.Transfer with { CustomRequest = "PUT", Timeout = TimeSpan.FromSeconds(2.5) }, set.Transfer);
         Assert.AreEqual(defaults.Tls with { Origin = defaults.Tls.Origin with { VerifyPeer = false, VerifyHost = false } }, set.Tls);
-        CollectionAssert.AreEqual(new[] { "X-One: 1", "X-Empty;" }, set.Http.HttpHeaders.ToArray());
+        CollectionAssert.AreEqual(new[] { "X-One: 1", "X-Empty:" }, set.Http.HttpHeaders.ToArray());
         CollectionAssert.AreEqual(Encoding.UTF8.GetBytes("payload"), set.Http.PostFields!.Value.ToArray());
         Assert.AreEqual(
             defaults.Http with { UserAgent = "agent/1", FollowLocation = FollowLocation.All, Post = true },

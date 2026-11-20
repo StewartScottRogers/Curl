@@ -25,12 +25,13 @@ internal static class McpOptionValuePaths
     /// <param name="use">How the option uses a path; never <see cref="McpOptionPathUse.None" />.</param>
     /// <param name="value">The option's value.</param>
     /// <param name="outputDirectory">The <c>--output-dir</c> value curl joins before an <c>-o</c> name, or <see langword="null" /> when none is given.</param>
+    /// <param name="globAlternativesEscape">Whether an argument has a URL glob alternative holding <c>/</c>, <c>\</c> or <c>..</c>, so an <c>-o</c> name with <c>#&lt;n&gt;</c> is refused.</param>
     /// <returns>The paths to check, in the order the value names them.</returns>
-    internal static IReadOnlyList<McpValuePath> PathsIn(string longName, McpOptionPathUse use, string value, string? outputDirectory = null) => use switch
+    internal static IReadOnlyList<McpValuePath> PathsIn(string longName, McpOptionPathUse use, string value, string? outputDirectory = null, bool globAlternativesEscape = false) => use switch
     {
         McpOptionPathUse.ValueEmbedded => EmbeddedPaths(longName, value),
         McpOptionPathUse.ReadsFileOrLiteral => FileOrLiteralPaths(longName, value),
-        McpOptionPathUse.WritesFile => WrittenFilePaths(longName, value, outputDirectory),
+        McpOptionPathUse.WritesFile => WrittenFilePaths(longName, value, outputDirectory, globAlternativesEscape),
         McpOptionPathUse.UnixSocketPath => SocketPaths(longName, value),
         _ => longName == "upload-file" ? UploadPaths(value) : [new(value)],
     };
@@ -257,7 +258,7 @@ internal static class McpOptionValuePaths
     /// <paramref name="outputDirectory" /> when one is given, and a <c>#1</c> glob reference counts as
     /// file-name characters, so the name is judged on its literal directory part.
     /// </summary>
-    private static IReadOnlyList<McpValuePath> WrittenFilePaths(string longName, string value, string? outputDirectory)
+    private static IReadOnlyList<McpValuePath> WrittenFilePaths(string longName, string value, string? outputDirectory, bool globAlternativesEscape)
     {
         if (longName != "output")
         {
@@ -270,7 +271,42 @@ internal static class McpOptionValuePaths
         }
 
         string name = WithoutGlobReferences(value);
-        return [new(string.IsNullOrEmpty(outputDirectory) ? name : outputDirectory + "/" + name)];
+        return [OutputPath(value, name, outputDirectory, globAlternativesEscape && name != value)];
+    }
+
+    /// <summary>The path an <c>-o</c> name writes; refused when its <c>#&lt;n&gt;</c> would carry an escaping glob alternative into it.</summary>
+    private static McpValuePath OutputPath(string value, string name, string? outputDirectory, bool carriesEscape) =>
+        carriesEscape
+            ? new(value, "names a #<n> glob reference while an argument has a {} or [] alternative holding /, \\ or .., which curl would write into the name outside CURL_MCP_ROOT.")
+            : new(string.IsNullOrEmpty(outputDirectory) ? name : outputDirectory + "/" + name);
+
+    /// <summary>Whether any argument holds a <c>{...}</c> or <c>[...]</c> alternative with <c>/</c>, <c>\</c> or <c>..</c>, which a <c>#1</c> in an <c>-o</c> name would carry into the path.</summary>
+    internal static bool AnyAlternativeEscapes(IReadOnlyList<string> arguments)
+    {
+        foreach (string argument in arguments)
+        {
+            if (AlternativeEscapes(argument ?? string.Empty, '{', '}') || AlternativeEscapes(argument ?? string.Empty, '[', ']'))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool AlternativeEscapes(string text, char open, char close)
+    {
+        for (int start = text.IndexOf(open); start >= 0; start = text.IndexOf(open, start + 1))
+        {
+            int end = text.IndexOf(close, start + 1);
+            string alternatives = end < 0 ? text[(start + 1)..] : text[(start + 1)..end];
+            if (alternatives.AsSpan().IndexOfAny('/', '\\') >= 0 || alternatives.Contains("..", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Replaces each <c>#</c> followed by a digit, curl's <c>#1</c> reference to a URL glob, with a file-name character.</summary>

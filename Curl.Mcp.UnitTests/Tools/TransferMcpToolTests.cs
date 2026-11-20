@@ -16,8 +16,8 @@ public sealed class TransferMcpToolTests
         {"type":"object","properties":{
         "url":{"description":"The absolute URL to transfer, e.g. https://example.com/; file: URLs are refused.","type":"string"},
         "method":{"description":"The request method, sent as given; GET when omitted.","type":"string","default":"GET"},
-        "headers":{"description":"Extra request headers, in the order sent; an empty value sends the header empty.","type":["array","null"],
-          "items":{"type":["object","null"],"properties":{"name":{"type":["string","null"]},"value":{"type":["string","null"]}},"required":["name","value"]},"default":null},
+        "headers":{"description":"Extra request headers, in the order sent. An empty value removes the header, including a default one such as Accept, as curl -H 'Accept:' does; an empty value with sendEmpty true sends the header empty, as curl -H 'Accept;' does.","type":["array","null"],
+          "items":{"type":["object","null"],"properties":{"name":{"type":["string","null"]},"value":{"type":["string","null"]},"sendEmpty":{"type":"boolean","default":false}},"required":["name","value"]},"default":null},
         "body":{"description":"The request body: inline text sent as UTF-8, or base64 when isBase64 is true. Never a file.","type":["object","null"],
           "properties":{"content":{"type":["string","null"]},"isBase64":{"type":"boolean"}},"required":["content","isBase64"],"default":null},
         "followRedirects":{"description":"Whether redirects are followed, as curl -L follows them.","type":"boolean","default":false},
@@ -55,7 +55,7 @@ public sealed class TransferMcpToolTests
         };
 
         McpToolCallResult result = await CallAsync(transfer, """
-            {"url":"https://example.test/","method":"PUT","headers":[{"name":"X-One","value":"1"},{"name":"X-Empty","value":""}],
+            {"url":"https://example.test/","method":"PUT","headers":[{"name":"X-One","value":"1"},{"name":"X-Empty","value":"","sendEmpty":true},{"name":"Accept","value":""}],
              "body":{"content":"payload","isBase64":false},"followRedirects":true,"timeoutSeconds":3,"insecure":true,
              "proxy":"http://proxy.test:3128","userAgent":"agent/1"}
             """);
@@ -64,7 +64,7 @@ public sealed class TransferMcpToolTests
         Assert.AreEqual("https://example.test/", transfer.Options.Network.Url);
         Assert.AreEqual("PUT", transfer.Options.Transfer.CustomRequest);
         Assert.AreEqual(TimeSpan.FromSeconds(3), transfer.Options.Transfer.Timeout);
-        CollectionAssert.AreEqual(new[] { "X-One: 1", "X-Empty;" }, transfer.Options.Http.HttpHeaders.ToArray());
+        CollectionAssert.AreEqual(new[] { "X-One: 1", "X-Empty;", "Accept:" }, transfer.Options.Http.HttpHeaders.ToArray());
         CollectionAssert.AreEqual(Encoding.UTF8.GetBytes("payload"), transfer.Options.Http.PostFields!.Value.ToArray());
         Assert.AreEqual("agent/1", transfer.Options.Http.UserAgent);
         Assert.AreEqual("http://proxy.test:3128", transfer.Options.Proxy.Proxy);

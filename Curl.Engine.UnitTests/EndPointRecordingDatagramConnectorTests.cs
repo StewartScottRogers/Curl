@@ -150,6 +150,19 @@ public sealed class EndPointRecordingDatagramConnectorTests
         Assert.IsNull(recorder.DatagramLocalEndPoint);
     }
 
+    [TestMethod]
+    public async Task ConnectToServer_FirstChannel_ReachesTheInnerChannel()
+    {
+        IPEndPoint server = new(IPAddress.Loopback, 5683);
+        SwitchingChannel inner = new(server, server, server);
+        EndPointRecordingDatagramConnector connector = new(new SingleChannelConnector(inner), new ConnectionEndPointRecorder());
+
+        DatagramOpenResult opened = await connector.OpenAsync("h", 5683, CancellationToken.None);
+        opened.Channel!.ConnectToServer();
+
+        Assert.IsTrue(inner.Connected);
+    }
+
     private sealed class QueueConnector(params IDatagramChannel[] channels) : IDatagramConnector
     {
         private int _next;
@@ -170,6 +183,10 @@ public sealed class EndPointRecordingDatagramConnectorTests
         private IPEndPoint? _local;
 
         public bool Disposed { get; private set; }
+
+        public bool Connected { get; private set; }
+
+        public void ConnectToServer() => Connected = true;
 
         public EndPoint ServerEndPoint => _server;
 

@@ -78,13 +78,23 @@ public sealed class McpTransferOptionsTests
     }
 
     [TestMethod]
-    public void Build_HeaderValues_AreTrimmedAndAnEmptyOneUsesTheSemicolonForm()
+    public void Build_HeaderValues_AreTrimmedAndAnEmptyOneUsesTheRemovingColonForm()
     {
-        McpTransferRequest request = new("http://h/") { Headers = [new McpTransferHeader("A", "  x  "), new McpTransferHeader("B", "   ")] };
+        McpTransferRequest request = new("http://h/") { Headers = [new McpTransferHeader("A", "  x  "), new McpTransferHeader("Accept", "   ")] };
 
         EasyOptions options = McpTransferOptions.Build(request, null);
 
-        CollectionAssert.AreEqual(new[] { "A: x", "B;" }, options.Http.HttpHeaders.ToArray());
+        CollectionAssert.AreEqual(new[] { "A: x", "Accept:" }, options.Http.HttpHeaders.ToArray());
+    }
+
+    [TestMethod]
+    public void Build_SendEmpty_SendsAnEmptyValueEmptyAndAValueAsGiven()
+    {
+        McpTransferRequest request = new("http://h/") { Headers = [new McpTransferHeader("B", " ", SendEmpty: true), new McpTransferHeader("C", "y", SendEmpty: true)] };
+
+        EasyOptions options = McpTransferOptions.Build(request, null);
+
+        CollectionAssert.AreEqual(new[] { "B;", "C: y" }, options.Http.HttpHeaders.ToArray());
     }
 
     [TestMethod]
