@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-20 | 2026-11-20_0456.md | reproduces: yes | The literal Select-String for run 44566263056 finds nothing. That run ended 17:19Z, before the first copied log line (23:30Z), so it is not evidence of a missing trace. Re-audited by mechanism: run 97190262520 failed at 02:00Z (19:00 MST), the coordinators' ci traces run 17:50 then 20:03 with a gap while no coordinator ran, and the run is never named in any log. The next green run ended 83 minutes later. The window holds shifts that finished 16 tasks. The run id looks synthetic, so the audit run may set the verdict aside.
+
 ## Log
 
 - 2026-11-19: filed proposed.
