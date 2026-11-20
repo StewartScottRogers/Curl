@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5595 — Make ldaps:// on Windows trust a --cacert file (and Curl.Api CertificateAuthorityBlob) as https:// does, if curl 8.22.0 Schannel does
 
@@ -26,14 +26,19 @@ From Surly cookbook bug report `2026-11-19T1942-Curl-bug-report.md` (batch 1 of 
 
 ## Acceptance criteria
 
-- [ ] The Notes record the reference curl 8.22.0 Schannel result for the repro on Windows and the OpenSSL build's result on Linux.
-- [ ] The port's exit code and error text for the repro match the reference on each platform, pinned by a test.
-- [ ] If the port keeps exit 60 on Windows, an ADR and the LDAP docs say `--cacert` does not apply to ldaps there; if it now trusts the file, `CertificateAuthorityBlob` does too, pinned by a test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The Notes record the reference curl 8.22.0 Schannel result for the repro on Windows and the OpenSSL build's result on Linux.
+- [x] The port's exit code and error text for the repro match the reference on each platform, pinned by a test.
+- [x] If the port keeps exit 60 on Windows, an ADR and the LDAP docs say `--cacert` does not apply to ldaps there; if it now trusts the file, `CertificateAuthorityBlob` does too, pinned by a test.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measured earlier with the reference curl 8.22.0 Schannel (ADR-0994, BL-5461): WinLDAP ignores --cacert; the repro (no -u) exits 38 "LDAP local: bind via ldap_win_bind Server Down", with -u exit 60 SEC_E_UNTRUSTED_ROOT. The port matches both (Cgr289Tests pins the 38). The OpenSSL build verifies against --cacert; not re-measured, this lane is Windows only. The report's exit 60 predates ADR-0994.
+- Decision: no code change; ADR-1314 records that --cacert and CertificateAuthorityBlob do not apply to ldaps on Windows.
+- Build and tests not rerun: only an ADR and the board changed.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (1942 #1).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 3ce73eb5 40717039 c58aac16 3d836d5e.
+- 2026-11-20: Doing -> Done. Reference ignores --cacert for ldaps on Windows; port matches; ADR-1314
