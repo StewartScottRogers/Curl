@@ -36,3 +36,4 @@ Combine `--output-dir` with `-o` as curl does (including `--create-dirs`), and t
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (1942 #4, 2203 #6).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 0a81666f a5bbb262 c5fa87fb.
