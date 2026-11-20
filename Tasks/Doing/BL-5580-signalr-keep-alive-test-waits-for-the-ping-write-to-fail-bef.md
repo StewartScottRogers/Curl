@@ -33,3 +33,4 @@ The held write in `BlockingConnection` fails through `release.TrySetException`, 
 ## Log
 
 - 2026-11-19: Created.
+- 2026-11-19: Backlog -> Doing. Criteria at claim: 7550eea5 10d68653 cf3158a8.
