@@ -3,12 +3,12 @@ id: AF-0907
 title: Surviving mutant: n-fold can drop the end-around carry into its first byte
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Kerberos.UnitLibrary/KerberosNFold.cs:Fold-ge:surviving-mutant
 reproduction: mutation Curl.Kerberos.UnitLibrary/KerberosNFold.cs:33:>=
-task: none
-tasks:
+task: BL-5622
+tasks: BL-5622
 found: 2026-11-20
 found-at: 1ce730765b795e99d4d034faf03432b41b5ec6a4
 scorecard: 2026-11-20_0456.md

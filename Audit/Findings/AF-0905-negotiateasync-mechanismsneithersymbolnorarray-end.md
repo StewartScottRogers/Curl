@@ -3,12 +3,12 @@ id: AF-0905
 title: NegotiateAsync_MechanismsNeitherSymbolNorArray_EndsWithLoginDenied never checks the LoginDenied exit code its name promises
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Amqp1.UnitTests/Client/Amqp1SaslNegotiationTests.cs:NegotiateAsync_MechanismsNeitherSymbolNorArray_EndsWithLoginDenied:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-5620
+tasks: BL-5620
 found: 2026-11-20
 found-at: 1ce730765b795e99d4d034faf03432b41b5ec6a4
 scorecard: 2026-11-20_0456.md

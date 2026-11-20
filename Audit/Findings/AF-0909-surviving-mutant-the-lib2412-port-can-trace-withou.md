@@ -3,12 +3,12 @@ id: AF-0909
 title: Surviving mutant: the lib2412 port can trace without the time prefix
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib2412.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib2412.cs:54:true
-task: none
-tasks:
+task: BL-5624
+tasks: BL-5624
 found: 2026-11-20
 found-at: 1ce730765b795e99d4d034faf03432b41b5ec6a4
 scorecard: 2026-11-20_0456.md

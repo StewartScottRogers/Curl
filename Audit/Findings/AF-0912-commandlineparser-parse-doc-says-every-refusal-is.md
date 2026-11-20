@@ -3,12 +3,12 @@ id: AF-0912
 title: CommandLineParser.Parse doc says every refusal is exit 2 except -d @file, but --proto-default refuses with 1 and --url @file and -K with 26
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Cli.UnitLibrary/CommandLineParser.cs:CommandLineParser.Parse:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-5627
+tasks: BL-5627
 found: 2026-11-20
 found-at: 1ce730765b795e99d4d034faf03432b41b5ec6a4
 scorecard: 2026-11-20_0456.md

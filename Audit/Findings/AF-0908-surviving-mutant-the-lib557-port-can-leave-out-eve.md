@@ -3,12 +3,12 @@ id: AF-0908
 title: Surviving mutant: the lib557 port can leave out every lowest-nibble unsigned printf case
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib557.cs:Unsigned-ge:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib557.cs:193:>=
-task: none
-tasks:
+task: BL-5623
+tasks: BL-5623
 found: 2026-11-20
 found-at: 1ce730765b795e99d4d034faf03432b41b5ec6a4
 scorecard: 2026-11-20_0456.md

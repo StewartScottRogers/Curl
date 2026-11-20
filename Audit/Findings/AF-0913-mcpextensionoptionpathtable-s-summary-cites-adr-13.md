@@ -3,12 +3,12 @@ id: AF-0913
 title: McpExtensionOptionPathTable's summary cites ADR-1311 (socketio auth) for the decision ADR-1310 records
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Mcp.UnitLibrary/McpExtensionOptionPathTable.cs:McpExtensionOptionPathTable:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-5628
+tasks: BL-5628
 found: 2026-11-20
 found-at: 1ce730765b795e99d4d034faf03432b41b5ec6a4
 scorecard: 2026-11-20_0456.md

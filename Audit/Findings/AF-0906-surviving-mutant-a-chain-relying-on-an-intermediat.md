@@ -3,12 +3,12 @@ id: AF-0906
 title: Surviving mutant: a chain relying on an intermediate the server did not send can be observed as verified
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:PeerVerification-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:300:false
-task: none
-tasks:
+task: BL-5621
+tasks: BL-5621
 found: 2026-11-20
 found-at: 1ce730765b795e99d4d034faf03432b41b5ec6a4
 scorecard: 2026-11-20_0456.md

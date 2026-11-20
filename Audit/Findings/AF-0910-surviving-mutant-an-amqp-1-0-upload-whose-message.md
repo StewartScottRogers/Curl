@@ -3,12 +3,12 @@ id: AF-0910
 title: Surviving mutant: an AMQP 1.0 upload whose message fills whole frames can send an extra empty transfer frame
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Amqp1.UnitLibrary/Client/Amqp1ClientFlow.cs:SendMessageAsync-lt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Amqp1.UnitLibrary/Client/Amqp1ClientFlow.cs:166:<
-task: none
-tasks:
+task: BL-5625
+tasks: BL-5625
 found: 2026-11-20
 found-at: 1ce730765b795e99d4d034faf03432b41b5ec6a4
 scorecard: 2026-11-20_0456.md
