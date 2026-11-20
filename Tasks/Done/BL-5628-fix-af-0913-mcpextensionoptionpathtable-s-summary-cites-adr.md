@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Mcp.UnitLibrary/McpExtensionOptionPathTable.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5628 — Fix AF-0913: McpExtensionOptionPathTable's summary cites ADR-1311 (socketio auth) for the decision ADR-1310 records
 
@@ -52,3 +52,4 @@ Comment-only fix: summary now cites ADR-1310. Build clean; no code change so tes
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-20: Doing -> Done. Summary now cites ADR-1310
