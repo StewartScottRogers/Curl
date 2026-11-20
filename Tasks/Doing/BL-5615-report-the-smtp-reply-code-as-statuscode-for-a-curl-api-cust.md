@@ -33,3 +33,4 @@ A `NOOP` custom request gives `StatusCode` 0; `curl -X NOOP -w %{response_code} 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1022, finding 4.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 2491c0c4 28e934ce 3d836d5e.
