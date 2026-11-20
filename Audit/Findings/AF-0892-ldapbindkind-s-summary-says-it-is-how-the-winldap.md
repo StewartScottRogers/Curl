@@ -3,8 +3,8 @@ id: AF-0892
 title: LdapBindKind's summary says it is how the WinLDAP dialect binds, but it also holds the OpenLDAP dialect's Sasl and Simple binds
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-19_1633.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Original.Protocol.Ldap.UnitLibrary/LdapBindKind.cs:LdapBindKind:false-doc-comment
 reproduction: none
 task: BL-5563
@@ -13,9 +13,9 @@ found: 2026-11-19
 found-at: 6e68cb60b626d421113f6d7d7f35c2a46bbc3b46
 scorecard: 2026-11-19_0602.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-19
+closed-how: reliable-reaudit
+closed-by: 2026-11-19_1633.md
 ---
 # AF-0892 - LdapBindKind's summary says it is how the WinLDAP dialect binds, but it also holds the OpenLDAP dialect's Sasl and Simple binds
 
@@ -43,6 +43,9 @@ Select-String -Path Curl.Original.Protocol.Ldap.UnitLibrary/LdapBindKind.cs -Pat
 
 ## Re-audits
 
+- 2026-11-19 | 2026-11-19_1633.md | reproduces: no | Ran the reproduction. It matched only "22: /// <summary>The OpenLDAP dialect's SASL bind, chosen by the auth mask or <c>AUTH=</c> login options (BL-5435).</summary>". The text 'How the WinLDAP dialect binds' is gone. The enum summary now reads 'How a bind is made, in either dialect: the WinLDAP dialect as curl's ldap_win_bind ... the OpenLDAP dialect as ChooseOpenLdapBindKind chooses (Simple or Sasl)'.
+
 ## Log
 
 - 2026-11-19: filed proposed.
+- 2026-11-19: accepted -> closed. Re-audit 2026-11-19_1633.md: the reproduction no longer reproduces.
