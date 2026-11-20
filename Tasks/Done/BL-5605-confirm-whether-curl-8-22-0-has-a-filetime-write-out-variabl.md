@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary/WriteOutTemplateRenderer.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5605 — Confirm whether curl 8.22.0 has a %{filetime} write-out variable, and match it
 
@@ -24,13 +24,16 @@ The cookbook reports `curl -w '%{filetime}'` refused with `unknown --write-out v
 
 ## Acceptance criteria
 
-- [ ] The Notes quote what curl 8.22.0's write-out documentation and binary do with `%{filetime}`.
-- [ ] The port's output for `-w '%{filetime}'` (with and without `-R`) matches curl 8.22.0's, pinned by a test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The Notes quote what curl 8.22.0's write-out documentation and binary do with `%{filetime}`.
+- [x] The port's output for `-w '%{filetime}'` (with and without `-R`) matches curl 8.22.0's, pinned by a test.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measured real curl 8.22.0 (Schannel build): `curl -w "[%{filetime}]" file:///...` with and without `-R` writes `[]`, prints `curl: unknown --write-out variable: filetime` and exits 37; `curl -M` (the manual) lists no filetime variable. The port already matches, so no production change; only a test pins the refusal (Curl.Output.UnitTests WriteOutTemplateRendererAdversarialTests). The real binary is the authority. The cookbook report was wrong that upstream has it. Nothing for --ai-help to change.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug reports (2203 #4).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 51919ce1 189e5f61 3d836d5e.
+- 2026-11-20: Doing -> Done. curl 8.22.0 has no filetime variable; port matches; refusal pinned by test
