@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.CompressionDictionary.UnitLibrary/StructuredFieldDictionaryParser.cs line 138`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.CompressionDictionary.UnitLibrary/StructuredFieldDictionaryParser.cs line 138`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The line-138 mutant needs items.Add(item!) to compile (nullable warnings are errors). Killed by Parse_InvalidStructuredField_ReturnsNull rows l=(1 2x) and l=(1"a") in UseAsDictionaryTests.cs; reverted, all pass. Test-only change, no production edit.
 
 ## Log
 
