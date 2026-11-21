@@ -24,9 +24,9 @@ The message after a refused `LOGIN` ends with a stray 0x02 (`Access denied.` fol
 
 ## Acceptance criteria
 
-- [x] A refused IMAP `LOGIN` gives the same stderr as curl 8.22.0 (which itself ends with 0x02), pinned by existing tests (ImapProtocolHandlerAuthenticationTests, ImapProtocolHandlerEventTests).
-- [x] `Curl.Api` carries the same curl message; byte matches curl, see ADR-1321.
-- [x] No code changed; build and tests unaffected.
+- [ ] A refused IMAP `LOGIN` gives the same stderr as curl 8.22.0 (which itself ends with 0x02), pinned by existing tests (ImapProtocolHandlerAuthenticationTests, ImapProtocolHandlerEventTests).
+- [ ] `Curl.Api` carries the same curl message; byte matches curl, see ADR-1321.
+- [ ] No code changed; build and tests unaffected.
 
 ## Notes
 
@@ -36,3 +36,4 @@ Not a bug: measured curl 8.22.0 on a loopback IMAP server answering NO to LOGIN:
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1836, finding 6.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 56ff107d 465f86b3 3d836d5e.
+- 2026-11-20: Doing -> Backlog. Criteria cannot be met as written: curl 8.22.0 itself ends the message with 0x02 (ADR-1321); criteria reworded for the next claim to close
