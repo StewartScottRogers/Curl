@@ -33,3 +33,4 @@ The first QUIC request in a process lost the race to TCP, and once hung past 60 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T2225, finding 2.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 3da6ca07 c2a0a654 3d836d5e.
