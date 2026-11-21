@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ParallelProgressMeter.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5692 — Fix AF-0933: Surviving mutant: the parallel progress meter can treat an unknown upload total as known
 
@@ -43,3 +43,4 @@ Killed by `DrawIfDue_OneUploadOfKnownSizeBesideOneOfUnknownSize_ShowsNoUploadPer
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 55fc6ee5 9742157d.
+- 2026-11-21: Doing -> Done. Mutant killed by new test; build and fast tests green
