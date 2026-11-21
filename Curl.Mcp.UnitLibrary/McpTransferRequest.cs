@@ -37,4 +37,16 @@ public sealed record McpTransferRequest(string Url)
 
     /// <summary>The CA certificate file to verify the server with, as <c>curl --cacert</c> takes it; <see cref="McpTransferTool" /> confines it to <c>CURL_MCP_ROOT</c>. Default <see langword="null" />: the build's default store.</summary>
     public string? CaFile { get; init; }
+
+    /// <summary>The proxy login, <c>user:password</c> as <c>curl --proxy-user</c> takes it. Default <see langword="null" />: none. The password is never logged or traced.</summary>
+    public string? ProxyUser { get; init; }
+
+    /// <summary>The CA certificate file to verify an HTTPS proxy with, as <c>curl --proxy-cacert</c> takes it; <see cref="McpTransferTool" /> confines it to <c>CURL_MCP_ROOT</c>. Default <see langword="null" />.</summary>
+    public string? ProxyCaFile { get; init; }
+
+    /// <summary>Host-to-address pins, each <c>host:port:address</c> as <c>curl --resolve</c> takes it. Default none.</summary>
+    public IReadOnlyList<string> Resolve { get; init; } = [];
+
+    /// <summary>The most response body bytes to return, 1 up to <see cref="McpResponseCap.CeilingMaxBytes" />. Default <see langword="null" />: the server's cap (1 MiB unless <c>CURL_MCP_MAX_RESPONSE_BYTES</c> sets another).</summary>
+    public int? MaxBodyBytes { get; init; }
 }

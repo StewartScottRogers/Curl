@@ -45,7 +45,8 @@ internal sealed class InProcessCurlCommandRunner : ICurlCommandRunner
             standardInput,
             new TcpDialer(new TcpSocketOptions()),
             dnsResolver,
-            new UdpDatagramConnector(dnsResolver, TimeProvider.System));
+            new UdpDatagramConnector(dnsResolver, TimeProvider.System),
+            usesHandBuiltNtlm: false);
     }
 
     /// <summary>Whether <paramref name="directory" /> is the process's current directory, ignoring a trailing separator; compared ordinally.</summary>

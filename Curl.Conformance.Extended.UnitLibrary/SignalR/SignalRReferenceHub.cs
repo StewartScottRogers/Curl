@@ -70,7 +70,7 @@ public sealed class SignalRReferenceHub(IReadOnlyList<string> negotiateBodies, p
     {
         ArgumentNullException.ThrowIfNull(connection);
         SignalRReferenceReader reader = new(connection);
-        if (await reader.ReadAsync<SignalRReferenceRequest>(SignalRReferenceRequest.TryRead, cancellationToken).ConfigureAwait(false) is not { } request)
+        if (await reader.ReadAsync<SignalRReferenceRequest>(SignalRReferenceRequest.TakeWholeRequest, cancellationToken).ConfigureAwait(false) is not { } request)
         {
             return;
         }

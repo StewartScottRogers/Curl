@@ -32,12 +32,30 @@ public sealed class UploadSchemeBodyTests
     [DataRow("telnet://h/")]
     [DataRow("s3://b/k")]
     [DataRow("az://c/b")]
+    [DataRow("abfs://c@a.dfs.core.windows.net/f")]
+    [DataRow("abfss://c@a.dfs.core.windows.net/f")]
+    [DataRow("gs://b/k")]
+    [DataRow("oci://r/p:t")]
     [DataRow("kafka://h/t")]
     [DataRow("kafkas://h/t")]
     [DataRow("grpc://h/p.S/M")]
     [DataRow("grpcs://h/p.S/M")]
     [DataRow("signalr://h/hub")]
     [DataRow("signalrs://h/hub")]
+    [DataRow("amqp://h/q")]
+    [DataRow("amqps://h/q")]
+    [DataRow("amqp1://h/q")]
+    [DataRow("amqp1s://h/q")]
+    [DataRow("mqtt5://h/t")]
+    [DataRow("mqtt5s://h/t")]
+    [DataRow("stomp://h/q")]
+    [DataRow("stomps://h/q")]
+    [DataRow("nats://h/s")]
+    [DataRow("natss://h/s")]
+    [DataRow("redis://h/0/k")]
+    [DataRow("rediss://h/0/k")]
+    [DataRow("xmpp://h/j")]
+    [DataRow("xmpps://h/j")]
     public async Task SendAsync_BytesBodyToAnUploadScheme_UploadsWithItsLength(string url)
     {
         UploadingEasyTransfer easy = await SendAsync(HttpMethod.Put, url, CurlContent.FromBytes(Hello));
@@ -55,6 +73,9 @@ public sealed class UploadSchemeBodyTests
     [DataRow("ftp://h/f", "POST")]
     [DataRow("smtp://h/", "GET")]
     [DataRow("telnet://h/", "PUT")]
+    [DataRow("gs://b/k", "PUT")]
+    [DataRow("oci://r/p:t", "PUT")]
+    [DataRow("abfs://c@a.dfs.core.windows.net/f", "PUT")]
     [DataRow("imap://h/INBOX", "PUT")]
     [DataRow("kafka://h/t", "POST")]
     [DataRow("grpc://h/p.S/M", "POST")]
@@ -85,12 +106,22 @@ public sealed class UploadSchemeBodyTests
     }
 
     [TestMethod]
-    public async Task SendAsync_BytesBodyToHttp_IsStillPosted()
+    public async Task SendAsync_BytesBodyPostedToHttp_IsStillPosted()
     {
-        UploadingEasyTransfer easy = await SendAsync(HttpMethod.Put, "http://h/", CurlContent.FromBytes(Hello));
+        UploadingEasyTransfer easy = await SendAsync(HttpMethod.Post, "http://h/", CurlContent.FromBytes(Hello));
 
         Assert.IsFalse(easy.PerformedOptions!.Transfer.Upload);
         Assert.IsTrue(easy.PerformedOptions.Http.Post);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_BytesBodyPutToHttp_IsUploaded()
+    {
+        UploadingEasyTransfer easy = await SendAsync(HttpMethod.Put, "http://h/", CurlContent.FromBytes(Hello));
+
+        Assert.IsTrue(easy.PerformedOptions!.Transfer.Upload);
+        Assert.IsFalse(easy.PerformedOptions.Http.Post);
+        Assert.IsNull(easy.PerformedOptions.Transfer.CustomRequest);
     }
 
     [TestMethod]

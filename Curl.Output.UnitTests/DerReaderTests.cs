@@ -152,6 +152,29 @@ public sealed class DerReaderTests
         diagnostics.Assert("exception type", nameof(FormatException), exception.GetType().Name);
     }
 
+    [TestMethod]
+    public void TryRead_SourceOfExactlyTheMaximumLength_IsRead()
+    {
+        var der = new byte[0x40000];
+        der[0] = 0x04;
+        der[1] = 0x02;
+
+        var read = DerReader.TryRead(der, 0, der.Length, out var element);
+
+        Assert.IsTrue(read);
+        Assert.AreEqual((4, false, 2, 4, 4), Describe(element));
+    }
+
+    [TestMethod]
+    public void TryRead_SourceOneByteOverTheMaximumLength_IsRefused()
+    {
+        var der = new byte[0x40001];
+        der[0] = 0x04;
+        der[1] = 0x02;
+
+        Assert.IsFalse(DerReader.TryRead(der, 0, der.Length, out _));
+    }
+
     private static (int Tag, bool IsConstructed, int Start, int End, int Next) Describe(DerElement element) =>
         (element.Tag, element.IsConstructed, element.Start, element.End, element.Next);
 }

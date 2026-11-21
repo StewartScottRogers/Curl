@@ -33,16 +33,12 @@ public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap, McpC
             return McpTransferToolResult.Failed(check.Failure!);
         }
 
-        string? caFilePath = null;
-        if (request.CaFile is not null)
+        McpToolFailure? refused = null;
+        string? caFilePath = ConfinePath("caFile", request.CaFile, ref refused);
+        string? proxyCaFilePath = ConfinePath("proxyCaFile", request.ProxyCaFile, ref refused);
+        if (refused is not null)
         {
-            McpPathCheck path = (root ?? McpConfinementRoot.NotConfigured).Check(request.CaFile);
-            if (!path.IsAllowed)
-            {
-                return McpTransferToolResult.Failed(McpToolFailure.PathRefused("caFile", path.Reason));
-            }
-
-            caFilePath = path.ResolvedPath;
+            return McpTransferToolResult.Failed(refused);
         }
 
         if (cancellationToken.IsCancellationRequested)
@@ -51,9 +47,9 @@ public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap, McpC
         }
 
         await using IEasyTransfer transfer = engine.CreateEasy();
-        using McpCappedCaptureStream body = new(cap);
+        using McpCappedCaptureStream body = new(request.MaxBodyBytes is int maxBodyBytes ? new McpResponseCap(maxBodyBytes) : cap);
         McpResponseHeaderCollector headers = new();
-        transfer.Options = McpTransferOptions.Build(request, check.Body, caFilePath) with
+        transfer.Options = McpTransferOptions.Build(request, check.Body, caFilePath, proxyCaFilePath) with
         {
             Callbacks = new EasyCallbackOptions { Write = data => WriteBody(body, data), Header = headers.Collect },
         };
@@ -68,6 +64,24 @@ public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap, McpC
         }
 
         return ToResult(code, transfer, body, headers, cancellationToken);
+    }
+
+    /// <summary>The resolved path of <paramref name="path" /> inside the root, or <see langword="null" /> when it is unset or refused (then <paramref name="refused" /> names the field, unless an earlier field already did).</summary>
+    private string? ConfinePath(string field, string? path, ref McpToolFailure? refused)
+    {
+        if (path is null)
+        {
+            return null;
+        }
+
+        McpPathCheck check = (root ?? McpConfinementRoot.NotConfigured).Check(path);
+        if (!check.IsAllowed)
+        {
+            refused ??= McpToolFailure.PathRefused(field, check.Reason);
+            return null;
+        }
+
+        return check.ResolvedPath;
     }
 
     /// <summary>The write callback: keeps the chunk (up to the cap) and reports all of it taken, since libcurl aborts the transfer on a short count.</summary>

@@ -1514,7 +1514,11 @@ public sealed partial class UpstreamCaseRunnerTests
         Assert.AreEqual(UpstreamCaseRunner.HttpUnixPath, target.Host);
         Assert.AreEqual(UpstreamCaseRunner.HttpPort, target.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
         Assert.IsFalse(target.UseTls);
-        Assert.IsNotNull(connected.Connection, connected.ErrorMessage);
+        IConnection connection = connected.Connection!;
+        await connection.WriteAsync(System.Text.Encoding.Latin1.GetBytes("GET /1 HTTP/1.1\r\nHost: h\r\n\r\n"), CancellationToken.None);
+        byte[] buffer = new byte[256];
+        int count = await connection.ReadAsync(buffer, CancellationToken.None);
+        Assert.StartsWith("HTTP/1.1 200 OK", System.Text.Encoding.Latin1.GetString(buffer, 0, count), connected.ErrorMessage);
     }
 
     [TestMethod]

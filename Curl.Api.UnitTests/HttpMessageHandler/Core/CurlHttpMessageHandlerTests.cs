@@ -181,7 +181,8 @@ public sealed class CurlHttpMessageHandlerTests
 
         await WithHttpClientAsync(easy, http => http.PutAsync("http://example/", new ByteArrayContent([1, 2])));
 
-        Assert.AreEqual("PUT", easy.PerformedOptions!.Transfer.CustomRequest);
+        Assert.IsTrue(easy.PerformedOptions!.Transfer.Upload);
+        Assert.IsNull(easy.PerformedOptions.Transfer.CustomRequest);
         CollectionAssert.AreEqual(new byte[] { 1, 2 }, easy.Uploads.Single());
     }
 

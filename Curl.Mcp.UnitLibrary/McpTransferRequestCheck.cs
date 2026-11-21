@@ -71,10 +71,18 @@ public sealed record McpTransferRequestCheck(McpToolFailure? Failure, byte[]? Bo
         ["userAgent"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
         ["minTlsVersion"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
         ["caFile"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
+        ["proxyUser"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
+        ["proxyCaFile"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
+        ["resolve"] = new("an array of strings", IsStringArrayOrNull),
+        ["maxBodyBytes"] = new("a whole number", value => IsKindOrNull(value, JsonValueKind.Number) && (value.ValueKind == JsonValueKind.Null || value.TryGetInt32(out _))),
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static bool IsKindOrNull(JsonElement value, JsonValueKind kind) =>
         value.ValueKind == kind || value.ValueKind == JsonValueKind.Null;
+
+    private static bool IsStringArrayOrNull(JsonElement value) =>
+        value.ValueKind == JsonValueKind.Null
+        || (value.ValueKind == JsonValueKind.Array && value.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String));
 
     private static bool IsBoolean(JsonElement value) =>
         value.ValueKind is JsonValueKind.True or JsonValueKind.False;
@@ -163,7 +171,12 @@ public sealed record McpTransferRequestCheck(McpToolFailure? Failure, byte[]? Bo
             : McpToolFailure.InvalidRequest("timeoutSeconds", $"it must be from 0 to {MaxTimeoutSeconds} seconds.");
 
     private static McpToolFailure? CheckBodyAndTls(McpTransferRequest request) =>
-        CheckBodyAllowed(request) ?? CheckMinTlsVersion(request.MinTlsVersion);
+        CheckBodyAllowed(request) ?? CheckMinTlsVersion(request.MinTlsVersion) ?? CheckMaxBodyBytes(request.MaxBodyBytes);
+
+    private static McpToolFailure? CheckMaxBodyBytes(int? maxBodyBytes) =>
+        maxBodyBytes is not int bytes || bytes is >= 1 and <= McpResponseCap.CeilingMaxBytes
+            ? null
+            : McpToolFailure.InvalidRequest("maxBodyBytes", $"it must be from 1 to {McpResponseCap.CeilingMaxBytes} bytes.");
 
     private static readonly string[] TlsVersions = ["1.0", "1.1", "1.2", "1.3"];
 

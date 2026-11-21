@@ -90,13 +90,21 @@ internal static class MqttPackets
     internal static byte[] BuildPublish(byte[] topic, ReadOnlyMemory<byte> payload)
     {
         long remainingLength = 2L + topic.Length + payload.Length;
-        if (remainingLength > MaximumPublishRemainingLength)
+        if (IsOverPublishLimit(remainingLength))
         {
             throw new MqttTransferException(CurlExitCode.TooLarge, MqttTransferMessages.TooLarge);
         }
 
         return Assemble(PublishType, [.. LengthPrefixed(topic), .. payload.Span]);
     }
+
+    /// <summary>
+    /// Tells whether a PUBLISH remaining length is over curl's limit (268435450); a length
+    /// exactly at the limit is accepted.
+    /// </summary>
+    /// <param name="remainingLength">The remaining length of the PUBLISH packet.</param>
+    /// <returns><see langword="true"/> when curl refuses it with exit 100.</returns>
+    internal static bool IsOverPublishLimit(long remainingLength) => remainingLength > MaximumPublishRemainingLength;
 
     /// <summary>
     /// Builds the DISCONNECT curl sends once its PUBLISH is sent.

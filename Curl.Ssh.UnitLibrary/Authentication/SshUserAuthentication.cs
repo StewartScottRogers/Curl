@@ -104,6 +104,26 @@ internal sealed class SshUserAuthentication(
     /// <summary>The state curl's state machine enters once the user is authenticated.</summary>
     internal const string AuthDoneState = "SSH_AUTH_DONE";
 
+    /// <summary>libcurl's <c>CURLSSH_AUTH_PUBLICKEY</c> bit.</summary>
+    internal const uint PublicKeyBit = 1u << 0;
+
+    /// <summary>libcurl's <c>CURLSSH_AUTH_PASSWORD</c> bit.</summary>
+    internal const uint PasswordBit = 1u << 1;
+
+    /// <summary>libcurl's <c>CURLSSH_AUTH_KEYBOARD</c> bit.</summary>
+    internal const uint KeyboardBit = 1u << 3;
+
+    /// <summary>libcurl's <c>CURLSSH_AUTH_AGENT</c> bit.</summary>
+    internal const uint AgentBit = 1u << 4;
+
+    /// <summary>
+    /// Gets the <c>CURLOPT_SSH_AUTH_TYPES</c> mask: a method is tried only when its bit is set
+    /// and the server offers it, as libcurl's libssh2 backend does (BL-5670). All bits by default.
+    /// </summary>
+    internal uint AllowedMethodMask { get; init; } = uint.MaxValue;
+
+    private bool Allows(uint bit) => (AllowedMethodMask & bit) != 0;
+
     // The last server-sig-algs value an SSH_MSG_EXT_INFO carried, or null before one did.
     private string? serverSignatureAlgorithms;
 
@@ -200,7 +220,7 @@ internal sealed class SshUserAuthentication(
     {
         bool offersPublicKey = methods.Contains(PublicKeyMethod, StringComparison.Ordinal);
         Trace.Enter("SSH_AUTH_PKEY_INIT");
-        if (offersPublicKey && await TryLoggedAsync(PublicKeyMethod, () => TryPublicKeyAsync(credentials.User, cancellationToken)).ConfigureAwait(false))
+        if (offersPublicKey && Allows(PublicKeyBit) && await TryLoggedAsync(PublicKeyMethod, () => TryPublicKeyAsync(credentials.User, cancellationToken)).ConfigureAwait(false))
         {
             return;
         }
@@ -213,7 +233,7 @@ internal sealed class SshUserAuthentication(
 
         Trace.Enter("SSH_AUTH_HOST_INIT");
         Trace.Enter("SSH_AUTH_AGENT_INIT");
-        if (offersPublicKey && await TryLoggedAsync(AgentMethod, () => TryAgentAsync(credentials, cancellationToken)).ConfigureAwait(false))
+        if (offersPublicKey && Allows(AgentBit) && await TryLoggedAsync(AgentMethod, () => TryAgentAsync(credentials, cancellationToken)).ConfigureAwait(false))
         {
             return;
         }
@@ -225,7 +245,7 @@ internal sealed class SshUserAuthentication(
     // curl's SSH_AUTH_PASS state, entered only when the server offers password (BL-1204).
     private async ValueTask<bool> TryPasswordIfOfferedAsync(string methods, UserCredentials credentials, CancellationToken cancellationToken)
     {
-        if (!methods.Contains(PasswordMethod, StringComparison.Ordinal))
+        if (!Allows(PasswordBit) || !methods.Contains(PasswordMethod, StringComparison.Ordinal))
         {
             return false;
         }
@@ -405,7 +425,7 @@ internal sealed class SshUserAuthentication(
 
     private async ValueTask RequireKeyboardInteractiveAsync(string methods, byte[] user, byte[] password, CancellationToken cancellationToken)
     {
-        if (!methods.Contains(KeyboardInteractiveMethod, StringComparison.Ordinal))
+        if (!Allows(KeyboardBit) || !methods.Contains(KeyboardInteractiveMethod, StringComparison.Ordinal))
         {
             Trace.Enter(AuthDoneState);
             throw SshTransferException.AuthenticationFailure();

@@ -20,7 +20,7 @@ public sealed class TransferMcpTool(McpTransferTool tool) : IMcpTool
         "Makes one request, described by fields rather than a command line, through Curl's transfer engine, and returns a structured result: "
         + "the status code, the response headers, the body (text, or base64 when it is not UTF-8) and timing and size information. "
         + "Prefer it to the `curl` tool for a single HTTP request whose response you want to read; use `curl` for anything else, "
-        + "such as files, other protocols or any curl option this tool has no field for. Its minTlsVersion and caFile fields set the lowest TLS version and a CA file (inside CURL_MCP_ROOT) for a self-signed server. A URL of one of Curl's extended protocols (the version tool's extendedProtocols) runs through its extension, as curl's own schemes run through theirs. A failed transfer is a tool error carrying "
+        + "such as files, other protocols or any curl option this tool has no field for. Its minTlsVersion and caFile fields set the lowest TLS version and a CA file (inside CURL_MCP_ROOT) for a self-signed server; proxyUser, proxyCaFile and resolve set a proxy login, a proxy CA file and host pins. The body returned is limited to 1 MiB (1048576 bytes) by default and is cut with isTruncated true past it; maxBodyBytes raises the limit up to a ceiling of 64 MiB (67108864 bytes). A URL of one of Curl's extended protocols (the version tool's extendedProtocols) runs through its extension, as curl's own schemes run through theirs. A failed transfer is a tool error carrying "
         + "libcurl's error code.";
 
     /// <inheritdoc />
@@ -53,7 +53,11 @@ public sealed class TransferMcpTool(McpTransferTool tool) : IMcpTool
             "proxy": { "description": "The proxy to use, as curl -x takes it; the environment's when omitted.", "type": ["string", "null"], "default": null },
             "userAgent": { "description": "The User-Agent header; none is sent when omitted.", "type": ["string", "null"], "default": null },
             "minTlsVersion": { "description": "The lowest TLS version to accept, as curl --tlsv1.2 sets it: 1.0, 1.1, 1.2 or 1.3; the default when omitted.", "type": ["string", "null"], "enum": ["1.0", "1.1", "1.2", "1.3", null], "default": null },
-            "caFile": { "description": "A CA certificate file to verify the server with, as curl --cacert takes it, e.g. for a self-signed server; it must lie inside CURL_MCP_ROOT, else the call is refused with PathRefused.", "type": ["string", "null"], "default": null }
+            "caFile": { "description": "A CA certificate file to verify the server with, as curl --cacert takes it, e.g. for a self-signed server; it must lie inside CURL_MCP_ROOT, else the call is refused with PathRefused.", "type": ["string", "null"], "default": null },
+            "proxyUser": { "description": "The proxy login as user:password, as curl --proxy-user takes it; never logged or traced.", "type": ["string", "null"], "default": null },
+            "proxyCaFile": { "description": "A CA certificate file to verify an HTTPS proxy with, as curl --proxy-cacert takes it; it must lie inside CURL_MCP_ROOT, else the call is refused with PathRefused.", "type": ["string", "null"], "default": null },
+            "resolve": { "description": "Host pins, each host:port:address as curl --resolve takes it.", "type": ["array", "null"], "items": { "type": "string" }, "default": null },
+            "maxBodyBytes": { "description": "The most response body bytes returned, 1 to 67108864 (64 MiB); the default is the server's limit, 1048576 (1 MiB). A longer body is cut with isTruncated true.", "type": ["integer", "null"], "default": null }
           },
           "required": ["url"]
         }
@@ -101,6 +105,10 @@ public sealed class TransferMcpTool(McpTransferTool tool) : IMcpTool
             UserAgent = Text(fields, "userAgent"),
             MinTlsVersion = Text(fields, "minTlsVersion"),
             CaFile = Text(fields, "caFile"),
+            ProxyUser = Text(fields, "proxyUser"),
+            ProxyCaFile = Text(fields, "proxyCaFile"),
+            Resolve = Field(fields, "resolve") is JsonElement resolve ? [.. resolve.EnumerateArray().Select(item => item.GetString()!)] : [],
+            MaxBodyBytes = Field(fields, "maxBodyBytes") is JsonElement maxBodyBytes ? maxBodyBytes.GetInt32() : null,
         };
 
     private static string? Text(Dictionary<string, JsonElement> fields, string name) =>

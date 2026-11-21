@@ -22,16 +22,21 @@ public static class McpTransferOptions
     /// <param name="body">The body's bytes, as the check decoded them; <see langword="null" /> for none.</param>
     /// <returns>The handle's options.</returns>
     /// <param name="caFilePath">The resolved CA file inside <c>CURL_MCP_ROOT</c>; <see langword="null" /> for none.</param>
-    public static EasyOptions Build(McpTransferRequest request, byte[]? body, string? caFilePath = null)
+    /// <param name="proxyCaFilePath">The resolved proxy CA file inside <c>CURL_MCP_ROOT</c>; <see langword="null" /> for none.</param>
+    public static EasyOptions Build(McpTransferRequest request, byte[]? body, string? caFilePath = null, string? proxyCaFilePath = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         EasyOptions defaults = new();
         return defaults with
         {
-            Network = defaults.Network with { Url = request.Url },
+            Network = defaults.Network with { Url = request.Url, Resolve = request.Resolve.Count == 0 ? defaults.Network.Resolve : [.. request.Resolve] },
             Transfer = Transfer(defaults.Transfer, request, body),
             Http = Http(defaults.Http, request, body),
-            Tls = Tls(defaults.Tls, request, caFilePath),
+            Tls = Tls(defaults.Tls, request, caFilePath) with
+            {
+                Proxy = defaults.Tls.Proxy with { CertificateAuthorityFile = proxyCaFilePath },
+            },
+            Authentication = defaults.Authentication with { ProxyUserPassword = request.ProxyUser },
             Proxy = defaults.Proxy with { Proxy = request.Proxy },
         };
     }

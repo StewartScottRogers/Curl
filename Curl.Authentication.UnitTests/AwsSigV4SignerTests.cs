@@ -91,6 +91,24 @@ public sealed class AwsSigV4SignerTests
     }
 
     [TestMethod]
+    public void Sign_HostHeaderValueIsTheAuthority_SignsHostAsCurlDoesBeforeHttp2SendsItAsAuthority()
+    {
+        // curl signs "host:<authority>" from the Host line it builds; over HTTP/2 it then sends
+        // that value as :authority and drops the Host header, so the signature is the same (BL-5682).
+        AwsSigV4SigningResult result = SignAt("20260929T060111Z", Loopback("aws:amz:us-east-1:s3") with
+        {
+            HostHeaderValue = "127.0.0.1:8443",
+            Path = "/bucket/x",
+            IsGetOrHead = true,
+        });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(
+            "GET\n/bucket/x\n\nhost:127.0.0.1:8443\nx-amz-content-sha256:" + EmptyHash + "\nx-amz-date:20260929T060111Z\n\nhost;x-amz-content-sha256;x-amz-date\n" + EmptyHash,
+            result.CanonicalRequest);
+    }
+
+    [TestMethod]
     public void Sign_OscWithServiceAndRegionInTheHost_TakesThemFromTheHost()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

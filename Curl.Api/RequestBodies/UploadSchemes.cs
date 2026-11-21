@@ -3,7 +3,7 @@ namespace Curl.Api;
 /// <summary>The URL schemes to which a request body is uploaded as <c>curl -T</c> uploads it (ADR-1316).</summary>
 internal static class UploadSchemes
 {
-    private static readonly string[] Schemes = ["ftp", "ftps", "sftp", "scp", "smb", "smbs", "smtp", "smtps", "imap", "imaps", "tftp", "telnet", "s3", "az", "kafka", "kafkas", "grpc", "grpcs", "signalr", "signalrs"];
+    private static readonly string[] Schemes = ["ftp", "ftps", "sftp", "scp", "smb", "smbs", "smtp", "smtps", "imap", "imaps", "tftp", "telnet", "s3", "az", "abfs", "abfss", "gs", "oci", "kafka", "kafkas", "grpc", "grpcs", "signalr", "signalrs", "amqp", "amqps", "amqp1", "amqp1s", "mqtt5", "mqtt5s", "stomp", "stomps", "nats", "natss", "redis", "rediss", "xmpp", "xmpps"];
 
     /// <summary>Whether a body sent to <paramref name="url"/> is an upload rather than HTTP post fields.</summary>
     /// <param name="url">The request's URL.</param>
