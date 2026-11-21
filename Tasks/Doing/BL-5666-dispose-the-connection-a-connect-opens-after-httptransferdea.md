@@ -34,3 +34,4 @@ A connect that `HttpTransferDeadline` stops waiting for at the connect or transf
 ## Log
 
 - 2026-11-21: Created by the shift-end review (ADR-0710) of 8c81a2532a...1f330a1f28.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: a963e8df 8bf195a0 9b28f950 e7657cfb.
