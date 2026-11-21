@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/StreamConnection.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5652 — Fix AF-0917: Surviving mutant: StreamConnection counts a zero-byte (end-of-stream) read as having read bytes
 
@@ -43,3 +43,4 @@ Killed by new test `ReadAsync_WhenTheOnlyEarlierReadReturnedZeroBytesAndTheFinWa
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 8433f1c8 9742157d.
+- 2026-11-20: Doing -> Done. Mutant killed by new StreamConnectionTests zero-byte-read test
