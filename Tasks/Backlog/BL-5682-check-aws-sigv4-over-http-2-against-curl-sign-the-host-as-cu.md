@@ -30,6 +30,8 @@ From Surly cookbook bug report `2026-11-21T0547-Curl-bug-report.md` (batch 9 of 
 
 ## Notes
 
+- 2026-11-21 (from the Surly session): Surl found the cause on its side and filed it High (Surl BL-1547..1549). Upstream curl signs `host` from the Host line it builds, then sends it as `:authority` over HTTP/2 and drops the Host header; Surl's signature check never fed `:authority` in as `host`. So the expected outcome is "the port matches upstream": run the comparison in the acceptance criteria to confirm, and close with only the pinning test if the canonical requests agree.
+
 ## Log
 
 - 2026-11-21: Created from Surly bug report 2026-11-21T0547, finding 3 (check).
