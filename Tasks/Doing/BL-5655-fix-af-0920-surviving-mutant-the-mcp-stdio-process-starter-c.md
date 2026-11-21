@@ -40,3 +40,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 ## Log
 
 - 2026-11-20: Created.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: c247efa1 9742157d.
