@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.OAuth2.UnitLibrary/Http/OAuth2HttpBodyReader.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5703 — Fix AF-0944: Surviving mutant: a token-endpoint body of exactly the 1 MiB limit can be refused
 
@@ -43,3 +43,4 @@ Mutant `>` to `>=` at line 42 killed by `PostFormAsync_CloseDelimitedBodyOfExact
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: f49780f9 9742157d.
+- 2026-11-21: Doing -> Done. Added two tests pinning exact-limit bodies; they kill the >= mutant
