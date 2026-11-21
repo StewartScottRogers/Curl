@@ -30,7 +30,7 @@ From Surly cookbook bug report `2026-11-20T1836-Curl-bug-report.md` (batch 6 of 
 
 ## Notes
 
-- Decided: ADR-1321 (bucket URL refused with exit 3, -X DELETE with -T refused). Help text comes from the S3Extension description, updated for both --extended-help and --ai-help. No live server run (lane has none); the request, 204 success and 404 failure are pinned through the fake connector, canonical request pinned in S3CanonicalRequestTests. Quality gate for the S3 library: 0 failing, 100% line and branch.
+- Decided: ADR-1322 (bucket URL refused with exit 3, -X DELETE with -T refused). Help text comes from the S3Extension description, updated for both --extended-help and --ai-help. No live server run (lane has none); the request, 204 success and 404 failure are pinned through the fake connector, canonical request pinned in S3CanonicalRequestTests. Quality gate for the S3 library: 0 failing, 100% line and branch.
 - az:// has the same gap: filed as a separate task.
 
 ## Log

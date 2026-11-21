@@ -1,4 +1,4 @@
-# ADR-1321: s3:// -X DELETE deletes one object and refuses a bucket URL
+# ADR-1322: s3:// -X DELETE deletes one object and refuses a bucket URL
 
 - Status: Accepted
 - Date: 2026-11-20
