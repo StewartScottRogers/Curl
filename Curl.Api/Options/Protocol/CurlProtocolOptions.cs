@@ -35,6 +35,7 @@ internal static class CurlProtocolOptions
             Http = ApplyHttp(options.Http, records.Http),
             Authentication = Pick(records.Authentication, options.Authentication),
             Protocols = ApplyProtocols(options.Protocols, records),
+            Transfer = records.Ftp?.ApplyTo(options.Transfer) ?? options.Transfer,
         };
 
     private static EasyHttpOptions ApplyHttp(EasyHttpOptions current, CurlHttpOptions? http) =>

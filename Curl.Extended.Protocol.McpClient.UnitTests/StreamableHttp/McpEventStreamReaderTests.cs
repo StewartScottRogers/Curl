@@ -30,6 +30,16 @@ public sealed class McpEventStreamReaderTests
     }
 
     [TestMethod]
+    public async Task ReadEventDataAsync_LfArrivesInTheReadAfterTheLineText_IsItsOwnLineEnd()
+    {
+        // The first read ends right after "data: a", so its LF is the first byte of the next read and ends that line;
+        // it must not be skipped as if it followed a CR, or the blank line is lost and the event never dispatches.
+        var events = await ReadAll("data: a\n\ndata: b\n\n", readSize: 7);
+
+        CollectionAssert.AreEqual(new[] { "a", "b" }, events);
+    }
+
+    [TestMethod]
     public async Task ReadEventDataAsync_StreamEndsInsideAnEvent_DiscardsIt()
     {
         // An event not followed by a blank line before the end of the stream is not dispatched.

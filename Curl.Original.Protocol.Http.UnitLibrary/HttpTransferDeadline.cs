@@ -147,7 +147,10 @@ internal sealed class HttpTransferDeadline : IDisposable
         using CancellationTokenSource connect = CancellationTokenSource.CreateLinkedTokenSource(Token, connectElapsed.Token, abandoned);
         try
         {
-            return await connectAsync(connect.Token).ConfigureAwait(false);
+            // WaitAsync ends the connect at the limit even when the connector does not honour its token (BL-5660);
+            // an abandoned connect is still awaited, so the race can dispose the connection it opens anyway.
+            using CancellationTokenSource limit = CancellationTokenSource.CreateLinkedTokenSource(Token, connectElapsed.Token);
+            return await connectAsync(connect.Token).AsTask().WaitAsync(limit.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (EndedByLimit)
         {

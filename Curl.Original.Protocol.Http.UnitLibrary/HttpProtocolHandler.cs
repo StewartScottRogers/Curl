@@ -263,6 +263,16 @@ public sealed class HttpProtocolHandler(
     public bool TracesHttp2Frames { get; init; }
 
     /// <summary>
+    /// Gets or sets how much longer than the happy-eyeballs timeout the first QUIC attempt of the
+    /// process (see <see cref="QuicColdStartGate" />) leads TCP, to cover the start-up cost of the
+    /// hand-built QUIC and TLS code (BL-5660). Zero, the default, gives no extra head start.
+    /// </summary>
+    public TimeSpan QuicColdStartAllowance { get; init; }
+
+    /// <summary>Gets or sets the gate that says which QUIC attempt is the process's first.</summary>
+    public QuicColdStartGate QuicColdStart { get; init; } = QuicColdStartGate.Process;
+
+    /// <summary>
     /// Gets or sets whether an HTTP/3 transfer writes curl 8.21.0's <c>--trace-config http/3</c> lines
     /// (<see cref="Http3StreamTrace" />, BL-1168): each response head's end, each piece of body and
     /// the stream's close. Off by default.
@@ -376,13 +386,14 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Tells whether the platform's curl answers the origin as an empty user when the transfer has
     /// no credential: <c>--sasl-authzid</c> with Digest the one scheme (ADR-1182), or, on Windows
-    /// only, <c>--service-name</c> with NTLM the one scheme (ADR-1183): the Schannel build starts
+    /// only, <c>--service-name</c> with NTLM the one scheme (ADR-1183), or on every platform<br/>
+    /// <c>--service-name</c> with <c>--aws-sigv4</c>, which curl signs with an empty key ID (AF-0923, BL-5658): the Schannel build starts
     /// NTLM with the default Windows credentials, the OpenSSL build sends no <c>Authorization</c>.
     /// </summary>
     /// <param name="options">The transfer's HTTP options.</param>
     /// <param name="onWindows">Whether Curl runs on Windows, where curl is the Schannel build.</param>
     internal static bool StartsWithAnEmptyUser(HttpRequestOptions options, bool onWindows) =>
-        AllowedSchemesOf(options) switch
+        (options.AwsSigV4 is not null && options.ServiceName is not null) || AllowedSchemesOf(options) switch
         {
             HttpAuthSchemes.Digest => options.SaslAuthorizationIdentity is not null,
             HttpAuthSchemes.Ntlm => onWindows && options.ServiceName is not null,
@@ -991,7 +1002,7 @@ public sealed class HttpProtocolHandler(
         using CancellationTokenSource quicAbandoned = new();
         using CancellationTokenSource tcpAbandoned = new();
         Task<ConnectResult> quic = ConnectOverQuicAsync(plan, target, quicAbandoned.Token).AsTask();
-        await FirstAttemptOrHappyEyeballsTimeoutAsync(plan, quic).ConfigureAwait(false);
+        await FirstAttemptOrHappyEyeballsTimeoutAsync(plan, quic, HeadStartOfFirstQuicAttempt(plan)).ConfigureAwait(false);
         if (quic.IsCompleted && (await quic.ConfigureAwait(false)).Connection is not null)
         {
             return quic.Result;
@@ -1035,7 +1046,7 @@ public sealed class HttpProtocolHandler(
         using CancellationTokenSource quicAbandoned = new();
         using CancellationTokenSource tcpAbandoned = new();
         Task<ConnectResult> tcp = plan.Deadline.ConnectAsync(connector, target, tcpAbandoned.Token).AsTask();
-        await FirstAttemptOrHappyEyeballsTimeoutAsync(plan, tcp).ConfigureAwait(false);
+        await FirstAttemptOrHappyEyeballsTimeoutAsync(plan, tcp, plan.Options.HappyEyeballsTimeout).ConfigureAwait(false);
         if (tcp.IsCompleted && (await tcp.ConfigureAwait(false)).Connection is not null)
         {
             return tcp.Result;
@@ -1062,13 +1073,22 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// The head start QUIC has over TCP: the happy-eyeballs timeout, plus <see cref="QuicColdStartAllowance" />
+    /// for the first QUIC attempt of the process only (BL-5660, ADR-1326).
+    /// </summary>
+    private TimeSpan HeadStartOfFirstQuicAttempt(HttpRequestPlan plan) =>
+        QuicColdStartAllowance > TimeSpan.Zero && QuicColdStart.TryTakeColdStart()
+            ? plan.Options.HappyEyeballsTimeout + QuicColdStartAllowance
+            : plan.Options.HappyEyeballsTimeout;
+
+    /// <summary>
     /// Waits until the first attempt of a race, <paramref name="first" />, completes or the
     /// happy-eyeballs timeout passes on the transfer's clock, whichever comes first.
     /// </summary>
-    private static async Task FirstAttemptOrHappyEyeballsTimeoutAsync(HttpRequestPlan plan, Task first)
+    private static async Task FirstAttemptOrHappyEyeballsTimeoutAsync(HttpRequestPlan plan, Task first, TimeSpan headStart)
     {
         using CancellationTokenSource firstCompleted = new();
-        Task timeout = Task.Delay(plan.Options.HappyEyeballsTimeout, plan.Context.TimeProvider, firstCompleted.Token);
+        Task timeout = Task.Delay(headStart, plan.Context.TimeProvider, firstCompleted.Token);
         await Task.WhenAny(first, timeout).ConfigureAwait(false);
         await firstCompleted.CancelAsync().ConfigureAwait(false);
     }

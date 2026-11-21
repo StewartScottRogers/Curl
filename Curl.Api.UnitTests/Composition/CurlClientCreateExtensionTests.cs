@@ -1,5 +1,8 @@
 using Curl.Api.Codes;
 using Curl.Api.Errors;
+using Curl.Extension.Abstractions;
+using Curl.Extension.Abstractions.Transfer;
+using Curl.Extension.Composition;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Api.Composition;
@@ -71,7 +74,12 @@ public sealed class CurlClientCreateExtensionTests
     [TestMethod]
     public void ExtensionTransferHooksFor_DnsJson_ActivatesTheDnsHook()
     {
-        Assert.IsNotNull(CurlClient.ExtensionTransferHooksFor(new Dictionary<string, string> { ["dns-json"] = string.Empty }));
+        Dictionary<string, string> values = new() { ["dns-json"] = string.Empty };
+
+        Assert.IsNotNull(CurlClient.ExtensionTransferHooksFor(values));
+        TransferHooks hooks = TransferHooks.ActivatedBy(new ExtensionOptionValues(values), ExtensionTransferHookCatalogue.Entries);
+        Assert.AreEqual(1, hooks.Hooks.Count);
+        Assert.AreEqual("DnsQueryTransferHook", hooks.Hooks[0].GetType().Name);
     }
 
     [TestMethod]

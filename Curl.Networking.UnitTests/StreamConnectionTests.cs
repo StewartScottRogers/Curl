@@ -238,6 +238,26 @@ public sealed class StreamConnectionTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_WhenTheOnlyEarlierReadReturnedZeroBytesAndTheFinWasUnreadAtTheWrite_FailsWithConnectionReset()
+    {
+        // AF-0917: a zero-byte (end-of-stream) read is not a byte read, so the connection still counts as fresh.
+        var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
+        await using var connection = new StreamConnection(new ReadZeroThenFailingStream(aborted), null)
+        {
+            ReportsAbortedReadAsReset = true,
+            HasUnreadBytesOrEndBeforeWrite = _ => true,
+            HasUnreadBytesBeforeFirstRead = _ => false,
+        };
+        int read = await connection.ReadAsync(new byte[8], CancellationToken.None);
+
+        await connection.WriteAsync(new byte[] { 0x47 }, CancellationToken.None);
+        var failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[8], CancellationToken.None).AsTask());
+
+        Assert.AreEqual(0, read);
+        Assert.AreEqual(SocketError.ConnectionReset, ((SocketException)failure.InnerException!).SocketErrorCode);
+    }
+
+    [TestMethod]
     public async Task ReadAsync_WhenNoBytesWereUnreadBeforeTheWriteAndTheReadIsAborted_FailsWithConnectionReset()
     {
         var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
@@ -310,6 +330,23 @@ public sealed class StreamConnectionTests
             _served = true;
             buffer.Span[0] = 0x47;
             return ValueTask.FromResult(1);
+        }
+    }
+
+    /// <summary>A stream whose first read returns zero bytes and every later read fails with the given exception.</summary>
+    private sealed class ReadZeroThenFailingStream(IOException failure) : MemoryStream
+    {
+        private bool _served;
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_served)
+            {
+                return ValueTask.FromException<int>(failure);
+            }
+
+            _served = true;
+            return ValueTask.FromResult(0);
         }
     }
 

@@ -83,11 +83,31 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     public List<int> ReadLengths { get; } = [];
 
     /// <inheritdoc />
-    public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+        YieldsBeforeReads ? ReadAfterYieldingAsync(buffer) : ReadNow(buffer);
+
+    /// <summary>Gets or sets whether a read after the last scripted one never completes, as a quiet peer's does.</summary>
+    public bool HangsWhenExhausted { get; set; }
+
+    /// <summary>Gets or sets whether every read completes asynchronously, after a yield, as a socket's does.</summary>
+    public bool YieldsBeforeReads { get; set; }
+
+    private async ValueTask<int> ReadAfterYieldingAsync(Memory<byte> buffer)
+    {
+        await Task.Yield();
+        return await ReadNow(buffer).ConfigureAwait(false);
+    }
+
+    private ValueTask<int> ReadNow(Memory<byte> buffer)
     {
         ReadLengths.Add(buffer.Length);
         if (nextRead == reads.Length)
         {
+            if (HangsWhenExhausted)
+            {
+                return new ValueTask<int>(new TaskCompletionSource<int>().Task);
+            }
+
             return FailReadsWhenExhausted
                 ? ValueTask.FromException<int>(ReadFailure)
                 : ValueTask.FromResult(0);

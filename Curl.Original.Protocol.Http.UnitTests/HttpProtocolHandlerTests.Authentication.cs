@@ -930,6 +930,14 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(expected, actual);
     }
 
+    [TestMethod]
+    public void StartsWithAnEmptyUser_AwsSigV4WithServiceName_HoldsOnEveryPlatform()
+    {
+        HttpRequestOptions options = new() { AwsSigV4 = "xyz", ServiceName = "svc" };
+
+        Assert.IsTrue(HttpProtocolHandler.StartsWithAnEmptyUser(options, false));
+    }
+
     /// <summary>
     /// With no <c>-u</c>, a service name under any scheme but NTLM alone, and NTLM or Digest
     /// without a service name or authzid, give no credential: the request goes with no
