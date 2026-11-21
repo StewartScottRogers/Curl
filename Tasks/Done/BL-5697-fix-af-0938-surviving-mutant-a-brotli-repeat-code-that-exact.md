@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.CompressionDictionary.UnitLibrary/Brotli/BrotliSymbolLengthReader.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5697 — Fix AF-0938: Surviving mutant: a Brotli repeat code that exactly fills its alphabet can be refused
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.CompressionDictionary.UnitLibrary/Brotli/BrotliSymbolLengthReader.cs line 55`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.CompressionDictionary.UnitLibrary/Brotli/BrotliSymbolLengthReader.cs line 55`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by the new test `BrotliPrefixCodeReaderTests.Read_RepeatEndingExactlyAtAlphabetEnd_Reads` (a 256-symbol alphabet filled exactly by code 16 repeats of 5, 17, 65, 256). Verified by hand: with `>=` it fails, reverted it passes. Production code unchanged. Fast tests 190/190 green.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 39c5228c 9742157d.
+- 2026-11-21: Doing -> Done. Mutant killed by new test
