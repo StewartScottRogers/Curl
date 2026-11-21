@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/UpstreamCaseRunnerTests.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5678 — Fix AF-0928: HttpUnixSocketTarget_..._ReachesTheSwsEmulationOnTheHttpPort checks only that some connection exists
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The test now writes a GET through the connection and asserts the reply starts with the scripted `HTTP/1.1 200 OK`. Reproduction gives no match; Curl.Conformance.UnitTests fast tests green (4376 passed). Test-only change, no production code.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-21: Doing -> Done. test reads the SWS 200 reply through the connection
