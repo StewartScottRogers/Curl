@@ -21,3 +21,7 @@ trust a proxy's CA, pin a host to an address, or read a body past the 1 MiB resp
 ## Consequences
 
 The three goldens of the tool's schema and description change with the fields.
+
+## Amendment (BL-5688): the operator's limit bounds `maxBodyBytes`
+
+Decided by Claude under Stewart's delegation. When `CURL_MCP_MAX_RESPONSE_BYTES` is set, it is also the ceiling for a `transfer` call's `maxBodyBytes`: a larger value is clamped to it (the body is cut and `isTruncated` says so), not refused, so a client that asks for more than the operator allows still gets a truthful result. A smaller value still lowers the limit. When the variable is unset the ceiling stays 64 MiB. `McpResponseCap.RequestCeilingBytes` holds the ceiling. The tool description and the `maxBodyBytes` schema text say so.

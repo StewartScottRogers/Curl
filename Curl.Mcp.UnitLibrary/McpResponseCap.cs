@@ -29,6 +29,9 @@ public sealed record McpResponseCap
     /// <summary>The most bytes of output a tool returns.</summary>
     public int MaxBytes { get; }
 
+    /// <summary>The most a <c>transfer</c> request's <c>maxBodyBytes</c> may raise the cap to: <see cref="CeilingMaxBytes" /> unless the operator set <c>CURL_MCP_MAX_RESPONSE_BYTES</c>, then that value (ADR-1330 amendment).</summary>
+    public int RequestCeilingBytes { get; private init; } = CeilingMaxBytes;
+
     /// <summary>
     /// Reads the cap from <c>CURL_MCP_MAX_RESPONSE_BYTES</c>: the default when it is unset or
     /// empty, otherwise a positive whole number of bytes in plain digits.
@@ -50,6 +53,6 @@ public sealed record McpResponseCap
                 $"{VariableName} must be a positive whole number of bytes; got '{value}'.");
         }
 
-        return new McpResponseCap(maxBytes);
+        return new McpResponseCap(maxBytes) { RequestCeilingBytes = maxBytes };
     }
 }
