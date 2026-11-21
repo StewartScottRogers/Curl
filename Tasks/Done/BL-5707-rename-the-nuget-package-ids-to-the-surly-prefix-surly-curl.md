@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/Curl.Api.csproj, Libcurl/Libcurl.csproj, Libcurl/build, Libcurl.UnitTests/Libcurl.UnitTests.csproj, Curl.Mcp/Curl.Mcp.csproj, Curl.Mcp/.mcp/server.json, Curl.Mcp/README.md, Curl.Mcp.UnitTests/McpPackagingTests.cs, Curl.Mcp.IntegrationTests/CurlMcpPackIntegrationTests.cs, .github/workflows/release.yml, .github/release, .github/site/mcp, DOWNLOAD.md, README.md]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5707 — Rename the NuGet package IDs to the Surly. prefix: Surly.Curl.Api, Surly.Libcurl, Surly.Curl.Mcp
 
@@ -49,3 +49,4 @@ Change: `<PackageId>` in `Curl.Api/Curl.Api.csproj`, `Libcurl/Libcurl.csproj`, `
 
 - 2026-11-21: Created at Stewart's request ("Use Surly as the prefix").
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 739be49e 3bccf144 3037f02d 7781b8cb 3d836d5e.
+- 2026-11-21: Doing -> Done. Package IDs renamed; ADR-1333
