@@ -76,7 +76,14 @@ public sealed class CurlClientCreateExtensionTests
     {
         Dictionary<string, string> values = new() { ["dns-json"] = string.Empty };
 
-        Assert.IsNotNull(CurlClient.ExtensionTransferHooksFor(values));
+        Func<IProtocolHandler, IProtocolHandler>? around = CurlClient.ExtensionTransferHooksFor(values);
+        Assert.IsNotNull(around);
+        ReachedExtensionHandler inner = new();
+        IProtocolHandler wrapped = around(inner);
+        Assert.AreNotSame(inner, wrapped);
+        Assert.AreEqual("TransferHookingProtocolHandler", wrapped.GetType().Name);
+        Assert.AreEqual(1, CountHooks(wrapped));
+        Assert.AreEqual("DnsQueryTransferHook", HooksOf(wrapped)[0].GetType().Name);
         TransferHooks hooks = TransferHooks.ActivatedBy(new ExtensionOptionValues(values), ExtensionTransferHookCatalogue.Entries);
         Assert.AreEqual(1, hooks.Hooks.Count);
         Assert.AreEqual("DnsQueryTransferHook", hooks.Hooks[0].GetType().Name);
@@ -102,6 +109,14 @@ public sealed class CurlClientCreateExtensionTests
     {
         Assert.AreEqual(0, new CurlDnsOptions().ToExtensionOptions().Count);
     }
+
+    private static int CountHooks(IProtocolHandler wrapped) => HooksOf(wrapped).Count;
+
+    private static IReadOnlyList<ITransferHook> HooksOf(IProtocolHandler wrapped) =>
+        (IReadOnlyList<ITransferHook>)wrapped.GetType()
+            .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .Single(field => field.FieldType == typeof(IReadOnlyList<ITransferHook>))
+            .GetValue(wrapped)!;
 
     private sealed class ReachedExtensionHandler : IProtocolHandler
     {
