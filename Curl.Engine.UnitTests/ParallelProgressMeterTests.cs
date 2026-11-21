@@ -187,6 +187,27 @@ public sealed class ParallelProgressMeterTests
     }
 
     [TestMethod]
+    public void DrawIfDue_OneUploadOfKnownSizeBesideOneOfUnknownSize_ShowsNoUploadPercent()
+    {
+        Diagnostics.Arrange("transfers", "one uploading 50 of 100 bytes, one with no upload size known");
+        using ParallelProgressMeter meter = NewMeter();
+        ParallelTransferProgress known = meter.AddTransfer();
+        ParallelTransferProgress unknown = meter.AddTransfer();
+        known.MarkLive();
+        unknown.MarkLive();
+        clock.Advance(1000);
+
+        known.ReportUploaded(50, 100);
+        string output = written.ToString();
+        string lastLine = Neutral(output[output.LastIndexOf('\r')..]);
+        Diagnostics.Act("last meter line", lastLine);
+
+        // A run is known only when every transfer's size is known; any-known would show 50%.
+        Diagnostics.Assert("last meter line starts with", "\\r--  --   ", lastLine);
+        StringAssert.StartsWith(lastLine, "\\r--  --   ");
+    }
+
+    [TestMethod]
     public void DrawIfDue_TenSamplesTaken_MeasuresTheSpeedOverTheLastTen()
     {
         Diagnostics.Arrange("samples", "ten draws 600 ms apart, then 6000 bytes of unknown size");
