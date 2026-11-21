@@ -110,8 +110,10 @@
 
 .PARAMETER SelfTest
     Check the site finder, the operators, the member finder, site resolution, the test filter,
-    the baseline-failure path, the library draw and the memory limit (a stand-in whose child
-    allocates past it) on samples, print PASS or FAIL per case, and exit.
+    the baseline-failure path, the library draw, the memory limit (a stand-in whose child
+    allocates past it) and the timeout stop (a stand-in that sleeps past its limit, with a kill
+    step that throws and one that does nothing, BL-5593) on samples, print PASS or FAIL per
+    case, and exit.
 
 .OUTPUTS
     JSON: { library, commit, seed, baselineMs, excludedTests, mutants: [ { file, line, member,
@@ -304,19 +306,42 @@ function Invoke-Git([string[]]$Arguments) {
     return $LASTEXITCODE
 }
 
-function Get-ProcessTreePeakBytes([int]$RootId) {
-    # The largest working set, in bytes, of -RootId and every process below it; 0 when none is left.
-    # Windows reads Win32_Process, elsewhere ps (rss in KiB), so it runs under 5.1 and pwsh alike.
-    $rows = @()
+function Get-ProcessRows {
+    # Every process's id, parent id and working set in bytes. Windows reads Win32_Process,
+    # elsewhere ps (rss in KiB), so it runs under 5.1 and pwsh alike.
     if ($env:OS -eq 'Windows_NT') {
-        $rows = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, WorkingSetSize -ErrorAction SilentlyContinue |
+        return @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, WorkingSetSize -ErrorAction SilentlyContinue |
             ForEach-Object { [pscustomobject]@{ Id = [int]$_.ProcessId; Parent = [int]$_.ParentProcessId; Bytes = [double]$_.WorkingSetSize } })
     }
-    else {
-        $rows = @(& ps -A -o 'pid=,ppid=,rss=' 2>$null | ForEach-Object {
-                $f = "$_".Trim() -split '\s+'
-                if ($f.Count -ge 3) { [pscustomobject]@{ Id = [int]$f[0]; Parent = [int]$f[1]; Bytes = [double]$f[2] * 1024 } } })
+    return @(& ps -A -o 'pid=,ppid=,rss=' 2>$null | ForEach-Object {
+            $f = "$_".Trim() -split '\s+'
+            if ($f.Count -ge 3) { [pscustomobject]@{ Id = [int]$f[0]; Parent = [int]$f[1]; Bytes = [double]$f[2] * 1024 } } })
+}
+
+function Get-ProcessTreeIds([int]$RootId) {
+    # -RootId and the id of every process below it, deepest first, so stopping them in order
+    # never leaves a child whose parent is already gone.
+    $rows = Get-ProcessRows
+    $children = @{}
+    foreach ($r in $rows) { if ($r.Id -ne $r.Parent) { if (-not $children.ContainsKey($r.Parent)) { $children[$r.Parent] = @() }; $children[$r.Parent] += $r.Id } }
+    $order = [System.Collections.Generic.List[int]]::new()
+    $queue = [System.Collections.Generic.Queue[int]]::new()
+    $queue.Enqueue($RootId)
+    $seen = @{}
+    while ($queue.Count) {
+        $id = $queue.Dequeue()
+        if ($seen.ContainsKey($id)) { continue }
+        $seen[$id] = $true
+        $order.Add($id)
+        foreach ($c in @($children[$id])) { if ($c) { $queue.Enqueue($c) } }
     }
+    $order.Reverse()
+    return @($order)
+}
+
+function Get-ProcessTreePeakBytes([int]$RootId) {
+    # The largest working set, in bytes, of -RootId and every process below it; 0 when none is left.
+    $rows = Get-ProcessRows
     $children = @{}
     foreach ($r in $rows) { if ($r.Id -ne $r.Parent) { if (-not $children.ContainsKey($r.Parent)) { $children[$r.Parent] = @() }; $children[$r.Parent] += $r } }
     $peak = [double]0
@@ -333,11 +358,33 @@ function Get-ProcessTreePeakBytes([int]$RootId) {
     return $peak
 }
 
-function Stop-ProcessTree($Process) {
-    if ($env:OS -eq 'Windows_NT') { & taskkill /PID $Process.Id /T /F 2>&1 | Out-Null }
-    elseif ($PSVersionTable.PSVersion.Major -ge 7) { $Process.Kill($true) }
-    else { $Process.Kill() }
-    $Process.WaitForExit()
+function Stop-ProcessTree($Process, [scriptblock]$KillTree = $null, [int]$GraceMilliseconds = 30000) {
+    # Stops a run that outlived its limit, and every process below it, and never waits without a
+    # limit (BL-5593). The tree kill goes first - taskkill /T on Windows, Kill($true) elsewhere - and
+    # its failure is never an error: in audit 20261119-163306 taskkill's stderr became a terminating
+    # NativeCommandError that ended the Curl.Engine batch, and in audit 20261120-045659 a kill that did
+    # not take left the old WaitForExit with no limit hanging a batch for 40 minutes. When the run still
+    # lives after -GraceMilliseconds, each process of its tree is stopped deepest first and the run
+    # waited for once more. Returns whether the run ended; the caller counts the mutant as timedOut
+    # either way, so a run that would not die costs one grace period, not the audit.
+    if (-not $KillTree) {
+        $KillTree = {
+            param([int]$Id)
+            # Through cmd, so taskkill's stderr never reaches PowerShell as an error record.
+            if ($env:OS -eq 'Windows_NT') { & cmd.exe /d /c "taskkill /PID $Id /T /F >nul 2>&1" }
+            elseif ($PSVersionTable.PSVersion.Major -ge 7) { [Diagnostics.Process]::GetProcessById($Id).Kill($true) }
+            else { [Diagnostics.Process]::GetProcessById($Id).Kill() }
+        }
+    }
+    try { & $KillTree $Process.Id } catch { Write-Warning "stopping run $($Process.Id): $($_.Exception.Message)" }
+    if ($Process.WaitForExit($GraceMilliseconds)) { return $true }
+    foreach ($id in @(Get-ProcessTreeIds $Process.Id)) {
+        try { Stop-Process -Id $id -Force -ErrorAction Stop } catch { }
+    }
+    try { $Process.Kill() } catch { }
+    $ended = $Process.WaitForExit($GraceMilliseconds)
+    if (-not $ended) { Write-Warning "run $($Process.Id) still running after two stop attempts; going on without it" }
+    return $ended
 }
 
 function Invoke-Timed([string]$Exe, [string[]]$Arguments, [int]$Seconds, [string]$WorkDir, [double]$MemoryLimitGB = 0) {
@@ -360,7 +407,7 @@ function Invoke-Timed([string]$Exe, [string[]]$Arguments, [int]$Seconds, [string
             if (-not $done -and (Get-ProcessTreePeakBytes $p.Id) -gt $limitBytes) { $memoryLimited = $true; break }
         }
     }
-    if (-not $done) { Stop-ProcessTree $p }
+    if (-not $done) { $null = Stop-ProcessTree $p }
     $watch.Stop()
     $text = "$(Get-Content $out -Raw)`n$(Get-Content $err -Raw)"
     Remove-Item $out, $err -ErrorAction SilentlyContinue
@@ -605,6 +652,33 @@ if ($SelfTest) {
     if ($env:OS -eq 'Windows_NT') { $orphans = @(Get-CimInstance Win32_Process | Where-Object { "$($_.CommandLine)" -match [regex]::Escape($growEncoded) }) }
     else { $orphans = @(& ps -A -o 'args=' 2>$null | Where-Object { "$_" -match [regex]::Escape($growEncoded.Substring(0, 40)) }) }
     Check 'the stopped run leaves no process of its tree behind (BL-4827)' '0' "$($orphans.Count)"
+    # BL-5593: a run that ignores its timeout is stopped and reported timed out, whatever the kill
+    # step does. A sleeper stands in for the hung testhost of audit 20261120-045659.
+    $sleepMark = 'mutation-selftest-sleep-' + [guid]::NewGuid().ToString('N')
+    $sleeper = "`$null = '$sleepMark'; Start-Sleep -Seconds 600"
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    $hung = Invoke-Timed $shell @('-NoProfile', '-NonInteractive', '-Command', $sleeper) 2 ([IO.Path]::GetTempPath())
+    Check 'a run that ignores its 2-second limit comes back timed out within 60 seconds (BL-5593)' 'True -1 True timedOut' "$($hung.TimedOut) $($hung.ExitCode) $($watch.ElapsedMilliseconds -lt 60000) $(Get-TestOutcome $hung)"
+    $startSleeper = { Start-Process $shell -ArgumentList @('-NoProfile', '-NonInteractive', '-Command', "`"$sleeper`"") -PassThru -WindowStyle Hidden }
+    if ($env:OS -ne 'Windows_NT') { $startSleeper = { Start-Process $shell -ArgumentList @('-NoProfile', '-NonInteractive', '-Command', $sleeper) -PassThru } }
+    $victim = & $startSleeper
+    Start-Sleep -Milliseconds 500
+    $watch.Restart()
+    $threw = $false
+    $ended = $false
+    try { $ended = Stop-ProcessTree $victim -GraceMilliseconds 2000 -KillTree { param($Id) [Console]::Error.WriteLine('ERROR: The process cannot be terminated.'); throw 'taskkill exited 1' } 3>$null }
+    catch { $threw = $true }
+    Check 'a kill step that fails and throws is not an error, and the fallback stops the run (BL-5593)' 'False True True True' "$threw $ended $($victim.HasExited) $($watch.ElapsedMilliseconds -lt 30000)"
+    $victim = & $startSleeper
+    Start-Sleep -Milliseconds 500
+    $watch.Restart()
+    $ended = Stop-ProcessTree $victim -GraceMilliseconds 2000 -KillTree { param($Id) } 3>$null
+    Check 'a kill step that does nothing still ends the run within the grace periods (BL-5593)' 'True True True' "$ended $($victim.HasExited) $($watch.ElapsedMilliseconds -lt 30000)"
+    if ($env:OS -eq 'Windows_NT') { $sleepers = @(Get-CimInstance Win32_Process | Where-Object { "$($_.CommandLine)" -match $sleepMark }) }
+    else { $sleepers = @(& ps -A -o 'args=' 2>$null | Where-Object { "$_" -match $sleepMark }) }
+    Check 'no stand-in sleeper is left running (BL-5593)' '0' "$($sleepers.Count)"
+    $unbounded = @(Select-String -LiteralPath $PSCommandPath -Pattern 'WaitForExit\(\)' -SimpleMatch:$false | Where-Object { $_.Line -notmatch "Pattern 'WaitForExit" })
+    Check 'no WaitForExit without a time limit is left in this script (BL-5593)' '0' "$($unbounded.Count)"
     exit $(if ($failed) { 1 } else { 0 })
 }
 
