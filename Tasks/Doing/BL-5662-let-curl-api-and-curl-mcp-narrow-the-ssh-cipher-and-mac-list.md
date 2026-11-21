@@ -33,3 +33,4 @@ Neither `Curl.Api` nor `curl-mcp` can narrow its own SSH cipher or MAC list. Che
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T2225, finding 5.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 06c68995 db397537 3d836d5e.
