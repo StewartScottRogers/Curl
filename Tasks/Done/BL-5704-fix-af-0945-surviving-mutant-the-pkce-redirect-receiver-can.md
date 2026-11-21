@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.OAuth2.UnitLibrary/Flows/OAuth2RedirectReceiver.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5704 — Fix AF-0945: Surviving mutant: the PKCE redirect receiver can keep reading after the request head ends
 
@@ -43,3 +43,4 @@ Killed by `OAuth2RedirectReceiverTests.ReceiveAsync_HeadEndedAndBrowserWaitsForA
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 90c75c03 9742157d.
+- 2026-11-21: Doing -> Done. Test pins the mutant
