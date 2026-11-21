@@ -21,6 +21,15 @@ public sealed class McpServerProcessStarter : IMcpServerProcessStarter
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(arguments);
+        var startInfo = BuildStartInfo(command, arguments);
+        var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException($"The MCP server '{command}' did not start.");
+        return new SystemMcpServerProcess(process);
+    }
+
+    /// <summary>Builds the start info: no shell (the streams cannot be redirected through one), input and output redirected, error not.</summary>
+    internal static ProcessStartInfo BuildStartInfo(string command, IReadOnlyList<string> arguments)
+    {
         var startInfo = new ProcessStartInfo(command)
         {
             UseShellExecute = false,
@@ -34,9 +43,7 @@ public sealed class McpServerProcessStarter : IMcpServerProcessStarter
             startInfo.ArgumentList.Add(argument);
         }
 
-        var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException($"The MCP server '{command}' did not start.");
-        return new SystemMcpServerProcess(process);
+        return startInfo;
     }
 
     private sealed class SystemMcpServerProcess(Process process) : IMcpServerProcess

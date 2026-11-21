@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.McpClient.UnitLibrary/Stdio/McpServerProcessStarter.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5655 — Fix AF-0920: Surviving mutant: the MCP stdio process starter can set UseShellExecute, which cannot redirect the server's streams
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.McpClient.UnitLibrary/Stdio/McpServerProcessStarter.cs line 26`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.McpClient.UnitLibrary/Stdio/McpServerProcessStarter.cs line 26`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Extracted `McpServerProcessStarter.BuildStartInfo` (internal) and pinned it in `McpServerProcessStarterStartInfoTests`; with UseShellExecute mutated to true that test fails (244 pass, 1 fail), reverted all 245 pass. Build clean; Measure-CodeQuality 0 failing. Added the test file to the tests project (outside touches, new file only).
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: c247efa1 9742157d.
+- 2026-11-20: Doing -> Done. StartInfo pinned by a test that kills the UseShellExecute mutant
