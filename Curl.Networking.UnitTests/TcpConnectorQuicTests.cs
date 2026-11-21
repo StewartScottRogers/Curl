@@ -304,6 +304,28 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectMultiplexedAsync_WithTheDefaultThreeHundredSecondConnectTimeout_FailsWithExit55AfterTenSeconds()
+    {
+        // The engine always hands the connector curl's default 300 s, which must not replace
+        // ngtcp2's 10 s handshake timeout against a UDP peer that does not speak QUIC (BL-5659).
+        var clock = new ManualTimeProvider();
+        var opener = new QuicServerChannelOpener();
+        var events = new RecordingTransferEvents();
+        var connector = Connector(opener, clock, connectTimeout: TcpConnector.DefaultConnectTimeout);
+        Diagnostics.Arrange("connect timeout", "the default 300 s, then the clock advances 10000 ms");
+
+        var connecting = connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None).AsTask();
+        await opener.WaitingToReceive.WaitAsync();
+        clock.Advance(10000);
+        var result = await connecting;
+
+        ActResult(result.ExitCode, result.ErrorMessage);
+        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual("ngtcp2_conn_handle_expiry returned error: ERR_HANDSHAKE_TIMEOUT", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ConnectMultiplexedAsync_WhenTheServerRefusesTheConnection_FailsWithExit8()
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(closeAfterClientHello: 0x2) };
