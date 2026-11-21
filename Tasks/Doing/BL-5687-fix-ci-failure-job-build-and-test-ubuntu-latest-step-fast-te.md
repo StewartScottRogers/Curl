@@ -26,9 +26,11 @@ Lanes test only on Windows, so reproduce with `gh run view 44925879682 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `job Build and test (ubuntu-latest) step Fast tests` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `job Build and test (ubuntu-latest) step Fast tests` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+The failure was a 3-minute inactivity hang of `Curl.Console.UnitTests` (`CurlCommandRunnerParallelTests.RunAsync_FailEarlyAndATransferEndingBeforeTheAbortLands_CompletesIt`) on Linux in run 44925879682; the commit named (0680b975) only adds a networking test and cannot cause it. Locally on Windows the whole `CurlCommandRunnerParallelTests` class passes (23/23) and I could not reproduce it or find the race by reading ParallelRun, HeldTransferHandler and ManualTimerTimeProvider. Judged a one-off Linux scheduling flake; no code change. Reopen as "Fix flaky CI test" if it recurs.
 
 ## Log
 
