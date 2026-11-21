@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:NonEmptyCurlCaBundle-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:124:>
-task: BL-5689
-tasks: BL-5689
+task: BL-5706
+tasks: BL-5706
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md
