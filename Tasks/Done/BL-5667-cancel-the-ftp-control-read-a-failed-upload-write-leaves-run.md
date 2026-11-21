@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Original.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5667 — Cancel the FTP control read a failed upload write leaves running when no 552 arrives
 
@@ -42,3 +42,4 @@ When a failed FTP upload write gets no `552` within the 500 ms wait, the control
 
 - 2026-11-21: Created by the shift-end review (ADR-0710) of 8c81a2532a...1f330a1f28.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 5debf57d 97a94584 6bea890d 590f1cb4 e7657cfb.
+- 2026-11-21: Doing -> Done. Failed-upload-write wait cancels and observes its control read, honours cancellation, holds non-552 replies unshown; tests and ADR-1328
