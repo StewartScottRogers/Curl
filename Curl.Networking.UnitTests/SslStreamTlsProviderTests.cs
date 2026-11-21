@@ -1108,6 +1108,15 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.IsNull(verification.DefaultCaBundleFile);
     }
 
+    // curl treats an empty CURL_CA_BUNDLE as unset (AF-0930).
+    [TestMethod]
+    public void DefaultCaBundleFile_CurlCaBundleIsEmpty_IsNone()
+    {
+        var verification = EnvironmentBundleVerification(new TlsClientOptions(), OpenSslBuild, string.Empty);
+
+        Assert.IsNull(verification.DefaultCaBundleFile);
+    }
+
     private static ServerCertificateVerification EnvironmentBundleVerification(
         TlsClientOptions options, bool matchesSchannelBuild, string bundle) =>
         new(options, matchesSchannelBuild, TimeProvider.System)
