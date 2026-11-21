@@ -3,8 +3,8 @@ id: AF-0921
 title: AuthenticateAsClientAsync_WithSessionCache_TracksTheConnectionsTickets uses a server that sends no ticket and asserts the cache is empty
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-21_0114.md: the reproduction no longer reproduces.
 key: quality:Curl.Networking.UnitTests/HandBuiltTlsProviderTests.SslSessions.cs:AuthenticateAsClientAsync_WithSessionCache_TracksTheConnectionsTickets:name-lies
 reproduction: none
 task: BL-5656
@@ -13,9 +13,9 @@ found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-21
+closed-how: reliable-reaudit
+closed-by: 2026-11-21_0114.md
 ---
 # AF-0921 - AuthenticateAsClientAsync_WithSessionCache_TracksTheConnectionsTickets uses a server that sends no ticket and asserts the cache is empty
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Networking.UnitTests/HandBuiltTlsProviderTests.SslSessi
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_0114.md | reproduces: no | Ran Select-String -Pattern 'sends no ticket': no match. The test's server now sends a NewSessionTicket and the test asserts the exported cache holds one session line (Assert.AreEqual(3, exported.Split(...).Length)).
+
 ## Log
 
 - 2026-11-20: filed proposed.
+- 2026-11-21: accepted -> closed. Re-audit 2026-11-21_0114.md: the reproduction no longer reproduces.

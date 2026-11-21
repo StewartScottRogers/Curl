@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_0114.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site Curl.Engine.UnitLibrary/WriteGate.cs:80:true command: resolvedLine 80, 'heldByThisFlow.Value = true;' -> 'heldByThisFlow.Value = false;', outcome survived (two unrelated baseline failures excluded). Runner's targeted mutation rerun on the clean audited commit: survived.
+
 ## Log
 
 - 2026-11-20: filed proposed.
