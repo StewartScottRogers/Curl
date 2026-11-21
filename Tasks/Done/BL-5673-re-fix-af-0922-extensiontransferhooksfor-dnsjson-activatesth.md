@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api.UnitTests/Composition/CurlClientCreateExtensionTests.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5673 — Re-fix AF-0922: ExtensionTransferHooksFor_DnsJson_ActivatesTheDnsHook asserts only that some hooks exist, not the DNS hook
 
@@ -56,3 +56,4 @@ The test now wraps a handler with what CurlClient.ExtensionTransferHooksFor retu
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-21: Doing -> Done. ExtensionTransferHooksFor result now asserted to hold the DnsQueryTransferHook
