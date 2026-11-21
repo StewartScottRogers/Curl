@@ -36,10 +36,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/WriteGate.cs line 80`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/WriteGate.cs line 80`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by the new test `WriteGateTests.RunExclusive_WhileWriting_MarksThisFlowAsHoldingTheGate`: with line 80 mutated to `= false` it fails (nested WriteExclusiveAsync inside RunExclusive waits for the permit); reverted, all 3132 fast Curl.Engine tests pass. No production change.
 
 ## Log
 
