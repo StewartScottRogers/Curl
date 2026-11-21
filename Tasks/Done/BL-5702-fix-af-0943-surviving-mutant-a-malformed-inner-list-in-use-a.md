@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.CompressionDictionary.UnitLibrary/StructuredFieldDictionaryParser.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5702 — Fix AF-0943: Surviving mutant: a malformed inner list in Use-As-Dictionary can be accepted
 
@@ -43,3 +43,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 85c3ce90 9742157d.
+- 2026-11-21: Doing -> Done. Added two invalid inner-list rows that kill the line-138 mutant.
