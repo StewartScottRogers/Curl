@@ -33,3 +33,4 @@ An empty file cannot be uploaded over TFTP: exit 26. RFC 1350 ends a transfer wi
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T2225, finding 8 (check).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 8beea2eb 6c434bcb 3d836d5e.
