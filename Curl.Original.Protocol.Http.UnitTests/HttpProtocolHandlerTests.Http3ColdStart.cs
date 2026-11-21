@@ -4,7 +4,7 @@ using Curl.Original.Protocol.Http.Fakes;
 namespace Curl.Original.Protocol.Http;
 
 /// <summary>
-/// Pins BL-5660 (ADR-1325): the first QUIC attempt of a process leads TCP by the cold-start
+/// Pins BL-5660 (ADR-1326): the first QUIC attempt of a process leads TCP by the cold-start
 /// allowance on top of the happy-eyeballs timeout, later ones do not, and a QUIC connect that
 /// ignores its token still ends at the connect timeout.
 /// </summary>

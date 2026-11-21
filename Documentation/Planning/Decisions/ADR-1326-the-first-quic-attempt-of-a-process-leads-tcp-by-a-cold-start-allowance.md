@@ -1,4 +1,4 @@
-# ADR-1325: The first QUIC attempt of a process leads TCP by a cold-start allowance
+# ADR-1326: The first QUIC attempt of a process leads TCP by a cold-start allowance
 
 - Status: Accepted
 - Date: 2026-11-20

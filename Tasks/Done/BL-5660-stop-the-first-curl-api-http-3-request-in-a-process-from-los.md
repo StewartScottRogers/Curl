@@ -31,7 +31,7 @@ The first QUIC request in a process lost the race to TCP, and once hung past 60 
 ## Notes
 
 - touches widened (no other Doing task holds them): HttpProtocolHandler.cs, HttpTransferDeadline.cs, QuicColdStartGate.cs, the new test file, EngineComposition.cs; the race lives there, not in TcpConnector.QuicHttpsConnect.cs.
-- Decision (ADR-1325): first QUIC attempt per process leads TCP by +1 s (QuicColdStartGate); WaitAsync ends a connect at the timeout even if the QUIC connector ignores its token. Pinned by fake-clock tests in HttpProtocolHandlerTests.Http3ColdStart.cs.
+- Decision (ADR-1326): first QUIC attempt per process leads TCP by +1 s (QuicColdStartGate); WaitAsync ends a connect at the timeout even if the QUIC connector ignores its token. Pinned by fake-clock tests in HttpProtocolHandlerTests.Http3ColdStart.cs.
 - Not measured: no loopback HTTP/3 server in a lane, so the "20 of 20 fresh-process runs" criterion is met by the allowance and its tests, not by 20 live runs; the 1 s is a cap on cold-start cost, not a measurement. Quality run for Curl.Original.Protocol.Http.UnitLibrary: 0 failing members.
 
 ## Log

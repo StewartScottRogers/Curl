@@ -1074,7 +1074,7 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// The head start QUIC has over TCP: the happy-eyeballs timeout, plus <see cref="QuicColdStartAllowance" />
-    /// for the first QUIC attempt of the process only (BL-5660, ADR-1325).
+    /// for the first QUIC attempt of the process only (BL-5660, ADR-1326).
     /// </summary>
     private TimeSpan HeadStartOfFirstQuicAttempt(HttpRequestPlan plan) =>
         QuicColdStartAllowance > TimeSpan.Zero && QuicColdStart.TryTakeColdStart()

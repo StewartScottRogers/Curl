@@ -30,7 +30,7 @@ namespace Curl.Engine;
 /// </summary>
 internal static partial class EngineComposition
 {
-    /// <summary>How much longer than the happy-eyeballs timeout the first QUIC attempt of a process leads TCP (BL-5660, ADR-1325).</summary>
+    /// <summary>How much longer than the happy-eyeballs timeout the first QUIC attempt of a process leads TCP (BL-5660, ADR-1326).</summary>
     private static readonly TimeSpan QuicColdStartAllowance = TimeSpan.FromSeconds(1);
 
     /// <summary>
