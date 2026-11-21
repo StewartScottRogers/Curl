@@ -34,3 +34,4 @@ Repro: `surl -v --directory site --throwaway-hostkey --user alice:s3cret sftp://
 ## Log
 
 - 2026-11-21: Created from Surly bug report 2026-11-21T0408, finding 1.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: c66c95b2 cc0f29f3 38f618d6 3d836d5e.
