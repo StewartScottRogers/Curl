@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/Options/Protocol/CurlFtpOptions.cs, Curl.Api/README.md, Curl.Api.UnitTests/Options/Protocol]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5668 — Say on CurlFtpOptions that ResumeFrom and ListOnly apply to every protocol, or move them to a transfer record
 
@@ -24,15 +24,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] Setting `CurlFtpOptions.ResumeFrom` no longer changes an HTTP transfer, or the option lives on a record whose name and doc comment say it is transfer-wide (record the choice in an ADR marked "Decided by Claude under Stewart's delegation").
-- [ ] The doc comments say that a request's record replaces the client's whole and what `-1` does on a download.
-- [ ] `Curl.Api/README.md` matches.
-- [ ] A unit test in `Curl.Api.UnitTests` pins the chosen behaviour for an HTTP request on a client whose resume offset is set.
-- [ ] `dotnet build` is clean and the fast tests pass; `Curl.Api` keeps 100% line and branch coverage.
+- [x] Setting `CurlFtpOptions.ResumeFrom` no longer changes an HTTP transfer, or the option lives on a record whose name and doc comment say it is transfer-wide (record the choice in an ADR marked "Decided by Claude under Stewart's delegation").
+- [x] The doc comments say that a request's record replaces the client's whole and what `-1` does on a download.
+- [x] `Curl.Api/README.md` matches.
+- [x] A unit test in `Curl.Api.UnitTests` pins the chosen behaviour for an HTTP request on a client whose resume offset is set.
+- [x] `dotnet build` is clean and the fast tests pass; `Curl.Api` keeps 100% line and branch coverage.
 
 ## Notes
+
+- Decided ADR-1328: behaviour kept (matches curl -C and -l), documented as transfer-wide on the members and in README; two tests added. Production change is doc comments only, so Measure-CodeQuality was not run. Linux and macOS CI: tests are platform-neutral.
 
 ## Log
 
 - 2026-11-21: Created by the shift-end review (ADR-0710) of 8c81a2532a...1f330a1f28.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 2b5b9b24 30a40fb0 7018b731 dbe840b8 1ae24dad.
+- 2026-11-21: Doing -> Done. ADR-1328: documented transfer-wide, tests pin it

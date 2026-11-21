@@ -1,5 +1,6 @@
 using Curl.Api.Messages;
 using Curl.Api.Options;
+using Curl.Api.Options.Protocols;
 
 namespace Curl.Api.UnitTests.Options.Protocol;
 
@@ -46,6 +47,30 @@ public sealed class CurlFtpOptionsResumeTests
 
         Assert.AreEqual(0, options.Transfer.ResumeFrom);
         Assert.IsFalse(options.Transfer.DirListOnly);
+    }
+
+    [TestMethod]
+    public async Task Client_ResumeFrom_ReachesAnHttpRequestToo()
+    {
+        CurlClientOptions clientOptions = new() { Ftp = new CurlFtpOptions { ResumeFrom = 500 } };
+
+        EasyOptions options = await PerformedOptions(clientOptions, new CurlRequest(HttpMethod.Get, "http://example/"));
+
+        Assert.AreEqual(500, options.Transfer.ResumeFrom);
+    }
+
+    [TestMethod]
+    public async Task RequestFtpRecord_ReplacesTheClientsWhole_ResettingResumeFrom()
+    {
+        CurlClientOptions clientOptions = new() { Ftp = new CurlFtpOptions { ResumeFrom = 500 } };
+        CurlRequest request = new(HttpMethod.Get, "ftp://example/f")
+        {
+            Ftp = new CurlFtpOptions { FileMethod = FtpFileMethod.NoCwd },
+        };
+
+        EasyOptions options = await PerformedOptions(clientOptions, request);
+
+        Assert.AreEqual(0, options.Transfer.ResumeFrom);
     }
 
     [TestMethod]
