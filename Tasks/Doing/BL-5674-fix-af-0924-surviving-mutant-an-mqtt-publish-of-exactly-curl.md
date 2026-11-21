@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Mqtt.UnitLibrary/MqttPackets.cs line 93`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Mqtt.UnitLibrary/MqttPackets.cs line 93`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `MqttPublishLimitTests.IsOverPublishLimit_ExactlyAtLimit_IsAccepted` (the `>=` mutant returns true at 268435450). Extracted `MqttPackets.IsOverPublishLimit` so the boundary is tested without a 268 MB payload. Build clean, fast tests green, quality run 0 failing members.
 
 ## Log
 
