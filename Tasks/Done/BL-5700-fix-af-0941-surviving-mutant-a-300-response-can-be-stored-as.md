@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.CompressionDictionary.UnitLibrary/CompressionDictionaryTransferHook.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5700 — Fix AF-0941: Surviving mutant: a 300 response can be stored as a compression dictionary
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.CompressionDictionary.UnitLibrary/CompressionDictionaryTransferHook.cs line 147`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.CompressionDictionary.UnitLibrary/CompressionDictionaryTransferHook.cs line 147`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added 300 and 199 cases to `ExecuteAsync_AResponseThatIsNotAUsableDictionary_IsNotStored_Rfc9842Section2_1`; with `<= 300` applied by hand it fails, with it reverted all 194 pass. Killing test: that one. Production code unchanged; solution-wide build not rerun beyond this test project.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: dbd77435 9742157d.
+- 2026-11-21: Doing -> Done. Added 300 and 199 cases; the <= 300 mutant now fails a test
