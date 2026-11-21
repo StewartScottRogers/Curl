@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ConnectionPoolKey.cs]
+touches: [Curl.Networking.UnitLibrary/ConnectionPoolKey.cs, Curl.Original.Protocol.Imap.UnitLibrary/ImapKeptConnection.cs, Curl.Original.Protocol.Pop3.UnitLibrary/Pop3KeptConnection.cs, Curl.Original.Protocol.Smtp.UnitLibrary/SmtpKeptConnection.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5641 — Never reuse a logged-in IMAP, POP3, SMTP or FTP connection for a request with different credentials
 
@@ -24,15 +24,21 @@ From Surly cookbook bug report `2026-11-20T1836-Curl-bug-report.md` (batch 6 of 
 
 ## Acceptance criteria
 
-- [ ] Two IMAP requests to the same server with different `-u` (console `--next`) open two connections and log in twice, matching curl 8.22.0's recorded exchange; the second, with a wrong password, fails with 67.
-- [ ] The same through one `CurlClient` with different credentials fails on the wrong password, pinned by a test.
-- [ ] Two requests with the same credentials still reuse one connection, and HTTP reuse is unchanged, pinned by tests.
-- [ ] The pool key never holds the password in clear in anything logged or traced.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Two IMAP requests to the same server with different `-u` (console `--next`) open two connections and log in twice, matching curl 8.22.0's recorded exchange; the second, with a wrong password, fails with 67.
+- [x] The same through one `CurlClient` with different credentials fails on the wrong password, pinned by a test.
+- [x] Two requests with the same credentials still reuse one connection, and HTTP reuse is unchanged, pinned by tests.
+- [x] The pool key never holds the password in clear in anything logged or traced.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measured the current branch first: IMAP with different `-u` values already opens a second connection through `curl --next` (exit 67 on the wrong password) and through `CurlClient` (CurlException), because each protocol handler already compares a `LoginKeyOf` (user, password, TLS level) on a reused connection. The pool key needs no change.
+- The real gap was the login key leaving out `--oauth2-bearer` and `--sasl-authzid`, which curl's `ConnectionExists` compares for these protocols (the report's "wrong token succeeds"). Added both to `ImapKeptConnection`, `Pop3KeptConnection` and `SmtpKeptConnection` `LoginKeyOf` (the key is unchanged when neither is given); tests in `*KeptConnectionLoginKeyTests.cs`. Widened `touches` to these three libraries; FTP's key has no bearer (no SASL), HTTP is untouched.
+- The key is compared in memory only, never logged or traced. Linux and macOS: the tests are platform-neutral.
+
 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1836, finding 2.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 32d242df 42f1e123 5367f651 0ddef9bd 3d836d5e.
+- 2026-11-20: Doing -> Done. Login key carries bearer token and SASL authzid for IMAP, POP3, SMTP

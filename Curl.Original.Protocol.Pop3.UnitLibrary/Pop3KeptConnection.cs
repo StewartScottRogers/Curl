@@ -38,7 +38,18 @@ internal sealed class Pop3KeptConnection(IConnection connection, string loginKey
     /// <param name="context">The transfer.</param>
     /// <returns>The key.</returns>
     public static string LoginKeyOf(ITransferContext context) =>
-        string.Join('\0', context.Credentials?.UserName, context.Credentials?.Password, context.SslLevel);
+        string.Join('\0', context.Credentials?.UserName, context.Credentials?.Password, context.SslLevel)
+        + MailLoginSuffixOf(context.Mail);
+
+    /// <summary>
+    /// What <c>--oauth2-bearer</c> and <c>--sasl-authzid</c> add to the login key, which curl 8.22.0 compares too, or nothing when neither is given.
+    /// </summary>
+    /// <param name="mail">The transfer's mail options, or <see langword="null" /> for none.</param>
+    /// <returns>The suffix.</returns>
+    private static string MailLoginSuffixOf(MailRequestOptions? mail) =>
+        mail is null or { BearerToken: null, SaslAuthorizationIdentity: null }
+            ? string.Empty
+            : string.Join('\0', string.Empty, mail.BearerToken, mail.SaslAuthorizationIdentity);
 
     /// <summary>Tells whether the connection was made for the login <paramref name="key" /> names.</summary>
     /// <param name="key">A transfer's <see cref="LoginKeyOf" />.</param>
