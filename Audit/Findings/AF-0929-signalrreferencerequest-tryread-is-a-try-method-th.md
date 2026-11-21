@@ -3,12 +3,12 @@ id: AF-0929
 title: SignalRReferenceRequest.TryRead is a Try method that returns a byte count, not a bool
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceRequest.cs:TryRead:misleading-name
 reproduction: none
-task: none
-tasks:
+task: BL-5679
+tasks: BL-5679
 found: 2026-11-21
 found-at: 1f330a1f28a1086717db7833947030e8fdc0bf9d
 scorecard: 2026-11-21_0114.md

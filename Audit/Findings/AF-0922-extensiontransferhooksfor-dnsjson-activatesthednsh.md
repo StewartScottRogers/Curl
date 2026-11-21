@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Api.UnitTests/Composition/CurlClientCreateExtensionTests.cs:ExtensionTransferHooksFor_DnsJson_ActivatesTheDnsHook:weak-assertion
 reproduction: none
-task: BL-5657
-tasks: BL-5657
+task: BL-5673
+tasks: BL-5657, BL-5673
 found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md

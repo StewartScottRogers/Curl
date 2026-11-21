@@ -3,12 +3,12 @@ id: AF-0927
 title: Surviving mutant: the lib670 port can go on after naming its mime part fails
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib670.cs:BindMime-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib670.cs:102:false
-task: none
-tasks:
+task: BL-5677
+tasks: BL-5677
 found: 2026-11-21
 found-at: 1f330a1f28a1086717db7833947030e8fdc0bf9d
 scorecard: 2026-11-21_0114.md

@@ -3,12 +3,12 @@ id: AF-0928
 title: HttpUnixSocketTarget_..._ReachesTheSwsEmulationOnTheHttpPort checks only that some connection exists
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.UnitTests/UpstreamCaseRunnerTests.cs:HttpUnixSocketTarget_TheHttpUnixPath_ReachesTheSwsEmulationOnTheHttpPort:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5678
+tasks: BL-5678
 found: 2026-11-21
 found-at: 1f330a1f28a1086717db7833947030e8fdc0bf9d
 scorecard: 2026-11-21_0114.md

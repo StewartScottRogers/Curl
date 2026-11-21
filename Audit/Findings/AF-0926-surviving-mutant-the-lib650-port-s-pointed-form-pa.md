@@ -3,12 +3,12 @@ id: AF-0926
 title: Surviving mutant: the lib650 port's pointed form part can be sent two bytes longer
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib650.cs:BuildForm-minus1:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib650.cs:92:-1
-task: none
-tasks:
+task: BL-5676
+tasks: BL-5676
 found: 2026-11-21
 found-at: 1f330a1f28a1086717db7833947030e8fdc0bf9d
 scorecard: 2026-11-21_0114.md

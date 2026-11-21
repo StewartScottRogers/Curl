@@ -3,12 +3,12 @@ id: AF-0925
 title: Surviving mutant: the DER reader can refuse a source of exactly curl's maximum length
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Output.UnitLibrary/DerReader.cs:HasReadableIdentifier-gt:surviving-mutant
 reproduction: mutation Curl.Output.UnitLibrary/DerReader.cs:77:>
-task: none
-tasks:
+task: BL-5675
+tasks: BL-5675
 found: 2026-11-21
 found-at: 1f330a1f28a1086717db7833947030e8fdc0bf9d
 scorecard: 2026-11-21_0114.md
