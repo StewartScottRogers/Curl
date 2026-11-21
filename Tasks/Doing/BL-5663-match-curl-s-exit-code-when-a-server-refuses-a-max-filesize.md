@@ -33,3 +33,4 @@ The exit races between 70 (`RemoteDiskFull`) and 55 (`SendError`) when the serve
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T2225, finding 6 (check).
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 2efbce0f 359c8009 3d836d5e.
