@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extended.Protocol.AzureStorage.Client;
 
 /// <summary>
-/// Refuses the request methods an <c>az://</c>, <c>abfs://</c> or <c>abfss://</c> transfer cannot send (ADR-1249, ADR-1323):
+/// Refuses the request methods an <c>az://</c>, <c>abfs://</c> or <c>abfss://</c> transfer cannot send (ADR-1249, ADR-1324):
 /// <c>-I</c>/<c>--head</c>, and a <c>-X</c> other than <c>GET</c> without <c>-T</c> (or <c>DELETE</c> on <c>az://</c>) or
 /// <c>PUT</c> with it, so a <c>-X DELETE</c> on <c>abfs://</c> never downloads instead.
 /// </summary>

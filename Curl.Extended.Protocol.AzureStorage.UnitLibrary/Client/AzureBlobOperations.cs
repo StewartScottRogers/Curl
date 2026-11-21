@@ -36,7 +36,7 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
             ? (int)needed
             : throw new AzureStorageTransferException(CurlExitCode.FilesizeExceeded, $"An Azure Storage upload of {length} bytes needs more than {maxBlockCount} blocks");
     }
-    /// <summary>Deletes the blob <paramref name="endpoint"/> names (Delete Blob, answered 202); a container or a name ending in <c>/</c> is refused, never deleting the container (ADR-1323).</summary>
+    /// <summary>Deletes the blob <paramref name="endpoint"/> names (Delete Blob, answered 202); a container or a name ending in <c>/</c> is refused, never deleting the container (ADR-1324).</summary>
     /// <param name="endpoint">The URL's endpoint, whose path is <c>/container/blob</c>; its query (for example <c>snapshot</c>) is sent as it is.</param>
     /// <returns>Zero: a delete transfers no bytes.</returns>
     /// <exception cref="AzureStorageTransferException">Exit 3 when the URL names no blob.</exception>

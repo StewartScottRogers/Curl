@@ -1,4 +1,4 @@
-# ADR-1323: az:// -X DELETE deletes one blob and refuses a container URL
+# ADR-1324: az:// -X DELETE deletes one blob and refuses a container URL
 
 - Status: Accepted
 - Date: 2026-11-20

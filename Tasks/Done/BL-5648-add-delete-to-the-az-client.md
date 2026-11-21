@@ -26,7 +26,7 @@ completed: 2026-11-20
 
 ## Notes
 
-`curl -X DELETE az://account/container/blob` sends Delete Blob; a container URL or name ending in `/` is refused (exit 3); abfs:// still refuses DELETE (exit 4). Decided in ADR-1323. Tested in AzureStorageProtocolHandlerTests and AzureStorageRequestMethodTests; quality run clean for the library (100/100, max complexity 10). Platform-neutral tests. The criterion above is the unedited template placeholder (its claim fingerprint), met by this.
+`curl -X DELETE az://account/container/blob` sends Delete Blob; a container URL or name ending in `/` is refused (exit 3); abfs:// still refuses DELETE (exit 4). Decided in ADR-1324. Tested in AzureStorageProtocolHandlerTests and AzureStorageRequestMethodTests; quality run clean for the library (100/100, max complexity 10). Platform-neutral tests. The criterion above is the unedited template placeholder (its claim fingerprint), met by this.
 
 ## Log
 
