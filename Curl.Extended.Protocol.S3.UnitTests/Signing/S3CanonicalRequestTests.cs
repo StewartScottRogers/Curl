@@ -30,6 +30,26 @@ public sealed class S3CanonicalRequestTests
     }
 
     [TestMethod]
+    public void Build_DeleteObject_PinsItsCanonicalRequest()
+    {
+        // DeleteObject (BL-5647): the DELETE verb, the object path, no query, the empty payload's hash.
+        var request = new S3SigningRequest(
+            "DELETE",
+            "/dir/a.txt",
+            [],
+            [Header("x-amz-date", "20130524T000000Z"), Header("Host", "examplebucket.s3.amazonaws.com"), Header("x-amz-content-sha256", EmptyPayloadHash)],
+            EmptyPayloadHash);
+
+        var (canonicalRequest, signedHeaders) = S3CanonicalRequest.Build(request);
+
+        Assert.AreEqual(
+            "DELETE\n/dir/a.txt\n\nhost:examplebucket.s3.amazonaws.com\nx-amz-content-sha256:" + EmptyPayloadHash
+            + "\nx-amz-date:20130524T000000Z\n\nhost;x-amz-content-sha256;x-amz-date\n" + EmptyPayloadHash,
+            canonicalRequest);
+        Assert.AreEqual("host;x-amz-content-sha256;x-amz-date", signedHeaders);
+    }
+
+    [TestMethod]
     public void Build_HeaderValueWithOuterAndSequentialSpaces_TrimsAndCollapsesThem()
     {
         var request = new S3SigningRequest("GET", "/", [], [Header("X-Note", "  a   b c  ")], EmptyPayloadHash);

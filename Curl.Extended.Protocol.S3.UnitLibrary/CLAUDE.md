@@ -5,10 +5,10 @@ base class library, `Curl.Protocol.Abstractions` and `Curl.Extension.Abstraction
 (whose `--aws-sigv4` code is curl's, not this extension's). It adds no options.
 
 - `Client/S3Extension` gives the description and handler factory, registered in `Curl.Extension.Composition`.
-- `Client/S3ProtocolHandler` serves `s3://bucket/key`: `-T` uploads, an empty key or one ending in `/` lists, otherwise
+- `Client/S3ProtocolHandler` serves `s3://bucket/key`: `-T` uploads, `-X DELETE` deletes the object (DeleteObject), an empty key or one ending in `/` lists, otherwise
   it downloads. `Client/S3Configuration` reads `--user` and the `AWS_*` variables; `Client/S3Endpoint` picks the
   virtual-hosted or path-style server and splits the URL's query (ADR-1315); `Client/S3Client` signs and sends one request per connection and turns a status
-  of 300 or more into exit 22, writing the error body to the output first under `--fail-with-body`; `Client/S3Operations` holds GetObject, PutObject, the multipart upload and ListObjectsV2.
+  of 300 or more into exit 22, writing the error body to the output first under `--fail-with-body`; `Client/S3Operations` holds GetObject, PutObject, DeleteObject, the multipart upload and ListObjectsV2.
 
 - `Xml/S3ListBucketResultParser`, `Xml/S3InitiateMultipartUploadResultParser` and
   `Xml/S3ErrorResponseParser` read the ListObjectsV2, CreateMultipartUpload and error response

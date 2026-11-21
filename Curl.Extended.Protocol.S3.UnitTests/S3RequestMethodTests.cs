@@ -13,9 +13,10 @@ public sealed class S3RequestMethodTests
     private const string Url = "s3://mybucket/obj";
 
     [TestMethod]
-    [DataRow("DELETE", null, "s3:// does not support -X DELETE; it sends only GET, or PUT with -T")]
-    [DataRow("PUT", null, "s3:// does not support -X PUT; it sends only GET, or PUT with -T")]
-    [DataRow("GET", "body", "s3:// does not support -X GET; it sends only GET, or PUT with -T")]
+    [DataRow("DELETE", "body", "s3:// does not support -X DELETE; it sends only GET, DELETE with -X DELETE, or PUT with -T")]
+    [DataRow("POST", null, "s3:// does not support -X POST; it sends only GET, DELETE with -X DELETE, or PUT with -T")]
+    [DataRow("PUT", null, "s3:// does not support -X PUT; it sends only GET, DELETE with -X DELETE, or PUT with -T")]
+    [DataRow("GET", "body", "s3:// does not support -X GET; it sends only GET, DELETE with -X DELETE, or PUT with -T")]
     public async Task ExecuteAsync_MethodItCannotSend_FailsWithExit4BeforeConnecting(string method, string? upload, string expectedMessage)
     {
         QueuedS3Connector connector = new();
@@ -33,13 +34,14 @@ public sealed class S3RequestMethodTests
 
         TransferResult result = await Handler(connector).ExecuteAsync(Context(null, null, noBody: true));
 
-        Assert.AreEqual((CurlExitCode.NotBuiltIn, "s3:// does not support -I/--head; it sends only GET, or PUT with -T"), (result.ExitCode, result.ErrorMessage));
+        Assert.AreEqual((CurlExitCode.NotBuiltIn, "s3:// does not support -I/--head; it sends only GET, DELETE with -X DELETE, or PUT with -T"), (result.ExitCode, result.ErrorMessage));
         Assert.IsEmpty(connector.Targets);
     }
 
     [TestMethod]
     [DataRow(null, null)]
     [DataRow("GET", null)]
+    [DataRow("DELETE", null)]
     [DataRow("PUT", "body")]
     public void RefusalOf_MethodItSends_IsNull(string? method, string? upload) =>
         Assert.IsNull(S3RequestMethod.RefusalOf(Context(method, upload, noBody: false)));

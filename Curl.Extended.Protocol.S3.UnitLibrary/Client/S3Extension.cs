@@ -12,7 +12,7 @@ public static class S3Extension
     /// <summary>Gets what <c>curl --extended-help</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "s3",
-        "Reads and writes Amazon S3 objects (and MinIO or R2) at s3://bucket/key, signed with SigV4: a key downloads the object, -T uploads it (in 8 MiB parts from 8 MiB), an empty key or one ending in / lists the keys under it, and a ?query goes to S3 too (?prefix=logs/ narrows a list, ?max-keys=1 limits a page); --user ACCESS:SECRET or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY sign, AWS_REGION picks the region and AWS_ENDPOINT_URL another service. An s3:// URL uses s3_proxy, else https_proxy or HTTPS_PROXY, else ALL_PROXY, as wss:// does (ADR-1297).",
+        "Reads and writes Amazon S3 objects (and MinIO or R2) at s3://bucket/key, signed with SigV4: a key downloads the object, -T uploads it (in 8 MiB parts from 8 MiB), -X DELETE deletes it (DeleteObject; a bucket URL is refused), an empty key or one ending in / lists the keys under it, and a ?query goes to S3 too (?prefix=logs/ narrows a list, ?max-keys=1 limits a page); --user ACCESS:SECRET or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY sign, AWS_REGION picks the region and AWS_ENDPOINT_URL another service. An s3:// URL uses s3_proxy, else https_proxy or HTTPS_PROXY, else ALL_PROXY, as wss:// does (ADR-1297).",
         ["s3"],
         [],
         new Uri("https://docs.aws.amazon.com/AmazonS3/latest/API/Welcome.html"));

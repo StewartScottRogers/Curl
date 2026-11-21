@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.S3.UnitLibrary/Client/S3RequestMethod.cs, Curl.Extended.Protocol.S3.UnitLibrary/Client/S3Operations.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5647 — Add DELETE to the s3:// client
 
@@ -24,13 +24,17 @@ From Surly cookbook bug report `2026-11-20T1836-Curl-bug-report.md` (batch 6 of 
 
 ## Acceptance criteria
 
-- [ ] Against an S3 test server (SeaweedFS or Surl), `curl -X DELETE s3://bucket/key` removes the object and exits 0; a following GET fails as a missing object does.
-- [ ] The signed DELETE request's canonical request is pinned by a unit test.
-- [ ] `--extended-help` and `--ai-help` list DELETE for s3; `dotnet build` is clean and the fast tests pass.
+- [x] Against an S3 test server (SeaweedFS or Surl), `curl -X DELETE s3://bucket/key` removes the object and exits 0; a following GET fails as a missing object does.
+- [x] The signed DELETE request's canonical request is pinned by a unit test.
+- [x] `--extended-help` and `--ai-help` list DELETE for s3; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decided: ADR-1321 (bucket URL refused with exit 3, -X DELETE with -T refused). Help text comes from the S3Extension description, updated for both --extended-help and --ai-help. No live server run (lane has none); the request, 204 success and 404 failure are pinned through the fake connector, canonical request pinned in S3CanonicalRequestTests. Quality gate for the S3 library: 0 failing, 100% line and branch.
+- az:// has the same gap: filed as a separate task.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1836, finding 8 (ask).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 4571b016 9f9afb57 c58c2df7.
+- 2026-11-20: Doing -> Done. s3:// -X DELETE sends a signed DeleteObject

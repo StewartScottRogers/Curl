@@ -34,6 +34,43 @@ public sealed class S3ProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DeleteMethod_DeletesTheObjectSignedWithSigV4()
+    {
+        QueuedS3Connector connector = new("HTTP/1.1 204 No Content\r\n\r\n");
+        TransferContext context = DeleteContext("s3://bucket/dir/a%20b.txt?versionId=3");
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(context);
+
+        Assert.AreEqual((CurlExitCode.Ok, 0L), (result.ExitCode, result.BytesTransferred));
+        string sent = connector.Connections[0].Written;
+        Assert.StartsWith("DELETE /bucket/dir/a%20b.txt?versionId=3 HTTP/1.1\r\n", sent);
+        Assert.Contains("SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=", sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DeleteOfMissingObject_FailsLikeTheOtherOperations()
+    {
+        QueuedS3Connector connector = new("HTTP/1.1 404 Not Found\r\nContent-Length: 37\r\n\r\n<Error><Code>NoSuchKey</Code></Error>");
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(DeleteContext("s3://bucket/gone"));
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow("s3://bucket")]
+    [DataRow("s3://bucket/dir/")]
+    public async Task ExecuteAsync_DeleteOfABucketOrPrefix_IsRefusedBeforeSending(string url)
+    {
+        QueuedS3Connector connector = new();
+
+        TransferResult result = await Handler(connector, Minio).ExecuteAsync(DeleteContext(url));
+
+        Assert.AreEqual((CurlExitCode.UrlMalformat, "An S3 delete needs an object key in the URL"), (result.ExitCode, result.ErrorMessage));
+        Assert.IsEmpty(connector.Targets);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NoCredentials_SendsAnUnsignedRequestToTheVirtualHost()
     {
         QueuedS3Connector connector = new(QueuedS3Connector.Ok(string.Empty));
@@ -268,6 +305,15 @@ public sealed class S3ProtocolHandlerTests
         Output = output,
         Credentials = credentials,
         Upload = upload is null ? null : new MemoryStream(Encoding.UTF8.GetBytes(upload)),
+        TimeProvider = new FixedTimeProvider(),
+    };
+
+    private static TransferContext DeleteContext(string url) => new()
+    {
+        Url = CurlUrl.Parse(url),
+        Output = new MemoryStream(),
+        Credentials = new NetworkCredential("AKID", "secret"),
+        Http = new Curl.Protocol.Abstractions.HttpRequestOptions { CustomMethod = "DELETE" },
         TimeProvider = new FixedTimeProvider(),
     };
 
