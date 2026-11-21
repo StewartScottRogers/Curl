@@ -1370,3 +1370,4 @@ Each option and the specific reason it lost.
 | [1326](ADR-1326-the-first-quic-attempt-of-a-process-leads-tcp-by-a-cold-start-allowance.md) | The first QUIC attempt of a process leads TCP by a cold-start allowance (BL-5660) | Accepted | 2026-11-20 |
 | [1327](ADR-1327-a-failed-ftp-upload-write-waits-briefly-for-the-servers-552-reply.md) | A failed FTP upload write waits briefly for the server's 552 reply (BL-5663) | Accepted | 2026-11-21 |
 | [1328](ADR-1328-ftp-resume-offset-and-names-only-listing-are-documented-as-transfer-wide.md) | CurlFtpOptions.ResumeFrom and ListOnly are documented as transfer-wide (BL-5668) | Accepted | 2026-11-21 |
+| [1328](ADR-1328-the-failed-upload-write-wait-cancels-its-control-read-and-holds-the-reply.md) | The failed-upload-write wait cancels its control read and holds the reply it reads (BL-5667) | Accepted | 2026-11-21 |

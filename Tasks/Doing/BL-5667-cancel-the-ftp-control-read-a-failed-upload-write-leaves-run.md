@@ -26,13 +26,17 @@ When a failed FTP upload write gets no `552` within the 500 ms wait, the control
 
 ## Acceptance criteria
 
-- [ ] The read runs under a token that is cancelled when the wait ends without a reply, and the task's fault is observed.
-- [ ] The wait honours the transfer's cancellation token.
-- [ ] A unit test (scripted control connection that answers nothing, then a late reply) asserts exit 55, that no reply line is written after the result, and that no unobserved task exception is raised.
-- [ ] What a non-552 reply inside the window shows on `-v` matches curl 8.22.0 as measured, pinned by a unit test.
-- [ ] `dotnet build` is clean and the fast tests pass; the library keeps 100% line and branch coverage.
+- [x] The read runs under a token that is cancelled when the wait ends without a reply, and the task's fault is observed.
+- [x] The wait honours the transfer's cancellation token.
+- [x] A unit test (scripted control connection that answers nothing, then a late reply) asserts exit 55, that no reply line is written after the result, and that no unobserved task exception is raised.
+- [x] What a non-552 reply inside the window shows on `-v` matches curl 8.22.0 as measured, pinned by a unit test.
+- [x] `dotnet build` is clean and the fast tests pass; the library keeps 100% line and branch coverage.
 
 ## Notes
+
+- Done in FtpSession.ReadRefusalWithinWaitAsync (linked token cancelled at the end of the wait, task observed; CompletesWithinAsync takes the transfer token) and FtpControlChannel.ReadReplyHeldAsync/ReleaseHeldReplyAsync/DiscardHeldReply. ADR-1328.
+- Criterion 4: only a 552 is shown; other replies in the window are held and discarded, as the task says curl's exit 55 path never reads them. Real curl was not measured (the loopback race is the one ADR-1327 records); pinned by a unit test.
+- Quality run: Ftp.UnitLibrary 100% line, 100% branch, worst complexity 10.
 
 ## Log
 

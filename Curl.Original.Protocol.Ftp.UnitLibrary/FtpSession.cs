@@ -1330,6 +1330,26 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
+    /// Reads the control connection for <see cref="RefusalReplyWait" /> under a token the end of
+    /// the wait cancels, so no read is left pending to show a late reply or to fault unobserved
+    /// once the session is disposed; the wait ends early when the transfer is cancelled.
+    /// </summary>
+    /// <returns>The reply that arrived in time, or <see langword="null" />.</returns>
+    private async ValueTask<FtpReply?> ReadRefusalWithinWaitAsync()
+    {
+        using var wait = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
+        CancellationToken transferToken = control.CancellationToken;
+        control.CancellationToken = wait.Token;
+        Task<FtpReply?> read = control.ReadReplyHeldAsync().AsTask();
+        await CompletesWithinAsync(read, RefusalReplyWait, context.CancellationToken).ConfigureAwait(false);
+        await wait.CancelAsync().ConfigureAwait(false);
+        await Task.WhenAny(read).ConfigureAwait(false);
+        _ = read.Exception;
+        control.CancellationToken = transferToken;
+        return read.IsCompletedSuccessfully ? read.Result : null;
+    }
+
+    /// <summary>
     /// Ends an upload whose write to the data connection failed. A server that refuses the upload
     /// with <c>552</c> and closes the data connection mid-transfer has sent its reply before the
     /// write fails, and curl 8.22.0 reports it as exit 70, so the control connection is given
@@ -1339,11 +1359,15 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult> EndFailedUploadWriteAsync(IConnection data, IOException failure)
     {
-        Task<FtpReply?> read = control.ReadReplyAsync().AsTask();
-        await CompletesWithinAsync(read, RefusalReplyWait).ConfigureAwait(false);
-        FtpReply? refusal = read.IsCompletedSuccessfully ? read.Result : null;
+        FtpReply? refusal = await ReadRefusalWithinWaitAsync().ConfigureAwait(false);
+        if (refusal?.Code != 552)
+        {
+            control.DiscardHeldReply();
+        }
+
         if (refusal?.Code == 552)
         {
+            await control.ReleaseHeldReplyAsync(refusal).ConfigureAwait(false);
             lastReplyCode = refusal.Code;
             dataConnection = null;
             await CloseDataConnectionAtOnceAsync(data).ConfigureAwait(false);
@@ -3116,13 +3140,13 @@ internal sealed class FtpSession(
     /// the transfer's clock, waiting out a timer that fires early, without cancelling the read.
     /// </summary>
     /// <returns>Whether <paramref name="read" /> completed in time.</returns>
-    private async ValueTask<bool> CompletesWithinAsync(Task read, TimeSpan limit)
+    private async ValueTask<bool> CompletesWithinAsync(Task read, TimeSpan limit, CancellationToken cancellationToken = default)
     {
         long started = context.TimeProvider.GetTimestamp();
         TimeSpan left = limit;
         while (!read.IsCompleted && left > TimeSpan.Zero)
         {
-            using var replied = new CancellationTokenSource();
+            using var replied = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             await Task.WhenAny(read, Task.Delay(left, context.TimeProvider, replied.Token)).ConfigureAwait(false);
             await replied.CancelAsync().ConfigureAwait(false);
             left = limit - context.TimeProvider.GetElapsedTime(started);
