@@ -37,3 +37,4 @@ So the option set through `Curl.Api` does not reach the FTP and IMAP handlers' T
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1836, finding 1.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: f603ed89 9ea168b5 580e6135 3d836d5e.
