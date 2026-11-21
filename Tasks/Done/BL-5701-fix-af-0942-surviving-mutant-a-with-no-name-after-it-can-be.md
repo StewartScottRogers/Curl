@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.CompressionDictionary.UnitLibrary/DictionaryMatchPattern.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5701 — Fix AF-0942: Surviving mutant: a ':' with no name after it can be compiled as a URL-pattern group
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.CompressionDictionary.UnitLibrary/DictionaryMatchPattern.cs line 82`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.CompressionDictionary.UnitLibrary/DictionaryMatchPattern.cs line 82`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by the new DataRow `("/app/:", "https://example.com/app/x", false)` in `DictionaryMatchPatternTests.Matches_RequestUrl_FollowsThePattern`. Mutant verified by hand (fails), reverted (195 pass). Build is untouched production code; fast tests of the project green.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 7dc16237 9742157d.
+- 2026-11-21: Doing -> Done. Mutant killed by new DataRow; tests green
