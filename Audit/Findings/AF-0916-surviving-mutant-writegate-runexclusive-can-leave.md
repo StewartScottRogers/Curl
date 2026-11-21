@@ -3,8 +3,8 @@ id: AF-0916
 title: Surviving mutant: WriteGate.RunExclusive can leave its flow marked as holding the gate, so later writes bypass it
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-21_0835.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/WriteGate.cs:RunExclusive-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/WriteGate.cs:80:true
 task: BL-5672
@@ -13,9 +13,9 @@ found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-21
+closed-how: mechanical
+closed-by: 2026-11-21_0835.md
 ---
 # AF-0916 - Surviving mutant: WriteGate.RunExclusive can leave its flow marked as holding the gate, so later writes bypass it
 
@@ -43,7 +43,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Re-audits
 
 - 2026-11-21 | 2026-11-21_0114.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site Curl.Engine.UnitLibrary/WriteGate.cs:80:true command: resolvedLine 80, 'heldByThisFlow.Value = true;' -> 'heldByThisFlow.Value = false;', outcome survived (two unrelated baseline failures excluded). Runner's targeted mutation rerun on the clean audited commit: survived.
+- 2026-11-21 | 2026-11-21_0835.md | reproduces: no | Ran the -Site command (WriteGate.cs:80:true, member RunExclusive): resolved at line 80, heldByThisFlow.Value = true mutated to false, outcome killed (24.2 s). The baseline left out 2 AwsSigV4 tests that fail unmutated (filed separately). Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-11-20: filed proposed.
+- 2026-11-21: accepted -> closed. Re-audit 2026-11-21_0835.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.UnitTests/UpstreamCaseRunnerTests.cs -Patte
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_0835.md | reproduces: no | Ran the Select-String reproduction: no match. The test now writes a GET over the connection and asserts Assert.StartsWith("HTTP/1.1 200 OK", ...) on the reply (UpstreamCaseRunnerTests.cs:1521).
+
 ## Log
 
 - 2026-11-21: filed proposed.

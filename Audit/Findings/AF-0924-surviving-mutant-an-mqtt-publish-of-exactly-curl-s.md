@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Origi
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_0835.md | not re-audited | Ran the -Site command (MqttPackets.cs:93:>, member BuildPublish): outcome site-missing. The limit check moved to IsOverPublishLimit at line 107; for information, -Site MqttPackets.cs:107:> -Member IsOverPublishLimit was killed, but the finding's own site could not be run, so not re-audited.
+
 ## Log
 
 - 2026-11-21: filed proposed.

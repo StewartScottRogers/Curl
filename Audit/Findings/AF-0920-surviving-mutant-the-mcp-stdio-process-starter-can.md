@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 ## Re-audits
 
 - 2026-11-21 | 2026-11-21_0114.md | not re-audited | Ran the -Site .../Stdio/McpServerProcessStarter.cs:26:false -Member Start command: outcome site-missing, no mutant ran. UseShellExecute = false now sits in BuildStartInfo (line 36), not in Start, so the site could not be found: not re-audited.
+- 2026-11-21 | 2026-11-21_0835.md | not re-audited | Ran the -Site command (McpServerProcessStarter.cs:26:false, member Start): outcome site-missing. UseShellExecute = false now sits in BuildStartInfo at line 35; for information, -Site ...McpServerProcessStarter.cs:35:false -Member BuildStartInfo was killed, but the finding's own site could not be run, so not re-audited.
 
 ## Log
 
