@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Mcp/Tools/TransferMcpTool.cs, Curl.Mcp.UnitLibrary/McpTransferRequestCheck.cs, Curl.Mcp.UnitLibrary/McpResponseCap.cs, Curl.Mcp.UnitTests/Tools/TransferMcpToolTests.cs, Curl.Mcp.UnitTests/McpTransferProxyAndLimitFieldsTests.cs, Curl.Mcp.IntegrationTests/Golden/tools-list.json, Curl.Mcp.IntegrationTests/Golden/request-before-initialize.json, Documentation/Planning/Decisions/ADR-1330-the-transfer-tool-takes-proxy-login-proxy-ca-resolve-and-a-body-limit-field.md]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5689 — Make the transfer tool's maxBodyBytes ceiling text true when CURL_MCP_MAX_RESPONSE_BYTES exceeds 64 MiB
 
@@ -50,3 +50,4 @@ Decided: fix the text, not the code (ADR-1330 amendment): the real ceiling is th
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: c9cfd04c 44ac0007 c3da6b19 9134e538.
+- 2026-11-21: Doing -> Done. Text fixed: ceiling is the smaller of 64 MiB and the variable; unit test pins refusal.
