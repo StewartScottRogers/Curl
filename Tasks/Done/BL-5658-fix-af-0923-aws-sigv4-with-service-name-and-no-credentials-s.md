@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs, Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Original.Protocol.Http.UnitTests/HttpProtocolHandlerTests.Authentication.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5658 — Fix AF-0923: --aws-sigv4 with --service-name and no credentials sends no signature, where curl signs with an empty key ID
 
@@ -52,3 +52,4 @@ Fixed in HttpProtocolHandler.StartsWithAnEmptyUser (the credential origin; HttpA
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-20: Doing -> Done. AwsSigV4 with --service-name now signs with an empty key ID
