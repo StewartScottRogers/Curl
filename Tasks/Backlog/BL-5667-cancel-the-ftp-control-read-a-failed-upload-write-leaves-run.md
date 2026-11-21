@@ -1,0 +1,39 @@
+---
+id: BL-5667
+title: Cancel the FTP control read a failed upload write leaves running when no 552 arrives
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: []
+touches: [Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Original.Protocol.Ftp.UnitTests]
+requirement: none
+created: 2026-11-21
+completed:
+---
+# BL-5667 — Cancel the FTP control read a failed upload write leaves running when no 552 arrives
+
+## Goal
+
+When a failed FTP upload write gets no `552` within the 500 ms wait, the control-connection read it started is cancelled and observed, and no later reply is written to `-v`, `--trace` or `-D` after the transfer has decided on exit 55.
+
+## Context
+
+- `Curl.Original.Protocol.Ftp.UnitLibrary/FtpSession.cs:1340-1355` (`EndFailedUploadWriteAsync`, BL-5663). Found by the shift-end review's silent-failure-hunter and code-reviewer.
+- `control.ReadReplyAsync()` takes no token. If nothing arrives within `RefusalReplyWait`, the method returns exit 55 with the read still pending. Disposing the session then faults that read, and nothing observes the exception (`UnobservedTaskException`). A reply arriving after 500 ms but before disposal is written by `diagnostics.ReplyRead` (`FtpControlChannel.cs:187`) after the result is decided.
+- A reply other than 552 (426, 451) that arrives in the window is read, shown on `-v`/`--trace`/`-D`, and thrown away. curl 8.22.0's exit 55 path never reads it, so the bytes differ from curl's. Measure curl with `Record-CurlExchange.ps1` before pinning that output.
+- Nothing reads the control connection on this path today, but a later `QUIT` here would race the pending read for `FtpControlChannel`'s buffer.
+- The 500 ms delay in `CompletesWithinAsync` (`FtpSession.cs:3126`) ignores `context.CancellationToken`, so Ctrl-C or `-m` takes effect up to 500 ms late.
+
+## Acceptance criteria
+
+- [ ] The read runs under a token that is cancelled when the wait ends without a reply, and the task's fault is observed.
+- [ ] The wait honours the transfer's cancellation token.
+- [ ] A unit test (scripted control connection that answers nothing, then a late reply) asserts exit 55, that no reply line is written after the result, and that no unobserved task exception is raised.
+- [ ] What a non-552 reply inside the window shows on `-v` matches curl 8.22.0 as measured, pinned by a unit test.
+- [ ] `dotnet build` is clean and the fast tests pass; the library keeps 100% line and branch coverage.
+
+## Notes
+
+## Log
+
+- 2026-11-21: Created by the shift-end review (ADR-0710) of 8c81a2532a...1f330a1f28.
