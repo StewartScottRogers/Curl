@@ -39,6 +39,8 @@ Observed: surl prints `Listening on http://localhost:8080/ over unix://surl.sock
 - [ ] `dotnet build` is clean and the fast tests pass on all three platforms in CI.
 
 ## Notes
+- 2026-11-21 (lane 1): Read the dial path: `TcpDialer.DialUnixSocketAsync` sets no socket option at all (no NoDelay, no keep-alive, no QoS; `ApplySocketOptions` is only called from the TCP `DialAsync`), and the wrappers (`LocalBindingTcpDialer`, `SocketOpenerTcpDialer`, `SocketActionGatedTcpDialer`) and `TcpConnector.ConnectOverUnixSocketTracedAsync` pass straight through. So the first suspect (a TCP-only option) is ruled out by reading; the port sets none on any platform. A path is passed unchanged to `UnixDomainSocketEndPoint`, relative or not. Added Integration test `DialUnixSocketAsync_HttpRequestThenReply_CarriesTheRequestOutAndTheReplyBack` (Curl.Networking.IntegrationTests, passes on Windows; runs on macOS in CI) which pins the request/reply exchange over the dialer; committed.
+- Not found: the macOS cause. No macOS host is reachable from a lane, so the exit-55 cause (port or Surl) cannot be measured here. Remaining suspects for a macOS run: the engine's HTTP write path after connect (`ConnectionEndPointRecorder.RemoteIpOf` uses `UnixDomainSocketEndPoint.Serialize()[2]`), and Surl's listener. Next step needs the CI log of the macOS cookbook case with `-v`/`--trace` output.
 
 ## Log
 
