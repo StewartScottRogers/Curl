@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/Options/Protocol/CurlSshOptions.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5662 — Let Curl.Api and curl-mcp narrow the SSH cipher and MAC lists, as curl --ciphers does for SSH
 
@@ -36,3 +36,4 @@ Neither `Curl.Api` nor `curl-mcp` can narrow its own SSH cipher or MAC list. Che
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T2225, finding 5.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 06c68995 db397537 3d836d5e.
+- 2026-11-20: Doing -> Done. curl has no SSH cipher/MAC option; documented
