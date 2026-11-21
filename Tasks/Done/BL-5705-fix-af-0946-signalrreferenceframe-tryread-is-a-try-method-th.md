@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceFrame.cs, Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceHub.cs, Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceParser.cs, Curl.Conformance.Extended.UnitLibrary/SocketIo/SocketIoReferenceServer.cs, Curl.Conformance.Extended.UnitTests/SignalR/SignalRReferenceHubTests.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5705 — Fix AF-0946: SignalRReferenceFrame.TryRead is a Try method that returns a byte count, not a bool
 
@@ -52,3 +52,4 @@ Renamed TryRead to TakeWholeFrame (as SignalRReferenceRequest.TakeWholeRequest);
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-21: Doing -> Done. Renamed SignalRReferenceFrame.TryRead to TakeWholeFrame; build clean, fast tests green
