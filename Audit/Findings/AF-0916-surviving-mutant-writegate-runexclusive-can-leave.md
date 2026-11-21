@@ -3,12 +3,12 @@ id: AF-0916
 title: Surviving mutant: WriteGate.RunExclusive can leave its flow marked as holding the gate, so later writes bypass it
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/WriteGate.cs:RunExclusive-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/WriteGate.cs:80:true
-task: none
-tasks:
+task: BL-5651
+tasks: BL-5651
 found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md

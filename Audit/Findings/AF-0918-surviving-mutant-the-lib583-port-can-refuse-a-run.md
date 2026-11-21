@@ -3,12 +3,12 @@ id: AF-0918
 title: Surviving mutant: the lib583 port can refuse a run given exactly three arguments
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib583.cs:RunAsync-lt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib583.cs:24:<
-task: none
-tasks:
+task: BL-5653
+tasks: BL-5653
 found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md

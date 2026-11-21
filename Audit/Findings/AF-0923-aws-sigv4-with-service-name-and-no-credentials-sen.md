@@ -3,12 +3,12 @@ id: AF-0923
 title: --aws-sigv4 with --service-name and no credentials sends no signature, where curl signs with an empty key ID
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs:--aws-sigv4:request
 reproduction: none
-task: none
-tasks:
+task: BL-5658
+tasks: BL-5658
 found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md

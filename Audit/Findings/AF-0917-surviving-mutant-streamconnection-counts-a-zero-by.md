@@ -3,12 +3,12 @@ id: AF-0917
 title: Surviving mutant: StreamConnection counts a zero-byte (end-of-stream) read as having read bytes
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/StreamConnection.cs:ReadAsync-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/StreamConnection.cs:128:>
-task: none
-tasks:
+task: BL-5652
+tasks: BL-5652
 found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md

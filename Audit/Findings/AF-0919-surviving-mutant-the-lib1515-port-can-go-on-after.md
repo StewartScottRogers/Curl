@@ -3,12 +3,12 @@ id: AF-0919
 title: Surviving mutant: the lib1515 port can go on after easy_init fails instead of stopping
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1515.cs:PerformAsync-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1515.cs:119:false
-task: none
-tasks:
+task: BL-5654
+tasks: BL-5654
 found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md

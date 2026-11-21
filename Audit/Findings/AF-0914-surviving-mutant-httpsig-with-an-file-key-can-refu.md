@@ -3,12 +3,12 @@ id: AF-0914
 title: Surviving mutant: --httpsig with an @file key can refuse every non-empty key file and accept an empty one
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/HttpSignatureSetup.cs:WithKey-eq:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/HttpSignatureSetup.cs:81:==
-task: none
-tasks:
+task: BL-5649
+tasks: BL-5649
 found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md
