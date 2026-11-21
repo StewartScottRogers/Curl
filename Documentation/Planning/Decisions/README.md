@@ -1366,3 +1366,4 @@ Each option and the specific reason it lost.
 | [1322](ADR-1322-s3-x-delete-deletes-one-object-and-refuses-a-bucket-url.md) | s3:// -X DELETE deletes one object and refuses a bucket URL (BL-5647) | Accepted | 2026-11-20 |
 | [1323](ADR-1323-networking-reads-curl-ca-bundle-for-a-host-that-sets-no-ca-option.md) | Curl.Networking reads CURL_CA_BUNDLE for a host that sets no CA option (BL-5642) | Accepted | 2026-11-20 |
 | [1324](ADR-1324-az-x-delete-deletes-one-blob-and-refuses-a-container-url.md) | az:// -X DELETE deletes one blob and refuses a container URL (BL-5648) | Accepted | 2026-11-20 |
+| [1325](ADR-1325-curl-api-ftp-resume-offset-and-names-only-listing-live-on-curlftpoptions.md) | Curl.Api's FTP resume offset and names-only listing live on CurlFtpOptions (BL-5661) | Accepted | 2026-11-20 |

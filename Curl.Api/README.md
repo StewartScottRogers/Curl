@@ -84,6 +84,10 @@ transport groups `CurlNetworkOptions`, `CurlTlsOptions` (with `CurlTlsPeerOption
 checked as it is set. Choose HTTP authentication methods (Digest, for a plain-HTTP server that refuses
 Basic) with `HttpAuthenticationMethods` from `Curl.Api.Options.Authentication`.
 
+For FTP, `CurlFtpOptions.ResumeFrom` is curl's `-C`: a download of `N` sends `REST N` and returns the file
+from byte `N`, and an upload continues from `N` (`-1` appends at the end of the remote file); `ListOnly`
+is `-l`, a names-only listing (`NLST`). Neither needs `REST` in `PreQuote` (ADR-1325).
+
 Curl's extensions have typed records of their own. `CurlRequest.Dns` takes a `CurlDnsOptions`: `Json = true`
 is `--dns-json` and `Transport = "tcp"` is `--dns-transport tcp`, for a `dns://` request. They work only while
 extensions are on; with `CURL_EXTENSIONS=0` the request fails with `CurlCode.UnknownOption`, as the `curl`

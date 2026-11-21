@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/Options/Protocol/CurlFtpOptions.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5661 — Give Curl.Api an FTP resume offset and a names-only listing option
 
@@ -24,13 +24,16 @@ From Surly cookbook bug report `2026-11-20T2225-Curl-bug-report.md` (batch 7 of 
 
 ## Acceptance criteria
 
-- [ ] A `Curl.Api` FTP download with a resume offset of N sends `REST N` and returns the file from byte N, pinned by a test; an upload with an offset appends as `-C` does.
-- [ ] A names-only listing sends `NLST` and returns the names, pinned by a test.
-- [ ] The README documents both; `dotnet build` is clean and the fast tests pass.
+- [x] A `Curl.Api` FTP download with a resume offset of N sends `REST N` and returns the file from byte N, pinned by a test; an upload with an offset appends as `-C` does.
+- [x] A names-only listing sends `NLST` and returns the names, pinned by a test.
+- [x] The README documents both; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Decision: ADR-1325, options on CurlFtpOptions (ResumeFrom, ListOnly), applied to the transfer options by CurlProtocolOptions. touches widened to CurlProtocolOptions.cs, the tests, README and the ADR. The engine already sends REST N and NLST for these transfer options (console -C and -l); Curl.Api tests pin that the options reach the handle. Curl.Api quality run: 0 failing members. CI on Linux and macOS: tests are platform-neutral.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T2225, finding 4.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 77aaecde b51ba9bf fc48aace.
+- 2026-11-20: Doing -> Done. FTP ResumeFrom and ListOnly on CurlFtpOptions
