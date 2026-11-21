@@ -157,6 +157,38 @@ public sealed class McpTransferProxyAndLimitFieldsTests
     }
 
     [TestMethod]
+    public async Task RunAsync_OperatorLimitSetBelowMaxBodyBytes_CutsAtTheOperatorLimit()
+    {
+        FakeEasyTransfer transfer = new() { BodyChunks = [new byte[100_000]] };
+        McpResponseCap operatorCap = McpResponseCap.FromEnvironment(_ => "65536");
+
+        McpTransferToolResult result = await new McpTransferTool(new FakeTransferEngine(transfer), operatorCap)
+            .RunAsync(new McpTransferRequest("http://h/") { MaxBodyBytes = 1_000_000 }, CancellationToken.None);
+
+        Assert.IsTrue(result.IsBodyTruncated);
+        Assert.AreEqual(65536, result.Body!.ReturnedBytes);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OperatorLimitSetAboveMaxBodyBytes_MaxBodyBytesStillLowersIt()
+    {
+        FakeEasyTransfer transfer = new() { BodyChunks = [new byte[100_000]] };
+        McpResponseCap operatorCap = McpResponseCap.FromEnvironment(_ => "65536");
+
+        McpTransferToolResult result = await new McpTransferTool(new FakeTransferEngine(transfer), operatorCap)
+            .RunAsync(new McpTransferRequest("http://h/") { MaxBodyBytes = 1000 }, CancellationToken.None);
+
+        Assert.AreEqual(1000, result.Body!.ReturnedBytes);
+    }
+
+    [TestMethod]
+    public void RequestCeilingBytes_VariableUnsetOrSet_IsTheCeilingOrTheOperatorLimit()
+    {
+        Assert.AreEqual(McpResponseCap.CeilingMaxBytes, McpResponseCap.FromEnvironment(_ => null).RequestCeilingBytes);
+        Assert.AreEqual(5, McpResponseCap.FromEnvironment(_ => "5").RequestCeilingBytes);
+    }
+
+    [TestMethod]
     public async Task CallAsync_NewFields_AreReadIntoTheRequest()
     {
         FakeEasyTransfer transfer = new();

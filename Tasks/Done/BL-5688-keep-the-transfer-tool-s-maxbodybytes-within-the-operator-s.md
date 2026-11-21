@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Mcp.UnitLibrary/McpTransferTool.cs, Curl.Mcp/Tools/TransferMcpTool.cs, Curl.Mcp.UnitTests, Curl.Mcp.IntegrationTests/Golden, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5688 — Keep the transfer tool's maxBodyBytes within the operator's response cap and state the cap truly
 
@@ -27,11 +27,11 @@ Suggested rule: when `CURL_MCP_MAX_RESPONSE_BYTES` is set, it is the ceiling for
 
 ## Acceptance criteria
 
-- [ ] With `CURL_MCP_MAX_RESPONSE_BYTES` set below the requested `maxBodyBytes`, a unit test in `Curl.Mcp.UnitTests` shows the returned body is no longer than the operator's limit (or the call is refused `InvalidRequest` naming `maxBodyBytes`).
-- [ ] With the variable unset, a unit test shows `maxBodyBytes` up to 64 MiB still raises the cap above 1 MiB.
-- [ ] The tool description and the `maxBodyBytes` schema text say the default is the server's limit (1 MiB unless `CURL_MCP_MAX_RESPONSE_BYTES` sets another) and how the operator's limit bounds the field; the goldens in `Curl.Mcp.IntegrationTests/Golden` match.
-- [ ] ADR-1330 (or a new ADR that amends it) records the rule.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] With `CURL_MCP_MAX_RESPONSE_BYTES` set below the requested `maxBodyBytes`, a unit test in `Curl.Mcp.UnitTests` shows the returned body is no longer than the operator's limit (or the call is refused `InvalidRequest` naming `maxBodyBytes`).
+- [x] With the variable unset, a unit test shows `maxBodyBytes` up to 64 MiB still raises the cap above 1 MiB.
+- [x] The tool description and the `maxBodyBytes` schema text say the default is the server's limit (1 MiB unless `CURL_MCP_MAX_RESPONSE_BYTES` sets another) and how the operator's limit bounds the field; the goldens in `Curl.Mcp.IntegrationTests/Golden` match.
+- [x] ADR-1330 (or a new ADR that amends it) records the rule.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -39,3 +39,4 @@ Suggested rule: when `CURL_MCP_MAX_RESPONSE_BYTES` is set, it is the ceiling for
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 16e59f1e 9fdb3919 22e83cd6 2ee404e4 3d836d5e.
+- 2026-11-21: Doing -> Done. Clamped maxBodyBytes to the operator limit; text, goldens, ADR-1330 amendment done

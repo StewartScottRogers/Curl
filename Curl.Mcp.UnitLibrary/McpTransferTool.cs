@@ -47,7 +47,7 @@ public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap, McpC
         }
 
         await using IEasyTransfer transfer = engine.CreateEasy();
-        using McpCappedCaptureStream body = new(request.MaxBodyBytes is int maxBodyBytes ? new McpResponseCap(maxBodyBytes) : cap);
+        using McpCappedCaptureStream body = new(request.MaxBodyBytes is int maxBodyBytes ? new McpResponseCap(Math.Min(maxBodyBytes, cap.RequestCeilingBytes)) : cap);
         McpResponseHeaderCollector headers = new();
         transfer.Options = McpTransferOptions.Build(request, check.Body, caFilePath, proxyCaFilePath) with
         {
