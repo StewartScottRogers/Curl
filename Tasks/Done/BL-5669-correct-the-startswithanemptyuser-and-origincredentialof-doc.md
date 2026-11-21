@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5669 — Correct the StartsWithAnEmptyUser and OriginCredentialOf doc comments for the AWS SigV4 case
 
@@ -35,3 +35,4 @@ Doc-comment only change in HttpProtocolHandler.cs; build clean, Http unit tests 
 
 - 2026-11-21: Created by the shift-end review (ADR-0710) of 8c81a2532a...1f330a1f28.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 0a98328b d29c4cf1 31087550.
+- 2026-11-21: Doing -> Done. Doc comments corrected; build clean, fast tests green.
