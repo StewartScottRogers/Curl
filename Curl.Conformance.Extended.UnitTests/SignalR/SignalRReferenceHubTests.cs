@@ -93,7 +93,7 @@ public sealed class SignalRReferenceHubTests
     [TestMethod]
     public void TryRead_RequestWithABodyNotYetWhole_TakesNothing()
     {
-        int taken = SignalRReferenceRequest.TryRead("POST / HTTP/1.1\r\nContent-Length: 4\r\n\r\nab"u8, out SignalRReferenceRequest? request);
+        int taken = SignalRReferenceRequest.TakeWholeRequest("POST / HTTP/1.1\r\nContent-Length: 4\r\n\r\nab"u8, out SignalRReferenceRequest? request);
 
         Assert.AreEqual(0, taken);
         Assert.IsNull(request);
@@ -102,7 +102,7 @@ public sealed class SignalRReferenceHubTests
     [TestMethod]
     public void TryRead_RequestWithABody_ReadsItAndItsHeaders()
     {
-        int taken = SignalRReferenceRequest.TryRead("POST /n HTTP/1.1\r\ncontent-length: 2\r\n\r\nokNEXT"u8, out SignalRReferenceRequest? request);
+        int taken = SignalRReferenceRequest.TakeWholeRequest("POST /n HTTP/1.1\r\ncontent-length: 2\r\n\r\nokNEXT"u8, out SignalRReferenceRequest? request);
 
         Assert.AreEqual(41, taken);
         Assert.AreEqual("ok", request!.Body);

@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceRequest.cs]
+touches: [Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceRequest.cs, Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceHub.cs, Curl.Conformance.Extended.UnitLibrary/SocketIo/SocketIoReferenceServer.cs, Curl.Conformance.Extended.UnitTests/SignalR/SignalRReferenceHubTests.cs]
 requirement: none
 created: 2026-11-21
 completed:
@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Renamed TryRead to TakeWholeRequest (returns the bytes taken, 0 when not whole). Callers in SignalRReferenceHub, SocketIoReferenceServer and the hub tests updated; added them to touches (no other Doing task names them). Build clean, 1737 tests pass, quality run 0 failing members.
 
 ## Log
 
