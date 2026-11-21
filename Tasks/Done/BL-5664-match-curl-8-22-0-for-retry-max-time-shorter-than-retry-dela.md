@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/TransferRetryWarning.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5664 — Match curl 8.22.0 for --retry-max-time shorter than --retry-delay
 
@@ -36,3 +36,4 @@ Measured curl 8.22.0 (Windows Schannel) against an always-500 loopback server wi
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T2225, finding 7 (check).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: a3d4aa2a cb4df1bd 3d836d5e.
+- 2026-11-20: Doing -> Done. curl also retries once; port already matched, pinned by test
