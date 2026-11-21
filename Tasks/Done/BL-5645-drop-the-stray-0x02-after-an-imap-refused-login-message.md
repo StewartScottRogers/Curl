@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Imap.UnitLibrary/ImapAuthentication.cs, Curl.Original.Protocol.Imap.UnitLibrary/ImapSessionMessages.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5645 — Drop the stray 0x02 after an IMAP refused-LOGIN message
 
@@ -24,13 +24,15 @@ The message after a refused `LOGIN` ends with a stray 0x02 (`Access denied.` fol
 
 ## Acceptance criteria
 
-- [ ] A refused IMAP `LOGIN` gives the same stderr as curl 8.22.0 (which itself ends with 0x02), pinned by existing tests (ImapProtocolHandlerAuthenticationTests, ImapProtocolHandlerEventTests).
-- [ ] `Curl.Api` carries the same curl message; byte matches curl, see ADR-1321.
-- [ ] No code changed; build and tests unaffected.
+- [x] A refused IMAP `LOGIN` gives the same stderr as curl 8.22.0 (which itself ends with 0x02), pinned by existing tests (ImapProtocolHandlerAuthenticationTests, ImapProtocolHandlerEventTests).
+- [x] `Curl.Api` carries the same curl message; byte matches curl, see ADR-1321.
+- [x] No code changed; build and tests unaffected.
 
 ## Notes
 
 Not a bug: measured curl 8.22.0 on a loopback IMAP server answering NO to LOGIN: stderr is `curl: (67) Access denied. ` + 0x02 + CRLF. Curl already matches. Decided in ADR-1321, no code change.
+
+- 2026-11-20 (lane 1): checked on the current branch: ImapSessionMessages.cs still gives `Access denied. ` + 0x02 (0x03 after PREAUTH), as curl 8.22.0 does, and the IMAP tests pin it. Curl.Api builds its CurlException message from the engine's IEasyTransfer.ErrorText, the same text the console prints. Build clean, fast tests green, no code changed.
 
 ## Log
 
@@ -38,3 +40,4 @@ Not a bug: measured curl 8.22.0 on a loopback IMAP server answering NO to LOGIN:
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 56ff107d 465f86b3 3d836d5e.
 - 2026-11-20: Doing -> Backlog. Criteria cannot be met as written: curl 8.22.0 itself ends the message with 0x02 (ADR-1321); criteria reworded for the next claim to close
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 7b74c8cc 18d4e43a 53319a69.
+- 2026-11-20: Doing -> Done. Refused IMAP LOGIN message matches curl 8.22.0 byte for byte (trailing 0x02, ADR-1321); no code change
