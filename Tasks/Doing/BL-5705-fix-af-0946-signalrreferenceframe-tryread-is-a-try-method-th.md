@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceFrame.cs]
+touches: [Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceFrame.cs, Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceHub.cs, Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceParser.cs, Curl.Conformance.Extended.UnitLibrary/SocketIo/SocketIoReferenceServer.cs, Curl.Conformance.Extended.UnitTests/SignalR/SignalRReferenceHubTests.cs]
 requirement: none
 created: 2026-11-21
 completed:
@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Renamed TryRead to TakeWholeFrame (as SignalRReferenceRequest.TakeWholeRequest); widened touches to the callers and tests. Rename only, no logic change, so the quality gates are unchanged. Build clean, 1737 fast tests pass.
 
 ## Log
 
