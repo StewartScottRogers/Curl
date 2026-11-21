@@ -54,7 +54,23 @@ public sealed class McpArgumentCheckerTests
     [DataRow("-T|{in}/u|http://h/", "")]
     [DataRow("-T|-|http://h/", "")]
     [DataRow("-T|.|http://h/", "")]
-    [DataRow("-T|{in}/{a,b}|http://h/", "-T")]
+    [DataRow("-T|{in}/{a,b}.txt|http://h/", "")]
+    [DataRow("-T|{in}/f[1-2].txt|http://h/", "")]
+    [DataRow("-T|{in}/f[01-10:3].txt|http://h/", "")]
+    [DataRow("-T|{in}/[a-c]{x,y}\\[z.txt|http://h/", "")]
+    [DataRow("-T|{in}/{a,../x}.txt|http://h/", "-T")]
+    [DataRow("-T|{in}/{a,b}/../../x|http://h/", "-T")]
+    [DataRow("-T|{in}/{a,b|http://h/", "-T")]
+    [DataRow("-T|{in}/a}|http://h/", "-T")]
+    [DataRow("-T|{in}/[1-99999]|http://h/", "-T")]
+    [DataRow("-T|{in}/[3-1]|http://h/", "-T")]
+    [DataRow("-T|{in}/[c-a]|http://h/", "-T")]
+    [DataRow("-T|{in}/[1-3:0]|http://h/", "-T")]
+    [DataRow("-T|{in}/[1-3:x]|http://h/", "-T")]
+    [DataRow("-T|{in}/[1-3:1:1]|http://h/", "-T")]
+    [DataRow("-T|{in}/[a]|http://h/", "-T")]
+    [DataRow("-T|{in}/[1-b]|http://h/", "-T")]
+    [DataRow("-T|{in}/{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}|http://h/", "-T")]
     // WritesFile.
     [DataRow("-o|{out}/x|http://h/", "-o")]
     [DataRow("-o|-|http://h/", "")]
@@ -248,10 +264,10 @@ public sealed class McpArgumentCheckerTests
     [TestMethod]
     public void Check_UncheckableValue_SaysWhy()
     {
-        McpArgumentCheck check = checker.Check(Arguments("-T|{in}/{a,b}|http://h/"));
+        McpArgumentCheck check = checker.Check(Arguments("-T|{in}/{a,b|http://h/"));
 
-        Assert.AreEqual(Expand("{in}/{a,b}"), check.Path);
-        StringAssert.Contains(check.Reason, "glob characters");
+        Assert.AreEqual(Expand("{in}/{a,b"), check.Path);
+        StringAssert.Contains(check.Reason, "malformed or very large glob");
     }
 
     [TestMethod]

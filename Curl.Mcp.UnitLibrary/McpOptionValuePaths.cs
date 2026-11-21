@@ -12,6 +12,12 @@ internal static class McpOptionValuePaths
 {
     private const string StandardStream = "-";
 
+    private const int MaxUploadExpansions = 1000;
+
+    private const string GroupOpeners = "{[";
+
+    private const string GroupClosers = "}]";
+
     private const string OutputDirective = "output{";
 
     private const string FormHeadersParameter = ";headers=";
@@ -341,7 +347,10 @@ internal static class McpOptionValuePaths
     private static bool IsNullDevice(string value) =>
         value == "/dev/null" || value.Equals("NUL", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary><c>-T -</c> and <c>-T .</c> read standard input; a globbed <c>-T</c> name cannot be checked before curl expands it.</summary>
+    /// <summary>
+    /// <c>-T -</c> and <c>-T .</c> read standard input. A <c>{a,b}</c> or <c>[1-2]</c> glob is expanded as curl does,
+    /// so each file it names is checked; a glob that cannot be expanded here is refused.
+    /// </summary>
     private static IReadOnlyList<McpValuePath> UploadPaths(string value)
     {
         if (value is StandardStream or ".")
@@ -349,11 +358,121 @@ internal static class McpOptionValuePaths
             return [];
         }
 
-        return value.IndexOfAny(GlobCharacters) >= 0
-            ? [new(value, "names files with glob characters ({}, []), whose expanded paths cannot be checked before curl runs.")]
-            : [new(value)];
+        return value.IndexOfAny(GlobCharacters) < 0 ? [new(value)] : GlobUploadPaths(value);
     }
 
+    private static IReadOnlyList<McpValuePath> GlobUploadPaths(string value)
+    {
+        List<string>? expansions = ExpandUploadGlob(value);
+        return expansions is null
+            ? [new(value, "names files with a malformed or very large glob ({}, []), whose expanded paths cannot be checked before curl runs.")]
+            : [.. expansions.Select(expansion => new McpValuePath(expansion))];
+    }
+
+    /// <summary>Every file name a <c>-T</c> glob expands to, or <see langword="null" /> when it is malformed or expands to more than <see cref="MaxUploadExpansions" /> names.</summary>
+    private static List<string>? ExpandUploadGlob(string value)
+    {
+        List<string> expansions = [string.Empty];
+        int index = 0;
+        while (index < value.Length)
+        {
+            string[]? alternatives = AlternativesAt(value, ref index);
+            if (alternatives is null)
+            {
+                return null;
+            }
+
+            expansions = [.. expansions.SelectMany(_ => alternatives, (prefix, alternative) => prefix + alternative)];
+            if (expansions.Count > MaxUploadExpansions)
+            {
+                return null;
+            }
+        }
+
+        return expansions;
+    }
+
+    /// <summary>The alternatives the glob part at <paramref name="index" /> stands for (one for a literal character), moving <paramref name="index" /> past it; <see langword="null" /> when malformed.</summary>
+    private static string[]? AlternativesAt(string value, ref int index)
+    {
+        char current = value[index];
+        if (GroupClosers.Contains(current))
+        {
+            return null;
+        }
+
+        if (GroupOpeners.Contains(current))
+        {
+            return GroupAlternatives(value, ref index);
+        }
+
+        index += IsEscapedGlobCharacter(value, index) ? 2 : 1;
+        return [value[index - 1].ToString()];
+    }
+
+    /// <summary>The alternatives of the <c>{...}</c> or <c>[...]</c> group opening at <paramref name="index" />, or <see langword="null" /> when it never closes or is malformed.</summary>
+    private static string[]? GroupAlternatives(string value, ref int index)
+    {
+        bool isBrace = value[index] == '{';
+        int close = value.IndexOf(isBrace ? '}' : ']', index + 1);
+        if (close < 0)
+        {
+            return null;
+        }
+
+        string body = value[(index + 1)..close];
+        index = close + 1;
+        return isBrace ? body.Split(',') : RangeValues(body);
+    }
+
+    /// <summary>The values of a <c>[a-z]</c>, <c>[1-10]</c>, <c>[01-10]</c> or <c>[1-10:2]</c> range, or <see langword="null" /> when it is malformed, descending or too large.</summary>
+    private static string[]? RangeValues(string body)
+    {
+        string[] byStep = body.Split(':');
+        string[] ends = byStep[0].Split('-');
+        int step = RangeStep(byStep);
+        return step < 1 || ends.Length != 2 ? null : NumberRange(ends[0], ends[1], step) ?? LetterRange(ends[0], ends[1], step);
+    }
+
+    /// <summary>A range's step: 1 when none is given, 0 when it is not a number or the range has more than one <c>:</c>.</summary>
+    private static int RangeStep(string[] byStep) =>
+        byStep.Length == 1 ? 1 : byStep.Length == 2 && int.TryParse(byStep[1], out int parsed) ? parsed : 0;
+
+    private static bool IsEscapedGlobCharacter(string value, int index) =>
+        value[index] == '\\' && index + 1 < value.Length && GlobCharacters.Contains(value[index + 1]);
+
+    private static string[]? NumberRange(string first, string last, int step)
+    {
+        if (!int.TryParse(first, out int start) || !int.TryParse(last, out int end))
+        {
+            return null;
+        }
+
+        int width = first.Length > 1 && first[0] == '0' ? first.Length : 0;
+        return SteppedValues(start, end, step, number => number.ToString(System.Globalization.CultureInfo.InvariantCulture).PadLeft(width, '0'));
+    }
+
+    private static string[]? LetterRange(string first, string last, int step) =>
+        first.Length == 1 && last.Length == 1 && char.IsAsciiLetter(first[0]) && char.IsAsciiLetter(last[0])
+            ? SteppedValues(first[0], last[0], step, letter => ((char)letter).ToString())
+            : null;
+
+    /// <summary>The <paramref name="format" />ted numbers from <paramref name="start" /> to <paramref name="end" /> by <paramref name="step" />; <see langword="null" /> when descending or more than <see cref="MaxUploadExpansions" />.</summary>
+    private static string[]? SteppedValues(int start, int end, int step, Func<long, string> format)
+    {
+        if (end < start || ((long)end - start) / step >= MaxUploadExpansions)
+        {
+            return null;
+        }
+
+        List<string> values = [];
+        for (long number = start; number <= end; number += step)
+        {
+            values.Add(format(number));
+        }
+
+        return [.. values];
+    }
     /// <summary>An abstract socket's name lives in no file system, so the root cannot confine it.</summary>
     private static IReadOnlyList<McpValuePath> SocketPaths(string longName, string value) =>
         longName == "abstract-unix-socket"
