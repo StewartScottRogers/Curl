@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.OAuth2.UnitLibrary/Http/OAuth2HttpBodyReader.cs line 42`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.OAuth2.UnitLibrary/Http/OAuth2HttpBodyReader.cs line 42`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Mutant `>` to `>=` at line 42 killed by `PostFormAsync_CloseDelimitedBodyOfExactlyTheLimit_IsRead` and `PostFormAsync_ContentLengthOfExactlyTheLimit_IsRead` (both failed with the mutant, pass reverted). Production code unchanged, so no quality run.
 
 ## Log
 
