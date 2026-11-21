@@ -41,3 +41,4 @@ Shared values go in `Directory.Build.props` only if every packable project uses 
 ## Log
 
 - 2026-11-21: Created at Stewart's request (differentiate the packages on NuGet).
+- 2026-11-21: Backlog -> Doing. Criteria at claim: 8a9f7bee ef2545e0 35f14f63 7cda2e82 3d836d5e.
