@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EndPointRecordingDatagramConnector.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5694 — Fix AF-0935: Surviving mutant: a datagram channel's end points can be re-recorded on every datagram, not once
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EndPointRecordingDatagramConnector.cs line 65`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EndPointRecordingDatagramConnector.cs line 65`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by the new test `EndPointRecordingDatagramConnectorTests.ReceiveAsync_ChannelMovesAgainAfterTheFirstReceive_KeepsTheEndPointsRecordedAtTheFirst` (a channel that moves on every receive; with `_recorded = false` it fails, reverted it passes). Production code unchanged. Build clean; Curl.Engine fast tests 3136 passed, 0 failed.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 391e436c 9742157d.
+- 2026-11-21: Doing -> Done. Mutant killed by a new test; fast tests green
