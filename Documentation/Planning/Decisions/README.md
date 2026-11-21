@@ -1368,4 +1368,4 @@ Each option and the specific reason it lost.
 | [1324](ADR-1324-az-x-delete-deletes-one-blob-and-refuses-a-container-url.md) | az:// -X DELETE deletes one blob and refuses a container URL (BL-5648) | Accepted | 2026-11-20 |
 | [1325](ADR-1325-curl-api-ftp-resume-offset-and-names-only-listing-live-on-curlftpoptions.md) | Curl.Api's FTP resume offset and names-only listing live on CurlFtpOptions (BL-5661) | Accepted | 2026-11-20 |
 | [1326](ADR-1326-the-first-quic-attempt-of-a-process-leads-tcp-by-a-cold-start-allowance.md) | The first QUIC attempt of a process leads TCP by a cold-start allowance (BL-5660) | Accepted | 2026-11-20 |
-| [1326](ADR-1326-a-failed-ftp-upload-write-waits-briefly-for-the-servers-552-reply.md) | A failed FTP upload write waits briefly for the server's 552 reply (BL-5663) | Accepted | 2026-11-21 |
+| [1327](ADR-1327-a-failed-ftp-upload-write-waits-briefly-for-the-servers-552-reply.md) | A failed FTP upload write waits briefly for the server's 552 reply (BL-5663) | Accepted | 2026-11-21 |

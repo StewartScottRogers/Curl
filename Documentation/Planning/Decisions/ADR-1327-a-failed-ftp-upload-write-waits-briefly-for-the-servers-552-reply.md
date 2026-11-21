@@ -1,4 +1,4 @@
-# ADR-1326: A failed FTP upload write waits briefly for the server's 552 reply
+# ADR-1327: A failed FTP upload write waits briefly for the server's 552 reply
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-5663).
 
