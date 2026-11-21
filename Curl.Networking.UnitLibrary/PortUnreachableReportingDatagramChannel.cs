@@ -45,8 +45,12 @@ internal sealed class PortUnreachableReportingDatagramChannel(
         {
             _inner.ConnectToServer();
         }
-        catch (SocketException) when (ConnectToNextAddress())
+        catch (SocketException)
         {
+            if (!ConnectToNextAddress())
+            {
+                throw;
+            }
         }
     }
 
@@ -65,11 +69,16 @@ internal sealed class PortUnreachableReportingDatagramChannel(
                 opened = openChannel(alternatives[_nextAlternative++]);
                 opened.ConnectToServer();
             }
-            catch (SocketException)
+            catch (Exception failure)
             {
                 if (opened is not null)
                 {
                     _retired.Add(opened);
+                }
+
+                if (failure is not SocketException)
+                {
+                    throw;
                 }
 
                 continue;

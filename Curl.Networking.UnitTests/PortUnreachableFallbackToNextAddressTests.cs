@@ -164,6 +164,29 @@ public sealed class PortUnreachableFallbackToNextAddressTests
         Assert.AreEqual(SocketError.NetworkUnreachable, failure.SocketErrorCode);
     }
 
+    [TestMethod]
+    public async Task ConnectToServer_NextAddressFailsWithAnotherException_PropagatesItAndDisposesTheOpenedChannel()
+    {
+        var first = new ScriptedChannel(IPAddress.IPv6Loopback) { ConnectFailure = new SocketException((int)SocketError.NetworkUnreachable) };
+        var broken = new ScriptedChannel(IPAddress.Loopback) { ConnectFailure = new InvalidOperationException("broken") };
+        await using var channel = Channel(first, [Second, Third], _ => broken);
+
+        var failure = Assert.ThrowsExactly<InvalidOperationException>(channel.ConnectToServer);
+
+        Assert.AreEqual("broken", failure.Message);
+        await channel.DisposeAsync();
+        Assert.IsTrue(broken.Disposed);
+    }
+
+    [TestMethod]
+    public async Task ConnectToServer_OpeningTheNextChannelFailsWithAnotherException_Propagates()
+    {
+        var first = new ScriptedChannel(IPAddress.IPv6Loopback) { ConnectFailure = new SocketException((int)SocketError.NetworkUnreachable) };
+        await using var channel = Channel(first, [Second], _ => throw new InvalidOperationException("cannot open"));
+
+        Assert.ThrowsExactly<InvalidOperationException>(channel.ConnectToServer);
+    }
+
     private static SocketException Refused() => new((int)SocketError.ConnectionRefused);
 
     private static PortUnreachableReportingDatagramChannel Channel(
@@ -190,7 +213,7 @@ public sealed class PortUnreachableFallbackToNextAddressTests
 
         public bool Disposed { get; private set; }
 
-        public SocketException? ConnectFailure { get; set; }
+        public Exception? ConnectFailure { get; set; }
 
         public bool Connected { get; private set; }
 

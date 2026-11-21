@@ -508,6 +508,20 @@ public sealed class FtpProtocolHandlerRangeTests
         diagnostics.Diff("output", FtpDiagnostics.Escape(expectedOutput), FtpDiagnostics.Escape(run.OutputText));
         Assert.AreEqual(expectedOutput, run.OutputText);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
+        Assert.IsNull(run.Result.SourceLastWriteUnixSeconds);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_HeadWithA213ModificationTime_SetsSourceLastWriteUnixSeconds()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("MDTM reply", "213 20260927123456");
+
+        FtpRun run = await RunHeadAsync(diagnostics, InDirectory + "213 20260927123456\r\n200 Type set\r\n213 10\r\n" + Restarting + Bye);
+
+        long expected = new DateTimeOffset(2026, 9, 27, 12, 34, 56, TimeSpan.Zero).ToUnixTimeSeconds();
+        diagnostics.Assert("SourceLastWriteUnixSeconds", expected, run.Result.SourceLastWriteUnixSeconds);
+        Assert.AreEqual(expected, run.Result.SourceLastWriteUnixSeconds);
     }
 
     [TestMethod]
