@@ -33,3 +33,4 @@ BL-5594 (Done) made a body upload on ftp, smb, smtp, s3, az, tftp and telnet; gs
 ## Log
 
 - 2026-11-21: Created from Surly bug report 2026-11-21T0547, finding 1.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: a201a555 808ef102 3d836d5e.
