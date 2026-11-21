@@ -35,3 +35,4 @@ completed:
 ## Log
 
 - 2026-11-21: Created by the shift-end review (ADR-0710) of 8c81a2532a...1f330a1f28.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: 2b5b9b24 30a40fb0 7018b731 dbe840b8 1ae24dad.
