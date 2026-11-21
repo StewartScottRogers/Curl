@@ -30,6 +30,9 @@ namespace Curl.Engine;
 /// </summary>
 internal static partial class EngineComposition
 {
+    /// <summary>How much longer than the happy-eyeballs timeout the first QUIC attempt of a process leads TCP (BL-5660, ADR-1325).</summary>
+    private static readonly TimeSpan QuicColdStartAllowance = TimeSpan.FromSeconds(1);
+
     /// <summary>
     /// Creates the protocol handlers the executable registers: <c>file</c> over the real
     /// disk; <c>dict</c>, <c>gopher</c> and <c>gophers</c>, <c>telnet</c>, <c>mqtt</c>
@@ -178,7 +181,7 @@ internal static partial class EngineComposition
         Lazy<ISecurityContextFactory> contexts = new(() => securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog));
         Lazy<RankedHttpAuthenticator> httpAuthenticator = new(() => CreateHttpAuthenticator(contexts.Value, negotiateOptions, diagnosticLog, digestRandomBytes));
         SecurityDelegation saslDelegation = (negotiateOptions ?? NegotiateOptions.Default).Delegation;
-        LazyProtocolHandler http = new(["http", "https"], () => new HttpProtocolHandler(recordingConnector, new HttpSignatureHttpAuthenticator(new AwsSigV4HttpAuthenticator(httpAuthenticator.Value, new AwsSigV4Signer(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), diagnosticLog)), signingClock ?? TimeProvider.System), cookieStore, proxyAuthSchemes, http2PushSink) { TracesHttp2Frames = tracesHttp2, TracesHttp3Streams = tracesHttp3, TracesClientReaders = tracesRead, ContinueWaitBegins = ContinueWaitBeginsOf(socketWait), ContinueWaitEnds = ContinueWaitEndsOf(socketWait) });
+        LazyProtocolHandler http = new(["http", "https"], () => new HttpProtocolHandler(recordingConnector, new HttpSignatureHttpAuthenticator(new AwsSigV4HttpAuthenticator(httpAuthenticator.Value, new AwsSigV4Signer(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), diagnosticLog)), signingClock ?? TimeProvider.System), cookieStore, proxyAuthSchemes, http2PushSink) { QuicColdStartAllowance = QuicColdStartAllowance, TracesHttp2Frames = tracesHttp2, TracesHttp3Streams = tracesHttp3, TracesClientReaders = tracesRead, ContinueWaitBegins = ContinueWaitBeginsOf(socketWait), ContinueWaitEnds = ContinueWaitEndsOf(socketWait) });
 
         IProtocolHandler[] handlers =
         [
