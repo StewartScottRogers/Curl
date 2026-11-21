@@ -42,6 +42,20 @@ public sealed class UploadSchemeBodyTests
     [DataRow("grpcs://h/p.S/M")]
     [DataRow("signalr://h/hub")]
     [DataRow("signalrs://h/hub")]
+    [DataRow("amqp://h/q")]
+    [DataRow("amqps://h/q")]
+    [DataRow("amqp1://h/q")]
+    [DataRow("amqp1s://h/q")]
+    [DataRow("mqtt5://h/t")]
+    [DataRow("mqtt5s://h/t")]
+    [DataRow("stomp://h/q")]
+    [DataRow("stomps://h/q")]
+    [DataRow("nats://h/s")]
+    [DataRow("natss://h/s")]
+    [DataRow("redis://h/0/k")]
+    [DataRow("rediss://h/0/k")]
+    [DataRow("xmpp://h/j")]
+    [DataRow("xmpps://h/j")]
     public async Task SendAsync_BytesBodyToAnUploadScheme_UploadsWithItsLength(string url)
     {
         UploadingEasyTransfer easy = await SendAsync(HttpMethod.Put, url, CurlContent.FromBytes(Hello));
