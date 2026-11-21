@@ -47,3 +47,4 @@ Record the choice in ADR-1330's amendment.
 ## Log
 
 - 2026-11-21: Created.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: c9cfd04c 44ac0007 c3da6b19 9134e538.
