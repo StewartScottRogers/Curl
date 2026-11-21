@@ -1,4 +1,4 @@
-# ADR-1321: Curl.Networking reads CURL_CA_BUNDLE for a host that sets no CA option
+# ADR-1323: Curl.Networking reads CURL_CA_BUNDLE for a host that sets no CA option
 
 - Status: Accepted
 - Date: 2026-11-20

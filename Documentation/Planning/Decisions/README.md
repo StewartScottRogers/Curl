@@ -1364,4 +1364,4 @@ Each option and the specific reason it lost.
 | [1320](ADR-1320-curl-mcp-transfer-empty-header-removes-it-unless-send-empty.md) | The curl-mcp transfer tool removes a header given an empty value, unless sendEmpty is set (BL-5598) | Accepted | 2026-11-20 |
 | [1321](ADR-1321-imap-refused-login-keeps-curls-trailing-0x02-byte.md) | A refused IMAP LOGIN keeps curl's trailing 0x02 byte (BL-5645) | Accepted | 2026-11-20 |
 | [1322](ADR-1322-s3-x-delete-deletes-one-object-and-refuses-a-bucket-url.md) | s3:// -X DELETE deletes one object and refuses a bucket URL (BL-5647) | Accepted | 2026-11-20 |
-| [1321](ADR-1321-networking-reads-curl-ca-bundle-for-a-host-that-sets-no-ca-option.md) | Curl.Networking reads CURL_CA_BUNDLE for a host that sets no CA option (BL-5642) | Accepted | 2026-11-20 |
+| [1323](ADR-1323-networking-reads-curl-ca-bundle-for-a-host-that-sets-no-ca-option.md) | Curl.Networking reads CURL_CA_BUNDLE for a host that sets no CA option (BL-5642) | Accepted | 2026-11-20 |
