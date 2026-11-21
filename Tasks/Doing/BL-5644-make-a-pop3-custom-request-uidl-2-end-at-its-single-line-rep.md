@@ -34,3 +34,4 @@ A `Curl.Api` POP3 custom request `UIDL 2` hangs until the timeout. RFC 1939: `UI
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1836, finding 5.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 52effbf3 4ec6ae8a 80406a9b 3d836d5e.
