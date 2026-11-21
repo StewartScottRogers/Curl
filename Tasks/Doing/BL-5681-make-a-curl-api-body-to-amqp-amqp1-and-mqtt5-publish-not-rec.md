@@ -34,3 +34,4 @@ BL-5611 (Done) made a `Curl.Api` body reach the kafka, grpc and signalr extensio
 ## Log
 
 - 2026-11-21: Created from Surly bug report 2026-11-21T0547, finding 2.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: faf5b611 347362c2 852c882f 3d836d5e.
