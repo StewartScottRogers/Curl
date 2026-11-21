@@ -3,8 +3,8 @@ id: AF-0906
 title: Surviving mutant: a chain relying on an intermediate the server did not send can be observed as verified
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-20_1740.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:PeerVerification-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:300:false
 task: BL-5621
@@ -13,9 +13,9 @@ found: 2026-11-20
 found-at: 1ce730765b795e99d4d034faf03432b41b5ec6a4
 scorecard: 2026-11-20_0456.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-20
+closed-how: mechanical
+closed-by: 2026-11-20_1740.md
 ---
 # AF-0906 - Surviving mutant: a chain relying on an intermediate the server did not send can be observed as verified
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-20 | 2026-11-20_1740.md | reproduces: no | Ran the -Site command on df0e14366f: ServerCertificateVerification.cs:300:false (PeerVerification), resolvedLine 300, outcome killed (17.3 s). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-20: filed proposed.
+- 2026-11-20: accepted -> closed. Re-audit 2026-11-20_1740.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

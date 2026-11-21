@@ -3,8 +3,8 @@ id: AF-0911
 title: Surviving mutant: an AMQP 1.0 frame read can wait on a bare 4-byte SIZE instead of refusing a malformed one
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-20_1740.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Extended.Protocol.Amqp1.UnitLibrary/Frames/Amqp1FrameCodec.cs:TryRead-lt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Amqp1.UnitLibrary/Frames/Amqp1FrameCodec.cs:37:<
 task: BL-5626
@@ -13,9 +13,9 @@ found: 2026-11-20
 found-at: 1ce730765b795e99d4d034faf03432b41b5ec6a4
 scorecard: 2026-11-20_0456.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-20
+closed-how: mechanical
+closed-by: 2026-11-20_1740.md
 ---
 # AF-0911 - Surviving mutant: an AMQP 1.0 frame read can wait on a bare 4-byte SIZE instead of refusing a malformed one
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 
 ## Re-audits
 
+- 2026-11-20 | 2026-11-20_1740.md | reproduces: no | Ran the -Site command: Amqp1FrameCodec.cs:37:< (TryRead), resolvedLine 37, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-20: filed proposed.
+- 2026-11-20: accepted -> closed. Re-audit 2026-11-20_1740.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
