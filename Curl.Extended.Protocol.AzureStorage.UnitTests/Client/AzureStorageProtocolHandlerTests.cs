@@ -90,6 +90,33 @@ public sealed class AzureStorageProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_DeleteBlob_SendsDeleteAndWritesNothing()
+    {
+        QueuedAzureStorageConnector connector = new(QueuedAzureStorageConnector.Reply(string.Empty, status: "202 Accepted"));
+        TransferContext context = Context("az://account/container/blob?snapshot=s1", new MemoryStream(), method: "DELETE");
+
+        TransferResult result = await Handler(connector).ExecuteAsync(context);
+
+        Assert.AreEqual((CurlExitCode.Ok, 0L), (result.ExitCode, result.BytesTransferred));
+        Assert.StartsWith("DELETE /container/blob?snapshot=s1 HTTP/1.1\r\n", connector.Connections[0].Written);
+    }
+
+    [TestMethod]
+    [DataRow("az://account")]
+    [DataRow("az://account/container")]
+    [DataRow("az://account/container/dir/")]
+    public async Task ExecuteAsync_DeleteWithoutABlobName_FailsWithExit3BeforeConnecting(string url)
+    {
+        QueuedAzureStorageConnector connector = new();
+        TransferContext context = Context(url, new MemoryStream(), method: "DELETE");
+
+        TransferResult result = await Handler(connector).ExecuteAsync(context);
+
+        Assert.AreEqual((CurlExitCode.UrlMalformat, "An Azure Storage delete needs a blob name in the URL"), (result.ExitCode, result.ErrorMessage));
+        Assert.IsEmpty(connector.Targets);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SmallUpload_SendsOnePutBlobOfABlockBlob()
     {
         QueuedAzureStorageConnector connector = new(QueuedAzureStorageConnector.Reply(string.Empty, status: "201 Created"));
@@ -354,13 +381,13 @@ public sealed class AzureStorageProtocolHandlerTests
     private static AzureStorageProtocolHandler Handler(QueuedAzureStorageConnector connector, string? sas = null, int maxBlockCount = AzureBlobOperations.MaxBlockCount) =>
         new(connector, name => name == "AZURE_STORAGE_SAS_TOKEN" ? sas : null, 8, maxBlockCount);
 
-    private static TransferContext Context(string url, Stream output, string? upload = null, string? bearer = null, Stream? uploadStream = null, HttpFailMode fail = HttpFailMode.None) => new()
+    private static TransferContext Context(string url, Stream output, string? upload = null, string? bearer = null, Stream? uploadStream = null, HttpFailMode fail = HttpFailMode.None, string? method = null) => new()
     {
         Url = CurlUrl.Parse(url),
         Output = output,
         Upload = uploadStream ?? (upload is null ? null : new MemoryStream(Encoding.UTF8.GetBytes(upload))),
         TimeProvider = new FixedTimeProvider(),
-        Http = bearer is null && fail == HttpFailMode.None ? null : new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = bearer, Fail = fail },
+        Http = bearer is null && fail == HttpFailMode.None && method is null ? null : new Curl.Protocol.Abstractions.HttpRequestOptions { BearerToken = bearer, Fail = fail, CustomMethod = method },
     };
 
     private static string Blob(string name) =>

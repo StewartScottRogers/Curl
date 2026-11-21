@@ -12,9 +12,9 @@ public sealed class AzureStorageRequestMethodTests
     private const string Url = "az://account/container/obj";
 
     [TestMethod]
-    [DataRow("DELETE", null, "az:// does not support -X DELETE; it sends only GET, or PUT with -T")]
-    [DataRow("PUT", null, "az:// does not support -X PUT; it sends only GET, or PUT with -T")]
-    [DataRow("GET", "body", "az:// does not support -X GET; it sends only GET, or PUT with -T")]
+    [DataRow("DELETE", "body", "az:// does not support -X DELETE; it sends only GET, DELETE with -X DELETE, or PUT with -T")]
+    [DataRow("PUT", null, "az:// does not support -X PUT; it sends only GET, DELETE with -X DELETE, or PUT with -T")]
+    [DataRow("GET", "body", "az:// does not support -X GET; it sends only GET, DELETE with -X DELETE, or PUT with -T")]
     public async Task ExecuteAsync_MethodItCannotSend_FailsWithExit4BeforeConnecting(string method, string? upload, string expectedMessage)
     {
         QueuedAzureStorageConnector connector = new();
@@ -32,7 +32,7 @@ public sealed class AzureStorageRequestMethodTests
 
         TransferResult result = await Handler(connector).ExecuteAsync(Context(null, null, noBody: true));
 
-        Assert.AreEqual((CurlExitCode.NotBuiltIn, "az:// does not support -I/--head; it sends only GET, or PUT with -T"), (result.ExitCode, result.ErrorMessage));
+        Assert.AreEqual((CurlExitCode.NotBuiltIn, "az:// does not support -I/--head; it sends only GET, DELETE with -X DELETE, or PUT with -T"), (result.ExitCode, result.ErrorMessage));
         Assert.IsEmpty(connector.Targets);
     }
 
@@ -40,12 +40,25 @@ public sealed class AzureStorageRequestMethodTests
     [DataRow(null, null)]
     [DataRow("GET", null)]
     [DataRow("PUT", "body")]
+    [DataRow("DELETE", null)]
     public void RefusalOf_MethodItSends_IsNull(string? method, string? upload) =>
         Assert.IsNull(AzureStorageRequestMethod.RefusalOf(Context(method, upload, noBody: false)));
 
     [TestMethod]
     public void RefusalOf_NoHttpOptions_IsNull() =>
         Assert.IsNull(AzureStorageRequestMethod.RefusalOf(new TransferContext { Url = CurlUrl.Parse(Url), Output = new MemoryStream() }));
+
+    [TestMethod]
+    public async Task ExecuteAsync_DeleteOnAbfs_FailsWithExit4BeforeConnecting()
+    {
+        QueuedAzureStorageConnector connector = new();
+        TransferContext context = new() { Url = CurlUrl.Parse("abfs://fs@account/f"), Output = new MemoryStream(), Http = new Curl.Protocol.Abstractions.HttpRequestOptions { CustomMethod = "DELETE" } };
+
+        TransferResult result = await Handler(connector).ExecuteAsync(context);
+
+        Assert.AreEqual((CurlExitCode.NotBuiltIn, "abfs:// does not support -X DELETE; it sends only GET, or PUT with -T"), (result.ExitCode, result.ErrorMessage));
+        Assert.IsEmpty(connector.Targets);
+    }
 
     private static AzureStorageProtocolHandler Handler(QueuedAzureStorageConnector connector) => new(connector, _ => null, 8, 8);
 

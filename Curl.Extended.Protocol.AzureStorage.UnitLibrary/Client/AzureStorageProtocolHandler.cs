@@ -35,10 +35,7 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
             AzureStorageCredential credential = AzureStorageCredential.Choose(context.Http?.BearerToken, environment, context.Credentials);
             AzureStorageClient client = new(connector, context, new AzureStorageRequestAuthorizer(context.TimeProvider), credential, headReporter);
             context.Progress.ReportTransferStarted();
-            Task<long> transfer = context.Url.Scheme == "az"
-                ? new AzureBlobOperations(client, blockSize, maxBlockCount).TransferAsync(endpoint, context.Upload, context.Output)
-                : new AzureDataLakeOperations(client, blockSize).TransferAsync(endpoint, context.Upload, context.Output);
-            long downloaded = await transfer;
+            long downloaded = await TransferAsync(context, client, endpoint);
             return TransferResult.Success(downloaded) with { Report = headReporter.ReportWith(context.Upload is null ? downloaded : 0) };
         }
         catch (AzureStorageRequestException failure)
@@ -53,6 +50,17 @@ internal sealed class AzureStorageProtocolHandler(IConnector connector, Func<str
         {
             return TransferResult.Failure(ExitCodeOf(failure.Failure), failure.Message) with { Report = headReporter.Report };
         }
+    }
+
+    private Task<long> TransferAsync(ITransferContext context, AzureStorageClient client, AzureStorageEndpoint endpoint)
+    {
+        if (context.Url.Scheme != "az")
+        {
+            return new AzureDataLakeOperations(client, blockSize).TransferAsync(endpoint, context.Upload, context.Output);
+        }
+
+        AzureBlobOperations operations = new(client, blockSize, maxBlockCount);
+        return context.Http?.CustomMethod == "DELETE" ? operations.DeleteAsync(endpoint) : operations.TransferAsync(endpoint, context.Upload, context.Output);
     }
 
     private static CurlExitCode ExitCodeOf(AzureStorageHttpFailure failure) =>
