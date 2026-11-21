@@ -24,12 +24,14 @@ A connect that `HttpTransferDeadline` stops waiting for at the connect or transf
 
 ## Acceptance criteria
 
-- [ ] When `WaitAsync` gives up at the limit, a continuation on the inner task disposes any connection it later returns and observes its exception.
-- [ ] A unit test in `Curl.Original.Protocol.Http.UnitTests` uses a fake connector that ignores its token and returns a connection after the connect timeout (on a fake `TimeProvider`), and asserts the transfer ends with exit 28 and the late connection is disposed.
-- [ ] The comment at the `WaitAsync` line describes both the abandoned case and the limit case truthfully.
-- [ ] `dotnet build` is clean and the fast tests pass; the library keeps 100% line and branch coverage.
+- [x] When `WaitAsync` gives up at the limit, a continuation on the inner task disposes any connection it later returns and observes its exception.
+- [x] A unit test in `Curl.Original.Protocol.Http.UnitTests` uses a fake connector that ignores its token and returns a connection after the connect timeout (on a fake `TimeProvider`), and asserts the transfer ends with exit 28 and the late connection is disposed.
+- [x] The comment at the `WaitAsync` line describes both the abandoned case and the limit case truthfully.
+- [x] `dotnet build` is clean and the fast tests pass; the library keeps 100% line and branch coverage.
 
 ## Notes
+
+- Continuation is `HttpTransferDeadline.DisposeLateConnectionAsync` (disposes a late connection, swallows a late fault). Made `WithinConnectTimeoutAsync` non-generic (both callers use ConnectResult). Quality run: 0 failing members; fast tests green. Committed with the task.
 
 ## Log
 
