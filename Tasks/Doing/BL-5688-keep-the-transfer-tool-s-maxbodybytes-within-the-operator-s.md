@@ -38,3 +38,4 @@ Suggested rule: when `CURL_MCP_MAX_RESPONSE_BYTES` is set, it is the ceiling for
 ## Log
 
 - 2026-11-21: Created.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: 16e59f1e 9fdb3919 22e83cd6 2ee404e4 3d836d5e.
