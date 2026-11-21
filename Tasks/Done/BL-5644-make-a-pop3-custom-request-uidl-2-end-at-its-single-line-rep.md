@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Pop3.UnitLibrary/Pop3Command.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5644 — Make a POP3 custom request UIDL 2 end at its single-line reply instead of hanging
 
@@ -24,14 +24,18 @@ A `Curl.Api` POP3 custom request `UIDL 2` hangs until the timeout. RFC 1939: `UI
 
 ## Acceptance criteria
 
-- [ ] `curl -X "UIDL 2" pop3://...` and `-X "LIST 2"` against a POP3 test server return at once with the same output and exit code as curl 8.22.0's recorded run.
-- [ ] The same through `Curl.Api` returns at once, pinned by a test.
-- [ ] `UIDL` and `LIST` with no argument still read the multi-line listing, pinned by the existing tests.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `curl -X "UIDL 2" pop3://...` and `-X "LIST 2"` against a POP3 test server return at once with the same output and exit code as curl 8.22.0's recorded run.
+- [x] The same through `Curl.Api` returns at once, pinned by a test.
+- [x] `UIDL` and `LIST` with no argument still read the multi-line listing, pinned by the existing tests.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Did not reproduce on this branch: Pop3Command.HasBody already treats `UIDL n` and `LIST n` (no id in the URL) as one line. Measured with the built console (`-X "UIDL 2"`, `-X "LIST 2"` against a loopback POP3 server) and with Curl.Api (CurlRequest.CustomRequest, ManagedCurlEngine, body read to the end): both return at once, exit 0, empty body, as the BL-550 measurement of curl pinned. The report was likely against an older build.
+- Added `UIDL 2` and `LIST 2` rows to Pop3ProtocolHandlerCustomCommandTests; the Api shares the same engine mapping (MailRequestOptionsMapping). No-argument UIDL/LIST stay pinned by the existing `-X UIDL` rows.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1836, finding 5.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 52effbf3 4ec6ae8a 80406a9b 3d836d5e.
+- 2026-11-20: Doing -> Done. UIDL 2 / LIST 2 single-line replies verified non-hanging in console and Curl.Api, pinned by tests
