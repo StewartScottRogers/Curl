@@ -26,7 +26,7 @@
     <PublishAot>true</PublishAot>
     <!-- Curl.Console is referenced as a library for its InProcessCurl, never run as its own executable. -->
     <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
-    <PackageId>Curl.Mcp</PackageId>
+    <PackageId>Surly.Curl.Mcp</PackageId>
     <Version>0.1.0</Version>
     <Authors>Stewart Scott Rogers</Authors>
     <Description>An MCP server that runs curl for AI agents: Curl, the drop-in C# replacement for the curl command-line tool, served over standard input and output.</Description>

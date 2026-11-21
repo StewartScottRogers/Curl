@@ -58,7 +58,7 @@ upstream runs several words together, the member's XML summary gives the word-ca
 
 ## Porting from C
 
-The package adds these implicit usings (`build/Libcurl.props`, ADR-1306), so `CurlCode`, `CurlWebSocketFlags`,
+The package adds these implicit usings (`build/Surly.Libcurl.props`, ADR-1306), so `CurlCode`, `CurlWebSocketFlags`,
 `RtspRequest` and the callback delegates need no `using` of their own:
 
 - `Curl.Api.Callbacks`
@@ -122,4 +122,4 @@ and a CRAP score at most 30, measured from the fast tests only. Its tests are in
 
 ## Use the package from the preview release
 
-Download `Libcurl.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Libcurl --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.
+Download `Surly.Libcurl.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Surly.Libcurl --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.

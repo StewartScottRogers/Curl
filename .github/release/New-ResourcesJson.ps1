@@ -52,25 +52,25 @@ function Get-ResourceDescription([string]$File) {
                 use = "Extract the archive and run $exe; it takes curl's options and gives curl's output."
                 docs = "$blob/DOWNLOAD.md" }
         }
-        '^Curl\.Mcp\.(?<rid>(win|linux|osx)-(x64|arm64))\.\d' {
+        '^Surly\.Curl\.Mcp\.(?<rid>(win|linux|osx)-(x64|arm64))\.\d' {
             $rid = $Matches['rid']
             return @{ name = "Curl.Mcp native binary ($rid)"; kind = 'mcp-server'; platform = $rid
                 use = 'Installed for you by the Curl.Mcp tool package; install that one, not this.'
                 docs = "$blob/Curl.Mcp/README.md" }
         }
-        '^Curl\.Mcp\.\d' {
+        '^Surly\.Curl\.Mcp\.\d' {
             return @{ name = 'Curl.Mcp'; kind = 'mcp-server'; platform = 'any'
-                use = 'Put every Curl.Mcp nupkg file in one folder and run the server over stdio with: dnx Curl.Mcp --yes --prerelease --add-source <folder>.'
+                use = 'Put every Curl.Mcp nupkg file in one folder and run the server over stdio with: dnx Surly.Curl.Mcp --yes --prerelease --add-source <folder>.'
                 docs = "$blob/Curl.Mcp/README.md" }
         }
-        '^Curl\.Api\.\d' {
+        '^Surly\.Curl\.Api\.\d' {
             return @{ name = 'Curl.Api'; kind = 'dotnet-library'; platform = 'any'
-                use = 'Use the folder holding the nupkg file as a package source, then: dotnet add package Curl.Api --prerelease. For new .NET code.'
+                use = 'Use the folder holding the nupkg file as a package source, then: dotnet add package Surly.Curl.Api --prerelease. For new .NET code.'
                 docs = "$blob/Curl.Api/README.md" }
         }
-        '^Libcurl\.\d' {
+        '^Surly\.Libcurl\.\d' {
             return @{ name = 'Libcurl'; kind = 'dotnet-library'; platform = 'any'
-                use = 'Use the folder holding the nupkg file as a package source, then: dotnet add package Libcurl --prerelease. For porting C code that uses libcurl.'
+                use = 'Use the folder holding the nupkg file as a package source, then: dotnet add package Surly.Libcurl --prerelease. For porting C code that uses libcurl.'
                 docs = "$blob/Libcurl/README.md" }
         }
         '^SHA256SUMS$' {

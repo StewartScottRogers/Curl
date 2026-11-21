@@ -12,7 +12,7 @@ this project holds the Microsoft MCP SDK wiring and the packing. Design: ADR-054
 ## Run it
 
 ```
-dnx Curl.Mcp
+dnx Surly.Curl.Mcp
 ```
 
 The server speaks MCP on standard input and output; its log lines go to standard error. Set
@@ -70,7 +70,7 @@ Add to `.vscode/mcp.json` in the workspace (or the user's `mcp.json`):
     "curl": {
       "type": "stdio",
       "command": "dnx",
-      "args": ["Curl.Mcp", "--yes"],
+      "args": ["Surly.Curl.Mcp", "--yes"],
       "env": {
         "CURL_MCP_ROOT": "${workspaceFolder}"
       }
@@ -89,7 +89,7 @@ Add to `.mcp.json` in the solution folder (or `%USERPROFILE%\.mcp.json` for ever
     "curl": {
       "type": "stdio",
       "command": "dnx",
-      "args": ["Curl.Mcp", "--yes"],
+      "args": ["Surly.Curl.Mcp", "--yes"],
       "env": {
         "CURL_MCP_ROOT": "C:\\work\\my-project"
       }

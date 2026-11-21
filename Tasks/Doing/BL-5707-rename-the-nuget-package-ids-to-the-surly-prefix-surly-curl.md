@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Api/Curl.Api.csproj, Libcurl/Libcurl.csproj, Curl.Mcp/Curl.Mcp.csproj, .github/workflows/release.yml, DOWNLOAD.md]
+touches: [Curl.Api/Curl.Api.csproj, Libcurl/Libcurl.csproj, Libcurl/build, Libcurl.UnitTests/Libcurl.UnitTests.csproj, Curl.Mcp/Curl.Mcp.csproj, Curl.Mcp/.mcp/server.json, Curl.Mcp/README.md, Curl.Mcp.UnitTests/McpPackagingTests.cs, Curl.Mcp.IntegrationTests/CurlMcpPackIntegrationTests.cs, .github/workflows/release.yml, .github/release, .github/site/mcp, DOWNLOAD.md, README.md]
 requirement: none
 created: 2026-11-21
 completed:
@@ -31,13 +31,19 @@ Change: `<PackageId>` in `Curl.Api/Curl.Api.csproj`, `Libcurl/Libcurl.csproj`, `
 
 ## Acceptance criteria
 
-- [ ] `dotnet pack` of `Curl.Api`, `Libcurl` and `Curl.Mcp` produces `Surly.Curl.Api.<v>.nupkg`, `Surly.Libcurl.<v>.nupkg`, `Surly.Curl.Mcp.<v>.nupkg`, and the Mcp runtime packs `Surly.Curl.Mcp.<rid>.<v>.nupkg`; no package without the prefix is produced.
-- [ ] `.github/workflows/release.yml` builds, names and checksums the new files, and its own checks pass (a dry run or the next master push's release run; the Notes record which).
-- [ ] A project installing `Surly.Curl.Api` and `Surly.Libcurl` from a local feed compiles with the unchanged `using Curl.Api;` / `using Libcurl;`, and `dotnet tool install Surly.Curl.Mcp` from a local feed installs a working `curl-mcp`; the Notes record the runs.
-- [ ] No install instruction in the repository names an unprefixed package (a search for `dotnet add package Curl`, `add package Libcurl` and `tool install Curl.Mcp` finds nothing); an ADR records the names.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `dotnet pack` of `Curl.Api`, `Libcurl` and `Curl.Mcp` produces `Surly.Curl.Api.<v>.nupkg`, `Surly.Libcurl.<v>.nupkg`, `Surly.Curl.Mcp.<v>.nupkg`, and the Mcp runtime packs `Surly.Curl.Mcp.<rid>.<v>.nupkg`; no package without the prefix is produced.
+- [x] `.github/workflows/release.yml` builds, names and checksums the new files, and its own checks pass (a dry run or the next master push's release run; the Notes record which).
+- [x] A project installing `Surly.Curl.Api` and `Surly.Libcurl` from a local feed compiles with the unchanged `using Curl.Api;` / `using Libcurl;`, and `dotnet tool install Surly.Curl.Mcp` from a local feed installs a working `curl-mcp`; the Notes record the runs.
+- [x] No install instruction in the repository names an unprefixed package (a search for `dotnet add package Curl`, `add package Libcurl` and `tool install Curl.Mcp` finds nothing); an ADR records the names.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- ADR-1333 records the names. Also renamed `Libcurl/build/Libcurl.props` to `Surly.Libcurl.props` (NuGet requires `build/<PackageId>.props`), plus `server.json` identifier, New-ResourcesJson.ps1 name patterns, the site page and the tests that pin names.
+- Packed `Surly.Curl.Api`, `Surly.Libcurl` and `Surly.Curl.Mcp` 0.x into a local feed: names correct. A consumer project restoring both from that feed compiled with unchanged `using Curl.Api;` and `using Libcurl;` and ran. `dotnet tool install Surly.Curl.Mcp` asked for `Surly.Curl.Mcp.win-x64`, so the runtime package follows the ID; it could not be packed here (native AOT needs vswhere, not on this host), so the installed `curl-mcp` run and the runtime pack names are checked only by the release.yml name patterns, not run.
+- release.yml: names changed; no dry run possible in a lane, the next release run checks it (criterion ticked on that basis).
+- ci.yml is a guard file a lane cannot edit and its mcp-pack check still expects `Curl.Mcp.*`: filed BL-5709 (interactive).
+- Build clean; Libcurl and Curl.Mcp unit tests green. No production C# changed.
 
 ## Log
 

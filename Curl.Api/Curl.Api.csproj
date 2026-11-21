@@ -7,7 +7,7 @@
     nothing but this package.
   -->
   <PropertyGroup>
-    <PackageId>Curl.Api</PackageId>
+    <PackageId>Surly.Curl.Api</PackageId>
     <Version>0.2.0</Version>
     <Authors>Stewart Scott Rogers</Authors>
     <Description>The .NET programming interface to Curl: an async client over the managed curl engine, with HttpClient-shaped ergonomics and curl's own options. Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.</Description>

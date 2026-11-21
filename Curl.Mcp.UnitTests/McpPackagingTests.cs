@@ -34,7 +34,7 @@ public sealed class McpPackagingTests
 
         Assert.AreEqual("true", (string?)properties.Element("PackAsTool"));
         Assert.AreEqual("McpServer", (string?)properties.Element("PackageType"));
-        Assert.AreEqual("Curl.Mcp", (string?)properties.Element("PackageId"));
+        Assert.AreEqual("Surly.Curl.Mcp", (string?)properties.Element("PackageId"));
         Assert.IsFalse(string.IsNullOrWhiteSpace((string?)properties.Element("ToolCommandName")));
         Assert.AreEqual("README.md", (string?)properties.Element("PackageReadmeFile"));
     }
@@ -77,7 +77,7 @@ public sealed class McpPackagingTests
 
         Assert.AreEqual("io.github.StewartScottRogers/Curl", server.GetProperty("name").GetString());
         Assert.AreEqual("nuget", package.GetProperty("registryType").GetString());
-        Assert.AreEqual("Curl.Mcp", package.GetProperty("identifier").GetString());
+        Assert.AreEqual("Surly.Curl.Mcp", package.GetProperty("identifier").GetString());
         Assert.AreEqual("stdio", package.GetProperty("transport").GetProperty("type").GetString());
     }
 
