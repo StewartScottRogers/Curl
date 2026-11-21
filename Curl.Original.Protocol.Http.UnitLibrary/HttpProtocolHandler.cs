@@ -377,7 +377,9 @@ public sealed class HttpProtocolHandler(
     /// curl 8.22.0 then probes and answers Digest for user <c>''</c> (AF-0522, BL-4457, ADR-1182),
     /// or when <c>--service-name</c> is given and NTLM is the one scheme allowed, as curl 8.22.0
     /// then starts NTLM with the default Windows credentials on Windows only (AF-0524, BL-4460,
-    /// BL-4509, ADR-1183); <see langword="null" /> otherwise.
+    /// BL-4509, ADR-1183), or when <c>--service-name</c> is given with <c>--aws-sigv4</c>, which
+    /// curl signs with an empty key ID on every platform (AF-0923, BL-5658);
+    /// <see langword="null" /> otherwise.
     /// </summary>
     private static NetworkCredential? OriginCredentialOf(ITransferContext context, HttpRequestOptions options) =>
         context.Credentials
@@ -385,10 +387,16 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Tells whether the platform's curl answers the origin as an empty user when the transfer has
-    /// no credential: <c>--sasl-authzid</c> with Digest the one scheme (ADR-1182), or, on Windows
-    /// only, <c>--service-name</c> with NTLM the one scheme (ADR-1183), or on every platform<br/>
-    /// <c>--service-name</c> with <c>--aws-sigv4</c>, which curl signs with an empty key ID (AF-0923, BL-5658): the Schannel build starts
-    /// NTLM with the default Windows credentials, the OpenSSL build sends no <c>Authorization</c>.
+    /// no credential, in three cases:
+    /// <list type="bullet">
+    /// <item><description><c>--sasl-authzid</c> with Digest the one scheme allowed, on every platform:
+    /// curl probes and answers Digest for user <c>''</c> (ADR-1182).</description></item>
+    /// <item><description><c>--service-name</c> with NTLM the one scheme allowed, on Windows only:
+    /// the Schannel build starts NTLM with the default Windows credentials, while the OpenSSL
+    /// build sends no <c>Authorization</c> (ADR-1183).</description></item>
+    /// <item><description><c>--service-name</c> with <c>--aws-sigv4</c>, on every platform: curl
+    /// signs the request with an empty key ID (AF-0923, BL-5658).</description></item>
+    /// </list>
     /// </summary>
     /// <param name="options">The transfer's HTTP options.</param>
     /// <param name="onWindows">Whether Curl runs on Windows, where curl is the Schannel build.</param>

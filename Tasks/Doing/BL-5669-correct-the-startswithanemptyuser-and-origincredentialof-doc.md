@@ -23,11 +23,13 @@ The doc comments of `HttpProtocolHandler.StartsWithAnEmptyUser` and its caller `
 
 ## Acceptance criteria
 
-- [ ] The `StartsWithAnEmptyUser` summary lists the Digest, NTLM (Windows only) and AWS SigV4 (every platform) cases, each with its own explanation, and has no `<br/>`.
-- [ ] The `OriginCredentialOf` summary names the AWS SigV4 case.
-- [ ] No code changes; `dotnet build` is clean and the fast tests pass.
+- [x] The `StartsWithAnEmptyUser` summary lists the Digest, NTLM (Windows only) and AWS SigV4 (every platform) cases, each with its own explanation, and has no `<br/>`.
+- [x] The `OriginCredentialOf` summary names the AWS SigV4 case.
+- [x] No code changes; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Doc-comment only change in HttpProtocolHandler.cs; build clean, Http unit tests 2731 passed. No production code changed, so no quality run was needed.
 
 ## Log
 
