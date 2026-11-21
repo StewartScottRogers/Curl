@@ -33,3 +33,4 @@ The message after a refused `LOGIN` ends with a stray 0x02 (`Access denied.` fol
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1836, finding 6.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 56ff107d 465f86b3 3d836d5e.
