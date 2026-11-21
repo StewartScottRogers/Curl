@@ -94,6 +94,10 @@ public sealed record CurlFtpOptions : IEasyOptionRecord<EasyFtpOptions>
     /// <summary>
     /// <c>CURLOPT_RESUME_FROM_LARGE</c> (curl's <c>-C</c>): the byte offset a download starts at (<c>REST N</c>) or an
     /// upload continues from; -1 for an upload means the end of the remote file. Default 0: the start (ADR-1325).
+    /// Despite living on the FTP record, it is transfer-wide, as <c>curl -C</c> is: it applies to every protocol, so
+    /// an HTTP request sends <c>Range: bytes=N-</c> (ADR-1328). A request's <see cref="CurlRequest.Ftp"/> replaces the
+    /// client's whole record, so a request that sets only another member resets this to 0. -1 on a download is
+    /// treated as no resume.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">The value is below -1.</exception>
     public long ResumeFrom
@@ -102,7 +106,7 @@ public sealed record CurlFtpOptions : IEasyOptionRecord<EasyFtpOptions>
         init => field = TransportOptionGuard.InRange(value, -1, long.MaxValue, nameof(ResumeFrom));
     }
 
-    /// <summary><c>CURLOPT_DIRLISTONLY</c> (curl's <c>-l</c>): a directory listing gives names only (<c>NLST</c>). Default <see langword="false"/>.</summary>
+    /// <summary><c>CURLOPT_DIRLISTONLY</c> (curl's <c>-l</c>): a directory listing gives names only (<c>NLST</c>). Default <see langword="false"/>. Transfer-wide like <see cref="ResumeFrom"/>: it also reaches SFTP and SCP listings (ADR-1328).</summary>
     public bool ListOnly { get; init; }
 
     /// <summary><paramref name="transfer"/> with this record's resume offset and names-only listing set.</summary>

@@ -86,7 +86,10 @@ Basic) with `HttpAuthenticationMethods` from `Curl.Api.Options.Authentication`.
 
 For FTP, `CurlFtpOptions.ResumeFrom` is curl's `-C`: a download of `N` sends `REST N` and returns the file
 from byte `N`, and an upload continues from `N` (`-1` appends at the end of the remote file); `ListOnly`
-is `-l`, a names-only listing (`NLST`). Neither needs `REST` in `PreQuote` (ADR-1325).
+is `-l`, a names-only listing (`NLST`). Neither needs `REST` in `PreQuote` (ADR-1325). Both apply to every
+protocol, not only FTP, as `curl -C` and `-l` do: an HTTP request on a client whose `ResumeFrom` is set sends
+`Range: bytes=N-`, and `ListOnly` reaches SFTP and SCP. A request's `Ftp` record replaces the client's whole, so
+`ResumeFrom` is 0 again when a request sets only another member. `-1` on a download is no resume (ADR-1328).
 
 Curl's extensions have typed records of their own. `CurlRequest.Dns` takes a `CurlDnsOptions`: `Json = true`
 is `--dns-json` and `Transport = "tcp"` is `--dns-transport tcp`, for a `dns://` request. They work only while

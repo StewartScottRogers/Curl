@@ -457,6 +457,86 @@ public sealed class FtpProtocolHandlerUploadTests
 
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
     }
+    [TestMethod]
+    public async Task ExecuteAsync_WriteFailedAndNoReplyInTheWait_CancelsTheControlReadAndFailsWithExit55()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var data = ResettingDataConnection();
+        var control = HangingControl();
+
+        FtpRun run = await RunWithControlAsync(diagnostics, control, data, new CancellationTokenSource().Token);
+
+        diagnostics.Assert("hanging control reads cancelled", 1, control.HangingReadsCancelled);
+        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Assert.AreEqual(1, control.HangingReadsCancelled);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WriteFailedAndTheTransferIsCancelledInTheWait_EndsWithoutWaitingOutTheFullWait()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var data = ResettingDataConnection();
+        var control = HangingControl();
+        using var cancel = new CancellationTokenSource();
+        control.OnReadHangs = () => cancel.Cancel();
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+
+        FtpRun run = await RunWithControlAsync(diagnostics, control, data, cancel.Token);
+
+        diagnostics.Assert("hanging control reads cancelled", 1, control.HangingReadsCancelled);
+        Assert.AreEqual(1, control.HangingReadsCancelled);
+        Assert.IsLessThan(450, timer.ElapsedMilliseconds);
+        Assert.AreNotEqual(CurlExitCode.Ok, run.Result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WriteFailedAndAnother426ArrivesInTheWait_FailsWithExit55ShowingNoReplyLikeCurl()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var events = new RecordingTransferEvents();
+        var control = new ScriptedConnection([Encoding.Latin1.GetBytes(LoggedIn + Passive + Opened), Encoding.Latin1.GetBytes("426 Aborted\r\n")]);
+
+        // curl 8.22.0's exit 55 path never reads the control connection, so the 426 is not shown (BL-5667).
+        FtpRun run = await RunWithControlAsync(diagnostics, control, ResettingDataConnection(), CancellationToken.None, events);
+
+        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Assert.IsFalse(events.Headers.Any(header => header.StartsWith("< 426", StringComparison.Ordinal)));
+        Assert.IsTrue(events.Headers.Any(header => header.StartsWith("< 227", StringComparison.Ordinal) || header.StartsWith("< 229", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WriteFailedAnd552ArrivesInTheWait_ShowsTheReplyLikeAnyOther()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var events = new RecordingTransferEvents();
+        var control = new ScriptedConnection([Encoding.Latin1.GetBytes(LoggedIn + Passive + Opened), Encoding.Latin1.GetBytes("552 Quota exceeded\r\n" + Bye)]);
+
+        FtpRun run = await RunWithControlAsync(diagnostics, control, ResettingDataConnection(), CancellationToken.None, events);
+
+        Assert.AreEqual(CurlExitCode.RemoteDiskFull, run.Result.ExitCode);
+        Assert.IsTrue(events.Headers.Any(header => header.StartsWith("< 552", StringComparison.Ordinal)));
+    }
+    private static ScriptedConnection HangingControl() => new([Encoding.Latin1.GetBytes(LoggedIn + Passive + Opened)]) { HangsWhenExhausted = true };
+
+    private static async Task<FtpRun> RunWithControlAsync(TestDiagnostics diagnostics, ScriptedConnection control, ScriptedConnection data, CancellationToken token, RecordingTransferEvents? events = null)
+    {
+        string upload = new('x', 16384 + 12);
+        diagnostics.Arrange("upload length", upload.Length);
+        FtpRun run = await FtpRun.ExecuteAsync(
+            Url,
+            control,
+            data,
+            c => MutableContext.Build(
+                new TransferContext { Url = c.Url, Output = c.Output },
+                mutable =>
+                {
+                    mutable.Upload = Seekable(upload);
+                    mutable.CancellationToken = token;
+                    mutable.Events = (ITransferEvents?)events ?? NoTransferEvents.Instance;
+                }));
+        diagnostics.ActRun(run);
+        return run;
+    }
     // The first 16384-byte chunk is sent; the second write is reset.
     private static ScriptedConnection ResettingDataConnection() => new()
     {

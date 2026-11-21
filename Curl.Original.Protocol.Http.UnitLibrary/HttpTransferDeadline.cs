@@ -138,23 +138,43 @@ internal sealed class HttpTransferDeadline : IDisposable
             message => ConnectResult.Failed(CurlExitCode.OperationTimedOut, message),
             abandoned);
 
-    private async ValueTask<TResult> WithinConnectTimeoutAsync<TResult>(
-        Func<CancellationToken, ValueTask<TResult>> connectAsync,
-        Func<string, TResult> timedOut,
+    private async ValueTask<ConnectResult> WithinConnectTimeoutAsync(
+        Func<CancellationToken, ValueTask<ConnectResult>> connectAsync,
+        Func<string, ConnectResult> timedOut,
         CancellationToken abandoned)
     {
         using CancellationTokenSource connectElapsed = new(connectTimeout, timeProvider);
         using CancellationTokenSource connect = CancellationTokenSource.CreateLinkedTokenSource(Token, connectElapsed.Token, abandoned);
+        Task<ConnectResult> connecting = connectAsync(connect.Token).AsTask();
         try
         {
-            // WaitAsync ends the connect at the limit even when the connector does not honour its token (BL-5660);
-            // an abandoned connect is still awaited, so the race can dispose the connection it opens anyway.
+            // WaitAsync ends the wait at the limit even when the connector does not honour its token (BL-5660).
+            // An abandoned connect (its own token) is awaited here until it ends, so the race disposes what it opens.
+            // At the limit the connect is left running: DisposeLateConnectionAsync disposes the connection it may
+            // still open and observes its fault.
             using CancellationTokenSource limit = CancellationTokenSource.CreateLinkedTokenSource(Token, connectElapsed.Token);
-            return await connectAsync(connect.Token).AsTask().WaitAsync(limit.Token).ConfigureAwait(false);
+            return await connecting.WaitAsync(limit.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (EndedByLimit)
         {
+            _ = DisposeLateConnectionAsync(connecting);
             return timedOut(HttpTransferMessages.ConnectionTimedOut(ElapsedMilliseconds));
+        }
+    }
+
+    internal static async Task DisposeLateConnectionAsync(Task<ConnectResult> connecting)
+    {
+        try
+        {
+            ConnectResult late = await connecting.ConfigureAwait(false);
+            if (late.Connection is not null)
+            {
+                await late.Connection.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+        catch (Exception)
+        {
+            // The transfer already ended as exit 28; a late fault has nobody to report to.
         }
     }
 
