@@ -1,0 +1,30 @@
+# Curl
+
+Curl is a drop-in replacement for the `curl` command-line tool, written in C# on .NET 10: the same options, exit codes and output bytes. It also ships as an MCP server and as two .NET libraries. Everything below is a file of the rolling `preview` pre-release on GitHub; start from `resources.json`, which lists every file with its URL, SHA-256, size and one line on how to use it.
+
+Which .NET library to use: Curl.Api is for new .NET work: an async, HttpClient-shaped client. Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call.
+
+## Start here
+
+- [resources.json](https://github.com/StewartScottRogers/Curl/releases/download/preview/resources.json): every file in the release, one entry each with `name`, `kind`, `platform`, `url`, `sha256`, `size`, `use` and `docs`. Choose by `kind` and `platform`.
+- [SHA256SUMS](https://github.com/StewartScottRogers/Curl/releases/download/preview/SHA256SUMS): verify a download with `sha256sum --check --ignore-missing SHA256SUMS` (each line is `<sha256>  <file>`), or compare the file's `sha256` in resources.json.
+- [Download page](https://stewartscottrogers.github.io/Curl/download/): the same table as resources.json, as plain HTML.
+
+## Resources (kinds in resources.json)
+
+- curl command-line tool (kind `cli`): one native archive per platform (Windows, Linux, macOS); extract it and run `curl`. The download page names the file for your platform.
+- Curl.Mcp (kind `mcp-server`): the MCP server, as NuGet packages; run it over stdio with `dnx Curl.Mcp --yes --prerelease --add-source <folder>`. Setup for each client: [MCP setup](https://stewartscottrogers.github.io/Curl/mcp/).
+- Curl.Api (kind `dotnet-library`): the .NET client for new code; use the folder holding the nupkg as a package source, then `dotnet add package Curl.Api --prerelease`.
+- Libcurl (kind `dotnet-library`): the libcurl API for .NET, for porting C code; `dotnet add package Libcurl --prerelease` from the same folder.
+- SHA256SUMS (kind `checksums`): the checksums above.
+- ai-help.md (kind `ai-help`): see below.
+
+## Help for AI agents
+
+- [--ai-help reference](https://stewartscottrogers.github.io/Curl/ai-help/): every option, as Markdown; the raw file is [ai-help.md](https://github.com/StewartScottRogers/Curl/releases/download/preview/ai-help.md). The same text comes from `curl --ai-help all`, and `curl --ai-help` lists the categories.
+
+## Project
+
+- [Repository](https://github.com/StewartScottRogers/Curl)
+- [Download instructions](https://github.com/StewartScottRogers/Curl/blob/master/DOWNLOAD.md)
+- [Licence](https://github.com/StewartScottRogers/Curl/blob/master/LICENSE.txt)

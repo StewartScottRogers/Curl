@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<!--
+  Curl gap dashboard: the gap analysis office's measurement of Curl against upstream curl
+  (ADR-0433 decision 8), drawn in the viewer's browser from the data.json beside this page.
+  One self-contained file: no build step, no framework, no external script, stylesheet or
+  font. The data shape is the "Dashboard data" section of Gap/Instructions/Gap-Format.md,
+  written by Gap/Tools/Export-GapDashboardData.ps1.
+
+  It shows the release banner (when a newer curl than the target is out), the headline
+  equivalence against the targeted and the newest curl on the lowest-scoring platform (data
+  "lowest", ADR-0505), one row per area with one column per platform and each platform's
+  change since its previous run, an inline SVG trend of the overall and per-area scores over
+  one platform's run history, with a platform picker (drawn at the page's own width on a
+  time axis, with a range picker, a legend that shows and hides each line, and a guide
+  listing every score of the run nearest the pointer, so it stays readable at hundreds of
+  runs), the open gaps with area, platform, severity, scope and introduced-in filters, the
+  regressions and the recently closed gaps. Data written before platforms existed (no
+  "platforms") shows its latest entry as the one platform. With "latest": null it says "No gap analysis
+  has run yet".
+
+  Query overrides (all optional):
+    ?data=url   read this data file instead of ./data.json, e.g. ?data=../fixtures/data.json;
+                honoured only when the url is on the page's own origin, as the board page
+                does for ?contents=
+
+  Local preview: dotnet run --file .github/gource/serve.cs -- .github/gaps 8000
+  then open http://localhost:8000/site/?data=../fixtures/data.json, or
+  ?data=../fixtures/long-history.json for 300 made-up runs to check the trend at scale
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curl gap dashboard</title>
+<style>
+  :root { color-scheme: light dark; --line: #8884; --card: #8881; --warn: #c60; --bad: #c33; --good: #2a8; }
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 12px 16px; }
+  header { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 15px; margin: 16px 0 6px; }
+  .muted { opacity: .7; }
+  a { color: inherit; }
+  nav.tabs { display: flex; gap: 4px; margin-top: 10px; border-bottom: 1px solid var(--line); }
+  nav.tabs a { padding: 6px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; color: inherit; text-decoration: none; margin-bottom: -1px; }
+  nav.tabs a[aria-selected="true"] { border-color: var(--line); background: Canvas; font-weight: 600; }
+  [hidden] { display: none !important; }
+  #messages p { margin: 6px 0; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--bad); }
+  .banner { margin-top: 12px; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--warn); }
+  .headline { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  .score { border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--card); }
+  .score .pct { font-size: 28px; font-weight: 600; }
+  .run { margin-top: 6px; overflow-wrap: anywhere; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td.num, th.num { text-align: right; }
+  .bar { width: 120px; height: 8px; margin: 2px 0 0 auto; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--good); }
+  .up { color: var(--good); }
+  .down { color: var(--bad); }
+  #trend .chart-card { border: 1px solid var(--line); border-radius: 6px; background: var(--card); padding: 10px 12px 6px; }
+  #trend .toolbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  #trend .ranges { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+  #trend .ranges button { font: inherit; font-size: 12px; padding: 3px 10px; border: 0; background: transparent; color: inherit; cursor: pointer; }
+  #trend .ranges button + button { border-left: 1px solid var(--line); }
+  #trend .ranges button[aria-pressed="true"] { background: var(--line); font-weight: 600; }
+  #trend .plot { position: relative; }
+  #trend svg { display: block; width: 100%; overflow: visible; touch-action: pan-y; }
+  #trend .grid { stroke: var(--line); stroke-width: 1; shape-rendering: crispEdges; }
+  #trend .baseline { stroke: currentColor; stroke-opacity: .35; stroke-width: 1; shape-rendering: crispEdges; }
+  #trend .tick { fill: currentColor; fill-opacity: .65; font-size: 11px; font-variant-numeric: tabular-nums; }
+  #trend .series { fill: none; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+  #trend .series.overall { stroke-width: 2.5; }
+  #trend .guide { stroke: currentColor; stroke-opacity: .4; stroke-width: 1; shape-rendering: crispEdges; }
+  #trend .marker { stroke: Canvas; stroke-width: 1.5; }
+  #trend .overlay { fill: transparent; cursor: crosshair; outline: none; }
+  #trend .tooltip { position: absolute; top: 0; pointer-events: none; min-width: 170px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 5px; background: Canvas; box-shadow: 0 2px 8px #0004; font-size: 12px; line-height: 1.45; }
+  #trend .tooltip .when { font-weight: 600; margin-bottom: 2px; }
+  #trend .tooltip .row { display: grid; grid-template-columns: 10px 1fr auto; gap: 6px; align-items: center; }
+  #trend .tooltip .row b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  #trend .tooltip i, .legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; margin-top: 6px; }
+  .legend button { font: inherit; font-size: 12px; display: inline-flex; gap: 6px; align-items: center; padding: 2px 8px; border: 1px solid var(--line); border-radius: 12px; background: transparent; color: inherit; cursor: pointer; }
+  .legend button[aria-pressed="false"] { opacity: .4; }
+  .legend button[aria-pressed="false"] i { background: var(--line) !important; }
+  .legend button b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  #trend .hint { font-size: 11px; margin: 4px 0 0; }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 8px; }
+  .filters label { display: flex; gap: 4px; align-items: center; }
+  .gap { padding: 6px 8px; margin-bottom: 6px; border-radius: 4px; background: var(--card); }
+  .gap .id { font-weight: 600; margin-right: 6px; }
+  .gap .facts { display: block; font-size: 12px; }
+  .gap details { margin-top: 4px; }
+  .gap summary { cursor: pointer; }
+  .gap pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.4 ui-monospace, monospace; margin: 4px 0 0; }
+  .sev-Critical, .sev-High { color: var(--bad); font-weight: 600; }
+  .sev-Medium { color: var(--warn); font-weight: 600; }
+  .lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .lists ul { margin: 0; padding-left: 18px; }
+  .lists li { overflow-wrap: anywhere; }
+  footer { margin-top: 16px; font-size: 12px; }
+  @media (max-width: 700px) {
+    .headline, .lists { grid-template-columns: minmax(0, 1fr); }
+    table { font-size: 12px; }
+    th { white-space: normal; }
+    th, td { padding: 4px 3px; }
+    .bar { width: 40px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Curl gap dashboard</h1>
+  <span id="source" class="muted"></span>
+  <span id="generated" class="muted">Loading…</span>
+</header>
+<nav class="tabs">
+  <a href="../">Gource</a>
+  <a href="../board/">Board</a>
+  <a href="../coverage/">Coverage</a>
+  <a href="./" aria-selected="true">Gaps</a>
+</nav>
+<div id="messages"></div>
+<main id="dashboard"></main>
+<footer class="muted">Measured by the gap analysis office against upstream curl (ADR-0433).</footer>
+<script>
+'use strict';
+
+const params = new URLSearchParams(location.search);
+// The overall line first, then one colour per area: a colour-blind-safe set (Tableau 10)
+// that reads on both the light and the dark scheme.
+const palette = ['#5b8def', '#f28e2b', '#59a14f', '#e15759', '#76b7b2', '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac'];
+
+// ?data= is honoured only on the page's own origin, so a crafted link cannot make the page
+// read and render someone else's file.
+function dataUrl() {
+  const value = params.get('data');
+  if (!value) return new URL('data.json', location.href).href;
+  const url = new URL(value, location.href);
+  if (url.origin !== location.origin) throw new Error(`?data= must be on ${location.origin}; ignored ${url.href}`);
+  return url.href;
+}
+
+function element(tag, attributes, ...children) {
+  const node = document.createElement(tag);
+  for (const [name, value] of Object.entries(attributes || {})) {
+    if (value === null || value === undefined || value === false) continue;
+    if (name === 'text') node.textContent = value; else node.setAttribute(name, value);
+  }
+  for (const child of children) if (child !== null && child !== undefined) node.append(child);
+  return node;
+}
+
+function svg(tag, attributes) {
+  const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [name, value] of Object.entries(attributes || {})) node.setAttribute(name, value);
+  return node;
+}
+
+function percent(score) {
+  return score && score.y > 0 ? 100 * score.x / score.y : null;
+}
+
+function percentText(score) {
+  const value = percent(score);
+  return value === null ? '—' : `${value.toFixed(1)}%`;
+}
+
+function changeText(current, previous) {
+  const now = percent(current), before = percent(previous);
+  if (now === null || before === null) return element('span', { class: 'muted', text: '—' });
+  const delta = now - before;
+  if (Math.abs(delta) < 0.05) return element('span', { class: 'muted', text: '±0.0' });
+  return element('span', { class: delta > 0 ? 'up' : 'down', text: `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}` });
+}
+
+function renderBanner(data) {
+  if (!data.release) return null;
+  return element('p', { class: 'banner', text: `curl ${data.release.version} released: ${data.release.newGaps} new gaps` });
+}
+
+function scoreCard(label, version, score) {
+  return element('div', { class: 'score' },
+    element('div', { class: 'muted', text: `${label}, curl ${version}` }),
+    element('div', { class: 'pct', text: percentText(score) }),
+    element('div', { text: score ? `${score.x} of ${score.y}` : 'not measured' }));
+}
+
+// Each platform's newest history entry (data.platforms, ADR-0505), or the latest entry alone
+// for data written before platforms existed.
+function platformEntries(data) {
+  const platforms = data.platforms && Object.keys(data.platforms).length ? data.platforms : { [data.latest.platform]: data.latest };
+  return Object.entries(platforms);
+}
+
+// The entry before this one on the same platform, for the change column.
+function previousOnPlatform(data, entry) {
+  const same = data.history.filter(run => run.platform === entry.platform && run.stamp < entry.stamp);
+  return same.length ? same[same.length - 1] : null;
+}
+
+// The headline is the lowest platform's score, so no platform hides behind another; each
+// platform's own score follows.
+function renderHeadline(data) {
+  const entries = platformEntries(data);
+  const lowestName = data.lowest ? data.lowest.platform : entries[0][0];
+  const lowest = (entries.find(([name]) => name === lowestName) || entries[0])[1];
+  const run = element('p', { class: 'run muted' },
+    `Lowest platform: ${lowestName} · run ${lowest.stamp} · commit `,
+    element('a', { href: `https://github.com/StewartScottRogers/Curl/commit/${lowest.commit}`, text: lowest.commit.slice(0, 9) }),
+    ` · platforms ${entries.map(([name, entry]) => `${name} ${percentText(entry.overall)} (${entry.stamp})`).join(', ')}`);
+  return element('section', {},
+    element('div', { class: 'headline' },
+      scoreCard(`Targeted, lowest (${lowestName})`, lowest.targetVersion || data.target, lowest.overall),
+      scoreCard(`Newest, ${lowestName}`, lowest.newestVersion || data.newest, lowest.newest)),
+    run);
+}
+
+// One row per area, one column per platform: its score, the change since that platform's
+// previous run, and a bar.
+function renderAreas(data) {
+  const entries = platformEntries(data);
+  const areas = [...new Set(entries.flatMap(([, entry]) => Object.keys(entry.areas || {})))].sort();
+  const head = element('tr', {}, element('th', { text: 'Area' }),
+    ...entries.map(([name]) => element('th', { class: 'num', text: name })));
+  const cell = (score, before) => {
+    if (!score) return element('td', { class: 'num muted', text: '—' });
+    const value = percent(score) || 0;
+    const bar = element('div', { class: 'bar', role: 'img', 'aria-label': percentText(score) },
+      element('span', { style: `width: ${value.toFixed(1)}%` }));
+    return element('td', { class: 'num' }, `${score.x} of ${score.y} · ${percentText(score)} `, changeText(score, before), bar);
+  };
+  const row = (label, pick) => element('tr', {}, element('td', {}, label),
+    ...entries.map(([, entry]) => {
+      const previous = previousOnPlatform(data, entry);
+      return cell(pick(entry), previous && pick(previous));
+    }));
+  const rows = areas.map(area => row(area, entry => entry.areas && entry.areas[area]));
+  rows.push(row(element('b', { text: 'overall' }), entry => entry.overall));
+  return element('section', {}, element('h2', { text: 'Areas' }),
+    element('div', { class: 'table-wrap' }, element('table', {}, element('thead', {}, head), element('tbody', {}, ...rows))));
+}
+
+const HOUR = 3600e3, DAY = 24 * HOUR;
+
+// A run's stamp, yyyy-MM-dd_HHmm, as milliseconds; null when it is not one. The stamp's
+// digits are kept as they are: it is read and shown as UTC, so no time zone shifts it.
+function stampTime(stamp) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})$/.exec(stamp || '');
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null;
+}
+
+function utcText(time, options) {
+  return new Date(time).toLocaleString('en-US', { timeZone: 'UTC', ...options });
+}
+
+// Ticks for a time axis from `from` to `to`, at most `most` of them, on round hours, days
+// or months, each with its label.
+function timeTicks(from, to, most) {
+  const steps = [HOUR, 3 * HOUR, 6 * HOUR, 12 * HOUR, DAY, 2 * DAY, 7 * DAY, 14 * DAY];
+  const step = steps.find(s => (to - from) / s <= most);
+  const ticks = [];
+  if (step) {
+    for (let t = Math.ceil(from / step) * step; t <= to; t += step) {
+      const label = step < DAY
+        ? (t % DAY === 0 || !ticks.length ? utcText(t, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : utcText(t, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }))
+        : utcText(t, { month: 'short', day: 'numeric' });
+      ticks.push({ t, label });
+    }
+    return ticks;
+  }
+  const months = [1, 2, 3, 6, 12, 24, 60].find(m => (to - from) / (m * 30.44 * DAY) <= most) || 120;
+  const start = new Date(from);
+  let year = start.getUTCFullYear(), month = Math.ceil((start.getUTCMonth() + (start.getUTCDate() > 1 ? 1 : 0)) / months) * months;
+  for (let t = Date.UTC(year, month, 1); t <= to; month += months, t = Date.UTC(year, month, 1)) {
+    ticks.push({ t, label: utcText(t, months >= 12 ? { year: 'numeric' } : { month: 'short', year: 'numeric' }) });
+  }
+  return ticks;
+}
+
+// A round step for the percentage axis and the lowest gridline at or below `min`, so the
+// axis shows about five lines and always ends at 100%.
+function percentScale(min) {
+  const span = Math.max(100 - min, 1);
+  const step = [1, 2, 5, 10, 20, 25].find(s => span / s <= 5) || 25;
+  const low = Math.max(0, Math.floor((min - step / 4) / step) * step);
+  return { low: Math.min(low, 100 - step), step };
+}
+
+// Index of the run in `times` (sorted) nearest to time `t`.
+function nearestIndex(times, t) {
+  let lo = 0, hi = times.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (times[mid] < t) lo = mid + 1; else hi = mid;
+  }
+  return lo > 0 && t - times[lo - 1] < times[lo] - t ? lo - 1 : lo;
+}
+
+// The overall and per-area scores over the run history: a time axis that stays readable
+// at hundreds of runs, a range picker, a legend that shows and hides each line with its
+// latest score, and a guide that lists every shown score of the run nearest the pointer
+// (or the arrow keys).
+function renderTrend(data) {
+  const history = data.history.slice();
+  const timed = history.every(run => stampTime(run.stamp) !== null);
+  if (timed) history.sort((a, b) => stampTime(a.stamp) - stampTime(b.stamp));
+  const times = history.map((run, i) => timed ? stampTime(run.stamp) : i);
+  const areas = [...new Set(history.flatMap(run => Object.keys(run.areas || {})))].sort();
+  const series = [{ name: 'overall', pick: run => run.overall }]
+    .concat(areas.map(area => ({ name: area, pick: run => run.areas && run.areas[area] })))
+    .map((s, index) => ({ ...s, colour: palette[index % palette.length], values: history.map(run => percent(s.pick(run))) }));
+  const hidden = new Set();
+  const span = times.length ? times[times.length - 1] - times[0] : 0;
+  const ranges = [{ label: 'All', length: Infinity }]
+    .concat(timed ? [{ label: '90 days', length: 90 * DAY }, { label: '30 days', length: 30 * DAY }, { label: '7 days', length: 7 * DAY }].filter(r => r.length < span) : []);
+  let range = ranges[0];
+  let focus = -1;
+
+  const plot = element('div', { class: 'plot' });
+  const tooltip = element('div', { class: 'tooltip', hidden: true });
+  const hint = element('p', { class: 'hint muted', text: history.length ? 'Hover, tap or focus the chart and use the arrow keys to read each run.' : 'No runs yet.' });
+  const rangeBar = element('div', { class: 'ranges', role: 'group', 'aria-label': 'Range' });
+  const legend = element('div', { class: 'legend', role: 'group', 'aria-label': 'Lines shown' });
+  let lastWidth = 0;
+
+  const visible = () => {
+    const from = range.length === Infinity ? -Infinity : times[times.length - 1] - range.length;
+    const indexes = times.map((t, i) => i).filter(i => times[i] >= from);
+    return indexes;
+  };
+
+  function draw() {
+    const width = Math.max(plot.clientWidth, 280);
+    lastWidth = width;
+    const height = Math.round(Math.min(360, Math.max(220, width * 0.36)));
+    const margin = { left: 44, right: 12, top: 10, bottom: 26 };
+    const indexes = visible();
+    const shown = series.filter(s => !hidden.has(s.name));
+    const values = indexes.flatMap(i => shown.map(s => s.values[i])).filter(v => v !== null);
+    const { low, step } = percentScale(values.length ? Math.min(...values) : 90);
+    let from = indexes.length ? times[indexes[0]] : 0, to = indexes.length ? times[indexes[indexes.length - 1]] : 1;
+    if (to === from) { from -= timed ? 12 * HOUR : 1; to += timed ? 12 * HOUR : 1; }
+    const innerW = width - margin.left - margin.right, innerH = height - margin.top - margin.bottom;
+    const x = t => margin.left + (t - from) * innerW / (to - from);
+    const y = v => margin.top + (100 - v) * innerH / (100 - low);
+    const chart = svg('svg', { width, height, viewBox: `0 0 ${width} ${height}`, role: 'img',
+      'aria-label': `Scores over ${indexes.length} run${indexes.length === 1 ? '' : 's'}` });
+
+    for (let v = low; v <= 100 + 1e-9; v += step) {
+      chart.append(svg('line', { class: v === low ? 'baseline' : 'grid', x1: margin.left, x2: width - margin.right, y1: y(v), y2: y(v) }));
+      const label = svg('text', { class: 'tick', x: margin.left - 6, y: y(v) + 4, 'text-anchor': 'end' });
+      label.textContent = `${v}%`;
+      chart.append(label);
+    }
+    const ticks = timed
+      ? timeTicks(from, to, Math.max(2, Math.floor(innerW / 100)))
+      : indexes.filter((_, k) => k % Math.max(1, Math.ceil(indexes.length / Math.max(2, Math.floor(innerW / 60)))) === 0).map(i => ({ t: i, label: `run ${i + 1}` }));
+    for (const tick of ticks) {
+      const label = svg('text', { class: 'tick', x: x(tick.t), y: height - 8, 'text-anchor': 'middle' });
+      label.textContent = tick.label;
+      chart.append(label);
+    }
+
+    const dots = indexes.length <= Math.floor(innerW / 24);
+    for (const s of shown.slice().reverse()) {
+      let d = '', pen = 'M';
+      for (const i of indexes) {
+        if (s.values[i] === null) { pen = 'M'; continue; }
+        d += `${pen}${x(times[i]).toFixed(1)},${y(s.values[i]).toFixed(1)}`;
+        pen = 'L';
+      }
+      if (d) chart.append(svg('path', { class: `series${s.name === 'overall' ? ' overall' : ''}`, stroke: s.colour, d }));
+      if (dots) {
+        for (const i of indexes) {
+          if (s.values[i] !== null) chart.append(svg('circle', { cx: x(times[i]).toFixed(1), cy: y(s.values[i]).toFixed(1), r: s.name === 'overall' ? 3 : 2.25, fill: s.colour }));
+        }
+      }
+    }
+
+    const guide = svg('g', { 'pointer-events': 'none' });
+    chart.append(guide);
+    const overlay = svg('rect', { class: 'overlay', x: margin.left, y: margin.top, width: innerW, height: innerH, tabindex: 0,
+      'aria-label': 'Run reader: use the arrow keys' });
+    chart.append(overlay);
+
+    const show = k => {
+      guide.replaceChildren();
+      if (k < 0 || !indexes.length) { tooltip.hidden = true; return; }
+      focus = k;
+      const i = indexes[k], px = x(times[i]);
+      guide.append(svg('line', { class: 'guide', x1: px, x2: px, y1: margin.top, y2: margin.top + innerH }));
+      const rows = shown.filter(s => s.values[i] !== null).sort((a, b) => b.values[i] - a.values[i]);
+      for (const s of rows) guide.append(svg('circle', { class: 'marker', cx: px, cy: y(s.values[i]), r: 4, fill: s.colour }));
+      const run = history[i];
+      tooltip.replaceChildren(
+        element('div', { class: 'when', text: timed ? utcText(times[i], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : run.stamp }),
+        element('div', { class: 'muted', text: [run.commit ? run.commit.slice(0, 9) : '', run.platform, run.targetVersion ? `curl ${run.targetVersion}` : ''].filter(Boolean).join(' · ') }),
+        ...rows.map(s => element('div', { class: 'row' }, element('i', { style: `background: ${s.colour}` }), element('span', { text: s.name }), element('b', { text: `${s.values[i].toFixed(1)}%` }))));
+      tooltip.hidden = false;
+      const box = tooltip.offsetWidth;
+      tooltip.style.left = `${px + 14 + box <= width ? px + 14 : Math.max(0, px - 14 - box)}px`;
+    };
+    const pick = event => {
+      const box = chart.getBoundingClientRect();
+      const t = from + (event.clientX - box.left - margin.left) * (to - from) / innerW;
+      show(nearestIndex(indexes.map(i => times[i]), t));
+    };
+    overlay.addEventListener('pointermove', pick);
+    overlay.addEventListener('pointerdown', pick);
+    overlay.addEventListener('pointerleave', event => { if (event.pointerType === 'mouse') show(-1); });
+    overlay.addEventListener('blur', () => show(-1));
+    overlay.addEventListener('focus', () => show(focus >= 0 && focus < indexes.length ? focus : indexes.length - 1));
+    overlay.addEventListener('keydown', event => {
+      const moves = { ArrowLeft: -1, ArrowRight: 1, Home: -Infinity, End: Infinity };
+      if (!(event.key in moves)) return;
+      event.preventDefault();
+      show(Math.min(indexes.length - 1, Math.max(0, (focus < 0 ? indexes.length - 1 : focus) + moves[event.key])));
+    });
+    focus = -1;
+    plot.replaceChildren(chart, tooltip);
+    tooltip.hidden = true;
+  }
+
+  for (const r of ranges) {
+    const button = element('button', { type: 'button', 'aria-pressed': String(r === range), text: r.label });
+    button.addEventListener('click', () => {
+      range = r;
+      for (const b of rangeBar.children) b.setAttribute('aria-pressed', String(b === button));
+      draw();
+    });
+    rangeBar.append(button);
+  }
+  for (const s of series) {
+    const latest = s.values.filter(v => v !== null).pop();
+    const button = element('button', { type: 'button', 'aria-pressed': 'true', title: `Show or hide ${s.name}` },
+      element('i', { style: `background: ${s.colour}` }), s.name,
+      element('b', { text: latest === undefined ? '—' : `${latest.toFixed(1)}%` }));
+    button.addEventListener('click', () => {
+      if (hidden.has(s.name)) hidden.delete(s.name); else hidden.add(s.name);
+      button.setAttribute('aria-pressed', String(!hidden.has(s.name)));
+      draw();
+    });
+    legend.append(button);
+  }
+
+  const count = element('span', { class: 'muted', text: `${history.length} run${history.length === 1 ? '' : 's'}` });
+  const card = element('div', { class: 'chart-card' },
+    element('div', { class: 'toolbar' }, count, ranges.length > 1 ? rangeBar : null), plot, legend, hint);
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => { if (plot.clientWidth && Math.abs(plot.clientWidth - lastWidth) > 1) draw(); }).observe(plot);
+  }
+  requestAnimationFrame(draw);
+  return element('section', { id: 'trend' }, element('h2', { text: 'Trend' }), card);
+}
+
+// The trend of one platform at a time, the lowest platform first, with a picker when the
+// history holds more than one platform (ADR-0505).
+function renderPlatformTrend(data) {
+  const names = [...new Set(data.history.map(run => run.platform))];
+  if (names.length <= 1) return renderTrend(data);
+  const chosen = data.lowest && names.includes(data.lowest.platform) ? data.lowest.platform : names[0];
+  const select = element('select', { name: 'platform' },
+    ...names.map(name => element('option', { value: name, text: name, selected: name === chosen ? 'selected' : null })));
+  const holder = element('div', {});
+  const draw = () => holder.replaceChildren(renderTrend({ ...data, history: data.history.filter(run => run.platform === select.value) }));
+  select.addEventListener('change', draw);
+  draw();
+  return element('section', {}, element('label', { class: 'filters' }, 'Trend on ', select), holder);
+}
+
+function platformOf(gap) {
+  return gap.platform || 'windows';
+}
+
+function gapEntry(gap) {
+  const facts = [gap.area, gap.severity, platformOf(gap), `scope ${gap.scope}`,
+    gap.introducedIn ? `since ${gap.introducedIn}` : 'introduced in unknown',
+    `${gap.items} item${gap.items === 1 ? '' : 's'}`,
+    gap.tasks.length ? gap.tasks.join(', ') : 'no task'];
+  return element('div', { class: 'gap' },
+    element('a', { class: 'id', href: gap.url, text: gap.id }),
+    element('span', { text: gap.title }),
+    element('span', { class: 'facts' },
+      element('span', { class: `sev-${gap.severity}`, text: gap.severity }),
+      ` · ${facts.filter((_, i) => i !== 1).join(' · ')}`),
+    element('details', {}, element('summary', { text: 'Suggestion' }), element('pre', { text: gap.suggestion })));
+}
+
+function selectFilter(name, label, values) {
+  const select = element('select', { name },
+    element('option', { value: '', text: 'all' }),
+    ...values.map(value => element('option', { value, text: value })));
+  return element('label', {}, label, select);
+}
+
+function renderOpen(data) {
+  const open = data.open;
+  const distinct = pick => [...new Set(open.map(pick))].sort();
+  const introduced = gap => gap.introducedIn || 'unknown';
+  const filters = element('form', { class: 'filters' },
+    selectFilter('area', 'Area', distinct(g => g.area)),
+    selectFilter('platform', 'Platform', distinct(platformOf)),
+    selectFilter('severity', 'Severity', ['Critical', 'High', 'Medium', 'Low'].filter(s => open.some(g => g.severity === s))),
+    selectFilter('scope', 'Scope', distinct(g => g.scope)),
+    selectFilter('introducedIn', 'Introduced in', distinct(introduced)));
+  const list = element('div', {});
+  const count = element('span', { class: 'muted' });
+  const draw = () => {
+    const chosen = Object.fromEntries(new FormData(filters));
+    const shown = open.filter(g => (!chosen.area || g.area === chosen.area)
+      && (!chosen.platform || platformOf(g) === chosen.platform)
+      && (!chosen.severity || g.severity === chosen.severity)
+      && (!chosen.scope || g.scope === chosen.scope)
+      && (!chosen.introducedIn || introduced(g) === chosen.introducedIn));
+    list.replaceChildren(...(shown.length ? shown.map(gapEntry) : [element('p', { class: 'muted', text: 'No open gap matches.' })]));
+    count.textContent = ` ${shown.length} of ${open.length}`;
+  };
+  filters.addEventListener('change', draw);
+  draw();
+  return element('section', { id: 'open' }, element('h2', {}, 'Open gaps', count), filters, list);
+}
+
+function shortList(title, gaps, empty) {
+  const items = gaps.map(g => element('li', {}, element('a', { href: g.url, text: g.id }), ` ${g.title} (${g.area}, ${platformOf(g)}, ${g.severity})`));
+  return element('section', {}, element('h2', { text: title }),
+    items.length ? element('ul', {}, ...items) : element('p', { class: 'muted', text: empty }));
+}
+
+function render(data) {
+  document.getElementById('generated').textContent = data.generated ? `Generated ${data.generated}` : '';
+  const main = document.getElementById('dashboard');
+  if (!data.latest) {
+    main.replaceChildren(element('p', { class: 'banner', text: 'No gap analysis has run yet' }));
+    return;
+  }
+  main.replaceChildren(...[
+    renderBanner(data),
+    renderHeadline(data),
+    renderAreas(data),
+    renderPlatformTrend(data),
+    renderOpen(data),
+    element('div', { class: 'lists' },
+      shortList('Regressions', data.regressions || [], 'No regressions.'),
+      shortList('Recently closed', data.closed || [], 'Nothing closed in the last 5 runs.')),
+  ].filter(Boolean));
+}
+
+async function load() {
+  try {
+    const url = dataUrl();
+    document.getElementById('source').textContent = new URL(url).pathname;
+    const response = await fetch(url, { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+    const data = await response.json();
+    data.history = data.history || [];
+    data.open = data.open || [];
+    render(data);
+  } catch (error) {
+    document.getElementById('generated').textContent = '';
+    document.getElementById('messages').replaceChildren(element('p', { text: String(error.message || error) }));
+  }
+}
+
+load();
+</script>
+</body>
+</html>

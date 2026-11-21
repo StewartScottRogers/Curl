@@ -1,0 +1,14 @@
+{
+  "platform": "Linux",
+  "commit": "d930fa2a87c9919175dfdf5cc5ecab4397359f40",
+  "runUrl": "https://github.com/StewartScottRogers/Curl/actions/runs/44942529718",
+  "measuredAt": "2026-11-21T20:06:21Z",
+  "resultFiles": 248,
+  "projects": 10,
+  "passed": 81,
+  "failed": 1,
+  "notRun": 22,
+  "failedTests": [
+    "curl.networking.integrationtests: DialAsync_ToAPortNothingListensOn_ThrowsNamingTheEphemeralLocalPort"
+  ]
+}
