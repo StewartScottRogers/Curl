@@ -3,8 +3,8 @@ id: AF-0926
 title: Surviving mutant: the lib650 port's pointed form part can be sent two bytes longer
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-21_0835.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib650.cs:BuildForm-minus1:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib650.cs:92:-1
 task: BL-5676
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 1f330a1f28a1086717db7833947030e8fdc0bf9d
 scorecard: 2026-11-21_0114.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-21
+closed-how: mechanical
+closed-by: 2026-11-21_0835.md
 ---
 # AF-0926 - Surviving mutant: the lib650 port's pointed form part can be sent two bytes longer
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_0835.md | reproduces: no | Ran the -Site command (Lib650.cs:92:-1, member BuildForm): TestData.Length - 1 mutated to + 1, outcome killed (28.9 s). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-21: accepted -> closed. Re-audit 2026-11-21_0835.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

@@ -3,8 +3,8 @@ id: AF-0925
 title: Surviving mutant: the DER reader can refuse a source of exactly curl's maximum length
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-21_0835.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Output.UnitLibrary/DerReader.cs:HasReadableIdentifier-gt:surviving-mutant
 reproduction: mutation Curl.Output.UnitLibrary/DerReader.cs:77:>
 task: BL-5675
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 1f330a1f28a1086717db7833947030e8fdc0bf9d
 scorecard: 2026-11-21_0114.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-21
+closed-how: mechanical
+closed-by: 2026-11-21_0835.md
 ---
 # AF-0925 - Surviving mutant: the DER reader can refuse a source of exactly curl's maximum length
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Outpu
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_0835.md | reproduces: no | Ran the -Site command (DerReader.cs:77:>, member HasReadableIdentifier): end - start > MaximumSourceLength mutated to >=, outcome killed (19.8 s). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-21: accepted -> closed. Re-audit 2026-11-21_0835.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

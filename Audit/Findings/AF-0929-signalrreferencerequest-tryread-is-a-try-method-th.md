@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferen
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_0835.md | reproduces: no | Ran Select-String -Path Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceRequest.cs -Pattern 'public static \w+ TryRead': no match. The method is now 'public static int TakeWholeRequest(ReadOnlySpan<byte> pending, out SignalRReferenceRequest? request)', a name that fits its byte-count return. The same fault remains in SignalRReferenceFrame.TryRead, filed as a new finding.
+
 ## Log
 
 - 2026-11-21: filed proposed.
