@@ -43,3 +43,4 @@ Observed: surl prints `Listening on http://localhost:8080/ over unix://surl.sock
 ## Log
 
 - 2026-11-21: Created from Surly bug report 2026-11-21T0725, finding 1.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: edecd269 dbd35abe b7fc0636 b3b3bfe9.
