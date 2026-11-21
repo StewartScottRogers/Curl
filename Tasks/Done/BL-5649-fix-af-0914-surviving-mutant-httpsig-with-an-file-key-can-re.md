@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/HttpSignatureSetup.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5649 — Fix AF-0914: Surviving mutant: --httpsig with an @file key can refuse every non-empty key file and accept an empty one
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/HttpSignatureSetup.cs line 81`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/HttpSignatureSetup.cs line 81`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `HttpSignatureSetupOf_KeyFileWithText_UsesTheFileTextAsTheKey` and `HttpSignatureSetupOf_EmptyKeyFile_RefusesWithExit43` (both fail with `!=` applied at line 81, pass reverted). Fast Engine tests: 3131 passed. Production code unchanged.
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 9270fae9 9742157d.
+- 2026-11-20: Doing -> Done. Two new tests kill the line 81 mutant

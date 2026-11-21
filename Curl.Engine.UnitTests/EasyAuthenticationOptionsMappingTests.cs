@@ -135,6 +135,48 @@ public sealed class EasyAuthenticationOptionsMappingTests
     }
 
     [TestMethod]
+    public void HttpSignatureSetupOf_KeyFileWithText_UsesTheFileTextAsTheKey()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"httpsig-key-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(path, "00112233");
+        try
+        {
+            EasyAuthenticationOptions authentication = new() { HttpSignatureKey = "@" + path, HttpSignatureKeyId = "k1" };
+
+            HttpSignatureSetup setup = HttpSignatureSetup.Of(authentication);
+
+            Assert.AreEqual(CurlExitCode.Ok, setup.ExitCode);
+            Assert.IsNull(setup.ErrorLine);
+            Assert.AreEqual(new HttpSignatureSettings("ed25519", "00112233", "k1", null), setup.Settings);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    public void HttpSignatureSetupOf_EmptyKeyFile_RefusesWithExit43()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"httpsig-key-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(path, string.Empty);
+        try
+        {
+            EasyAuthenticationOptions authentication = new() { HttpSignatureKey = "@" + path, HttpSignatureKeyId = "k1" };
+
+            HttpSignatureSetup setup = HttpSignatureSetup.Of(authentication);
+
+            Assert.AreEqual(CurlExitCode.BadFunctionArgument, setup.ExitCode);
+            Assert.AreEqual($"curl: httpsig: key file '{path}' is empty", setup.ErrorLine);
+            Assert.IsNull(setup.Settings);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
     public void MailFromCommandLine_Record_CopiesTheLoginSaslBearerAndServiceName()
     {
         EasyAuthenticationOptions authentication = new()
