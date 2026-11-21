@@ -33,3 +33,4 @@ With no `CertificateAuthorityBlob`, an untrusted HTTPS peer throws 77 `SslCacert
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1836, finding 3.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: e512ca0d 55a901a4 b3b3bfe9.
