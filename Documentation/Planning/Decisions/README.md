@@ -1371,3 +1371,4 @@ Each option and the specific reason it lost.
 | [1327](ADR-1327-a-failed-ftp-upload-write-waits-briefly-for-the-servers-552-reply.md) | A failed FTP upload write waits briefly for the server's 552 reply (BL-5663) | Accepted | 2026-11-21 |
 | [1328](ADR-1328-ftp-resume-offset-and-names-only-listing-are-documented-as-transfer-wide.md) | CurlFtpOptions.ResumeFrom and ListOnly are documented as transfer-wide (BL-5668) | Accepted | 2026-11-21 |
 | [1329](ADR-1329-the-failed-upload-write-wait-cancels-its-control-read-and-holds-the-reply.md) | The failed-upload-write wait cancels its control read and holds the reply it reads (BL-5667) | Accepted | 2026-11-21 |
+| [1330](ADR-1330-the-transfer-tool-takes-proxy-login-proxy-ca-resolve-and-a-body-limit-field.md) | The transfer tool takes proxy login, proxy CA, resolve and a body-limit field (BL-5671) | Accepted | 2026-11-21 |

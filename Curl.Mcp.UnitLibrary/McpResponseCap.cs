@@ -14,6 +14,9 @@ public sealed record McpResponseCap
     /// <summary>The cap when the variable is unset or empty: 1 MiB.</summary>
     public const int DefaultMaxBytes = 1024 * 1024;
 
+    /// <summary>The most a <c>transfer</c> request's <c>maxBodyBytes</c> may raise the cap to: 64 MiB.</summary>
+    public const int CeilingMaxBytes = 64 * 1024 * 1024;
+
     /// <summary>Creates a cap of <paramref name="maxBytes" /> bytes.</summary>
     /// <param name="maxBytes">The most bytes a tool returns; at least 1.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxBytes" /> is zero or negative.</exception>

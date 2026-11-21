@@ -26,7 +26,11 @@ public sealed class TransferMcpToolTests
         "proxy":{"description":"The proxy to use, as curl -x takes it; the environment's when omitted.","type":["string","null"],"default":null},
         "userAgent":{"description":"The User-Agent header; none is sent when omitted.","type":["string","null"],"default":null},
         "minTlsVersion":{"description":"The lowest TLS version to accept, as curl --tlsv1.2 sets it: 1.0, 1.1, 1.2 or 1.3; the default when omitted.","type":["string","null"],"enum":["1.0","1.1","1.2","1.3",null],"default":null},
-        "caFile":{"description":"A CA certificate file to verify the server with, as curl --cacert takes it, e.g. for a self-signed server; it must lie inside CURL_MCP_ROOT, else the call is refused with PathRefused.","type":["string","null"],"default":null}},
+        "caFile":{"description":"A CA certificate file to verify the server with, as curl --cacert takes it, e.g. for a self-signed server; it must lie inside CURL_MCP_ROOT, else the call is refused with PathRefused.","type":["string","null"],"default":null},
+        "proxyUser":{"description":"The proxy login as user:password, as curl --proxy-user takes it; never logged or traced.","type":["string","null"],"default":null},
+        "proxyCaFile":{"description":"A CA certificate file to verify an HTTPS proxy with, as curl --proxy-cacert takes it; it must lie inside CURL_MCP_ROOT, else the call is refused with PathRefused.","type":["string","null"],"default":null},
+        "resolve":{"description":"Host pins, each host:port:address as curl --resolve takes it.","type":["array","null"],"items":{"type":"string"},"default":null},
+        "maxBodyBytes":{"description":"The most response body bytes returned, 1 to 67108864 (64 MiB); the default is the server's limit, 1048576 (1 MiB). A longer body is cut with isTruncated true.","type":["integer","null"],"default":null}},
         "required":["url"]}
         """;
 
