@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib670.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5677 — Fix AF-0927: Surviving mutant: the lib670 port can go on after naming its mime part fails
 
@@ -43,3 +43,4 @@ Killed by `Lib670_WhenNamingItsMimePartFails_WritesTheErrorAndDoesNotTransfer` (
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 160170d2 9742157d.
+- 2026-11-21: Doing -> Done. Test Lib670_WhenNamingItsMimePartFails kills the mutant.
