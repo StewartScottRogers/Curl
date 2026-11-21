@@ -1,4 +1,4 @@
-# ADR-1331: The curl-mcp curl tool answers Digest as the platform's own curl does
+# ADR-1332: The curl-mcp curl tool answers Digest as the platform's own curl does
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-5685).
 
