@@ -258,18 +258,23 @@ jobs:
         shell: pwsh
         run: |
           Add-Type -AssemblyName System.IO.Compression.FileSystem
+          # The package ID comes from the project, so a rename (BL-5707: Curl.Mcp became
+          # Surly.Curl.Mcp) needs no change here; the binary keeps the assembly name Curl.Mcp.
+          $packageId = ([xml](Get-Content -Raw 'Curl.Mcp/Curl.Mcp.csproj')).Project.PropertyGroup.PackageId | Where-Object { $_ } | Select-Object -First 1
+          if (-not $packageId) { throw 'Curl.Mcp/Curl.Mcp.csproj names no PackageId' }
+          Write-Host "package ID: $packageId"
           $tool = Join-Path $env:PACKAGES 'tool'
           if (Test-Path $tool) {
             $files = @(Get-ChildItem $tool -Filter '*.nupkg')
             $files | ForEach-Object { Write-Host "$($_.Name) $($_.Length)" }
-            if ($files.Count -ne 1 -or $files[0].Name -notmatch '^Curl\.Mcp\.\d') { throw 'expected only the Curl.Mcp tool package' }
+            if ($files.Count -ne 1 -or $files[0].Name -notmatch "^$([regex]::Escape($packageId))\.\d") { throw "expected only the $packageId tool package" }
             $zip = [IO.Compression.ZipFile]::OpenRead($files[0].FullName)
             try { if ($zip.Entries.FullName -notcontains '.mcp/server.json') { throw "$($files[0].Name) has no .mcp/server.json" } }
             finally { $zip.Dispose() }
           }
           $files = @(Get-ChildItem (Join-Path $env:PACKAGES 'runtime') -Filter '*.nupkg')
           $files | ForEach-Object { Write-Host "$($_.Name) $($_.Length)" }
-          if ($files.Count -ne 1 -or $files[0].Name -notlike "Curl.Mcp.$env:RID.*") { throw "expected only the Curl.Mcp.$env:RID package" }
+          if ($files.Count -ne 1 -or $files[0].Name -notlike "$packageId.$env:RID.*") { throw "expected only the $packageId.$env:RID package" }
           $name = $files[0].Name
           $binary = if ($env:RID -like 'win-*') { 'Curl.Mcp.exe' } else { 'Curl.Mcp' }
           $zip = [IO.Compression.ZipFile]::OpenRead($files[0].FullName)
