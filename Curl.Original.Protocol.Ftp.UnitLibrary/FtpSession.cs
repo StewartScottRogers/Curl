@@ -1315,7 +1315,7 @@ internal sealed class FtpSession(
             }
             catch (IOException failure)
             {
-                return TransferResult.Failure(CurlExitCode.SendError, FtpTransferMessages.SendFailed(failure), bytesTransferred);
+                return await EndFailedUploadWriteAsync(data, failure).ConfigureAwait(false);
             }
 
             context.Events.ReportDataSent(chunk.Span);
@@ -1327,6 +1327,32 @@ internal sealed class FtpSession(
         await CloseDataConnectionDrainingAsync(data).ConfigureAwait(false);
         context.Events.ReportInfo(FtpTransferMessages.UploadSent(bytesTransferred));
         return null;
+    }
+
+    /// <summary>
+    /// Ends an upload whose write to the data connection failed. A server that refuses the upload
+    /// with <c>552</c> and closes the data connection mid-transfer has sent its reply before the
+    /// write fails, and curl 8.22.0 reports it as exit 70, so the control connection is given
+    /// <see cref="RefusalReplyWait" /> to show that reply first, which makes the exit code
+    /// the same whichever of the reply and the failed write the client sees first; any other
+    /// outcome is exit 55.
+    /// </summary>
+    private async ValueTask<TransferResult> EndFailedUploadWriteAsync(IConnection data, IOException failure)
+    {
+        Task<FtpReply?> read = control.ReadReplyAsync().AsTask();
+        await CompletesWithinAsync(read, RefusalReplyWait).ConfigureAwait(false);
+        FtpReply? refusal = read.IsCompletedSuccessfully ? read.Result : null;
+        if (refusal?.Code == 552)
+        {
+            lastReplyCode = refusal.Code;
+            dataConnection = null;
+            await CloseDataConnectionAtOnceAsync(data).ConfigureAwait(false);
+            trace.TransferReplyRead(refusal);
+            (CurlExitCode exitCode, string message) = DescribeTransferNotOk(refusal.Code);
+            return await QuitAndFailLeavingConnectionIntactAsync(exitCode, message).ConfigureAwait(false);
+        }
+
+        return TransferResult.Failure(CurlExitCode.SendError, FtpTransferMessages.SendFailed(failure), bytesTransferred);
     }
 
     /// <summary>
@@ -3161,6 +3187,9 @@ internal sealed class FtpSession(
 
     /// <summary>How long curl 8.22.0 waits for a peer to end a connection it shuts down (<c>DEFAULT_SHUTDOWN_TIMEOUT_MS</c>).</summary>
     private static readonly TimeSpan DataShutdownTimeout = TimeSpan.FromSeconds(2);
+
+    /// <summary>How long a failed upload write waits for the server's refusal reply before it is exit 55.</summary>
+    private static readonly TimeSpan RefusalReplyWait = TimeSpan.FromMilliseconds(500);
 
     private FtpControlConversationFailedException Failed(CurlExitCode exitCode, string message) =>
         new(TransferResult.Failure(exitCode, message, bytesTransferred));

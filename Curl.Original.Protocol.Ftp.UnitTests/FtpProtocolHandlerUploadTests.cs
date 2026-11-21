@@ -1,6 +1,6 @@
 using System.Text;
-using Curl.Protocol.Abstractions;
 using Curl.Original.Protocol.Ftp.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Original.Protocol.Ftp;
@@ -422,6 +422,41 @@ public sealed class FtpProtocolHandlerUploadTests
         Assert.IsTrue(data.IsDisposed);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ServerRefusedWith552BeforeTheWriteFailed_FailsWithExit70AfterQuit()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var data = ResettingDataConnection();
+
+        // curl 8.22.0 against a server that sends 552 and closes the data connection mid-upload: exit 70 (BL-5663).
+        FtpRun run = await RunResetMidUploadAsync(diagnostics, data, "552 Quota exceeded\r\n" + Bye);
+
+        Assert.AreEqual(CurlExitCode.RemoteDiskFull, run.Result.ExitCode);
+        Assert.IsTrue(data.IsDisposed);
+        StringAssert.EndsWith(run.Sent, "QUIT\r\n");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WriteFailedAndTheServerSaysNothingForAWhile_FailsWithExit55()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var data = ResettingDataConnection();
+
+        FtpRun run = await RunResetMidUploadAsync(diagnostics, data, string.Empty, hangControlReads: true);
+
+        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_WriteFailedAndTheControlConnectionHasNoReply_FailsWithExit55()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var data = ResettingDataConnection();
+
+        FtpRun run = await RunResetMidUploadAsync(diagnostics, data, string.Empty);
+
+        Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+    }
     // The first 16384-byte chunk is sent; the second write is reset.
     private static ScriptedConnection ResettingDataConnection() => new()
     {
@@ -429,15 +464,15 @@ public sealed class FtpProtocolHandlerUploadTests
         WriteFailure = new IOException("reset", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionReset)),
     };
 
-    private static async Task<FtpRun> RunResetMidUploadAsync(TestDiagnostics diagnostics, ScriptedConnection data)
+    private static async Task<FtpRun> RunResetMidUploadAsync(TestDiagnostics diagnostics, ScriptedConnection data, string? afterOpened = null, bool hangControlReads = false, bool yieldControlReads = false)
     {
         string upload = new('x', 16384 + 12);
-        string replies = LoggedIn + Passive + Opened + Complete + Bye;
+        string replies = LoggedIn + Passive + Opened + (afterOpened ?? Complete + Bye);
         diagnostics.ArrangeFtp(Url, replies);
         diagnostics.Arrange("upload length", upload.Length);
         FtpRun run = await FtpRun.ExecuteAsync(
             Url,
-            new ScriptedConnection(Encoding.Latin1.GetBytes(replies)),
+            new ScriptedConnection([.. new[] { LoggedIn + Passive + Opened, afterOpened ?? Complete + Bye }.Where(chunk => chunk.Length > 0).Select(Encoding.Latin1.GetBytes)]) { HangsWhenExhausted = hangControlReads, YieldsBeforeReads = yieldControlReads },
             data,
             c => new TransferContext { Url = c.Url, Output = c.Output, Upload = Seekable(upload) });
         diagnostics.ActRun(run);
