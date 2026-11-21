@@ -1,4 +1,4 @@
-# ADR-1328: The failed-upload-write wait cancels its control read and holds the reply it reads
+# ADR-1329: The failed-upload-write wait cancels its control read and holds the reply it reads
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-5667).
 

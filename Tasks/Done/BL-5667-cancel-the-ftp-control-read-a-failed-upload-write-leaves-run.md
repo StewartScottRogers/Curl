@@ -34,7 +34,7 @@ When a failed FTP upload write gets no `552` within the 500 ms wait, the control
 
 ## Notes
 
-- Done in FtpSession.ReadRefusalWithinWaitAsync (linked token cancelled at the end of the wait, task observed; CompletesWithinAsync takes the transfer token) and FtpControlChannel.ReadReplyHeldAsync/ReleaseHeldReplyAsync/DiscardHeldReply. ADR-1328.
+- Done in FtpSession.ReadRefusalWithinWaitAsync (linked token cancelled at the end of the wait, task observed; CompletesWithinAsync takes the transfer token) and FtpControlChannel.ReadReplyHeldAsync/ReleaseHeldReplyAsync/DiscardHeldReply. ADR-1329.
 - Criterion 4: only a 552 is shown; other replies in the window are held and discarded, as the task says curl's exit 55 path never reads them. Real curl was not measured (the loopback race is the one ADR-1327 records); pinned by a unit test.
 - Quality run: Ftp.UnitLibrary 100% line, 100% branch, worst complexity 10.
 
@@ -42,4 +42,4 @@ When a failed FTP upload write gets no `552` within the 500 ms wait, the control
 
 - 2026-11-21: Created by the shift-end review (ADR-0710) of 8c81a2532a...1f330a1f28.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 5debf57d 97a94584 6bea890d 590f1cb4 e7657cfb.
-- 2026-11-21: Doing -> Done. Failed-upload-write wait cancels and observes its control read, honours cancellation, holds non-552 replies unshown; tests and ADR-1328
+- 2026-11-21: Doing -> Done. Failed-upload-write wait cancels and observes its control read, honours cancellation, holds non-552 replies unshown; tests and ADR-1329
