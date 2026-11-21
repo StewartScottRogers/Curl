@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib526.cs line 147`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib526.cs line 147`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `Lib526Tests.RunAsync_ASecondAddThatFailsInAnUnlistedCase_LeavesTheEasyHandlesAlone` (test 999 with a failing add must dispose no easy handle): with the `||` mutant it fails, reverted all 1235 fast tests in the project pass. No production change.
 
 ## Log
 

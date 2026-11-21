@@ -135,6 +135,20 @@ public sealed class Lib526Tests
     }
 
     [TestMethod]
+    public async Task RunAsync_ASecondAddThatFailsInAnUnlistedCase_LeavesTheEasyHandlesAlone()
+    {
+        var engine = new FakeCurlEngine();
+        engine.Multi.PerformResults.Enqueue((CurlMultiCode.Ok, 1));
+        engine.Multi.Waiting = () => engine.Multi.AddResult = CurlMultiCode.BadEasyHandle;
+        var run = new PortRun(engine, 999, "http://x/526");
+
+        LibTestResult result = await new Lib526(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual((int)LibTestErrorCodes.Multi, result.ExitCode);
+        Assert.AreEqual(0, engine.DisposedEasyCount);
+    }
+
+    [TestMethod]
     public async Task RunAsync_APerformThatFails_StopsAtTheFirstUrl()
     {
         var engine = new FakeCurlEngine();
