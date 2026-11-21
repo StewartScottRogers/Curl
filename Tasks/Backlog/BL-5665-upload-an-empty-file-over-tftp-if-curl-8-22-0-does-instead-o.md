@@ -1,0 +1,35 @@
+---
+id: BL-5665
+title: Upload an empty file over TFTP if curl 8.22.0 does, instead of exiting 26
+priority: Low
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Original.Protocol.Tftp.UnitLibrary]
+requirement: none
+created: 2026-11-20
+completed:
+---
+# BL-5665 — Upload an empty file over TFTP if curl 8.22.0 does, instead of exiting 26
+
+## Goal
+
+`curl -T empty.txt tftp://...` behaves as curl 8.22.0 does: an empty upload sends a WRQ and one empty DATA block, or fails with curl's own exit code and message.
+
+## Context
+
+From Surly cookbook bug report `2026-11-20T2225-Curl-bug-report.md` (batch 7 of the 1,000-recipe plan), finding 8 (check). Build tested: Curl `7d167fa10a`, Windows 11; server Surl `9ad60d80c`. Check it still reproduces on the current branch first.
+
+An empty file cannot be uploaded over TFTP: exit 26. RFC 1350 ends a transfer with a DATA block shorter than the block size, so an empty file is one DATA block of 0 bytes. Measure curl 8.22.0 against a TFTP server (Surl or `tftpd`), and match it; if curl uploads, the port's read of a zero-length source is wrongly treated as an unreadable file.
+
+## Acceptance criteria
+
+- [ ] The Notes record curl 8.22.0's result for `-T empty.txt tftp://...`.
+- [ ] The port's result matches it, pinned by a test of the packets sent.
+- [ ] `dotnet build` is clean and the fast tests pass.
+
+## Notes
+
+## Log
+
+- 2026-11-20: Created from Surly bug report 2026-11-20T2225, finding 8 (check).
