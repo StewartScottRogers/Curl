@@ -5,6 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
+lane: no
 touches: [Curl.slnx]
 requirement: none
 created: 2026-11-21
@@ -29,6 +30,8 @@ Lanes test only on Windows, so reproduce with `gh run view 44941565490 --log-fai
 - [ ] `job Pack Curl.Mcp (windows-latest) step Check the packages` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Interactive only: the fix is in `.github/workflows/ci.yml`, a guard file a lane may not change. BL-5708 renamed the packages to `Surly.Curl.Mcp*`; the "Check the packages" step in ci.yml still matches `Curl.Mcp.d` (line 265) and `Curl.Mcp.$env:RID.*` (line 272). Change both to `Surly.Curl.Mcp...` (check the same in other pack jobs). Remove `lane: no` once ci.yml is fixed or if the interactive session decides otherwise.
 
 ## Log
 
