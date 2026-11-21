@@ -37,12 +37,14 @@ Record the choice in ADR-1330's amendment.
 
 ## Acceptance criteria
 
-- [ ] The tool description, the `maxBodyBytes` schema text and ADR-1330's amendment state the same ceiling the code enforces, including when `CURL_MCP_MAX_RESPONSE_BYTES` is above 67108864.
-- [ ] A unit test in `Curl.Mcp.UnitTests` sets the variable above 64 MiB and pins what a `maxBodyBytes` between 64 MiB and that value does: a refusal with `InvalidRequest`, or a body returned up to the requested size.
-- [ ] `TransferMcpToolTests` and the two goldens (`tools-list.json`, `request-before-initialize.json`) match the new text.
-- [ ] `dotnet build` is clean, and the fast tests pass with Curl.Mcp and Curl.Mcp.UnitLibrary still at 100% line and branch coverage.
+- [x] The tool description, the `maxBodyBytes` schema text and ADR-1330's amendment state the same ceiling the code enforces, including when `CURL_MCP_MAX_RESPONSE_BYTES` is above 67108864.
+- [x] A unit test in `Curl.Mcp.UnitTests` sets the variable above 64 MiB and pins what a `maxBodyBytes` between 64 MiB and that value does: a refusal with `InvalidRequest`, or a body returned up to the requested size.
+- [x] `TransferMcpToolTests` and the two goldens (`tools-list.json`, `request-before-initialize.json`) match the new text.
+- [x] `dotnet build` is clean, and the fast tests pass with Curl.Mcp and Curl.Mcp.UnitLibrary still at 100% line and branch coverage.
 
 ## Notes
+
+Decided: fix the text, not the code (ADR-1330 amendment): the real ceiling is the smaller of 64 MiB and the variable. Only a doc comment changed in production code, so no quality run. Unit tests pass (661).
 
 ## Log
 

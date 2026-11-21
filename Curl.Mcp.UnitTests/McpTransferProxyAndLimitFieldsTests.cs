@@ -182,6 +182,19 @@ public sealed class McpTransferProxyAndLimitFieldsTests
     }
 
     [TestMethod]
+    public async Task RunAsync_OperatorLimitAbove64MiBAndMaxBodyBytesBetween_IsRefusedAsInvalidRequest()
+    {
+        FakeEasyTransfer transfer = new() { BodyChunks = [new byte[10]] };
+        McpResponseCap operatorCap = McpResponseCap.FromEnvironment(_ => "134217728");
+
+        McpTransferToolResult result = await new McpTransferTool(new FakeTransferEngine(transfer), operatorCap)
+            .RunAsync(new McpTransferRequest("http://h/") { MaxBodyBytes = 100_000_000 }, CancellationToken.None);
+
+        Assert.IsNotNull(result.Failure);
+        StringAssert.Contains(result.Failure.Text, "maxBodyBytes");
+    }
+
+    [TestMethod]
     public void RequestCeilingBytes_VariableUnsetOrSet_IsTheCeilingOrTheOperatorLimit()
     {
         Assert.AreEqual(McpResponseCap.CeilingMaxBytes, McpResponseCap.FromEnvironment(_ => null).RequestCeilingBytes);
