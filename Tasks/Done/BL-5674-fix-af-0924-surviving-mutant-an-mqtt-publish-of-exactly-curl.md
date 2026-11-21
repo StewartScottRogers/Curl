@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Mqtt.UnitLibrary/MqttPackets.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5674 — Fix AF-0924: Surviving mutant: an MQTT publish of exactly curl's size limit can be refused with exit 100
 
@@ -43,3 +43,4 @@ Killed by `MqttPublishLimitTests.IsOverPublishLimit_ExactlyAtLimit_IsAccepted` (
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: be21a3c5 9742157d.
+- 2026-11-21: Doing -> Done. Boundary test kills the >= mutant
