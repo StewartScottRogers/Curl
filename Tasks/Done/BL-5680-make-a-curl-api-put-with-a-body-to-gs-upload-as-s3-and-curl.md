@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/RequestBodies/UploadSchemes.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5680 — Make a Curl.Api PUT with a body to gs:// upload, as s3:// and curl -T do
 
@@ -24,13 +24,16 @@ BL-5594 (Done) made a body upload on ftp, smb, smtp, s3, az, tftp and telnet; gs
 
 ## Acceptance criteria
 
-- [ ] A `Curl.Api` `PUT` with a byte body and with a stream body to a gs test server stores the object, pinned by tests; a GET returns the same bytes.
-- [ ] Every scheme whose console upload is `-T` is in `UploadSchemes`, or the Notes say why not; BL-5594's ADR lists them.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A `Curl.Api` `PUT` with a byte body and with a stream body to a gs test server stores the object, pinned by tests; a GET returns the same bytes.
+- [x] Every scheme whose console upload is `-T` is in `UploadSchemes`, or the Notes say why not; BL-5594's ADR lists them.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Added gs, oci, abfs and abfss to UploadSchemes (az was already there; the Azure handler serves all three azure schemes). Tests pin byte and stream bodies. ADR-1316 lists them. Other -T schemes were already present.
 
 ## Log
 
 - 2026-11-21: Created from Surly bug report 2026-11-21T0547, finding 1.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: a201a555 808ef102 3d836d5e.
+- 2026-11-21: Doing -> Done. gs, oci, abfs, abfss added to UploadSchemes; tests and ADR-1316 updated
