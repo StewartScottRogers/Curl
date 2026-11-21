@@ -33,3 +33,4 @@ About 1 `Curl.Api` FTPS download in 30 fails with 18 `PartialFile`; console curl
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1836, finding 4.
+- 2026-11-20: Backlog -> Doing. Criteria at claim: ca88f8a7 9865646e 3d836d5e.
