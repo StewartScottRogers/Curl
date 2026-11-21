@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/WriteGate.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5651 — Fix AF-0916: Surviving mutant: WriteGate.RunExclusive can leave its flow marked as holding the gate, so later writes bypass it
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/WriteGate.cs line 80`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/WriteGate.cs line 80`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The mutant is already killed: `WriteGateTests.RunExclusive_AfterItReturns_NextWriteOfThisFlowWaitsForAnotherHolder` (added by BL-4861, c1e1b49a60). Checked by hand on this tree: the statement is now at WriteGate.cs line 85 (the finding said 80; the file shifted). With `= true` that test failed (next write completed while another flow held the gate); reverted, all 3129 fast tests in Curl.Engine.UnitTests pass. No code change was needed.
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 3e72ddbc 9742157d.
+- 2026-11-20: Doing -> Done. Mutant already killed by RunExclusive_AfterItReturns_NextWriteOfThisFlowWaitsForAnotherHolder; verified by hand
