@@ -43,6 +43,7 @@ Select-String -Path Curl.Api.UnitTests/Composition/CurlClientCreateExtensionTest
 ## Re-audits
 
 - 2026-11-21 | 2026-11-21_0114.md | reproduces: yes | Ran Select-String -Pattern 'ActivatesTheDnsHook' -Context 0,3 and read the test: CurlClient.ExtensionTransferHooksFor(values), the method the name is about, is still checked only by Assert.IsNotNull. The added AreEqual("DnsQueryTransferHook", ...) checks a separately built TransferHooks.ActivatedBy(...), not what CurlClient returned.
+- 2026-11-21 | 2026-11-21_0835.md | reproduces: no | Ran the Select-String reproduction. The test now asserts the hook itself: line 86 Assert.AreEqual("DnsQueryTransferHook", HooksOf(wrapped)[0].GetType().Name) and line 89 the same of TransferHooks.ActivatedBy, beside the exact count 1.
 
 ## Log
 
