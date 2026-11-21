@@ -3,12 +3,12 @@ id: AF-0946
 title: SignalRReferenceFrame.TryRead is a Try method that returns a byte count, not a bool
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceFrame.cs:SignalRReferenceFrame.TryRead:misleading-name
 reproduction: none
-task: none
-tasks:
+task: BL-5705
+tasks: BL-5705
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

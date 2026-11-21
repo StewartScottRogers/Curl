@@ -3,12 +3,12 @@ id: AF-0936
 title: Surviving mutant: the lib526-family port can clean up its handles when upstream does not
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib526.cs:CleansUpTheHandles-and:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib526.cs:147:&&
-task: none
-tasks:
+task: BL-5695
+tasks: BL-5695
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

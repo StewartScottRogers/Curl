@@ -3,12 +3,12 @@ id: AF-0932
 title: Surviving mutant: a cipher string starting with a separator can be read as one element
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/OpenSslCipherString.cs:ApplyNextRule-lt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/OpenSslCipherString.cs:195:<
-task: none
-tasks:
+task: BL-5691
+tasks: BL-5691
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

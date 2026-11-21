@@ -3,12 +3,12 @@ id: AF-0944
 title: Surviving mutant: a token-endpoint body of exactly the 1 MiB limit can be refused
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OAuth2.UnitLibrary/Http/OAuth2HttpBodyReader.cs:RequireRoomFor-gt:surviving-mutant
 reproduction: mutation Curl.Extension.OAuth2.UnitLibrary/Http/OAuth2HttpBodyReader.cs:42:>
-task: none
-tasks:
+task: BL-5703
+tasks: BL-5703
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

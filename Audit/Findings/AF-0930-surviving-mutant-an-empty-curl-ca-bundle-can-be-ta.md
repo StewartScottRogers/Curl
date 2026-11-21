@@ -3,12 +3,12 @@ id: AF-0930
 title: Surviving mutant: an empty CURL_CA_BUNDLE can be taken as the CA bundle path
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:NonEmptyCurlCaBundle-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:124:>
-task: none
-tasks:
+task: BL-5689
+tasks: BL-5689
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

@@ -3,12 +3,12 @@ id: AF-0942
 title: Surviving mutant: a ':' with no name after it can be compiled as a URL-pattern group
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.CompressionDictionary.UnitLibrary/DictionaryMatchPattern.cs:AppendPatternPart-gt:surviving-mutant
 reproduction: mutation Curl.Extension.CompressionDictionary.UnitLibrary/DictionaryMatchPattern.cs:82:>
-task: none
-tasks:
+task: BL-5701
+tasks: BL-5701
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

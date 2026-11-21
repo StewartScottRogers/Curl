@@ -3,12 +3,12 @@ id: AF-0940
 title: Surviving mutant: the Brotli UTF8 context of byte 0xC0 can be wrong, mis-decoding output
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.CompressionDictionary.UnitLibrary/Brotli/BrotliLiteralContext.cs:BuildUtf8LastByte-ge:surviving-mutant
 reproduction: mutation Curl.Extension.CompressionDictionary.UnitLibrary/Brotli/BrotliLiteralContext.cs:35:>=
-task: none
-tasks:
+task: BL-5699
+tasks: BL-5699
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

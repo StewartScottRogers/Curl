@@ -3,12 +3,12 @@ id: AF-0941
 title: Surviving mutant: a 300 response can be stored as a compression dictionary
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.CompressionDictionary.UnitLibrary/CompressionDictionaryTransferHook.cs:IsSuccessfulResponse-lt:surviving-mutant
 reproduction: mutation Curl.Extension.CompressionDictionary.UnitLibrary/CompressionDictionaryTransferHook.cs:147:<
-task: none
-tasks:
+task: BL-5700
+tasks: BL-5700
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

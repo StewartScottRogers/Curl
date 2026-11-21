@@ -3,12 +3,12 @@ id: AF-0934
 title: Surviving mutant: every HTTP transfer can get an Alt-Svc cache without --alt-svc
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:OpenAltSvcCacheAsync-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:391:&&
-task: none
-tasks:
+task: BL-5693
+tasks: BL-5693
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

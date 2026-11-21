@@ -3,12 +3,12 @@ id: AF-0943
 title: Surviving mutant: a malformed inner list in Use-As-Dictionary can be accepted
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.CompressionDictionary.UnitLibrary/StructuredFieldDictionaryParser.cs:ParseInnerList-or:surviving-mutant
 reproduction: mutation Curl.Extension.CompressionDictionary.UnitLibrary/StructuredFieldDictionaryParser.cs:138:||
-task: none
-tasks:
+task: BL-5702
+tasks: BL-5702
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

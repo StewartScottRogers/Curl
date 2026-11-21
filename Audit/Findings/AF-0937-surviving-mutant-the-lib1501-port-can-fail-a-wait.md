@@ -3,12 +3,12 @@ id: AF-0937
 title: Surviving mutant: the lib1501 port can fail a wait of exactly its blocking limit
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1501.cs:WithinBlockingLimit-le:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1501.cs:98:<=
-task: none
-tasks:
+task: BL-5696
+tasks: BL-5696
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

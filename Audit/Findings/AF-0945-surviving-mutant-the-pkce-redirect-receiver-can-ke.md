@@ -3,12 +3,12 @@ id: AF-0945
 title: Surviving mutant: the PKCE redirect receiver can keep reading after the request head ends
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OAuth2.UnitLibrary/Flows/OAuth2RedirectReceiver.cs:ReadRequestLineAsync-and:surviving-mutant
 reproduction: mutation Curl.Extension.OAuth2.UnitLibrary/Flows/OAuth2RedirectReceiver.cs:45:&&
-task: none
-tasks:
+task: BL-5704
+tasks: BL-5704
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

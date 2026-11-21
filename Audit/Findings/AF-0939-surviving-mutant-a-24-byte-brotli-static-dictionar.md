@@ -3,12 +3,12 @@ id: AF-0939
 title: Surviving mutant: a 24-byte Brotli static-dictionary word can be refused
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.CompressionDictionary.UnitLibrary/Brotli/BrotliStaticDictionary.cs:WriteWord-gt:surviving-mutant
 reproduction: mutation Curl.Extension.CompressionDictionary.UnitLibrary/Brotli/BrotliStaticDictionary.cs:57:>
-task: none
-tasks:
+task: BL-5698
+tasks: BL-5698
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md

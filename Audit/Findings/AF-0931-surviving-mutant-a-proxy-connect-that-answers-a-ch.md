@@ -3,12 +3,12 @@ id: AF-0931
 title: Surviving mutant: a proxy CONNECT that answers a challenge on the same connection can be reported as not answering it
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.cs:NetworkDiagnosticLog-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.cs:1926:true
-task: none
-tasks:
+task: BL-5690
+tasks: BL-5690
 found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md
