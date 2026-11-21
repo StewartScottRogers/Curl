@@ -1070,6 +1070,51 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.IsNull(verification.DefaultCaBundleFile);
     }
 
+    // A host that sets no CA option (Curl.Api) reads CURL_CA_BUNDLE as the console does (BL-5642).
+    [TestMethod]
+    public void VerifyChain_OpenSslBuildWithCurlCaBundleSet_TrustsThatFile()
+    {
+        var bundle = WriteCaFile("env-bundle.crt", s_serverCertificate.ExportCertificatePem());
+        var verification = EnvironmentBundleVerification(new TlsClientOptions(), OpenSslBuild, bundle);
+
+        var verdict = verification.VerifyChain([s_serverCertificate.RawData], CertificateHost);
+
+        Assert.AreEqual(bundle, verification.DefaultCaBundleFile);
+        Assert.IsTrue(verdict.IsAccepted);
+    }
+
+    [TestMethod]
+    public void VerifyChain_OpenSslBuildWithCurlCaBundleNamingAMissingFile_IsExit77()
+    {
+        var bundle = Path.Combine(_caFileDirectory, "missing-env-bundle.crt");
+        var verification = EnvironmentBundleVerification(new TlsClientOptions(), OpenSslBuild, bundle);
+
+        var verdict = verification.VerifyChain([s_serverCertificate.RawData], CertificateHost);
+
+        Assert.AreEqual(CurlExitCode.SslCacertBadfile, verdict.ExitCode);
+    }
+
+    [TestMethod]
+    [DataRow(SchannelBuild, false, false)]
+    [DataRow(OpenSslBuild, true, false)]
+    [DataRow(OpenSslBuild, false, true)]
+    public void DefaultCaBundleFile_CurlCaBundleSetButSchannelOrCaFileOrInsecure_IsNone(
+        bool matchesSchannelBuild, bool withCaCertificateFile, bool insecure)
+    {
+        var bundle = WriteCaFile("env-bundle.crt", s_serverCertificate.ExportCertificatePem());
+        var options = new TlsClientOptions(Insecure: insecure, CaCertificateFile: withCaCertificateFile ? bundle : null);
+        var verification = EnvironmentBundleVerification(options, matchesSchannelBuild, bundle);
+
+        Assert.IsNull(verification.DefaultCaBundleFile);
+    }
+
+    private static ServerCertificateVerification EnvironmentBundleVerification(
+        TlsClientOptions options, bool matchesSchannelBuild, string bundle) =>
+        new(options, matchesSchannelBuild, TimeProvider.System)
+        {
+            ReadEnvironmentVariable = name => name == "CURL_CA_BUNDLE" ? bundle : null,
+        };
+
     [TestMethod]
     public void ConfigureCaBundleCandidates_AreCurlConfiguresSearchOrder()
     {

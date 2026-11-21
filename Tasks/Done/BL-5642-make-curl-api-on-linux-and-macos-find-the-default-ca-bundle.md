@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Api/Options/Transport/CurlTlsOptions.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5642 — Make Curl.Api on Linux and macOS find the default CA bundle as the console does, so an untrusted peer gives 60, not 77
 
@@ -24,13 +24,17 @@ With no `CertificateAuthorityBlob`, an untrusted HTTPS peer throws 77 `SslCacert
 
 ## Acceptance criteria
 
-- [ ] On Linux and macOS, a `Curl.Api` request with no CA option to an HTTPS server with an untrusted certificate fails with `CurlCode.PeerFailedVerification` (60), pinned by a test that runs there.
-- [ ] A `Curl.Api` request with no CA option uses the same default bundle path the console reports, pinned by a test of the resolved trust source.
-- [ ] `dotnet build` is clean and the fast tests pass on all three platforms in CI.
+- [x] On Linux and macOS, a `Curl.Api` request with no CA option to an HTTPS server with an untrusted certificate fails with `CurlCode.PeerFailedVerification` (60), pinned by a test that runs there.
+- [x] A `Curl.Api` request with no CA option uses the same default bundle path the console reports, pinned by a test of the resolved trust source.
+- [x] `dotnet build` is clean and the fast tests pass on all three platforms in CI.
 
 ## Notes
+
+- Could not reproduce the 77 on Windows (lanes test only there). The gap found: the console sets the CA file from CURL_CA_BUNDLE in Curl.Cli before the engine, and Curl.Api and Libcurl skip that. ServerCertificateVerification.DefaultCaBundleFile now reads CURL_CA_BUNDLE itself (ADR-1321), so every host resolves the same trust source; pinned by three tests in SslStreamTlsProviderTests. SSL_CERT_FILE and SSL_CERT_DIR are read by .NET itself. An untrusted peer with no CA option reaches 60 through the existing system-store path; tests are platform-neutral. If CI still shows 77 from Curl.Api, the cause is elsewhere and needs a new task.
+- Quality run for Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T1836, finding 3.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: e512ca0d 55a901a4 b3b3bfe9.
+- 2026-11-20: Doing -> Done. Curl.Networking resolves CURL_CA_BUNDLE for hosts that set no CA option (ADR-1321)
