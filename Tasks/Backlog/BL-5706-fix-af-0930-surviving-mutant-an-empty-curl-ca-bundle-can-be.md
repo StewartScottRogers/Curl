@@ -1,5 +1,5 @@
 ---
-id: BL-5689
+id: BL-5706
 title: Fix AF-0930: Surviving mutant: an empty CURL_CA_BUNDLE can be taken as the CA bundle path
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-21
 completed:
 ---
-# BL-5689 — Fix AF-0930: Surviving mutant: an empty CURL_CA_BUNDLE can be taken as the CA bundle path
+# BL-5706 — Fix AF-0930: Surviving mutant: an empty CURL_CA_BUNDLE can be taken as the CA bundle path
 
 ## Goal
 
