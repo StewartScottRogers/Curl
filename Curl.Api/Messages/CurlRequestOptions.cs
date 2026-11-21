@@ -21,7 +21,7 @@ internal static class CurlRequestOptions
     /// <returns>The options to perform the request with.</returns>
     public static EasyOptions Apply(EasyOptions options, CurlRequest request, HeaderCallback header, WriteCallback write, ICurlEngine engine, ICollection<IDisposable> owned)
     {
-        bool upload = request.Body is not null && UploadSchemes.UploadsWithBody(request.Url);
+        bool upload = request.Body is not null && (UploadSchemes.UploadsWithBody(request.Url) || IsHttpPutUpload(request));
         bool post = !upload && (request.Body is not null || request.Method == HttpMethod.Post);
         EasyOptions applied = options with
         {
@@ -32,6 +32,10 @@ internal static class CurlRequestOptions
         };
         return ApplyBody(applied, BodyToApply(request, post, upload), upload, engine, owned);
     }
+
+    /// <summary>Whether a <c>PUT</c> body is sent as an upload, as <c>curl -T</c> does (ADR-1331): any body but a multipart one.</summary>
+    private static bool IsHttpPutUpload(CurlRequest request) =>
+        request.Method == HttpMethod.Put && request.Body is not CurlMultipartContent;
 
     /// <summary>The <c>CURLOPT_HTTPHEADER</c> lines of the request: its fields, then an empty line for each removed header.</summary>
     private static string[] HeaderLines(CurlRequest request) =>

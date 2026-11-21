@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/RequestBodies/CurlContent.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5683 — Send no form Content-Type on a Curl.Api PUT with a body unless the body names one
 
@@ -24,14 +24,17 @@ A `Curl.Api` `PUT` with a `Body` sends `Content-Type: application/x-www-form-url
 
 ## Acceptance criteria
 
-- [ ] An ADR records how an HTTP PUT body is sent and why.
-- [ ] A `Curl.Api` PUT with a stream body sends no `Content-Type`, and one with a `CurlContent` that names a type sends that type, pinned by tests of the request bytes.
-- [ ] POST with a body still sends `application/x-www-form-urlencoded` unless the body names a type, pinned by the existing tests.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] An ADR records how an HTTP PUT body is sent and why.
+- [x] A `Curl.Api` PUT with a stream body sends no `Content-Type`, and one with a `CurlContent` that names a type sends that type, pinned by tests of the request bytes.
+- [x] POST with a body still sends `application/x-www-form-urlencoded` unless the body names a type, pinned by the existing tests.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+PUT with a non-multipart body over HTTP now uses the upload path (ADR-1331). CurlContent carries no content type today, so none is sent; a caller header is sent as given. Multipart PUT unchanged. Quality gate: 0 failing members.
 
 ## Log
 
 - 2026-11-21: Created from Surly bug report 2026-11-21T0547, finding 4.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 4f977388 e2dc41ea 07c16a66 3d836d5e.
+- 2026-11-21: Doing -> Done. Curl.Api HTTP PUT body is an upload with no form Content-Type

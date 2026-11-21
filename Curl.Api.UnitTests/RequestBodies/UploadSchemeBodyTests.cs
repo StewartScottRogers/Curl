@@ -106,12 +106,22 @@ public sealed class UploadSchemeBodyTests
     }
 
     [TestMethod]
-    public async Task SendAsync_BytesBodyToHttp_IsStillPosted()
+    public async Task SendAsync_BytesBodyPostedToHttp_IsStillPosted()
     {
-        UploadingEasyTransfer easy = await SendAsync(HttpMethod.Put, "http://h/", CurlContent.FromBytes(Hello));
+        UploadingEasyTransfer easy = await SendAsync(HttpMethod.Post, "http://h/", CurlContent.FromBytes(Hello));
 
         Assert.IsFalse(easy.PerformedOptions!.Transfer.Upload);
         Assert.IsTrue(easy.PerformedOptions.Http.Post);
+    }
+
+    [TestMethod]
+    public async Task SendAsync_BytesBodyPutToHttp_IsUploaded()
+    {
+        UploadingEasyTransfer easy = await SendAsync(HttpMethod.Put, "http://h/", CurlContent.FromBytes(Hello));
+
+        Assert.IsTrue(easy.PerformedOptions!.Transfer.Upload);
+        Assert.IsFalse(easy.PerformedOptions.Http.Post);
+        Assert.IsNull(easy.PerformedOptions.Transfer.CustomRequest);
     }
 
     [TestMethod]

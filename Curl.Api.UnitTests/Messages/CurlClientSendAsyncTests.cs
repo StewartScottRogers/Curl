@@ -104,17 +104,18 @@ public sealed class CurlClientSendAsyncTests
     }
 
     [TestMethod]
-    public async Task SendAsync_PutWithBody_PostsTheBodyUnderACustomMethod()
+    public async Task SendAsync_PutWithBody_UploadsTheBodyAsCurlTDoes()
     {
         CurlRequest request = new(HttpMethod.Put, "http://example/") { Body = new byte[] { 1, 2, 3 } };
 
         (_, ScriptedEasyTransfer easy) = await SendAsync(request);
 
         EasyOptions options = Performed(easy);
-        Assert.IsTrue(options.Http.Post);
-        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, options.Http.PostFields!.Value.ToArray());
-        Assert.AreEqual(3, options.Http.PostFieldSize);
-        Assert.AreEqual("PUT", options.Transfer.CustomRequest);
+        Assert.IsTrue(options.Transfer.Upload);
+        Assert.IsFalse(options.Http.Post);
+        Assert.IsNull(options.Http.PostFields);
+        Assert.AreEqual(3, options.Transfer.InFileSize);
+        Assert.IsNull(options.Transfer.CustomRequest);
     }
 
     [TestMethod]

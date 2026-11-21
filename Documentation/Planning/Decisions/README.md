@@ -1372,3 +1372,4 @@ Each option and the specific reason it lost.
 | [1328](ADR-1328-ftp-resume-offset-and-names-only-listing-are-documented-as-transfer-wide.md) | CurlFtpOptions.ResumeFrom and ListOnly are documented as transfer-wide (BL-5668) | Accepted | 2026-11-21 |
 | [1329](ADR-1329-the-failed-upload-write-wait-cancels-its-control-read-and-holds-the-reply.md) | The failed-upload-write wait cancels its control read and holds the reply it reads (BL-5667) | Accepted | 2026-11-21 |
 | [1330](ADR-1330-the-transfer-tool-takes-proxy-login-proxy-ca-resolve-and-a-body-limit-field.md) | The transfer tool takes proxy login, proxy CA, resolve and a body-limit field (BL-5671) | Accepted | 2026-11-21 |
+| [1331](ADR-1331-a-curl-api-http-put-body-is-an-upload-not-post-fields.md) | A Curl.Api HTTP PUT body is an upload, not post fields (BL-5683) | Accepted | 2026-11-21 |
