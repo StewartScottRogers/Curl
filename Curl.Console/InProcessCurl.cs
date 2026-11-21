@@ -67,6 +67,7 @@ public static class InProcessCurl
     /// <param name="tcpDialer">Opens every plaintext TCP connection the connector dials.</param>
     /// <param name="dnsResolver">Resolves every host name the connector looks up.</param>
     /// <param name="datagramConnector">Opens every UDP channel the transfers make.</param>
+    /// <param name="usesHandBuiltNtlm">Whether NTLM and Digest answer as the non-SSPI build, as the conformance harness expects (the default); <see langword="false" /> answers as the platform's own curl, which on Windows is SSPI (BL-5685).</param>
     /// <returns>The exit code curl would end with.</returns>
     /// <exception cref="ArgumentNullException">Any argument is <see langword="null" />.</exception>
     public static Task<int> RunAsync(
@@ -76,7 +77,8 @@ public static class InProcessCurl
         Stream standardInput,
         ITcpDialer tcpDialer,
         IDnsResolver dnsResolver,
-        IDatagramConnector datagramConnector)
+        IDatagramConnector datagramConnector,
+        bool usesHandBuiltNtlm = true)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(standardOutput);
@@ -85,7 +87,7 @@ public static class InProcessCurl
         ArgumentNullException.ThrowIfNull(tcpDialer);
         ArgumentNullException.ThrowIfNull(dnsResolver);
         ArgumentNullException.ThrowIfNull(datagramConnector);
-        return CreateDialingRunner(standardOutput, standardError, standardInput, tcpDialer, dnsResolver, datagramConnector, readEnvironmentVariable: null, defaultConfigFileSearch: null, ftpListener: null).RunAsync(arguments);
+        return CreateDialingRunner(standardOutput, standardError, standardInput, tcpDialer, dnsResolver, datagramConnector, readEnvironmentVariable: null, defaultConfigFileSearch: null, ftpListener: null, usesHandBuiltNtlm: usesHandBuiltNtlm).RunAsync(arguments);
     }
 
     /// <summary>
@@ -289,7 +291,8 @@ public static class InProcessCurl
         DefaultConfigFileSearch? defaultConfigFileSearch,
         IConnectionListener? ftpListener,
         TimeProvider? timeProvider = null,
-        IExtensionProcessStarter? processStarter = null) =>
+        IExtensionProcessStarter? processStarter = null,
+        bool usesHandBuiltNtlm = true) =>
         CurlComposition.CreateRunner(
             standardOutput,
             standardError,
@@ -299,7 +302,7 @@ public static class InProcessCurl
             datagramConnector,
             writesProgressMeter: true,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows()),
-            usesHandBuiltNtlm: true,
+            usesHandBuiltNtlm: usesHandBuiltNtlm,
             readEnvironmentVariable: readEnvironmentVariable,
             defaultConfigFileSearch: defaultConfigFileSearch,
             ftpListener: ftpListener,
