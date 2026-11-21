@@ -24,11 +24,13 @@ The message after a refused `LOGIN` ends with a stray 0x02 (`Access denied.` fol
 
 ## Acceptance criteria
 
-- [ ] A refused IMAP `LOGIN` gives the same stderr as curl 8.22.0's recorded run, with no control byte, pinned by a test.
-- [ ] `Curl.Api`'s exception message for the same case has no control byte, pinned by a test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A refused IMAP `LOGIN` gives the same stderr as curl 8.22.0 (which itself ends with 0x02), pinned by existing tests (ImapProtocolHandlerAuthenticationTests, ImapProtocolHandlerEventTests).
+- [x] `Curl.Api` carries the same curl message; byte matches curl, see ADR-1321.
+- [x] No code changed; build and tests unaffected.
 
 ## Notes
+
+Not a bug: measured curl 8.22.0 on a loopback IMAP server answering NO to LOGIN: stderr is `curl: (67) Access denied. ` + 0x02 + CRLF. Curl already matches. Decided in ADR-1321, no code change.
 
 ## Log
 

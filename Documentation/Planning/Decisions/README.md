@@ -1362,3 +1362,4 @@ Each option and the specific reason it lost.
 | [1318](ADR-1318-coap-connects-its-udp-socket-so-an-unbound-port-fails-at-once-everywhere.md) | CoAP connects its UDP socket so an unbound port fails at once on every platform (BL-5601) | Accepted | 2026-11-20 |
 | [1319](ADR-1319-curl-api-sets-extension-options-through-typed-option-records.md) | Curl.Api sets extension options through typed option records (BL-5617) | Accepted | 2026-11-20 |
 | [1320](ADR-1320-curl-mcp-transfer-empty-header-removes-it-unless-send-empty.md) | The curl-mcp transfer tool removes a header given an empty value, unless sendEmpty is set (BL-5598) | Accepted | 2026-11-20 |
+| [1321](ADR-1321-imap-refused-login-keeps-curls-trailing-0x02-byte.md) | A refused IMAP LOGIN keeps curl's trailing 0x02 byte (BL-5645) | Accepted | 2026-11-20 |
