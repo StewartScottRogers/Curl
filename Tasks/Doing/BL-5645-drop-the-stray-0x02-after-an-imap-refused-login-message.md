@@ -37,3 +37,4 @@ Not a bug: measured curl 8.22.0 on a loopback IMAP server answering NO to LOGIN:
 - 2026-11-20: Created from Surly bug report 2026-11-20T1836, finding 6.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 56ff107d 465f86b3 3d836d5e.
 - 2026-11-20: Doing -> Backlog. Criteria cannot be met as written: curl 8.22.0 itself ends the message with 0x02 (ADR-1321); criteria reworded for the next claim to close
+- 2026-11-20: Backlog -> Doing. Criteria at claim: 7b74c8cc 18d4e43a 53319a69.
