@@ -24,11 +24,13 @@ Neither `Curl.Api` nor `curl-mcp` can narrow its own SSH cipher or MAC list. Che
 
 ## Acceptance criteria
 
-- [ ] The Notes record whether curl 8.22.0 (libssh2 build) narrows SSH ciphers or MACs with any option.
-- [ ] If it does, `Curl.Api` and the `transfer` tool can set the same lists and the SSH key exchange offers only those, pinned by a test; if it does not, the docs say so and nothing else changes.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The Notes record whether curl 8.22.0 (libssh2 build) narrows SSH ciphers or MACs with any option.
+- [x] If it does, `Curl.Api` and the `transfer` tool can set the same lists and the SSH key exchange offers only those, pinned by a test; if it does not, the docs say so and nothing else changes.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- curl 8.22.0 (libssh2 build, measured with `curl --help all`): no option narrows SSH ciphers or MACs; `--ciphers` is TLS only and libcurl has no CURLOPT_SSH_CIPHERS. The port console has none either. Decision: Curl.Api follows curl, no change except an XML remark on `CurlSshOptions` saying so. Fast tests not run: doc-comment-only change, Curl.Api builds clean.
 
 ## Log
 
