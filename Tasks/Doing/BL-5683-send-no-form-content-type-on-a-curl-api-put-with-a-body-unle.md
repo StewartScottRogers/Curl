@@ -34,3 +34,4 @@ A `Curl.Api` `PUT` with a `Body` sends `Content-Type: application/x-www-form-url
 ## Log
 
 - 2026-11-21: Created from Surly bug report 2026-11-21T0547, finding 4.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: 4f977388 e2dc41ea 07c16a66 3d836d5e.
