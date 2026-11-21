@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary/DerReader.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5675 — Fix AF-0925: Surviving mutant: the DER reader can refuse a source of exactly curl's maximum length
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Output.UnitLibrary/DerReader.cs line 77`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Output.UnitLibrary/DerReader.cs line 77`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `TryRead_SourceOfExactlyTheMaximumLength_IsRead` (mutant applied by hand: it failed; reverted: all 917 Output tests pass). `TryRead_SourceOneByteOverTheMaximumLength_IsRefused` pins the other side.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: ea97f8f0 9742157d.
+- 2026-11-21: Doing -> Done. Boundary tests kill the mutant
