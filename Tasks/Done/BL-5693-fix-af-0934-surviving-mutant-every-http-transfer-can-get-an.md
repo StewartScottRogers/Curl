@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5693 — Fix AF-0934: Surviving mutant: every HTTP transfer can get an Alt-Svc cache without --alt-svc
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs line 391`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs line 391`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `TransferPerformerTests.OpenAltSvcCacheAsync_OptionAndUrl_OpensACacheOnlyForAltSvcOptionAndHttpUrl` (Curl.Engine.UnitTests/TransferPerformerTests.Setup.cs): with `||` applied by hand 2 of its 3 rows fail; reverted, all pass. Build clean, Engine fast tests 3138 passed. Test-only change, no production code changed.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: dcf7efaa 9742157d.
+- 2026-11-21: Doing -> Done. Test pins that no Alt-Svc cache opens without --alt-svc or for non-HTTP URLs; kills the || mutant
