@@ -13,6 +13,15 @@
     <EmbeddedResource Include="Readme\ReadmeSamples.cs" LogicalName="ReadmeSamples.cs" />
   </ItemGroup>
 
+  <!-- The package metadata files SurlyPackageMetadataTests reads (BL-5708). -->
+  <ItemGroup>
+    <None Include="..\Curl.Api\Curl.Api.csproj" Link="SurlyPackaging\Curl.Api.csproj" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Libcurl\Libcurl.csproj" Link="SurlyPackaging\Libcurl.csproj" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Curl.Mcp\Curl.Mcp.csproj" Link="SurlyPackaging\Curl.Mcp.csproj" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Curl.Api\README.md" Link="SurlyPackaging\Curl.Api.README.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Libcurl\README.md" Link="SurlyPackaging\Libcurl.README.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Curl.Mcp\README.md" Link="SurlyPackaging\Curl.Mcp.README.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Curl.Api\Curl.Api.csproj" />
     <ProjectReference Include="..\Curl.Api.UnitLibrary\Curl.Api.UnitLibrary.csproj" />

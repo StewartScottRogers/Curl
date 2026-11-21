@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-5707]
-touches: [Curl.Api/Curl.Api.csproj, Libcurl/Libcurl.csproj, Curl.Mcp/Curl.Mcp.csproj]
+touches: [Curl.Api/Curl.Api.csproj, Libcurl/Libcurl.csproj, Curl.Mcp/Curl.Mcp.csproj, Curl.Api/README.md, Libcurl/README.md, Curl.Mcp/README.md, SurlyIcon.png, Curl.Api.UnitTests/Curl.Api.UnitTests.csproj, Curl.Api.UnitTests/SurlyPackageMetadataTests.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5708 — Make each Surly NuGet package page say it is a managed curl reimplementation with no native libcurl
 
@@ -30,15 +30,19 @@ Shared values go in `Directory.Build.props` only if every packable project uses 
 
 ## Acceptance criteria
 
-- [ ] Each of the three packed `.nuspec`s (read from the `.nupkg`) has a `title`, an `icon`, a `license` expression, a `projectUrl`, and a `description` whose first sentence says managed reimplementation and no native libcurl.
-- [ ] Each package's tags include `managed`, `reimplementation`, `no-native` and `aot`.
-- [ ] Each packed README opens with that statement and the `Surly.*` install line.
-- [ ] A test (or the pack Integration test) reads the packed metadata and pins the points above.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Each of the three packed `.nuspec`s (read from the `.nupkg`) has a `title`, an `icon`, a `license` expression, a `projectUrl`, and a `description` whose first sentence says managed reimplementation and no native libcurl.
+- [x] Each package's tags include `managed`, `reimplementation`, `no-native` and `aot`.
+- [x] Each packed README opens with that statement and the `Surly.*` install line.
+- [x] A test (or the pack Integration test) reads the packed metadata and pins the points above.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decided by Claude under Stewart's delegation: licence expression is `curl` (SPDX id of the repository's curl-style LICENSE.txt), replacing PackageLicenseFile (the two are exclusive). Icon is a generated 128x128 PNG `SurlyIcon.png` at the repo root, packed by all three. Shared values stay in each csproj (Directory.Build.props covers non-packable projects).
+- touches widened to the READMEs, icon and the metadata test (no other Doing task names them). The test lives in Curl.Api.UnitTests and reads the three csprojs and READMEs copied to its output; `dotnet pack Curl.Api` succeeds. Linux/macOS CI: platform-neutral.
 
 ## Log
 
 - 2026-11-21: Created at Stewart's request (differentiate the packages on NuGet).
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 8a9f7bee ef2545e0 35f14f63 7cda2e82 3d836d5e.
+- 2026-11-21: Doing -> Done. Surly packages carry title, icon, curl licence expression, managed/no-native description, tags and README statement; pinned by SurlyPackageMetadataTests

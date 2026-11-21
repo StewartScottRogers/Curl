@@ -1,5 +1,7 @@
 # Libcurl
 
+A complete managed C# reimplementation of curl and libcurl for .NET 10: no native libcurl, native-AOT ready, and it behaves like curl 8.22.0. Install: `dotnet add package Surly.Libcurl --prerelease`.
+
 Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.
 
 The libcurl-faithful programming interface to Curl (ADR-0506): the libcurl C API shaped for C#.

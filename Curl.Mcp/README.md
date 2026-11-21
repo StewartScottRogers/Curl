@@ -1,5 +1,7 @@
 # Curl.Mcp
 
+A complete managed C# reimplementation of curl and libcurl for .NET 10: no native libcurl, native-AOT ready, and it behaves like curl 8.22.0. Run it as an MCP server with `dnx Surly.Curl.Mcp`.
+
 An MCP server that runs curl for AI agents. It serves Curl, the drop-in C# replacement for the
 curl command-line tool (<https://github.com/StewartScottRogers/Curl>), over standard input and
 output, using the Model Context Protocol (MCP). Any MCP client can use it: GitHub Copilot in VS

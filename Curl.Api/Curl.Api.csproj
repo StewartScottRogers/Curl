@@ -10,10 +10,13 @@
     <PackageId>Surly.Curl.Api</PackageId>
     <Version>0.2.0</Version>
     <Authors>Stewart Scott Rogers</Authors>
-    <Description>The .NET programming interface to Curl: an async client over the managed curl engine, with HttpClient-shaped ergonomics and curl's own options. Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.</Description>
-    <PackageTags>curl; http; client; async</PackageTags>
+    <Description>A complete managed C# reimplementation of curl and libcurl for .NET 10: no native libcurl, native-AOT ready, behaves like curl 8.22.0. The .NET programming interface to Curl: an async client over the managed curl engine, with HttpClient-shaped ergonomics and curl's own options. Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.</Description>
+    <PackageTags>curl; http; client; async; managed; reimplementation; no-native; aot</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <Title>Surly Curl for .NET (managed)</Title>
+    <PackageLicenseExpression>curl</PackageLicenseExpression>
+    <PackageIcon>SurlyIcon.png</PackageIcon>
+    <Copyright>Copyright (c) 2026, Stewart Scott Rogers, and many contributors.</Copyright>
     <PackageProjectUrl>https://github.com/StewartScottRogers/Curl</PackageProjectUrl>
     <RepositoryUrl>https://github.com/StewartScottRogers/Curl</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -22,7 +25,7 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
-    <None Include="..\LICENSE.txt" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="..\SurlyIcon.png" Pack="true" PackagePath="/" Visible="false" />
   </ItemGroup>
 
   <Target Name="BundleReferencedProjectAssemblies" DependsOnTargets="ResolveReferences">
