@@ -92,7 +92,12 @@ public sealed class Lib1501(TimeProvider timeProvider) : ILibTest
         }
     }
 
-    private static bool WithinBlockingLimit(LibTestContext context, LibTestSteps steps, long elapsed)
+    /// <summary>Writes <c>pong = N</c> and answers whether a call that took <paramref name="elapsed"/> milliseconds stayed within <see cref="MaxBlockedMilliseconds"/>; past it, sets <see cref="CurlCode.TooLarge"/>.</summary>
+    /// <param name="context">The program's context.</param>
+    /// <param name="steps">The program's steps, carrying its <c>result</c>.</param>
+    /// <param name="elapsed">Milliseconds the <c>multi_perform</c> call took.</param>
+    /// <returns><see langword="true"/> when the program goes on.</returns>
+    public static bool WithinBlockingLimit(LibTestContext context, LibTestSteps steps, long elapsed)
     {
         context.StandardError.Write($"pong = {elapsed}\n");
         if (elapsed <= MaxBlockedMilliseconds)
