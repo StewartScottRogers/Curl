@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Tftp.UnitLibrary]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5665 — Upload an empty file over TFTP if curl 8.22.0 does, instead of exiting 26
 
@@ -24,13 +24,17 @@ An empty file cannot be uploaded over TFTP: exit 26. RFC 1350 ends a transfer wi
 
 ## Acceptance criteria
 
-- [ ] The Notes record curl 8.22.0's result for `-T empty.txt tftp://...`.
-- [ ] The port's result matches it, pinned by a test of the packets sent.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The Notes record curl 8.22.0's result for `-T empty.txt tftp://...`.
+- [x] The port's result matches it, pinned by a test of the packets sent.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Does not reproduce on the current branch. Measured against a loopback PowerShell TFTP server: curl 8.22.0 (Schannel) `-T empty.txt tftp://127.0.0.1:6969/x` exits 0, sends a WRQ then one 4-byte DATA block 1 (0 payload bytes). Curl.Console does exactly the same, exit 0.
+- Pinned already by `TftpUploadTests.ExecuteAsync_EmptyUpload_SendsTsizeZeroAndOneEmptyData1`. The exit 26 in the report was most likely already fixed or specific to the Surl server. No code change.
 
 ## Log
 
 - 2026-11-20: Created from Surly bug report 2026-11-20T2225, finding 8 (check).
 - 2026-11-20: Backlog -> Doing. Criteria at claim: 8beea2eb 6c434bcb 3d836d5e.
+- 2026-11-20: Doing -> Done. Does not reproduce: Curl matches curl 8.22.0 (WRQ + one empty DATA, exit 0); already pinned by a test
