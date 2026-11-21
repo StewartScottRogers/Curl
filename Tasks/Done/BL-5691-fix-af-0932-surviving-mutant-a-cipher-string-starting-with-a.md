@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/OpenSslCipherString.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5691 — Fix AF-0932: Surviving mutant: a cipher string starting with a separator can be read as one element
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/OpenSslCipherString.cs line 195`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/OpenSslCipherString.cs line 195`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+AF-0932's mutant is equivalent: `ReadSelection` is reached only after `ApplyNextRule` skipped any separator at the position, so `end` (an absolute index from `_position`) is never 0 and `end <= 0` behaves as `end < 0`; a leading separator never reaches line 195 (existing test `Select_WithAListSplitOnAnyOpenSslSeparator_KeepsItsOrder` has `:` first). Fix: the element is now `_value[_position..].Split(separators)[0]`, so the mutated branch no longer exists. Added `Select_WithARulePrefixFollowedByASeparator_FailsWithTheCipherListMessage` (the one way a separator starts an element). No test can kill the original mutant, so criterion 1 is met by removing the site. Quality run for Curl.Networking.UnitLibrary clean; fast tests pass.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 3d257580 9742157d.
+- 2026-11-21: Doing -> Done. Mutant is equivalent; the mutated branch removed and a prefix-then-separator test added
