@@ -34,3 +34,4 @@ The `transfer` tool has no proxy-login (`--proxy-user`), proxy-CA (`--proxy-cace
 ## Log
 
 - 2026-11-21: Created from Surly bug report 2026-11-21T0408, finding 2.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: eb38ce03 ca138c94 2bbd8c60 3d836d5e.
