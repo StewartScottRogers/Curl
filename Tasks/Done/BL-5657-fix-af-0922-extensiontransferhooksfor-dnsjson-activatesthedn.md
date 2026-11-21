@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api.UnitTests/Composition/CurlClientCreateExtensionTests.cs]
 requirement: none
 created: 2026-11-20
-completed:
+completed: 2026-11-20
 ---
 # BL-5657 — Fix AF-0922: ExtensionTransferHooksFor_DnsJson_ActivatesTheDnsHook asserts only that some hooks exist, not the DNS hook
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The test now also activates the catalogue hooks for dns-json and asserts exactly one, of type DnsQueryTransferHook. Fast Curl.Api.UnitTests green; test-only change.
 
 ## Log
 
 - 2026-11-20: Created.
 - 2026-11-20: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-20: Doing -> Done. Test asserts the DnsQueryTransferHook is the one activated
