@@ -38,3 +38,4 @@ Interactive only. The package check in `.github/workflows/ci.yml` (lines ~265 an
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 60a0b9b1.
 - 2026-11-21: Doing -> Backlog. Interactive only: the fix is in .github/workflows/ci.yml (guard file); package check still expects Curl.Mcp.* but packages are Surly.Curl.Mcp.*
+- 2026-11-21: Backlog -> Doing. Criteria at claim: 60a0b9b1.

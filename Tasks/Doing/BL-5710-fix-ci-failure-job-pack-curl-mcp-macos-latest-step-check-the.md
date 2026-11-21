@@ -38,3 +38,4 @@ Interactive only: the cause is in `.github/workflows/ci.yml` (guard file, lanes 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 4090b3a3.
 - 2026-11-21: Doing -> Backlog. Interactive only: fix is in guard file ci.yml (Surly. package prefix); lane: no
+- 2026-11-21: Backlog -> Doing. Criteria at claim: 4090b3a3.

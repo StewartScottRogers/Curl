@@ -38,3 +38,4 @@ Interactive only: the fix is in `.github/workflows/ci.yml`, a guard file a lane 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: b5d91029.
 - 2026-11-21: Doing -> Backlog. Interactive only: fix is in guard file .github/workflows/ci.yml (package name now Surly.Curl.Mcp*)
+- 2026-11-21: Backlog -> Doing. Criteria at claim: b5d91029.
