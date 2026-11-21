@@ -9,6 +9,7 @@ using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
 using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
@@ -181,6 +182,19 @@ internal sealed partial class ManagedEasyTransfer
         };
 
     /// <summary>
+    /// How strictly the handlers require TLS for <c>CURLOPT_USE_SSL</c>, as the console reads <c>--ssl</c>, <c>--ssl-reqd</c> and
+    /// <c>--ftp-ssl-control</c>: <see cref="UseSsl.Try"/> tries, <see cref="UseSsl.Control"/> and <see cref="UseSsl.All"/> require.
+    /// </summary>
+    /// <param name="useSsl">The handle's <c>CURLOPT_USE_SSL</c> value.</param>
+    /// <returns>The security level.</returns>
+    internal static TransportSecurityLevel SslLevelOf(UseSsl useSsl) => useSsl switch
+    {
+        UseSsl.Try => TransportSecurityLevel.Try,
+        UseSsl.Control or UseSsl.All => TransportSecurityLevel.Required,
+        _ => TransportSecurityLevel.None,
+    };
+
+    /// <summary>
     /// The curl tool's own settings for a transfer driven through the easy interface with no
     /// <see cref="ToolSettings" />: what the easy groups say (<c>CURLOPT_SSL_VERIFYPEER</c>,
     /// <c>CURLOPT_KEYPASSWD</c>, <c>CURLOPT_SSLENGINE</c>, <c>CURLOPT_PROTOCOLS_STR</c>,
@@ -205,9 +219,9 @@ internal sealed partial class ManagedEasyTransfer
             ProxyCredentials: ProxyCredentialsOf(options.Authentication),
             AllowedProtocols: ProtocolSetOf(options.Network.Protocols),
             AllowedRedirectProtocols: ProtocolSetOf(options.Network.RedirectProtocols),
-            SslLevel: TransportSecurityLevel.None,
-            FtpSslControlOnly: false,
-            SslRequired: false,
+            SslLevel: SslLevelOf(options.Network.UseSsl),
+            FtpSslControlOnly: options.Network.UseSsl == UseSsl.Control,
+            SslRequired: options.Network.UseSsl == UseSsl.All,
             ListOnly: options.Transfer.DirListOnly,
             UploadFlags: UploadFlagNamesOf(options.Protocols.Smtp.UploadFlags),
             ProxyHeaders: options.Proxy.HeaderOption == HeaderOption.Unified ? [] : options.Proxy.ProxyHeaders,

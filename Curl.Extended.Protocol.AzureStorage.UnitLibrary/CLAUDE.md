@@ -7,7 +7,7 @@ or another extension. It is registered in `ExtensionCatalogue.cs` and `Extension
 
 - `Client/` is the handler (ADR-1105). `AzureStorageExtension` gives the description and creates
   `AzureStorageProtocolHandler`, which maps the URL, chooses the credential and hands `az` to
-  `AzureBlobOperations` (Get Blob, Put Blob, Put Block and Put Block List from 8 MiB, List Blobs) and
+  `AzureBlobOperations` (Get Blob, Put Blob, Put Block and Put Block List from 8 MiB, Delete Blob with `-X DELETE`, List Blobs) and
   `abfs`/`abfss` to `AzureDataLakeOperations` (Path Read, Path Create, Path Update append and flush,
   Path List). `AzureStorageClient` sends one request per connection over HTTPS on 443 and turns a status
   of 300 or above into exit 22 naming the `Error` code (the XML `Error` body, else the DFS JSON

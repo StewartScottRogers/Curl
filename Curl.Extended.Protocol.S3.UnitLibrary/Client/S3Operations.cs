@@ -26,6 +26,13 @@ internal sealed class S3Operations(S3Client client, S3Endpoint endpoint, string 
     internal Task<long> DownloadAsync(string key, IReadOnlyList<KeyValuePair<string, string>> query, Stream output) =>
         client.ExchangeAsync("GET", endpoint.PathOf(bucket, key), query, null, response => CopyAsync(response.Body, output));
 
+    /// <summary>Deletes the object at <paramref name="key"/> (DeleteObject); a 204 is success, any other 3xx or above fails as the other operations do.</summary>
+    /// <param name="key">The object key.</param>
+    /// <param name="query">The URL's own query parameters, sent as they are (for example <c>versionId</c>).</param>
+    /// <returns>Zero: a delete transfers no bytes.</returns>
+    internal Task<long> DeleteAsync(string key, IReadOnlyList<KeyValuePair<string, string>> query) =>
+        client.ExchangeAsync("DELETE", endpoint.PathOf(bucket, key), query, null, _ => Task.FromResult(0L));
+
     /// <summary>Writes, one per line, the common prefixes and then the keys of each page of the listing under <paramref name="prefix"/> (ListObjectsV2).</summary>
     /// <param name="prefix">The prefix the keys start with, empty for the whole bucket.</param>
     /// <param name="query">The URL's own query parameters; each replaces curl's default of the same name (<c>delimiter</c>), except <c>prefix</c>, which is appended to <paramref name="prefix"/>, and <c>list-type</c> and <c>continuation-token</c>, which curl owns (ADR-1315).</param>

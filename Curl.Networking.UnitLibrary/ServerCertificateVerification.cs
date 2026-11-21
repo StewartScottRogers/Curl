@@ -113,10 +113,18 @@ internal sealed partial class ServerCertificateVerification(TlsClientOptions opt
         }
     }
 
+    // A host that sets no CA option (Curl.Api) gets what the console's CaCertificateEnvironment gives
+    // its options: CURL_CA_BUNDLE names the CA file (BL-5642).
     private string? FindDefaultCaBundleFile() =>
-        matchesSchannelBuild || options.HasCaCertificates || !EmptiesSystemStore()
+        matchesSchannelBuild || options.HasCaCertificates || options.Insecure
             ? null
-            : DefaultCaBundleCandidates.FirstOrDefault(File.Exists);
+            : NonEmptyCurlCaBundle() ?? BuiltInBundleForAnEmptiedSystemStore();
+
+    private string? NonEmptyCurlCaBundle() =>
+        ReadEnvironmentVariable("CURL_CA_BUNDLE") is { Length: > 0 } bundle ? bundle : null;
+
+    private string? BuiltInBundleForAnEmptiedSystemStore() =>
+        EmptiesSystemStore() ? DefaultCaBundleCandidates.FirstOrDefault(File.Exists) : null;
 
     private bool EmptiesSystemStore() =>
         ReadEnvironmentVariable("SSL_CERT_FILE") is "" || ReadEnvironmentVariable("SSL_CERT_DIR") is "";

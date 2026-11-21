@@ -36,6 +36,18 @@ internal sealed class AzureBlobOperations(AzureStorageClient client, int blockSi
             ? (int)needed
             : throw new AzureStorageTransferException(CurlExitCode.FilesizeExceeded, $"An Azure Storage upload of {length} bytes needs more than {maxBlockCount} blocks");
     }
+    /// <summary>Deletes the blob <paramref name="endpoint"/> names (Delete Blob, answered 202); a container or a name ending in <c>/</c> is refused, never deleting the container (ADR-1324).</summary>
+    /// <param name="endpoint">The URL's endpoint, whose path is <c>/container/blob</c>; its query (for example <c>snapshot</c>) is sent as it is.</param>
+    /// <returns>Zero: a delete transfers no bytes.</returns>
+    /// <exception cref="AzureStorageTransferException">Exit 3 when the URL names no blob.</exception>
+    internal Task<long> DeleteAsync(AzureStorageEndpoint endpoint)
+    {
+        (_, string container, string blob) = SplitPath(endpoint);
+        return container.Length == 0 || blob.Length == 0 || blob.EndsWith('/')
+            ? throw new AzureStorageTransferException(CurlExitCode.UrlMalformat, "An Azure Storage delete needs a blob name in the URL")
+            : client.ExchangeAsync("DELETE", endpoint, [], null, _ => Task.FromResult(0L));
+    }
+
     /// <summary>Downloads, uploads or lists what <paramref name="endpoint"/> names.</summary>
     /// <param name="endpoint">The URL's endpoint, whose path is <c>/container/blob</c>.</param>
     /// <param name="upload">The bytes to upload, or <see langword="null"/> to download or list.</param>

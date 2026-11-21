@@ -55,16 +55,29 @@ internal sealed class S3ProtocolHandler(IConnector connector, Func<string, strin
         return path[Math.Min(1, path.Length)..];
     }
 
+    // A bucket or prefix URL is refused rather than deleting the bucket: -X DELETE removes one object (BL-5647).
+    private static Task<long> DeleteObjectAsync(S3Operations operations, ITransferContext context, string key) =>
+        IsPrefix(key)
+            ? throw new S3TransferException(CurlExitCode.UrlMalformat, "An S3 delete needs an object key in the URL")
+            : operations.DeleteAsync(key, S3Endpoint.QueryOf(context.Url.Query));
+
     private static Task<long> TransferAsync(S3Operations operations, ITransferContext context, string key)
     {
-        bool namesPrefix = key.Length == 0 || key.EndsWith('/');
         context.Progress.ReportTransferStarted();
-        return context.Upload switch
-        {
-            null when namesPrefix => operations.ListAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output),
-            null => operations.DownloadAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output),
-            _ when namesPrefix => throw new S3TransferException(CurlExitCode.UrlMalformat, "An S3 upload needs an object key in the URL"),
-            { } upload => operations.UploadAsync(key, upload),
-        };
+        return context.Upload is { } upload
+            ? UploadObjectAsync(operations, upload, key)
+            : context.Http?.CustomMethod == "DELETE" ? DeleteObjectAsync(operations, context, key) : ReadAsync(operations, context, key);
     }
+
+    private static Task<long> ReadAsync(S3Operations operations, ITransferContext context, string key) =>
+        IsPrefix(key)
+            ? operations.ListAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output)
+            : operations.DownloadAsync(key, S3Endpoint.QueryOf(context.Url.Query), context.Output);
+
+    private static Task<long> UploadObjectAsync(S3Operations operations, Stream upload, string key) =>
+        IsPrefix(key)
+            ? throw new S3TransferException(CurlExitCode.UrlMalformat, "An S3 upload needs an object key in the URL")
+            : operations.UploadAsync(key, upload);
+
+    private static bool IsPrefix(string key) => key.Length == 0 || key.EndsWith('/');
 }
