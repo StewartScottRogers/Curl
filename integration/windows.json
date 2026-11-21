@@ -1,15 +1,14 @@
 {
   "platform": "Windows",
-  "commit": "d930fa2a87c9919175dfdf5cc5ecab4397359f40",
-  "runUrl": "https://github.com/StewartScottRogers/Curl/actions/runs/44942529718",
-  "measuredAt": "2026-11-21T20:05:45Z",
+  "commit": "0bb4260a139393621ad3a57f88a4b3aa503ac8fa",
+  "runUrl": "https://github.com/StewartScottRogers/Curl/actions/runs/44943977067",
+  "measuredAt": "2026-11-21T20:50:17Z",
   "resultFiles": 248,
   "projects": 10,
   "passed": 86,
-  "failed": 2,
+  "failed": 1,
   "notRun": 17,
   "failedTests": [
-    "curl.extended.protocol.mcpclient.integrationtests: [Curl.Extended.Protocol.McpClient.Stdio.McpServerProcessStarterIntegrationTests ClassCleanup]",
     "curl.networking.integrationtests: AuthenticateAsClientAsync_WhenTheServerSendsAnIntermediate_ReportsItAfterTheServersCertificate"
   ]
 }
