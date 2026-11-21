@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Ssh.UnitLibrary/Authentication/SshUserAuthentication.cs, Curl.Api.UnitLibrary/Options/Protocols/EasySshOptions.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5670 — Make an SSH login limited to password (CURLSSH_AUTH_PASSWORD) try only the password, never keyboard-interactive
 
@@ -24,14 +24,20 @@ Repro: `surl -v --directory site --throwaway-hostkey --user alice:s3cret sftp://
 
 ## Acceptance criteria
 
-- [ ] With the mask set to password only, a wrong password produces exactly one `SSH_MSG_USERAUTH_REQUEST` with method `password` and the transfer fails with `LoginDenied` (67), pinned by a test against the in-memory SSH server.
-- [ ] With the mask set to keyboard-interactive only, no password request is sent; with the default mask, the order matches libcurl's, pinned by tests.
-- [ ] The same holds through `Libcurl`'s `CURLOPT_SSH_AUTH_TYPES`, pinned by a test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] With the mask set to password only, a wrong password produces exactly one `SSH_MSG_USERAUTH_REQUEST` with method `password` and the transfer fails with `LoginDenied` (67), pinned by a test against the in-memory SSH server.
+- [x] With the mask set to keyboard-interactive only, no password request is sent; with the default mask, the order matches libcurl's, pinned by tests.
+- [x] The same holds through `Libcurl`'s `CURLOPT_SSH_AUTH_TYPES`, pinned by a test.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Cause: the mask reached `EasySshOptions` but never the SSH library. Added `SshOptions.AuthenticationMask` (Curl.Protocol.Abstractions), mapped from `EasySshOptions.AuthenticationTypes` in `SshOptionsMapping`, passed by `SshProtocolHandler` to `SshUserAuthentication.AllowedMethodMask`, which gates publickey, password, agent and keyboard-interactive on their bits as libcurl's libssh2 backend does (host-based is not implemented in curl or here). Files outside the original `touches` (SshOptions.cs, SshOptionsMapping.cs, SshProtocolHandler.cs) were added; no other Doing task named them. Decided by Claude under Stewart's delegation; no ADR needed (a bug fix, no new behaviour choice).
+- Libcurl criterion: Libcurl's setter already stored the mask in the same `EasySshOptions`; `ManagedEasyTransferTests.SshAuthTypes` pins it through the engine both Libcurl and Curl.Api drive.
+- Tests: `SshProtocolHandlerTests.AuthenticationMask`, `ManagedEasyTransferTests.SshAuthTypes`. Measure-CodeQuality for Curl.Ssh.UnitLibrary: 0 failing members; fast tests of dependents green in that run.
+- Linux and macOS: tests are platform-neutral.
 
 ## Log
 
 - 2026-11-21: Created from Surly bug report 2026-11-21T0408, finding 1.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: c66c95b2 cc0f29f3 38f618d6 3d836d5e.
+- 2026-11-21: Doing -> Done. SSH auth-type mask now limits login methods; password-only no longer tries keyboard-interactive
