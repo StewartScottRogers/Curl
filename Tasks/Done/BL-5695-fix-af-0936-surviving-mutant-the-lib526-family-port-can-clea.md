@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib526.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5695 — Fix AF-0936: Surviving mutant: the lib526-family port can clean up its handles when upstream does not
 
@@ -43,3 +43,4 @@ Killed by `Lib526Tests.RunAsync_ASecondAddThatFailsInAnUnlistedCase_LeavesTheEas
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 4689eb59 9742157d.
+- 2026-11-21: Doing -> Done. Added a test that kills the AF-0936 mutant
