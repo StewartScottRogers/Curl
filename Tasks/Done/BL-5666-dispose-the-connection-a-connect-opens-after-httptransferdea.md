@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Http.UnitLibrary/HttpTransferDeadline.cs, Curl.Original.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5666 — Dispose the connection a connect opens after HttpTransferDeadline's limit gave up on it
 
@@ -37,3 +37,4 @@ A connect that `HttpTransferDeadline` stops waiting for at the connect or transf
 
 - 2026-11-21: Created by the shift-end review (ADR-0710) of 8c81a2532a...1f330a1f28.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: a963e8df 8bf195a0 9b28f950 e7657cfb.
+- 2026-11-21: Doing -> Done. A late connect after the limit now has its connection disposed and fault observed; tests and quality run green
