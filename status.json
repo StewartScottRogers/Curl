@@ -1,0 +1,93 @@
+{
+    "schema":  1,
+    "shift":  "20261121-113211",
+    "branch":  "work/dark-factory",
+    "state":  "running",
+    "publishedAt":  "2026-11-21T21:12:08Z",
+    "autoLanes":  {
+                      "lanes":  3,
+                      "target":  3,
+                      "binding":  "unpaced",
+                      "reason":  "lanes 2 -\u003e 3 (up to 3 lanes run unpaced)",
+                      "changedAt":  "2026-11-21T20:19:20Z"
+                  },
+    "lanes":  [
+                  {
+                      "lane":  0,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "idle",
+                      "step":  "polling",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-21T21:12:08Z"
+                  },
+                  {
+                      "lane":  1,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-21T20:29:31Z"
+                  },
+                  {
+                      "lane":  2,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-21T20:23:57Z"
+                  },
+                  {
+                      "lane":  3,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-21T20:24:15Z"
+                  },
+                  {
+                      "lane":  4,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-21T19:44:39Z"
+                  },
+                  {
+                      "lane":  5,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-21T19:48:25Z"
+                  },
+                  {
+                      "lane":  6,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-11-21T20:29:12Z"
+                  }
+              ]
+}
