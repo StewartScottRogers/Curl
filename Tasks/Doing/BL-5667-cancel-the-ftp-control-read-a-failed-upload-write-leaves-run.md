@@ -37,3 +37,4 @@ When a failed FTP upload write gets no `552` within the 500 ms wait, the control
 ## Log
 
 - 2026-11-21: Created by the shift-end review (ADR-0710) of 8c81a2532a...1f330a1f28.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: 5debf57d 97a94584 6bea890d 590f1cb4 e7657cfb.
