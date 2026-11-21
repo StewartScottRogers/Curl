@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.slnx]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5687 — Fix CI failure job Build and test (ubuntu-latest) step Fast tests on Linux
 
@@ -36,3 +36,4 @@ The failure was a 3-minute inactivity hang of `Curl.Console.UnitTests` (`CurlCom
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 1426f56b.
+- 2026-11-21: Doing -> Done. One-off Linux hang in a parallel fail-early test; not reproducible, no code change
