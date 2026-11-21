@@ -3,8 +3,8 @@ id: AF-0915
 title: Surviving mutant: the MCP event-stream reader can drop a line's LF that arrives in the next read and merge two lines
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-21_0114.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Extended.Protocol.McpClient.UnitLibrary/StreamableHttp/McpEventStreamReader.cs:ReadLineAsync-false:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.McpClient.UnitLibrary/StreamableHttp/McpEventStreamReader.cs:75:false
 task: BL-5650
@@ -13,9 +13,9 @@ found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-21
+closed-how: mechanical
+closed-by: 2026-11-21_0114.md
 ---
 # AF-0915 - Surviving mutant: the MCP event-stream reader can drop a line's LF that arrives in the next read and merge two lines
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_0114.md | reproduces: no | Ran the -Site .../McpEventStreamReader.cs:75:false command: resolvedLine 75, 'skipLineFeed = false;' -> 'skipLineFeed = true;', outcome killed, no excluded tests. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-20: filed proposed.
+- 2026-11-21: accepted -> closed. Re-audit 2026-11-21_0114.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

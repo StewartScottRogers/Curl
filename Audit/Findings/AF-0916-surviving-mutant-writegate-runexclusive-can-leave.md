@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/WriteGate.cs:RunExclusive-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/WriteGate.cs:80:true
-task: BL-5651
-tasks: BL-5651
+task: BL-5672
+tasks: BL-5651, BL-5672
 found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md
@@ -41,6 +41,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 - Actual: outcome survived
 
 ## Re-audits
+
+- 2026-11-21 | 2026-11-21_0114.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site Curl.Engine.UnitLibrary/WriteGate.cs:80:true command: resolvedLine 80, 'heldByThisFlow.Value = true;' -> 'heldByThisFlow.Value = false;', outcome survived (two unrelated baseline failures excluded). Runner's targeted mutation rerun on the clean audited commit: survived.
 
 ## Log
 

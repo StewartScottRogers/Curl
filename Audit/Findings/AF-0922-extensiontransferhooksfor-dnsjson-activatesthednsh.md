@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Api.UnitTests/Composition/CurlClientCreateExtensionTests.cs:ExtensionTransferHooksFor_DnsJson_ActivatesTheDnsHook:weak-assertion
 reproduction: none
-task: BL-5657
-tasks: BL-5657
+task: BL-5673
+tasks: BL-5657, BL-5673
 found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md
@@ -41,6 +41,8 @@ Select-String -Path Curl.Api.UnitTests/Composition/CurlClientCreateExtensionTest
 - Actual: The only assertion is Assert.IsNotNull(CurlClient.ExtensionTransferHooksFor(...)).
 
 ## Re-audits
+
+- 2026-11-21 | 2026-11-21_0114.md | reproduces: yes | Ran Select-String -Pattern 'ActivatesTheDnsHook' -Context 0,3 and read the test: CurlClient.ExtensionTransferHooksFor(values), the method the name is about, is still checked only by Assert.IsNotNull. The added AreEqual("DnsQueryTransferHook", ...) checks a separately built TransferHooks.ActivatedBy(...), not what CurlClient returned.
 
 ## Log
 

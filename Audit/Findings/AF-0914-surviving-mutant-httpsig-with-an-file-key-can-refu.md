@@ -3,8 +3,8 @@ id: AF-0914
 title: Surviving mutant: --httpsig with an @file key can refuse every non-empty key file and accept an empty one
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-21_0114.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/HttpSignatureSetup.cs:WithKey-eq:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/HttpSignatureSetup.cs:81:==
 task: BL-5649
@@ -13,9 +13,9 @@ found: 2026-11-20
 found-at: e78a1e70bbba7541cf5f1abfedb0ef1c8ae8e2a0
 scorecard: 2026-11-20_1740.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-21
+closed-how: mechanical
+closed-by: 2026-11-21_0114.md
 ---
 # AF-0914 - Surviving mutant: --httpsig with an @file key can refuse every non-empty key file and accept an empty one
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_0114.md | reproduces: no | Ran the -Site Curl.Engine.UnitLibrary/HttpSignatureSetup.cs:81:== command: resolvedLine 81, 'return text.Length == 0' -> 'return text.Length != 0', outcome killed. Two baseline failures in HttpSignatureHttpAuthenticatorTests were excluded (filed separately). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-20: filed proposed.
+- 2026-11-21: accepted -> closed. Re-audit 2026-11-21_0114.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
