@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpConnector.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5690 — Fix AF-0931: Surviving mutant: a proxy CONNECT that answers a challenge on the same connection can be reported as not answering it
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/TcpConnector.cs line 1926`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/TcpConnector.cs line 1926`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by the new test `ConnectAsync_WithProxyAnyAuth_WhenTheType1AnswersAChallengeAndTheNextChallengeIsBare_FailsWithThe407` (TcpConnectorTests.ProxyNtlmAndNegotiate.cs): with line 1926 set to false the repeated NTLM leg is treated as sent before any challenge, so a bare NTLM 407 goes to Negotiate instead of failing with the 407. Verified by hand: fails with the mutant, passes reverted; fast tests of Curl.Networking.UnitTests green (4398). Production code unchanged.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 3fc4315c 9742157d.
+- 2026-11-21: Doing -> Done. Test added that kills the mutant
