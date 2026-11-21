@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.OAuth2.UnitLibrary/Flows/OAuth2RedirectReceiver.cs line 45`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.OAuth2.UnitLibrary/Flows/OAuth2RedirectReceiver.cs line 45`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `OAuth2RedirectReceiverTests.ReceiveAsync_HeadEndedAndBrowserWaitsForAnswer_AnswersWithoutReadingAgain` (the browser connection throws on a second read). Verified by hand: with `||` it fails, reverted all 186 pass. Test-only change; production code unchanged.
 
 ## Log
 
