@@ -33,3 +33,4 @@ With `-v`, the `curl` tool's `standardError.content` lines end in `\r\r\n` on Wi
 ## Log
 
 - 2026-11-21: Created from Surly bug report 2026-11-21T0547, finding 5.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: 4a980250 38306fae 3d836d5e.
