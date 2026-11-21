@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/WriteGate.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5672 — Re-fix AF-0916: Surviving mutant: WriteGate.RunExclusive can leave its flow marked as holding the gate, so later writes bypass it
 
@@ -47,3 +47,4 @@ Killed by the new test `WriteGateTests.RunExclusive_WhileWriting_MarksThisFlowAs
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 3e72ddbc 9742157d.
+- 2026-11-21: Doing -> Done. Added WriteGateTests.RunExclusive_WhileWriting_MarksThisFlowAsHoldingTheGate, which kills the line-80 mutant
