@@ -183,6 +183,9 @@ public sealed class Lib643To661Tests
         {
             var array = (CurlFormArgument[])form.Calls[1][2].Value!;
             Assert.AreEqual((byte)'u', ((byte[])array[0].Value!)[0]);
+            // CURLFORM_CONTENTSLENGTH is strlen(testdata) - 1: 44 bytes of testdata minus one.
+            Assert.AreEqual(CurlFormOption.ContentsLength, array[1].Option);
+            Assert.AreEqual(((byte[])array[0].Value!).Length - 1L, array[1].Value);
         }
 
         if (failingCall == 0)

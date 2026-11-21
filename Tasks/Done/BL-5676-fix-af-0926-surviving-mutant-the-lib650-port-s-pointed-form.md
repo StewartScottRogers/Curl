@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary/Lib650.cs]
+touches: [Curl.Conformance.LibTest.UnitLibrary/Lib650.cs, Curl.Conformance.LibTest.UnitTests/Lib643To661Tests.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5676 — Fix AF-0926: Surviving mutant: the lib650 port's pointed form part can be sent two bytes longer
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib650.cs line 92`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib650.cs line 92`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by Lib650_AddsTheSixFieldsAndPostsOnlyWhenAllSucceed (new assertion on the second part's ContentsLength). Mutant applied: 5 of 8 cases failed; reverted: 1233 fast tests pass. touches widened to the test file Curl.Conformance.LibTest.UnitTests/Lib643To661Tests.cs. No production change, so no quality run.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 6f3bb35f 9742157d.
+- 2026-11-21: Doing -> Done. Mutant killed by a new ContentsLength assertion in Lib650 test
