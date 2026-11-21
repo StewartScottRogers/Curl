@@ -376,13 +376,14 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Tells whether the platform's curl answers the origin as an empty user when the transfer has
     /// no credential: <c>--sasl-authzid</c> with Digest the one scheme (ADR-1182), or, on Windows
-    /// only, <c>--service-name</c> with NTLM the one scheme (ADR-1183): the Schannel build starts
+    /// only, <c>--service-name</c> with NTLM the one scheme (ADR-1183), or on every platform<br/>
+    /// <c>--service-name</c> with <c>--aws-sigv4</c>, which curl signs with an empty key ID (AF-0923, BL-5658): the Schannel build starts
     /// NTLM with the default Windows credentials, the OpenSSL build sends no <c>Authorization</c>.
     /// </summary>
     /// <param name="options">The transfer's HTTP options.</param>
     /// <param name="onWindows">Whether Curl runs on Windows, where curl is the Schannel build.</param>
     internal static bool StartsWithAnEmptyUser(HttpRequestOptions options, bool onWindows) =>
-        AllowedSchemesOf(options) switch
+        (options.AwsSigV4 is not null && options.ServiceName is not null) || AllowedSchemesOf(options) switch
         {
             HttpAuthSchemes.Digest => options.SaslAuthorizationIdentity is not null,
             HttpAuthSchemes.Ntlm => onWindows && options.ServiceName is not null,
