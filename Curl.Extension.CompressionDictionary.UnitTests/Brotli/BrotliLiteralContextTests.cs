@@ -11,6 +11,8 @@ public sealed class BrotliLiteralContextTests
     [DataRow(1, 0x41, 0, 16)]
     [DataRow(2, (int)'a', (int)' ', 56)]
     [DataRow(2, 0xC5, 0xC5, 3)]
+    [DataRow(2, 0xC0, 0, 2)]
+    [DataRow(2, 0xBF, 0, 1)]
     [DataRow(3, 0xFF, 0x10, 58)]
     public void Of_Mode_GivesSection71Context(int mode, int last, int secondLast, int expected) =>
         Assert.AreEqual(expected, BrotliLiteralContext.Of(mode, (byte)last, (byte)secondLast));
