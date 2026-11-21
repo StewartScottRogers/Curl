@@ -42,3 +42,4 @@ Change: `<PackageId>` in `Curl.Api/Curl.Api.csproj`, `Libcurl/Libcurl.csproj`, `
 ## Log
 
 - 2026-11-21: Created at Stewart's request ("Use Surly as the prefix").
+- 2026-11-21: Backlog -> Doing. Criteria at claim: 739be49e 3bccf144 3037f02d 7781b8cb 3d836d5e.
