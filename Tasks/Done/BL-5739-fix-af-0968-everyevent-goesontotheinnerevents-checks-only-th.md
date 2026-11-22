@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests/EngineConnectionIdTransferEventsTests.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5739 — Fix AF-0968: EveryEvent_GoesOnToTheInnerEvents checks only that 13 calls arrived, not that each event reached its own method
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+CountingEvents replaced by RecordingEvents: records each call by name and argument; the test compares the list. Fast tests green for the class.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-22: Doing -> Done. Fake records each call by name and argument; test compares them
