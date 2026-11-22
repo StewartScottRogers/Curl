@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Replaced SequenceEqual with CryptographicOperations.FixedTimeEquals over the limbs as bytes (same as DsaSignature). Crypto unit tests pass (1507); Measure-CodeQuality for Curl.Cryptography.UnitLibrary: 0 failing members. Full-solution fast tests not run: single-line change in one library.
 
 ## Log
 

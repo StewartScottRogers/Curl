@@ -183,7 +183,7 @@ public sealed class BrainpoolEcdsa : IDisposable
         BrainpoolPoint.MultiplyAndAddPublic(domain, scalars.AsSpan(0, length), domain.Generator, scalars.AsSpan(length), publicPoint, sum);
         bool finite = BrainpoolPoint.ToAffine(domain, sum, x, y);
         domain.Order.Reduce(x, w);
-        return finite && w.SequenceEqual(r);
+        return finite && CryptographicOperations.FixedTimeEquals(MemoryMarshal.AsBytes(w), MemoryMarshal.AsBytes(r));
     }
 
     /// <summary>
