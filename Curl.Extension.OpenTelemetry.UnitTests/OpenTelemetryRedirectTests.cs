@@ -41,6 +41,20 @@ public sealed class OpenTelemetryRedirectTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_A300WithALocationThenA200_ExportsOneSpanBecauseThe300HopIsFollowed_BL5778()
+    {
+        var (hook, connection, connector) = Fixture();
+        var services = new TransferHookServices(connector, connector);
+        var multipleChoices = TransferResult.Success(0) with { Report = new TransferReport { Method = "GET", ResponseCode = 300, RedirectUrl = "http://example.com/next" } };
+
+        await hook.ExecuteAsync(Hop(0), services, c => Respond(c, [], multipleChoices));
+        Assert.AreEqual(0, Count(connection.Written, "POST "));
+        await hook.ExecuteAsync(Hop(1), services, c => Respond(c, [], Final()));
+
+        Assert.AreEqual(1, Count(connection.Written, "POST "));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ARedirectThatIsNotFollowed_ExportsItsOwnSpan()
     {
         var (hook, connection, connector) = Fixture();

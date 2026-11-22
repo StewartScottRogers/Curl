@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5778 — Fix AF-0981: Surviving mutant: a 300 Multiple Choices with a Location can be treated as not a redirect (>= 300 -> > 300)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs line 111`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs line 111`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killed by OpenTelemetryRedirectTests.ExecuteAsync_A300WithALocationThenA200_ExportsOneSpanBecauseThe300HopIsFollowed_BL5778: with > 300 applied it fails; reverted, all 67 pass.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b83ebf3a 9742157d.
+- 2026-11-22: Doing -> Done. Mutant killed by new 300 test
