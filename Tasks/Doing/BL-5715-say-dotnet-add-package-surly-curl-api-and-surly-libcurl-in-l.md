@@ -41,3 +41,4 @@ projects, not the packages. `llms.txt` is hand-written (BL-5714's notes say ther
 ## Log
 
 - 2026-11-21: Created.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: d879f2ec b92652c0 42b24d12.
