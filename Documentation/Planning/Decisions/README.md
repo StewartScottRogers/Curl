@@ -1380,3 +1380,4 @@ Each option and the specific reason it lost.
 | [1336](ADR-1336-a-curl-api-body-to-an-extension-scheme-reaches-the-handler-as-curl-d-data.md) | A Curl.Api body to an extension scheme reaches the handler as -d data (BL-5758) | Accepted | 2026-11-22 |
 | [1337](ADR-1337-a-curl-api-stream-body-to-an-extension-scheme-is-read-up-front-as-curl-d-data.md) | A Curl.Api stream body to an extension scheme is read up front as -d data (BL-5754) | Accepted | 2026-11-22 |
 | [1338](ADR-1338-a-socketio-emit-ends-at-the-first-event-the-server-sends-back.md) | A socketio emit ends at the first event the server sends back (BL-5763) | Accepted | 2026-11-22 |
+| [1339](ADR-1339-an-extension-url-post-whose-read-callback-aborts-pauses-or-lies-fails-the-transfer.md) | An extension URL post whose read callback aborts, pauses or lies fails the transfer (BL-5764) | Accepted | 2026-11-22 |
