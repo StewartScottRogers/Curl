@@ -350,6 +350,26 @@ public sealed class Lib1535To1550Tests
     }
 
     [TestMethod]
+    public async Task Lib1542_TracesDataWithoutTheHexColumn()
+    {
+        var engine = new FakeCurlEngine
+        {
+            Performing = o =>
+            {
+                _ = o.Callbacks.Debug!(CurlInfoType.DataOut, "ok"u8);
+                return CurlCode.RecvError;
+            },
+        };
+        var run = new PortRun(engine, 1542, "http://x/1542");
+
+        _ = await new Lib1542(new ManualTimeProvider(DateTimeOffset.UnixEpoch)).RunAsync(run.Context, CancellationToken.None);
+
+        string error = run.Error.ToString();
+        Assert.Contains("0000: ok", error);
+        Assert.DoesNotContain("6f 6b", error);
+    }
+
+    [TestMethod]
     [DataRow(1, 1)]
     [DataRow(2, 2)]
     [DataRow(3, 3)]
