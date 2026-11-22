@@ -9,8 +9,10 @@
 # the shift's branch and files a High task for each new failure. Runs are cached by id;
 # Settled holds "<key>|<run id>" pairs already filed or found covered, so each is decided once.
 $CiWatchDir = Join-Path $LanesDir 'ci-watch'
-# Settled maps each pair to what became of it ("filed BL-###", "covered by a task"); Logged
-# holds the last line traced for each run, so a run is traced again only when that changes.
+# Settled maps each pair to what became of it ("filed BL-###", "covered by BL-###", either
+# ending " (interactive only)" when no lane can take the task); Logged holds the last line
+# traced for each run, so a run is traced again only when that changes. NeedsYou is set while
+# a red run waits only on interactive-only tasks (Update-CiNeedsYou), TabBefore the caption it replaced.
 $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
 # The shift's branch once the coordinator knows it, so a wait for tokens keeps watching CI.
 $script:CiWatchBranch = ''
@@ -413,23 +415,57 @@ function Get-CiHangs {
 }
 
 function Test-CiFailureCovered {
-    # Whether a task already covers -Key failing in the run on -Sha: a live task (Backlog, Doing,
-    # Blocked) names it, or a finished one does whose last commit that run did not yet contain,
-    # so the failure predates its fix. Read in the -Repo worktree.
+    # Whether a task already covers -Key failing in the run on -Sha (Get-CiCoveringTasks).
+    param([string]$Key, [string]$Sha, [string]$Repo)
+    return [bool]@(Get-CiCoveringTasks -Key $Key -Sha $Sha -Repo $Repo).Count
+}
+
+function Get-CiCoveringTasks {
+    # The tasks that already cover -Key failing in the run on -Sha, each as Id and Interactive: a
+    # live task (Backlog, Doing, Blocked) that names it, Interactive when no lane can take it
+    # (Test-CiTaskInteractiveOnly), or a finished one that does whose last commit that run did
+    # not yet contain, so the failure predates its fix (never Interactive: nobody need act).
+    # Read in the -Repo worktree. The ids let a trace name the task, not "a task" (AF-0961).
     param([string]$Key, [string]$Sha, [string]$Repo)
     $tasks = Join-Path $Repo 'Tasks'
-    foreach ($file in @(Get-ChildItem $tasks -Recurse -Filter 'BL-*.md' -ErrorAction SilentlyContinue)) {
+    $covering = @()
+    foreach ($file in @(Get-ChildItem $tasks -Recurse -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Sort-Object Name)) {
         # The whole name only: a task for Parse_Empty does not cover Parse_Empty_Throws.
         if (-not (Select-String -LiteralPath $file.FullName -Pattern "(?<![\w.])$([regex]::Escape($Key))(?![\w])" -CaseSensitive -Quiet)) { continue }
+        $id = $file.Name -replace '^(BL-\d+).*$', '$1'
         $state = (Split-Path (Split-Path $file.FullName -Parent) -Leaf)
-        if ($state -in 'Backlog', 'Doing', 'Blocked') { return $true }
+        if ($state -in 'Backlog', 'Doing', 'Blocked') {
+            $covering += [pscustomobject]@{ Id = $id; Interactive = (Test-CiTaskInteractiveOnly $file.FullName) }
+            continue
+        }
         $relative = $file.FullName.Substring($Repo.TrimEnd('\', '/').Length + 1)
         $last = "$(git -C $Repo log -1 --format=%H -- $relative 2>$null)".Trim()
         if (-not $last) { continue }
         git -C $Repo merge-base --is-ancestor $last $Sha 2>$null | Out-Null
-        if ($LASTEXITCODE -ne 0) { return $true }
+        if ($LASTEXITCODE -ne 0) { $covering += [pscustomobject]@{ Id = $id; Interactive = $false } }
     }
+    # Unrolled: callers wrap it in @(), which an empty result leaves empty.
+    return $covering
+}
+
+function Test-CiTaskInteractiveOnly {
+    # True when no lane can take the task at -Path: its file says lane: no, or, once Claim.ps1 is
+    # loaded, the board's rule (Test-InteractiveOnlyTask) finds a touch on an audit path or guard
+    # file. A CI fix in .github/workflows/ci.yml is one (BL-5710 to BL-5712, AF-0961).
+    param([string]$Path)
+    if ((Get-Content -Raw -LiteralPath $Path) -match '(?m)^lane: no\s*$') { return $true }
+    if (Get-Command Test-InteractiveOnlyTask -ErrorAction SilentlyContinue) { return [bool](Test-InteractiveOnlyTask $Path) }
     return $false
+}
+
+function Get-CiCoveredText {
+    # What became of a failure -Tasks (Get-CiCoveringTasks) cover, as Settled holds it:
+    # "covered by BL-1, BL-2", ending " (interactive only)" when no lane can take any of them.
+    param([object[]]$Tasks)
+    $Tasks = @($Tasks | Where-Object { $_ })
+    $text = "covered by $(@($Tasks | ForEach-Object { $_.Id }) -join ', ')"
+    if (-not @($Tasks | Where-Object { -not $_.Interactive }).Count) { $text += ' (interactive only)' }
+    return $text
 }
 
 function Send-CiWhisper {
@@ -808,22 +844,85 @@ function Write-CiRunLine {
 function Get-CiRunOutcome {
     # One line on what the watch did with -Run, one of -Runs (newest first): nothing for a
     # green run; for a red one, each failure and whether it was filed (-Settled holds
-    # "<key>|<run id>" -> "filed BL-###" or "covered by a task"), is filed with a newer run,
-    # waits for a run to confirm it, or has passed since.
+    # "<key>|<run id>" -> "filed BL-###" or "covered by BL-###", either ending " (interactive
+    # only)" when no lane can take the task), is filed with a newer run (and what that one
+    # settled), waits for a run to confirm it, or has passed since. A red run's line starts with
+    # a short head of those outcomes, task ids included, before the failures: the trace cuts a
+    # line at 118 characters, and a long job key used to cut the outcome off (AF-0961, AF-0973).
     param($Run, [object[]]$Runs, [object[]]$Verdicts, [hashtable]$Settled, [int]$ConfirmMinutes = $CiConfirmMinutes)
     $on = "$($Run.Sha)".Substring(0, [math]::Min(8, "$($Run.Sha)".Length))
     $failures = @($Run.Failures | Where-Object { $_ })
     if (-not $failures.Count) { return "success on ${on}: nothing to file" }
+    $filed = @(); $covered = @(); $others = @()
     $said = foreach ($failure in $failures) {
         $verdict = @($Verdicts | Where-Object { $_ -and $_.Key -ceq $failure.Key })[0]
-        $what = if ($verdict -and $verdict.RunId -ne $Run.Id) { "filed with run $($verdict.RunId)" }
-            elseif ($verdict -and $Settled.ContainsKey("$($failure.Key)|$($Run.Id)")) { "$($verdict.Verdict), $($Settled["$($failure.Key)|$($Run.Id)"])" }
+        $settledText = ''
+        if ($verdict) {
+            $settledText = "$($Settled["$($failure.Key)|$($Run.Id)"])"
+            if (-not $settledText) { $settledText = "$($Settled["$($failure.Key)|$($verdict.RunId)"])" }
+        }
+        $what = if ($verdict -and $settledText) { "$($verdict.Verdict), $settledText" }
+            elseif ($verdict -and $verdict.RunId -ne $Run.Id) { "filed with run $($verdict.RunId)" }
             elseif ($verdict) { "$($verdict.Verdict), not filed yet" }
             elseif (@($Runs)[0].Id -eq $Run.Id) { "on $($failure.Platforms -join '+') only, waiting for the next run or $($Run.FinishedAt.AddMinutes($ConfirmMinutes).ToString('HH:mm')) to confirm it" }
             else { 'passed since, not filed' }
+        if ($settledText -match '^filed (BL-\d+)') { $filed += $Matches[1] }
+        elseif ($settledText -match '^covered by (.+?)(?: \(interactive only\))?$') { $covered += @($Matches[1] -split ', ') }
+        elseif ($what -match '^filed with run') { $others += $what }
+        elseif ($what -match 'not filed yet$') { $others += 'not filed yet' }
+        elseif ($what -match 'to confirm it$') { $others += 'waiting to confirm' }
+        else { $others += 'passed since' }
         "$($failure.Key) $what"
     }
-    return "failure on ${on}: $(@($said) -join '; ')"
+    $head = @()
+    if ($filed.Count) { $head += "filed $(@($filed | Select-Object -Unique) -join ', ')" }
+    if ($covered.Count) { $head += "covered by $(@($covered | Select-Object -Unique) -join ', ')" }
+    $head += @($others | Select-Object -Unique)
+    return "failure on ${on}: $($head -join '; ') - $(@($said) -join '; ')"
+}
+
+function Get-CiNeedsYouLine {
+    # '' unless a failure of -Run (the newest run the watch read) is settled (-Settled, against
+    # its verdict's run in -Verdicts) only by tasks no lane can take; then one line naming them.
+    # Lanes cannot fix such a run, so it stays red until an interactive session does: the Pack
+    # Curl.Mcp spell of 2026-11-21 sat 227 minutes with its fixes in ci.yml (AF-0961, AF-0973).
+    param($Run, [object[]]$Verdicts, [hashtable]$Settled)
+    if (-not $Run) { return '' }
+    $ids = @()
+    foreach ($failure in @($Run.Failures | Where-Object { $_ })) {
+        $verdict = @($Verdicts | Where-Object { $_ -and $_.Key -ceq $failure.Key })[0]
+        if (-not $verdict) { continue }
+        $text = "$($Settled["$($failure.Key)|$($verdict.RunId)"])"
+        if ($text -match '^(?:filed|covered by) (.+) \(interactive only\)$') { $ids += @($Matches[1] -split ', ') }
+    }
+    if (-not $ids.Count) { return '' }
+    return "CI needs you: interactive-only $(@($ids | Select-Object -Unique) -join ', ') cover red run $($Run.Id)"
+}
+
+function Update-CiNeedsYou {
+    # Says when CI waits on an interactive session (-Line from Get-CiNeedsYouLine): traces -Line
+    # whenever it changes and captions the coordinator's tab "CI needs you, read" (-SetLabel) the
+    # first time; once -Line is '' again, traces that and puts back the caption it replaced,
+    # unless something else has captioned the tab since ($script:OwnTabText, Set-OwnTabLabel).
+    param([string]$Line, [scriptblock]$SetLabel = { param([string]$Text) Set-OwnTabLabel $Text })
+    $label = 'CI needs you, read'
+    if ($Line) {
+        if ($script:CiWatch.Logged['needs you'] -cne $Line) {
+            $script:CiWatch.Logged['needs you'] = $Line
+            Write-Trace '-' 'ci' $Line 'Yellow'
+        }
+        if (-not $script:CiWatch.NeedsYou) {
+            $script:CiWatch.NeedsYou = $true
+            $script:CiWatch.TabBefore = "$script:OwnTabText"
+            & $SetLabel $label
+        }
+        return
+    }
+    if (-not $script:CiWatch.NeedsYou) { return }
+    $script:CiWatch.NeedsYou = $false
+    $script:CiWatch.Logged.Remove('needs you')
+    Write-Trace '-' 'ci' 'CI no longer needs you: no red failure waits only on an interactive-only task' 'Green'
+    if ("$script:OwnTabText" -ceq $label) { & $SetLabel "$($script:CiWatch.TabBefore)" }
 }
 
 function Invoke-CiWatch {
@@ -866,6 +965,7 @@ function Invoke-CiWatch {
     foreach ($run in $runs) {
         Write-CiRunLine -RunId $run.Id -Line (Get-CiRunOutcome -Run $run -Runs $runs -Verdicts $all -Settled $script:CiWatch.Settled -ConfirmMinutes $confirm)
     }
+    Update-CiNeedsYou -Line (Get-CiNeedsYouLine -Run @($runs)[0] -Verdicts $all -Settled $script:CiWatch.Settled)
 }
 
 function New-CiFailureTasks {
@@ -882,15 +982,16 @@ function New-CiFailureTasks {
             $filed = @()
             foreach ($verdict in $verdicts) {
                 $sha = @($runs | Where-Object { $_.Id -eq $verdict.RunId })[0].Sha
-                if (Test-CiFailureCovered -Key $verdict.Key -Sha $sha -Repo $CiWatchDir) { $script:CiWatch.Settled["$($verdict.Key)|$($verdict.RunId)"] = 'covered by a task'; continue }
+                $covering = @(Get-CiCoveringTasks -Key $verdict.Key -Sha $sha -Repo $CiWatchDir)
+                if ($covering.Count) { $script:CiWatch.Settled["$($verdict.Key)|$($verdict.RunId)"] = Get-CiCoveredText $covering; continue }
                 $touches = if ($verdict.Kind -eq 'job') { @(Get-CiJobTouches -Verdict $verdict -Repo $CiWatchDir) } else { @(Get-CiTouches -Project $verdict.Project -Repo $CiWatchDir) }
                 $newArgs = Get-CiTaskNewArgs -Verdict $verdict -Touches $touches
                 $out = (& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
                 if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Trace '-' 'ci' "cannot file $($verdict.Key): $(Get-Short $out 60)" 'DarkYellow'; continue }
-                $id = $Matches[1]; $line = $Matches[0]
+                $id = $Matches[1]; $line = $Matches[0]; $path = Join-Path $CiWatchDir $Matches[2]
                 $url = "https://github.com/$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>$null)/actions/runs/$($verdict.RunId)"
-                Set-CiTaskBody -Path (Join-Path $CiWatchDir $Matches[2]) -Verdict $verdict -RunUrl $url
-                $filed += [pscustomobject]@{ Id = $id; Line = $line; Verdict = $verdict }
+                Set-CiTaskBody -Path $path -Verdict $verdict -RunUrl $url
+                $filed += [pscustomobject]@{ Id = $id; Line = $line; Verdict = $verdict; Interactive = (Test-CiTaskInteractiveOnly $path) }
                 if ($verdict.Kind -eq 'audit') { $script:CiWatch.AuditTasks["$id"] = Get-CiTaskTitle $verdict }
             }
             if (-not $filed.Count) { return }
@@ -899,7 +1000,7 @@ function New-CiFailureTasks {
             git -C $CiWatchDir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { continue }
             foreach ($task in $filed) {
-                $script:CiWatch.Settled["$($task.Verdict.Key)|$($task.Verdict.RunId)"] = "filed $($task.Id)"
+                $script:CiWatch.Settled["$($task.Verdict.Key)|$($task.Verdict.RunId)"] = "filed $($task.Id)$(if ($task.Interactive) { ' (interactive only)' })"
                 Write-Trace $task.Id 'ci' "filed: $($task.Verdict.Verdict) $($task.Verdict.Key) on $($task.Verdict.Platforms -join '+'), run $($task.Verdict.RunId)" 'Yellow'
                 Send-CiWhisper $task.Line
             }
@@ -1395,12 +1496,12 @@ if ($TestCiWatch) {
     # What a coordinator log line says for each run it examined, and that it says it once.
     $verdicts = @(Get-CiVerdicts -Now $replayAt.AddMinutes(31) -Runs $replay)
     $waiting = Get-CiRunOutcome -Run $replay[0] -Runs $replay -Verdicts @() -Settled @{} -ConfirmMinutes 5
-    & $check 'outcome: waiting' "failure on d0621052: BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed on Linux only, waiting for the next run or $($replayAt.AddMinutes(5).ToString('HH:mm')) to confirm it; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext on Linux only, waiting for the next run or $($replayAt.AddMinutes(5).ToString('HH:mm')) to confirm it" $waiting
-    $settled = @{ 'BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed|36674691490' = 'filed BL-1040'; 'BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext|36674691490' = 'covered by a task' }
-    & $check 'outcome: filed and covered' 'failure on d0621052: BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed regression, filed BL-1040; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext regression, covered by a task' `
+    & $check 'outcome: waiting' "failure on d0621052: waiting to confirm - BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed on Linux only, waiting for the next run or $($replayAt.AddMinutes(5).ToString('HH:mm')) to confirm it; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext on Linux only, waiting for the next run or $($replayAt.AddMinutes(5).ToString('HH:mm')) to confirm it" $waiting
+    $settled = @{ 'BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed|36674691490' = 'filed BL-1040'; 'BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext|36674691490' = 'covered by BL-1041' }
+    & $check 'outcome: filed and covered' 'failure on d0621052: filed BL-1040; covered by BL-1041 - BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed regression, filed BL-1040; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext regression, covered by BL-1041' `
         (Get-CiRunOutcome -Run $replay[0] -Runs $replay -Verdicts $verdicts -Settled $settled)
     & $check 'outcome: green run' 'success on 7c9833f4: nothing to file' (Get-CiRunOutcome -Run $replay[1] -Runs $replay -Verdicts $verdicts -Settled $settled)
-    & $check 'outcome: not filed yet, older run, passed since' 'failure on sha8: A regression, not filed yet; failure on sha8: A filed with run 9; failure on sha8: A passed since, not filed' `
+    & $check 'outcome: not filed yet, older run, passed since' 'failure on sha8: not filed yet - A regression, not filed yet; failure on sha8: filed with run 9 - A filed with run 9; failure on sha8: passed since - A passed since, not filed' `
         ((@(
             Get-CiRunOutcome -Run (& $run 8 9 @(& $f A @('Linux'))) -Runs @((& $run 8 9 @())) -Verdicts @([pscustomobject]@{ Key = 'A'; Verdict = 'regression'; RunId = '8' }) -Settled @{}
             Get-CiRunOutcome -Run (& $run 8 9 @(& $f A @('Linux'))) -Runs @((& $run 9 2 @())) -Verdicts @([pscustomobject]@{ Key = 'A'; Verdict = 'regression'; RunId = '9' }) -Settled @{}
@@ -1411,6 +1512,73 @@ if ($TestCiWatch) {
     Write-CiRunLine -RunId '8' -Line 'failure on sha8: A waiting'
     Write-CiRunLine -RunId '8' -Line 'failure on sha8: A regression, filed BL-1'
     & $check 'a run is traced once per outcome' 'run 7 success on sha7: nothing to file|run 8 failure on sha8: A waiting|run 8 failure on sha8: A regression, filed BL-1' ($traced -join '|')
+    # AF-0961, AF-0973: the Pack Curl.Mcp spell of 2026-11-21. Run 44941565490 filed BL-5710 to
+    # BL-5712, all interactive only (their fix is in ci.yml); runs 44942529813 on were covered by
+    # them, but the 118-character trace cut the outcome off behind the long job keys.
+    $packKeys = @('macos', 'ubuntu', 'windows') | ForEach-Object { "job Pack Curl.Mcp ($_-latest) step Check the packages" }
+    $packFailures = { @($packKeys | ForEach-Object { [pscustomobject]@{ Key = $_; Kind = 'job'; Platforms = @(Get-CiPlatform $_); Project = ''; Message = '' } }) }
+    $packRuns = @(
+        [pscustomobject]@{ Id = '44942529813'; Sha = 'd930fa2a0000'; FinishedAt = $now; Failures = (& $packFailures) }
+        [pscustomobject]@{ Id = '44941565490'; Sha = 'c3c60a470000'; FinishedAt = $now.AddMinutes(-12); Failures = (& $packFailures) })
+    $packVerdicts = @(Get-CiVerdicts -Now $now -Runs $packRuns)
+    $packSettled = @{}
+    foreach ($i in 0..2) {
+        $packSettled["$($packKeys[$i])|44941565490"] = "filed BL-571$i (interactive only)"
+        $packSettled["$($packKeys[$i])|44942529813"] = "covered by BL-571$i (interactive only)"
+    }
+    $packNewer = Get-CiRunOutcome -Run $packRuns[0] -Runs $packRuns -Verdicts $packVerdicts -Settled $packSettled
+    $packOlder = Get-CiRunOutcome -Run $packRuns[1] -Runs $packRuns -Verdicts $packVerdicts -Settled $packSettled
+    $cutAt118 = { param([string]$Id, [string]$Line) $l = "13:01:05 -      ci      run $Id $Line"; if ($l.Length -gt 118) { $l.Substring(0, 117) + '~' } else { $l } }
+    & $check 'a covered run says covered by the named tasks before its failures (AF-0961)' 'failure on d930fa2a: covered by BL-5710, BL-5711, BL-5712 - job Pack Curl.Mcp (macos-latest) step Check the packages regression, covered by BL-5710 (interactive only)' `
+        (($packNewer -split '; job ')[0])
+    & $check 'the outcome survives the trace cut at 118 characters (AF-0973)' 'True|True' `
+        "$((& $cutAt118 '44942529813' $packNewer).Contains('covered by BL-5710, BL-5711, BL-5712'))|$((& $cutAt118 '44941565490' $packOlder).Contains('filed BL-5710, BL-5711, BL-5712'))"
+    & $check 'an older run in the spell keeps its own filing' 'failure on c3c60a47: filed BL-5710, BL-5711, BL-5712' ($packOlder -split ' - ')[0]
+    $packAfter = @{}; foreach ($i in 0..2) { $packAfter["$($packKeys[$i])|44942529813"] = "covered by BL-571$i (interactive only)" }
+    & $check 'an older run with nothing of its own settled says what its verdict run settled' 'failure on c3c60a47: covered by BL-5710, BL-5711, BL-5712' `
+        ((Get-CiRunOutcome -Run $packRuns[1] -Runs $packRuns -Verdicts $packVerdicts -Settled $packAfter) -split ' - ')[0]
+    # The covering tasks, named, and whether a lane can take them.
+    $coverRepo = Join-Path ([IO.Path]::GetTempPath()) "df-ci-cover-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+    New-Item -ItemType Directory -Force -Path (Join-Path $coverRepo 'Tasks/Backlog') | Out-Null
+    try {
+        [IO.File]::WriteAllText((Join-Path $coverRepo 'Tasks/Backlog/BL-5710-fix-ci-failure-pack.md'), "---`nid: BL-5710`ntouches: [.github/workflows/ci.yml]`nlane: no`n---`n# BL-5710 - Fix CI failure $($packKeys[0]) on macOS`n")
+        [IO.File]::WriteAllText((Join-Path $coverRepo 'Tasks/Backlog/BL-7-fix-ci-failure-a.md'), "---`nid: BL-7`ntouches: [Curl.slnx]`n---`n# BL-7 - Fix CI failure A_Throws on Linux; also $($packKeys[0])`n")
+        $onlyLane = @(Get-CiCoveringTasks -Key 'A_Throws' -Sha 'x' -Repo $coverRepo)
+        $both = @(Get-CiCoveringTasks -Key $packKeys[0] -Sha 'x' -Repo $coverRepo)
+        Remove-Item (Join-Path $coverRepo 'Tasks/Backlog/BL-7-fix-ci-failure-a.md')
+        $onlyYou = @(Get-CiCoveringTasks -Key $packKeys[0] -Sha 'x' -Repo $coverRepo)
+        & $check 'covering tasks are named, interactive-only ones marked (AF-0961)' 'BL-7 False|BL-5710 True,BL-7 False|BL-5710 True' `
+            ((@($onlyLane, $both, $onlyYou) | ForEach-Object { (@($_) | ForEach-Object { "$($_.Id) $($_.Interactive)" }) -join ',' }) -join '|')
+        & $check 'the covered text names the tasks and says interactive only when no lane can take any' 'covered by BL-7|covered by BL-5710, BL-7|covered by BL-5710 (interactive only)' `
+            ((@($onlyLane, $both, $onlyYou) | ForEach-Object { Get-CiCoveredText $_ }) -join '|')
+        & $check 'Test-CiFailureCovered still answers True and False' 'True False' "$(Test-CiFailureCovered -Key $packKeys[0] -Sha 'x' -Repo $coverRepo) $(Test-CiFailureCovered -Key 'Nothing_Names_This' -Sha 'x' -Repo $coverRepo)"
+    } finally { Remove-Item -Recurse -Force -Path $coverRepo -ErrorAction SilentlyContinue }
+    # CI that waits only on interactive-only tasks says so: a trace line and the tab caption (AF-0973).
+    & $check 'a red run covered only by interactive-only tasks needs you' 'CI needs you: interactive-only BL-5710, BL-5711, BL-5712 cover red run 44942529813' `
+        (Get-CiNeedsYouLine -Run $packRuns[0] -Verdicts $packVerdicts -Settled $packSettled)
+    $laneSettled = @{}; foreach ($i in 0..2) { $laneSettled["$($packKeys[$i])|44942529813"] = "covered by BL-571$i" }
+    & $check 'a red run a lane can fix, a green run and no run need nobody' '||' `
+        "$(Get-CiNeedsYouLine -Run $packRuns[0] -Verdicts $packVerdicts -Settled $laneSettled)|$(Get-CiNeedsYouLine -Run ([pscustomobject]@{ Id = '1'; Sha = 's'; Failures = @() }) -Verdicts @() -Settled @{})|$(Get-CiNeedsYouLine -Run $null -Verdicts @() -Settled @{})"
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $traced.Clear()
+    $script:ciLabels = @()
+    $setLabel = { param([string]$Text) $script:ciLabels += $Text; $script:OwnTabText = $Text }
+    $savedTabText = $script:OwnTabText
+    $script:OwnTabText = 'idle, polling'
+    $needsLine = Get-CiNeedsYouLine -Run $packRuns[0] -Verdicts $packVerdicts -Settled $packSettled
+    Update-CiNeedsYou -Line $needsLine -SetLabel $setLabel
+    Update-CiNeedsYou -Line $needsLine -SetLabel $setLabel
+    Update-CiNeedsYou -Line '' -SetLabel $setLabel
+    Update-CiNeedsYou -Line '' -SetLabel $setLabel
+    & $check 'needing you is traced and captioned once, then cleared and the caption put back' "$needsLine|CI no longer needs you: no red failure waits only on an interactive-only task; CI needs you, read|idle, polling" `
+        "$($traced -join '|'); $($script:ciLabels -join '|')"
+    $script:ciLabels = @()
+    $script:OwnTabText = 'idle, polling'
+    Update-CiNeedsYou -Line $needsLine -SetLabel $setLabel
+    $script:OwnTabText = 'ALARM, read'
+    Update-CiNeedsYou -Line '' -SetLabel $setLabel
+    & $check 'a caption set since is not overwritten when CI stops needing you' 'CI needs you, read' ($script:ciLabels -join '|')
+    $script:OwnTabText = $savedTabText
     # BL-999: the audit guard's failure line files one interactive-only task, once.
     $auditLog = @("audit-guard${t}Run guard${t}2026-09-29T10:00:00.0000000Z Audit guard: Audit/Findings/x.md changed on work/dark-factory since its merge base with master")
     $audit = @(Get-CiFailures $auditLog)
