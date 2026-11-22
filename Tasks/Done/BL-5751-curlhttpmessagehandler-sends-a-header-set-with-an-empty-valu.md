@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/HttpMessageHandler/Core/HttpRequestMapping.cs, Curl.Api.UnitTests/HttpMessageHandler/Core]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5751 — CurlHttpMessageHandler sends a header set with an empty value as Name; again after ADR-1335
 
@@ -38,3 +38,4 @@ HttpRequestMapping splits empty-valued fields into EmptyHeaders via SplitEmpty (
 
 - 2026-11-22: Created by the shift-end review (ADR-0710).
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 90ddf0c5 ff7c0920 0a2c860d 7692c245 3d836d5e.
+- 2026-11-22: Doing -> Done. Empty request headers map to EmptyHeaders; tests, ADR-1335 note, Curl.Api quality 100%
