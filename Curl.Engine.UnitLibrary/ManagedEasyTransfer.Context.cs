@@ -155,13 +155,22 @@ internal sealed partial class ManagedEasyTransfer
     /// <param name="url">The URL to transfer.</param>
     /// <returns>The declared length, or <see langword="null" />.</returns>
     internal static long? DeclaredUploadLengthOf(EasyOptions options, CurlUrl url) =>
-        options.Transfer.InFileSize >= 0 && (IsScheme(url, "http") || IsScheme(url, "https") || IsScheme(url, "smb") || IsScheme(url, "smbs") || IsScheme(url, "imap") || IsScheme(url, "imaps")) ? options.Transfer.InFileSize : null;
+        options.Transfer.InFileSize >= 0 && HoldsUploadToDeclaredLength(url) ? options.Transfer.InFileSize : null;
 
     /// <summary>Whether <paramref name="url" />'s scheme is <paramref name="scheme" />, in any case.</summary>
     /// <param name="url">The URL.</param>
     /// <param name="scheme">The scheme.</param>
     /// <returns><see langword="true" /> when it is.</returns>
     private static bool IsScheme(CurlUrl url, string scheme) => string.Equals(url.Scheme, scheme, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether a read-callback upload to <paramref name="url" /> is held to its declared length: <c>http</c>, <c>https</c>, <c>smb</c>, <c>smbs</c>, <c>imap</c> and <c>imaps</c> ones.</summary>
+    /// <param name="url">The URL.</param>
+    /// <returns><see langword="true" /> when it is.</returns>
+    private static bool HoldsUploadToDeclaredLength(CurlUrl url) =>
+        DeclaredLengthSchemes.Contains(url.Scheme);
+
+    /// <summary>The schemes whose read-callback upload is held to <c>CURLOPT_INFILESIZE</c>.</summary>
+    private static readonly HashSet<string> DeclaredLengthSchemes = new(["http", "https", "smb", "smbs", "imap", "imaps"], StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// The read callback's upload stream: one the seek callback rewinds when one is set, else one the ioctl callback rewinds (BL-2607), carrying the trailer
