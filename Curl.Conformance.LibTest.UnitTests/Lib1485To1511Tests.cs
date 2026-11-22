@@ -383,6 +383,22 @@ public sealed class Lib1485To1511Tests
     }
 
     [TestMethod]
+    public async Task Lib1507_WhenAWaitEndsExactlyAtTheLimit_DoesNotAbort()
+    {
+        var time = new ManualTimeProvider(DateTimeOffset.UnixEpoch);
+        var engine = new FakeCurlEngine();
+        engine.Multi.PerformResults.Enqueue((CurlMultiCode.Ok, 1));
+        engine.Multi.PerformResults.Enqueue((CurlMultiCode.Ok, 0));
+        engine.Multi.Waiting = () => time.Advance(TimeSpan.FromMilliseconds(Lib1507.MultiPerformHangTimeoutMilliseconds));
+        var run = new PortRun(engine, 1507, "smtp://x/1507");
+
+        LibTestResult result = await new Lib1507(time).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual(string.Empty, run.Error.ToString());
+    }
+
+    [TestMethod]
     public async Task Lib1507_OnARefusedAdd_StopsWithMulti()
     {
         var engine = new FakeCurlEngine();
