@@ -111,7 +111,9 @@ public sealed partial class TcpConnectorQuicTests
 
         var result = await ConnectMultiplexedAsync(TunnelConnector(_ => proxy), TunnelTarget(events));
 
-        await using var connection = result.Connection!;
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNotNull(result.Connection);
+        await using var connection = result.Connection;
         ActEvents(events);
         Diagnostics.Assert("has the established line", true, events.Info.Contains("CONNECT-UDP tunnel established, response 200"));
         CollectionAssert.Contains(events.Info, "CONNECT-UDP tunnel established, response 200");
