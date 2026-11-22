@@ -39,3 +39,4 @@ From Surly cookbook bug report `2026-11-22T0805-Curl-bug-report.md` (CI on ubunt
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T0805, finding 1.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: ca67575f eee90515 b955d362 91533a3c 3d836d5e.
