@@ -45,4 +45,11 @@ public sealed class SmtpMailboxFeatureMaskTests
 
         Assert.StartsWith("sender@xn--", sent);
     }
+
+    [TestMethod]
+    public void Bracketed_NullReversePath_SendsEmptyBrackets()
+    {
+        Assert.AreEqual("<>", SmtpMailbox.Bracketed("<>", Utf8, hostAsWritten: false));
+        Assert.AreEqual("<> RET=HDRS", SmtpMailbox.Bracketed("<> RET=HDRS", Utf8, hostAsWritten: false));
+    }
 }

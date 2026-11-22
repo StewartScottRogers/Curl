@@ -55,6 +55,15 @@ public sealed class HttpFileParserTests
     }
 
     [TestMethod]
+    public void Parse_HeaderLineWithAnEmptyName_FailsWithExit2()
+    {
+        ArgumentExpansionException failure = Assert.ThrowsExactly<ArgumentExpansionException>(() => ParseOne("GET http://h/\n:x"));
+
+        Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
+        Assert.AreEqual("http-file: ':x' is not a header line", failure.Message);
+    }
+
+    [TestMethod]
     public void Parse_BodyWithTrailingBlankLines_DropsThem() =>
         Assert.AreEqual("a=1\n\nb=2", ParseOne("POST http://h/\n\na=1\n\nb=2\n\n  \n").Body);
 

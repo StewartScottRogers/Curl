@@ -258,6 +258,22 @@ public sealed class WsFrameEncoderTests
         Assert.AreEqual("offset", negative.ParamName);
     }
 
+    [TestMethod]
+    [DataRow(WsOpcode.Ping, 126, true)]
+    [DataRow(WsOpcode.Pong, 126, true)]
+    [DataRow(WsOpcode.Close, 126, true)]
+    [DataRow(WsOpcode.Ping, 125, false)]
+    [DataRow(WsOpcode.Close, 0, false)]
+    [DataRow(WsOpcode.Text, 126, false)]
+    [DataRow(WsOpcode.Binary, 100000, false)]
+    [DataRow(WsOpcode.Text, 5, false)]
+    public void IsControlPayloadTooLong_OpcodeAndLength_RefusesOnlyLongControlFrames(WsOpcode opcode, long length, bool expected)
+    {
+        bool actual = WsFrameEncoder.IsControlPayloadTooLong(opcode, length);
+
+        Assert.AreEqual(expected, actual);
+    }
+
     private static void WriteFrame(TestDiagnostics diagnostics, byte[] frame)
     {
         diagnostics.Bytes("frame", frame);

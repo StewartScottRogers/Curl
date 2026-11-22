@@ -27,6 +27,9 @@ internal sealed class FakeCurlEngine : ICurlEngine
     /// <summary>Runs as each easy transfer is created, before it is returned.</summary>
     public Action? CreatingEasy { get; init; }
 
+    /// <summary>Runs as each easy transfer is disposed.</summary>
+    public Action? EasyDisposing { get; init; }
+
     /// <summary>Runs as the multi handle is handed out.</summary>
     public Action? CreatingMulti { get; init; }
 
@@ -60,7 +63,7 @@ internal sealed class FakeCurlEngine : ICurlEngine
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        var easy = new FakeEasyTransfer(PerformResult, Info, Performing) { Importing = Importing, Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket, Disposing = () => DisposedEasyCount++ };
+        var easy = new FakeEasyTransfer(PerformResult, Info, Performing) { Importing = Importing, Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket, Disposing = () => { DisposedEasyCount++; EasyDisposing?.Invoke(); } };
         CreatedEasies.Add(easy);
         return easy;
     }
