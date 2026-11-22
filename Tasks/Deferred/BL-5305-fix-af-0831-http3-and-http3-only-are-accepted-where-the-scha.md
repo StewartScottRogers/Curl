@@ -54,3 +54,4 @@ Stewart decided 2026-11-16 (option 1, keep HTTP/3 on): --http3 and --http3-only 
 - 2026-11-16: Backlog -> Deferred. Stewart 2026-11-16 chose to keep HTTP/3 on (ADR-1282), as HTTP/2 on Windows (ADR-0871); AF-0831 closed at his word
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Blocked. Stewart: would undo ADR-0871/ADR-1282 (keep HTTP/2 and HTTP/3 on); held off lanes until Stewart reverses those ADRs
+- 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): HTTP/3 stays accepted on every platform (ADR-1282); doing this would make --http3 exit 2 as the Schannel curl.exe does. Listed in the handoff's known differences.
