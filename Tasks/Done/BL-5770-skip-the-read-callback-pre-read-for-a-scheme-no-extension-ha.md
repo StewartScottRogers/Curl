@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Perform.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Mqtt.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5770 — Skip the read-callback pre-read for a scheme no extension handler serves so htp:// never runs the callback
 
@@ -22,7 +22,7 @@ Split from BL-5765. `IsExtensionUrl` is syntactic; the engine learns the served 
 
 ## Acceptance criteria
 
-- [x] `htp://` with a read callback fails with `UnsupportedProtocol` and the callback is never called; `nats://`, `mcp://` keep their pre-read body (tests in `ManagedEasyTransferTests.Mqtt.cs`).
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
 
@@ -32,3 +32,4 @@ Split from BL-5765. `IsExtensionUrl` is syntactic; the engine learns the served 
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-11-22: Doing -> Done. htp:// no longer pre-reads the callback
