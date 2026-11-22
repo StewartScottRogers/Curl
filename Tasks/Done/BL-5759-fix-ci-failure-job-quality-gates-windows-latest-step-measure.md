@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Nats.UnitTests/NatsTlsUpgradeTests.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5759 — Fix CI failure job Quality gates (windows-latest) step Measure coverage, complexity and CRAP on Windows
 
@@ -36,3 +36,4 @@ The gate failure was a branch in NatsSession.ReadPlainInfoLineAsync (exception f
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 10cc6e68.
+- 2026-11-22: Doing -> Done. Added the missing cancel-before-silence test; Nats quality gate shows 0 failing members
