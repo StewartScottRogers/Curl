@@ -21,7 +21,7 @@ internal static class CurlRequestOptions
     /// <returns>The options to perform the request with.</returns>
     public static EasyOptions Apply(EasyOptions options, CurlRequest request, HeaderCallback header, WriteCallback write, ICurlEngine engine, ICollection<IDisposable> owned)
     {
-        bool upload = request.Body is not null && (UploadSchemes.UploadsWithBody(request.Url) || IsHttpPutUpload(request));
+        bool upload = request.Body is not null && (UploadSchemes.UploadsWithBody(request.Url) || (IsHttpPutUpload(request) && !UploadSchemes.ServedByExtension(request.Url)));
         bool post = !upload && (request.Body is not null || request.Method == HttpMethod.Post);
         EasyOptions applied = options with
         {

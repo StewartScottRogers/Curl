@@ -224,7 +224,7 @@ internal sealed partial class ManagedEasyTransfer
             Passphrase: options.Tls.Origin.KeyPassword,
             Engine: options.Tls.Engine,
             EchModeIsMalformed: false,
-            PostData: MqttPostDataOf(options),
+            PostData: PostDataOf(options),
             ProxyCredentials: ProxyCredentialsOf(options.Authentication),
             AllowedProtocols: ProtocolSetOf(options.Network.Protocols),
             AllowedRedirectProtocols: ProtocolSetOf(options.Network.RedirectProtocols),
@@ -253,9 +253,9 @@ internal sealed partial class ManagedEasyTransfer
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <returns>The payload, or <see langword="null" />.</returns>
-    private static ReadOnlyMemory<byte>? MqttPostDataOf(EasyOptions options)
+    private static ReadOnlyMemory<byte>? PostDataOf(EasyOptions options)
     {
-        if (options.Http.PostFields is not { } fields || !IsMqttUrl(options))
+        if (options.Http.PostFields is not { } fields || !(IsMqttUrl(options) || IsExtensionUrl(options)))
         {
             return null;
         }
@@ -268,6 +268,12 @@ internal sealed partial class ManagedEasyTransfer
     private static bool IsMqttUrl(EasyOptions options) =>
         options.Network.Url is { } url
         && MqttSchemePrefixes.Any(prefix => url.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Whether the handle's URL names a scheme curl itself does not serve, which an extension may (BL-5758): its body reaches the handler as <c>-d</c> data does.</summary>
+    private static bool IsExtensionUrl(EasyOptions options) =>
+        options.Network.Url is { } url
+        && url.IndexOf(':', StringComparison.Ordinal) is > 0 and var colon
+        && !ManagedCurlVersion.Protocols.Contains(url[..colon], StringComparer.OrdinalIgnoreCase);
 
     private static readonly string[] MqttSchemePrefixes = ["mqtt:", "mqtts:", "mqtt5:", "mqtt5s:", "mqtt5+ws:"];
 

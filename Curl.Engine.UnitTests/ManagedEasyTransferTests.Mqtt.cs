@@ -12,6 +12,27 @@ public sealed partial class ManagedEasyTransferTests
         ManagedEasyTransfer.TransferSettingsOf(new EasyOptions { Network = new EasyNetworkOptions { Url = url }, Http = http });
 
     [TestMethod]
+    [DataRow("mcp://h/t")]
+    [DataRow("mcp+stdio://h/t")]
+    [DataRow("webtransport://h/t")]
+    [DataRow("COAP://h/t")]
+    public void TransferSettingsOf_PostFieldsOnAnExtensionUrl_ReachTheHandlerAsPostData(string url)
+    {
+        EngineTransferSettings settings = MqttSettingsOf(url, new EasyHttpOptions { PostFields = Encoding.ASCII.GetBytes("a=1") });
+
+        Assert.AreEqual("a=1", Encoding.ASCII.GetString(settings.PostData!.Value.Span));
+    }
+
+    [TestMethod]
+    [DataRow("ftp://h/t")]
+    [DataRow("no-scheme")]
+    public void TransferSettingsOf_PostFieldsOnACurlSchemeOrNoScheme_LeaveNoPostData(string url)
+    {
+        EngineTransferSettings settings = MqttSettingsOf(url, new EasyHttpOptions { PostFields = Encoding.ASCII.GetBytes("a=1") });
+
+        Assert.IsNull(settings.PostData);
+    }
+    [TestMethod]
     public void TransferSettingsOf_EmptyPostFieldsOnAnMqttUrl_PublishesAnEmptyPayload()
     {
         EngineTransferSettings settings = MqttSettingsOf("mqtt://h/%20", new EasyHttpOptions { PostFields = ReadOnlyMemory<byte>.Empty });

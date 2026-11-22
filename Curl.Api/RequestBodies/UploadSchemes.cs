@@ -1,3 +1,5 @@
+using Curl.Extension.Composition;
+
 namespace Curl.Api;
 
 /// <summary>The URL schemes to which a request body is uploaded as <c>curl -T</c> uploads it (ADR-1316).</summary>
@@ -13,4 +15,18 @@ internal static class UploadSchemes
         int colon = url.IndexOf(':', StringComparison.Ordinal);
         return colon > 0 && Schemes.Contains(url[..colon], StringComparer.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Whether an extension serves the scheme of <paramref name="url"/>. A body for such a URL that is not an upload
+    /// is <c>-d</c> data whatever the method, as the console sends it (ADR-1336).
+    /// </summary>
+    /// <param name="url">The request's URL.</param>
+    /// <returns><see langword="true"/> when the scheme is one an extension registers.</returns>
+    public static bool ServedByExtension(string url)
+    {
+        int colon = url.IndexOf(':', StringComparison.Ordinal);
+        return colon > 0 && ExtensionSchemes.Contains(url[..colon], StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static readonly IReadOnlyList<string> ExtensionSchemes = ExtensionListing.Schemes(_ => null);
 }
