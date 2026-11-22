@@ -86,6 +86,34 @@ public sealed class CurlHttpMessageHandlerTests
     }
 
     [TestMethod]
+    public async Task Send_HeaderSetEmpty_IsSentAsEmptyHeaderNotRemoved()
+    {
+        ScriptedEasyTransfer easy = Scripted("", "HTTP/1.1 200 OK\r\n", "\r\n");
+        HttpRequestMessage request = new(HttpMethod.Get, "http://example/");
+        request.Headers.TryAddWithoutValidation("X-Foo", "");
+
+        await WithHttpClientAsync(easy, http => http.SendAsync(request));
+
+        string[] lines = easy.PerformedOptions!.Http.HttpHeaders.ToArray();
+        CollectionAssert.Contains(lines, "X-Foo;");
+        CollectionAssert.DoesNotContain(lines, "X-Foo:");
+    }
+
+    [TestMethod]
+    public async Task Send_EmptyUserAgent_IsSentAsEmptyHeaderNotRemoved()
+    {
+        ScriptedEasyTransfer easy = Scripted("", "HTTP/1.1 200 OK\r\n", "\r\n");
+        HttpRequestMessage request = new(HttpMethod.Get, "http://example/");
+        request.Headers.TryAddWithoutValidation("User-Agent", "");
+
+        await WithHttpClientAsync(easy, http => http.SendAsync(request));
+
+        string[] lines = easy.PerformedOptions!.Http.HttpHeaders.ToArray();
+        CollectionAssert.Contains(lines, "User-Agent;");
+        CollectionAssert.DoesNotContain(lines, "User-Agent:");
+    }
+
+    [TestMethod]
     public async Task Get_ResponseWithoutReason_GivesTheStatusPhrase()
     {
         ScriptedEasyTransfer easy = Scripted("", "HTTP/2 404\r\n", "\r\n");

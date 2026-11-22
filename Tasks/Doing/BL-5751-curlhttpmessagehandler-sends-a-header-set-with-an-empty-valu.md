@@ -24,13 +24,15 @@ BL-5749 / ADR-1335 changed `Curl.Api/Messages/CurlRequestOptions.cs:74-75` so an
 
 ## Acceptance criteria
 
-- [ ] `HttpRequestMapping.ToCurlRequestAsync` puts every request or content header whose joined value is empty into `CurlRequest.EmptyHeaders`, and only non-empty ones into `CurlRequest.Headers`.
-- [ ] A test in `Curl.Api.UnitTests/HttpMessageHandler/Core` sends an `HttpRequestMessage` with `X-Foo` set to `""` through `CurlHttpMessageHandler` and asserts the engine receives the `CURLOPT_HTTPHEADER` line `X-Foo;` and no `X-Foo:` line.
-- [ ] A test asserts an empty `User-Agent` is sent as `User-Agent;`, not removed.
-- [ ] ADR-1335's Consequences note the adapter's mapping; `Curl.Api` stays at 100% line and branch coverage.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `HttpRequestMapping.ToCurlRequestAsync` puts every request or content header whose joined value is empty into `CurlRequest.EmptyHeaders`, and only non-empty ones into `CurlRequest.Headers`.
+- [x] A test in `Curl.Api.UnitTests/HttpMessageHandler/Core` sends an `HttpRequestMessage` with `X-Foo` set to `""` through `CurlHttpMessageHandler` and asserts the engine receives the `CURLOPT_HTTPHEADER` line `X-Foo;` and no `X-Foo:` line.
+- [x] A test asserts an empty `User-Agent` is sent as `User-Agent;`, not removed.
+- [x] ADR-1335's Consequences note the adapter's mapping; `Curl.Api` stays at 100% line and branch coverage.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+HttpRequestMapping splits empty-valued fields into EmptyHeaders via SplitEmpty (keeps ToCurlRequestAsync under complexity 10). Curl.Api quality run: 100% line and branch, 0 failing. ADR-1335 Consequences updated.
 
 ## Log
 
