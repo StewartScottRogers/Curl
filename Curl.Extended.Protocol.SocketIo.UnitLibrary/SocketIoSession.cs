@@ -11,7 +11,7 @@ namespace Curl.Extended.Protocol.SocketIo;
 /// event once the server confirms, answers each <c>ping</c> with a <c>pong</c> (Engine.IO
 /// "Heartbeat") and ends with exit 56 when no ping arrives within the open packet's
 /// <c>pingInterval</c> + <c>pingTimeout</c> on the transfer's clock (ADR-1210), sends no packet over the open packet's <c>maxPayload</c> and ends with exit 55 instead (ADR-1212), writes each event received as its JSON array and a newline, acknowledges each event
-/// that asks for it with an empty array, and ends when the server disconnects or closes.
+/// that asks for it with an empty array, and ends when the server disconnects or closes, or, when it emitted an event, after the first event the server sends back (BL-5763), so an emit returns its echo at once.
 /// </summary>
 /// <param name="channel">The WebSocket messages.</param>
 /// <param name="namespaceName">The namespace to connect to, <c>/</c> for the main one.</param>
@@ -206,6 +206,7 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
         await output.WriteAsync(line, cancellationToken).ConfigureAwait(false);
         written += line.Length;
         progress.ReportDownloaded(written, null);
+        isEnded = emit is not null;
         if (packet.AckId is not null)
         {
             await SendPacketAsync(new SocketIoPacket(SocketIoPacketType.Ack, namespaceName, packet.AckId, "[]"), cancellationToken).ConfigureAwait(false);
