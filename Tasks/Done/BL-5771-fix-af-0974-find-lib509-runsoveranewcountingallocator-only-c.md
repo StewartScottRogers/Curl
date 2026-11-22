@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests/Lib510To519Tests.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5771 — Fix AF-0974: Find_Lib509_RunsOverANewCountingAllocator only checks that the exit code is not -1, never that a counting allocator was used
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The test now asserts exit code 0, the "Callbacks were invoked!" output (proves the counting allocator was called) and empty stderr. Test-only change in Lib510To519Tests.cs; fast tests of the project: 1241 passed.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-22: Doing -> Done. Find_Lib509 test now asserts exit code 0 and the allocator-invoked output
