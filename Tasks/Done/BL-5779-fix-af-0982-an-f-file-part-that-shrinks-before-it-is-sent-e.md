@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs, Curl.Console/CurlCommandRunner.cs, Curl.Core.UnitTests/Multipart/MultipartFormBodyBuilderTraceSizeTests.cs, Curl.Console.UnitTests/FormFileSizedBeforeTraceTests.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5779 — Fix AF-0982: An -F file part that shrinks before it is sent (e.g. --trace-ascii into the same file) exits 0 where curl fails with exit 26
 
@@ -52,3 +52,4 @@ Cause: the runner built the -F body after the trace file truncated the file, so 
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-22: Doing -> Done. -F files are sized before the trace file opens; a shrunk part now fails with exit 26
