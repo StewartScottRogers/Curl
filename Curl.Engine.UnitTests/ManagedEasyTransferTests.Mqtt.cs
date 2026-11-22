@@ -3,6 +3,9 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 using Curl.Api.Options.Http;
+using Curl.Core;
+using Curl.Networking;
+using Curl.Protocol.Abstractions;
 using Curl.Api.Options.Network;
 
 namespace Curl.Engine;
@@ -85,7 +88,7 @@ public sealed partial class ManagedEasyTransferTests
     [TestMethod]
     public async Task PerformAsync_ReadCallbackAbortingOnAnExtensionUrl_EndsWithAbortedByCallbackAndRunsNoHandler()
     {
-        ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([])).CreateEasy();
+        ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngineServing(new ScriptedConnector([]), "mcp").CreateEasy();
         await using IEasyTransfer handle = easy;
         easy.Options = new EasyOptions
         {
@@ -254,5 +257,55 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual(CurlCode.Ok, code);
         StringAssert.EndsWith(Encoding.ASCII.GetString(connector.Written), "\r\n\r\nhello");
         Assert.IsTrue(calls >= 1);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void TransferSettingsOf_ReadCallbackOnASchemeNoHandlerServes_IsReadOnlyWhenAHandlerServesIt(bool served)
+    {
+        int calls = 0;
+        EngineTransferSettings settings = ManagedEasyTransfer.TransferSettingsOf(
+            new EasyOptions
+            {
+                Network = new EasyNetworkOptions { Url = "htp://h/t" },
+                Http = new EasyHttpOptions { Post = true, PostFieldSize = -1 },
+                Callbacks = new Curl.Api.Callbacks.EasyCallbackOptions { Read = buffer => { calls++; return 0; } },
+            },
+            scheme => served && scheme == "htp");
+
+        Assert.AreEqual(served ? 1 : 0, calls);
+        Assert.AreEqual(served, settings.PostData is not null);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ReadCallbackPostToAMistypedScheme_FailsWithoutRunningTheCallback()
+    {
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([])).CreateEasy();
+        int calls = 0;
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "htp://h/t" },
+            Http = new EasyHttpOptions { Post = true, PostFieldSize = -1 },
+            Callbacks = new Curl.Api.Callbacks.EasyCallbackOptions { Read = buffer => { calls++; return 0; } },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.UnsupportedProtocol, code);
+        Assert.AreEqual(0, calls);
+    }
+
+    private static ManagedCurlEngine CreateEngineServing(IConnector connector, string scheme) =>
+        new(TimeProvider.System, (_, _, cookies) => new ProtocolDispatcher([.. CreateDispatcherHandlers(connector, cookies), new SchemeServingHandler(scheme)]), readEnvironmentVariable: _ => null);
+
+    private static IEnumerable<IProtocolHandler> CreateDispatcherHandlers(IConnector connector, ICookieStore? cookies) =>
+        EngineComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure), new PassThroughTlsProvider(), new LoopbackDnsResolver(), cookies);
+
+    private sealed class SchemeServingHandler(string scheme) : IProtocolHandler
+    {
+        public IReadOnlyCollection<string> SupportedSchemes { get; } = [scheme];
+
+        public ValueTask<TransferResult> ExecuteAsync(ITransferContext context) => throw new InvalidOperationException("No handler runs.");
     }
 }

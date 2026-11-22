@@ -213,8 +213,9 @@ internal sealed partial class ManagedEasyTransfer
     /// <see cref="HttpRequestOptionsMapping" /> reads it from the behaviour group.
     /// </summary>
     /// <param name="options">The handle's options.</param>
+    /// <param name="isServedScheme">Whether some handler serves a scheme, or <see langword="null" /> to take every explicit non-curl scheme as served; a read callback is not read up front for a scheme no handler serves (BL-5770).</param>
     /// <returns>The settings.</returns>
-    internal static EngineTransferSettings TransferSettingsOf(EasyOptions options) =>
+    internal static EngineTransferSettings TransferSettingsOf(EasyOptions options, Func<string, bool>? isServedScheme = null) =>
         new(
             Silent: true,
             ShowError: false,
@@ -224,7 +225,7 @@ internal sealed partial class ManagedEasyTransfer
             Passphrase: options.Tls.Origin.KeyPassword,
             Engine: options.Tls.Engine,
             EchModeIsMalformed: false,
-            PostData: PostDataOf(options),
+            PostData: PostDataOf(options, isServedScheme),
             ProxyCredentials: ProxyCredentialsOf(options.Authentication),
             AllowedProtocols: ProtocolSetOf(options.Network.Protocols),
             AllowedRedirectProtocols: ProtocolSetOf(options.Network.RedirectProtocols),
@@ -252,9 +253,10 @@ internal sealed partial class ManagedEasyTransfer
     /// instead; only an <c>mqtt</c> or <c>mqtts</c> URL reads it, as libcurl's <c>mqtt_do</c> does (upstream test1916, BL-2673).
     /// </summary>
     /// <param name="options">The handle's options.</param>
+    /// <param name="isServedScheme">Whether some handler serves a scheme; <see langword="null" /> takes every explicit non-curl scheme as served.</param>
     /// <returns>The payload, or <see langword="null" />.</returns>
-    private static ReadOnlyMemory<byte>? PostDataOf(EasyOptions options) =>
-        options.Http.PostFields is { } fields ? PostFieldsDataOf(options, fields) : ReadCallbackPostDataOf(options);
+    private static ReadOnlyMemory<byte>? PostDataOf(EasyOptions options, Func<string, bool>? isServedScheme) =>
+        options.Http.PostFields is { } fields ? PostFieldsDataOf(options, fields) : ReadCallbackPostDataOf(options, isServedScheme);
 
     /// <summary>The <c>CURLOPT_POSTFIELDS</c> an MQTT or extension URL's handler reads, cut to a shorter non-negative <c>CURLOPT_POSTFIELDSIZE</c>; <see langword="null" /> for any other URL.</summary>
     /// <param name="options">The handle's options.</param>
@@ -276,9 +278,10 @@ internal sealed partial class ManagedEasyTransfer
     /// front so they reach the handler as <c>-d</c> data does (BL-5754); <see langword="null" /> for any other handle.
     /// </summary>
     /// <param name="options">The handle's options.</param>
+    /// <param name="isServedScheme">Whether some handler serves a scheme; <see langword="null" /> takes every explicit non-curl scheme as served.</param>
     /// <returns>The data, or <see langword="null" />.</returns>
-    private static ReadOnlyMemory<byte>? ReadCallbackPostDataOf(EasyOptions options) =>
-        PostsWithoutFields(options) && options.Callbacks.Read is { } read && IsExtensionUrl(options)
+    private static ReadOnlyMemory<byte>? ReadCallbackPostDataOf(EasyOptions options, Func<string, bool>? isServedScheme) =>
+        PostsWithoutFields(options) && options.Callbacks.Read is { } read && IsExtensionUrl(options) && IsServedBy(options, isServedScheme)
             ? ReadAllOf(read, options.Http.PostFieldSize)
             : (ReadOnlyMemory<byte>?)null;
 
@@ -337,6 +340,10 @@ internal sealed partial class ManagedEasyTransfer
     private static bool IsMqttUrl(EasyOptions options) =>
         options.Network.Url is { } url
         && MqttSchemePrefixes.Any(prefix => url.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Whether <paramref name="isServedScheme" /> (when given) says a handler serves the scheme the handle's URL spells out (BL-5770).</summary>
+    private static bool IsServedBy(EasyOptions options, Func<string, bool>? isServedScheme) =>
+        isServedScheme is null || isServedScheme(ExplicitSchemeOf(options.Network.Url!)!);
 
     /// <summary>Whether the handle's URL names a scheme curl itself does not serve, which an extension may (BL-5758): its body reaches the handler as <c>-d</c> data does.</summary>
     private static bool IsExtensionUrl(EasyOptions options) =>

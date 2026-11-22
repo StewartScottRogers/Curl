@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Mqtt.cs]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Perform.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Mqtt.cs]
 requirement: none
 created: 2026-11-22
 completed:
@@ -14,17 +14,19 @@ completed:
 
 ## Goal
 
-<!-- One sentence: the observable outcome once this task is done. -->
+A read-callback POST to a scheme no handler serves (`htp://`) ends with exit 1 and never runs the callback.
 
 ## Context
 
-<!-- Why this matters, and where to start: requirement IDs, ADRs, projects, files, upstream curl links with the curl version. -->
+Split from BL-5765. `IsExtensionUrl` is syntactic; the engine learns the served schemes from the dispatcher (`ProtocolDispatcher.Serves`).
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] `htp://` with a read callback fails with `UnsupportedProtocol` and the callback is never called; `nats://`, `mcp://` keep their pre-read body (tests in `ManagedEasyTransferTests.Mqtt.cs`).
 
 ## Notes
+
+- `TransferSettingsOf` takes an optional `isServedScheme`; `PerformFromOptionsOverCachesAsync` passes the dispatcher's `Serves` (built only when a pre-read is considered). `null` keeps the old behaviour. Added `ManagedEasyTransfer.Perform.cs` to `touches`; `ManagedCurlEngine.cs` needed no change. Engine quality gates pass; fast tests green.
 
 ## Log
 
