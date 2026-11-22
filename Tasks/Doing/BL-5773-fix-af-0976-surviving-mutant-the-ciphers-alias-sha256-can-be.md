@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/OpenSslCipherString.cs line 51`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/OpenSslCipherString.cs line 51`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `OpenSslCipherStringHashAliasTests.Expand_Sha256Alias_SelectsOnlyNonGcmSuitesEndingSha256` (mutant applied by hand: it failed; reverted: all 4407 fast tests in Curl.Networking.UnitTests pass). Added a SHA384 twin test. Production code unchanged.
 
 ## Log
 
