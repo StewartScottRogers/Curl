@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_0210.md | reproduces: yes | Ran the Measure-FactoryProcess.ps1 command: spell 19:47:17Z to 23:34:30Z is 227.22 min, started by run 44941565490, still reported. The Select-String over DarkFactory-20261121-113211.log shows the four runs 44942529813, 44946270671, 44946492351 and 44952616925 only in truncated 'failure on' lines and 'running ... no failing test' lines, with no filed, covered or passed since. Their ends (19:59:49Z, 20:47:30Z, 21:01:42Z, 22:29:04Z) are each more than 30 minutes before the next green run (23:34:30Z). The window holds a shift that finished tasks, so the verdict stands.
+
 ## Log
 
 - 2026-11-21: filed proposed.

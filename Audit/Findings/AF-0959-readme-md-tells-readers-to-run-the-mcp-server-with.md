@@ -42,6 +42,8 @@ Select-String -Path README.md,Curl.Mcp/README.md,Curl.Mcp/Curl.Mcp.csproj -Patte
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_0210.md | reproduces: no | Ran Select-String -Path README.md,Curl.Mcp/README.md,Curl.Mcp/Curl.Mcp.csproj -Pattern 'dnx (Surly\.)?Curl\.Mcp|<PackageId>'. README.md:133 now says 'Run it with `dnx Surly.Curl.Mcp`'; Curl.Mcp/README.md:3 and :17 say 'dnx Surly.Curl.Mcp'; Curl.Mcp.csproj:29 has <PackageId>Surly.Curl.Mcp</PackageId>. No 'dnx Curl.Mcp' remains; the documented command matches the package ID.
+
 ## Log
 
 - 2026-11-21: filed proposed.

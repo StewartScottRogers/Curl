@@ -3,8 +3,8 @@ id: AF-0949
 title: Surviving mutant: every control frame, and any frame over 125 bytes, can be refused as too large (IsControlPayloadTooLong && -> ||)
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_0210.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.WebSocket.UnitLibrary/WsFrameEncoder.cs:IsControlPayloadTooLong-and:surviving-mutant
 reproduction: mutation Curl.WebSocket.UnitLibrary/WsFrameEncoder.cs:43:&&
 task: BL-5718
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: mechanical
+closed-by: 2026-11-22_0210.md
 ---
 # AF-0949 - Surviving mutant: every control frame, and any frame over 125 bytes, can be refused as too large (IsControlPayloadTooLong && -> ||)
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.WebSo
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_0210.md | reproduces: no | Ran the -Site command (&&): resolvedLine 43, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_0210.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

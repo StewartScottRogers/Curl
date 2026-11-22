@@ -42,6 +42,8 @@ Select-String -Path Curl.Mcp/Curl.Mcp.csproj -Pattern 'dnx Curl\.Mcp|<PackageId>
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_0210.md | reproduces: no | Ran Select-String -Path Curl.Mcp/Curl.Mcp.csproj -Pattern 'dnx Curl\.Mcp|<PackageId>'. The only match is line 29, <PackageId>Surly.Curl.Mcp</PackageId>; the comment at line 11 now reads 'tool package of PackageType McpServer that `dnx Surly.Curl.Mcp` runs', so it agrees with the PackageId.
+
 ## Log
 
 - 2026-11-21: filed proposed.

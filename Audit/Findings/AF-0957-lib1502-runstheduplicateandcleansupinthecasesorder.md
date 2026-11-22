@@ -3,8 +3,8 @@ id: AF-0957
 title: Lib1502_RunsTheDuplicateAndCleansUpInTheCasesOrder never checks the cleanup order its name promises
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_0210.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1485To1511Tests.cs:Lib1502_RunsTheDuplicateAndCleansUpInTheCasesOrder:name-lies
 reproduction: none
 task: BL-5726
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_0210.md
 ---
 # AF-0957 - Lib1502_RunsTheDuplicateAndCleansUpInTheCasesOrder never checks the cleanup order its name promises
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1485To1511Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_0210.md | reproduces: no | Ran the Select-String reproduction. The test now records the fake's EasyDisposing, Multi.Removing and Multi.Disposing calls into events, and asserts Assert.AreEqual(expectedEvents, string.Join(' ', events), "the original is cleaned up first, then the case's own removal and clean-up order") (Lib1485To1511Tests.cs:301).
+
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_0210.md: the reproduction no longer reproduces.

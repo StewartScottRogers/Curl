@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_0210.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: resolvedLine 59, outcome survived. Line 59 is still 'var trace = new LibTestDebugTrace(context.StandardError, timeProvider, traceTime: true, noHex: true);' and no test pins the trace format. Runner's targeted mutation rerun on the clean audited commit: survived.
+
 ## Log
 
 - 2026-11-21: filed proposed.
