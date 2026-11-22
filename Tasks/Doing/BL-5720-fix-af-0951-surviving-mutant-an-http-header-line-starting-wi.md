@@ -32,10 +32,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.HttpFile.UnitLibrary/HttpFileParser.cs line 126`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.HttpFile.UnitLibrary/HttpFileParser.cs line 126`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test Parse_HeaderLineWithAnEmptyName_FailsWithExit2 (mutant `>= 0` fails it; reverted, 49 tests pass). Production code unchanged. Full-solution fast tests not rerun: only a test was added.
 
 ## Log
 
