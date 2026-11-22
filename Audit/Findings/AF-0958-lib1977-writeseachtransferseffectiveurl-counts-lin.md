@@ -3,8 +3,8 @@ id: AF-0958
 title: Lib1977_WritesEachTransfersEffectiveUrl counts lines starting 'effective URL: ' but never checks a URL
 auditor: quality
 severity: Low
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_0210.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1964To1977Tests.cs:Lib1977_WritesEachTransfersEffectiveUrl:weak-assertion
 reproduction: none
 task: BL-5727
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: reliable-reaudit
+closed-by: 2026-11-22_0210.md
 ---
 # AF-0958 - Lib1977_WritesEachTransfersEffectiveUrl counts lines starting 'effective URL: ' but never checks a URL
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1964To1977Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_0210.md | reproduces: no | Ran the reproduction: Select-String for 'StartsWith("effective URL: "' finds no match. Lib1977_WritesEachTransfersEffectiveUrl now asserts the exact output, Assert.AreEqual("effective URL: http://x/1977\neffective URL: http://x/1977\neffective URL: http://x/1977\n", ...) (Lib1964To1977Tests.cs:201).
+
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_0210.md: the reproduction no longer reproduces.

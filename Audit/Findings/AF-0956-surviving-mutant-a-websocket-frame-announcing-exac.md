@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs:PayloadLength-gt:surviving-mutant
 reproduction: mutation Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs:261:>
-task: BL-5725
-tasks: BL-5725
+task: BL-5732
+tasks: BL-5725, BL-5732
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md
@@ -41,6 +41,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.WebSo
 - Actual: outcome survived
 
 ## Re-audits
+
+- 2026-11-22 | 2026-11-22_0210.md | reproduces: yes | Ran the -Site command: resolvedLine 261, outcome survived. Line 261 is still 'if (length > long.MaxValue)' in PayloadLength.
 
 ## Log
 

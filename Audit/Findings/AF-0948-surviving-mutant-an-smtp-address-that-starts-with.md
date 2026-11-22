@@ -3,8 +3,8 @@ id: AF-0948
 title: Surviving mutant: an SMTP address that starts with CR or LF can be sent instead of refused (HasLineBreak >= 0 -> > 0)
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-22_0210.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Original.Protocol.Smtp.UnitLibrary/SmtpMailTransaction.cs:HasLineBreak-ge:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Smtp.UnitLibrary/SmtpMailTransaction.cs:139:>=
 task: BL-5717
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-22
+closed-how: mechanical
+closed-by: 2026-11-22_0210.md
 ---
 # AF-0948 - Surviving mutant: an SMTP address that starts with CR or LF can be sent instead of refused (HasLineBreak >= 0 -> > 0)
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Origi
 
 ## Re-audits
 
+- 2026-11-22 | 2026-11-22_0210.md | reproduces: no | Ran the -Site command: resolvedLine 139, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-22: accepted -> closed. Re-audit 2026-11-22_0210.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

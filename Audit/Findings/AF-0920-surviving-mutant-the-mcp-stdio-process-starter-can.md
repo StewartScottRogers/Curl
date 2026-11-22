@@ -45,6 +45,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 - 2026-11-21 | 2026-11-21_0114.md | not re-audited | Ran the -Site .../Stdio/McpServerProcessStarter.cs:26:false -Member Start command: outcome site-missing, no mutant ran. UseShellExecute = false now sits in BuildStartInfo (line 36), not in Start, so the site could not be found: not re-audited.
 - 2026-11-21 | 2026-11-21_0835.md | not re-audited | Ran the -Site command (McpServerProcessStarter.cs:26:false, member Start): outcome site-missing. UseShellExecute = false now sits in BuildStartInfo at line 35; for information, -Site ...McpServerProcessStarter.cs:35:false -Member BuildStartInfo was killed, but the finding's own site could not be run, so not re-audited.
 - 2026-11-21 | 2026-11-21_1740.md | not re-audited | Ran the -Site command: outcome site-missing. McpServerProcessStarter.cs:26 is now the '?? throw new InvalidOperationException' line; the start info moved to BuildStartInfo, and no 'false' site is left in Start. Not re-audited.
+- 2026-11-22 | 2026-11-22_0210.md | not re-audited | Ran the -Site command: outcome site-missing (resolvedLine null). Start() no longer holds the start info; it calls BuildStartInfo, where 'UseShellExecute = false,' is now line 35. Not re-audited. Separately I ran -Site Curl.Extended.Protocol.McpClient.UnitLibrary/Stdio/McpServerProcessStarter.cs:35:false -Member BuildStartInfo: outcome killed.
 
 ## Log
 

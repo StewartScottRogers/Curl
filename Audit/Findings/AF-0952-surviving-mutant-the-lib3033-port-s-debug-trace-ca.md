@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib3033.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib3033.cs:59:true
-task: BL-5721
-tasks: BL-5721
+task: BL-5731
+tasks: BL-5721, BL-5731
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md
@@ -41,6 +41,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 - Actual: outcome survived
 
 ## Re-audits
+
+- 2026-11-22 | 2026-11-22_0210.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: resolvedLine 59, outcome survived. Line 59 is still 'var trace = new LibTestDebugTrace(context.StandardError, timeProvider, traceTime: true, noHex: true);' and no test pins the trace format. Runner's targeted mutation rerun on the clean audited commit: survived.
 
 ## Log
 
