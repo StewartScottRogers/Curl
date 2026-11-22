@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5735 — Fix AF-0964: Surviving mutant: a Socket.IO upgrade reply head of exactly 65536 bytes can be refused as too long (WrittenCount > LongestHead -> >=)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs line 66`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs line 66`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added ReadReplyAsync_AHeadEndArrivingAfterExactlyTheLimit_IsAccepted (SocketIoUpgradeTests.cs): a 65536-byte head without its end, then the closing CRLF. With '>=' applied by hand it fails; reverted, all 105 pass. It kills the mutant. Production code unchanged.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 7efc6ad1 9742157d.
+- 2026-11-22: Doing -> Done. Boundary test added; mutant killed

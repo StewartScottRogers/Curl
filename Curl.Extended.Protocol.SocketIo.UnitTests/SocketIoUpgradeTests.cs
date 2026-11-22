@@ -70,6 +70,19 @@ public sealed class SocketIoUpgradeTests
     }
 
     [TestMethod]
+    public async Task ReadReplyAsync_AHeadEndArrivingAfterExactlyTheLimit_IsAccepted()
+    {
+        string start = $"HTTP/1.1 101 OK\r\nSec-WebSocket-Accept: {SocketIoUpgrade.AcceptFor(ZeroRandomSource.Key)}\r\nX: ";
+        byte[] almost = Encoding.ASCII.GetBytes(start + new string('a', SocketIoUpgrade.LongestHead - start.Length - 2) + "\r\n");
+        Assert.AreEqual(SocketIoUpgrade.LongestHead, almost.Length);
+        ScriptedConnection connection = new([.. almost.Chunk(4096), "\r\n"u8.ToArray()]);
+
+        ReadOnlyMemory<byte> after = await SocketIoUpgrade.ReadReplyAsync(connection, ZeroRandomSource.Key, CancellationToken.None);
+
+        Assert.AreEqual(0, after.Length);
+    }
+
+    [TestMethod]
     public async Task ReadReplyAsync_AHeadLongerThanTheLimit_FailsWithExit8()
     {
         byte[] chunk = Encoding.ASCII.GetBytes("HTTP/1.1 101 OK\r\nX: " + new string('a', 4000) + "\r\n");
