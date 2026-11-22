@@ -32,11 +32,13 @@ projects, not the packages. `llms.txt` is hand-written (BL-5714's notes say ther
 
 ## Acceptance criteria
 
-- [ ] `llms.txt` says `dotnet add package Surly.Curl.Api --prerelease` and `dotnet add package Surly.Libcurl --prerelease`.
-- [ ] A search of the repository for `add package Curl.Api` and `add package Libcurl`, outside `Tasks/`, `Audit/`, `Gap/` and the ADRs, finds nothing.
-- [ ] `dotnet build` is clean.
+- [x] `llms.txt` says `dotnet add package Surly.Curl.Api --prerelease` and `dotnet add package Surly.Libcurl --prerelease`.
+- [x] A search of the repository for `add package Curl.Api` and `add package Libcurl`, outside `Tasks/`, `Audit/`, `Gap/` and the ADRs, finds nothing.
+- [x] `dotnet build` is clean.
 
 ## Notes
+
+llms.txt lines 17-18 now use Surly.* package IDs; repo search finds no old commands; build clean.
 
 ## Log
 
