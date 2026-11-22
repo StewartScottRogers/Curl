@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib3033.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5731 — Re-fix AF-0952: Surviving mutant: the lib3033 port's debug trace can dump with the hex column (noHex true -> false)
 
@@ -47,3 +47,4 @@ Mutant noHex: true -> false at Lib3033.cs:59 applied by hand: Lib3033_TracesToSt
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 90d30022 9742157d.
+- 2026-11-22: Doing -> Done. Mutant killed by Lib3033_TracesToStandardErrorWithoutTheHexColumn; verified by hand
