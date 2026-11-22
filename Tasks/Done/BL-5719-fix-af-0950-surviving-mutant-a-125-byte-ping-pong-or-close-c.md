@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.WebSocket.UnitLibrary/WsFrameEncoder.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5719 — Fix AF-0950: Surviving mutant: a 125-byte ping, pong or close can be refused as too large (payloadLength > 125 -> >= 125)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.WebSocket.UnitLibrary/WsFrameEncoder.cs line 43`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.WebSocket.UnitLibrary/WsFrameEncoder.cs line 43`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+No code change needed: commit 163d9c5581 (BL-5718) already pinned the row. Applied `>` -> `>=` at WsFrameEncoder.cs:43 by hand; `IsControlPayloadTooLong_OpcodeAndLength_RefusesOnlyLongControlFrames (Ping,125,False)` in WsFrameEncoderTests failed (1 failed, 86 passed); reverted, source unchanged. Fast tests of Curl.WebSocket.UnitTests pass without the mutant.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: b7dd445e 9742157d.
+- 2026-11-21: Doing -> Done. Mutant already killed by the Ping,125,False row; verified by hand
