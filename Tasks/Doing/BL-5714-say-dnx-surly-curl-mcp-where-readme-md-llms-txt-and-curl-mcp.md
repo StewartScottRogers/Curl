@@ -41,3 +41,4 @@ This breaks the "say what it does" rule. `Documentation/Planning/Decisions/ADR-0
 ## Log
 
 - 2026-11-21: Created.
+- 2026-11-21: Backlog -> Doing. Criteria at claim: a42e1a1b e4cfe50f 7b0d5525 94f0556a.
