@@ -35,3 +35,4 @@ The test that runs a globbed `-o` into a missing folder against a loopback HTTP 
 ## Log
 
 - 2026-11-22: Created.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 13d8430b 29ffcf4c e2726449 f2bc4630.
