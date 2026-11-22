@@ -255,10 +255,12 @@ internal sealed partial class ManagedEasyTransfer
         return size < 0 || size >= fields.Length ? fields : fields[..(int)size];
     }
 
-    /// <summary>Whether the handle's URL names the <c>mqtt</c> or <c>mqtts</c> scheme.</summary>
+    /// <summary>Whether the handle's URL names an MQTT scheme: <c>mqtt</c>, <c>mqtts</c>, <c>mqtt5</c>, <c>mqtt5s</c> or <c>mqtt5+ws</c> (BL-5745).</summary>
     private static bool IsMqttUrl(EasyOptions options) =>
         options.Network.Url is { } url
-        && (url.StartsWith("mqtt:", StringComparison.OrdinalIgnoreCase) || url.StartsWith("mqtts:", StringComparison.OrdinalIgnoreCase));
+        && MqttSchemePrefixes.Any(prefix => url.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+    private static readonly string[] MqttSchemePrefixes = ["mqtt:", "mqtts:", "mqtt5:", "mqtt5s:", "mqtt5+ws:"];
 
     /// <summary>
     /// The proxy credentials <c>CURLOPT_PROXYUSERPWD</c>, <c>CURLOPT_PROXYUSERNAME</c> and <c>CURLOPT_PROXYPASSWORD</c>

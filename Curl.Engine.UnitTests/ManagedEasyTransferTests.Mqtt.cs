@@ -45,6 +45,17 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    [DataRow("mqtt5://h/t")]
+    [DataRow("mqtt5s://h/t")]
+    [DataRow("mqtt5+ws://h/t")]
+    public void TransferSettingsOf_PostFieldsOnAnMqtt5Url_PublishesThem(string url)
+    {
+        EngineTransferSettings settings = MqttSettingsOf(url, new EasyHttpOptions { PostFields = Encoding.ASCII.GetBytes("21.5") });
+
+        CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("21.5"), settings.PostData?.ToArray());
+    }
+
+    [TestMethod]
     public void TransferSettingsOf_PostFieldsOnAnHttpUrl_LeavesPostDataToTheHttpHandler()
     {
         EngineTransferSettings settings = MqttSettingsOf("http://h/t", new EasyHttpOptions { PostFields = Encoding.ASCII.GetBytes("a=1") });
