@@ -36,10 +36,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib3033.cs line 59`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Conformance.LibTest.UnitLibrary/Lib3033.cs line 59`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Mutant noHex: true -> false at Lib3033.cs:59 applied by hand: Lib3033_TracesToStandardErrorWithoutTheHexColumn (Lib2505To3100Tests.cs, added by BL-5721 in b17efca54a) fails, the other 1239 LibTest tests pass; reverted, tree clean. No code change needed.
 
 ## Log
 
