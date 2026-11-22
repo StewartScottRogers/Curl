@@ -161,8 +161,10 @@ function Test-FactoryTab {
 }
 
 function Set-OwnTabLabel {
-    # Captions this process's own tab: "DF 09:07 L1 $Dot $Text", or just the prefix.
+    # Captions this process's own tab: "DF 09:07 L1 $Dot $Text", or just the prefix. Keeps
+    # $Text in $script:OwnTabText, so the CI watch can put back a caption it replaced (Update-CiNeedsYou).
     param([string]$Text)
+    $script:OwnTabText = $Text
     if (-not (Test-FactoryTab $env:HERDR_TAB_ID)) { return }
     Set-HerdrTabLabel $env:HERDR_TAB_ID $(if ($Text) { "$OwnTabPrefix $Dot $Text" } else { $OwnTabPrefix })
 }

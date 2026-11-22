@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Mcp.Protocol.UnitLibrary/Tools/ToolsCallHandler.cs]
+touches: [Curl.Mcp.UnitTests/InProcessCurlCommandRunnerTests.cs, Curl.Mcp.UnitTests/McpCurlToolMissingFolderTests.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5761 — Return curl's exit 2 as the curl-mcp tool result when -o names a folder that does not exist, not a plain tool error
 
@@ -24,12 +24,14 @@ Repro: `surl --mail-domain example.com --mailbox bob@example.com:bobpass smtp://
 
 ## Acceptance criteria
 
-- [ ] The `curl` tool with the repro's arguments returns a JSON result with the same exit code and stderr text as the console, pinned by a test.
-- [ ] No input to the `curl` tool produces the generic "An error occurred invoking" text for a failure curl itself reports; a test runs a handful of failing arguments (missing folder, unknown option, bad URL) and checks each returns a result with an exit code.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The `curl` tool with the repro's arguments returns a JSON result with the same exit code and stderr text as the console, pinned by a test.
+- [x] No input to the `curl` tool produces the generic "An error occurred invoking" text for a failure curl itself reports; a test runs a handful of failing arguments (missing folder, unknown option, bad URL) and checks each returns a result with an exit code.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T1308, finding 1.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: f9e4a29a d193aa6d 3d836d5e.
+- 2026-11-22: Doing -> Done. Does not reproduce; pinned with tests

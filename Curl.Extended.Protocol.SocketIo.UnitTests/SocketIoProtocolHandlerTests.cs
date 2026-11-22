@@ -16,7 +16,7 @@ public sealed class SocketIoProtocolHandlerTests
     private const string Open = "0{\"sid\":\"lv_VI97HAXpY6yYWAAAC\",\"upgrades\":[],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}";
 
     [TestMethod]
-    public async Task ExecuteAsync_TheMainNamespace_EmitsAnswersPingsAndWritesEachEvent()
+    public async Task ExecuteAsync_TheMainNamespace_EmitsAnswersPingsAndEndsAtTheFirstEventBack()
     {
         ScriptedConnection connection = Server(Open, "40{\"sid\":\"x\"}", "2", "", "6", "4x", "42[\"news\",{\"a\":1}]", "421[\"question\"]", "43[]", "51-[\"bin\",{\"_placeholder\":true,\"num\":0}]", "41", "42[\"late\"]");
         MemoryStream output = new();
@@ -24,9 +24,9 @@ public sealed class SocketIoProtocolHandlerTests
         TransferResult result = await ExecuteAsync(connection, "socketio://example.com/", output, "[\"hello\",\"world\"]");
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual("[\"news\",{\"a\":1}]\n[\"question\"]\n", Encoding.UTF8.GetString(output.ToArray()));
+        Assert.AreEqual("[\"news\",{\"a\":1}]\n", Encoding.UTF8.GetString(output.ToArray()));
         Assert.AreEqual(output.Length, result.BytesTransferred);
-        CollectionAssert.AreEqual(new[] { "1:40", "1:42[\"hello\",\"world\"]", "1:3", "1:431[]" }, connection.SentFrames());
+        CollectionAssert.AreEqual(new[] { "1:40", "1:42[\"hello\",\"world\"]", "1:3" }, connection.SentFrames());
         StringAssert.StartsWith(Encoding.ASCII.GetString(connection.Writes[0]), "GET /socket.io/?EIO=4&transport=websocket HTTP/1.1\r\nHost: example.com\r\n");
         Assert.IsTrue(connection.IsDisposed);
     }

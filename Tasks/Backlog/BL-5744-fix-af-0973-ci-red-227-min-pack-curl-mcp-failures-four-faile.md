@@ -43,10 +43,16 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Acceptance criteria
 
 - [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Same cause and fix as BL-5730 (AF-0961 and AF-0973 report the same 227-minute spell); see its Notes. In short: the four runs were traced as covered within minutes, but the 118-character trace cut hid "covered" behind the long `job Pack Curl.Mcp ... step Check the packages` key, the task was never named, and nothing said its covering tasks were interactive only. The CI watch now starts a red run's line with a short head naming the filed or covering tasks, and traces `CI needs you: interactive-only BL-### cover red run <id>` with the tab caption "CI needs you, read" while only interactive-only tasks can fix CI.
+- Tests: `-TestCiWatch` 110 cases (11 new or changed) and `-TestLaneMarker`, under Windows PowerShell and PowerShell 7: all pass. `dotnet build`: 0 warnings, 0 errors; fast tests: 115 test projects passed, exit 0.
+- Landed in 8119026445 on work/dark-factory (2026-11-22; the Log's 5b3a07c211 is the same commit before its rebase). Criterion 1 needs a factory shift to run on the new code: the task goes back to Backlog (lane: no) until one has, then an interactive session runs the measurement.
 
 ## Log
 
 - 2026-11-22: Created.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-22: Doing -> Backlog. Fix committed (5b3a07c211); criterion 1 needs a factory shift to run on the new code before the measurement, interactive only (lane: no)

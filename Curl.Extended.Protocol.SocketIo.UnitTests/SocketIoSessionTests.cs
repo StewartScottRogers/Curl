@@ -62,6 +62,37 @@ public sealed class SocketIoSessionTests
     }
 
     [TestMethod]
+    public async Task RunAsync_EmitEchoedWhileServerStaysOpen_ReturnsAtTheFirstEventWithoutWaitingForATimeout()
+    {
+        ScriptedConnection connection = Server(Open, "40{\"sid\":\"x\"}", "42[\"hello\"]", "42[\"later\"]");
+        connection.WaitsAtEnd = true;
+        MemoryStream output = new();
+
+        TransferResult result = await new SocketIoProtocolHandler(new ScriptedConnector(ConnectResult.Connected(connection)), new ZeroRandomSource()).ExecuteAsync(
+            new TransferContext
+            {
+                Url = CurlUrl.Parse("socketio://h/"),
+                Output = output,
+                TimeProvider = new ManualClock(),
+                PostData = System.Text.Encoding.UTF8.GetBytes("""["hello"]"""),
+            });
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("[\"hello\"]\n", System.Text.Encoding.UTF8.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ListenOnlyEventAsksForAnAck_AcknowledgesAndKeepsListening()
+    {
+        ScriptedConnection connection = Server(Open, "40{\"sid\":\"x\"}", "421[\"q\"]", "43[]", "42[\"r\"]", "41", "42[\"late\"]");
+
+        TransferResult result = await Execute(connection, new ManualClock(), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { "1:40", "1:431[]" }, connection.SentFrames());
+    }
+
+    [TestMethod]
     public async Task RunAsync_NoPingWithinPingIntervalPlusPingTimeout_FailsWithExit56()
     {
         ManualClock clock = new();

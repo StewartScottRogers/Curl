@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5763 — Make Curl.Api SendAsync return the echoed event on an open Socket.IO session instead of timing out
 
@@ -24,12 +24,16 @@ Repro: `surl --cert server.pem --key server.key --user alice:s3cret socketios://
 
 ## Acceptance criteria
 
-- [ ] Against Surl's Socket.IO endpoint (or the test double), a `Curl.Api` emit returns the echoed event within a second, or delivers it on the response stream before the timeout, matching the console; the Notes record which and why.
-- [ ] A unit test pins it with an injected `TimeProvider`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Against Surl's Socket.IO endpoint (or the test double), a `Curl.Api` emit returns the echoed event within a second, or delivers it on the response stream before the timeout, matching the console; the Notes record which and why.
+- [x] A unit test pins it with an injected `TimeProvider`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+The console waited too (it listened until the server disconnected), so this was not a Curl.Api streaming gap. Fix in the extension (ADR-1338): a transfer that emits ends after the first event back, so console and Curl.Api both return the echo at once. Pinned by RunAsync_EmitEchoedWhileServerStaysOpen_ReturnsAtTheFirstEventWithoutWaitingForATimeout (scripted connection, ManualClock). Quality run 100/100, no failing member. Tests are platform-neutral.
 
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T1308, finding 3.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 0cf2f8a5 7500a68d 3d836d5e.
+- 2026-11-22: Doing -> Done. A Socket.IO emit now returns the echoed event at once on console and Curl.Api (ADR-1338)

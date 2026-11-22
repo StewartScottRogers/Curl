@@ -256,8 +256,13 @@
     which the next lane step retires once idle; and a lane integrating one waits for the
     integrate lock ahead of the others. Each filing is traced "ci filed: ..." and whispered through
     .claude\hooks\whisper-milestone.ps1. Each run it examines is traced "ci run <id> ...":
-    green, or each failure and whether it was filed, covered by a task, or is waiting for a
-    run to confirm it - once per run, and again when that changes. The watch also runs while
+    green, or each failure and whether it was filed, covered by a task (named), or is waiting
+    for a run to confirm it - once per run, and again when that changes; a red run's line
+    starts with a short head ("filed BL-1; covered by BL-2 - ..."), so the trace's 118-character
+    cut never hides it (AF-0961). When a red failure waits only on tasks no lane can take
+    (lane: no, or touching a guard file such as ci.yml), the watch traces "ci CI needs you:
+    interactive-only BL-### cover red run <id>" and captions the coordinator's tab "CI needs
+    you, read" until it clears (AF-0973). The watch also runs while
     a coordinator waits for a fresh session before its shift starts, and once more at the
     end of a shift, after the merge has waited for CI on the last commit; that last look
     files a one-platform failure at once instead of waiting 5 minutes (BL-1031). A failed run
