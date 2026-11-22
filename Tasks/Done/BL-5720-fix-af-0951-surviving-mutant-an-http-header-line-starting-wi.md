@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.HttpFile.UnitLibrary/HttpFileParser.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5720 — Fix AF-0951: Surviving mutant: an .http header line starting with ':' can be accepted instead of refused with exit 2
 
@@ -43,3 +43,4 @@ Killed by new test Parse_HeaderLineWithAnEmptyName_FailsWithExit2 (mutant `>= 0`
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: f8aeeb23 9742157d.
+- 2026-11-21: Doing -> Done. New test pins empty-name header refusal; mutant killed
