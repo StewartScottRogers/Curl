@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.JsonRpc.UnitLibrary/JsonRpcCallList.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5733 — Fix AF-0962: Surviving mutant: --jsonrpc whose method name ends the value can crash with IndexOutOfRangeException (MethodEnd end < text.Length -> <=)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.JsonRpc.UnitLibrary/JsonRpcCallList.cs line 71`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.JsonRpc.UnitLibrary/JsonRpcCallList.cs line 71`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test Parse_AMethodNameEndingTheValue_IsOneCallWithoutParamsAndId1 (mutant applied: it failed; reverted: 33 JsonRpc tests pass). Test-only change, no production edit; fast tests of the JsonRpc project green.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: e560cad0 9742157d.
+- 2026-11-22: Doing -> Done. Added test killing the MethodEnd mutant
