@@ -38,3 +38,4 @@ Only the silent case (the 2-second timer) should go straight to the TLS handshak
 ## Log
 
 - 2026-11-22: Created by the shift-end review (ADR-0710).
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 7e82c8a7 9bfe89ab 0316b17f b8a34be9 3d836d5e.
