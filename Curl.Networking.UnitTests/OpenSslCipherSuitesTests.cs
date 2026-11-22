@@ -234,6 +234,19 @@ public sealed class OpenSslCipherSuitesTests
     }
 
     [TestMethod]
+    [DataRow("+:ECDHE-RSA-AES256-GCM-SHA384")]
+    [DataRow("-:ECDHE-RSA-AES256-GCM-SHA384")]
+    [DataRow("+ TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256")]
+    public void Select_WithARulePrefixFollowedByASeparator_FailsWithTheCipherListMessage(string ciphers)
+    {
+        var (suites, failureMessage) = Select(ciphers, null);
+
+        Diagnostics.Assert("suites", "null", suites is null ? "null" : "list");
+        Assert.IsNull(suites);
+        Assert.AreEqual($"failed setting cipher list: {ciphers}", failureMessage);
+    }
+
+    [TestMethod]
     public void Select_WithUnknownRepeatedAndTls13EntriesInCiphers_DropsThem()
     {
         var (suites, _) = Select(

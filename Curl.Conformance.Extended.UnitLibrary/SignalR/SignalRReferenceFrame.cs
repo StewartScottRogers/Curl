@@ -29,7 +29,7 @@ public sealed record SignalRReferenceFrame(bool IsFinal, int Opcode, bool IsMask
     /// <param name="pending">The bytes received and not yet read.</param>
     /// <param name="frame">The frame, or <see langword="null" /> when <paramref name="pending" /> holds no whole one yet.</param>
     /// <returns>The number of bytes the frame took; 0 when it is not whole yet.</returns>
-    public static int TryRead(ReadOnlySpan<byte> pending, out SignalRReferenceFrame? frame)
+    public static int TakeWholeFrame(ReadOnlySpan<byte> pending, out SignalRReferenceFrame? frame)
     {
         frame = null;
         if (pending.Length < 4)

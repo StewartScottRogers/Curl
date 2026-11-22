@@ -7,7 +7,7 @@ Status: Accepted. Decided by Claude under Stewart's delegation (BL-5551).
 so a C program ported to `Libcurl` needed four extra `using` lines.
 
 ## Decision
-The `Libcurl` package ships `build/Libcurl.props`, which adds `<Using Include="..." />` items for
+The `Libcurl` package ships `build/Surly.Libcurl.props`, which adds `<Using Include="..." />` items for
 `Curl.Api.Callbacks`, `Curl.Api.Codes`, `Curl.Api.EngineContracts.WebSocket` and `Curl.Api.Options.Protocols`.
 A consuming project sees those types with no edits. `Libcurl/README.md` lists the namespaces under "Porting from C",
 and a test pins the README list to the props file.

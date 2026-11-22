@@ -82,5 +82,7 @@ public sealed class UseAsDictionaryTests
     [DataRow("match=\"/a\", l=(1,2)")]
     [DataRow("match=\"/a\", l=(@)")]
     [DataRow("match=\"/a\", l=(1);")]
+    [DataRow("match=\"/a\", l=(1\"a\")")]
+    [DataRow("match=\"/a\", l=(1 2x)")]
     public void Parse_InvalidStructuredField_ReturnsNull(string fieldValue) => Assert.IsNull(UseAsDictionary.Parse(fieldValue));
 }

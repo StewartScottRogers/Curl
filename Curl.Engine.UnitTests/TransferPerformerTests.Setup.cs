@@ -270,7 +270,30 @@ public sealed partial class TransferPerformerTests
         Assert.IsEmpty(fileSystem.ReadPaths);
     }
 
+    [TestMethod]
+    [DataRow(null, "http://example.com/a", false)]
+    [DataRow("alt.txt", "http://example.com/a", true)]
+    [DataRow("alt.txt", "ftp://example.com/a", false)]
+    public async Task OpenAltSvcCacheAsync_OptionAndUrl_OpensACacheOnlyForAltSvcOptionAndHttpUrl(string? altSvcFile, string url, bool opens)
+    {
+        EngineTransferState state = new();
+
+        await sshPerformer.OpenAltSvcCacheAsync(
+            state, SettingsOf(url), NetworkOf(url), new EasyHttpOptions { AltSvc = altSvcFile }, url, new ReadRecordingFileSystem(), new SilentDiagnosticLog(), false);
+
+        Assert.AreEqual(opens, state.AltSvc is not null);
+    }
+
     private const string SftpUrl = "sftp://example.com/file";
+
+    private sealed class SilentDiagnosticLog : IDiagnosticLog
+    {
+        public bool IsEnabled(DiagnosticLogLevel level) => false;
+
+        public void Write(DiagnosticLogLevel level, string component, string message)
+        {
+        }
+    }
 
     private const string Md5Fingerprint = "00112233445566778899aabbccddeeff";
 

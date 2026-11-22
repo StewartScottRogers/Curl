@@ -30,7 +30,7 @@ public sealed class TransferMcpToolTests
         "proxyUser":{"description":"The proxy login as user:password, as curl --proxy-user takes it; never logged or traced.","type":["string","null"],"default":null},
         "proxyCaFile":{"description":"A CA certificate file to verify an HTTPS proxy with, as curl --proxy-cacert takes it; it must lie inside CURL_MCP_ROOT, else the call is refused with PathRefused.","type":["string","null"],"default":null},
         "resolve":{"description":"Host pins, each host:port:address as curl --resolve takes it.","type":["array","null"],"items":{"type":"string"},"default":null},
-        "maxBodyBytes":{"description":"The most response body bytes returned, 1 to 67108864 (64 MiB); the default is the server's limit, 1048576 (1 MiB) unless CURL_MCP_MAX_RESPONSE_BYTES sets another; when that variable is set, a larger value is cut to it. A longer body is cut with isTruncated true.","type":["integer","null"],"default":null}},
+        "maxBodyBytes":{"description":"The most response body bytes returned, 1 to 67108864 (64 MiB); the default is the server's limit, 1048576 (1 MiB) unless CURL_MCP_MAX_RESPONSE_BYTES sets another; a larger value is refused; when that variable is set below 64 MiB, a value above it is cut to it. A longer body is cut with isTruncated true.","type":["integer","null"],"default":null}},
         "required":["url"]}
         """;
 

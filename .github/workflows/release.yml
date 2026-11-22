@@ -4,7 +4,7 @@
 #
 # resources.json and ai-help.md (BL-3147) are made by the describe job, for the dry run too.
 #
-# Curl.Api.<version>.nupkg and Libcurl.<version>.nupkg (BL-3146) are packed once each, platform-neutral,
+# Surly.Curl.Api.<version>.nupkg and Surly.Libcurl.<version>.nupkg (BL-3146) are packed once each, platform-neutral,
 # and listed in SHA256SUMS beside the others (the checksum step covers every *.nupkg).
 #
 #   * Pushing a tag `v*` (e.g. v0.1.0) builds all six curl packages and the seven Curl.Mcp
@@ -206,7 +206,7 @@ jobs:
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $files = @(Get-ChildItem curl-mcp-packages -Filter '*.nupkg')
           $files | ForEach-Object { Write-Host "$($_.Name) $($_.Length)" }
-          $name = if ($env:RID -eq 'any') { "Curl.Mcp.$env:VERSION.nupkg" } else { "Curl.Mcp.$env:RID.$env:VERSION.nupkg" }
+          $name = if ($env:RID -eq 'any') { "Surly.Curl.Mcp.$env:VERSION.nupkg" } else { "Surly.Curl.Mcp.$env:RID.$env:VERSION.nupkg" }
           if ($files.Count -ne 1 -or $files[0].Name -ne $name) { throw "expected only $name" }
           $zip = [IO.Compression.ZipFile]::OpenRead($files[0].FullName)
           try {

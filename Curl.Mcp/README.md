@@ -1,5 +1,7 @@
 # Curl.Mcp
 
+A complete managed C# reimplementation of curl and libcurl for .NET 10: no native libcurl, native-AOT ready, and it behaves like curl 8.22.0. Run it as an MCP server with `dnx Surly.Curl.Mcp`.
+
 An MCP server that runs curl for AI agents. It serves Curl, the drop-in C# replacement for the
 curl command-line tool (<https://github.com/StewartScottRogers/Curl>), over standard input and
 output, using the Model Context Protocol (MCP). Any MCP client can use it: GitHub Copilot in VS
@@ -12,7 +14,7 @@ this project holds the Microsoft MCP SDK wiring and the packing. Design: ADR-054
 ## Run it
 
 ```
-dnx Curl.Mcp
+dnx Surly.Curl.Mcp
 ```
 
 The server speaks MCP on standard input and output; its log lines go to standard error. Set
@@ -70,7 +72,7 @@ Add to `.vscode/mcp.json` in the workspace (or the user's `mcp.json`):
     "curl": {
       "type": "stdio",
       "command": "dnx",
-      "args": ["Curl.Mcp", "--yes"],
+      "args": ["Surly.Curl.Mcp", "--yes"],
       "env": {
         "CURL_MCP_ROOT": "${workspaceFolder}"
       }
@@ -89,7 +91,7 @@ Add to `.mcp.json` in the solution folder (or `%USERPROFILE%\.mcp.json` for ever
     "curl": {
       "type": "stdio",
       "command": "dnx",
-      "args": ["Curl.Mcp", "--yes"],
+      "args": ["Surly.Curl.Mcp", "--yes"],
       "env": {
         "CURL_MCP_ROOT": "C:\\work\\my-project"
       }

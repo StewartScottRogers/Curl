@@ -18,6 +18,7 @@ public sealed class DictionaryMatchPatternTests
     [DataRow("/app/:version/main.js", "https://example.com/app/v2/main.js", true)]
     [DataRow("/app/:version/main.js", "https://example.com/app/v2/x/main.js", false)]
     [DataRow("/app/:", "https://example.com/app/:", true)]
+    [DataRow("/app/:", "https://example.com/app/x", false)]
     [DataRow("/a.js", "https://example.com/aXjs", false)]
     [DataRow("/app/*?lang=*", "https://example.com/app/x?lang=en", true)]
     [DataRow("/app/*?lang=*", "https://example.com/app/x?region=en", false)]

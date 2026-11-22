@@ -1,5 +1,7 @@
 # Curl.Api
 
+A complete managed C# reimplementation of curl and libcurl for .NET 10: no native libcurl, native-AOT ready, and it behaves like curl 8.22.0. Install: `dotnet add package Surly.Curl.Api --prerelease`.
+
 Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.
 
 The .NET programming interface to Curl (ADR-0506): an async client over curl's engine, with
@@ -379,4 +381,4 @@ no I/O) and `Curl.Engine.UnitLibrary` (the engine it sends through); `Curl.Api` 
 
 ## Use the package from the preview release
 
-Download `Curl.Api.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Curl.Api --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.
+Download `Surly.Curl.Api.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Surly.Curl.Api --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.

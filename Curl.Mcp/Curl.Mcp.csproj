@@ -26,13 +26,16 @@
     <PublishAot>true</PublishAot>
     <!-- Curl.Console is referenced as a library for its InProcessCurl, never run as its own executable. -->
     <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
-    <PackageId>Curl.Mcp</PackageId>
+    <PackageId>Surly.Curl.Mcp</PackageId>
     <Version>0.1.0</Version>
     <Authors>Stewart Scott Rogers</Authors>
-    <Description>An MCP server that runs curl for AI agents: Curl, the drop-in C# replacement for the curl command-line tool, served over standard input and output.</Description>
-    <PackageTags>AI; MCP; server; stdio; curl</PackageTags>
+    <Description>A complete managed C# reimplementation of curl and libcurl for .NET 10: no native libcurl, native-AOT ready, behaves like curl 8.22.0. An MCP server that runs curl for AI agents: Curl, the drop-in C# replacement for the curl command-line tool, served over standard input and output.</Description>
+    <PackageTags>AI; MCP; server; stdio; curl; managed; reimplementation; no-native; aot</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <Title>Surly Curl MCP server</Title>
+    <PackageLicenseExpression>curl</PackageLicenseExpression>
+    <PackageIcon>SurlyIcon.png</PackageIcon>
+    <Copyright>Copyright (c) 2026, Stewart Scott Rogers, and many contributors.</Copyright>
     <PackageProjectUrl>https://github.com/StewartScottRogers/Curl</PackageProjectUrl>
     <RepositoryUrl>https://github.com/StewartScottRogers/Curl</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -41,7 +44,7 @@
   <ItemGroup>
     <None Include=".mcp\server.json" Pack="true" PackagePath="/.mcp/" />
     <None Include="README.md" Pack="true" PackagePath="/" />
-    <None Include="..\LICENSE.txt" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="..\SurlyIcon.png" Pack="true" PackagePath="/" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>

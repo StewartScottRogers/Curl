@@ -434,6 +434,8 @@ public sealed class CompressionDictionaryTransferHookTests
     public async Task ExecuteAsync_AResponseThatIsNotAUsableDictionary_IsNotStored_Rfc9842Section2_1()
     {
         await Hook().ExecuteAsync(Context(DictionaryUrl), Origin(404, "missing", UseAsDictionaryField).Invoke);
+        await Hook().ExecuteAsync(Context(DictionaryUrl), Origin(300, "choices", UseAsDictionaryField).Invoke);
+        await Hook().ExecuteAsync(Context(DictionaryUrl), Origin(199, "early", UseAsDictionaryField).Invoke);
         await Hook().ExecuteAsync(Context(DictionaryUrl), Origin(200, "bad", "Use-As-Dictionary: id=\"no match\"").Invoke);
         await Hook().ExecuteAsync(Context(DictionaryUrl), Origin(200, "failed", UseAsDictionaryField).Failing);
         await Hook().ExecuteAsync(Context(DictionaryUrl), Origin(200, "no report", UseAsDictionaryField).WithoutReport);

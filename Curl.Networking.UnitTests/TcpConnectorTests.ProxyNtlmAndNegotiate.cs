@@ -256,6 +256,24 @@ public sealed partial class TcpConnectorTests
         return (result, connection, events);
     }
 
+    [TestMethod]
+    public async Task ConnectAsync_WithProxyAnyAuth_WhenTheType1AnswersAChallengeAndTheNextChallengeIsBare_FailsWithThe407()
+    {
+        // The Type 1 answers a challenge, so a bare NTLM 407 after it is the handshake's failure, not a reason to try Negotiate.
+        const string bareNtlm = "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: NTLM\r\nContent-Length: 0\r\n\r\n";
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(bareNtlm + bareNtlm));
+        var tokens = new ScriptedTokenSource(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Convert.FromBase64String(TunnelNtlmType1)));
+        var (connector, _) = CreateTokenConnector(HttpAuthSchemes.Any, tokens, matchesSspiBuild: false, connection);
+
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
+
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(407, result.ProxyConnectResponseCode);
+        Assert.AreEqual(UnauthenticatedConnect + TokenConnect("NTLM " + TunnelNtlmType1), Encoding.Latin1.GetString([.. connection.Written]));
+        Assert.AreEqual(1, tokens.ContextsMade);
+    }
+
     private static ScriptedTokenSource NtlmTunnelTokens() => new(
         new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Convert.FromBase64String(TunnelNtlmType1)),
         new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Convert.FromBase64String(TunnelNtlmType1)),

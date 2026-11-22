@@ -128,7 +128,7 @@ public sealed class SignalRReferenceHub(IReadOnlyList<string> negotiateBodies, p
 
     private async Task<SignalRReferenceFrame?> ReceiveAsync(SignalRReferenceReader reader, CancellationToken cancellationToken)
     {
-        SignalRReferenceFrame? frame = await reader.ReadAsync<SignalRReferenceFrame>(SignalRReferenceFrame.TryRead, cancellationToken).ConfigureAwait(false);
+        SignalRReferenceFrame? frame = await reader.ReadAsync<SignalRReferenceFrame>(SignalRReferenceFrame.TakeWholeFrame, cancellationToken).ConfigureAwait(false);
         if (frame is not null)
         {
             lock (gate)

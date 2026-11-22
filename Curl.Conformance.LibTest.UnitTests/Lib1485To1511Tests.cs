@@ -528,6 +528,21 @@ public sealed class Lib1485To1511Tests
     }
 
     [TestMethod]
+    [DataRow(499L, true)]
+    [DataRow(500L, true)]
+    [DataRow(501L, false)]
+    public void Lib1501_WithinBlockingLimit_AcceptsAWaitOfExactlyTheLimit(long elapsed, bool expected)
+    {
+        var run = new PortRun(new FakeCurlEngine(), 1501, "http://x/");
+
+        bool goesOn = Lib1501.WithinBlockingLimit(run.Context, run.Steps, elapsed);
+
+        Assert.AreEqual(expected, goesOn);
+        Assert.AreEqual($"pong = {elapsed}\n", run.Error.ToString());
+        Assert.AreEqual(expected ? default : CurlCode.TooLarge, run.Steps.Result);
+    }
+
+    [TestMethod]
     public void LibTestServerResolves_WritesEachEntryAndBuildsTheUrls()
     {
         var run = new PortRun(new FakeCurlEngine(), 1510, "-", "10.0.0.1", "80");

@@ -163,6 +163,53 @@ public sealed class EndPointRecordingDatagramConnectorTests
         Assert.IsTrue(inner.Connected);
     }
 
+    [TestMethod]
+    public async Task ReceiveAsync_ChannelMovesAgainAfterTheFirstReceive_KeepsTheEndPointsRecordedAtTheFirst()
+    {
+        IPEndPoint opening = new(IPAddress.IPv6Loopback, 69);
+        IPEndPoint afterFirst = new(IPAddress.Loopback, 69);
+        IPEndPoint afterSecond = new(IPAddress.Loopback, 70);
+        MovingChannel channel = new(opening, afterFirst, afterSecond);
+        ConnectionEndPointRecorder recorder = new();
+        EndPointRecordingDatagramConnector connector = new(new SingleChannelConnector(channel), recorder);
+
+        DatagramOpenResult opened = await connector.OpenAsync("localhost", 69, CancellationToken.None);
+        await opened.Channel!.ReceiveAsync(new byte[16], CancellationToken.None);
+        await opened.Channel.ReceiveAsync(new byte[16], CancellationToken.None);
+        TransferReport report = recorder.ReportOn(TransferResult.Success(0)).Report!;
+
+        Assert.AreEqual(afterFirst, report.RemoteEndPoint);
+        Assert.AreEqual(afterFirst, recorder.DatagramLocalEndPoint);
+    }
+
+    private sealed class MovingChannel(IPEndPoint opening, IPEndPoint afterFirst, IPEndPoint afterSecond) : IDatagramChannel
+    {
+        private IPEndPoint _server = opening;
+        private IPEndPoint? _local;
+        private int _receives;
+
+        public EndPoint ServerEndPoint => _server;
+
+        public EndPoint? LocalEndPoint => _local;
+
+        public void ConnectToServer()
+        {
+        }
+
+        public ValueTask SendAsync(ReadOnlyMemory<byte> datagram, EndPoint destination, CancellationToken cancellationToken) =>
+            ValueTask.CompletedTask;
+
+        public ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            _server = _receives++ == 0 ? afterFirst : afterSecond;
+            _local = _server;
+
+            return ValueTask.FromResult(new DatagramReceived(1, _server));
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     private sealed class QueueConnector(params IDatagramChannel[] channels) : IDatagramConnector
     {
         private int _next;

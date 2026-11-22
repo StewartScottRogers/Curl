@@ -32,26 +32,26 @@ Linux packages are built on Ubuntu 22.04 and need glibc 2.35 or newer (Ubuntu 22
 
 Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.
 
-Curl.Api is the async, `HttpClient`-shaped client ([Curl.Api/README.md](Curl.Api/README.md)). Its `Curl.Api.<version>.nupkg` is attached to each release, at the release's version, and **is not on nuget.org**: download it from the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) into a folder and use the folder as a package source. The package is platform-neutral, so there is one file for every platform.
+Curl.Api is the async, `HttpClient`-shaped client ([Curl.Api/README.md](Curl.Api/README.md)). Its `Surly.Curl.Api.<version>.nupkg` is attached to each release, at the release's version, and **is not on nuget.org**: download it from the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) into a folder and use the folder as a package source. The package is platform-neutral, so there is one file for every platform.
 
 ```sh
-dotnet add package Curl.Api --prerelease --source ./folder-with-the-nupkg
+dotnet add package Surly.Curl.Api --prerelease --source ./folder-with-the-nupkg
 ```
 
 Verify the download first against the release's `SHA256SUMS` (the same file covers every platform's files):
 
 - **Linux:** `sha256sum --check --ignore-missing SHA256SUMS`
 - **macOS:** `shasum -a 256 --check --ignore-missing SHA256SUMS`
-- **Windows (PowerShell):** `(Get-FileHash .\Curl.Api.<version>.nupkg).Hash` and compare it with the file's line in `SHA256SUMS`.
+- **Windows (PowerShell):** `(Get-FileHash .\Surly.Curl.Api.<version>.nupkg).Hash` and compare it with the file's line in `SHA256SUMS`.
 
 ## Libcurl: libcurl API for porting C code
 
 Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.
 
-Libcurl is the libcurl API shaped for C#: `CurlGlobal.Init()`, `CurlEasy` with `SetOption` and `Perform` ([Libcurl/README.md](Libcurl/README.md)). Its `Libcurl.<version>.nupkg` is attached to each release, is platform-neutral, and **is not on nuget.org**; use it from a folder the same way.
+Libcurl is the libcurl API shaped for C#: `CurlGlobal.Init()`, `CurlEasy` with `SetOption` and `Perform` ([Libcurl/README.md](Libcurl/README.md)). Its `Surly.Libcurl.<version>.nupkg` is attached to each release, is platform-neutral, and **is not on nuget.org**; use it from a folder the same way.
 
 ```sh
-dotnet add package Libcurl --prerelease --source ./folder-with-the-nupkg
+dotnet add package Surly.Libcurl --prerelease --source ./folder-with-the-nupkg
 ```
 
 Verify it against `SHA256SUMS` with the same commands as for Curl.Api above, on Linux, macOS and Windows.
@@ -64,22 +64,22 @@ a folder. See [Curl.Mcp/README.md](Curl.Mcp/README.md) for the tools it offers.
 
 | Package | What it is |
 | --- | --- |
-| [Curl.Mcp](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | The tool package (`curl-mcp`) with `.mcp/server.json` |
-| [Curl.Mcp.win-x64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Windows x64 |
-| [Curl.Mcp.win-arm64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Windows Arm64 |
-| [Curl.Mcp.linux-x64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Linux x64 |
-| [Curl.Mcp.linux-arm64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Linux Arm64 |
-| [Curl.Mcp.osx-x64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | macOS Intel |
-| [Curl.Mcp.osx-arm64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | macOS Apple silicon |
+| [Surly.Curl.Mcp](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | The tool package (`curl-mcp`) with `.mcp/server.json` |
+| [Surly.Curl.Mcp.win-x64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Windows x64 |
+| [Surly.Curl.Mcp.win-arm64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Windows Arm64 |
+| [Surly.Curl.Mcp.linux-x64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Linux x64 |
+| [Surly.Curl.Mcp.linux-arm64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | Linux Arm64 |
+| [Surly.Curl.Mcp.osx-x64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | macOS Intel |
+| [Surly.Curl.Mcp.osx-arm64](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | macOS Apple silicon |
 
 Each package's file name carries its build's version, which changes with every build, so these
 link to the latest build's release page, where all seven are listed.
 
 To run one without nuget.org, download all seven into one folder and install from it
-(the tool package picks the matching `Curl.Mcp.<rid>` package from the same folder):
+(the tool package picks the matching `Surly.Curl.Mcp.<rid>` package from the same folder):
 
 ```sh
-dotnet tool install --global --add-source ./folder-with-the-packages Curl.Mcp --prerelease
+dotnet tool install --global --add-source ./folder-with-the-packages Surly.Curl.Mcp --prerelease
 CURL_MCP_ROOT="$HOME/curl-work" curl-mcp
 ```
 

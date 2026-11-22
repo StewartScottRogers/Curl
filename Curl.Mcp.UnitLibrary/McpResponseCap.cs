@@ -29,7 +29,7 @@ public sealed record McpResponseCap
     /// <summary>The most bytes of output a tool returns.</summary>
     public int MaxBytes { get; }
 
-    /// <summary>The most a <c>transfer</c> request's <c>maxBodyBytes</c> may raise the cap to: <see cref="CeilingMaxBytes" /> unless the operator set <c>CURL_MCP_MAX_RESPONSE_BYTES</c>, then that value (ADR-1330 amendment).</summary>
+    /// <summary>The most a <c>transfer</c> request's <c>maxBodyBytes</c> may raise the cap to: <see cref="CeilingMaxBytes" /> unless the operator set <c>CURL_MCP_MAX_RESPONSE_BYTES</c>, then that value; the check on the field still refuses anything above <see cref="CeilingMaxBytes" /> (ADR-1330 amendment).</summary>
     public int RequestCeilingBytes { get; private init; } = CeilingMaxBytes;
 
     /// <summary>
