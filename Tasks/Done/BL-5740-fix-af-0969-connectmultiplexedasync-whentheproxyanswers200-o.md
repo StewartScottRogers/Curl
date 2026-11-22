@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnel.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5740 — Fix AF-0969: ConnectMultiplexedAsync_WhenTheProxyAnswers200_OpensTheTunnel checks a log line, never that a tunnel connection was opened
 
@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-22: Doing -> Done. Test now asserts ExitCode Ok and non-null Connection; passes
