@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs]
+touches: [Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs, Curl.Console/CurlCommandRunner.cs, Curl.Core.UnitTests/Multipart/MultipartFormBodyBuilderTraceSizeTests.cs, Curl.Console.UnitTests/FormFileSizedBeforeTraceTests.cs]
 requirement: none
 created: 2026-11-22
 completed:
@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: the runner built the -F body after the trace file truncated the file, so the length was 0. Fix: the runner sizes -F files before the trace opens (like -T, ADR-1175) and hands the sizes to the builder's FileSizesBeforeTrace, which declares the larger size, so the send reads short and fails with exit 26. Added Curl.Console/CurlCommandRunner.cs to touches (no other Doing task names it). Verified by unit tests (Core and Console) and Measure-CodeQuality (0 failing); no listening server run of real exit 26 text, which the existing short-read path already produces. Platform-neutral tests.
 
 ## Log
 

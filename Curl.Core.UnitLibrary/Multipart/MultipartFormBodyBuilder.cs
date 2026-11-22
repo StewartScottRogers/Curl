@@ -92,6 +92,13 @@ public sealed class MultipartFormBodyBuilder(
     public bool SevenBitRefusalWaitsForSend { get; init; }
 
     /// <summary>
+    /// Gets or sets the sizes form files had before the run's trace file opened, by path: a file now smaller
+    /// than its entry is declared at the entry's size, so the send reads it short and fails with exit 26, as
+    /// curl 8.22.0 sizes a part before its first trace event truncates a file the trace names (AF-0982).
+    /// </summary>
+    public IReadOnlyDictionary<string, long>? FileSizesBeforeTrace { get; set; }
+
+    /// <summary>
     /// Gets a value indicating whether a file part whose file does not open fails when the send reaches it, with
     /// exit 26 and no message, after the connection is made and the bytes before it are sent, as libcurl 8.22.0
     /// reads a missing <c>curl_formadd</c> <c>CURLFORM_FILE</c> (CGR-262), instead of failing the build before
@@ -411,6 +418,11 @@ public sealed class MultipartFormBodyBuilder(
             ? AddStandardInputPartAsync(segments, part, disposition, nameEscaping, forMail, encoder, standardInput, cancellationToken)
             : AddOpenedFilePartAsync(segments, part, disposition, nameEscaping, forMail, encoder, cancellationToken);
 
+    private long SizeBeforeTrace(string path, long openedLength) =>
+        FileSizesBeforeTrace is not null && FileSizesBeforeTrace.TryGetValue(path, out long sized) && sized > openedLength
+            ? sized
+            : openedLength;
+
     private async ValueTask<TransferResult?> AddOpenedFilePartAsync(
         MultipartBodySegments segments,
         MultipartFormPart part,
@@ -429,7 +441,7 @@ public sealed class MultipartFormBodyBuilder(
 
         Stream content = opened.Content!;
         segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
-        long? length = content.CanSeek ? seekableFileLength(part.Content, opened.Length) : unseekableFileLength(part.Content);
+        long? length = content.CanSeek ? seekableFileLength(part.Content, SizeBeforeTrace(part.Content, opened.Length)) : unseekableFileLength(part.Content);
         return await AddFileDataAsync(segments, content, length, encoder, forMail, cancellationToken)
             .ConfigureAwait(false);
     }
