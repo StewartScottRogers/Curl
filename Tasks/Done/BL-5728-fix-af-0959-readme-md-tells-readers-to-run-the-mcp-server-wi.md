@@ -8,7 +8,7 @@ depends-on: []
 touches: [README.md]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5728 — Fix AF-0959: README.md tells readers to run the MCP server with 'dnx Curl.Mcp', but the package ID is Surly.Curl.Mcp
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+README.md:133 now says `dnx Surly.Curl.Mcp`. Docs-only change: no code touched, so build and fast tests are unaffected.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-21: Doing -> Done. README.md names dnx Surly.Curl.Mcp
