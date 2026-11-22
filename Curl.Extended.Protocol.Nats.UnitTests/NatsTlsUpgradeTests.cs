@@ -69,6 +69,18 @@ public sealed class NatsTlsUpgradeTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_CancelledBeforeTheSilenceTimerFires_IsCancelledNotTakenForHandshakeFirst()
+    {
+        using CancellationTokenSource cancel = new();
+        await cancel.CancelAsync();
+        UpgradingTlsProvider tls = new(ConnectResult.Connected(ScriptedConnection.Of()));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await RunAsync(new SilentConnection(), tls, TimeProvider.System, cancel.Token));
+
+        Assert.IsNull(tls.Upgraded);
+    }
+
+    [TestMethod]
     [DataRow("", "NATS server did not begin with INFO")]
     [DataRow("-ERR 'Authorization Violation'\r\n", "NATS server did not begin with INFO")]
     [DataRow("HTTP/1.1 400 Bad Request\r\n", "NATS server did not begin with INFO")]
