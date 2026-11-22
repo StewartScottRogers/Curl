@@ -8,9 +8,9 @@ The engine already honours both through `EasyTransferOptions` (`-C`, `-l`).
 
 ## Decision
 `CurlFtpOptions.ResumeFrom` (-1 means the end of the remote file for an upload) and `CurlFtpOptions.ListOnly`
-are set on the handle's transfer options whenever an FTP record is applied. They sit with FTP, not on every
-protocol: the task asked for FTP, and a general resume offset for HTTP, FILE and SFTP can be added as its own
-option later without changing these.
+are set on the handle's transfer options whenever an FTP record is applied. They are declared on the FTP record but are transfer-wide, as `curl -C` and `-l` are: both members apply to every
+protocol that reads the shared transfer options (an HTTP request sends `Range: bytes=N-`; ListOnly also reaches SFTP and SCP).
+This is amended by ADR-1328, which records the transfer-wide behaviour; the record is FTP-named because the task asked for FTP.
 
 ## Consequences
 A set FTP record resets the transfer's resume offset and listing mode to its own values (a request's record

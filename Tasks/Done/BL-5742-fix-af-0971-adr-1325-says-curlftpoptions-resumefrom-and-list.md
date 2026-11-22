@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions/ADR-1325-curl-api-ftp-resume-offset-and-names-only-listing-live-on-curlftpoptions.md]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5742 — Fix AF-0971: ADR-1325 says CurlFtpOptions.ResumeFrom and ListOnly sit with FTP, not on every protocol; the code applies them to every protocol
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Amended ADR-1325 text to say the members are transfer-wide (ADR-1328); repro grep now gives 0 matches in the ADR.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-22: Doing -> Done. ADR-1325 now says ResumeFrom and ListOnly apply to every protocol
