@@ -8,7 +8,7 @@ depends-on: []
 touches: [README.md, llms.txt, Curl.Mcp/Curl.Mcp.csproj]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5714 — Say dnx Surly.Curl.Mcp where README.md, llms.txt and Curl.Mcp.csproj still say dnx Curl.Mcp
 
@@ -31,14 +31,17 @@ This breaks the "say what it does" rule. `Documentation/Planning/Decisions/ADR-0
 
 ## Acceptance criteria
 
-- [ ] `README.md`, `llms.txt` and `Curl.Mcp/Curl.Mcp.csproj` say `dnx Surly.Curl.Mcp` wherever they told the reader to run `dnx Curl.Mcp`.
-- [ ] A search of the repository for `dnx Curl.Mcp`, outside `Tasks/`, `Audit/`, `Gap/` and the ADRs, finds nothing.
-- [ ] If `llms.txt` is generated, the generator emits the new name, and the committed file matches its output.
-- [ ] `dotnet build` is clean, and the fast tests for `Curl.Mcp.UnitTests` pass.
+- [x] `README.md`, `llms.txt` and `Curl.Mcp/Curl.Mcp.csproj` say `dnx Surly.Curl.Mcp` wherever they told the reader to run `dnx Curl.Mcp`.
+- [x] A search of the repository for `dnx Curl.Mcp`, outside `Tasks/`, `Audit/`, `Gap/` and the ADRs, finds nothing.
+- [x] If `llms.txt` is generated, the generator emits the new name, and the committed file matches its output.
+- [x] `dotnet build` is clean, and the fast tests for `Curl.Mcp.UnitTests` pass.
 
 ## Notes
+
+llms.txt is hand-written (no generator). Edited by sed; Curl.Mcp build clean, Curl.Mcp.UnitTests 661 pass.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: a42e1a1b e4cfe50f 7b0d5525 94f0556a.
+- 2026-11-21: Doing -> Done. Three places now say dnx Surly.Curl.Mcp
