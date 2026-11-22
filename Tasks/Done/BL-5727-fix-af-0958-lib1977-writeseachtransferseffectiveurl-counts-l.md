@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests/Lib1964To1977Tests.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5727 — Fix AF-0958: Lib1977_WritesEachTransfersEffectiveUrl counts lines starting 'effective URL: ' but never checks a URL
 
@@ -52,3 +52,4 @@ Lib1977 test now sets a fixed EffectiveUrl on the fake engine and asserts the wh
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-21: Doing -> Done. Lib1977 test asserts the full output with exact effective URLs
