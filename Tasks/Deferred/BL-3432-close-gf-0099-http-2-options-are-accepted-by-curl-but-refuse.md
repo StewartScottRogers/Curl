@@ -69,3 +69,4 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
 - 2026-11-02: Blocked -> Deferred. Stewart 2026-11-02 ('keep 0871'): ADR-0871 stays - --http2, --http2-prior-knowledge and --proxy-http2 keep running HTTP/2 on Windows; the exit-2 criterion would undo it. Closed as an accepted platform difference, listed in the handoff's known differences. GF-0098 and GF-0099 are already closed on the ADR-0871 exclusion.
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Blocked. Stewart: would undo ADR-0871/ADR-1282 (keep HTTP/2 and HTTP/3 on); held off lanes until Stewart reverses those ADRs
+- 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): HTTP/2 stays on for Windows (ADR-0871, ADR-0929); doing this would make --http2 exit 2 as the Schannel curl.exe does. Listed in the handoff's known differences.

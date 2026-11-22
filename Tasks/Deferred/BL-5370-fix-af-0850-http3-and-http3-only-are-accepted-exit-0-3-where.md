@@ -52,3 +52,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-11-17: Backlog -> Deferred. AF-0850 closed as a duplicate of AF-0831: Stewart keeps --http3 and --http3-only accepted on every platform (ADR-1282); same deferral as BL-5305
 - 2026-11-18: Deferred -> Backlog. Stewart 2026-11-18: clear Deferred; returned to Backlog
 - 2026-11-18: Backlog -> Blocked. Stewart: would undo ADR-0871/ADR-1282 (keep HTTP/2 and HTTP/3 on); held off lanes until Stewart reverses those ADRs
+- 2026-11-22: Blocked -> Deferred. Kept by Stewart's decision (2026-11-22, closing the board): HTTP/3 stays accepted on every platform (ADR-1282); doing this would make --http3 exit 2 as the Schannel curl.exe does. Listed in the handoff's known differences.

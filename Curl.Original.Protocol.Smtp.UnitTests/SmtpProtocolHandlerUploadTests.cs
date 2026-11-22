@@ -188,6 +188,7 @@ public sealed class SmtpProtocolHandlerUploadTests
 
     [TestMethod]
     [DataRow("552 too big\r\n", 552)]
+    [DataRow("452 4.2.2 Mailbox full\r\n", 452)]
     [DataRow("251 ok\r\n", 251)]
     public async Task ExecuteAsync_MessageAnsweredOtherThan250_IsExit8AndQuits(string doneReply, int code)
     {

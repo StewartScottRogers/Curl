@@ -155,13 +155,22 @@ internal sealed partial class ManagedEasyTransfer
     /// <param name="url">The URL to transfer.</param>
     /// <returns>The declared length, or <see langword="null" />.</returns>
     internal static long? DeclaredUploadLengthOf(EasyOptions options, CurlUrl url) =>
-        options.Transfer.InFileSize >= 0 && (IsScheme(url, "http") || IsScheme(url, "https") || IsScheme(url, "smb") || IsScheme(url, "smbs")) ? options.Transfer.InFileSize : null;
+        options.Transfer.InFileSize >= 0 && HoldsUploadToDeclaredLength(url) ? options.Transfer.InFileSize : null;
 
     /// <summary>Whether <paramref name="url" />'s scheme is <paramref name="scheme" />, in any case.</summary>
     /// <param name="url">The URL.</param>
     /// <param name="scheme">The scheme.</param>
     /// <returns><see langword="true" /> when it is.</returns>
     private static bool IsScheme(CurlUrl url, string scheme) => string.Equals(url.Scheme, scheme, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether a read-callback upload to <paramref name="url" /> is held to its declared length: <c>http</c>, <c>https</c>, <c>smb</c>, <c>smbs</c>, <c>imap</c> and <c>imaps</c> ones.</summary>
+    /// <param name="url">The URL.</param>
+    /// <returns><see langword="true" /> when it is.</returns>
+    private static bool HoldsUploadToDeclaredLength(CurlUrl url) =>
+        DeclaredLengthSchemes.Contains(url.Scheme);
+
+    /// <summary>The schemes whose read-callback upload is held to <c>CURLOPT_INFILESIZE</c>.</summary>
+    private static readonly HashSet<string> DeclaredLengthSchemes = new(["http", "https", "smb", "smbs", "imap", "imaps"], StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// The read callback's upload stream: one the seek callback rewinds when one is set, else one the ioctl callback rewinds (BL-2607), carrying the trailer
@@ -215,7 +224,7 @@ internal sealed partial class ManagedEasyTransfer
             Passphrase: options.Tls.Origin.KeyPassword,
             Engine: options.Tls.Engine,
             EchModeIsMalformed: false,
-            PostData: MqttPostDataOf(options),
+            PostData: PostDataOf(options),
             ProxyCredentials: ProxyCredentialsOf(options.Authentication),
             AllowedProtocols: ProtocolSetOf(options.Network.Protocols),
             AllowedRedirectProtocols: ProtocolSetOf(options.Network.RedirectProtocols),
@@ -244,9 +253,16 @@ internal sealed partial class ManagedEasyTransfer
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <returns>The payload, or <see langword="null" />.</returns>
-    private static ReadOnlyMemory<byte>? MqttPostDataOf(EasyOptions options)
+    private static ReadOnlyMemory<byte>? PostDataOf(EasyOptions options) =>
+        options.Http.PostFields is { } fields ? PostFieldsDataOf(options, fields) : ReadCallbackPostDataOf(options);
+
+    /// <summary>The <c>CURLOPT_POSTFIELDS</c> an MQTT or extension URL's handler reads, cut to a shorter non-negative <c>CURLOPT_POSTFIELDSIZE</c>; <see langword="null" /> for any other URL.</summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="fields">The handle's <c>CURLOPT_POSTFIELDS</c>.</param>
+    /// <returns>The payload, or <see langword="null" />.</returns>
+    private static ReadOnlyMemory<byte>? PostFieldsDataOf(EasyOptions options, ReadOnlyMemory<byte> fields)
     {
-        if (options.Http.PostFields is not { } fields || !IsMqttUrl(options))
+        if (!(IsMqttUrl(options) || IsExtensionUrl(options)))
         {
             return null;
         }
@@ -255,10 +271,53 @@ internal sealed partial class ManagedEasyTransfer
         return size < 0 || size >= fields.Length ? fields : fields[..(int)size];
     }
 
+    /// <summary>
+    /// The bytes a <c>CURLOPT_READFUNCTION</c> post to an extension's URL gives (a <c>Curl.Api</c> stream body), read up
+    /// front so they reach the handler as <c>-d</c> data does (BL-5754); <see langword="null" /> for any other handle.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The data, or <see langword="null" />.</returns>
+    private static ReadOnlyMemory<byte>? ReadCallbackPostDataOf(EasyOptions options) =>
+        PostsWithoutFields(options) && options.Callbacks.Read is { } read && IsExtensionUrl(options)
+            ? ReadAllOf(read, options.Http.PostFieldSize)
+            : (ReadOnlyMemory<byte>?)null;
+
+    /// <summary>
+    /// Calls <paramref name="read" /> until it gives <paramref name="size" /> bytes (all it has when negative), returns
+    /// zero, or answers with a code rather than a count (an abort or a pause).
+    /// </summary>
+    /// <param name="read">The handle's read callback.</param>
+    /// <param name="size">The <c>CURLOPT_POSTFIELDSIZE</c>, negative when unknown.</param>
+    /// <returns>The bytes read.</returns>
+    private static byte[] ReadAllOf(ReadCallback read, long size)
+    {
+        using MemoryStream data = new();
+        byte[] buffer = new byte[16384];
+        while (size < 0 || data.Length < size)
+        {
+            int wanted = size < 0 ? buffer.Length : (int)Math.Min(buffer.Length, size - data.Length);
+            long count = read(buffer.AsSpan(0, wanted));
+            if (count <= 0 || count > wanted)
+            {
+                break;
+            }
+
+            data.Write(buffer, 0, (int)count);
+        }
+
+        return data.ToArray();
+    }
+
     /// <summary>Whether the handle's URL names an MQTT scheme: <c>mqtt</c>, <c>mqtts</c>, <c>mqtt5</c>, <c>mqtt5s</c> or <c>mqtt5+ws</c> (BL-5745).</summary>
     private static bool IsMqttUrl(EasyOptions options) =>
         options.Network.Url is { } url
         && MqttSchemePrefixes.Any(prefix => url.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Whether the handle's URL names a scheme curl itself does not serve, which an extension may (BL-5758): its body reaches the handler as <c>-d</c> data does.</summary>
+    private static bool IsExtensionUrl(EasyOptions options) =>
+        options.Network.Url is { } url
+        && url.IndexOf(':', StringComparison.Ordinal) is > 0 and var colon
+        && !ManagedCurlVersion.Protocols.Contains(url[..colon], StringComparer.OrdinalIgnoreCase);
 
     private static readonly string[] MqttSchemePrefixes = ["mqtt:", "mqtts:", "mqtt5:", "mqtt5s:", "mqtt5+ws:"];
 

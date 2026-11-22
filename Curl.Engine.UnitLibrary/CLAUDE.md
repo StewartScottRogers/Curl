@@ -513,7 +513,7 @@ When `ManagedCurlEngine`'s internal constructor is given a `readEnvironmentVaria
 
 ## CURLOPT_POSTFIELDS and CURLOPT_POST on an mqtt URL (BL-2673)
 
-`ManagedEasyTransfer.TransferSettingsOf` gives an `mqtt` or `mqtts` URL's handle `PostData` of `EasyHttpOptions.PostFields` (cut to a shorter non-negative `PostFieldSize`; empty fields are an empty payload), so the MQTT handler publishes instead of subscribing, and `PostWithoutData` when `Post` is set with no fields, which the handler fails with exit 43 after the CONNACK, as libcurl's `mqtt_do` does (upstream tests 1916 and 1917). Other schemes get neither. Its tests are `ManagedEasyTransferTests.Mqtt.cs`.
+`ManagedEasyTransfer.TransferSettingsOf` gives an `mqtt` or `mqtts` URL's handle `PostData` of `EasyHttpOptions.PostFields` (cut to a shorter non-negative `PostFieldSize`; empty fields are an empty payload), so the MQTT handler publishes instead of subscribing, and `PostWithoutData` when `Post` is set with no fields, which the handler fails with exit 43 after the CONNACK, as libcurl's `mqtt_do` does (upstream tests 1916 and 1917). A URL whose scheme curl does not serve (an extension's) gets its `PostFields` the same way (BL-5758), and a read-callback post there (a `Curl.Api` stream body) is read up front, to a non-negative `PostFieldSize` or until the callback returns 0, as its `PostData` (BL-5754, ADR-1337). Other schemes get neither. Its tests are `ManagedEasyTransferTests.Mqtt.cs`.
 
 ## CURLOPT_VERBOSE with no debug function (BL-2726)
 

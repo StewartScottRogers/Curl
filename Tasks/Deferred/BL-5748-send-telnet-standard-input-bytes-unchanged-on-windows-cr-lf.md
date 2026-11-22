@@ -45,3 +45,4 @@ From Surly cookbook bug report `2026-11-22T0726-Curl-bug-report.md` (batch 10 of
 - 2026-11-22: Created from Surly bug report 2026-11-22T0726, finding 4.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 193c7f95 3e043be4 3d836d5e.
 - 2026-11-22: Doing -> Blocked. Stewart: criteria assume curl sends stdin unchanged, but curl 8.22.0 on Windows sends CR LF as LF (ADR-0848); close as not a bug or keep?
+- 2026-11-22: Blocked -> Deferred. Decided by Claude under Stewart's delegation: curl 8.22.0 on Windows also sends a TELNET stdin CR LF as LF (ADR-0848), so the port matches the platform's curl; no change.

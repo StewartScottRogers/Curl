@@ -7,7 +7,7 @@ internal static class HttpRequestMapping
 {
     /// <summary>
     /// The <see cref="CurlRequest"/> for <paramref name="request"/>: its method, absolute URI, request
-    /// headers then content headers (each name once, its values joined as <see cref="HttpClient"/> sends
+    /// headers then content headers (each name once, an empty value named in <see cref="CurlRequest.EmptyHeaders"/> so it is sent as <c>Name;</c>, its values joined as <see cref="HttpClient"/> sends
     /// them, <c>Content-Length</c> left to the engine), its content as a stream body of the content's
     /// length, and its version as <c>CURLOPT_HTTP_VERSION</c> on the client's HTTP options.
     /// </summary>
@@ -24,13 +24,21 @@ internal static class HttpRequestMapping
             : throw new InvalidOperationException("The request URI must be set and absolute.");
         CurlHttpVersion version = VersionOf(HttpVersionPolicyGuard.SupportedVersion(request.Version, request.VersionPolicy), request.VersionPolicy);
         CurlContent? body = request.Content is null ? null : await BodyOfAsync(request.Content, cancellationToken).ConfigureAwait(false);
+        (IReadOnlyList<KeyValuePair<string, string>> headers, IReadOnlyList<string> emptyHeaders) = SplitEmpty([.. FieldsOf(request.Headers), .. FieldsOf(request.Content?.Headers)]);
         return new CurlRequest(request.Method, uri.AbsoluteUri)
         {
-            Headers = [.. FieldsOf(request.Headers), .. FieldsOf(request.Content?.Headers)],
+            Headers = headers,
+            EmptyHeaders = emptyHeaders,
             Body = body,
             Http = (clientHttp ?? new CurlHttpOptions()) with { HttpVersion = version },
         };
     }
+
+    /// <summary>The non-empty fields, and the names of the fields whose value is empty.</summary>
+    /// <param name="fields">The header fields.</param>
+    /// <returns>The non-empty fields and the empty fields' names.</returns>
+    private static (IReadOnlyList<KeyValuePair<string, string>> Headers, IReadOnlyList<string> EmptyHeaders) SplitEmpty(KeyValuePair<string, string>[] fields) =>
+        ([.. fields.Where(field => field.Value.Length > 0)], [.. fields.Where(field => field.Value.Length == 0).Select(field => field.Key)]);
 
     /// <summary>
     /// The <c>CURLOPT_HTTP_VERSION</c> for a request <paramref name="version"/> and <paramref name="policy"/>:

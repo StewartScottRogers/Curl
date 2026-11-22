@@ -57,3 +57,4 @@ Observed: surl prints `Listening on http://localhost:8080/ over unix://surl.sock
 - 2026-11-21: Deferred -> Backlog. Reopened: upstream curl does not crash Surl on macOS, only the ports .NET client does, so the ports Unix-socket client differs from curls; next step in Notes
 - 2026-11-21: Backlog -> Doing. Criteria at claim: edecd269 dbd35abe b7fc0636 b3b3bfe9.
 - 2026-11-21: Doing -> Backlog. Interactive only: the macOS cause needs a macOS run comparing the server's accept of upstream curl and of the port with the same socket path; lane test added
+- 2026-11-22: Backlog -> Doing. Criteria at claim: edecd269 dbd35abe b7fc0636 b3b3bfe9.

@@ -20,4 +20,4 @@ unchanged.
 ## Consequences
 
 A caller that relied on an empty `Headers` value sending an empty header moves that name to
-`EmptyHeaders`.
+`EmptyHeaders`. `CurlHttpMessageHandler` (`HttpRequestMapping`) maps a request or content header whose joined value is empty to `EmptyHeaders`, so it is sent as `Name;` as `SocketsHttpHandler` sends it, never removed (BL-5751).

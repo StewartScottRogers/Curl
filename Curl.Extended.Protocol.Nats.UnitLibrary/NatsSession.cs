@@ -68,6 +68,11 @@ internal sealed class NatsSession(IConnection connection, ITransferContext conte
         }
 
         string? plainInfo = await ReadPlainInfoLineAsync(upgrade).ConfigureAwait(false);
+        if (plainInfo is not null)
+        {
+            _ = NatsServerInfo.Parse(plainInfo);
+        }
+
         await UpgradeAsync(upgrade).ConfigureAwait(false);
         return plainInfo ?? await reader.ReadLineAsync(context.CancellationToken).ConfigureAwait(false) ?? string.Empty;
     }

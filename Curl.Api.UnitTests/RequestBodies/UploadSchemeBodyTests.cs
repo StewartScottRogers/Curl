@@ -114,6 +114,22 @@ public sealed class UploadSchemeBodyTests
     }
 
     [TestMethod]
+    [DataRow("mcp://h/")]
+    [DataRow("mcps://h/")]
+    [DataRow("mcp+stdio:///server")]
+    public async Task SendAsync_PostedToolCallToAnMcpScheme_ReachesTheMcpClientAsDashDData(string url)
+    {
+        byte[] toolCall = """{"name":"version","arguments":{}}"""u8.ToArray();
+
+        UploadingEasyTransfer easy = await SendAsync(HttpMethod.Post, url, CurlContent.FromBytes(toolCall));
+
+        Assert.IsFalse(easy.PerformedOptions!.Transfer.Upload);
+        Assert.IsTrue(easy.PerformedOptions.Http.Post);
+        CollectionAssert.AreEqual(toolCall, easy.PerformedOptions.Http.PostFields!.Value.ToArray());
+        Assert.IsNull(easy.PerformedOptions.Transfer.CustomRequest);
+    }
+
+    [TestMethod]
     public async Task SendAsync_MultipartBodyToSmtp_IsStillSentAsMime()
     {
         ScriptedEasyTransfer easy = new();
@@ -142,6 +158,22 @@ public sealed class UploadSchemeBodyTests
         Assert.IsTrue(easy.PerformedOptions!.Transfer.Upload);
         Assert.IsFalse(easy.PerformedOptions.Http.Post);
         Assert.IsNull(easy.PerformedOptions.Transfer.CustomRequest);
+    }
+
+    [TestMethod]
+    [DataRow("webtransport://h/")]
+    [DataRow("webtransport://h/?wt=uni")]
+    [DataRow("WEBTRANSPORT://h/?wt=datagram")]
+    public async Task SendAsync_BytesBodyPostedToWebTransport_ReachesTheClientAsDashDData(string url)
+    {
+        UploadingEasyTransfer easy = await SendAsync(HttpMethod.Post, url, CurlContent.FromBytes(Hello));
+
+        EasyOptions options = easy.PerformedOptions!;
+        Assert.IsFalse(UploadSchemes.UploadsWithBody(url));
+        Assert.IsFalse(options.Transfer.Upload);
+        Assert.IsTrue(options.Http.Post);
+        CollectionAssert.AreEqual(Hello, options.Http.PostFields!.Value.ToArray());
+        Assert.IsNull(options.Transfer.CustomRequest);
     }
 
     [TestMethod]

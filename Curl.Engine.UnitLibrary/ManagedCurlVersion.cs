@@ -12,7 +12,7 @@ namespace Curl.Engine;
 internal static class ManagedCurlVersion
 {
     // -V's Protocols: line without ipfs and ipns, which the curl tool adds itself (src/tool_libinfo.c).
-    private static readonly string[] Protocols =
+    internal static readonly string[] Protocols =
     [
         "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap", "imaps", "ldap", "ldaps",
         "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smb", "smbs", "smtp", "smtps", "telnet", "tftp", "ws", "wss",
