@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cryptography.UnitLibrary/BrainpoolEcdsa.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5741 — Fix AF-0970: BrainpoolEcdsa.Verify compares the recomputed r with the signature's r using SequenceEqual, unlike DsaSignature, Ed25519 and Ed448
 
@@ -52,3 +52,4 @@ Replaced SequenceEqual with CryptographicOperations.FixedTimeEquals over the lim
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-22: Doing -> Done. BrainpoolEcdsa.Verify now uses FixedTimeEquals; crypto tests and quality run green
