@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Mqtt.cs]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Mqtt.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Perform.cs]
 requirement: none
 created: 2026-11-22
 completed:
@@ -25,12 +25,14 @@ A `Curl.Api` stream body (`CURLOPT_READFUNCTION` post) to an extension URL whose
 
 ## Acceptance criteria
 
-- [ ] A read callback that returns `CURL_READFUNC_ABORT` while an extension URL's post data is read up front makes the transfer end with `CurlCode.AbortedByCallback` (42), and no handler runs with a partial body.
-- [ ] `CURL_READFUNC_PAUSE` during that read is handled explicitly (decided and recorded in ADR-1337 or a new ADR), not treated as the end of the body.
-- [ ] A count larger than asked that is not a control code still ends the read as today, or fails as libcurl does (`CURLE_READ_ERROR`), whichever matches libcurl; the test at `ManagedEasyTransferTests.Mqtt.cs:70` is replaced to pin the new behaviour.
-- [ ] Curl.Engine.UnitLibrary stays at 100% line and branch coverage; `dotnet build` is clean and the fast tests pass.
+- [x] A read callback that returns `CURL_READFUNC_ABORT` while an extension URL's post data is read up front makes the transfer end with `CurlCode.AbortedByCallback` (42), and no handler runs with a partial body.
+- [x] `CURL_READFUNC_PAUSE` during that read is handled explicitly (decided and recorded in ADR-1337 or a new ADR), not treated as the end of the body.
+- [x] A count larger than asked that is not a control code still ends the read as today, or fails as libcurl does (`CURLE_READ_ERROR`), whichever matches libcurl; the test at `ManagedEasyTransferTests.Mqtt.cs:70` is replaced to pin the new behaviour.
+- [x] Curl.Engine.UnitLibrary stays at 100% line and branch coverage; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Added ManagedEasyTransfer.Perform.cs to touches: the perform must catch the read failure; no other Doing task touches it. PAUSE decided in ADR-1339 (CURLE_READ_ERROR). Quality run for Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
 

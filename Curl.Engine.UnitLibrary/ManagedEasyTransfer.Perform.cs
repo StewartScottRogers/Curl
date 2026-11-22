@@ -240,7 +240,15 @@ internal sealed partial class ManagedEasyTransfer
             return Finish(CurlCode.UrlMalformat, TransferPerformer.UrlRejectionText(rejection), new TransferInfo { EffectiveUrl = urlText });
         }
 
-        EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
+        EngineTransferSettings settings;
+        try
+        {
+            settings = ToolSettings ?? TransferSettingsOf(options);
+        }
+        catch (ExtensionPostReadFailedException exception)
+        {
+            return Finish(exception.Code, exception.Message, new TransferInfo { EffectiveUrl = urlText });
+        }
         long transferId = TransferIdOf(ToolEvents);
         Info = new TransferInfo { EffectiveUrl = urlText, TransferId = transferId, ConnectionId = NoConnectionId };
         performedHsts = PerformShared.Hsts;

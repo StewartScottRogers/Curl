@@ -283,31 +283,56 @@ internal sealed partial class ManagedEasyTransfer
             : (ReadOnlyMemory<byte>?)null;
 
     /// <summary>
-    /// Calls <paramref name="read" /> until it gives <paramref name="size" /> bytes (all it has when negative), returns
-    /// zero, or answers with a code rather than a count (an abort or a pause).
+    /// Calls <paramref name="read" /> until it gives <paramref name="size" /> bytes (all it has when negative) or
+    /// returns zero. As libcurl does for a read callback it cannot serve: <c>CURL_READFUNC_ABORT</c> ends the transfer
+    /// with <see cref="CurlCode.AbortedByCallback" />, and <c>CURL_READFUNC_PAUSE</c> (the body is read before the
+    /// handler starts, so there is no transfer to pause) or a count that is neither a control code nor within what was
+    /// asked ends it with <see cref="CurlCode.ReadError" /> (BL-5764).
     /// </summary>
     /// <param name="read">The handle's read callback.</param>
     /// <param name="size">The <c>CURLOPT_POSTFIELDSIZE</c>, negative when unknown.</param>
     /// <returns>The bytes read.</returns>
+    /// <exception cref="ExtensionPostReadFailedException">The callback aborted, paused or answered a funny value.</exception>
     private static byte[] ReadAllOf(ReadCallback read, long size)
     {
         using MemoryStream data = new();
+        CallbackReadStream stream = new(read);
         byte[] buffer = new byte[16384];
         while (size < 0 || data.Length < size)
         {
             int wanted = size < 0 ? buffer.Length : (int)Math.Min(buffer.Length, size - data.Length);
-            long count = read(buffer.AsSpan(0, wanted));
-            if (count <= 0 || count > wanted)
+            int count = ReadOnce(stream, buffer.AsSpan(0, wanted));
+            if (count == 0)
             {
                 break;
             }
 
-            data.Write(buffer, 0, (int)count);
+            data.Write(buffer, 0, count);
         }
 
         return data.ToArray();
     }
 
+    private static int ReadOnce(CallbackReadStream stream, Span<byte> buffer)
+    {
+        try
+        {
+            return stream.Read(buffer);
+        }
+        catch (IOException exception)
+        {
+            throw new ExtensionPostReadFailedException(stream.Aborted ? CurlCode.AbortedByCallback : CurlCode.ReadError, exception.Message);
+        }
+    }
+
+    /// <summary>The read callback of a post to an extension's URL failed while its body was read up front (BL-5764).</summary>
+    /// <param name="code">The code the transfer ends with.</param>
+    /// <param name="message">libcurl's text for it.</param>
+    internal sealed class ExtensionPostReadFailedException(CurlCode code, string message) : Exception(message)
+    {
+        /// <summary>Gets the code the transfer ends with.</summary>
+        internal CurlCode Code { get; } = code;
+    }
     /// <summary>Whether the handle's URL names an MQTT scheme: <c>mqtt</c>, <c>mqtts</c>, <c>mqtt5</c>, <c>mqtt5s</c> or <c>mqtt5+ws</c> (BL-5745).</summary>
     private static bool IsMqttUrl(EasyOptions options) =>
         options.Network.Url is { } url

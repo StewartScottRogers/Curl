@@ -1,4 +1,6 @@
 using System.Text;
+using Curl.Api.Codes;
+using Curl.Api.EngineContracts;
 using Curl.Api.Options;
 using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
@@ -67,13 +69,36 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public void TransferSettingsOf_ReadCallbackAnsweringMoreThanAskedOnAnExtensionUrl_StopsReading()
+    [DataRow(0x10000000L, CurlCode.AbortedByCallback, "operation aborted by callback")]
+    [DataRow(0x10000001L, CurlCode.ReadError, "Read callback asked for PAUSE when not supported")]
+    [DataRow(20000L, CurlCode.ReadError, "read function returned funny value")]
+    [DataRow(-1L, CurlCode.ReadError, "read function returned funny value")]
+    public void TransferSettingsOf_ReadCallbackAnsweringACodeOrFunnyValueOnAnExtensionUrl_FailsTheTransferAsLibcurlDoes(long answer, CurlCode code, string message)
     {
-        EngineTransferSettings settings = ReadCallbackPostSettingsOf("mcp://h/", [], -1, overReport: 0x10000000);
+        ManagedEasyTransfer.ExtensionPostReadFailedException failure = Assert.ThrowsExactly<ManagedEasyTransfer.ExtensionPostReadFailedException>(
+            () => ReadCallbackPostSettingsOf("mcp://h/", [], -1, overReport: answer));
 
-        Assert.AreEqual(0, settings.PostData!.Value.Length);
+        Assert.AreEqual(code, failure.Code);
+        Assert.AreEqual(message, failure.Message);
     }
 
+    [TestMethod]
+    public async Task PerformAsync_ReadCallbackAbortingOnAnExtensionUrl_EndsWithAbortedByCallbackAndRunsNoHandler()
+    {
+        ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([])).CreateEasy();
+        await using IEasyTransfer handle = easy;
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "mcp://h/" },
+            Http = new EasyHttpOptions { Post = true },
+            Callbacks = new Curl.Api.Callbacks.EasyCallbackOptions { Read = _ => 0x10000000 },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.AbortedByCallback, code);
+        Assert.AreEqual("operation aborted by callback", easy.ErrorText);
+    }
     [TestMethod]
     [DataRow("ftp://h/t", true)]
     [DataRow("mcp://h/", false)]
