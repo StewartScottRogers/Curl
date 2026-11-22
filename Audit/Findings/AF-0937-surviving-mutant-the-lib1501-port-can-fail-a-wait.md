@@ -3,8 +3,8 @@ id: AF-0937
 title: Surviving mutant: the lib1501 port can fail a wait of exactly its blocking limit
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-21_1740.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1501.cs:WithinBlockingLimit-le:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1501.cs:98:<=
 task: BL-5696
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-21
+closed-how: mechanical
+closed-by: 2026-11-21_1740.md
 ---
 # AF-0937 - Surviving mutant: the lib1501 port can fail a wait of exactly its blocking limit
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_1740.md | reproduces: no | Ran the -Site command: line 98 is now a doc comment, and the tool resolved to line 103 in the same member WithinBlockingLimit. Mutant 'elapsed < MaxBlockedMilliseconds' killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-21: accepted -> closed. Re-audit 2026-11-21_1740.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

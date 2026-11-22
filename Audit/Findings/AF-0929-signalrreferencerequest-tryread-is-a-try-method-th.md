@@ -3,8 +3,8 @@ id: AF-0929
 title: SignalRReferenceRequest.TryRead is a Try method that returns a byte count, not a bool
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-21_1740.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceRequest.cs:TryRead:misleading-name
 reproduction: none
 task: BL-5679
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 1f330a1f28a1086717db7833947030e8fdc0bf9d
 scorecard: 2026-11-21_0114.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-21
+closed-how: reliable-reaudit
+closed-by: 2026-11-21_1740.md
 ---
 # AF-0929 - SignalRReferenceRequest.TryRead is a Try method that returns a byte count, not a bool
 
@@ -43,7 +43,9 @@ Select-String -Path Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferen
 ## Re-audits
 
 - 2026-11-21 | 2026-11-21_0835.md | reproduces: no | Ran Select-String -Path Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceRequest.cs -Pattern 'public static \w+ TryRead': no match. The method is now 'public static int TakeWholeRequest(ReadOnlySpan<byte> pending, out SignalRReferenceRequest? request)', a name that fits its byte-count return. The same fault remains in SignalRReferenceFrame.TryRead, filed as a new finding.
+- 2026-11-21 | 2026-11-21_1740.md | reproduces: no | Ran Select-String -Path Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceRequest.cs -Pattern 'public static \w+ TryRead': no match. The method is now 'public static int TakeWholeRequest(ReadOnlySpan<byte> pending, out SignalRReferenceRequest? request)' (line 22); no TryRead remains in the SignalR folder.
 
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-21: accepted -> closed. Re-audit 2026-11-21_1740.md: the reproduction no longer reproduces.

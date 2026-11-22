@@ -3,8 +3,8 @@ id: AF-0946
 title: SignalRReferenceFrame.TryRead is a Try method that returns a byte count, not a bool
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-21_1740.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceFrame.cs:SignalRReferenceFrame.TryRead:misleading-name
 reproduction: none
 task: BL-5705
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-21
+closed-how: reliable-reaudit
+closed-by: 2026-11-21_1740.md
 ---
 # AF-0946 - SignalRReferenceFrame.TryRead is a Try method that returns a byte count, not a bool
 
@@ -42,6 +42,9 @@ Select-String -Path Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferen
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_1740.md | reproduces: no | Ran Select-String -Path Curl.Conformance.Extended.UnitLibrary/SignalR/SignalRReferenceFrame.cs -Pattern 'public static \w+ TryRead': no match. The method is now 'public static int TakeWholeFrame(ReadOnlySpan<byte> pending, out SignalRReferenceFrame? frame)' (line 32).
+
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-21: accepted -> closed. Re-audit 2026-11-21_1740.md: the reproduction no longer reproduces.
