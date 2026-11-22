@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/OpenSslCipherString.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5773 — Fix AF-0976: Surviving mutant: the --ciphers alias SHA256 can be made to also select GCM suites (&& -> ||)
 
@@ -43,3 +43,4 @@ Killed by `OpenSslCipherStringHashAliasTests.Expand_Sha256Alias_SelectsOnlyNonGc
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 79942afa 9742157d.
+- 2026-11-22: Doing -> Done. Added OpenSslCipherStringHashAliasTests; the SHA256 mutant is killed.
