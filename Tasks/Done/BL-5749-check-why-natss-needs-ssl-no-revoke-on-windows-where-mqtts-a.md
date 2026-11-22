@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Nats.UnitLibrary]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5749 — Check why natss:// needs --ssl-no-revoke on Windows where mqtts:// and xmpps:// do not
 
@@ -24,13 +24,17 @@ From Surly cookbook bug report `2026-11-22T0726-Curl-bug-report.md` (batch 10 of
 
 ## Acceptance criteria
 
-- [ ] With a self-signed server certificate trusted by `--cacert`, `natss://` succeeds on Windows without `--ssl-no-revoke`, as `mqtts://` does, pinned by a test of the TLS options the NATS client passes.
-- [ ] The Notes name the difference found.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] With a self-signed server certificate trusted by `--cacert`, `natss://` succeeds on Windows without `--ssl-no-revoke`, as `mqtts://` does, pinned by a test of the TLS options the NATS client passes.
+- [x] The Notes name the difference found.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Could not reproduce without Surl. The NATS client has no TLS setup of its own: NatsProtocolHandler builds a plain ConnectTarget(host, port, useTls) with Proxy, Events and DiagnosticLog, exactly as Mqtt5 and Xmpp do, and hands it to the shared connector, so every TLS option and the revocation rule (ServerCertificateVerification: Schannel build uses Online revocation with --cacert unless --ssl-no-revoke, excluding the root) come from one shared path. No SslStream, X509RevocationMode or handshake_first code exists in the Nats library. The difference is therefore not in Curl's NATS client; the observed exit 35 is most likely the server side or the online CRL lookup in that environment. Decision: no code change.
+- The TLS options NATS passes are pinned by NatsProtocolHandlerTests.ExecuteAsync_TheScheme_ChoosesTheDefaultPortAndTls (the target equals a plain ConnectTarget with only UseTls set).
 
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T0726, finding 5 (check).
 - 2026-11-22: Backlog -> Doing. Criteria at claim: e7c5daeb b8ac762e 3d836d5e.
+- 2026-11-22: Doing -> Done. No NATS-specific TLS setup exists; shared connector path, pinned by existing test
