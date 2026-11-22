@@ -1375,3 +1375,4 @@ Each option and the specific reason it lost.
 | [1331](ADR-1331-a-curl-api-http-put-body-is-an-upload-not-post-fields.md) | A Curl.Api HTTP PUT body is an upload, not post fields (BL-5683) | Accepted | 2026-11-21 |
 | [1332](ADR-1332-the-curl-mcp-curl-tool-answers-digest-as-the-platforms-own-curl-does.md) | The curl-mcp curl tool answers Digest as the platform's own curl does (BL-5685) | Accepted | 2026-11-21 |
 | [1333](ADR-1333-curl-nuget-packages-carry-the-surly-prefix.md) | Curl's NuGet packages carry the Surly. prefix (BL-5707) | Accepted | 2026-11-21 |
+| [1334](ADR-1334-curl-api-hands-over-the-body-a-failed-transfer-delivered-before-its-error.md) | Curl.Api hands over the body a failed transfer delivered before its error (BL-5746) | Accepted | 2026-11-22 |

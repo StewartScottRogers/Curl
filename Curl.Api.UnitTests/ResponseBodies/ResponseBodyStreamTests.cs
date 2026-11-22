@@ -156,6 +156,35 @@ public sealed class ResponseBodyStreamTests
     }
 
     [TestMethod]
+    public async Task StartAsync_TransferFailsAfterDeliveringBody_ReturnsAndReadsThenThrows()
+    {
+        SteppedEasyTransfer easy = new() { ErrorText = "gRPC status 13" };
+        await using ResponseBodyStream body = NewBody(easy);
+        easy.Deliver(1, 2, 3);
+        easy.Finish(CurlCode.HttpReturnedError);
+        byte[] destination = new byte[8];
+
+        await body.StartAsync();
+        int read = await body.ReadAsync(destination);
+        CurlException exception = await Assert.ThrowsExactlyAsync<CurlException>(() => body.ReadAsync(destination).AsTask());
+
+        Assert.AreEqual(3, read);
+        Assert.AreEqual(CurlCode.HttpReturnedError, exception.Code);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_TransferFailsWithNoBody_Throws()
+    {
+        SteppedEasyTransfer easy = new() { ErrorText = "Could not connect" };
+        await using ResponseBodyStream body = NewBody(easy);
+        easy.Finish(CurlCode.CouldntConnect);
+
+        CurlException exception = await Assert.ThrowsExactlyAsync<CurlException>(() => body.StartAsync());
+
+        Assert.AreEqual(CurlCode.CouldntConnect, exception.Code);
+    }
+
+    [TestMethod]
     public async Task ReadAsync_PendingReadCancelled_ThrowsAndTheTransferGoesOn()
     {
         SteppedEasyTransfer easy = new();
