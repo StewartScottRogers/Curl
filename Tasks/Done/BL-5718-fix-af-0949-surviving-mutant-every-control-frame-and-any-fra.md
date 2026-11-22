@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.WebSocket.UnitLibrary/WsFrameEncoder.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5718 — Fix AF-0949: Surviving mutant: every control frame, and any frame over 125 bytes, can be refused as too large (IsControlPayloadTooLong && -> ||)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.WebSocket.UnitLibrary/WsFrameEncoder.cs line 43`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.WebSocket.UnitLibrary/WsFrameEncoder.cs line 43`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `WsFrameEncoderTests.IsControlPayloadTooLong_OpcodeAndLength_RefusesOnlyLongControlFrames` (4 rows fail under the `||` mutant, 87 pass reverted). Production code unchanged.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: b7dd445e 9742157d.
+- 2026-11-21: Doing -> Done. Mutant killed by new IsControlPayloadTooLong test
