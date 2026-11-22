@@ -33,3 +33,4 @@ BL-5681 (Done 2026-11-21) made a `Curl.Api` body publish on amqp, amqp1 and mqtt
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T0726, finding 1.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: ba15cb0c 48d2aff2 3d836d5e.
