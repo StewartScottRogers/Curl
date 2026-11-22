@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.Queueing.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5737 — Fix AF-0966: Surviving mutant: removing a handle from a multi can drop every other handle's done message and keep its own (== -> !=)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedMultiTransfer.Queueing.cs line 136`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/ManagedMultiTransfer.Queueing.cs line 136`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `Remove_OneOfTwoFinishedTransfers_KeepsTheOtherUnreadMessageOnly` (ManagedMultiTransferTests.cs): with line 136 changed to `!=` it fails, with it reverted all 3140 Engine fast tests pass. Test-only change; no production code changed.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 3b0aeef4 9742157d.
+- 2026-11-22: Doing -> Done. Added a multi test removing one of two finished handles; it kills the == -> != mutant
