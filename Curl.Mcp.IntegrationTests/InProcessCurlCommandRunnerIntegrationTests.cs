@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Text.Json;
 using Curl.Mcp.Tools;
 
@@ -10,7 +9,7 @@ namespace Curl.Mcp;
 [TestClass]
 [DoNotParallelize]
 [TestCategory("Integration")]
-public sealed class InProcessCurlCommandRunnerMissingFolderIntegrationTests
+public sealed class InProcessCurlCommandRunnerIntegrationTests
 {
     [TestMethod]
     [DataRow("-o", "nosuch-folder-bl5761/msg#1.eml", "pop3://127.0.0.1:1/[1-3]")]
@@ -37,11 +36,7 @@ public sealed class InProcessCurlCommandRunnerMissingFolderIntegrationTests
             {
                 while (true)
                 {
-                    using TcpClient client = await listener.AcceptTcpClientAsync();
-                    Stream stream = client.GetStream();
-                    byte[] buffer = new byte[4096];
-                    _ = await stream.ReadAsync(buffer);
-                    await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi"));
+                    _ = await LoopbackHttpResponder.ServeOneResponseAsync(listener, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi");
                 }
             }
             catch (Exception ex) when (ex is SocketException or ObjectDisposedException or InvalidOperationException)
