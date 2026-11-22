@@ -8,7 +8,7 @@ depends-on: []
 touches: [llms.txt]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5715 — Say dotnet add package Surly.Curl.Api and Surly.Libcurl in llms.txt
 
@@ -44,3 +44,4 @@ llms.txt lines 17-18 now use Surly.* package IDs; repo search finds no old comma
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: d879f2ec b92652c0 42b24d12.
+- 2026-11-21: Doing -> Done. llms.txt names Surly.Curl.Api and Surly.Libcurl packages
