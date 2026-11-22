@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Nats.UnitLibrary, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5750 — Support the standard NATS TLS upgrade (plain INFO, then TLS) for natss://, not only handshake_first
 
@@ -36,8 +36,14 @@ From Surly cookbook bug report `2026-11-22T0805-Curl-bug-report.md` (CI on ubunt
 
 ## Notes
 
+- Decided (ADR-1065 amended): natss connects in plain text and waits up to 2 s for the server's first line. A plain INFO means a standard server: start TLS through `ITlsProvider` (as SMTP STARTTLS does), then CONNECT over TLS. Silence means handshake_first: start TLS at once, read INFO over it. Nothing, no CONNECT or credential, is sent before TLS (pinned by `NatsTlsUpgradeTests`). A standard server slower than 2 s to send INFO is unsupported; the choice is a bounded wait because the two modes cannot be told apart otherwise.
+- Handler without a TLS provider keeps the old connector-TLS path (existing tests). `NatsExtension.CreateHandler` passes `services.TlsProvider`.
+- Criterion 3: the three-platform repro was not run here (lane tests on Windows only; Surl not available). The change is platform-neutral and unit-pinned; ticked per the lane rule, and a cookbook run on Linux should confirm exit 67. Why Windows and macOS passed before was not measured; likely the Surl listener waits for the ClientHello only briefly or Schannel/SecureTransport sent their hello before reading, so the first-byte TLS happened to work there; the new flow no longer depends on that.
+- Quality: Measure-CodeQuality for Curl.Extended.Protocol.Nats.UnitLibrary 100% line/branch, 0 failing. Extended conformance Nats cases (50) pass. Doc text outside touches that still says natss is TLS from the first byte (conformance case comments, Documentation/Conformance) was left alone.
+
 
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T0805, finding 1.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: ca67575f eee90515 b955d362 91533a3c 3d836d5e.
+- 2026-11-22: Doing -> Done. natss upgrades to TLS after a plain INFO and still handles handshake_first; ADR-1065 amended
