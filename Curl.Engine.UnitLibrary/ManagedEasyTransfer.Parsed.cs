@@ -131,10 +131,16 @@ internal sealed partial class ManagedEasyTransfer
     {
         LastResult = recorder is null ? result : negotiateFailure!.ReportOn(recorder.ReportOn(result));
         keptDigestChallenges = ChallengesOfLast401(result);
-        keptDigestStaysAvailable = result?.Report?.DigestStaysAvailable ?? false;
+        keptDigestStaysAvailable = DigestStaysAvailableAfter(result);
         keptDigestOrigin = OriginOf(url);
         keptAuthSchemePicked = AuthSchemeKeptAfter(result, keptAuthSchemePicked);
     }
+
+    /// <summary>Whether Digest stays available after a perform: its report says so; never after an abort or without a report.</summary>
+    /// <param name="result">The perform's result, or <see langword="null" /> after an abort.</param>
+    /// <returns>The report's flag, else <see langword="false" />.</returns>
+    internal static bool DigestStaysAvailableAfter(TransferResult? result) =>
+        result?.Report?.DigestStaysAvailable ?? false;
 
     /// <summary>The scheme the handle keeps after a perform: its report's picked scheme, else the one kept before.</summary>
     /// <param name="result">The perform's result, or <see langword="null" /> after an abort.</param>
