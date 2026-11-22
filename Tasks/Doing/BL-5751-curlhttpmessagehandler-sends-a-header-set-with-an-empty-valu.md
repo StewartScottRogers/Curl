@@ -35,3 +35,4 @@ BL-5749 / ADR-1335 changed `Curl.Api/Messages/CurlRequestOptions.cs:74-75` so an
 ## Log
 
 - 2026-11-22: Created by the shift-end review (ADR-0710).
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 90ddf0c5 ff7c0920 0a2c860d 7692c245 3d836d5e.
