@@ -39,3 +39,4 @@ The console's `-d` lands on the transfer context's post data (`ReadOnlyMemory<by
 ## Log
 
 - 2026-11-22: Created at Stewart's request after the fifth Surly report of a Curl.Api body not reaching an extension.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 28cb5b82 2b23dfc9 6033af1b 3d836d5e.
