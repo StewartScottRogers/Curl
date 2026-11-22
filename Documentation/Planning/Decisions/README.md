@@ -1378,3 +1378,4 @@ Each option and the specific reason it lost.
 | [1334](ADR-1334-curl-api-hands-over-the-body-a-failed-transfer-delivered-before-its-error.md) | Curl.Api hands over the body a failed transfer delivered before its error (BL-5746) | Accepted | 2026-11-22 |
 | [1335](ADR-1335-a-curl-api-header-with-an-empty-value-removes-it-and-empty-headers-sends-it-empty.md) | A Curl.Api header with an empty value removes it; EmptyHeaders sends one empty (BL-5747) | Accepted | 2026-11-22 |
 | [1336](ADR-1336-a-curl-api-body-to-an-extension-scheme-reaches-the-handler-as-curl-d-data.md) | A Curl.Api body to an extension scheme reaches the handler as -d data (BL-5758) | Accepted | 2026-11-22 |
+| [1337](ADR-1337-a-curl-api-stream-body-to-an-extension-scheme-is-read-up-front-as-curl-d-data.md) | A Curl.Api stream body to an extension scheme is read up front as -d data (BL-5754) | Accepted | 2026-11-22 |

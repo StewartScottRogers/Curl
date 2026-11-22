@@ -253,15 +253,59 @@ internal sealed partial class ManagedEasyTransfer
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <returns>The payload, or <see langword="null" />.</returns>
-    private static ReadOnlyMemory<byte>? PostDataOf(EasyOptions options)
+    private static ReadOnlyMemory<byte>? PostDataOf(EasyOptions options) =>
+        options.Http.PostFields is { } fields ? PostFieldsDataOf(options, fields) : ReadCallbackPostDataOf(options);
+
+    /// <summary>The <c>CURLOPT_POSTFIELDS</c> an MQTT or extension URL's handler reads, cut to a shorter non-negative <c>CURLOPT_POSTFIELDSIZE</c>; <see langword="null" /> for any other URL.</summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="fields">The handle's <c>CURLOPT_POSTFIELDS</c>.</param>
+    /// <returns>The payload, or <see langword="null" />.</returns>
+    private static ReadOnlyMemory<byte>? PostFieldsDataOf(EasyOptions options, ReadOnlyMemory<byte> fields)
     {
-        if (options.Http.PostFields is not { } fields || !(IsMqttUrl(options) || IsExtensionUrl(options)))
+        if (!(IsMqttUrl(options) || IsExtensionUrl(options)))
         {
             return null;
         }
 
         long size = options.Http.PostFieldSize;
         return size < 0 || size >= fields.Length ? fields : fields[..(int)size];
+    }
+
+    /// <summary>
+    /// The bytes a <c>CURLOPT_READFUNCTION</c> post to an extension's URL gives (a <c>Curl.Api</c> stream body), read up
+    /// front so they reach the handler as <c>-d</c> data does (BL-5754); <see langword="null" /> for any other handle.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The data, or <see langword="null" />.</returns>
+    private static ReadOnlyMemory<byte>? ReadCallbackPostDataOf(EasyOptions options) =>
+        PostsWithoutFields(options) && options.Callbacks.Read is { } read && IsExtensionUrl(options)
+            ? ReadAllOf(read, options.Http.PostFieldSize)
+            : (ReadOnlyMemory<byte>?)null;
+
+    /// <summary>
+    /// Calls <paramref name="read" /> until it gives <paramref name="size" /> bytes (all it has when negative), returns
+    /// zero, or answers with a code rather than a count (an abort or a pause).
+    /// </summary>
+    /// <param name="read">The handle's read callback.</param>
+    /// <param name="size">The <c>CURLOPT_POSTFIELDSIZE</c>, negative when unknown.</param>
+    /// <returns>The bytes read.</returns>
+    private static byte[] ReadAllOf(ReadCallback read, long size)
+    {
+        using MemoryStream data = new();
+        byte[] buffer = new byte[16384];
+        while (size < 0 || data.Length < size)
+        {
+            int wanted = size < 0 ? buffer.Length : (int)Math.Min(buffer.Length, size - data.Length);
+            long count = read(buffer.AsSpan(0, wanted));
+            if (count <= 0 || count > wanted)
+            {
+                break;
+            }
+
+            data.Write(buffer, 0, (int)count);
+        }
+
+        return data.ToArray();
     }
 
     /// <summary>Whether the handle's URL names an MQTT scheme: <c>mqtt</c>, <c>mqtts</c>, <c>mqtt5</c>, <c>mqtt5s</c> or <c>mqtt5+ws</c> (BL-5745).</summary>

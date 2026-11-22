@@ -23,6 +23,75 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual("a=1", Encoding.ASCII.GetString(settings.PostData!.Value.Span));
     }
 
+    private static EngineTransferSettings ReadCallbackPostSettingsOf(string url, byte[] body, long size, bool post = true, long? overReport = null)
+    {
+        int offset = 0;
+        long Read(Span<byte> buffer)
+        {
+            if (overReport is { } funny)
+            {
+                return funny;
+            }
+
+            int count = Math.Min(Math.Min(buffer.Length, 3), body.Length - offset);
+            body.AsSpan(offset, count).CopyTo(buffer);
+            offset += count;
+            return count;
+        }
+
+        return ManagedEasyTransfer.TransferSettingsOf(new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = url },
+            Http = new EasyHttpOptions { Post = post, PostFieldSize = size },
+            Callbacks = new Curl.Api.Callbacks.EasyCallbackOptions { Read = Read },
+        });
+    }
+
+    [TestMethod]
+    [DataRow("mcp://h/")]
+    [DataRow("mcps://h/")]
+    [DataRow("mcp+stdio://localhost/server")]
+    public void TransferSettingsOf_ReadCallbackPostOfUnknownSizeOnAnExtensionUrl_ReachesTheHandlerAsPostData(string url)
+    {
+        EngineTransferSettings settings = ReadCallbackPostSettingsOf(url, Encoding.ASCII.GetBytes("{\"name\":\"version\"}"), -1);
+
+        Assert.AreEqual("{\"name\":\"version\"}", Encoding.ASCII.GetString(settings.PostData!.Value.Span));
+    }
+
+    [TestMethod]
+    public void TransferSettingsOf_ReadCallbackPostOfKnownSizeOnAnExtensionUrl_ReadsNoMoreThanTheSize()
+    {
+        EngineTransferSettings settings = ReadCallbackPostSettingsOf("mcp://h/", Encoding.ASCII.GetBytes("abcdefgh"), 5);
+
+        Assert.AreEqual("abcde", Encoding.ASCII.GetString(settings.PostData!.Value.Span));
+    }
+
+    [TestMethod]
+    public void TransferSettingsOf_ReadCallbackAnsweringMoreThanAskedOnAnExtensionUrl_StopsReading()
+    {
+        EngineTransferSettings settings = ReadCallbackPostSettingsOf("mcp://h/", [], -1, overReport: 0x10000000);
+
+        Assert.AreEqual(0, settings.PostData!.Value.Length);
+    }
+
+    [TestMethod]
+    [DataRow("ftp://h/t", true)]
+    [DataRow("mcp://h/", false)]
+    public void TransferSettingsOf_ReadCallbackOnACurlSchemeOrWithoutPost_LeavesNoPostData(string url, bool post)
+    {
+        EngineTransferSettings settings = ReadCallbackPostSettingsOf(url, Encoding.ASCII.GetBytes("a=1"), -1, post);
+
+        Assert.IsNull(settings.PostData);
+    }
+
+    [TestMethod]
+    public void TransferSettingsOf_PostWithoutFieldsOrReadCallbackOnAnExtensionUrl_LeavesNoPostData()
+    {
+        EngineTransferSettings settings = MqttSettingsOf("mcp://h/", new EasyHttpOptions { Post = true });
+
+        Assert.IsNull(settings.PostData);
+    }
+
     [TestMethod]
     [DataRow("ftp://h/t")]
     [DataRow("no-scheme")]
