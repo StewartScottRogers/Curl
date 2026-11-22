@@ -41,7 +41,7 @@ public sealed class CurlClientSendAsyncTests
         {
             Headers = [new("X-One", "1"), new("x-one", "2"), new("Accept", "")],
         };
-        // An empty value removes the header: the line is Name:, as curl -H "Name:" (ADR-1334).
+        // An empty value removes the header: the line is Name:, as curl -H "Name:" (ADR-1335).
 
         (_, ScriptedEasyTransfer easy) = await SendAsync(request);
 

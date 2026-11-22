@@ -70,7 +70,7 @@ internal static class CurlRequestOptions
     private static bool IsImpliedBy(HttpMethod method, bool post) =>
         method == HttpMethod.Head || method == (post ? HttpMethod.Post : HttpMethod.Get);
 
-    /// <summary>The <c>CURLOPT_HTTPHEADER</c> line of a field: <c>Name: value</c>, or <c>Name:</c> for an empty value, which removes the header as <c>curl -H "Name:"</c> does (ADR-1334).</summary>
+    /// <summary>The <c>CURLOPT_HTTPHEADER</c> line of a field: <c>Name: value</c>, or <c>Name:</c> for an empty value, which removes the header as <c>curl -H "Name:"</c> does (ADR-1335).</summary>
     private static string HeaderLine(KeyValuePair<string, string> field) =>
         field.Value.Length == 0 ? $"{field.Key}:" : $"{field.Key}: {field.Value}";
 }

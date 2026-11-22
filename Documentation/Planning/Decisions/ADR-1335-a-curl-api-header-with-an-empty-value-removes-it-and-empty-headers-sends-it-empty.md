@@ -1,4 +1,4 @@
-# ADR-1334: A Curl.Api header with an empty value removes it; `EmptyHeaders` sends one empty
+# ADR-1335: A Curl.Api header with an empty value removes it; `EmptyHeaders` sends one empty
 
 - Status: Accepted (2026-11-22, BL-5747)
 - Decided by Claude under Stewart's delegation.

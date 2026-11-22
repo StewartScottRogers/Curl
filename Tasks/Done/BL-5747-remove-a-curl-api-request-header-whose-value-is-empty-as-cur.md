@@ -30,7 +30,7 @@ From Surly cookbook bug report `2026-11-22T0726-Curl-bug-report.md` (batch 10 of
 
 ## Notes
 
-- Decided: empty `Headers` value is `Name:` (removes); new `CurlRequest.EmptyHeaders` sends `Name;`. ADR-1334. Widened touches to CurlRequest.cs, README, tests (no other Doing task holds them). Curl.Api quality run: 0 failing members.
+- Decided: empty `Headers` value is `Name:` (removes); new `CurlRequest.EmptyHeaders` sends `Name;`. ADR-1335. Widened touches to CurlRequest.cs, README, tests (no other Doing task holds them). Curl.Api quality run: 0 failing members.
 
 ## Log
 

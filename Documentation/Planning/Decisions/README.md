@@ -1376,4 +1376,4 @@ Each option and the specific reason it lost.
 | [1332](ADR-1332-the-curl-mcp-curl-tool-answers-digest-as-the-platforms-own-curl-does.md) | The curl-mcp curl tool answers Digest as the platform's own curl does (BL-5685) | Accepted | 2026-11-21 |
 | [1333](ADR-1333-curl-nuget-packages-carry-the-surly-prefix.md) | Curl's NuGet packages carry the Surly. prefix (BL-5707) | Accepted | 2026-11-21 |
 | [1334](ADR-1334-curl-api-hands-over-the-body-a-failed-transfer-delivered-before-its-error.md) | Curl.Api hands over the body a failed transfer delivered before its error (BL-5746) | Accepted | 2026-11-22 |
-| [1334](ADR-1334-a-curl-api-header-with-an-empty-value-removes-it-and-empty-headers-sends-it-empty.md) | A Curl.Api header with an empty value removes it; EmptyHeaders sends one empty (BL-5747) | Accepted | 2026-11-22 |
+| [1335](ADR-1335-a-curl-api-header-with-an-empty-value-removes-it-and-empty-headers-sends-it-empty.md) | A Curl.Api header with an empty value removes it; EmptyHeaders sends one empty (BL-5747) | Accepted | 2026-11-22 |
