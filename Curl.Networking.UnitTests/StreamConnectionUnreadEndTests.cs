@@ -41,4 +41,22 @@ public sealed class StreamConnectionUnreadEndTests
 
         Assert.IsFalse(connection.HasUnreadBytesOrEndBeforeWrite(client.GetStream()));
     }
+
+    [TestMethod]
+    public async Task HasUnreadBytesOrEndBeforeWrite_OverASocketWhosePeerReset_IsFalse()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        using var client = new TcpClient();
+        await client.ConnectAsync((IPEndPoint)listener.LocalEndpoint);
+        using TcpClient peer = await listener.AcceptTcpClientAsync();
+        await using var connection = new StreamConnection(client.GetStream(), remoteEndPoint: null);
+
+        peer.Client.LingerState = new LingerOption(true, 0);
+        peer.Client.Close();
+        bool resetArrived = client.Client.Poll(TimeSpan.FromSeconds(5), SelectMode.SelectRead);
+
+        Assert.IsTrue(resetArrived, "The peer's reset did not arrive.");
+        Assert.IsFalse(connection.HasUnreadBytesOrEndBeforeWrite(client.GetStream()), "A reset is not the peer's FIN.");
+    }
 }

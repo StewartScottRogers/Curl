@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/StreamConnection.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5724 — Fix AF-0955: Surviving mutant: a connection reset can be taken for the peer's FIN (HasUnreadEnd catch returns true)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/StreamConnection.cs line 106`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Networking.UnitLibrary/StreamConnection.cs line 106`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added `StreamConnectionUnreadEndTests.HasUnreadBytesOrEndBeforeWrite_OverASocketWhosePeerReset_IsFalse` (loopback, peer closes with linger 0 so it sends an RST, no byte). With line 106 mutated to `return true;` it fails; reverted, all 4403 fast tests pass. Test-only change, no production code touched.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 39f56745 9742157d.
+- 2026-11-21: Doing -> Done. Reset-peer test kills the mutant
