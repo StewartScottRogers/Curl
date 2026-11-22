@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Mqtt.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Perform.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5764 — Fail an extension URL's read-callback post with exit 42 on CURL_READFUNC_ABORT instead of sending a truncated body
 
@@ -38,3 +38,4 @@ Added ManagedEasyTransfer.Perform.cs to touches: the perform must catch the read
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 5a3940a1 d5643ed9 88a63bc1 dd656b97.
+- 2026-11-22: Doing -> Done. Abort, pause and funny read values on an extension URL's read-callback post now fail the transfer (ADR-1339)
