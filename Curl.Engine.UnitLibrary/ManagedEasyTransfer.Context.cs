@@ -341,8 +341,28 @@ internal sealed partial class ManagedEasyTransfer
     /// <summary>Whether the handle's URL names a scheme curl itself does not serve, which an extension may (BL-5758): its body reaches the handler as <c>-d</c> data does.</summary>
     private static bool IsExtensionUrl(EasyOptions options) =>
         options.Network.Url is { } url
-        && url.IndexOf(':', StringComparison.Ordinal) is > 0 and var colon
-        && !ManagedCurlVersion.Protocols.Contains(url[..colon], StringComparer.OrdinalIgnoreCase);
+        && ExplicitSchemeOf(url) is { } scheme
+        && !ManagedCurlVersion.Protocols.Contains(scheme, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The scheme a URL spells out, <see langword="null" /> when libcurl would guess <c>http</c> for it (BL-5765): RFC 3986 scheme
+    /// characters then <c>://</c>, or a <c>+</c> in the scheme (<c>mcp+stdio:</c>). <c>localhost:8080/x</c> and <c>user:pw@host/</c> name none.
+    /// </summary>
+    private static bool IsSchemeText(ReadOnlySpan<char> text) =>
+        char.IsAsciiLetter(text[0]) && text.IndexOfAnyExcept(SchemeCharacters) < 0;
+
+    private static readonly System.Buffers.SearchValues<char> SchemeCharacters = System.Buffers.SearchValues.Create("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-.");
+
+    private static string? ExplicitSchemeOf(string url)
+    {
+        int colon = url.IndexOf(':', StringComparison.Ordinal);
+        if (colon <= 0 || !IsSchemeText(url.AsSpan(0, colon)))
+        {
+            return null;
+        }
+
+        return url.AsSpan(colon + 1).StartsWith("//", StringComparison.Ordinal) || url.AsSpan(0, colon).Contains('+') ? url[..colon] : null;
+    }
 
     private static readonly string[] MqttSchemePrefixes = ["mqtt:", "mqtts:", "mqtt5:", "mqtt5s:", "mqtt5+ws:"];
 

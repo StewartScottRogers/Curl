@@ -35,13 +35,16 @@ The shift-end review of 2026-11-22 (ADR-0710) found this in the merge `dfb9516dd
 
 ## Acceptance criteria
 
-- [ ] A `ManagedEasyTransferTests` case posts through a read callback to `localhost:<port>/x` (no scheme) on a scripted connector. It asserts that the HTTP request carries the callback's full body and that the callback was read once.
-- [ ] A case with `CURLOPT_POSTFIELDS` to a URL with no scheme asserts that the context's `PostData` is `null`.
+- [x] A `ManagedEasyTransferTests` case posts through a read callback to `localhost:<port>/x` (no scheme) on a scripted connector. It asserts that the HTTP request carries the callback's full body and that the callback was read once.
+- [x] A case with `CURLOPT_POSTFIELDS` to a URL with no scheme asserts that the context's `PostData` is `null`.
 - [ ] A case with an unknown scheme that no handler serves (`htp://host/`) asserts exit 1 and that the read callback was never called.
-- [ ] The existing extension cases in `ManagedEasyTransferTests.Mqtt.cs` (BL-5754, BL-5758) still pass. `mcp://`, `mcp+stdio:`, `nats://` and the other extension schemes still get their body as `PostData`.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Curl.Engine.UnitLibrary` keeps its four quality gates.
+- [x] The existing extension cases in `ManagedEasyTransferTests.Mqtt.cs` (BL-5754, BL-5758) still pass. `mcp://`, `mcp+stdio:`, `nats://` and the other extension schemes still get their body as `PostData`.
+- [x] `dotnet build` is clean, the fast tests pass, and `Curl.Engine.UnitLibrary` keeps its four quality gates.
 
 ## Notes
+
+- Done: `IsExtensionUrl` now needs an explicit scheme (`ExplicitSchemeOf`: RFC 3986 characters then `://`, or a `+` in the scheme as `mcp+stdio:`), so `localhost:8080/x`, `user:pw@host/` and `[::1]:8080/` are HTTP. Engine quality gates pass; fast tests green.
+- Unmet, split out: the `htp://host/` criterion (exit 1, callback never read). Syntax cannot tell `htp://` from `nats://`; only the extension handlers' registered schemes can, and the engine sees them only inside `ManagedCurlEngine`. Filed as BL-5768. Criterion 3 stays unticked.
 
 ## Log
 

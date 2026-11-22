@@ -201,3 +201,58 @@ public sealed partial class ManagedEasyTransferTests
         Assert.IsFalse(settings.PostWithoutData);
     }
 }
+
+public sealed partial class ManagedEasyTransferTests
+{
+    [TestMethod]
+    [DataRow("localhost:8080/x")]
+    [DataRow("user:pw@host/")]
+    [DataRow("[::1]:8080/")]
+    [DataRow("a_b:c@host/")]
+    [DataRow(":8080/")]
+    public void TransferSettingsOf_ReadCallbackOnAUrlWithNoScheme_LeavesNoPostDataAndReadsNothing(string url)
+    {
+        EngineTransferSettings settings = ReadCallbackPostSettingsOf(url, Encoding.ASCII.GetBytes("abc"), -1);
+
+        Assert.IsNull(settings.PostData);
+    }
+
+    [TestMethod]
+    [DataRow("nats://h/t")]
+    [DataRow("mcp+stdio:server")]
+    public void TransferSettingsOf_ReadCallbackOnAnExtensionScheme_GivesTheBodyAsPostData(string url)
+    {
+        EngineTransferSettings settings = ReadCallbackPostSettingsOf(url, Encoding.ASCII.GetBytes("abc"), -1);
+
+        Assert.AreEqual("abc", Encoding.ASCII.GetString(settings.PostData!.Value.Span));
+    }
+
+    [TestMethod]
+    public void TransferSettingsOf_PostFieldsOnAUrlWithNoScheme_LeaveNoPostData()
+    {
+        EngineTransferSettings settings = MqttSettingsOf("localhost:8080/x", new EasyHttpOptions { Post = true, PostFields = Encoding.ASCII.GetBytes("a=1") });
+
+        Assert.IsNull(settings.PostData);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_ReadCallbackPostToAUrlWithNoScheme_PostsTheWholeBodyReadingTheCallbackOnce()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes("HTTP/1.1 100 Continue\r\n\r\n"), Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")]);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
+        int calls = 0;
+        Curl.Api.Callbacks.ReadCallback inner = ReaderOf("hello");
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "localhost:8080/x" },
+            Http = new EasyHttpOptions { Post = true, PostFieldSize = 5 },
+            Callbacks = new Curl.Api.Callbacks.EasyCallbackOptions { Read = buffer => { calls++; return inner(buffer); } },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        StringAssert.EndsWith(Encoding.ASCII.GetString(connector.Written), "\r\n\r\nhello");
+        Assert.IsTrue(calls >= 1);
+    }
+}
