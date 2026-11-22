@@ -3,12 +3,12 @@ id: AF-0979
 title: Surviving mutant: after an aborted perform the easy handle can keep Digest as still available (?? false -> ?? true)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.Parsed.cs:KeepHandleStateOf-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.Parsed.cs:134:false
-task: none
-tasks:
+task: BL-5776
+tasks: BL-5776
 found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md

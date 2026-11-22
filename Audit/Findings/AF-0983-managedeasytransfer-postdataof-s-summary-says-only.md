@@ -3,12 +3,12 @@ id: AF-0983
 title: ManagedEasyTransfer.PostDataOf's summary says only an mqtt or mqtts URL reads the post data; it also gives it to every extension URL, read-callback posts included
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs:PostDataOf:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-5780
+tasks: BL-5780
 found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md

@@ -3,12 +3,12 @@ id: AF-0976
 title: Surviving mutant: the --ciphers alias SHA256 can be made to also select GCM suites (&& -> ||)
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/OpenSslCipherString.cs:readonly-and:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/OpenSslCipherString.cs:51:&&
-task: none
-tasks:
+task: BL-5773
+tasks: BL-5773
 found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md

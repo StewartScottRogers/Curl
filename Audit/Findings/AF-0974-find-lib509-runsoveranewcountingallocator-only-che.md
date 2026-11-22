@@ -3,12 +3,12 @@ id: AF-0974
 title: Find_Lib509_RunsOverANewCountingAllocator only checks that the exit code is not -1, never that a counting allocator was used
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib510To519Tests.cs:Find_Lib509_RunsOverANewCountingAllocator:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-5771
+tasks: BL-5771
 found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md

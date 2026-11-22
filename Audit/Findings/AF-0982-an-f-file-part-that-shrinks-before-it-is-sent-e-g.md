@@ -3,12 +3,12 @@ id: AF-0982
 title: An -F file part that shrinks before it is sent (e.g. --trace-ascii into the same file) exits 0 where curl fails with exit 26
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: conformance:-F:form-file-shorter-than-sized:exit-code
 reproduction: none
-task: none
-tasks:
+task: BL-5779
+tasks: BL-5779
 found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md

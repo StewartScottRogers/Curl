@@ -3,12 +3,12 @@ id: AF-0977
 title: Surviving mutant: an amqp:// URL with explicit port 0 can be dialled on the default port 5672 (>= -> >)
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ProtocolHandler.cs:TargetOf-ge:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ProtocolHandler.cs:41:>=
-task: none
-tasks:
+task: BL-5774
+tasks: BL-5774
 found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md

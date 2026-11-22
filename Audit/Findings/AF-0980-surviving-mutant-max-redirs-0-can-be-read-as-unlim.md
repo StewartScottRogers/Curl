@@ -3,12 +3,12 @@ id: AF-0980
 title: Surviving mutant: --max-redirs 0 can be read as unlimited when deciding whether a redirect is followed (< 0 -> <= 0)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs:MayFollowAnother-lt:surviving-mutant
 reproduction: mutation Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs:108:<
-task: none
-tasks:
+task: BL-5777
+tasks: BL-5777
 found: 2026-11-22
 found-at: fdfc7d13ff07752cdeb7bf999a56dd653660b7a2
 scorecard: 2026-11-22_1351.md
