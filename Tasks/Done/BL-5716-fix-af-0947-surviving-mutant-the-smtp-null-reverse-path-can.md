@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Smtp.UnitLibrary/SmtpMailbox.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5716 — Fix AF-0947: Surviving mutant: the SMTP null reverse-path <> can be sent as <>> (CutAtLastClosingBracket closing < 0 -> <= 0)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Smtp.UnitLibrary/SmtpMailbox.cs line 82`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Smtp.UnitLibrary/SmtpMailbox.cs line 82`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Killed by `SmtpMailboxFeatureMaskTests.Bracketed_NullReversePath_SendsEmptyBrackets` (new): with `closing <= 0` it failed, reverted it passes (432 passed). Build clean.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 61679aef 9742157d.
+- 2026-11-21: Doing -> Done. Mutant killed by new test
