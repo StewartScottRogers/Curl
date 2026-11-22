@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Smtp.UnitLibrary/SmtpMailTransaction.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5717 — Fix AF-0948: Surviving mutant: an SMTP address that starts with CR or LF can be sent instead of refused (HasLineBreak >= 0 -> > 0)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Smtp.UnitLibrary/SmtpMailTransaction.cs line 139`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Original.Protocol.Smtp.UnitLibrary/SmtpMailTransaction.cs line 139`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by `ExecuteAsync_MailFromWithLineBreak_QuitsWithExit43BeforeMailFrom` rows "LF at index 0" and "CR LF at index 0" (SmtpProtocolHandlerMailExtensionTests): with `>= 0` changed to `> 0` both fail (exit 56 instead of 43); reverted, all 433 pass. Test-only change; no production code touched.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 0b989ddc 9742157d.
+- 2026-11-21: Doing -> Done. Added leading-line-break rows that kill the >= 0 to > 0 mutant.
