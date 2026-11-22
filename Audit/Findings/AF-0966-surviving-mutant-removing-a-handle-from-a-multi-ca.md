@@ -3,12 +3,12 @@ id: AF-0966
 title: Surviving mutant: removing a handle from a multi can drop every other handle's done message and keep its own (== -> !=)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/ManagedMultiTransfer.Queueing.cs:RemoveEntry-eq:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedMultiTransfer.Queueing.cs:136:==
-task: none
-tasks:
+task: BL-5737
+tasks: BL-5737
 found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md

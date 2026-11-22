@@ -3,12 +3,12 @@ id: AF-0963
 title: Surviving mutant: libcurl's SMTP handler can write --trace-config smtp state lines by default (tracesSmtp = false -> true)
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/EngineComposition.cs:CreateProtocolHandlers-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EngineComposition.cs:146:false
-task: none
-tasks:
+task: BL-5734
+tasks: BL-5734
 found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md

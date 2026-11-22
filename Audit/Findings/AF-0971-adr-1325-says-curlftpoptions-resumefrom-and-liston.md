@@ -3,12 +3,12 @@ id: AF-0971
 title: ADR-1325 says CurlFtpOptions.ResumeFrom and ListOnly sit with FTP, not on every protocol; the code applies them to every protocol
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Documentation/Planning/Decisions/ADR-1325-curl-api-ftp-resume-offset-and-names-only-listing-live-on-curlftpoptions.md:CurlFtpOptions.ResumeFrom:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-5742
+tasks: BL-5742
 found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md

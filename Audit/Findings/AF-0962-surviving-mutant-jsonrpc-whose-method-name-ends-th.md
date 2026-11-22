@@ -3,12 +3,12 @@ id: AF-0962
 title: Surviving mutant: --jsonrpc whose method name ends the value can crash with IndexOutOfRangeException (MethodEnd end < text.Length -> <=)
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.JsonRpc.UnitLibrary/JsonRpcCallList.cs:MethodEnd-lt:surviving-mutant
 reproduction: mutation Curl.Extension.JsonRpc.UnitLibrary/JsonRpcCallList.cs:71:<
-task: none
-tasks:
+task: BL-5733
+tasks: BL-5733
 found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md

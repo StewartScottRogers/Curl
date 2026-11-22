@@ -3,12 +3,12 @@ id: AF-0972
 title: ManagedEasyTransfer.DisposeAsync's summary lists its cleanup steps but omits that it writes the CURLOPT_ALTSVC file and closes the WebSocket
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Engine.UnitLibrary/ManagedEasyTransfer.Lifecycle.cs:ManagedEasyTransfer.DisposeAsync:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-5743
+tasks: BL-5743
 found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md

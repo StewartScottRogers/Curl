@@ -3,12 +3,12 @@ id: AF-0965
 title: Surviving mutant: a Socket.IO upgrade reply that starts with an empty line can be read on instead of failing with exit 8 (IndexOf(HeadEnd) < 0 -> <= 0)
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs:ReadReplyAsync-lt:surviving-mutant
 reproduction: mutation Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs:64:<
-task: none
-tasks:
+task: BL-5736
+tasks: BL-5736
 found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md

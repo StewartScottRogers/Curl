@@ -3,12 +3,12 @@ id: AF-0968
 title: EveryEvent_GoesOnToTheInnerEvents checks only that 13 calls arrived, not that each event reached its own method
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitTests/EngineConnectionIdTransferEventsTests.cs:EveryEvent_GoesOnToTheInnerEvents:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5739
+tasks: BL-5739
 found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md

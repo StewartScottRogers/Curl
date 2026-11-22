@@ -3,12 +3,12 @@ id: AF-0967
 title: Surviving mutant: the lib655 port's debug trace can dump with the hex column (noHex true -> false)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib655.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib655.cs:46:true
-task: none
-tasks:
+task: BL-5738
+tasks: BL-5738
 found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md

@@ -3,12 +3,12 @@ id: AF-0973
 title: CI red 227 min: Pack Curl.Mcp failures, four failed runs with no filed/covered trace line; first green run 16:34 Arizona time
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: process:logs:run-44942529813-44946270671-44946492351-44952616925:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-5744
+tasks: BL-5744
 found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md

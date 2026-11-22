@@ -3,12 +3,12 @@ id: AF-0969
 title: ConnectMultiplexedAsync_WhenTheProxyAnswers200_OpensTheTunnel checks a log line, never that a tunnel connection was opened
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnel.cs:ConnectMultiplexedAsync_WhenTheProxyAnswers200_OpensTheTunnel:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5740
+tasks: BL-5740
 found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md

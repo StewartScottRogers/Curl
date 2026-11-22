@@ -3,12 +3,12 @@ id: AF-0970
 title: BrainpoolEcdsa.Verify compares the recomputed r with the signature's r using SequenceEqual, unlike DsaSignature, Ed25519 and Ed448
 auditor: security
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: security:Curl.Cryptography.UnitLibrary/BrainpoolEcdsa.cs:Verify:non-constant-time-compare
 reproduction: none
-task: none
-tasks:
+task: BL-5741
+tasks: BL-5741
 found: 2026-11-22
 found-at: 9f9f37761162551e34c06d99ea4c7ebfb0168e83
 scorecard: 2026-11-22_0210.md
