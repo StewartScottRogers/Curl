@@ -4,8 +4,8 @@ title: Make a Curl.Api body to webtransport:// be sent, as curl -d does
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Extended.Protocol.WebTransport.UnitLibrary]
+depends-on: [BL-5753]
+touches: [Curl.Extended.Protocol.WebTransport.UnitLibrary, Curl.Api/RequestBodies/UploadSchemes.cs, Curl.Api.UnitTests/RequestBodies/UploadSchemeBodyTests.cs]
 requirement: none
 created: 2026-11-22
 completed:
@@ -30,7 +30,10 @@ From Surly cookbook bug report `2026-11-22T1116-Curl-bug-report.md` (batch 11 of
 
 ## Notes
 
+Cause found before any edit: WebTransportProtocolHandler already reads context.PostData and context.Upload (as -d and -T), but Curl.Api/RequestBodies/UploadSchemes.cs does not list "webtransport", so a Curl.Api body becomes HTTP post fields. Fix: add "webtransport" to UploadSchemes and a DataRow in UploadSchemeBodyTests (as BL-5681 did for amqp etc.), plus a WebTransport handler test that an Upload stream body is sent. Curl.Api/RequestBodies is held by BL-5753 in Doing, so this waits on it (depends-on). Nothing edited yet.
+
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T1116, finding 3.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 8ab14af5 80c1f77b 3d836d5e.
+- 2026-11-22: Doing -> Backlog. Needs Curl.Api/RequestBodies/UploadSchemes.cs (add webtransport scheme), held by BL-5753 in Doing; waits on it
