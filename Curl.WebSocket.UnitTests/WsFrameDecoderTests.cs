@@ -81,6 +81,18 @@ public sealed class WsFrameDecoderTests
     }
 
     [TestMethod]
+    public void Decode_64BitLengthOfExactlyLongMaxValue_IsAcceptedNotAViolation()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        WsDecodedBytes decoded = Run(diagnostics, "82 7f 7f ff ff ff ff ff ff ff", "ok");
+
+        diagnostics.Assert("decoded.ViolationMessage", null, decoded.ViolationMessage);
+        Assert.IsNull(decoded.ViolationMessage);
+        diagnostics.Assert("Text(decoded.Payload)", "ok", Text(decoded.Payload));
+        Assert.AreEqual("ok", Text(decoded.Payload));
+    }
+
+    [TestMethod]
     public void Decode_TextMessageInThreeFragments_PassesEachFragmentOn()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

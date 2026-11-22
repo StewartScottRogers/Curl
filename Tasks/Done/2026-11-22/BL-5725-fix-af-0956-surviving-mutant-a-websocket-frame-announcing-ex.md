@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5725 — Fix AF-0956: Surviving mutant: a WebSocket frame announcing exactly 2^63-1 bytes can be refused as longer than 63 bits
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs line 261`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.WebSocket.UnitLibrary/WsFrameDecoder.cs line 261`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by new test `Decode_64BitLengthOfExactlyLongMaxValue_IsAcceptedNotAViolation` (WsFrameDecoderTests): with `>=` applied by hand it fails, reverted all 80 pass. Test-only change; WsFrameDecoder.cs untouched.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: ff4f9e80 9742157d.
+- 2026-11-21: Doing -> Done. Mutant killed by new test
