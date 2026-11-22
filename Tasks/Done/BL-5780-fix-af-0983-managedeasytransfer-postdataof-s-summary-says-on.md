@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5780 — Fix AF-0983: ManagedEasyTransfer.PostDataOf's summary says only an mqtt or mqtts URL reads the post data; it also gives it to every extension URL, read-callback posts included
 
@@ -54,3 +54,4 @@ Doc-comment-only fix to PostDataOf; reproduction no longer matches. Build clean;
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-22: Doing -> Done. PostDataOf summary now names MQTT, extension URLs and read-callback posts; reproduction clean, build green
