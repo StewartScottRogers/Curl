@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/CiWatch.ps1]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5768 — Keep the CI needs you tab caption up while CI waits on interactive-only tasks
 
@@ -25,14 +25,17 @@ While a red CI run waits only on interactive-only tasks, the coordinator's tab r
 
 ## Acceptance criteria
 
-- [ ] While `Get-CiNeedsYouLine` gives a line, `Update-CiNeedsYou` captions the tab "CI needs you, read" again whenever `$script:OwnTabText` has been set to a routine caption (`''`, `'idle, polling'` or a task title) since; it leaves a caption that starts with `ALARM` or `WAITING` alone.
-- [ ] The trace line is still written once per change of the line, not once per heartbeat.
-- [ ] A new `-TestCiWatch` check recaptions the tab to `'idle, polling'` between two "needs you" calls and expects "CI needs you, read" back; the existing `Update-CiNeedsYou` checks still pass.
-- [ ] `RunDarkFactory.ps1 -TestCiWatch` passes.
+- [x] While `Get-CiNeedsYouLine` gives a line, `Update-CiNeedsYou` captions the tab "CI needs you, read" again whenever `$script:OwnTabText` has been set to a routine caption (`''`, `'idle, polling'` or a task title) since; it leaves a caption that starts with `ALARM` or `WAITING` alone.
+- [x] The trace line is still written once per change of the line, not once per heartbeat.
+- [x] A new `-TestCiWatch` check recaptions the tab to `'idle, polling'` between two "needs you" calls and expects "CI needs you, read" back; the existing `Update-CiNeedsYou` checks still pass.
+- [x] `RunDarkFactory.ps1 -TestCiWatch` passes.
 
 ## Notes
+
+Update-CiNeedsYou recaptions when OwnTabText is a routine caption; TabBefore becomes that caption. Trace line unchanged (once per line change). New check added; -TestCiWatch passes.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 4f669472 af88ed69 51a52ae7 49318181.
+- 2026-11-22: Doing -> Done. Update-CiNeedsYou recaptions after a routine caption
