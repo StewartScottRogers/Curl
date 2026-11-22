@@ -54,6 +54,7 @@ public sealed class SocketIoUpgradeTests
 
     [TestMethod]
     [DataRow("HTTP/1.1 400 Bad Request\r\n\r\n", CurlExitCode.HttpReturnedError, "Refused WebSocket upgrade: 400")]
+    [DataRow("\r\n\r\n", CurlExitCode.WeirdServerReply, "Socket.IO: the WebSocket upgrade reply has no status line")]
     [DataRow("garbage\r\n\r\n", CurlExitCode.WeirdServerReply, "Socket.IO: the WebSocket upgrade reply has no status line")]
     [DataRow("SIP/2.0 101 x\r\n\r\n", CurlExitCode.WeirdServerReply, "Socket.IO: the WebSocket upgrade reply has no status line")]
     [DataRow("HTTP/1.1 101 OK\r\nSec-WebSocket-Accept: wrong\r\n\r\n", CurlExitCode.WeirdServerReply, "Socket.IO: the server's Sec-WebSocket-Accept does not match the key sent")]
