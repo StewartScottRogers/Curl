@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5777 — Fix AF-0980: Surviving mutant: --max-redirs 0 can be read as unlimited when deciding whether a redirect is followed (< 0 -> <= 0)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs line 108`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extension.OpenTelemetry.UnitLibrary/OpenTelemetryTransferHook.cs line 108`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Killed by ExecuteAsync_MaxRedirsZeroAndARedirect_ExportsTheSpanBecauseNoHopFollows (new, OpenTelemetryRedirectTests): with `<= 0` applied by hand it fails, reverted all 66 pass. Test-only change; no production edit.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 700f96ff 9742157d.
+- 2026-11-22: Doing -> Done. New max-redirs 0 test kills the mutant; build and fast tests green

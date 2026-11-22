@@ -61,6 +61,16 @@ public sealed class OpenTelemetryRedirectTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_MaxRedirsZeroAndARedirect_ExportsTheSpanBecauseNoHopFollows()
+    {
+        var (hook, connection, connector) = Fixture();
+
+        await hook.ExecuteAsync(Hop(0, maxRedirects: 0), new TransferHookServices(connector, connector), c => Respond(c, [], Redirect()));
+
+        Assert.AreEqual(1, Count(connection.Written, "POST "));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_AnUnlimitedRedirectCountAndARedirect_DefersTheExportToTheLastHop()
     {
         var (hook, connection, connector) = Fixture();
