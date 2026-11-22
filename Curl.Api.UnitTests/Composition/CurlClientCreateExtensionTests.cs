@@ -26,6 +26,19 @@ public sealed class CurlClientCreateExtensionTests
     }
 
     [TestMethod]
+    public async Task SendAsync_StreamBodyThatThrowsOnReadToAnExtensionScheme_FailsAndRunsNoHandler()
+    {
+        ReachedExtensionHandler handler = new();
+        await using CurlClient client = CurlClient.Create(new CurlClientOptions(), _ => null, _ => [handler]);
+        using Curl.Api.RequestBodies.ScriptedStream stream = new("body"u8.ToArray()) { ThrowOnRead = true };
+
+        _ = await Assert.ThrowsExactlyAsync<CurlException>(
+            () => client.SendAsync(new CurlRequest(HttpMethod.Post, ExtensionUrl) { Body = CurlContent.FromStream(stream) }, CancellationToken.None));
+
+        Assert.AreEqual(0, handler.Transfers);
+    }
+
+    [TestMethod]
     public async Task Create_WithCurlExtensionsZero_RefusesTheExtensionSchemeAsUnsupported()
     {
         ReachedExtensionHandler handler = new();
