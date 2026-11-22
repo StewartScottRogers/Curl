@@ -33,3 +33,4 @@ Repro: `surl --cert server.pem --key server.key --user alice:s3cret signalrs://1
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T1308, finding 2.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: df862df0 02aa84ae 3d836d5e.
