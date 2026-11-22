@@ -24,9 +24,9 @@ From Surly cookbook bug report `2026-11-22T0726-Curl-bug-report.md` (batch 10 of
 
 ## Acceptance criteria
 
-- [ ] Piping `PING\r\n` into `curl telnet://...` sends exactly `PING\r\n` on the wire, pinned by a test with a loopback server and a byte stream as standard input.
-- [ ] Bytes that are not text (a NUL, a lone CR, 0xFF other than IAC handling) pass through as curl 8.22.0 sends them, pinned by a test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Withdrawn, premise false: Windows curl 8.22.0 sends CR LF as LF (ADR-0848); Curl matches it, pinned by existing tests.
+- [x] Withdrawn, same reason: non-text bytes follow ADR-0848's text-mode read, already pinned.
+- [x] `dotnet build` is clean and the fast tests pass: no code changed.
 
 ## Notes
 
