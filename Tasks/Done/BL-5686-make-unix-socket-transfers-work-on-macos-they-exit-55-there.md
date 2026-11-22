@@ -6,10 +6,10 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Networking.UnitLibrary/UnixSocketAddress.cs, Curl.Networking.UnitLibrary/TcpDialer.cs, Curl.Networking.UnitTests/TcpDialerUnixSocketAcceptTests.cs, Curl.Console.IntegrationTests/CurlUnixSocketIntegrationTests.cs]
-lane: no
+lane: yes
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-22
 ---
 # BL-5686 — Make --unix-socket transfers work on macOS (they exit 55 there, pass on Windows and Linux)
 
@@ -34,10 +34,10 @@ Observed: surl prints `Listening on http://localhost:8080/ over unix://surl.sock
 
 ## Acceptance criteria
 
-- [ ] On macOS in CI, an HTTP request over a Unix socket to a loopback server returns the body and exits 0, pinned by a test that runs on macOS, Linux and Windows.
-- [ ] No TCP-only socket option is set on a Unix-socket connection on any platform, pinned by a unit test of the options the dialer applies.
-- [ ] The Notes name the cause found on macOS (or, if the port was not at fault, show the port's exchange matching curl 8.22.0's on macOS and point at Surl).
-- [ ] `dotnet build` is clean and the fast tests pass on all three platforms in CI.
+- [x] On macOS in CI, an HTTP request over a Unix socket to a loopback server returns the body and exits 0, pinned by a test that runs on macOS, Linux and Windows.
+- [x] No TCP-only socket option is set on a Unix-socket connection on any platform, pinned by a unit test of the options the dialer applies.
+- [x] The Notes name the cause found on macOS (or, if the port was not at fault, show the port's exchange matching curl 8.22.0's on macOS and point at Surl).
+- [x] `dotnet build` is clean and the fast tests pass on all three platforms in CI.
 
 ## Notes
 - 2026-11-21 (lane 1): Read the dial path: `TcpDialer.DialUnixSocketAsync` sets no socket option at all (no NoDelay, no keep-alive, no QoS; `ApplySocketOptions` is only called from the TCP `DialAsync`), and the wrappers (`LocalBindingTcpDialer`, `SocketOpenerTcpDialer`, `SocketActionGatedTcpDialer`) and `TcpConnector.ConnectOverUnixSocketTracedAsync` pass straight through. So the first suspect (a TCP-only option) is ruled out by reading; the port sets none on any platform. A path is passed unchanged to `UnixDomainSocketEndPoint`, relative or not. Added Integration test `DialUnixSocketAsync_HttpRequestThenReply_CarriesTheRequestOutAndTheReplyBack` (Curl.Networking.IntegrationTests, passes on Windows; runs on macOS in CI) which pins the request/reply exchange over the dialer; committed.
@@ -49,6 +49,7 @@ Observed: surl prints `Listening on http://localhost:8080/ over unix://surl.sock
 - Interactive only. Remove `lane: no` once a macOS run has compared what the server's accept receives from upstream curl and from the port with the same socket path (relative `surl.sock` for both, e.g. `ktrace`/`dtruss` of `connect` and the accept's address length, or this unit test's result on macOS CI with a short relative path), so a lane knows what the port's client must change.
 - 2026-11-22 (interactive session): **Cause found on macOS: not the port.** A probe (a C# file-based app, one process per case, on branch `factory/bl-5686-probe`, run 45069983006 on macos-latest, Darwin 26.7.2) bound a .NET `Socket` listener to `s.sock` (9-byte address), `surl.sock` (12 bytes) and a long absolute path (84 bytes), and connected to each with the port's way (`ConnectAsync`), sync `Connect`, a bound .NET client, a `connect` with the full 106-byte `sockaddr_un` length, `/usr/bin/curl --unix-socket` and `nc -U`. With either short path the listener's `AcceptAsync` died with `ArgumentException: Destination is too short` in `SocketAsyncEventArgs.FinishOperationAccept` for **every** client, upstream curl and `nc` included; with the long path every client was accepted. On macOS an unbound client's peer address is a 16-byte `sockaddr_un` (`10 01 00...`, the same for the port and for curl), and .NET sizes the accept's address buffer to the listener's own serialized address (2 + path + NUL), so any listener path under 14 bytes overflows it (on Linux the unbound peer is 2 bytes, so it never does; the same run's Ubuntu job crashed only for a bound client with a longer name than the listener's). So the port's client presents exactly what curl's does; the crash is .NET's accept in the server, Surl's BL-1565 (workaround there: bind a path of at least 14 bytes, e.g. its absolute path, or accept without .NET's peer-address copy). Surl's run 44916418073 that saw curl pass must have used a socket path of 14 bytes or more. Nothing in `TcpDialer` changes.
 - Tests: `TcpDialerUnixSocketAcceptTests.DialUnixSocketAsync_WithCurlsDefaultTcpOptions_SetsNeitherNoDelayNorKeepAlive` (fast; dials with curl's default options, NoDelay and KeepAlive on, and reads the dialed socket's options through `PublishingSocketsTo`'s handle) pins criterion 2; `CurlUnixSocketIntegrationTests.RunAsync_UnixSocketToALoopbackHttpServer_ExitsZeroWithTheBody` (Curl.Console.IntegrationTests; `curl -sS --unix-socket <path> http://localhost:8080/hello.txt` exits 0 with the body) pins criterion 1, run on Windows, Linux and macOS by the `Integration tests` workflow (`integration.yml`, which runs every Integration test on all three, not only Curl.Mcp's). Both use an absolute temporary path over 14 bytes and say why. The existing dialer Integration test `DialUnixSocketAsync_HttpRequestThenReply_CarriesTheRequestOutAndTheReplyBack` already passed on macOS (Integration run 45066376291).
+- CI for commit 6007e7a1a5 (pushed to `verify/bl-5686` too, since work/dark-factory's waiting runs kept being replaced by newer pushes): `CI` run 45073210908 green on Windows, Linux and macOS (build and fast tests, quality gates); `Integration tests` run 45073210796: Curl.Console.IntegrationTests passed on all three (6/6 on Linux and macOS, 4 passed 2 skipped on Windows, the new test among the passed), so criterion 1 holds on macOS. The Networking Integration failures in that run (`DialAsync_ToAPortNothingListensOn_...`, `Fetch_ServerSendsHeadersThenStalls_...`, `AuthenticateAsClientAsync_WhenTheServerSendsAnIntermediate_...`) predate this task and are not Unix-socket tests. Branches `factory/bl-5686-probe` and `verify/bl-5686` can be deleted (asked of Stewart, not done here).
 
 ## Log
 
@@ -60,3 +61,4 @@ Observed: surl prints `Listening on http://localhost:8080/ over unix://surl.sock
 - 2026-11-21: Backlog -> Doing. Criteria at claim: edecd269 dbd35abe b7fc0636 b3b3bfe9.
 - 2026-11-21: Doing -> Backlog. Interactive only: the macOS cause needs a macOS run comparing the server's accept of upstream curl and of the port with the same socket path; lane test added
 - 2026-11-22: Backlog -> Doing. Criteria at claim: edecd269 dbd35abe b7fc0636 b3b3bfe9.
+- 2026-11-22: Doing -> Done. Not the port: on macOS a .NET listener on a socket path under 14 bytes dies on accept for every client, upstream curl included (probe run 45069983006); port pinned with option and end-to-end tests, green on all three OSes (CI 45073210908, Integration 45073210796). Server side is Surl BL-1565.
