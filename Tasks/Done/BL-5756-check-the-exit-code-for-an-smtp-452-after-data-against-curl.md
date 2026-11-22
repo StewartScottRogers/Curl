@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Smtp.UnitLibrary/SmtpMailTransaction.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5756 — Check the exit code for an SMTP 452 after DATA against curl 8.22.0
 
@@ -24,13 +24,16 @@ From Surly cookbook bug report `2026-11-22T1116-Curl-bug-report.md` (batch 11 of
 
 ## Acceptance criteria
 
-- [ ] The Notes record curl 8.22.0's exit code and stderr for a 452 after DATA.
-- [ ] The port gives the same, pinned by a test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The Notes record curl 8.22.0's exit code and stderr for a 452 after DATA.
+- [x] The port gives the same, pinned by a test.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Measured curl 8.22.0 (Schannel) with Record-CurlExchange.ps1 -Smtp -SmtpReply "DATADONE=452 4.2.2 Mailbox full": exit 8, stderr `curl: (8) Weird server reply`. The port already matched (SmtpMailTransaction returns WeirdServerReply for any non-250 after DATA); no production change. Pinned by a new 452 DataRow in SmtpProtocolHandlerUploadTests.ExecuteAsync_MessageAnsweredOtherThan250_IsExit8AndQuits. Surly's expectation of 55 does not match curl.
 
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T1116, finding 4 (check).
 - 2026-11-22: Backlog -> Doing. Criteria at claim: e230aa96 1a5977bd 3d836d5e.
+- 2026-11-22: Doing -> Done. 452 after DATA already exit 8 like curl 8.22.0; pinned by test
