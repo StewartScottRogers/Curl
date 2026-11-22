@@ -20,7 +20,7 @@ internal sealed class NatsSession(IConnection connection, ITransferContext conte
 
     private const string AuthorizationViolation = "Authorization Violation";
 
-    private readonly NatsWireReader reader = new(connection);
+    private NatsWireReader reader = new(connection);
 
     private long maxPayload = NatsServerInfo.DefaultMaxPayload;
 
@@ -28,14 +28,18 @@ internal sealed class NatsSession(IConnection connection, ITransferContext conte
 
     private int received;
 
+    /// <summary>Gets the connection the transfer runs over now: the TLS one once the session upgraded it, so the caller disposes the right one.</summary>
+    public IConnection Connection { get; private set; } = connection;
+
     /// <summary>Runs the transfer.</summary>
     /// <param name="request">What the URL and <c>-d</c> ask for.</param>
     /// <param name="isSecure">Whether the connection is TLS.</param>
+    /// <param name="upgrade">How to start TLS over the plain connection, or <see langword="null"/> when the connection is already what the scheme asks for.</param>
     /// <returns>The bytes written to the output.</returns>
     /// <exception cref="NatsException">The server refused, failed or broke the protocol.</exception>
-    public async ValueTask<long> RunAsync(NatsRequest request, bool isSecure)
+    public async ValueTask<long> RunAsync(NatsRequest request, bool isSecure, NatsTlsUpgrade? upgrade = null)
     {
-        NatsServerInfo info = NatsServerInfo.Parse(await reader.ReadLineAsync(context.CancellationToken).ConfigureAwait(false) ?? string.Empty);
+        NatsServerInfo info = NatsServerInfo.Parse(await ReadInfoLineAsync(upgrade).ConfigureAwait(false));
         if (!isSecure && info.TlsRequired)
         {
             throw new NatsException(CurlExitCode.SslConnectError, NatsMessages.TlsRequired);
@@ -54,6 +58,47 @@ internal sealed class NatsSession(IConnection connection, ITransferContext conte
         return request.Kind == NatsRequestKind.Subscribe
             ? written
             : throw new NatsException(CurlExitCode.GotNothing, NatsMessages.ClosedBeforeReply);
+    }
+
+    private async ValueTask<string> ReadInfoLineAsync(NatsTlsUpgrade? upgrade)
+    {
+        if (upgrade is null)
+        {
+            return await reader.ReadLineAsync(context.CancellationToken).ConfigureAwait(false) ?? string.Empty;
+        }
+
+        string? plainInfo = await ReadPlainInfoLineAsync(upgrade).ConfigureAwait(false);
+        await UpgradeAsync(upgrade).ConfigureAwait(false);
+        return plainInfo ?? await reader.ReadLineAsync(context.CancellationToken).ConfigureAwait(false) ?? string.Empty;
+    }
+
+    /// <summary>Reads the plain <c>INFO</c> line, or gives <see langword="null"/> when the server stays silent: it waits for the client's hello.</summary>
+    private async ValueTask<string?> ReadPlainInfoLineAsync(NatsTlsUpgrade upgrade)
+    {
+        using var silence = new CancellationTokenSource(upgrade.SilenceMeansHandshakeFirst, upgrade.Time);
+        using var either = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, silence.Token);
+        try
+        {
+            return await reader.ReadLineAsync(either.Token).ConfigureAwait(false) ?? string.Empty;
+        }
+        catch (OperationCanceledException) when (silence.IsCancellationRequested && !context.CancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
+    private async ValueTask UpgradeAsync(NatsTlsUpgrade upgrade)
+    {
+        ConnectResult secured = await upgrade.TlsProvider
+            .AuthenticateAsClientAsync(Connection, upgrade.Host, upgrade.Events, context.CancellationToken)
+            .ConfigureAwait(false);
+        if (secured.Connection is not { } secureConnection)
+        {
+            throw new NatsException(secured.ExitCode, secured.ErrorMessage!);
+        }
+
+        Connection = secureConnection;
+        reader = new NatsWireReader(secureConnection);
     }
 
     private static NatsException ErrorOf(string line)
@@ -132,7 +177,7 @@ internal sealed class NatsSession(IConnection connection, ITransferContext conte
 
     private async ValueTask SendAsync(byte[] bytes)
     {
-        await connection.WriteAsync(bytes, context.CancellationToken).ConfigureAwait(false);
-        await connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+        await Connection.WriteAsync(bytes, context.CancellationToken).ConfigureAwait(false);
+        await Connection.FlushAsync(context.CancellationToken).ConfigureAwait(false);
     }
 }

@@ -8,10 +8,15 @@ namespace Curl.Extended.Protocol.Nats;
 /// payload and a newline; with <c>-d</c> or <c>-T</c> it publishes the data or the uploaded file; with <c>?request</c> it publishes the
 /// data with a reply subject and writes the one reply.
 /// </summary>
-/// <param name="connector">Opens the connection, with TLS from the first byte for <c>natss</c>.</param>
+/// <param name="connector">Opens the connection, in plain text for <c>natss</c> when a TLS provider is given, else with TLS from the first byte.</param>
 /// <param name="newInbox">Gives a fresh reply subject for a request.</param>
-public sealed class NatsProtocolHandler(IConnector connector, Func<string> newInbox) : IProtocolHandler
+/// <param name="tlsProvider">Starts TLS over the plain connection for <c>natss</c>; without one the connector opens TLS from the first byte.</param>
+/// <param name="timeProvider">Times how long a server may stay silent before it is taken for a <c>handshake_first</c> one; the system clock when absent.</param>
+public sealed class NatsProtocolHandler(IConnector connector, Func<string> newInbox, ITlsProvider? tlsProvider = null, TimeProvider? timeProvider = null) : IProtocolHandler
 {
+    /// <summary>How long a <c>natss</c> server may stay silent after the connection opens before the client starts TLS, taking it for a <c>handshake_first</c> server.</summary>
+    public static readonly TimeSpan SilenceMeansHandshakeFirst = TimeSpan.FromSeconds(2);
+
     /// <summary>The port a URL without one connects to, the NATS server's default.</summary>
     public const int DefaultPort = 4222;
 
@@ -52,14 +57,8 @@ public sealed class NatsProtocolHandler(IConnector connector, Func<string> newIn
             NatsSubject.RefuseWildcardToPublish(request.Subject);
         }
 
-        CurlUrl url = context.Url;
-        bool isSecure = string.Equals(url.Scheme, SecureScheme, StringComparison.OrdinalIgnoreCase);
-        var target = new ConnectTarget(url.IdnHost, url.Port >= 0 ? url.Port : DefaultPort, isSecure)
-        {
-            Proxy = context.Proxy,
-            Events = context.Events,
-            DiagnosticLog = context.DiagnosticLog,
-        };
+        bool isSecure = string.Equals(context.Url.Scheme, SecureScheme, StringComparison.OrdinalIgnoreCase);
+        ConnectTarget target = TargetFor(context, isSecure);
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
@@ -67,10 +66,27 @@ public sealed class NatsProtocolHandler(IConnector connector, Func<string> newIn
         }
 
         context.Progress.ReportTransferStarted();
-        TransferResult result = await ExchangeAsync(new NatsSession(connection, context, newInbox), request, isSecure).ConfigureAwait(false);
-        await connection.DisposeAsync().ConfigureAwait(false);
+        var session = new NatsSession(connection, context, newInbox);
+        NatsTlsUpgrade? upgrade = isSecure ? UpgradeFor(context) : null;
+        TransferResult result = await ExchangeAsync(session, request, isSecure, upgrade).ConfigureAwait(false);
+        await session.Connection.DisposeAsync().ConfigureAwait(false);
         return result;
     }
+
+    private ConnectTarget TargetFor(ITransferContext context, bool isSecure)
+    {
+        CurlUrl url = context.Url;
+        return new ConnectTarget(url.IdnHost, url.Port >= 0 ? url.Port : DefaultPort, isSecure && tlsProvider is null)
+        {
+            Proxy = context.Proxy,
+            Events = context.Events,
+            DiagnosticLog = context.DiagnosticLog,
+        };
+    }
+
+    private NatsTlsUpgrade? UpgradeFor(ITransferContext context) => tlsProvider is null
+        ? null
+        : new NatsTlsUpgrade(tlsProvider, context.Url.IdnHost, context.Events, SilenceMeansHandshakeFirst, timeProvider ?? TimeProvider.System);
 
     /// <summary>
     /// Gives the payload to publish: <c>-d</c>'s data when there is any, otherwise the whole
@@ -96,11 +112,11 @@ public sealed class NatsProtocolHandler(IConnector connector, Func<string> newIn
         return body.ToArray();
     }
 
-    private static async ValueTask<TransferResult> ExchangeAsync(NatsSession session, NatsRequest request, bool isSecure)
+    private static async ValueTask<TransferResult> ExchangeAsync(NatsSession session, NatsRequest request, bool isSecure, NatsTlsUpgrade? upgrade)
     {
         try
         {
-            return TransferResult.Success(await session.RunAsync(request, isSecure).ConfigureAwait(false));
+            return TransferResult.Success(await session.RunAsync(request, isSecure, upgrade).ConfigureAwait(false));
         }
         catch (NatsException failure)
         {

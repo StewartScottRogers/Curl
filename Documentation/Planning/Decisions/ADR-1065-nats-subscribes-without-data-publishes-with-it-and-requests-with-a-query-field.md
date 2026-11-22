@@ -20,9 +20,16 @@ CRLF-ended text lines with length-prefixed payloads, so the wire code is written
   refuses them as any unknown scheme: exit 1, `Protocol "nats" not supported`.
 - The URL's path, percent-decoded and without its leading `/`, is the subject; an empty one is exit 3,
   and one holding whitespace or an empty token (`a..b`) is exit 3, as the specification's subject rules.
-- `natss://` is TLS from the first byte, through curl's connector and its TLS options: the server must
-  run with `tls { handshake_first: true }` (NATS Server 2.10 and later). `IConnection` has no way to start
-  TLS over an open connection, which the classic INFO-then-upgrade flow would need. A `nats://` URL whose
+- `natss://` is TLS, through curl's TLS provider and its TLS options, in both modes a NATS server has
+  (amended by BL-5750, decided by Claude under Stewart's delegation; the first version said `IConnection`
+  could not start TLS over an open connection, which STARTTLS and `AUTH TLS` in this codebase disprove).
+  The connection opens in plain text; the client sends nothing and waits up to 2 seconds
+  (`NatsProtocolHandler.SilenceMeansHandshakeFirst`) for the server's first line. A plain `INFO` line
+  is the standard server: the client starts TLS, then sends CONNECT over it, so no credential goes out in
+  clear. Silence is a server set to `tls { handshake_first: true }`: the client starts TLS at once and reads
+  `INFO` over it. The 2 seconds only cost time against `handshake_first` servers; a standard server that
+  needs longer than 2 seconds to send INFO is not supported. Without a TLS provider in the handler
+  (tests) the connector opens TLS from the first byte, as before. A `nats://` URL whose
   server's INFO says `tls_required` is exit 35 `NATS server requires TLS; use natss://`.
 - The client sends CONNECT with `verbose` and `pedantic` off, `tls_required` as the scheme, `name` and
   `lang` `curl`, `protocol` 1; `-u user:password` (or the URL's user information) gives `user` and `pass`,

@@ -28,13 +28,14 @@ From Surly cookbook bug report `2026-11-22T0805-Curl-bug-report.md` (CI on ubunt
 
 ## Acceptance criteria
 
-- [ ] Against a NATS test double that sends a plain `INFO` with `tls_required` first, `natss://` upgrades to TLS after reading it and logs in; a wrong password gives exit 67 `NATS server refused the login: Authorization Violation`; the bytes sent before TLS hold no `CONNECT` and no credential. Pinned by tests.
-- [ ] Against a test double that waits for a ClientHello (handshake_first), `natss://` behaves as today, pinned by the existing tests.
-- [ ] The repro gives exit 67 on Linux, Windows and macOS (CI or a cookbook run; the Notes record which), and the Notes say why Windows and macOS passed before.
-- [ ] ADR-1065 is amended and `--extended-help` / `--ai-help` describe both TLS modes.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Against a NATS test double that sends a plain `INFO` with `tls_required` first, `natss://` upgrades to TLS after reading it and logs in; a wrong password gives exit 67 `NATS server refused the login: Authorization Violation`; the bytes sent before TLS hold no `CONNECT` and no credential. Pinned by tests.
+- [x] Against a test double that waits for a ClientHello (handshake_first), `natss://` behaves as today, pinned by the existing tests.
+- [x] The repro gives exit 67 on Linux, Windows and macOS (CI or a cookbook run; the Notes record which), and the Notes say why Windows and macOS passed before.
+- [x] ADR-1065 is amended and `--extended-help` / `--ai-help` describe both TLS modes.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
 
 ## Log
 
