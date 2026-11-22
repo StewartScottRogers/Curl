@@ -4,8 +4,8 @@ title: Make a Curl.Api body to mcp://, mcps:// and mcp+stdio: call the tool, not
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Extended.Protocol.McpClient.UnitLibrary]
+depends-on: [BL-5753]
+touches: [Curl.Extended.Protocol.McpClient.UnitLibrary, Curl.Api/RequestBodies/UploadSchemes.cs, Curl.Api.UnitTests/RequestBodies/UploadSchemeBodyTests.cs]
 requirement: none
 created: 2026-11-22
 completed:
@@ -34,3 +34,8 @@ From Surly cookbook bug report `2026-11-22T1116-Curl-bug-report.md` (batch 11 of
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T1116, finding 2.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: dc5fc37c 2a9c02b2 3d836d5e.
+
+## Notes
+
+- Run 1 (no edits): the fix is a one-line addition of "mcp", "mcps", "mcp+stdio" to `Curl.Api/RequestBodies/UploadSchemes.cs` (BL-5611's approach) plus DataRows in `UploadSchemeBodyTests.cs`; the McpClient library itself needs no change. BL-5753 (Doing) touches `Curl.Api/RequestBodies`, so this task waits for it (depends-on BL-5753).
+- 2026-11-22: Doing -> Backlog. Needs Curl.Api/RequestBodies/UploadSchemes.cs, which BL-5753 holds; waits for BL-5753.
