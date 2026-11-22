@@ -35,3 +35,4 @@ While a red CI run waits only on interactive-only tasks, the coordinator's tab r
 ## Log
 
 - 2026-11-22: Created.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 4f669472 af88ed69 51a52ae7 49318181.
