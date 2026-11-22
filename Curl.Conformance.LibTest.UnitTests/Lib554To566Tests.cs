@@ -306,7 +306,7 @@ public sealed class Lib560And564Tests
     }
 
     [TestMethod]
-    public async Task RunAsync_Lib564AddHandleFails_SaysNothing()
+    public async Task RunAsync_Lib564AddHandleFails_ReportsOnlyTheFailedCallAndExits32()
     {
         var engine = new FakeCurlEngine();
         engine.Multi.AddResult = Curl.Api.Codes.CurlMultiCode.BadEasyHandle;
@@ -314,8 +314,8 @@ public sealed class Lib560And564Tests
 
         LibTestResult result = await new Lib564(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
-        Assert.AreNotEqual(0, result.ExitCode);
-        Assert.IsFalse(run.Error.ToString().Contains("Start at URL", StringComparison.Ordinal));
+        Assert.AreEqual(32, result.ExitCode);
+        Assert.AreEqual("Lib564.cs:67 curl_multi_add_handle() failed, with code 2 (Invalid easy handle)\n", run.Error.ToString());
     }
 
     [TestMethod]

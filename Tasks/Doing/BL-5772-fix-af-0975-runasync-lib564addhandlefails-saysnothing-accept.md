@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The test now asserts exit code 32 and the exact stderr line (the old name "SaysNothing" was false: Lib564 reports the failed call on stderr, as upstream lib564 does), so it is renamed RunAsync_Lib564AddHandleFails_ReportsOnlyTheFailedCallAndExits32. Build clean, fast tests green.
 
 ## Log
 
