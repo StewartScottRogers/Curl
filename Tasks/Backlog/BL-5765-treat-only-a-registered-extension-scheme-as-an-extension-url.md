@@ -43,10 +43,10 @@ The shift-end review of 2026-11-22 (ADR-0710) found this in the merge `dfb9516dd
 ## Notes
 
 - Done: `IsExtensionUrl` now needs an explicit scheme (`ExplicitSchemeOf`: RFC 3986 characters then `://`, or a `+` in the scheme as `mcp+stdio:`), so `localhost:8080/x`, `user:pw@host/` and `[::1]:8080/` are HTTP. Engine quality gates pass; fast tests green.
-- Unmet, split out: the `htp://host/` criterion (exit 1, callback never read). Syntax cannot tell `htp://` from `nats://`; only the extension handlers' registered schemes can, and the engine sees them only inside `ManagedCurlEngine`. Filed as BL-5768. That criterion moved to BL-5768.
+- Unmet, split out: the `htp://host/` criterion (exit 1, callback never read). Syntax cannot tell `htp://` from `nats://`; only the extension handlers' registered schemes can, and the engine sees them only inside `ManagedCurlEngine`. Filed as BL-5770. That criterion moved to BL-5770.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 331bd101 e2736da1 20ec790b bcef008d da8c1361.
-- 2026-11-22: Doing -> Backlog. Code done and committed; only the htp:// criterion (moved to BL-5768) must be dropped from the criteria before Done
+- 2026-11-22: Doing -> Backlog. Code done and committed; only the htp:// criterion (moved to BL-5770) must be dropped from the criteria before Done

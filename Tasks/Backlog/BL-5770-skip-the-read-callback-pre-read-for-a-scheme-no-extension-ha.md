@@ -1,5 +1,5 @@
 ---
-id: BL-5768
+id: BL-5770
 title: Skip the read-callback pre-read for a scheme no extension handler serves so htp:// never runs the callback
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-22
 completed:
 ---
-# BL-5768 — Skip the read-callback pre-read for a scheme no extension handler serves so htp:// never runs the callback
+# BL-5770 — Skip the read-callback pre-read for a scheme no extension handler serves so htp:// never runs the callback
 
 ## Goal
 
