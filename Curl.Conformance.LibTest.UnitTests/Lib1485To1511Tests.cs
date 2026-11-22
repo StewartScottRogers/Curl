@@ -282,19 +282,23 @@ public sealed class Lib1485To1511Tests
     }
 
     [TestMethod]
-    [DataRow(1502)]
-    [DataRow(1503)]
-    [DataRow(1504)]
-    [DataRow(1505)]
-    public async Task Lib1502_RunsTheDuplicateAndCleansUpInTheCasesOrder(int testNumber)
+    [DataRow(1502, "easy multi easy")]
+    [DataRow(1503, "easy remove multi easy")]
+    [DataRow(1504, "easy easy multi")]
+    [DataRow(1505, "easy remove easy multi")]
+    public async Task Lib1502_RunsTheDuplicateAndCleansUpInTheCasesOrder(int testNumber, string expectedEvents)
     {
-        var engine = new FakeCurlEngine();
+        var events = new List<string>();
+        var engine = new FakeCurlEngine { EasyDisposing = () => events.Add("easy") };
+        engine.Multi.Removing = () => events.Add("remove");
+        engine.Multi.Disposing = () => events.Add("multi");
         engine.Multi.PerformResults.Enqueue((CurlMultiCode.Ok, 1));
         var run = new PortRun(engine, testNumber, "http://google.com:8990/1502", "8990", "127.0.0.1");
 
         LibTestResult result = await new Lib1502(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual(0, result.ExitCode);
+        Assert.AreEqual(expectedEvents, string.Join(' ', events), "the original is cleaned up first, then the case's own removal and clean-up order");
         Assert.AreEqual("http://google.com:8990/1502", engine.Multi.Added!.Options.Network.Url);
         Assert.AreEqual(string.Empty, run.Error.ToString());
         Assert.AreEqual("lib1502", new Lib1502(TimeProvider.System).ProgramName);

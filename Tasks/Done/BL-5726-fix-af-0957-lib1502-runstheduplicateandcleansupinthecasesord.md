@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitTests/Lib1485To1511Tests.cs]
+touches: [Curl.Conformance.LibTest.UnitTests/Lib1485To1511Tests.cs, Curl.Conformance.LibTest.UnitTests/FakeCurlEngine.cs, Curl.Conformance.LibTest.UnitTests/FakeMultiTransfer.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5726 — Fix AF-0957: Lib1502_RunsTheDuplicateAndCleansUpInTheCasesOrder never checks the cleanup order its name promises
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The test now records remove, easy-dispose and multi-dispose events through new Removing/Disposing hooks on FakeMultiTransfer and EasyDisposing on FakeCurlEngine (touches widened; no other Doing task holds them) and pins each case's order. Test-only change; no production code, so no quality run.
 
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-21: Doing -> Done. Order of removal and clean-up pinned per case
