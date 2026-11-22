@@ -47,3 +47,4 @@ The shift-end review of 2026-11-22 (ADR-0710) found this in the merge `dfb9516dd
 ## Log
 
 - 2026-11-22: Created.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: b22b9dcb 46569a08 4a1054fd 5457bf5f af89187f e58cc7bf.
