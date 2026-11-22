@@ -3,12 +3,12 @@ id: AF-0948
 title: Surviving mutant: an SMTP address that starts with CR or LF can be sent instead of refused (HasLineBreak >= 0 -> > 0)
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Smtp.UnitLibrary/SmtpMailTransaction.cs:HasLineBreak-ge:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Smtp.UnitLibrary/SmtpMailTransaction.cs:139:>=
-task: none
-tasks:
+task: BL-5717
+tasks: BL-5717
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md

@@ -3,12 +3,12 @@ id: AF-0958
 title: Lib1977_WritesEachTransfersEffectiveUrl counts lines starting 'effective URL: ' but never checks a URL
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1964To1977Tests.cs:Lib1977_WritesEachTransfersEffectiveUrl:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5727
+tasks: BL-5727
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md

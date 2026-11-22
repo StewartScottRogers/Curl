@@ -3,12 +3,12 @@ id: AF-0953
 title: Surviving mutant: the lib1507 port can abort a loop at exactly its hang limit (> -> >=)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1507.cs:LoopAsync-gt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1507.cs:95:>
-task: none
-tasks:
+task: BL-5722
+tasks: BL-5722
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md

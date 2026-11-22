@@ -3,12 +3,12 @@ id: AF-0955
 title: Surviving mutant: a connection reset can be taken for the peer's FIN (HasUnreadEnd catch returns true)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/StreamConnection.cs:HasUnreadEnd-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/StreamConnection.cs:106:false
-task: none
-tasks:
+task: BL-5724
+tasks: BL-5724
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md

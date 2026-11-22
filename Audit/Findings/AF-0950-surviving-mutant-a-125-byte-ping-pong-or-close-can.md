@@ -3,12 +3,12 @@ id: AF-0950
 title: Surviving mutant: a 125-byte ping, pong or close can be refused as too large (payloadLength > 125 -> >= 125)
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.WebSocket.UnitLibrary/WsFrameEncoder.cs:IsControlPayloadTooLong-gt:surviving-mutant
 reproduction: mutation Curl.WebSocket.UnitLibrary/WsFrameEncoder.cs:43:>
-task: none
-tasks:
+task: BL-5719
+tasks: BL-5719
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md

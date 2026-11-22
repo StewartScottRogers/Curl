@@ -3,12 +3,12 @@ id: AF-0954
 title: Surviving mutant: a chain can be refused as relying on an unsent intermediate when no peer certificates were captured
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:RelyingOnAnIntermediateTheServerDidNotSend-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:343:>
-task: none
-tasks:
+task: BL-5723
+tasks: BL-5723
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md

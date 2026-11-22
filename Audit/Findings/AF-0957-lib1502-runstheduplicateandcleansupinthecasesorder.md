@@ -3,12 +3,12 @@ id: AF-0957
 title: Lib1502_RunsTheDuplicateAndCleansUpInTheCasesOrder never checks the cleanup order its name promises
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1485To1511Tests.cs:Lib1502_RunsTheDuplicateAndCleansUpInTheCasesOrder:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-5726
+tasks: BL-5726
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md

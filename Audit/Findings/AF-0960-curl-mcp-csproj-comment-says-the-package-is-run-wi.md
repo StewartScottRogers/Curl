@@ -3,12 +3,12 @@ id: AF-0960
 title: Curl.Mcp.csproj comment says the package is run with 'dnx Curl.Mcp'; its PackageId is Surly.Curl.Mcp
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:Curl.Mcp/Curl.Mcp.csproj:PackageComment:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-5729
+tasks: BL-5729
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md

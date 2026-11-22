@@ -3,12 +3,12 @@ id: AF-0959
 title: README.md tells readers to run the MCP server with 'dnx Curl.Mcp', but the package ID is Surly.Curl.Mcp
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: truthfulness:README.md:Curl.Mcp-dnx-command:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-5728
+tasks: BL-5728
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md

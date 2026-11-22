@@ -3,12 +3,12 @@ id: AF-0961
 title: CI red 227 min (run 44941565490 onward): Pack Curl.Mcp failures left unfixed, four failed runs have no filed/covered trace line
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: process:logs:pack-curl-mcp-spell-2026-11-21T19-47:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-5730
+tasks: BL-5730
 found: 2026-11-21
 found-at: 8d41979abc77036a1cf5ff183027379b16dc1eea
 scorecard: 2026-11-21_1740.md
