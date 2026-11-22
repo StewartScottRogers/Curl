@@ -53,6 +53,18 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
         }
     }
 
+    /// <summary>Whether body bytes have been delivered and not yet read (ADR-1334): a transfer that failed after them still hands them to the reader before its error.</summary>
+    public bool HasUnreadBody
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _buffered > 0;
+            }
+        }
+    }
+
     /// <summary>Takes one delivery of body bytes; a <see cref="WriteCallback"/>.</summary>
     /// <param name="data">The bytes received, copied before the call returns.</param>
     /// <returns>

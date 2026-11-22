@@ -48,6 +48,7 @@ public sealed class UploadSchemeBodyTests
     [DataRow("amqp1s://h/q")]
     [DataRow("mqtt5://h/t")]
     [DataRow("mqtt5s://h/t")]
+    [DataRow("mqtt5+ws://h/t")]
     [DataRow("stomp://h/q")]
     [DataRow("stomps://h/q")]
     [DataRow("nats://h/s")]
@@ -91,6 +92,25 @@ public sealed class UploadSchemeBodyTests
         Assert.AreEqual(5, options.Transfer.InFileSize);
         Assert.IsFalse(options.Http.Post);
         CollectionAssert.AreEqual("world"u8.ToArray(), easy.Uploads.Single());
+    }
+
+    [TestMethod]
+    [DataRow("mqtt5://h/t")]
+    [DataRow("mqtt5s://h/t")]
+    [DataRow("mqtt5+ws://h/t")]
+    public async Task SendAsync_PostedBytesAndStreamBodiesToMqtt5_PublishAsAnUpload(string url)
+    {
+        UploadingEasyTransfer bytes = await SendAsync(HttpMethod.Post, url, CurlContent.FromBytes("21.5"u8.ToArray()));
+        using ScriptedStream stream = new("21.5"u8.ToArray());
+        UploadingEasyTransfer streamed = await SendAsync(HttpMethod.Post, url, CurlContent.FromStream(stream));
+
+        foreach (UploadingEasyTransfer easy in new[] { bytes, streamed })
+        {
+            Assert.IsTrue(easy.PerformedOptions!.Transfer.Upload);
+            Assert.IsFalse(easy.PerformedOptions.Http.Post);
+            Assert.IsNull(easy.PerformedOptions.Http.PostFields);
+            CollectionAssert.AreEqual("21.5"u8.ToArray(), easy.Uploads.Single());
+        }
     }
 
     [TestMethod]

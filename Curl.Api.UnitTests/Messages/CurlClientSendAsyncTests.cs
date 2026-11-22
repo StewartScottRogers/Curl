@@ -24,13 +24,14 @@ public sealed class CurlClientSendAsyncTests
     {
         CurlRequest request = new(HttpMethod.Get, "http://example/a")
         {
-            Headers = [new("X-One", "1"), new("X-Empty", "")],
+            Headers = [new("X-One", "1"), new("X-Gone", "")],
+            EmptyHeaders = ["X-Empty"],
             RemovedHeaders = ["Accept", "Host"],
         };
 
         (_, ScriptedEasyTransfer easy) = await SendAsync(request);
 
-        CollectionAssert.AreEqual(new[] { "X-One: 1", "X-Empty;", "Accept:", "Host:" }, Performed(easy).Http.HttpHeaders.ToArray());
+        CollectionAssert.AreEqual(new[] { "X-One: 1", "X-Gone:", "X-Empty;", "Accept:", "Host:" }, Performed(easy).Http.HttpHeaders.ToArray());
     }
 
     [TestMethod]
@@ -40,12 +41,13 @@ public sealed class CurlClientSendAsyncTests
         {
             Headers = [new("X-One", "1"), new("x-one", "2"), new("Accept", "")],
         };
+        // An empty value removes the header: the line is Name:, as curl -H "Name:" (ADR-1335).
 
         (_, ScriptedEasyTransfer easy) = await SendAsync(request);
 
         EasyOptions options = Performed(easy);
         Assert.AreEqual("http://example/a", options.Network.Url);
-        CollectionAssert.AreEqual(new[] { "X-One: 1", "x-one: 2", "Accept;" }, options.Http.HttpHeaders.ToArray());
+        CollectionAssert.AreEqual(new[] { "X-One: 1", "x-one: 2", "Accept:" }, options.Http.HttpHeaders.ToArray());
         Assert.AreEqual("agent/1", options.Http.UserAgent);
     }
 
