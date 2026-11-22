@@ -58,8 +58,16 @@ public sealed class ServerCertificateVerificationUnsentIntermediateTests
         Assert.IsNull(failure);
     }
 
+    [TestMethod]
+    public void Judge_NoPeerCertificatesCapturedInTheOpenSslBuild_DoesNotRefuseAsAnUnsentIntermediate()
+    {
+        var (_, failure) = JudgeSending(sendIntermediate: false, matchesSchannelBuild: false, insecure: false, sendNothing: true);
+
+        Assert.IsNull(failure);
+    }
+
     private static (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) JudgeSending(
-        bool sendIntermediate, bool matchesSchannelBuild, bool insecure, bool anchorsListIntermediate = false)
+        bool sendIntermediate, bool matchesSchannelBuild, bool insecure, bool anchorsListIntermediate = false, bool sendNothing = false)
     {
         using var rootKey = RSA.Create(2048);
         var rootRequest = new CertificateRequest("CN=Unsent Root", rootKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -88,7 +96,7 @@ public sealed class ServerCertificateVerificationUnsentIntermediateTests
         Assert.IsTrue(chain.Build(leaf));
         Assert.AreEqual(3, chain.ChainElements.Count);
 
-        ReadOnlyMemory<byte>[] sent = sendIntermediate ? [leaf.RawData, intermediate.RawData] : [leaf.RawData];
+        ReadOnlyMemory<byte>[] sent = sendNothing ? [] : sendIntermediate ? [leaf.RawData, intermediate.RawData] : [leaf.RawData];
         var verification = new ServerCertificateVerification(new TlsClientOptions(Insecure: insecure), matchesSchannelBuild, TimeProvider.System);
 
         return verification.Judge(SslPolicyErrors.None, chain, "unsent.test", [], null, sent);
