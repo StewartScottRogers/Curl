@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ProtocolHandler.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5774 — Fix AF-0977: Surviving mutant: an amqp:// URL with explicit port 0 can be dialled on the default port 5672 (>= -> >)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ProtocolHandler.cs line 41`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Extended.Protocol.Amqp0.UnitLibrary/Client/Amqp0ProtocolHandler.cs line 41`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added DataRows `amqp://broker:0/v/q` and `amqps://broker:0/v/q` (port 0) to `ExecuteAsync_Scheme_ConnectsWithTlsAndPortFromConnector`; with `>= 0` changed to `> 0` those two rows fail (verified by hand, reverted), so they kill the mutant. Production code unchanged. Full fast tests of the Amqp0 project pass (130).
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b79585e4 9742157d.
+- 2026-11-22: Doing -> Done. Port-0 test rows kill the >= -> > mutant
