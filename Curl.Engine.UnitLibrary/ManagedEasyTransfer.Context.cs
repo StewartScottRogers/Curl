@@ -248,9 +248,12 @@ internal sealed partial class ManagedEasyTransfer
         [.. UploadFlagNames.Where((_, bit) => (uploadFlags & (1 << bit)) != 0)];
 
     /// <summary>
-    /// The <c>CURLOPT_POSTFIELDS</c> an MQTT transfer publishes, cut to <c>CURLOPT_POSTFIELDSIZE</c> when that is not
-    /// negative and shorter (an empty set of fields is an empty payload), or <see langword="null" /> to subscribe
-    /// instead; only an <c>mqtt</c> or <c>mqtts</c> URL reads it, as libcurl's <c>mqtt_do</c> does (upstream test1916, BL-2673).
+    /// The post data an MQTT or extension URL's handler reads: the <c>CURLOPT_POSTFIELDS</c>, cut to
+    /// <c>CURLOPT_POSTFIELDSIZE</c> when that is not negative and shorter (an empty set of fields is an empty payload),
+    /// or, with no fields, a <c>CURLOPT_READFUNCTION</c> post read up front; <see langword="null" /> (an MQTT transfer
+    /// subscribes instead) for any other URL. An MQTT URL (<c>mqtt</c>, <c>mqtts</c> and the other MQTT schemes) reads it
+    /// as libcurl's <c>mqtt_do</c> does (upstream test1916, BL-2673), and every extension URL, a scheme curl itself
+    /// does not serve, is given it too (BL-5754, BL-5758, ADR-1336, ADR-1337).
     /// </summary>
     /// <param name="options">The handle's options.</param>
     /// <param name="isServedScheme">Whether some handler serves a scheme; <see langword="null" /> takes every explicit non-curl scheme as served.</param>
