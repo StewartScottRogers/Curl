@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Api/Messages/CurlRequestOptions.cs]
+touches: [Curl.Api/Messages/CurlRequestOptions.cs, Curl.Api/Messages/CurlRequest.cs, Curl.Api/README.md, Curl.Api.UnitTests/Messages]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5747 — Remove a Curl.Api request header whose value is empty, as curl -H "Name:" does
 
@@ -24,13 +24,16 @@ From Surly cookbook bug report `2026-11-22T0726-Curl-bug-report.md` (batch 10 of
 
 ## Acceptance criteria
 
-- [ ] A `Curl.Api` request with a header whose value is empty sends no such header, pinned by a test of the request bytes; `RemovedHeaders` still works.
-- [ ] The way to send an empty header on purpose is documented on the property and in the README.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A `Curl.Api` request with a header whose value is empty sends no such header, pinned by a test of the request bytes; `RemovedHeaders` still works.
+- [x] The way to send an empty header on purpose is documented on the property and in the README.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Decided: empty `Headers` value is `Name:` (removes); new `CurlRequest.EmptyHeaders` sends `Name;`. ADR-1334. Widened touches to CurlRequest.cs, README, tests (no other Doing task holds them). Curl.Api quality run: 0 failing members.
 
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T0726, finding 3.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: eecfb519 b6e24e06 3d836d5e.
+- 2026-11-22: Doing -> Done. Empty header value removes; EmptyHeaders sends empty

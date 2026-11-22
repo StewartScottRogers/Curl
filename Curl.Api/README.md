@@ -318,6 +318,9 @@ format. Give clients one `CurlStores` through `CurlClientOptions.Stores` to shar
   converts them.
 - A non-2xx status is a normal `CurlResponse`; nothing throws for it.
 - `Headers` is an ordered list keeping the casing and duplicates received, not a header table.
+- A request header with an empty value removes that header, as `curl -H "Name:"` does; to send a
+  header with no value on purpose, name it in `CurlRequest.EmptyHeaders` (`curl -H "Name;"`), and
+  `RemovedHeaders` removes a default header libcurl adds.
 - The body stream is async-only: a synchronous `Read` throws `NotSupportedException`.
 - There is no `HttpClient.Timeout`; use `CurlClientOptions.Timeout` and `ConnectTimeout`.
 

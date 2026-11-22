@@ -37,9 +37,9 @@ internal static class CurlRequestOptions
     private static bool IsHttpPutUpload(CurlRequest request) =>
         request.Method == HttpMethod.Put && request.Body is not CurlMultipartContent;
 
-    /// <summary>The <c>CURLOPT_HTTPHEADER</c> lines of the request: its fields, then an empty line for each removed header.</summary>
+    /// <summary>The <c>CURLOPT_HTTPHEADER</c> lines of the request: its fields, a <c>Name;</c> line for each empty header, then a <c>Name:</c> line for each removed header.</summary>
     private static string[] HeaderLines(CurlRequest request) =>
-        [.. request.Headers.Select(HeaderLine), .. request.RemovedHeaders.Select(name => $"{name}:")];
+        [.. request.Headers.Select(HeaderLine), .. request.EmptyHeaders.Select(name => $"{name};"), .. request.RemovedHeaders.Select(name => $"{name}:")];
 
     /// <summary>The body to apply: the request's, an empty one for a post with none, or <see langword="null"/> for none.</summary>
     private static CurlContent? BodyToApply(CurlRequest request, bool post, bool upload) =>
@@ -70,7 +70,7 @@ internal static class CurlRequestOptions
     private static bool IsImpliedBy(HttpMethod method, bool post) =>
         method == HttpMethod.Head || method == (post ? HttpMethod.Post : HttpMethod.Get);
 
-    /// <summary>The <c>CURLOPT_HTTPHEADER</c> line of a field: <c>Name: value</c>, or <c>Name;</c> for an empty value, which is how libcurl is told to send a header with no value.</summary>
+    /// <summary>The <c>CURLOPT_HTTPHEADER</c> line of a field: <c>Name: value</c>, or <c>Name:</c> for an empty value, which removes the header as <c>curl -H "Name:"</c> does (ADR-1334).</summary>
     private static string HeaderLine(KeyValuePair<string, string> field) =>
-        field.Value.Length == 0 ? $"{field.Key};" : $"{field.Key}: {field.Value}";
+        field.Value.Length == 0 ? $"{field.Key}:" : $"{field.Key}: {field.Value}";
 }
