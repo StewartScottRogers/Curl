@@ -49,3 +49,4 @@ The shift-end review of 2026-11-22 (ADR-0710) found this in the merge `dfb9516dd
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 331bd101 e2736da1 20ec790b bcef008d da8c1361.
+- 2026-11-22: Doing -> Backlog. Code done and committed; only the htp:// criterion (moved to BL-5768) must be dropped from the criteria before Done
