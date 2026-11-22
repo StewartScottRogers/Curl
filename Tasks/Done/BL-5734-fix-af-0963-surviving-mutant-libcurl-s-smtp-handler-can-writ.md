@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EngineComposition.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5734 — Fix AF-0963: Surviving mutant: libcurl's SMTP handler can write --trace-config smtp state lines by default (tracesSmtp = false -> true)
 
@@ -32,12 +32,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EngineComposition.cs line 146`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] With the mutant the evidence describes applied by hand at `Curl.Engine.UnitLibrary/EngineComposition.cs line 146`, at least one fast test fails, and with it reverted they all pass; Notes name the test that kills it.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The mutant (`tracesSmtp = true` at EngineComposition.cs:146) is killed by the new `EngineCompositionSmtpTraceTests.CreateProtocolHandlers_SmtpTransferWithoutTheTraceArgument_WritesNoSmtpLines`, which builds the handlers without the argument and expects no `[SMTP]` info lines. Applied by hand: that test failed; reverted: all 3140 Engine fast tests pass. No production change, so no quality run. The test lives in Curl.Engine.UnitTests (outside `touches`, a test-only addition).
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 7cb71a48 9742157d.
+- 2026-11-22: Doing -> Done. Mutant killed by new EngineCompositionSmtpTraceTests test
