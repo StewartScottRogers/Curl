@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoUpgrade.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5736 — Fix AF-0965: Surviving mutant: a Socket.IO upgrade reply that starts with an empty line can be read on instead of failing with exit 8 (IndexOf(HeadEnd) < 0 -> <= 0)
 
@@ -45,3 +45,4 @@ Killed by ReadReplyAsync_AReplyThatDoesNotUpgrade_Fails (new DataRow "
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 38662506 9742157d.
+- 2026-11-22: Doing -> Done. Mutant killed by new DataRow in SocketIoUpgradeTests
