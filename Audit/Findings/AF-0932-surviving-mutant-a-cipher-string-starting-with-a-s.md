@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_1740.md | not re-audited | Ran the -Site command: outcome site-missing. OpenSslCipherString.cs:195 is now inside ReadSelection, and ApplyNextRule has no '<' site left. Not re-audited.
+
 ## Log
 
 - 2026-11-21: filed proposed.

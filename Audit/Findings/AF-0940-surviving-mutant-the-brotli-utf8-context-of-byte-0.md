@@ -3,8 +3,8 @@ id: AF-0940
 title: Surviving mutant: the Brotli UTF8 context of byte 0xC0 can be wrong, mis-decoding output
 auditor: quality
 severity: High
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-21_1740.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Extension.CompressionDictionary.UnitLibrary/Brotli/BrotliLiteralContext.cs:BuildUtf8LastByte-ge:surviving-mutant
 reproduction: mutation Curl.Extension.CompressionDictionary.UnitLibrary/Brotli/BrotliLiteralContext.cs:35:>=
 task: BL-5699
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-21
+closed-how: mechanical
+closed-by: 2026-11-21_1740.md
 ---
 # AF-0940 - Surviving mutant: the Brotli UTF8 context of byte 0xC0 can be wrong, mis-decoding output
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Exten
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_1740.md | reproduces: no | Ran the -Site command: resolvedLine 35, mutant '(value > 192 ? 2 : 0)' killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-21: accepted -> closed. Re-audit 2026-11-21_1740.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

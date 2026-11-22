@@ -3,8 +3,8 @@ id: AF-0934
 title: Surviving mutant: every HTTP transfer can get an Alt-Svc cache without --alt-svc
 auditor: quality
 severity: Medium
-status: accepted
-reason: Accepted under Stewart's standing accept of 2026-11-02.
+status: closed
+reason: Re-audit 2026-11-21_1740.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:OpenAltSvcCacheAsync-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs:391:&&
 task: BL-5693
@@ -13,9 +13,9 @@ found: 2026-11-21
 found-at: 57bece6c118995fac41401b81793a8395d3fb16d
 scorecard: 2026-11-21_0835.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-11-21
+closed-how: mechanical
+closed-by: 2026-11-21_1740.md
 ---
 # AF-0934 - Surviving mutant: every HTTP transfer can get an Alt-Svc cache without --alt-svc
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-11-21 | 2026-11-21_1740.md | reproduces: no | Ran the -Site command: resolvedLine 391, mutant 'http.AltSvc is not null || IsHttpUrl(...)' killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-11-21: filed proposed.
+- 2026-11-21: accepted -> closed. Re-audit 2026-11-21_1740.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
