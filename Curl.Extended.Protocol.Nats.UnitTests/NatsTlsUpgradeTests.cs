@@ -68,6 +68,22 @@ public sealed class NatsTlsUpgradeTests
         Assert.IsNull(tls.Upgraded);
     }
 
+    [TestMethod]
+    [DataRow("", "NATS server did not begin with INFO")]
+    [DataRow("-ERR 'Authorization Violation'\r\n", "NATS server did not begin with INFO")]
+    [DataRow("HTTP/1.1 400 Bad Request\r\n", "NATS server did not begin with INFO")]
+    public async Task ExecuteAsync_PlainFirstLineIsNotInfo_FailsAsNatsDoesWithoutTlsHandshake(string firstLine, string message)
+    {
+        ScriptedConnection plain = firstLine.Length == 0 ? ScriptedConnection.Of() : ScriptedConnection.Of(firstLine);
+        UpgradingTlsProvider tls = new(ConnectResult.Connected(ScriptedConnection.Of()));
+
+        TransferResult result = await RunAsync(plain, tls, TimeProvider.System);
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual(message, result.ErrorMessage);
+        Assert.IsNull(tls.Upgraded);
+    }
+
     private static async Task<TransferResult> RunAsync(IConnection plain, ITlsProvider tls, TimeProvider? time, CancellationToken cancellationToken = default)
     {
         NatsProtocolHandler handler = new(new ScriptedConnector(ConnectResult.Connected(plain)), () => "_INBOX.t", tls, time);
