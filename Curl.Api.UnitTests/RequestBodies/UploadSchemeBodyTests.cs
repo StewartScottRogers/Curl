@@ -161,6 +161,22 @@ public sealed class UploadSchemeBodyTests
     }
 
     [TestMethod]
+    [DataRow("webtransport://h/")]
+    [DataRow("webtransport://h/?wt=uni")]
+    [DataRow("WEBTRANSPORT://h/?wt=datagram")]
+    public async Task SendAsync_BytesBodyPostedToWebTransport_ReachesTheClientAsDashDData(string url)
+    {
+        UploadingEasyTransfer easy = await SendAsync(HttpMethod.Post, url, CurlContent.FromBytes(Hello));
+
+        EasyOptions options = easy.PerformedOptions!;
+        Assert.IsFalse(UploadSchemes.UploadsWithBody(url));
+        Assert.IsFalse(options.Transfer.Upload);
+        Assert.IsTrue(options.Http.Post);
+        CollectionAssert.AreEqual(Hello, options.Http.PostFields!.Value.ToArray());
+        Assert.IsNull(options.Transfer.CustomRequest);
+    }
+
+    [TestMethod]
     [DataRow("nocolon", false)]
     [DataRow("://x", false)]
     [DataRow("http://x", false)]
