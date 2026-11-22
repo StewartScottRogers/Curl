@@ -54,6 +54,7 @@ public sealed class SocketIoUpgradeTests
 
     [TestMethod]
     [DataRow("HTTP/1.1 400 Bad Request\r\n\r\n", CurlExitCode.HttpReturnedError, "Refused WebSocket upgrade: 400")]
+    [DataRow("\r\n\r\n", CurlExitCode.WeirdServerReply, "Socket.IO: the WebSocket upgrade reply has no status line")]
     [DataRow("garbage\r\n\r\n", CurlExitCode.WeirdServerReply, "Socket.IO: the WebSocket upgrade reply has no status line")]
     [DataRow("SIP/2.0 101 x\r\n\r\n", CurlExitCode.WeirdServerReply, "Socket.IO: the WebSocket upgrade reply has no status line")]
     [DataRow("HTTP/1.1 101 OK\r\nSec-WebSocket-Accept: wrong\r\n\r\n", CurlExitCode.WeirdServerReply, "Socket.IO: the server's Sec-WebSocket-Accept does not match the key sent")]
@@ -67,6 +68,19 @@ public sealed class SocketIoUpgradeTests
 
         Assert.AreEqual(exitCode, failure.ExitCode);
         Assert.AreEqual(message, failure.Message);
+    }
+
+    [TestMethod]
+    public async Task ReadReplyAsync_AHeadEndArrivingAfterExactlyTheLimit_IsAccepted()
+    {
+        string start = $"HTTP/1.1 101 OK\r\nSec-WebSocket-Accept: {SocketIoUpgrade.AcceptFor(ZeroRandomSource.Key)}\r\nX: ";
+        byte[] almost = Encoding.ASCII.GetBytes(start + new string('a', SocketIoUpgrade.LongestHead - start.Length - 2) + "\r\n");
+        Assert.AreEqual(SocketIoUpgrade.LongestHead, almost.Length);
+        ScriptedConnection connection = new([.. almost.Chunk(4096), "\r\n"u8.ToArray()]);
+
+        ReadOnlyMemory<byte> after = await SocketIoUpgrade.ReadReplyAsync(connection, ZeroRandomSource.Key, CancellationToken.None);
+
+        Assert.AreEqual(0, after.Length);
     }
 
     [TestMethod]

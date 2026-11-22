@@ -107,6 +107,31 @@ public sealed class EngineCompositionSmtpTraceTests
         Assert.AreEqual(tracesSmtp ? 13 : 0, events.Info.Count(line => line.StartsWith("[SMTP] ", StringComparison.Ordinal)));
     }
 
+    [TestMethod]
+    public async Task CreateProtocolHandlers_SmtpTransferWithoutTheTraceArgument_WritesNoSmtpLines()
+    {
+        Diagnostics.Arrange("scripted server replies", ControlReplies);
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes(ControlReplies)]);
+        IProtocolHandler smtp = EngineComposition
+            .CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())
+            .Single(handler => handler.SupportedSchemes.Contains("smtp"));
+        InfoRecordingEvents events = new();
+
+        TransferResult result = await smtp.ExecuteAsync(new TransferContext
+        {
+            Url = CurlUrl.Parse("smtp://127.0.0.1/client"),
+            Output = new MemoryStream(),
+            Events = events,
+            Mail = new MailRequestOptions { Recipients = ["c@d"] },
+        });
+
+        int smtpLineCount = events.Info.Count(line => line.StartsWith("[SMTP] ", StringComparison.Ordinal));
+        Diagnostics.Act("smtp info line count", smtpLineCount);
+        Diagnostics.Assert("smtp info line count", 0, smtpLineCount);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(0, smtpLineCount);
+    }
+
     private static CommandLineOptions Parse(params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "smtp://127.0.0.1/"], _ => true);

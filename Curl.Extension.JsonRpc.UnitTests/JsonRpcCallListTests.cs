@@ -4,6 +4,12 @@ namespace Curl.Extension.JsonRpc;
 public sealed class JsonRpcCallListTests
 {
     [TestMethod]
+    public void Parse_AMethodNameEndingTheValue_IsOneCallWithoutParamsAndId1()
+    {
+        CollectionAssert.AreEqual(new[] { new JsonRpcCall("get_data", null, 1) }, JsonRpcCallList.Parse("get_data").ToArray());
+    }
+
+    [TestMethod]
     public void Parse_AMethodAlone_IsOneCallWithoutParamsAndId1_Section4()
     {
         CollectionAssert.AreEqual(new[] { new JsonRpcCall("get_data", null, 1) }, JsonRpcCallList.Parse("  get_data  ").ToArray());
