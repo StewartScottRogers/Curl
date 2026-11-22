@@ -33,3 +33,4 @@ BL-5610 (Done 2026-11-20) was to make a `Curl.Api` body to `imap://` upload with
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T1116, finding 1.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 2192c298 4a06c735 3d836d5e.
