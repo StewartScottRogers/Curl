@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitLibrary/Lib1507.cs]
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-21
 ---
 # BL-5722 — Fix AF-0953: Surviving mutant: the lib1507 port can abort a loop at exactly its hang limit (> -> >=)
 
@@ -43,3 +43,4 @@ Added `Lib1507_WhenAWaitEndsExactlyAtTheLimit_DoesNotAbort` (Lib1485To1511Tests.
 
 - 2026-11-21: Created.
 - 2026-11-21: Backlog -> Doing. Criteria at claim: 06445d9d 9742157d.
+- 2026-11-21: Doing -> Done. Boundary test added; kills the > to >= mutant.
