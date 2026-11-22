@@ -1,5 +1,5 @@
 ---
-id: BL-5766
+id: BL-5769
 title: Move the Curl.Mcp globbed-output loopback test into Curl.Mcp.IntegrationTests
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-22
 completed:
 ---
-# BL-5766 — Move the Curl.Mcp globbed-output loopback test into Curl.Mcp.IntegrationTests
+# BL-5769 — Move the Curl.Mcp globbed-output loopback test into Curl.Mcp.IntegrationTests
 
 ## Goal
 

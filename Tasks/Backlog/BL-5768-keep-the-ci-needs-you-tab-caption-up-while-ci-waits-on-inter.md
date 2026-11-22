@@ -1,5 +1,5 @@
 ---
-id: BL-5765
+id: BL-5768
 title: Keep the CI needs you tab caption up while CI waits on interactive-only tasks
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-11-22
 completed:
 ---
-# BL-5765 — Keep the CI needs you tab caption up while CI waits on interactive-only tasks
+# BL-5768 — Keep the CI needs you tab caption up while CI waits on interactive-only tasks
 
 ## Goal
 
