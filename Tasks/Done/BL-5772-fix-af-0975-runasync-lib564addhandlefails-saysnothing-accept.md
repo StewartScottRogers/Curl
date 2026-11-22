@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5772 — Fix AF-0975: RunAsync_Lib564AddHandleFails_SaysNothing accepts any non-zero exit and checks only that one string is absent
 
@@ -52,3 +52,4 @@ The test now asserts exit code 32 and the exact stderr line (the old name "SaysN
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-11-22: Doing -> Done. Test pins exit 32 and exact stderr; renamed to match.
