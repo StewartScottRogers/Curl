@@ -35,3 +35,4 @@ A `Curl.Api` stream body (`CURLOPT_READFUNCTION` post) to an extension URL whose
 ## Log
 
 - 2026-11-22: Created.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 5a3940a1 d5643ed9 88a63bc1 dd656b97.
