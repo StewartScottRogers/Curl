@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-11-21
-completed:
+completed: 2026-11-22
 ---
 # BL-5730 — Fix AF-0961: CI red 227 min (run 44941565490 onward): Pack Curl.Mcp failures left unfixed, four failed runs have no filed/covered trace line
 
@@ -42,7 +42,7 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Acceptance criteria
 
-- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
+- [x] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
 - [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -52,8 +52,12 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 - Tests: `-TestCiWatch` 110 cases (11 new or changed: the 2026-11-21 replay, the 118-character cut, covering tasks named and marked, the needs-you line, caption and its restore), and `-TestLaneMarker`, each under Windows PowerShell and PowerShell 7: all pass. `dotnet build`: 0 warnings, 0 errors; fast tests: 115 test projects passed, exit 0.
 - Landed in 8119026445 on work/dark-factory (2026-11-22; the Log's 5b3a07c211 is the same commit before its rebase). Criterion 1 needs a factory shift to run on the new code: the task goes back to Backlog (lane: no) until one has, then an interactive session runs the measurement (window from the landing time; expected: every failed run has a `ci` line with filed, covered or passed since within 30 minutes of its end).
 
+- 2026-11-22 (interactive session, measurement): fix `8119026445` landed 2026-11-22 14:11:59 Arizona; window 14:12 to 18:20 Arizona, in which shifts 20261122-144529, -164245 (approx.) and 20261122-174214 ran on the new code. `Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-11-22T14:11:59 -LogRoot Z:\repos\Curl.logs -CiRunsJson <fresh gh run list, 500 runs>`: ciRedMinutes 0, no red spells; no CI run on work/dark-factory failed in the window, so no run went untraced. That is the finding's expected result over the window. Plainly: because nothing failed, the new covered-by / CI-needs-you lines have not yet fired on a live failure; `-TestCiWatch` (110 cases, incl. a replay of the 2026-11-21 spell) is what exercises them. The finding itself closes only on the process auditor's re-audit (audit started 18:20).
+
 ## Log
 
 - 2026-11-21: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
 - 2026-11-22: Doing -> Backlog. Fix committed (5b3a07c211); criterion 1 needs a factory shift to run on the new code before the measurement, interactive only (lane: no)
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
+- 2026-11-22: Doing -> Done. CI watch names the covering tasks and says when CI needs you; no untraced red run since the fix landed
