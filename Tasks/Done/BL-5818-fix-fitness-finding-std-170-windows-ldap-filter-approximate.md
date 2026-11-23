@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Original.Protocol.Ldap.UnitLibrary/LdapFilterEncoder.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5818 — Fix fitness finding STD-170: Windows LDAP filter: approximate, >= and <= comparisons with an empty value are sent; curl rejects them
 
@@ -35,13 +35,16 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 
 ## Acceptance criteria
 
-- [ ] the first command exits 39 with `curl: (39) LDAP remote: Filter Error` and the relay log shows no SearchRequest.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] the first command exits 39 with `curl: (39) LDAP remote: Filter Error` and the relay log shows no SearchRequest.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- WinLDAP now refuses an empty value for ~=, >= and <= like it does for =; libldap still sends it. Measure-CodeQuality clean for the Ldap library.
 
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: cc1cf009 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. WinLDAP refuses empty ~=, >= and <= values
