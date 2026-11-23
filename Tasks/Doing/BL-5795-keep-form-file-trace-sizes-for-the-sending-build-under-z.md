@@ -42,3 +42,4 @@ Suggested fix: stop sharing mutable state on the builder. Pass the sizes into `B
 ## Log
 
 - 2026-11-22: Created.
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 3139bf72 67f76553 d2391483 4717605e.
