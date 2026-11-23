@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Perform.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Mqtt.cs]
 requirement: none
 created: 2026-11-22
-completed:
+completed: 2026-11-22
 ---
 # BL-5782 — Answer the read-callback served-scheme check without building a throwaway dispatcher
 
@@ -27,14 +27,17 @@ Found by the shift-end review of 2026-11-22 (ADR-0710; silent-failure-hunter, wi
 
 ## Acceptance criteria
 
-- [ ] `ManagedEasyTransfer.Perform.cs` no longer calls `createDispatcher` to answer the served-scheme question.
-- [ ] A unit test on an engine built with `stopsFirstFtpTransferBeforePwd: true` performs an extension-URL read-callback post whose callback aborts, then an FTP perform, and asserts the FTP perform still stops before PWD.
-- [ ] `TransferSettingsOf_ReadCallbackOnASchemeNoHandlerServes_IsReadOnlyWhenAHandlerServesIt` and the other BL-5770 tests still pass.
-- [ ] `dotnet build` is clean and the fast tests are green; `Curl.Engine.UnitLibrary` keeps 100% line and branch coverage.
+- [x] `ManagedEasyTransfer.Perform.cs` no longer calls `createDispatcher` to answer the served-scheme question.
+- [x] A unit test on an engine built with `stopsFirstFtpTransferBeforePwd: true` performs an extension-URL read-callback post whose callback aborts, then an FTP perform, and asserts the FTP perform still stops before PWD.
+- [x] `TransferSettingsOf_ReadCallbackOnASchemeNoHandlerServes_IsReadOnlyWhenAHandlerServesIt` and the other BL-5770 tests still pass.
+- [x] `dotnet build` is clean and the fast tests are green; `Curl.Engine.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+- Decision: the served-scheme check still asks the dispatcher factory, but over `PerformShared.WithoutFtpPwdStop()` (a state copy with no one-shot PWD stop), so it never claims engine state. It builds the handlers only when a read-callback post goes to an extension URL, once per such perform. Unit test added in ManagedEasyTransferTests.Mqtt.cs. Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members. Fast tests green. Linux and macOS: change is platform-neutral.
 
 ## Log
 
 - 2026-11-22: Created.
 - 2026-11-22: Backlog -> Doing. Criteria at claim: 3c2cd0e3 6c296569 aa41a6e8 002d78b5.
+- 2026-11-22: Doing -> Done. Served-scheme check no longer claims the FTP PWD stop

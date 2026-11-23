@@ -69,6 +69,7 @@ internal sealed class ManagedEngineSharedState
     /// <param name="cookies">The cookies.</param>
     /// <param name="hsts">The HSTS cache.</param>
     /// <param name="performer">The numbering of the new state's transfers, or <see langword="null" /> for <paramref name="engine" />'s.</param>
+    /// <param name="keepsFtpPwdStop">Whether the new state keeps <paramref name="engine" />'s one-shot FTP PWD stop; <see langword="false" /> leaves it none.</param>
     /// <remarks>It dials as <paramref name="engine" /> dials (<see cref="Dialing" />).</remarks>
     internal ManagedEngineSharedState(
         ManagedEngineSharedState engine,
@@ -77,7 +78,8 @@ internal sealed class ManagedEngineSharedState
         DnsCache dnsCache,
         CookieStore cookies,
         HstsTransferPolicy hsts,
-        TransferPerformer? performer = null)
+        TransferPerformer? performer = null,
+        bool keepsFtpPwdStop = true)
     {
         TimeProvider = engine.TimeProvider;
         Connections = connections;
@@ -98,7 +100,7 @@ internal sealed class ManagedEngineSharedState
         Dialing = engine.Dialing;
         SigningClock = engine.SigningClock;
         WebSocketRandomSource = engine.WebSocketRandomSource;
-        FtpPwdStop = engine.FtpPwdStop;
+        FtpPwdStop = keepsFtpPwdStop ? engine.FtpPwdStop : null;
         CreateFormBoundary = engine.CreateFormBoundary;
     }
 
@@ -243,4 +245,12 @@ internal sealed class ManagedEngineSharedState
     /// <returns>The state the transfer runs over.</returns>
     internal ManagedEngineSharedState WithSocketWait(TransferSocketWait? wait) =>
         wait is null ? this : new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts) { SocketWait = wait };
+
+    /// <summary>
+    /// Gives this state without the engine's one-shot <c>CURL_FTP_PWD_STOP</c> stand-in, for a dispatcher built only to be asked
+    /// which schemes it serves, so that question never claims the stop for the engine's next FTP perform (BL-5782).
+    /// </summary>
+    /// <returns>The state, sharing every cache with this one.</returns>
+    internal ManagedEngineSharedState WithoutFtpPwdStop() =>
+        new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts, keepsFtpPwdStop: false) { SocketWait = SocketWait };
 }

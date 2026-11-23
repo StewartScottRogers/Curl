@@ -279,6 +279,30 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_AbortedExtensionReadCallbackPost_LeavesTheFirstFtpPwdStopForTheNextFtpPerform()
+    {
+        ScriptedConnector server = new(["220 ready\r\n331 Password required\r\n230 Logged in\r\n257 \"/\" is current directory\r\n"u8.ToArray()]);
+        EngineDialing dialing = new(new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing, stopsFirstFtpTransferBeforePwd: true, extensionHandlers: _ => [new SchemeServingHandler("mcp")]);
+        await using IEasyTransfer aborted = engine.CreateEasy();
+        aborted.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "mcp://h/" },
+            Http = new EasyHttpOptions { Post = true },
+            Callbacks = new Curl.Api.Callbacks.EasyCallbackOptions { Read = _ => 0x10000000 },
+        };
+        await using IEasyTransfer ftp = engine.CreateEasy();
+        ftp.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "ftp://127.0.0.1:9000/753", ConnectTimeout = TimeSpan.FromMilliseconds(200) } };
+
+        CurlCode abortedCode = await aborted.PerformAsync(CancellationToken.None);
+        CurlCode ftpCode = await ftp.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.AbortedByCallback, abortedCode);
+        Assert.AreEqual(CurlCode.OperationTimedOut, ftpCode);
+        Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\n", Encoding.ASCII.GetString(server.Written));
+    }
+
+    [TestMethod]
     public async Task PerformAsync_ReadCallbackPostToAMistypedScheme_FailsWithoutRunningTheCallback()
     {
         await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([])).CreateEasy();
