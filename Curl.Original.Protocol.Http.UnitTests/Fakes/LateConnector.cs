@@ -22,6 +22,10 @@ public sealed class LateConnector : IConnector
     /// <param name="result">What the connect returns.</param>
     public void Finish(ConnectResult result) => late.SetResult(result);
 
+    /// <summary>Ends the connect with <paramref name="exception" />.</summary>
+    /// <param name="exception">What the connect throws.</param>
+    public void Fail(Exception exception) => late.SetException(exception);
+
     /// <inheritdoc />
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {

@@ -1436,7 +1436,9 @@ public sealed partial class TcpConnector(
         }
         catch (OperationCanceledException canceled)
         {
-            throw new CanceledAfterResolveException(timings, canceled);
+            var carrying = new CanceledAfterResolveException(timings, canceled);
+            carrying.Data[ConnectTimings.CarriedOnCancellationKey] = timings;
+            throw carrying;
         }
     }
 
