@@ -3,12 +3,12 @@ id: AF-0984
 title: ReceiveAsync_MaskedServerFrame_FailsWithTheViolation checks only that the message is non-empty, not that it names the violation
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Extension.WebSocketExtendedConnect.UnitTests/Http2/Http2WebSocketTests.cs:ReceiveAsync_MaskedServerFrame_FailsWithTheViolation:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5786
+tasks: BL-5786
 found: 2026-11-22
 found-at: 94c9744bc919995aff928a0378582601ddbbe990
 scorecard: 2026-11-22_1817.md

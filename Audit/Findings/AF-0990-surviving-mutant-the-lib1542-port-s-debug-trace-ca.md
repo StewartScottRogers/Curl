@@ -3,12 +3,12 @@ id: AF-0990
 title: Surviving mutant: the lib1542 port's debug trace can stamp each line with the time (traceTime false -> true)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1542.cs:TestAsync-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1542.cs:49:false
-task: none
-tasks:
+task: BL-5792
+tasks: BL-5792
 found: 2026-11-22
 found-at: 94c9744bc919995aff928a0378582601ddbbe990
 scorecard: 2026-11-22_1817.md

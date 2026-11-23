@@ -3,12 +3,12 @@ id: AF-0989
 title: Surviving mutant: the --capath reason chain can be rebuilt without requiring the server-auth purpose (true -> false)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs:ReasonChainFromAnchors-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs:207:true
-task: none
-tasks:
+task: BL-5791
+tasks: BL-5791
 found: 2026-11-22
 found-at: 94c9744bc919995aff928a0378582601ddbbe990
 scorecard: 2026-11-22_1817.md

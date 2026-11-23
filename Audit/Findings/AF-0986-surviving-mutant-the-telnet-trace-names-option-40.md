@@ -3,12 +3,12 @@ id: AF-0986
 title: Surviving mutant: the telnet trace names option 40 from a 40-entry table (>= -> >), throwing IndexOutOfRangeException
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Telnet.UnitLibrary/TelnetTraceReporter.cs:SubnegotiationOptionName-ge:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Telnet.UnitLibrary/TelnetTraceReporter.cs:192:>=
-task: none
-tasks:
+task: BL-5788
+tasks: BL-5788
 found: 2026-11-22
 found-at: 94c9744bc919995aff928a0378582601ddbbe990
 scorecard: 2026-11-22_1817.md

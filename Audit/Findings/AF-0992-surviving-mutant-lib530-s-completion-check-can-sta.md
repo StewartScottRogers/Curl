@@ -3,12 +3,12 @@ id: AF-0992
 title: Surviving mutant: lib530's completion check can start out as success (success = false -> true), hiding 'Error getting file.'
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib530Run.cs:CheckForCompletion-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib530Run.cs:209:false
-task: none
-tasks:
+task: BL-5794
+tasks: BL-5794
 found: 2026-11-22
 found-at: 94c9744bc919995aff928a0378582601ddbbe990
 scorecard: 2026-11-22_1817.md

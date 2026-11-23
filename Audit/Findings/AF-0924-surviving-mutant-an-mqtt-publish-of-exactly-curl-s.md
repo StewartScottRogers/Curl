@@ -7,8 +7,8 @@ status: accepted
 reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Original.Protocol.Mqtt.UnitLibrary/MqttPackets.cs:BuildPublish-gt:surviving-mutant
 reproduction: mutation Curl.Original.Protocol.Mqtt.UnitLibrary/MqttPackets.cs:93:>
-task: BL-5674
-tasks: BL-5674
+task: BL-5785
+tasks: BL-5674, BL-5785
 found: 2026-11-21
 found-at: 1f330a1f28a1086717db7833947030e8fdc0bf9d
 scorecard: 2026-11-21_0114.md

@@ -3,12 +3,12 @@ id: AF-0988
 title: Surviving mutant: the header store can count every later line as a new request once a final head ended (finalHeadEnded = false -> true)
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/TransferHeaderStore.cs:BeginNextRequestAfterFinalHead-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferHeaderStore.cs:235:false
-task: none
-tasks:
+task: BL-5790
+tasks: BL-5790
 found: 2026-11-22
 found-at: 94c9744bc919995aff928a0378582601ddbbe990
 scorecard: 2026-11-22_1817.md

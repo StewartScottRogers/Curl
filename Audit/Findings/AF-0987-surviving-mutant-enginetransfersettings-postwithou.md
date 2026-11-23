@@ -3,12 +3,12 @@ id: AF-0987
 title: Surviving mutant: EngineTransferSettings.PostWithoutData can default to true, turning every CLI CoAP GET into a POST and failing MQTT with exit 43
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Engine.UnitLibrary/EngineTransferSettings.cs:EngineTransferSettings-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/EngineTransferSettings.cs:57:false
-task: none
-tasks:
+task: BL-5789
+tasks: BL-5789
 found: 2026-11-22
 found-at: 94c9744bc919995aff928a0378582601ddbbe990
 scorecard: 2026-11-22_1817.md

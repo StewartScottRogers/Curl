@@ -3,12 +3,12 @@ id: AF-0985
 title: Lib5000And5004_SetTheSigningOptionsOnTheTransfer checks the signing key and key id only for null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Accepted under Stewart's standing accept of 2026-11-02.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib3101To5004Tests.cs:Lib5000And5004_SetTheSigningOptionsOnTheTransfer:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-5787
+tasks: BL-5787
 found: 2026-11-22
 found-at: 94c9744bc919995aff928a0378582601ddbbe990
 scorecard: 2026-11-22_1817.md
