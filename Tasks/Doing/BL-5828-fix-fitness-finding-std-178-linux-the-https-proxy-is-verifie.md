@@ -50,3 +50,4 @@ The reviewer's mock servers were Python; rebuild any you need in PowerShell or C
 ## Log
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
+- 2026-11-23: Backlog -> Doing. Criteria at claim: 97e4ff74 69116afe 3d836d5e.
