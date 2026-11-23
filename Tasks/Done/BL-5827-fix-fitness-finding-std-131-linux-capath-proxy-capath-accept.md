@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitLibrary/ServerCertificateVerification.CaCertificates.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5827 — Fix fitness finding STD-131: Linux --capath / --proxy-capath accept a chain completed from ~/.dotnet/corefx/cryptography/x509stores/ca (STILL OPEN, partly fixed)
 
@@ -59,3 +59,4 @@ Fix: Judge now also applies the sent-by-the-peer test to the chain rebuilt again
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: 400696f7 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. Judge applies the sent-by-the-peer test to the chain rebuilt against --capath roots
