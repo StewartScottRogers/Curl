@@ -40,3 +40,4 @@ Measure which side holds the connection. This machine is Windows, so iterate thr
 ## Log
 
 - 2026-11-22: Created from Surly bug report 2026-11-22T2247, finding 1 (interactive: needs macOS CI iteration).
+- 2026-11-22: Backlog -> Doing. Criteria at claim: 45325176 eeb2629c c7f736e4 0c9767aa.
