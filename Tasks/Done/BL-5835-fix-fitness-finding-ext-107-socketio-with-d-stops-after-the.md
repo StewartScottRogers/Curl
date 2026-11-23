@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extended.Protocol.SocketIo.UnitLibrary/SocketIoSession.cs]
 requirement: none
 created: 2026-11-23
-completed:
+completed: 2026-11-23
 ---
 # BL-5835 — Fix fitness finding EXT-107: socketio with -d stops after the first event received, so the reply to the emitted event (or every later event) is lost
 
@@ -40,9 +40,9 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 
 ## Acceptance criteria
 
-- [ ] step 2 prints both `["reply","ok"]` and `["reply2","ok2"]`, exit 0.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] step 2 prints both `["reply","ok"]` and `["reply2","ok2"]`, exit 0.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project pins the corrected behaviour (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -50,3 +50,4 @@ Shared setup: Common mock used by EXT-103 to EXT-111: a Python HTTP server `srv.
 
 - 2026-11-23: Created from fitness review 2026-11-23T0923.
 - 2026-11-23: Backlog -> Doing. Criteria at claim: 3e81f150 69116afe 3d836d5e.
+- 2026-11-23: Doing -> Done. socketio emit writes every event until disconnect; quiet 1 s ends an open server

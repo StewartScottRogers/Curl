@@ -17,3 +17,7 @@ When the transfer emits an event (`-d` or `-T`), the session ends after it has w
 ## Consequences
 
 `curl -d '["hello"]' socketio://...` and `SendAsync` return the echo at once. Servers that send several events after one emit have the later ones dropped.
+
+## Amendment (BL-5835, fitness finding EXT-107)
+
+Decided by Claude under Stewart's delegation. Ending at the first event dropped the later events of a server that sends several replies and a disconnect, against `--extended-help` ("writes each event received ... until the server disconnects"). A transfer that emits now writes every event until the server disconnects or closes, and also ends when the server has sent no further event for one second after an event, so a server that stays open still returns without waiting for a timeout (the BL-5763 case). The one-second quiet window restarts at every event.
